@@ -148,14 +148,6 @@ async def agent_conversation(
             thread_id=current_thread_id, type="user", content=message, meta={}
         )
 
-        # Store system message in database
-        db.messages.create(
-            thread_id=current_thread_id,
-            type="system",
-            content=system_event.content,
-            meta=system_event.metadata,
-        )
-
         # Get thread message history in Pydantic AI format with token limit
         message_history = []
         if current_thread_id:
@@ -214,7 +206,8 @@ async def agent_conversation(
                         output += token
                         await queue.put(TokenEvent(content=token))
 
-            # Store the full response when complete
+            # Store the full response for message history (tokens are for streaming only)
+            # This is saved directly since there's no IdeaAgentResponseEvent type
             db.messages.create(
                 thread_id=current_thread_id, type="idea_agent", content=output, meta={}
             )
@@ -280,7 +273,8 @@ async def agent_conversation(
             if output is None:
                 raise ValueError("No output from PRD agent")
 
-            # Store the PRD response in the database
+            # Store the PRD response for message history
+            # This is saved directly since structured events are for streaming only
             db.messages.create(
                 thread_id=current_thread_id,
                 type="prd_agent",
@@ -288,6 +282,7 @@ async def agent_conversation(
                 meta={"document_type": "prd"},
             )
 
+            # Send document event through queue (will be saved via send_event)
             await queue.put(
                 DocumentEvent(
                     content="Completed PRD",
@@ -320,7 +315,8 @@ async def agent_conversation(
                     response_content += token
                     await queue.put(TokenEvent(content=token))
 
-        # Store the agent's full response
+        # Store the full response for message history (tokens are for streaming only)
+        # This is saved directly since there's no ResponseEvent type
         db.messages.create(
             thread_id=current_thread_id,
             type="response",

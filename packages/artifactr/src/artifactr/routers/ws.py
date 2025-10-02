@@ -234,8 +234,18 @@ class ConversationSession:
         # Save event to history store
         history_store[self.thread_id].append(event)
 
+        # Define streaming-only event types that should not be persisted to DB
+        # These are for real-time display only and excluded from message history
+        streaming_only_types = {
+            "token",
+            "message_format",
+            "thinking",
+            "agent_action",
+        }
+
         # Save to database if we have a valid thread_id and save_to_db is True
-        if save_to_db:
+        # Skip streaming-only events (tokens are for real-time display only)
+        if save_to_db and event.type not in streaming_only_types:
             try:
                 if self.thread_id:
                     # Get content if the event has it

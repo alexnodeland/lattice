@@ -1,6 +1,6 @@
 """Settings for the backend."""
 
-from pydantic import EmailStr, Field, MySQLDsn
+from pydantic import EmailStr, Field
 from pydantic_extra_types.semantic_version import SemanticVersion
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     mode: str = Field(default="development")
 
     # Database Settings
-    db_url: MySQLDsn | None = Field(
-        description="The URL for the database.",
+    db_url: str | None = Field(
+        description="The URL for the database (supports SQLite, MySQL, PostgreSQL, etc.).",
         default=None,
     )
 

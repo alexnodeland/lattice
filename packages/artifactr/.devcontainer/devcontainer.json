@@ -1,5 +1,5 @@
 {
-  "name": "daydreamed",
+  "name": "Artifactr",
   "image": "mcr.microsoft.com/devcontainers/base:jammy",
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "features": {

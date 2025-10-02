@@ -10,7 +10,7 @@
 # ]
 # ///
 """
-Rich WebSocket Client for the Daydreamed application.
+Rich WebSocket Client for the Artifactr application.
 
 Connects to backend WebSocket and provides a beautiful CLI interface.
 """
@@ -48,7 +48,7 @@ from rich.traceback import install
 install(show_locals=True, width=100, suppress=[click, websockets])
 
 # Theme configuration
-DAYDREAM_THEME = Theme(
+ARTIFACTR_THEME = Theme(
     {
         "info": "dim cyan",
         "warning": "magenta",
@@ -72,8 +72,8 @@ DAYDREAM_THEME = Theme(
 )
 
 # Set up Rich console with theme
-console = Console(theme=DAYDREAM_THEME, highlight=True, record=True)
-error_console = Console(stderr=True, style="bold red", theme=DAYDREAM_THEME)
+console = Console(theme=ARTIFACTR_THEME, highlight=True, record=True)
+error_console = Console(stderr=True, style="bold red", theme=ARTIFACTR_THEME)
 
 # Message history
 message_history: list[dict] = []
@@ -485,7 +485,7 @@ async def handle_command(
     return True, "unknown"
 
 
-class DaydreamedCompleter(Completer):
+class ArtifactrCompleter(Completer):
     """Custom completer for command suggestions."""
 
     def __init__(self, commands: list[str], message_history: list[dict]):
@@ -623,13 +623,13 @@ async def connect_websocket(
                 auto_suggest=AutoSuggestFromHistory(),
                 key_bindings=key_bindings,
                 style=prompt_style,
-                completer=DaydreamedCompleter(COMMANDS, message_history),
+                completer=ArtifactrCompleter(COMMANDS, message_history),
             )
 
             # Main message loop
             while True:
                 # Refresh the completer with updated message history
-                session.completer = DaydreamedCompleter(COMMANDS, message_history)
+                session.completer = ArtifactrCompleter(COMMANDS, message_history)
 
                 # Display prompt with thread ID info
                 prompt_text = f"[thread {actual_thread_id}]" if actual_thread_id else ""
@@ -881,13 +881,13 @@ async def connect_sse(
             auto_suggest=AutoSuggestFromHistory(),
             key_bindings=key_bindings,
             style=prompt_style,
-            completer=DaydreamedCompleter(COMMANDS, message_history),
+            completer=ArtifactrCompleter(COMMANDS, message_history),
         )
 
         # Main message loop
         while True:
             # Refresh the completer with updated message history
-            session.completer = DaydreamedCompleter(COMMANDS, message_history)
+            session.completer = ArtifactrCompleter(COMMANDS, message_history)
 
             # Display prompt with thread ID info
             prompt_text = f"[thread {actual_thread_id}]" if actual_thread_id else ""
@@ -1059,7 +1059,7 @@ async def connect_sse(
 def print_welcome_banner(protocol: str = "ws"):
     """Display a welcome banner with app info."""
     # Create a nicely formatted welcome banner
-    title = Text("Daydreamed Client", style="title")
+    title = Text("Artifactr Client", style="title")
     version = Text("v1.0.0", style="dim")
 
     table = Table(show_header=False, box=box.ROUNDED, expand=True, border_style="blue")
@@ -1148,7 +1148,7 @@ def main(
     port: int = DEFAULT_PORT,
 ):
     """
-    Daydreamed Client - Connect to the backend and chat with the AI.
+    Artifactr Client - Connect to the backend and chat with the AI.
 
     If no thread ID is provided, a new conversation thread will be created automatically.
     You can choose between WebSocket (ws) or Server-Sent Events (sse) protocols.
@@ -1196,7 +1196,7 @@ def main(
             console.print_exception()
 
     console.print(
-        Panel("Thanks for using Daydreamed!", border_style="success", padding=(1, 2))
+        Panel("Thanks for using Artifactr!", border_style="success", padding=(1, 2))
     )
 
 

@@ -1,0 +1,142 @@
+[project]
+name = "artifactr"
+version = "0.1.0"
+description = "A template backend for collaborating on artifacts with agents."
+authors = [
+    { name = "Alex Nodeland", email = "alex@outnature.studio" }
+]
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "artifactr",
+    "fastapi[standard]>=0.115.12",
+    "pydantic-extra-types>=2.10.3",
+    "pydantic-ai>=0.1.6",
+    "pydantic-settings>=2.8.1",
+    "semver>=3.0.2",
+    "sqlmodel>=0.0.24",
+    "tiktoken>=0.9.0",
+]
+
+[dependency-groups]
+check = [
+    "pyright>=1.1.397",
+]
+dev = [
+    "click>=8.1.8",
+    "debugpy>=1.8.7",
+    "httpx>=0.28.1",
+    "pre-commit>=4.2.0",
+    "prompt-toolkit>=3.0.51",
+    "rich>=14.0.0",
+    "websockets>=15.0.1",
+]
+lint = [
+    "ruff>=0.11.0",
+]
+test = [
+    "hypothesis>=6.130.8",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.25.3",
+]
+
+[project.scripts]
+cli = "artifactr.cli:main"
+
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/artifactr"]
+
+[tool.ruff]
+line-length = 88
+indent-width = 4
+
+[tool.ruff.lint]
+extend-select = ["RUF", "D", "N", "UP", "PD"]
+ignore = ["N818"]
+fixable = ["ALL"]
+unfixable = []
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
+
+[tool.ruff.lint.pep8-naming]
+ignore-names = [
+    "A",
+    "A_*",
+    "B",
+    "B_*",
+    "C",
+    "C_*",
+    "D",
+    "D_*",
+    "E",
+    "E_*",
+    "F",
+    "F_*",
+    "G",
+    "G_*",
+    "H",
+    "H_*",
+    "I",
+    "I_*",
+    "J",
+    "J_*",
+    "K",
+    "K_*",
+    "L",
+    "L_*",
+    "M",
+    "M_*",
+    "N",
+    "N_*",
+    "O",
+    "O_*",
+    "P",
+    "P_*",
+    "Q",
+    "Q_*",
+    "R",
+    "R_*",
+    "S",
+    "S_*",
+    "T",
+    "T_*",
+    "U",
+    "U_*",
+    "V",
+    "V_*",
+    "W",
+    "W_*",
+    "X",
+    "X_*",
+    "Y",
+    "Y_*",
+    "Z",
+    "Z_*",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "D104"]
+"*/{tests,docs,scripts,examples}/*" = ["D", "E402", "N"]
+"tests/*" = ["D", "E402", "N"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.pyright]
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "src/artifactr",
+]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"

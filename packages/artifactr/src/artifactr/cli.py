@@ -436,10 +436,28 @@ async def handle_command(
 
     elif cmd_name == "status":
         conn_status = False
-        if protocol == "ws" and connection and not connection.closed:
-            conn_status = True
-        elif protocol == "sse" and connection and not connection.is_closed:
-            conn_status = True
+        try:
+            if protocol == "ws" and connection:
+                # For websockets library, check if connection exists and is open
+                # The connection object might not have a 'closed' attribute depending on version
+                if hasattr(connection, "closed"):
+                    conn_status = not connection.closed
+                elif hasattr(connection, "state"):
+                    # websockets 10+ uses state property
+                    from websockets.protocol import State
+
+                    conn_status = connection.state == State.OPEN
+                else:
+                    # If we have a connection object, assume it's open
+                    conn_status = True
+            elif protocol == "sse" and connection:
+                if hasattr(connection, "is_closed"):
+                    conn_status = not connection.is_closed
+                else:
+                    # For httpx client, assume it's open if it exists
+                    conn_status = True
+        except Exception:
+            conn_status = False
 
         if conn_status:
             console.print(

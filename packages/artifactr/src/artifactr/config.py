@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     # App Settings
     title: str = "Idea"
     description: str = "The ideation backend."
-    version: SemanticVersion = SemanticVersion(0, 0, 1, "alpha", 1)
+    version: SemanticVersion = SemanticVersion(0, 1, 0, "alpha", 1)
     support_email: EmailStr = "support@example.com"
 
     openai_api_key: str = Field(default="")

@@ -5,7 +5,7 @@
 | Package | Status |
 |---|---|
 | `artifactr.core` | Implemented |
-| `artifactr.workspace` | Planned (phase 2) |
+| `artifactr.workspace` | Implemented, with in-memory storage |
 | `artifactr.agent` | Planned (phase 3) |
 | `artifactr.sql` | Planned (phase 4) |
 | `artifactr.fastapi`, `artifactr.mcp` | Planned (phase 5) |
@@ -292,8 +292,9 @@ The run holds a lease, not a socket: if the connection that started it drops, th
 
 - **Scoped handles.** `await workspaces.open(tenant_id, workspace_id, actor=...)` returns a `Workspace` bound to that tenant, workspace and actor. Nothing below it accepts a raw tenant id, so a query that crosses tenants cannot be written. Postgres row-level security can be layered underneath as defence in depth.
 - **Actors are bound to handles.** `ws.as_actor(agent_actor)` returns a handle for the agent, and commits through it are attributed to the agent.
+- **Type allowlist.** `Workspaces(storage, types=[Doc, Plan])` rejects creating any other artifact type, even one registered elsewhere in the process.
 - **Optimistic concurrency.** Every edit names the version it was based on. A stale edit is rejected with the changes made since, so the agent retries against fresh state and a UI can rebase or ask the person.
-- **One active run per thread**, enforced by a lease (`thread.active_run_id` with an expiry) that works across replicas. Concurrency happens across threads. A message sent during a run steers it instead of queueing.
+- **One active run per thread**, enforced by `Workspace.claim_thread`: a storage lease with a time-to-live, renewed while held, that works across replicas and lapses if its holder dies. Concurrency happens across threads. A message sent during a run steers it instead of queueing.
 - **Sequencing.** `seq` is assigned inside the commit transaction (`UPDATE workspace SET head_seq = head_seq + :n RETURNING head_seq`), giving a gap-free total order per workspace. This serializes commits within one workspace; tokens are not in the log, so commit volume stays modest.
 
 ## Surfaces
@@ -308,26 +309,39 @@ pydantic-ai's AG-UI and Vercel AI adapters may be added later as compatibility s
 
 ## Storage protocols
 
+One protocol, `Storage`, covers everything a workspace persists ([ADR-0019](adr/0019-storage-protocol-and-workspace-handles.md)). Every method takes a `Scope` (tenant and workspace); `Workspace` handles hold the scope so application code never passes it.
+
 ```python
+class Transaction(Protocol):
+    async def load(self, needs: Needs) -> State: ...
+    async def save(
+        self, result: CommitResult, *, actor: Actor
+    ) -> list[Envelope]: ...  # assigns seq
+    async def append_history(self, thread_id: ThreadId, messages: bytes) -> None: ...
+
+
 class Storage(Protocol):
     def transaction(self, scope: Scope) -> AbstractAsyncContextManager[Transaction]: ...
-    async def read(self, scope: Scope, *, after_seq: int, limit: int) -> list[Envelope]: ...
-    def subscribe(
-        self, scope: Scope, *, after_seq: int, where: EventFilter | None = None
-    ) -> AsyncIterator[Envelope]: ...
+    async def read(
+        self, scope: Scope, *, after_seq: int = 0, limit: int | None = None
+    ) -> list[Envelope]: ...
+    def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncIterator[Envelope]: ...
+    async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool: ...
 
-
-class Transaction(Protocol):
-    async def load(self, artifact_id: ArtifactId) -> Versioned[Artifact] | None: ...
-    async def save(self, result: CommitResult) -> list[Envelope]: ...  # assigns seq
+    # plus reads: artifact(s), revisions, thread(s), proposal(s), run, head_seq, history
 ```
 
-Alongside `Storage`, the workspace layer defines `HistoryStore` (a thread's `ModelMessage`s) and `RunLeases`. Two implementations of each ship:
+- **Transactions serialize per workspace from the moment they begin**, so what a transaction loads cannot change before it saves. Writes are staged and applied atomically when the block exits normally; an exception rolls back entities, log and history together.
+- **`subscribe(after_seq)` replays, then follows live**, on one iterator. Because a subscription starts from a `seq`, there is no gap to manage between history and live events. It is the only read path for replay, live fan-out, hooks, MCP notifications and change notes.
+- **Leases** back `Workspace.claim_thread`: a time-limited, renewed claim that holds across processes and lapses if its holder dies.
+- **History** is opaque bytes (pydantic-ai `ModelMessage`s serialized by the agent layer), appended in the same transaction as the run fact that ends each run segment.
 
-- **In-memory**, for tests and examples. Subscribers wait on an `asyncio.Condition`.
-- **SQLAlchemy 2 async** (`artifactr.sql`), with Alembic migrations. Subscribers use Postgres `LISTEN/NOTIFY`, or polling on SQLite.
+Two implementations ship:
 
-`subscribe(after_seq=...)` is the only read path for replay, live fan-out, hooks, MCP notifications and change notes. Because a subscription starts from a `seq`, there is no gap to manage between replaying history and following live events.
+- **`InMemoryStorage`** (`artifactr.workspace`), for tests, examples and single-process prototypes. A per-workspace `asyncio.Lock` serializes transactions and an `asyncio.Condition` wakes subscribers. Its clock is injectable, so tests control lease expiry.
+- **`SqlStorage`** (`artifactr.sql`, planned for phase 4): SQLAlchemy 2 async with Alembic migrations, locking the workspace row per transaction.
+
+The workspace behaviour suite in `tests/workspace/` runs against every implementation.
 
 ## Dependencies
 
@@ -386,6 +400,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0016](adr/0016-mit-license.md) | MIT license |
 | [0017](adr/0017-application-toolsets-and-capability-events.md) | Application toolsets register on the agent; the capability emits capability events |
 | [0018](adr/0018-core-host-contract.md) | Core's host contract: needs, commit and record |
+| [0019](adr/0019-storage-protocol-and-workspace-handles.md) | One storage protocol behind workspace handles |
 
 ## Open questions
 

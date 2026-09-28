@@ -53,4 +53,4 @@ The `needs` loop keeps every rule about what a command touches inside core, wher
 ## Action items
 
 1. [x] Implement `needs`, `commit`, `record` and the conformance suite (RFC-0001 phase 1).
-2. [ ] Implement the host loop in `Workspace.commit` and `Workspace.record` (phase 2).
+2. [x] Implement the host loop in `Workspace.commit` and `Workspace.record` (phase 2).

@@ -74,6 +74,7 @@ from artifactr.core.events import (
     ToolCalled,
     ToolReturned,
     UnknownEvent,
+    delivered_to,
     scope_of,
 )
 from artifactr.core.ids import (
@@ -212,6 +213,7 @@ __all__ = [
     "change_notes",
     "commit",
     "create_artifact",
+    "delivered_to",
     "describe_patch",
     "diff",
     "get_artifact_type",

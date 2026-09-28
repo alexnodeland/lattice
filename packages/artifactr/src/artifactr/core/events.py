@@ -9,6 +9,7 @@ Each stored event travels in an :class:`Envelope` that adds its sequence number,
 timestamp, scope and actor. The envelope's shape is also the wire shape.
 """
 
+from collections.abc import Collection
 from datetime import datetime
 from typing import Annotated, Literal, cast, get_args
 
@@ -315,3 +316,24 @@ class Envelope(BaseModel):
     run_id: RunId | None = None
     actor: Actor
     event: Event
+
+
+_WORKSPACE_SCOPED = (
+    ArtifactCreated,
+    ArtifactChanged,
+    ArtifactArchived,
+    ProposalCreated,
+    ProposalResolved,
+)
+
+
+def delivered_to(envelope: Envelope, threads: Collection[ThreadId] | None) -> bool:
+    """Return whether a subscriber following ``threads`` receives ``envelope``.
+
+    Workspace-scoped events (artifacts and proposals) reach every subscriber, whichever thread
+    they originated in. Thread-scoped events reach subscribers that follow their thread.
+    ``None`` follows every thread.
+    """
+    if threads is None or envelope.thread_id is None:
+        return True
+    return isinstance(envelope.event, _WORKSPACE_SCOPED) or envelope.thread_id in threads

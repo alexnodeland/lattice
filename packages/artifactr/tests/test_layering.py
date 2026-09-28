@@ -16,6 +16,7 @@ SRC = Path(__file__).parent.parent / "src" / "artifactr"
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (artifactr packages it may import, third-party packages it may import)
     "core": ({"artifactr.core"}, {"pydantic", "jsonpatch", "jsonpointer"}),
+    "workspace": ({"artifactr.core", "artifactr.workspace"}, set()),
 }
 
 

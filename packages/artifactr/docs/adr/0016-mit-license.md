@@ -10,7 +10,7 @@ artifactr is a library meant to be depended on and extended by other projects, i
 
 ## Decision
 
-artifactr is licensed under the **MIT License**. The license text is in [`LICENSE`](../../LICENSE) and declared in `pyproject.toml` with SPDX metadata (`license = "MIT"`). Contributions are accepted under the same license.
+artifactr is licensed under the **MIT License**. The license text is in [`LICENSE`](https://github.com/alexnodeland/artifactr/blob/main/LICENSE) and declared in `pyproject.toml` with SPDX metadata (`license = "MIT"`). Contributions are accepted under the same license.
 
 ## Options considered
 

@@ -26,6 +26,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0020](0020-running-agents-in-threads.md) | Running agents in threads | Accepted |
 | [0021](0021-sql-storage.md) | SQL storage with one dialect-neutral implementation | Accepted |
 | [0022](0022-surfaces-over-one-command-handler.md) | Surfaces over one command handler | Accepted |
+| [0023](0023-documentation-site.md) | The documentation site | Accepted |
 | [0024](0024-reference-implementation-as-a-workspace-member.md) | The reference implementation as a workspace member | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

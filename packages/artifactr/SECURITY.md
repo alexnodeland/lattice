@@ -18,4 +18,8 @@ You can expect an acknowledgement within a week. Once a fix is available, we wil
 
 ## Scope notes
 
-artifactr enforces tenant isolation through scoped workspace handles ([ADR-0011](docs/adr/0011-workspace-scoped-artifacts-and-tenant-handles.md)). Any way to read or write another tenant's data through the public API is a vulnerability. Authentication itself is the host application's responsibility, through the `resolve_actor` hook.
+artifactr enforces tenant isolation through scoped workspace handles ([ADR-0011][adr-0011]). Any way to read or write another tenant's data through the public API is a vulnerability. Authentication itself is the host application's responsibility, through the `resolve_actor` hook.
+
+<!-- Link targets live here so the documentation site can redefine them for its own layout. -->
+
+[adr-0011]: docs/adr/0011-workspace-scoped-artifacts-and-tenant-handles.md

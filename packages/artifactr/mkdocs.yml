@@ -1,0 +1,185 @@
+# The documentation site, built with Zensical (ADR-0023). `make docs` builds it in strict mode;
+# `make docs-serve` serves it with live reload.
+
+site_name: artifactr
+site_description: >-
+  Build chat applications where people and agents collaborate through shared, versioned
+  artifacts.
+site_author: Alex Nodeland
+site_url: https://alexnodeland.github.io/artifactr/
+repo_url: https://github.com/alexnodeland/artifactr
+repo_name: alexnodeland/artifactr
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 Alex Nodeland. Released under the MIT License.
+docs_dir: docs
+
+theme:
+  name: material
+  variant: modern
+  language: en
+  logo: assets/brand/mark-light.svg
+  favicon: assets/brand/favicon.svg
+  font:
+    text: Schibsted Grotesk
+    code: Fragment Mono
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: lucide/sun-moon
+        name: Use the light scheme
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: lucide/sun
+        name: Use the dark scheme
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: lucide/moon
+        name: Follow the system scheme
+  features:
+    - content.action.edit
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - navigation.footer
+    - navigation.indexes
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - toc.follow
+
+extra_css:
+  - assets/stylesheets/brand.css
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      # Pages under docs/project/ include the repository's root files (CONTRIBUTING.md and
+      # others) instead of copying them.
+      base_path: [.]
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          inventories:
+            - https://docs.python.org/3/objects.inv
+            - https://docs.pydantic.dev/latest/objects.inv
+            - https://ai.pydantic.dev/objects.inv
+          options:
+            docstring_style: google
+            extensions:
+              - griffe_pydantic:
+                  schema: false
+              - scripts/griffe_sphinx_roles.py:SphinxRoles
+            filters: ["!^_", "!^model_config$"]
+            heading_level: 3
+            members_order: source
+            merge_init_into_class: true
+            separate_signature: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_signature_annotations: true
+            show_source: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            signature_crossrefs: true
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Reference implementation: reference-implementation.md
+  - Guides:
+      - Defining artifact types: guides/artifact-types.md
+      - Workspaces, commits and the log: guides/workspaces.md
+      - Storage: guides/storage.md
+      - The agent: guides/agent.md
+      - Live output: guides/live-output.md
+      - Serving over WebSocket and REST: guides/serving.md
+      - External agents over MCP: guides/mcp.md
+      - Multi-tenancy and security: guides/security.md
+      - Testing your application: guides/testing.md
+  - Reference:
+      - reference/index.md
+      - artifactr.core: reference/core.md
+      - artifactr.workspace: reference/workspace.md
+      - artifactr.agent: reference/agent.md
+      - artifactr.sql: reference/sql.md
+      - artifactr.fastapi: reference/fastapi.md
+      - artifactr.mcp: reference/mcp.md
+      - Thread protocol: protocol.md
+      - Protocol JSON Schema: reference/schema.md
+  - Design:
+      - Architecture: architecture.md
+      - Decisions:
+          - adr/README.md
+          - adr/0001-python-library-with-sans-io-core.md
+          - adr/0002-single-write-path.md
+          - adr/0003-artifact-types-as-pydantic-subclasses.md
+          - adr/0004-optimistic-concurrency-and-revisions.md
+          - adr/0005-one-event-log-per-workspace.md
+          - adr/0006-agent-integration-as-pydantic-ai-capability.md
+          - adr/0007-caller-owned-live-output.md
+          - adr/0008-agent-perception-and-steering.md
+          - adr/0009-write-policies-and-non-blocking-proposals.md
+          - adr/0010-pausing-with-deferred-tools.md
+          - adr/0011-workspace-scoped-artifacts-and-tenant-handles.md
+          - adr/0012-surfaces-websocket-rest-mcp.md
+          - adr/0013-library-with-reference-implementation.md
+          - adr/0014-trunk-based-development-with-rfcs-and-adrs.md
+          - adr/0015-quality-gates.md
+          - adr/0016-mit-license.md
+          - adr/0017-application-toolsets-and-capability-events.md
+          - adr/0018-core-host-contract.md
+          - adr/0019-storage-protocol-and-workspace-handles.md
+          - adr/0020-running-agents-in-threads.md
+          - adr/0022-surfaces-over-one-command-handler.md
+          - adr/0023-documentation-site.md
+          - adr/0024-reference-implementation-as-a-workspace-member.md
+          - adr/template.md
+      - RFCs:
+          - rfcs/README.md
+          - rfcs/0001-v0.1-implementation-plan.md
+          - rfcs/template.md
+  - Project:
+      - Contributing: project/contributing.md
+      - Changelog: project/changelog.md
+      - Code of conduct: project/code-of-conduct.md
+      - Security: project/security.md
+      - License: project/license.md
+      - Brand: assets/brand/README.md

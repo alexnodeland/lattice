@@ -17,7 +17,7 @@ artifactr is a Python library for building chat applications in which a person a
 
 The chat is one channel of communication. The artifacts are a second one. When the agent restructures a plan, or a person rewrites a paragraph the agent drafted, the edit says something about how each side is thinking. artifactr makes those edits first-class: versioned, attributed to whoever made them, visible to every participant, and fed back into the agent's context.
 
-The library provides the machinery; applications provide the artifact types. A reference implementation, [`examples/docplan`](../examples/docplan/README.md) (a Markdown document plus a structured plan), is built on the library's public API as one implementation of it ([ADR-0024](adr/0024-reference-implementation-as-a-workspace-member.md)).
+The library provides the machinery; applications provide the artifact types. A reference implementation, [`examples/docplan`](https://github.com/alexnodeland/artifactr/tree/main/examples/docplan) (a Markdown document plus a structured plan), is built on the library's public API as one implementation of it ([ADR-0024](adr/0024-reference-implementation-as-a-workspace-member.md)).
 
 ### Goals
 
@@ -121,7 +121,7 @@ class Plan(Artifact):  # registered as "plan"
     tasks: dict[str, Task] = {}  # keyed by id, so patch paths stay stable
 
     def add_task(self, title: str) -> str:
-        task_id = new_id()
+        task_id = new_id("task")
         self.tasks[task_id] = Task(title=title)
         return task_id
 
@@ -384,7 +384,7 @@ The workspace behaviour suite in `tests/workspace/` runs against every implement
 | FastAPI | WebSocket and REST adapter | 0.141 |
 | mcp | MCP server (`MCPServer`, subscriptions) | 2.2 |
 
-Python 3.12+. Tooling: uv, ruff, pyright in strict mode, pytest.
+Python 3.12+. Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical with mkdocstrings for the documentation site ([ADR-0023](adr/0023-documentation-site.md)).
 
 Observability uses pydantic-ai's built-in OpenTelemetry instrumentation. The capability adds tenant, workspace, thread and run as span attributes.
 
@@ -435,6 +435,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0020](adr/0020-running-agents-in-threads.md) | Running agents in threads |
 | [0021](adr/0021-sql-storage.md) | SQL storage with one dialect-neutral implementation |
 | [0022](adr/0022-surfaces-over-one-command-handler.md) | Surfaces over one command handler |
+| [0023](adr/0023-documentation-site.md) | The documentation site |
 | [0024](adr/0024-reference-implementation-as-a-workspace-member.md) | The reference implementation as a workspace member |
 
 ## Open questions

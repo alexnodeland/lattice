@@ -10,7 +10,7 @@ PG_CONTAINER ?= artifactr-postgres
 PG_PORT ?= 54329
 PG_URL ?= postgresql+asyncpg://postgres:artifactr@localhost:$(PG_PORT)/postgres
 
-.PHONY: help install fmt lint typecheck test check schema pg-up pg-down test-pg changelog clean
+.PHONY: help install fmt lint typecheck test check docs docs-serve schema pg-up pg-down test-pg changelog clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -35,6 +35,12 @@ test: ## Run the tests with the 100% branch-coverage gate
 
 check: lint typecheck test ## Run everything CI runs
 
+docs: ## Build the documentation site in strict mode, as CI does
+	$(UV) run zensical build --strict --clean
+
+docs-serve: ## Serve the documentation site with live reload at http://localhost:8000
+	$(UV) run zensical serve
+
 schema: ## Regenerate the protocol JSON Schema from the frame models
 	$(UV) run python -m artifactr.core.schema > schemas/artifactr.v1.json
 
@@ -53,5 +59,5 @@ changelog: ## Regenerate CHANGELOG.md from conventional commits
 	@$(UV) run python -c "import pathlib; p = pathlib.Path('CHANGELOG.md'); p.write_text(p.read_text().rstrip() + '\n')"
 
 clean: ## Remove caches and build output
-	rm -rf .pytest_cache .ruff_cache .coverage coverage.xml htmlcov dist site
+	rm -rf .pytest_cache .ruff_cache .coverage coverage.xml htmlcov dist site .cache
 	find . -name __pycache__ -type d -prune -not -path './.venv/*' -exec rm -rf {} +

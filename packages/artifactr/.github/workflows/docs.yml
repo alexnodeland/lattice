@@ -1,0 +1,46 @@
+# Builds the documentation site and publishes it to GitHub Pages (ADR-0023).
+#
+# It runs only when started by hand: publishing is a maintainer's decision. GitHub Pages must be
+# enabled for the repository, with "GitHub Actions" as its source, before the first run.
+
+name: Docs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --all-extras --all-groups --all-packages
+      - run: uv run zensical build --strict --clean
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

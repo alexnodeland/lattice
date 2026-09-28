@@ -21,9 +21,15 @@ from artifactr.agent.live import (
     forward_live,
     to_live,
 )
-from artifactr.agent.runner import RunHandle, Runner
+from artifactr.agent.runner import RunHandle, Runner, Sent
 from artifactr.agent.session import Session, Trigger, last_seen, load_history
-from artifactr.agent.tools import artifact_tools
+from artifactr.agent.tools import (
+    artifact_text,
+    artifact_tools,
+    describe_outcome,
+    list_artifacts_text,
+    submit,
+)
 
 __all__ = [
     "ArtifactDraft",
@@ -33,11 +39,16 @@ __all__ = [
     "NullChannel",
     "RunHandle",
     "Runner",
+    "Sent",
     "Session",
     "Trigger",
+    "artifact_text",
     "artifact_tools",
+    "describe_outcome",
     "forward_live",
     "last_seen",
+    "list_artifacts_text",
     "load_history",
+    "submit",
     "to_live",
 ]

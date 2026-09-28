@@ -67,5 +67,5 @@ A new problem appeared as well: if a person replies in the chat while a run is p
 ## Action items
 
 1. [x] Implement `Session`, `ArtifactWorkspace`, the generic tools, live forwarding and `Runner` (RFC-0001 phase 3).
-2. [ ] Use the `Runner` from the WebSocket, REST and MCP adapters (phase 5).
+2. [x] Use the `Runner` from the WebSocket, REST and MCP adapters (phase 5, [ADR-0022](0022-surfaces-over-one-command-handler.md)).
 3. [ ] A pub/sub live channel and cross-process stop (after v0.1).

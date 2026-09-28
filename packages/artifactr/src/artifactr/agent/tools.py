@@ -17,6 +17,7 @@ from pydantic_ai import CallDeferred, FunctionToolset, RunContext
 from artifactr.agent.session import Session
 from artifactr.core import (
     Applied,
+    ArchiveArtifact,
     Artifact,
     ArtifactId,
     CreateArtifact,
@@ -24,9 +25,9 @@ from artifactr.core import (
     ProposeChange,
     Proposed,
     SetFocus,
-    TextEdit,
-    TextEdits,
+    Versioned,
 )
+from artifactr.workspace import Workspace
 
 # Tools annotate their context as RunContext[...] literally: pydantic-ai detects context-taking
 # tools by that annotation, and a type alias would hide it.
@@ -56,12 +57,7 @@ def artifact_tools(
         Args:
             kind: Only list artifacts of this kind.
         """
-        artifacts = [
-            a for a in await ctx.deps.workspace.artifacts() if kind is None or a.kind == kind
-        ]
-        if not artifacts:
-            return "There are no artifacts yet."
-        return "\n".join(f"- {a.id} ({a.kind}, v{a.version})" for a in artifacts)
+        return await list_artifacts_text(ctx.deps.workspace, kind)
 
     @toolset.tool
     async def read_artifact(ctx: RunContext[Session[Any]], artifact_id: str) -> str:
@@ -72,9 +68,7 @@ def artifact_tools(
         """
         artifact = await ctx.deps.workspace.artifact(artifact_id)
         await _follow(ctx, artifact.id)
-        state = " (archived)" if artifact.archived else ""
-        header = f"{artifact.id} ({artifact.kind}, v{artifact.version}){state}"
-        return f"{header}\n\n{artifact.data.render_for_agent()}"
+        return artifact_text(artifact)
 
     @toolset.tool(
         description=f"Create an artifact of one of these kinds, whose data must match its "
@@ -87,7 +81,7 @@ def artifact_tools(
         outcome = await ctx.deps.workspace.commit(command)
         if isinstance(outcome, Applied):
             await _follow(ctx, outcome.artifact_id)
-        return _describe(outcome)
+        return describe_outcome(outcome)
 
     @toolset.tool
     async def edit_text(
@@ -113,21 +107,12 @@ def artifact_tools(
             rationale: Why you propose it; used with ``propose``.
         """
         artifact = await ctx.deps.workspace.artifact(artifact_id)
-        edit = EditArtifact(
-            artifact_id=artifact.id,
-            base_version=artifact.version,
-            patch=TextEdits(field=field, edits=(TextEdit(old=old, new=new),)),
-            summary=summary,
-            thread_id=ctx.deps.thread_id,
+        edit = artifact.edit_text(
+            old, new, field=field, summary=summary, thread_id=ctx.deps.thread_id
         )
-        workspace = ctx.deps.workspace
-        outcome = await (
-            workspace.commit(ProposeChange(change=edit, rationale=rationale))
-            if propose
-            else workspace.commit(edit)
-        )
+        outcome = await submit(ctx.deps.workspace, edit, propose=propose, rationale=rationale)
         await _follow(ctx, artifact.id)
-        return _describe(outcome)
+        return describe_outcome(outcome)
 
     @toolset.tool
     async def archive_artifact(ctx: RunContext[Session[Any]], artifact_id: str) -> str:
@@ -137,9 +122,8 @@ def artifact_tools(
             artifact_id: The artifact to archive.
         """
         artifact = await ctx.deps.workspace.artifact(artifact_id)
-        return _describe(
-            await ctx.deps.workspace.commit(artifact.archive(thread_id=ctx.deps.thread_id))
-        )
+        command = artifact.archive(thread_id=ctx.deps.thread_id)
+        return describe_outcome(await ctx.deps.workspace.commit(command))
 
     if ask:
 
@@ -167,7 +151,36 @@ async def _follow(ctx: RunContext[Session[Any]], artifact_id: ArtifactId) -> Non
         )
 
 
-def _describe(outcome: Applied | Proposed) -> str:
+async def list_artifacts_text(workspace: Workspace, kind: str | None = None) -> str:
+    """List a workspace's artifacts as text, one per line."""
+    artifacts = [a for a in await workspace.artifacts() if kind is None or a.kind == kind]
+    if not artifacts:
+        return "There are no artifacts yet."
+    return "\n".join(f"- {a.id} ({a.kind}, v{a.version})" for a in artifacts)
+
+
+def artifact_text(artifact: Versioned[Artifact]) -> str:
+    """Render an artifact for a model: a header line, then its ``render_for_agent`` text."""
+    state = " (archived)" if artifact.archived else ""
+    header = f"{artifact.id} ({artifact.kind}, v{artifact.version}){state}"
+    return f"{header}\n\n{artifact.data.render_for_agent()}"
+
+
+async def submit(
+    workspace: Workspace,
+    change: EditArtifact | ArchiveArtifact | CreateArtifact,
+    *,
+    propose: bool = False,
+    rationale: str | None = None,
+) -> Applied | Proposed:
+    """Commit a change, or propose it for review when ``propose`` is set."""
+    if propose:
+        return await workspace.commit(ProposeChange(change=change, rationale=rationale))
+    return await workspace.commit(change)
+
+
+def describe_outcome(outcome: Applied | Proposed) -> str:
+    """Tell a model what its change did."""
     if isinstance(outcome, Applied):
         return f"Done: {outcome.artifact_id} is now at version {outcome.version}."
     return (

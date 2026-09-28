@@ -24,5 +24,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0018](0018-core-host-contract.md) | Core's host contract: needs, commit and record | Accepted |
 | [0019](0019-storage-protocol-and-workspace-handles.md) | One storage protocol behind workspace handles | Accepted |
 | [0020](0020-running-agents-in-threads.md) | Running agents in threads | Accepted |
+| [0022](0022-surfaces-over-one-command-handler.md) | Surfaces over one command handler | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

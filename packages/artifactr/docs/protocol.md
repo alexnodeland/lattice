@@ -146,21 +146,33 @@ Every command gets exactly one result.
 
 `outcome.type` is `applied` (`artifact_id`, `version`), `proposed` (`proposal_id`), `resolved` (`proposal_id`, `decision`, `version?`) or `recorded`. `rejection.type` is one of `version_conflict`, `validation_failed`, `patch_failed`, `not_found`, `forbidden` or `invalid_state`; every rejection has a `message` and its typed details.
 
-### `replay_complete` and `snapshot`
+### `replay_complete`
 
 ```json
 {"type": "replay_complete", "up_to_seq": 1057}
 ```
 
+Sent once, when replay has reached the `head_seq` announced in `welcome`, even if the last replayed events belonged to threads the client does not follow. Every later `event` frame is live.
+
+v0.1 retains the whole log, so a `reset` is followed by a full replay. Snapshots for resuming beyond retention are an [open question](architecture.md#open-questions).
+
+### `error`
+
 ```json
-{"type": "snapshot", "as_of_seq": 900, "artifacts": [], "threads": []}
+{"type": "error", "message": "not a command frame: Input should be a valid dictionary"}
 ```
 
-The snapshot's contents are an [open question](architecture.md#open-questions).
+A frame the server could not parse, or a command that failed unexpectedly on the server. Rejections are not errors: they arrive as `command_result` frames with `ok: false`.
 
 ## Client frames: commands
 
-Every command frame carries a client-chosen `command_id`, which is also an idempotency key: the server deduplicates repeated ids within a window. The rest of the frame is the command itself, as defined by the `Command` models in `artifactr.core`. Ids of anything a command creates (`artifact_id`, `thread_id`, `message_id`, `proposal_id`) may be chosen by the client; the server generates any that are omitted.
+After `hello`, a client sends command frames. Each wraps one command with a client-chosen `command_id`, which correlates it with its `command_result` and is also an idempotency key: the server remembers recent ids (per process) and answers a repeated id with the original result instead of running the command again.
+
+```json
+{"type": "command", "command_id": "c_17", "command": {"type": "post_message", "thread_id": "thr_9", "content": "Draft the plan"}}
+```
+
+The command is one of the `Command` models in `artifactr.core`, or `stop_run` or `watch_run`. Ids of anything a command creates (`artifact_id`, `thread_id`, `message_id`, `proposal_id`) may be chosen by the client; they are generated when omitted. A frame that is not a valid command frame gets an `error` frame in reply, and the connection stays open.
 
 | `type` | Fields | Effect |
 |---|---|---|
@@ -174,18 +186,23 @@ Every command frame carries a client-chosen `command_id`, which is also an idemp
 | `propose_change` | `change` (a `create_artifact`, `edit_artifact` or `archive_artifact` command), `rationale?`, `proposal_id?` | `proposal_created`, whatever the write policy |
 | `respond_to_proposal` | `proposal_id`, `decision` (`accept`, `reject`), `changes?`, `reason?` | `proposal_resolved`, plus the artifact event when accepted |
 | `answer_deferred` | `run_id`, `tool_call_id`, `answer` or `approved` | `deferred_answered`. Once every pending request is answered, the paused run resumes. |
-| `stop_run` | `run_id` | Cancels the run; `run_ended` with status `stopped`. Handled by the transport, not core. |
-| `watch_run` | `run_id` | Attaches this socket to the run's live frames. Handled by the transport, not core. |
+| `stop_run` | `run_id` | Cancels a run of this workspace that is running in the serving process; `run_ended` with status `stopped`. |
+| `watch_run` | `run_id` | Attaches this socket to the run's live frames, starting with what the run has produced so far. WebSocket only. |
 
 ```json
 {
-  "type": "edit_artifact",
+  "type": "command",
   "command_id": "c_18",
-  "artifact_id": "plan_1",
-  "base_version": 7,
-  "patch": {"kind": "json_patch", "ops": [{"op": "add", "path": "/tasks/t9", "value": {"title": "Write changelog"}}]}
+  "command": {
+    "type": "edit_artifact",
+    "artifact_id": "plan_1",
+    "base_version": 7,
+    "patch": {"kind": "json_patch", "ops": [{"op": "add", "path": "/tasks/t9", "value": {"title": "Write changelog"}}]}
+  }
 }
 ```
+
+Every command is carried out by `artifactr.agent.Runner.execute`, whichever transport it arrives on, so it behaves identically everywhere.
 
 ## Close codes
 
@@ -193,40 +210,48 @@ Every command frame carries a client-chosen `command_id`, which is also an idemp
 |---|---|---|
 | `1000` | Normal closure | none |
 | `1001` | Server going away | reconnect and resume |
-| `4400` | Unsupported protocol version | upgrade the client |
+| `4400` | The first frame was not a valid `hello`, or asked for an unsupported protocol version | fix or upgrade the client |
 | `4401` | Unauthenticated | re-authenticate |
 | `4403` | Actor may not access this workspace | stop |
 | `4408` | `hello` not received in time | reconnect |
-| `4429` | Too many connections or rate limited | back off, then reconnect |
+| `4429` | The client did not read frames fast enough and its outbox overflowed | reconnect and resume |
 
 ## REST
 
-REST mirrors the commands and exposes reads. Command bodies are the same JSON as the WebSocket frames.
+REST mirrors the commands and exposes reads; `artifactr.fastapi.artifactr_router` serves both. Command bodies are the same `command` frames as over the WebSocket.
 
 | Method and path | Purpose |
 |---|---|
-| `POST /v1/workspaces/{workspace_id}/commands` | Submit one command; the response body is its `command_result`. |
-| `GET /v1/workspaces/{workspace_id}/artifacts?kind=` | List current artifacts. |
+| `POST /v1/workspaces/{workspace_id}/commands` | Submit one command frame; the response body is its `command_result`. |
+| `GET /v1/workspaces/{workspace_id}/artifacts?kind=&include_archived=` | List artifacts. |
 | `GET /v1/workspaces/{workspace_id}/artifacts/{artifact_id}` | The current `Versioned` artifact. |
 | `GET /v1/workspaces/{workspace_id}/artifacts/{artifact_id}/revisions` | Revision history. |
-| `GET /v1/workspaces/{workspace_id}/events?after_seq=&thread_id=&limit=` | A page of the log, as envelopes. |
-| `GET /v1/workspaces/{workspace_id}/threads/{thread_id}` | Thread metadata and focus. |
+| `GET /v1/workspaces/{workspace_id}/events?after_seq=&thread_id=&limit=` | A page of the log, as envelopes. `thread_id` may repeat. |
+| `GET /v1/workspaces/{workspace_id}/threads` | Every thread. |
+| `GET /v1/workspaces/{workspace_id}/threads/{thread_id}` | A thread's mode and focus. |
+| `GET /v1/workspaces/{workspace_id}/proposals?status=` | Proposals, pending by default. |
+| `GET /v1/workspaces/{workspace_id}/runs/{run_id}` | A run, with any requests it is paused on. |
 
-Rejections map to HTTP status codes: `version_conflict` and `invalid_state` → 409, `validation_failed` and `patch_failed` → 422, `not_found` → 404, `forbidden` → 403.
+Authentication is the host's: `resolve_actor(request)` returns the tenant and actor, or raises `Unauthorized` (401). An optional `authorize(tenant, workspace, actor)` refuses with 403.
+
+Rejections map to HTTP status codes (`artifactr.fastapi.STATUS_CODES`): `version_conflict` and `invalid_state` → 409, `validation_failed` and `patch_failed` → 422, `not_found` → 404, `forbidden` → 403. `watch_run` over REST is rejected as `invalid_state`.
 
 ## MCP mapping
 
-External agents connect over MCP with the same authority as any other actor.
+External agents connect over MCP (`artifactr.mcp.ArtifactrMcp`) with the same authority as any other actor. The host's `resolve(ctx)` returns the client's tenant and `ExternalAgentActor`, and every tool goes through the same workspace rules and `Runner`.
 
 | MCP | artifactr |
 |---|---|
-| Resource `artifact://{workspace_id}/{artifact_id}` | The current version: JSON, or Markdown for documents. The version number is in the resource metadata. |
-| Resource template `artifact://{workspace_id}/{artifact_id}/revisions/{version}` | A past revision. |
-| `subscriptions/listen` and resource-updated notifications | Driven by `artifact_changed` and `artifact_archived`, through a `SubscriptionBus` fed by the log. |
-| Tools `list_artifacts`, `read_artifact`, `edit_text`, `edit_artifact`, `propose_change`, `respond_to_proposal`, `post_message` | Commands, attributed to an `external_agent` actor for the MCP client. |
+| Resource template `artifactr://{tenant_id}/{workspace_id}/artifacts/{artifact_id}` | The artifact's current `Versioned` JSON. Only readable by clients of that tenant. |
+| `subscriptions/listen` and resource-updated notifications | Published for `artifact_created`, `artifact_changed` and `artifact_archived` in every workspace a client has used, through the server's `SubscriptionBus`. |
+| Tools `list_artifacts`, `read_artifact`, `create_artifact`, `edit_text`, `edit_artifact`, `archive_artifact` | Artifact commands. The edit tools take an optional `base_version` (required for `edit_artifact`) and `propose` with `rationale`. |
+| Tools `list_proposals`, `respond_to_proposal` | Review others' proposals. |
+| Tool `post_message` | A message in a thread, handled like any other: it starts, steers or answers the thread's agent. |
+
+Rejections are returned as tool errors carrying the rejection's message.
 
 ## Versioning and schema
 
-- The protocol identifier is `artifactr.v1`. Within v1, changes are additive only: new optional fields and new event types. Clients must ignore unknown fields and keep unknown event types as opaque envelopes, since they still carry a `seq`.
+- The protocol identifier is `artifactr.v1`, also accepted as the WebSocket subprotocol. Within v1, changes are additive only: new optional fields and new event types. Clients must ignore unknown fields and keep unknown event types as opaque envelopes, since they still carry a `seq`.
 - Breaking changes get a new subprotocol, `artifactr.v2`, served alongside v1 during migration.
 - The JSON Schema for every frame is generated from the Pydantic models (`TypeAdapter(...).json_schema()`) into `schemas/artifactr.v1.json` and checked in. CI fails if it drifts. Clients generate their types from it, for example with `json-schema-to-typescript`.

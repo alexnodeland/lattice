@@ -23,7 +23,22 @@ from pydantic_ai import Agent, AgentRunResult, DeferredToolResults, ToolDenied
 
 from artifactr.agent.live import FanoutChannel, forward_live
 from artifactr.agent.session import Session, Trigger, load_history
-from artifactr.core import AnswerDeferred, LiveFrame, Run, RunId, ThreadId, new_run_id
+from artifactr.core import (
+    AnswerDeferred,
+    Command,
+    LiveFrame,
+    MessageId,
+    NotFound,
+    Outcome,
+    PostMessage,
+    Recorded,
+    Run,
+    RunId,
+    StopRun,
+    ThreadId,
+    new_message_id,
+    new_run_id,
+)
 from artifactr.workspace import ThreadBusy, Workspace
 
 
@@ -38,6 +53,17 @@ class RunHandle:
     async def wait(self) -> AgentRunResult[Any]:
         """Wait for the run to finish (or pause) and return its result."""
         return await self.task
+
+
+@dataclass(frozen=True)
+class Sent:
+    """What posting a message, or an answer, did."""
+
+    outcome: Recorded
+    """The recorded message or answer."""
+
+    run: RunHandle | None
+    """The run it started or resumed; None if it steered a running run or awaits more answers."""
 
 
 class Runner[AppDepsT]:
@@ -68,20 +94,50 @@ class Runner[AppDepsT]:
         self._claim_ttl = claim_ttl
         self._runs: dict[RunId, RunHandle] = {}
 
-    async def send(
-        self, workspace: Workspace, thread_id: ThreadId, content: str
-    ) -> RunHandle | None:
-        """Post a message as the workspace handle's actor, and act on it.
+    async def execute(self, workspace: Workspace, command: Command | StopRun) -> Outcome:
+        """Carry out any command the way every surface should.
 
-        Returns:
-            The run the message started or resumed, or None if it steers a run already in
-            progress.
+        Messages and answers go through :meth:`send` and :meth:`answer`, so they start, steer
+        and resume runs; ``stop_run`` stops a run of this workspace; everything else is
+        committed as-is.
+
+        Raises:
+            Rejection: If the command is rejected, or the run to stop is not in this workspace
+                or not running in this process.
         """
-        posted = await workspace.post_message(thread_id, content)
+        match command:
+            case PostMessage():
+                sent = await self.send(
+                    workspace, command.thread_id, command.content, message_id=command.message_id
+                )
+                return sent.outcome
+            case AnswerDeferred():
+                return (await self.answer(workspace, command)).outcome
+            case StopRun():
+                await workspace.run(command.run_id)  # the run must belong to this workspace
+                if not await self.stop(command.run_id):
+                    raise NotFound("running run", command.run_id)
+                return Recorded()
+            case _:
+                return await workspace.commit(command)
+
+    async def send(
+        self,
+        workspace: Workspace,
+        thread_id: ThreadId,
+        content: str,
+        *,
+        message_id: MessageId | None = None,
+    ) -> Sent:
+        """Post a message as the workspace handle's actor, and act on it."""
+        message = PostMessage(
+            thread_id=thread_id, content=content, message_id=message_id or new_message_id()
+        )
+        posted = await workspace.commit(message)
         paused = await workspace.runs(thread_id=thread_id, status="paused")
         if paused:
-            return await self._reply(workspace, paused[-1], content)
-        return await self._start(
+            return Sent(posted, await self._reply(workspace, paused[-1], content))
+        run = await self._start(
             workspace,
             thread_id,
             new_run_id(),
@@ -89,11 +145,12 @@ class Runner[AppDepsT]:
             trigger="message",
             watch_after=posted.seq,
         )
+        return Sent(posted, run)
 
-    async def answer(self, workspace: Workspace, command: AnswerDeferred) -> RunHandle | None:
+    async def answer(self, workspace: Workspace, command: AnswerDeferred) -> Sent:
         """Answer one of a paused run's requests, resuming the run once all are answered."""
-        await workspace.commit(command)
-        return await self.resume(workspace, command.run_id)
+        answered = await workspace.commit(command)
+        return Sent(answered, await self.resume(workspace, command.run_id))
 
     async def resume(self, workspace: Workspace, run_id: RunId) -> RunHandle | None:
         """Resume a paused run whose requests are all answered; otherwise do nothing."""

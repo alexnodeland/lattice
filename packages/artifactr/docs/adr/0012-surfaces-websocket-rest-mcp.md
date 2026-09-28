@@ -90,6 +90,6 @@ The workspace model (a server-owned, versioned, shared log) is the product. Adop
 
 ## Action items
 
-1. [ ] Implement the WebSocket endpoint and REST routes in `artifactr.fastapi`.
-2. [ ] Implement `artifactr.mcp` with resources, tools and a log-fed `SubscriptionBus`.
-3. [ ] Generate and check in `schemas/artifactr.v1.json`.
+1. [x] Implement the WebSocket endpoint and REST routes in `artifactr.fastapi`.
+2. [x] Implement `artifactr.mcp` with resources, tools and a log-fed `SubscriptionBus`.
+3. [x] Generate and check in `schemas/artifactr.v1.json`.

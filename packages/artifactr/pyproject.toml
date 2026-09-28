@@ -84,6 +84,11 @@ ignore = [
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.ruff.lint.isort]
+# artifactr.fastapi and artifactr.mcp share their names with the libraries they adapt; without
+# this, isort's same-package detection files the libraries as first-party.
+known-third-party = ["fastapi", "mcp"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D", "ARG"]
 # pydantic-ai hides a tool's RunContext from the model, so tool docstrings don't document it.

@@ -7,7 +7,17 @@ from pydantic_ai import ModelRequest
 from artifactr.agent import Session, last_seen, load_history
 from artifactr.core import AgentActor, RunEnded, Thread
 from artifactr.workspace import Workspace
-from tests.agent.conftest import Gate, Script, call, make_agent, make_runner, say, types
+from tests.agent.conftest import (
+    Gate,
+    Script,
+    call,
+    event_as,
+    make_agent,
+    make_runner,
+    say,
+    started,
+    types,
+)
 from tests.artifact_types import Note
 
 
@@ -17,7 +27,7 @@ async def test_a_message_starts_a_recorded_run(ws: Workspace, thread: Thread, ga
         say("I drafted the plan."),
     )
     runner = make_runner(make_agent(script), gate)
-    handle = await runner.send(ws, thread.id, "Draft a plan")
+    handle = (await runner.send(ws, thread.id, "Draft a plan")).run
     assert handle is not None
     assert runner.running(thread.id) == handle
     result = await handle.wait()
@@ -54,8 +64,8 @@ async def test_the_next_run_continues_the_conversation(
 ) -> None:
     script = Script(say("Hello!"), say("Still here."))
     runner = make_runner(make_agent(script), gate)
-    await (await runner.send(ws, thread.id, "Hi")).wait()  # type: ignore[union-attr]
-    await (await runner.send(ws, thread.id, "Are you there?")).wait()  # type: ignore[union-attr]
+    await started(await runner.send(ws, thread.id, "Hi")).wait()
+    await started(await runner.send(ws, thread.id, "Are you there?")).wait()
     assert script.prompt_texts(1) == ["Hi", "Are you there?"]
     history = await load_history(ws, thread.id)
     assert len(history) == 4
@@ -70,10 +80,10 @@ async def test_the_agent_is_told_what_changed_since_it_last_looked(
         say("Noted."),
     )
     runner = make_runner(make_agent(script), gate)
-    await (await runner.send(ws, thread.id, "Draft")).wait()  # type: ignore[union-attr]
+    await started(await runner.send(ws, thread.id, "Draft")).wait()
     [note] = await ws.artifacts(Note)
     await ws.commit(note.edit_text("Friday", "Monday"))
-    await (await runner.send(ws, thread.id, "I moved the date")).wait()  # type: ignore[union-attr]
+    await started(await runner.send(ws, thread.id, "I moved the date")).wait()
     notes = [text for text in script.prompt_texts(2) if "<workspace-changes>" in text]
     assert notes == [
         f"<workspace-changes>\n- Alice changed {note.id} (note, v1 → v2): "
@@ -131,12 +141,12 @@ async def test_a_failed_run_is_recorded(ws: Workspace, thread: Thread, gate: Gat
         raise RuntimeError("model unavailable")
 
     runner = make_runner(make_agent(Script(fail)), gate)  # type: ignore[arg-type]
-    handle = await runner.send(ws, thread.id, "hi")
+    handle = (await runner.send(ws, thread.id, "hi")).run
     assert handle is not None
     with pytest.raises(RuntimeError):
         await handle.wait()
-    ended = (await ws.read())[-1].event
-    assert (ended.type, ended.status, ended.error) == ("run_ended", "failed", "model unavailable")  # type: ignore[union-attr]
+    ended = event_as((await ws.read())[-1], RunEnded)
+    assert (ended.status, ended.error) == ("failed", "model unavailable")
 
 
 async def test_an_unwatched_failure_does_not_warn(
@@ -146,7 +156,7 @@ async def test_an_unwatched_failure_does_not_warn(
         raise RuntimeError("boom")
 
     runner = make_runner(make_agent(Script(fail)), gate)  # type: ignore[arg-type]
-    handle = await runner.send(ws, thread.id, "hi")
+    handle = (await runner.send(ws, thread.id, "hi")).run
     assert handle is not None
     while not handle.task.done():
         await gate_sleep()

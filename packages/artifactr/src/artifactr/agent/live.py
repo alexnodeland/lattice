@@ -8,6 +8,7 @@ the durable log.
 import asyncio
 import dataclasses
 import json
+from collections import OrderedDict, deque
 from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable
 from typing import Any, Protocol
 
@@ -72,26 +73,40 @@ class NullChannel:
 class FanoutChannel:
     """An in-process channel that fans each run's frames out to its watchers.
 
-    Watchers that fall behind lose their oldest frames rather than slowing the run.
+    It keeps the frames of runs in progress, so a watcher that attaches mid-run first receives
+    what the run has produced so far. Watchers that fall behind lose their oldest frames rather
+    than slowing the run.
 
     Args:
-        buffer: How many frames each watcher may fall behind.
+        buffer: How many frames each run keeps, and each watcher may fall behind.
+        remember_closed: How many ended runs to remember, so late watchers end at once.
     """
 
-    def __init__(self, *, buffer: int = 1024) -> None:
+    def __init__(self, *, buffer: int = 1024, remember_closed: int = 10_000) -> None:
         self._buffer = buffer
+        self._frames: dict[RunId, deque[LiveFrame]] = {}
         self._watchers: dict[RunId, set[asyncio.Queue[LiveFrame | None]]] = {}
+        self._closed: OrderedDict[RunId, None] = OrderedDict()
+        self._remember_closed = remember_closed
 
     async def send(self, frame: LiveFrame) -> None:
-        """Deliver a frame to the run's current watchers."""
+        """Keep a frame for the run, and deliver it to the run's current watchers."""
+        if frame.run_id in self._closed:
+            return
+        self._frames.setdefault(frame.run_id, deque(maxlen=self._buffer)).append(frame)
         for queue in self._watchers.get(frame.run_id, ()):
-            if queue.full():
-                queue.get_nowait()
-            queue.put_nowait(frame)
+            _offer(queue, frame)
 
     async def watch(self, run_id: RunId) -> AsyncIterator[LiveFrame]:
-        """Yield the run's frames from now until :meth:`close` is called for it."""
+        """Yield the run's frames so far, then new ones until :meth:`close` is called for it.
+
+        Watching a run that has already ended stops at once.
+        """
+        if run_id in self._closed:
+            return
         queue: asyncio.Queue[LiveFrame | None] = asyncio.Queue(maxsize=self._buffer)
+        for frame in self._frames.get(run_id, ()):
+            _offer(queue, frame)
         watchers = self._watchers.setdefault(run_id, set())
         watchers.add(queue)
         try:
@@ -101,11 +116,19 @@ class FanoutChannel:
             watchers.discard(queue)
 
     def close(self, run_id: RunId) -> None:
-        """End every watcher of a run."""
+        """End every watcher of a run, and any that start watching it later."""
+        self._closed[run_id] = None
+        if len(self._closed) > self._remember_closed:
+            self._closed.popitem(last=False)
+        self._frames.pop(run_id, None)
         for queue in self._watchers.pop(run_id, ()):
-            if queue.full():
-                queue.get_nowait()
-            queue.put_nowait(None)
+            _offer(queue, None)
+
+
+def _offer(queue: asyncio.Queue[LiveFrame | None], item: LiveFrame | None) -> None:
+    if queue.full():
+        queue.get_nowait()
+    queue.put_nowait(item)
 
 
 EventStreamHandler = Callable[[RunContext[Any], AsyncIterable[AgentStreamEvent]], Awaitable[None]]

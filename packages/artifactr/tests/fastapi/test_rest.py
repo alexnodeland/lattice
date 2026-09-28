@@ -1,0 +1,120 @@
+"""REST: commands through the shared handler, and reads."""
+
+from fastapi.testclient import TestClient
+
+from tests.agent.conftest import Script, call, say
+from tests.fastapi.conftest import build, command, wait_for
+
+BASE = "/v1/workspaces/w1"
+
+
+def test_a_command_is_executed_once_per_id(client: TestClient) -> None:
+    create = command("c1", type="create_thread", thread_id="t1", title="Launch")
+    first = client.post(f"{BASE}/commands", json=create)
+    assert first.status_code == 200
+    assert first.json() == {
+        "type": "command_result",
+        "command_id": "c1",
+        "ok": True,
+        "outcome": {"type": "recorded", "seq": 1},
+        "rejection": None,
+    }
+    again = client.post(f"{BASE}/commands", json=create)
+    assert again.json() == first.json(), "a repeated command id returns the same result"
+    assert len(client.get(f"{BASE}/events").json()) == 1
+
+
+def test_rejections_map_to_status_codes(client: TestClient) -> None:
+    missing = client.post(
+        f"{BASE}/commands", json=command("c1", type="post_message", thread_id="t9", content="hi")
+    )
+    assert missing.status_code == 404
+    assert missing.json()["rejection"]["type"] == "not_found"
+    client.post(f"{BASE}/commands", json=command("c2", type="create_thread", thread_id="t1"))
+    exists = client.post(
+        f"{BASE}/commands", json=command("c3", type="create_thread", thread_id="t1")
+    )
+    assert exists.status_code == 409
+    watch = client.post(f"{BASE}/commands", json=command("c4", type="watch_run", run_id="r1"))
+    assert watch.status_code == 409
+    assert watch.json()["rejection"]["message"] == "watch_run needs a WebSocket"
+    unknown = client.post(
+        f"{BASE}/commands", json=command("c5", type="create_artifact", kind="x", data={})
+    )
+    assert unknown.status_code == 404
+
+
+def test_authentication_and_authorization(client: TestClient) -> None:
+    assert client.get(f"{BASE}/threads", headers={"x-token": "bad"}).status_code == 401
+    assert client.get("/v1/workspaces/secret/threads").status_code == 403
+
+
+def test_reads(client: TestClient) -> None:
+    post = lambda cid, **c: client.post(f"{BASE}/commands", json=command(cid, **c))  # noqa: E731
+    post("c1", type="create_thread", thread_id="t1")
+    post("c2", type="create_thread", thread_id="t2")
+    post("c3", type="create_artifact", artifact_id="n1", kind="note", data={"text": "Friday"})
+    post("c4", type="create_artifact", artifact_id="n2", kind="note", data={})
+    post(
+        "c5",
+        type="edit_artifact",
+        artifact_id="n1",
+        base_version=1,
+        patch={"kind": "text_edits", "edits": [{"old": "Friday", "new": "Monday"}]},
+    )
+    post("c6", type="archive_artifact", artifact_id="n2", base_version=1)
+    post("c7", type="post_message", thread_id="t2", content="elsewhere")
+    assert [a["id"] for a in client.get(f"{BASE}/artifacts").json()] == ["n1"]
+    everything = client.get(f"{BASE}/artifacts", params={"include_archived": True, "kind": "note"})
+    assert [a["id"] for a in everything.json()] == ["n1", "n2"]
+    assert client.get(f"{BASE}/artifacts", params={"kind": "checklist"}).json() == []
+    assert client.get(f"{BASE}/artifacts/n1").json()["data"]["text"] == "Monday"
+    assert client.get(f"{BASE}/artifacts/nope").status_code == 404
+    assert [r["version"] for r in client.get(f"{BASE}/artifacts/n1/revisions").json()] == [1, 2]
+    assert client.get(f"{BASE}/artifacts/nope/revisions").status_code == 404
+    only_t1 = client.get(f"{BASE}/events", params={"thread_id": "t1", "after_seq": 0, "limit": 10})
+    assert "message_posted" not in [e["event"]["type"] for e in only_t1.json()]
+    assert [t["id"] for t in client.get(f"{BASE}/threads").json()] == ["t1", "t2"]
+    assert client.get(f"{BASE}/threads/t1").json()["mode"] == "edit"
+    assert client.get(f"{BASE}/threads/t9").status_code == 404
+    assert client.get(f"{BASE}/proposals").json() == []
+    assert client.get(f"{BASE}/proposals", params={"status": "accepted"}).json() == []
+    assert client.get(f"{BASE}/runs/r1").status_code == 404
+
+
+def test_a_posted_message_runs_the_agent() -> None:
+    app, _ = build(
+        Script(call("create_artifact", kind="note", data={"text": "Plan"}), say("Done."))
+    )
+    with TestClient(app) as client:
+        client.post(f"{BASE}/commands", json=command("c1", type="create_thread", thread_id="t1"))
+        posted = client.post(
+            f"{BASE}/commands",
+            json=command("c2", type="post_message", thread_id="t1", content="Draft"),
+        )
+        assert posted.json()["outcome"]["type"] == "recorded"
+
+        def ended() -> bool:
+            return "run_ended" in [e["event"]["type"] for e in client.get(f"{BASE}/events").json()]
+
+        wait_for(ended)
+        [run_id] = {e["run_id"] for e in client.get(f"{BASE}/events").json() if e["run_id"]}
+        assert client.get(f"{BASE}/runs/{run_id}").json()["status"] == "completed"
+        stop = client.post(f"{BASE}/commands", json=command("c3", type="stop_run", run_id=run_id))
+        assert stop.status_code == 404, "a finished run cannot be stopped"
+        other = client.post(
+            "/v1/workspaces/w2/commands", json=command("c4", type="stop_run", run_id=run_id)
+        )
+        assert other.json()["rejection"]["entity"] == "run", (
+            "runs of other workspaces are invisible"
+        )
+
+
+def test_only_recent_command_ids_are_remembered() -> None:
+    app, _ = build(Script(), remembered_commands=1)
+    with TestClient(app) as client:
+        first = command("c1", type="create_thread", thread_id="t1")
+        client.post(f"{BASE}/commands", json=first)
+        client.post(f"{BASE}/commands", json=command("c2", type="create_thread", thread_id="t2"))
+        repeated = client.post(f"{BASE}/commands", json=first)
+        assert repeated.status_code == 409, "c1 was forgotten, so it ran again and was rejected"

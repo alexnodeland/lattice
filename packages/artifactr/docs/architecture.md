@@ -8,7 +8,7 @@
 | `artifactr.workspace` | Implemented, with in-memory storage |
 | `artifactr.agent` | Implemented |
 | `artifactr.sql` | Planned (phase 4) |
-| `artifactr.fastapi`, `artifactr.mcp` | Planned (phase 5) |
+| `artifactr.fastapi`, `artifactr.mcp` | Implemented |
 | `examples/docplan` | Planned (phase 6) |
 
 ## What artifactr is
@@ -282,7 +282,7 @@ await agent.run(
 )
 ```
 
-The `Runner` does this for every run it starts, sending frames to its `FanoutChannel`, an in-process fan-out keyed by `run_id`. Any connection can `runner.watch(run_id)` to receive a run's frames until it ends; watchers that fall behind lose their oldest frames rather than slowing the run. `NullChannel` drops frames for headless runs, and a pub/sub channel (Redis, NATS) can fan out across replicas.
+The `Runner` does this for every run it starts, sending frames to its `FanoutChannel`, an in-process fan-out keyed by `run_id`. It keeps each active run's frames (bounded), so any connection can `runner.watch(run_id)` mid-run and receive what the run has produced so far, then the rest until it ends; watchers that fall behind lose their oldest frames rather than slowing the run. `NullChannel` drops frames for headless runs, and a pub/sub channel (Redis, NATS) can fan out across replicas.
 
 The run holds a thread claim, not a socket: if the connection that started it drops, the run continues. Losing live frames is harmless, because the durable `message_posted`, `tool_returned` and `artifact_changed` events are authoritative. A client that reconnects mid-run replays the log from its last `seq` and watches the run again if it is still active.
 
@@ -297,11 +297,27 @@ The run holds a thread claim, not a socket: if the connection that started it dr
 
 ## Surfaces
 
+Every surface is a thin adapter: it authenticates, turns its input into commands, and hands them to `Runner.execute` ([ADR-0022](adr/0022-surfaces-over-one-command-handler.md)). Messages therefore start, steer or answer runs the same way everywhere, and every other command is a plain `Workspace.commit`.
+
 | Surface | Package | Role |
 |---|---|---|
-| WebSocket | `artifactr.fastapi` | The thread protocol: subscribe to a workspace log with resume, send commands, receive live frames for runs. See [`protocol.md`](protocol.md). |
-| REST | `artifactr.fastapi` | The same commands as HTTP endpoints, plus reads. Commands go through the same `Workspace.commit` and publish the same events. |
-| MCP | `artifactr.mcp` | External agents join the workspace as actors. Artifacts are resources, commands are tools, and change notifications flow through the MCP SDK's `SubscriptionBus`, fed by the log. Mounted on the application with `MCPServer.streamable_http_app()`. |
+| WebSocket | `artifactr.fastapi` | The thread protocol ([`protocol.md`](protocol.md)): `hello` and `welcome`, replay from a `seq` then live events on one subscription, command frames and results, and live frames for runs in followed threads or on request. |
+| REST | `artifactr.fastapi` | The same command frames at `POST .../commands`, and reads of artifacts, revisions, the log, threads, proposals and runs. |
+| MCP | `artifactr.mcp` | External agents join as `ExternalAgentActor`s: artifacts are resources at `artifactr://{tenant}/{workspace}/artifacts/{id}`, commands are tools, and artifact changes become resource-updated notifications on the server's `SubscriptionBus`. |
+
+```python
+app = FastAPI(lifespan=lifespan)
+app.include_router(artifactr_router(workspaces, runner, resolve_actor=resolve_actor), prefix="/v1")
+
+mcp = ArtifactrMcp(workspaces, runner, resolve=resolve_client)
+app.mount(
+    "/mcp", mcp.http_app(streamable_http_path="/")
+)  # run mcp.lifespan() in the app's lifespan
+```
+
+The WebSocket session reads with a single task and runs each command as its own task, so a `stop_run` is never stuck behind a slow command. All outgoing frames pass through one bounded outbox and one writer; a client too slow to keep up is disconnected (close code 4429) rather than holding events back, and resumes by `seq` when it reconnects. Recently seen `command_id`s are remembered per process, so a retried command returns its original result.
+
+The protocol's frames are Pydantic models in `artifactr.core.protocol`. `schemas/artifactr.v1.json` is generated from them (`make schema`) for clients to generate types from, and a test fails if it drifts.
 
 pydantic-ai's AG-UI and Vercel AI adapters may be added later as compatibility surfaces for simple frontends. They are request-scoped with client-supplied state, so they sit beside the thread protocol rather than replacing it.
 
@@ -400,6 +416,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0018](adr/0018-core-host-contract.md) | Core's host contract: needs, commit and record |
 | [0019](adr/0019-storage-protocol-and-workspace-handles.md) | One storage protocol behind workspace handles |
 | [0020](adr/0020-running-agents-in-threads.md) | Running agents in threads |
+| [0022](adr/0022-surfaces-over-one-command-handler.md) | Surfaces over one command handler |
 
 ## Open questions
 

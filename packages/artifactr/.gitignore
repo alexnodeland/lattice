@@ -184,3 +184,6 @@ cython_debug/
 .command_history
 
 *.db
+
+# Agent worktrees
+.claude/worktrees/

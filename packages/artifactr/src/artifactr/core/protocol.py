@@ -1,15 +1,20 @@
-"""The thread protocol's handshake and resume rule.
+"""The thread protocol: its frames, handshake and resume rule.
 
 A client says ``hello`` with the last ``seq`` it has seen; :func:`resume` decides where replay
-starts. Resume is by sequence number, never by timestamp (ADR-0005).
+starts. Resume is by sequence number, never by timestamp (ADR-0005). The frame models here are
+the protocol's source of truth; ``schemas/artifactr.v1.json`` is generated from them.
 """
 
-from typing import Final, Literal
+from typing import Annotated, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
+from artifactr.core.commands import Command
 from artifactr.core.errors import UnsupportedProtocol
-from artifactr.core.ids import ThreadId
+from artifactr.core.events import Envelope
+from artifactr.core.ids import RunId, ThreadId, WorkspaceId
+from artifactr.core.live import LiveFrame
+from artifactr.core.state import Outcome
 
 PROTOCOL: Final = "artifactr.v1"
 """The protocol version this library speaks."""
@@ -59,3 +64,110 @@ def resume(hello: Hello, *, head_seq: int, first_retained_seq: int = 1) -> Resum
         # The client has seen events this log does not have, or ones it no longer keeps.
         return ResumePlan(replay_after=oldest_resumable, reset=True)
     return ResumePlan(replay_after=hello.resume_after_seq)
+
+
+# ─── frames ───────────────────────────────────────────────────────────────────
+
+
+class StopRun(BaseModel):
+    """Cancel a run. Handled by the transport, not by core's rules."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    type: Literal["stop_run"] = "stop_run"
+    run_id: RunId
+
+
+class WatchRun(BaseModel):
+    """Receive a run's live frames on this connection. WebSocket only."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    type: Literal["watch_run"] = "watch_run"
+    run_id: RunId
+
+
+FrameCommand = Annotated[Command | StopRun | WatchRun, Field(discriminator="type")]
+"""Anything a client can ask for in a command frame."""
+
+
+class CommandFrame(BaseModel):
+    """A client's command, with an id that correlates it with its result.
+
+    ``command_id`` is also an idempotency key: the server deduplicates repeated ids.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["command"] = "command"
+    command_id: str = Field(min_length=1)
+    command: FrameCommand
+
+
+ClientFrame = Annotated[Hello | CommandFrame, Field(discriminator="type")]
+"""Any frame a client sends."""
+
+
+class ActiveRun(BaseModel):
+    """A run in progress, as listed in ``welcome``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    run_id: RunId
+    thread_id: ThreadId
+
+
+class Welcome(BaseModel):
+    """The server's answer to ``hello``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["welcome"] = "welcome"
+    protocol: str = PROTOCOL
+    workspace_id: WorkspaceId
+    head_seq: int
+    reset: bool = False
+    active_runs: tuple[ActiveRun, ...] = ()
+
+
+class EventFrame(Envelope):
+    """A durable event, delivered in its envelope."""
+
+    type: Literal["event"] = "event"
+
+
+class ReplayComplete(BaseModel):
+    """Every event up to ``up_to_seq`` has been replayed; what follows is live."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["replay_complete"] = "replay_complete"
+    up_to_seq: int
+
+
+class CommandResult(BaseModel):
+    """The result of one command frame."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["command_result"] = "command_result"
+    command_id: str
+    ok: bool
+    outcome: Outcome | None = None
+    rejection: dict[str, JsonValue] | None = None
+
+
+class ErrorFrame(BaseModel):
+    """A frame the server could not understand, or a failure it could not attribute."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["error"] = "error"
+    message: str
+
+
+ServerFrame = Annotated[
+    Welcome | EventFrame | ReplayComplete | LiveFrame | CommandResult | ErrorFrame,
+    Field(discriminator="type"),
+]
+"""Any frame the server sends."""

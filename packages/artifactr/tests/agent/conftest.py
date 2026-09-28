@@ -20,7 +20,7 @@ from pydantic_ai import (
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
 
 import tests.artifact_types  # noqa: F401  (registers the test artifact types)
-from artifactr.agent import ArtifactWorkspace, Runner, Session
+from artifactr.agent import ArtifactWorkspace, RunHandle, Runner, Sent, Session
 from artifactr.core import Envelope, Thread, UserActor
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
 from tests.artifact_types import Checklist, Note
@@ -159,3 +159,14 @@ def make_runner(agent: Agent[Session[Gate], Any], gate: Gate) -> Runner[Gate]:
 
 def types(envelopes: Sequence[Envelope]) -> list[str]:
     return [envelope.event.type for envelope in envelopes]
+
+
+def started(sent: Sent) -> RunHandle:
+    """The run a message or answer started or resumed."""
+    assert sent.run is not None, "expected the message to start or resume a run"
+    return sent.run
+
+
+def event_as[E](envelope: Envelope, event_type: type[E]) -> E:
+    assert isinstance(envelope.event, event_type), f"{envelope.event.type} is not {event_type}"
+    return envelope.event

@@ -7,9 +7,18 @@ import pytest
 from pydantic_ai import FunctionToolset, ModelRequest, RunContext
 
 from artifactr.agent import Session
-from artifactr.core import EditArtifact, SetFocus, SetThreadMode, TextEdit, TextEdits, Thread
+from artifactr.core import (
+    EditArtifact,
+    RunEnded,
+    SetFocus,
+    SetThreadMode,
+    TextEdit,
+    TextEdits,
+    Thread,
+    ToolReturned,
+)
 from artifactr.workspace import Workspace
-from tests.agent.conftest import Gate, Script, call, make_agent, make_runner, say, types
+from tests.agent.conftest import Gate, Script, call, event_as, make_agent, make_runner, say, types
 from tests.artifact_types import Note
 
 
@@ -27,10 +36,10 @@ async def test_a_message_during_a_run_steers_it(
 ) -> None:
     script = Script(call("hold"), say("Switching to Monday."))
     runner = make_runner(make_agent(script, tools=[app_tools]), gate)
-    handle = await runner.send(ws, thread.id, "Plan the launch for Friday")
+    handle = (await runner.send(ws, thread.id, "Plan the launch for Friday")).run
     assert handle is not None
     await _started(gate)
-    assert await runner.send(ws, thread.id, "Actually, make it Monday") is None
+    assert (await runner.send(ws, thread.id, "Actually, make it Monday")).run is None
     await _settle()
     gate.release.set()
     await handle.wait()
@@ -44,7 +53,7 @@ async def test_others_changes_during_a_run_are_delivered(
     await ws.commit(SetFocus(thread_id=thread.id, artifact_ids=("n1",)))
     script = Script(call("read_artifact", artifact_id="n1"), call("hold", call_id="c2"), say("ok"))
     runner = make_runner(make_agent(script, tools=[app_tools]), gate)
-    handle = await runner.send(ws, thread.id, "Review the plan")
+    handle = (await runner.send(ws, thread.id, "Review the plan")).run
     assert handle is not None
     await _started(gate)
     await ws.commit((await ws.get(Note, "n1")).edit_text("Friday", "Monday"))
@@ -71,7 +80,7 @@ async def test_a_rejected_tool_call_becomes_a_retry(
     retry = _retry_text(script.requests[1])
     assert "the anchor 'Sunday' is not found" in retry
     log = await ws.read()
-    statuses = [e.event.status for e in log if e.event.type == "tool_returned"]  # type: ignore[union-attr]
+    statuses = [event_as(e, ToolReturned).status for e in log if e.event.type == "tool_returned"]
     assert statuses == ["retry", "ok"]
     assert (await ws.get(Note, "n1")).data.text == "Ship Monday"
 
@@ -108,8 +117,9 @@ async def test_a_tool_failure_fails_the_run(ws: Workspace, thread: Thread, gate:
         )
     log = await ws.read()
     returned = next(e.event for e in log if e.event.type == "tool_returned")
-    assert (returned.status, returned.summary) == ("error", "ValueError: disk full")  # type: ignore[union-attr]
-    assert log[-1].event.status == "failed"  # type: ignore[union-attr]
+    assert isinstance(returned, ToolReturned)
+    assert (returned.status, returned.summary) == ("error", "ValueError: disk full")
+    assert event_as(log[-1], RunEnded).status == "failed"
 
 
 async def test_in_suggest_mode_edits_become_proposals(

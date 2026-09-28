@@ -1,157 +1,365 @@
-# System Architecture
+# Architecture
 
-## Overview
+> **Status:** accepted design, implementation in progress. The code currently in `src/` is an earlier prototype that this design replaces. Decisions are recorded in [`adr/`](adr/README.md); the wire protocol is specified in [`protocol.md`](protocol.md).
 
-This document outlines the architecture for our LLM-enabled platform that helps users transform ideas into structured product requirement documents (PRDs). The system consists of three main components:
+## What artifactr is
 
-1. **Frontend**: A chat-based interface with document editing capabilities
-2. **Backend**: A service layer that manages LLM interactions and business logic
-3. **Database**: Persistent storage for user data, documents, and conversation history
+artifactr is a Python library for building chat applications in which a person and an agent collaborate through **shared, mutually editable artifacts**: documents, plans, specs, datasets, anything with structure.
 
-## System Components
+The chat is one channel of communication. The artifacts are a second one. When the agent restructures a plan, or a person rewrites a paragraph the agent drafted, the edit says something about how each side is thinking. artifactr makes those edits first-class: versioned, attributed to whoever made them, visible to every participant, and fed back into the agent's context.
 
-### Frontend
+The library provides the machinery; applications provide the artifact types. A reference implementation, [`examples/docplan`](#build-plan) (a Markdown document plus a structured plan), is built on the library's public API as one implementation of it.
 
-The frontend provides an interactive chat terminal with document editing capabilities:
+### Goals
 
-- **Chat Interface**
-  - Real-time messaging with the LLM
-  - Message history visualization
-  - Typing indicators and response streaming
-  - Support for rich text formatting (markdown)
+- Downstream projects define an artifact type by subclassing a Pydantic model. Versioning, conflict handling, change history, agent tools and transports come from the library.
+- Every change, from any participant, takes the same path and produces the same events.
+- The agent always knows what changed since it last looked, and who changed it.
+- Multi-tenant, with many concurrent chats sharing a workspace's artifacts.
+- Idiomatic use of Pydantic, pydantic-ai, SQLAlchemy, FastAPI and the MCP SDK, rather than parallel abstractions next to them.
+- Small: six core concepts, readable in an afternoon.
 
-- **Document Editor**
-  - Side-by-side view of chat and document
-  - Real-time document updates based on LLM suggestions
-  - Syntax highlighting for different document sections
-  - Version history with diff visualization
+### Non-goals (for now)
 
-- **Version Control**
-  - Atomic commits with descriptive messages
-  - Ability to browse and restore previous versions
-  - Branching capability for exploring alternative approaches
-  - Visual diff between versions
+- Character-level real-time co-editing (CRDTs). Optimistic concurrency with patches covers turn-based collaboration; CRDT-backed types can come later behind the same interfaces.
+- A frontend. The protocol is specified and typed; applications build their own UIs.
+- Hosting or deployment tooling.
 
-- **Technologies**
-  - React.js for UI components
-  - Redux for state management
-  - Socket.io for real-time communication
-  - Monaco Editor for document editing
-  - Diff-Match-Patch for version comparison
+## Core concepts
 
-### Backend
+| Concept | What it is |
+|---|---|
+| **Actor** | Who did something: a user, the built-in agent (per run), an external agent connected over MCP, or the system. Every event is attributed to one. |
+| **Artifact** | A Pydantic model subclass that defines one artifact type. Stored instances are `Versioned[T]`: the data plus its id, version and last actor. |
+| **Command** | An intent to change the workspace: edit an artifact, propose an edit, answer a proposal, post a message. Commands can be rejected. |
+| **Event** | A fact that happened, appended to the workspace's log with a sequence number (`seq`). Events are never rejected or rewritten. |
+| **Workspace** | A tenant-scoped handle over artifacts, threads and the event log. The only way to read or write. |
+| **Session** | The pydantic-ai dependencies for one agent run: a workspace handle bound to the agent's actor, the thread, the artifacts in focus, and the application's own deps. |
 
-The backend manages LLM interactions and business logic:
+Supporting types: `Envelope` (an event plus its `seq`, actor, timestamp and scope), `Proposal` (a suggested change awaiting a decision), and `Thread` (a chat).
 
-- **API Layer**
-  - RESTful endpoints for CRUD operations
-  - WebSocket server for real-time communication
-  - Authentication and authorization middleware
-  - Rate limiting and request validation
+## Layers
 
-- **LLM Service**
-  - Integration with LLM providers (OpenAI, Anthropic, etc.)
-  - Context management for maintaining conversation history
-  - Prompt engineering and templating
-  - Response parsing and formatting
+```mermaid
+graph TD
+    app["Your application"] --> fastapi["artifactr.fastapi<br/>WebSocket + REST"]
+    app --> mcp["artifactr.mcp<br/>MCP server"]
+    app --> agent
+    fastapi --> agent["artifactr.agent<br/>pydantic-ai capability"]
+    fastapi --> workspace
+    mcp --> workspace
+    agent --> workspace["artifactr.workspace<br/>scoped handles, storage protocols"]
+    sql["artifactr.sql<br/>SQLAlchemy storage"] --> workspace
+    workspace --> core["artifactr.core<br/>pure, synchronous rules"]
+```
 
-- **Document Service**
-  - Document creation and management
-  - Version control system integration
-  - Document validation against PRD templates
-  - Export functionality (PDF, Word, etc.)
+Dependencies point one way. Each layer is usable without the ones above it.
 
-- **User Service**
-  - User authentication and profile management
-  - Subscription and billing integration
-  - Usage tracking and analytics
-  - Collaboration features
+| Package | Depends on | Responsibility |
+|---|---|---|
+| `artifactr.core` | pydantic, jsonpatch | Every rule. Pure, synchronous, no I/O, no pydantic-ai. |
+| `artifactr.workspace` | core | `Workspaces`, `Workspace`, storage protocols, in-memory storage. |
+| `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async | Durable storage and migrations. |
+| `artifactr.agent` | workspace, pydantic-ai | The `ArtifactWorkspace` capability, `Session`, live-output helpers. |
+| `artifactr.fastapi` (extra) | agent, FastAPI | The thread protocol over WebSocket, and REST commands. |
+| `artifactr.mcp` (extra) | workspace, mcp | Artifacts as MCP resources, commands as MCP tools. |
 
-- **Technologies**
-  - Node.js with Express or NestJS
-  - Socket.io for WebSocket support
-  - JWT for authentication
-  - Redis for caching and rate limiting
+### `artifactr.core`: sans-IO
 
-### Database
+Core holds every rule as plain functions over immutable values. Storage and transport belong to the host, which loads state, calls core, and saves what core returns inside its own transaction.
 
-The database provides persistent storage for all system data:
+```python
+result = core.commit(command, current=state, actor=actor)   # CommitResult, or raises a Rejection
+notes  = core.change_notes(envelopes, since=seq, focus=artifact_ids, viewer=actor)
+plan   = core.resume(hello, head_seq=head)
+```
 
-- **User Data**
-  - User profiles and authentication information
-  - Subscription and billing details
-  - Usage statistics and preferences
+- `commit` validates the command, applies the artifact type's write policy, checks the base version, applies the patch, validates the result against the type, and returns a `CommitResult`: the outcome (`Applied` or `Proposed`), the new revisions, and the events to append.
+- `respond` applies a person's decision on a proposal, including any changes they made to it, rebased onto the artifact's current version.
+- `change_notes` turns a slice of the log into short, attributed notes for the agent. It keeps only artifacts the thread is focused on and drops the viewer's own changes.
+- `resume` decides what a reconnecting client needs: a replay range or, if that range is no longer retained, a snapshot.
 
-- **Documents**
-  - PRD content and metadata
-  - Document templates and schemas
-  - Version history and change tracking
+Rejections are exceptions with typed fields: `VersionConflict(base, head, changes_since)`, `ValidationFailed(errors)`, `PatchFailed(reason)`, `NotFound`, `Forbidden`.
 
-- **Conversation History**
-  - Chat messages and timestamps
-  - LLM context windows
-  - User feedback and ratings
+Because core is pure, its behaviour is pinned by a **conformance suite** of JSON fixtures: given a state and a command, expect these events or this rejection. The fixtures are the language-neutral specification. Any future port of core, or a hot path rewritten as a native extension, must pass them.
 
-- **Technologies**
-  - PostgreSQL for relational data
-  - MongoDB for document storage (optional)
-  - Redis for caching and session management
+Core events form a **closed** discriminated union, so pyright checks `match event:` blocks ending in `assert_never` for exhaustiveness. Applications extend the log through one **open** family, `AppEvent`, whose unknown tags degrade to a raw payload instead of failing. This mirrors how pydantic-ai separates its own events from application `CustomEvent`s.
 
-## Data Flow
+### Defining an artifact type
 
-1. **User Interaction Flow**
-   - User inputs idea or request in chat interface
-   - Frontend sends message to backend via WebSocket
-   - Backend enriches prompt with context and sends to LLM
-   - LLM generates response
-   - Backend processes response and sends to frontend
-   - Frontend displays response and updates document if needed
-   - Changes are committed to version control with descriptive message
+```python
+from typing import ClassVar, Literal
 
-2. **Document Creation Flow**
-   - User initiates new PRD creation
-   - System creates document from template
-   - User describes product idea through chat
-   - LLM suggests document sections and content
-   - User approves or modifies suggestions
-   - System commits changes to document
-   - Process continues iteratively until PRD is complete
+from pydantic import BaseModel
 
-3. **Version Control Flow**
-   - Each significant change creates a commit
-   - Commits include metadata (timestamp, user, description)
-   - Users can browse version history
-   - Users can compare versions with visual diff
-   - Users can restore previous versions if needed
+from artifactr import Artifact, MarkdownArtifact, WritePolicy, new_id
 
-## Security Considerations
 
-- End-to-end encryption for sensitive data
-- Secure API authentication using JWT
-- Role-based access control for documents
-- Regular security audits and penetration testing
-- Compliance with data protection regulations (GDPR, CCPA)
+class Task(BaseModel):
+    title: str
+    status: Literal["todo", "doing", "done"] = "todo"
 
-## Scalability Considerations
 
-- Microservices architecture for independent scaling
-- Load balancing for API endpoints
-- Caching layer for frequently accessed data
-- Asynchronous processing for long-running tasks
-- Database sharding for large datasets
+class Plan(Artifact):  # registered as "plan"
+    write_policy: ClassVar[WritePolicy] = "propose"
 
-## Monitoring and Observability
+    goal: str = ""
+    tasks: dict[str, Task] = {}  # keyed by id, so patch paths stay stable
 
-- Centralized logging system
-- Performance metrics collection
-- Error tracking and alerting
-- User behavior analytics
-- System health dashboards
+    def add_task(self, title: str) -> str:
+        task_id = new_id()
+        self.tasks[task_id] = Task(title=title)
+        return task_id
 
-## Deployment Architecture
+    def render_for_agent(self) -> str:
+        lines = [f"Goal: {self.goal}"]
+        lines += [f"- [{t.status}] {t.title} ({tid})" for tid, t in self.tasks.items()]
+        return "\n".join(lines)
 
-- Containerized applications using Docker
-- Orchestration with Kubernetes
-- CI/CD pipeline for automated testing and deployment
-- Multi-environment setup (development, staging, production)
-- Cloud-based infrastructure (AWS, GCP, or Azure)
+
+class Doc(MarkdownArtifact):  # registered as "doc"; edited with anchored text replacements
+    pass
+```
+
+Registration happens in `__pydantic_init_subclass__`, Pydantic's hook that runs after the model's fields are built. The type name is derived from the class name and can be overridden with `class Plan(Artifact, name="...")`, the same convention pydantic-ai uses for `CustomEvent`.
+
+The library defines the patch kinds:
+
+- **JSON Patch** (RFC 6902) for `Artifact` subclasses. `Versioned[T].edit(fn)` copies the data, lets `fn` mutate the copy, and diffs the result into a patch against the current version.
+- **Anchored text edits** for `MarkdownArtifact`. Each edit replaces an exact string that must occur exactly once, the edit form language models perform most reliably.
+
+Agents do not write raw JSON Patch. They get domain tools from the application (`add_task`, `set_status`) or the generic text-edit tool for documents, and those tools produce patches.
+
+```python
+plan = await ws.get(Plan, plan_id)  # Versioned[Plan]
+outcome = await ws.commit(plan.edit(lambda p: p.add_task("Ship v1")))
+```
+
+## Data model
+
+```mermaid
+erDiagram
+    TENANT ||--o{ WORKSPACE : owns
+    WORKSPACE ||--o{ ARTIFACT : contains
+    WORKSPACE ||--o{ THREAD : contains
+    WORKSPACE ||--o{ EVENT : "log ordered by seq"
+    ARTIFACT ||--o{ REVISION : "append-only"
+    ARTIFACT ||--o{ PROPOSAL : "suggested changes"
+    THREAD }o--o{ ARTIFACT : "focuses on"
+    THREAD ||--o{ RUN : "one active at a time"
+```
+
+- **Artifacts belong to the workspace**, not to a chat, so several chats and people can work on the same plan. A thread lists the artifacts it is focused on.
+- **Revisions are append-only.** Every committed change writes a revision with its version, patch, resulting data and actor. Reverting writes a new revision; versions never go backwards.
+- **One event log per workspace**, with a single gap-free `seq`. Events carry an optional `thread_id` and `run_id`, and subscribers filter on them.
+- **Proposals** are durable objects that reference an artifact and the version they were based on.
+- **Model history** (pydantic-ai `ModelMessage`s, serialized with `ModelMessagesTypeAdapter`) is stored per thread next to the log, not reconstructed from it.
+
+## The write path
+
+Every change, whether from the built-in agent, a person in a UI, an external agent over MCP, or a script, goes through one path.
+
+```mermaid
+sequenceDiagram
+    participant A as Actor (agent tool, REST, WebSocket, MCP)
+    participant W as Workspace
+    participant C as core
+    participant S as Storage (host transaction)
+    participant L as Subscribers
+    A->>W: commit(command)
+    W->>S: begin, load current state
+    W->>C: commit(command, current, actor)
+    alt accepted
+        C-->>W: revisions and events
+        W->>S: save revisions, assign seq, append events, commit
+        W-->>A: Applied or Proposed
+        S-->>L: new envelopes (subscribe after_seq)
+    else rejected
+        C-->>W: raises VersionConflict, ValidationFailed, ...
+        W->>S: rollback
+        W-->>A: raises the rejection
+    end
+```
+
+`Workspace.commit` returns `Applied(version, seq)` when the change was written, or `Proposed(proposal_id, seq)` when the artifact type's write policy turned it into a proposal. Run lifecycle facts (a run started, a tool was called) are recorded through `Workspace.record`, which uses the same transaction and sequencing. Nothing else writes to storage.
+
+As a result:
+
+- No surface has its own copy of accept, merge or validation logic.
+- A person's edit is as visible to the agent as the agent's edit is to the person.
+- The host's transaction can include its own tables, because core never touches storage.
+
+## The agent
+
+artifactr plugs into pydantic-ai as one **capability**, `ArtifactWorkspace`. A turn is an ordinary `agent.run(...)`; there is no custom runner, and the capability composes with any others the application uses.
+
+```python
+agent = Agent(
+    "anthropic:claude-sonnet-5-5",
+    deps_type=Session[AppDeps],
+    capabilities=[ArtifactWorkspace(types=[Doc, Plan], toolsets=[plan_tools])],
+)
+```
+
+| Capability hook | What `ArtifactWorkspace` does |
+|---|---|
+| `get_toolset` | Generic tools (list, read, edit document text, propose) plus the application's toolsets. |
+| `get_instructions` | Renders focused artifacts with `render_for_agent`, fresh from storage. Lists currently available actions as text, so tool definitions never change and the prompt cache stays warm. |
+| `before_run` | Records `run_started` and the user's message. Adds change notes since the thread's last-seen `seq` to the prompt. |
+| `for_run` | Subscribes to the workspace log for the duration of the run. Other actors' changes to focused artifacts, and new messages in this thread, are delivered into the live run with `ctx.enqueue(priority="asap")`. |
+| `on_tool_execute_error` | Turns `VersionConflict` into `ModelRetry` with a summary of what changed, so tools never catch it themselves. |
+| `on_event` | Records tool calls and results as durable events. |
+| `after_run`, `on_run_error` | Stores the run's new `ModelMessage`s, records the final assistant message, and records `run_ended` with its status and usage. |
+
+Tools are plain pydantic-ai tools over `RunContext[Session]`:
+
+```python
+plan_tools = FunctionToolset[Session[AppDeps]]()
+
+
+@plan_tools.tool
+async def add_task(ctx: RunContext[Session[AppDeps]], plan_id: str, title: str) -> str:
+    """Add a task to a plan."""
+    plan = await ctx.deps.workspace.get(Plan, plan_id)
+    match await ctx.deps.workspace.commit(plan.edit(lambda p: p.add_task(title))):
+        case Applied(version=version):
+            return f"Added. The plan is now at version {version}."
+        case Proposed(proposal_id=proposal_id):
+            return f"Proposed adding the task ({proposal_id}); the user will review it."
+```
+
+Tools emit ephemeral progress, such as a draft of an artifact being generated, with `ctx.emit(...)` using a pydantic-ai `CustomEvent` subclass. Those reach the live channel only, never the log.
+
+### Change notes and steering
+
+- When a run starts, the agent receives notes such as *"alice edited plan-1 (v7 → v8): marked 'Ship v1' done; added task 'Write changelog'."* Notes cover only the artifacts the thread is focused on and exclude the agent's own changes.
+- While a run is active, the same notes, and any new message the person sends in the thread, are enqueued into the live run and reach the model at its next request. A person can steer a long run without stopping it.
+- Focused artifacts are rendered from storage, never cached across runs or connections.
+
+### Proposals and pausing
+
+- Each artifact type declares a `write_policy`: `"direct"` or `"propose"`. A thread can be switched into suggest mode, which forces proposals for every type.
+- Proposals do not block the run. The agent keeps working; the person accepts, rejects or edits the proposal whenever and from any surface; the outcome reaches the agent as a change note. When a proposal is accepted with edits, the note includes the person's changes as a diff.
+- Blocking points, such as a question the agent needs answered or a tool that requires approval, use pydantic-ai's deferred tools (`CallDeferred`, `ApprovalRequired`). The run ends with `DeferredToolRequests`, recorded as `run_paused`. When the answers arrive from any surface, the host resumes with `agent.run(..., deferred_tool_results=...)` under the same artifactr `run_id`. The pause survives restarts because nothing waits in memory.
+
+## Live output
+
+The event log carries durable domain events only. Token-level output belongs to whoever drives the run, passed as an independent parameter:
+
+```python
+async with ws.open_run(thread_id) as run:  # lease: one active run per thread
+    await agent.run(
+        prompt,
+        deps=run.session,
+        message_history=await run.history(),
+        event_stream_handler=forward_live(channel),  # caller-owned
+    )
+```
+
+`forward_live` maps pydantic-ai stream events (text and thinking deltas, tool-call argument deltas, and `CustomEvent`s emitted by tools) to the protocol's live frames and sends them to a `LiveChannel`:
+
+- `WebSocketChannel`: the connection that started the run.
+- `FanoutChannel`: in-process fan-out keyed by `run_id`, so other clients watching the thread can attach.
+- A pub/sub implementation (Redis, NATS) for fan-out across replicas, as an optional add-on.
+- `NullChannel` for headless runs.
+
+The run holds a lease, not a socket: if the connection that started it drops, the run continues and the channel detaches. Losing live frames is harmless, because the durable `assistant_message`, `tool_returned` and `artifact_changed` events are authoritative. A client that reconnects mid-run replays the log from its last `seq` and reattaches to the run's live channel if the run is still active.
+
+## Tenancy and concurrency
+
+- **Scoped handles.** `await workspaces.open(tenant_id, workspace_id, actor=...)` returns a `Workspace` bound to that tenant, workspace and actor. Nothing below it accepts a raw tenant id, so a query that crosses tenants cannot be written. Postgres row-level security can be layered underneath as defence in depth.
+- **Actors are bound to handles.** `ws.as_actor(agent_actor)` returns a handle for the agent, and commits through it are attributed to the agent.
+- **Optimistic concurrency.** Every edit names the version it was based on. A stale edit is rejected with the changes made since, so the agent retries against fresh state and a UI can rebase or ask the person.
+- **One active run per thread**, enforced by a lease (`thread.active_run_id` with an expiry) that works across replicas. Concurrency happens across threads. A message sent during a run steers it instead of queueing.
+- **Sequencing.** `seq` is assigned inside the commit transaction (`UPDATE workspace SET head_seq = head_seq + :n RETURNING head_seq`), giving a gap-free total order per workspace. This serializes commits within one workspace; tokens are not in the log, so commit volume stays modest.
+
+## Surfaces
+
+| Surface | Package | Role |
+|---|---|---|
+| WebSocket | `artifactr.fastapi` | The thread protocol: subscribe to a workspace log with resume, send commands, receive live frames for runs. See [`protocol.md`](protocol.md). |
+| REST | `artifactr.fastapi` | The same commands as HTTP endpoints, plus reads. Commands go through the same `Workspace.commit` and publish the same events. |
+| MCP | `artifactr.mcp` | External agents join the workspace as actors. Artifacts are resources, commands are tools, and change notifications flow through the MCP SDK's `SubscriptionBus`, fed by the log. Mounted on the application with `MCPServer.streamable_http_app()`. |
+
+pydantic-ai's AG-UI and Vercel AI adapters may be added later as compatibility surfaces for simple frontends. They are request-scoped with client-supplied state, so they sit beside the thread protocol rather than replacing it.
+
+## Storage protocols
+
+```python
+class Storage(Protocol):
+    def transaction(self, scope: Scope) -> AbstractAsyncContextManager[Transaction]: ...
+    async def read(self, scope: Scope, *, after_seq: int, limit: int) -> list[Envelope]: ...
+    def subscribe(
+        self, scope: Scope, *, after_seq: int, where: EventFilter | None = None
+    ) -> AsyncIterator[Envelope]: ...
+
+
+class Transaction(Protocol):
+    async def load(self, artifact_id: ArtifactId) -> Versioned[Artifact] | None: ...
+    async def save(self, result: CommitResult) -> list[Envelope]: ...  # assigns seq
+```
+
+Alongside `Storage`, the workspace layer defines `HistoryStore` (a thread's `ModelMessage`s) and `RunLeases`. Two implementations of each ship:
+
+- **In-memory**, for tests and examples. Subscribers wait on an `asyncio.Condition`.
+- **SQLAlchemy 2 async** (`artifactr.sql`), with Alembic migrations. Subscribers use Postgres `LISTEN/NOTIFY`, or polling on SQLite.
+
+`subscribe(after_seq=...)` is the only read path for replay, live fan-out, hooks, MCP notifications and change notes. Because a subscription starts from a `seq`, there is no gap to manage between replaying history and following live events.
+
+## Dependencies
+
+| Dependency | Used for | Current major (2026-09) |
+|---|---|---|
+| pydantic | Artifact types, commands, events, JSON Schema | 2.13 |
+| jsonpatch | RFC 6902 apply and diff in core | 1.33 |
+| pydantic-ai-slim | Agent runtime: capabilities, toolsets, deferred tools, message history | 2.51 |
+| SQLAlchemy (asyncio) | SQL storage | 2.1 |
+| FastAPI | WebSocket and REST adapter | 0.141 |
+| mcp | MCP server (`MCPServer`, subscriptions) | 2.2 |
+
+Python 3.12+. Tooling: uv, ruff, pyright in strict mode, pytest.
+
+Observability uses pydantic-ai's built-in OpenTelemetry instrumentation. The capability adds tenant, workspace, thread and run as span attributes.
+
+## Testing
+
+- **Core:** conformance fixtures, plus property tests (hypothesis) that patches round-trip: applying `diff(a, b)` to `a` gives `b`.
+- **Workspace:** one suite runs against both in-memory and SQL storage.
+- **Agent:** scripted runs with pydantic-ai's `TestModel` and `FunctionModel`, so no test calls a model API. Assertions are on the events written, including conflicts, steering and deferred pauses.
+- **Adapters:** WebSocket contract tests with FastAPI's `TestClient`, and an MCP client round-trip.
+- **Protocol:** the JSON Schema in `schemas/` is generated from the models and checked in. CI fails if it drifts.
+
+## Build plan
+
+1. `artifactr.core` and its conformance fixtures.
+2. `artifactr.workspace` with in-memory storage.
+3. `artifactr.agent` on pydantic-ai 2.x.
+4. `artifactr.sql` and migrations.
+5. `artifactr.fastapi` and `artifactr.mcp`, plus protocol schema generation.
+6. `examples/docplan` and the CLI; then remove the prototype in `src/`.
+
+## Decisions
+
+| ADR | Decision |
+|---|---|
+| [0001](adr/0001-python-library-with-sans-io-core.md) | Python library with a sans-IO core |
+| [0002](adr/0002-single-write-path.md) | One write path: commands through `Workspace.commit` |
+| [0003](adr/0003-artifact-types-as-pydantic-subclasses.md) | Artifact types are Pydantic subclasses with library-defined patch kinds |
+| [0004](adr/0004-optimistic-concurrency-and-revisions.md) | Optimistic concurrency and append-only revisions |
+| [0005](adr/0005-one-event-log-per-workspace.md) | One durable event log per workspace |
+| [0006](adr/0006-agent-integration-as-pydantic-ai-capability.md) | Agent integration as a pydantic-ai capability |
+| [0007](adr/0007-caller-owned-live-output.md) | Live output is owned by the caller, not the log |
+| [0008](adr/0008-agent-perception-and-steering.md) | Agent perception: change notes, fresh rendering, steering |
+| [0009](adr/0009-write-policies-and-non-blocking-proposals.md) | Write policies and non-blocking proposals |
+| [0010](adr/0010-pausing-with-deferred-tools.md) | Pausing with pydantic-ai deferred tools |
+| [0011](adr/0011-workspace-scoped-artifacts-and-tenant-handles.md) | Workspace-scoped artifacts and tenant-scoped handles |
+| [0012](adr/0012-surfaces-websocket-rest-mcp.md) | Surfaces: WebSocket thread protocol, REST commands, MCP |
+| [0013](adr/0013-library-with-reference-implementation.md) | A library with adapters and a reference implementation |
+
+## Open questions
+
+- **Log retention.** When old envelopes are compacted, `resume` falls back to a snapshot. The snapshot format is not yet specified.
+- **Very hot workspaces.** Assigning `seq` serializes commits per workspace. If that becomes a bottleneck, the log could be sharded by artifact group behind the same per-workspace cursor.
+- **Change-note volume.** With many concurrent chats, notes may need coalescing beyond focus filtering.
+- **Crash recovery for runs.** A run interrupted by a process crash is recorded as failed when its lease expires. pydantic-ai's durable execution integrations (Temporal, DBOS, Prefect) could make such runs resumable.
+- **`jsonpatch` maintenance.** It is stable but rarely updated; its surface is small enough to vendor if needed.

@@ -1,6 +1,15 @@
 # Architecture
 
-> **Status:** accepted design, implementation in progress. The code currently in `src/` is an earlier prototype that this design replaces. Decisions are recorded in [`adr/`](adr/README.md); the wire protocol is specified in [`protocol.md`](protocol.md).
+> **Status:** accepted design, being built in the phases tracked by [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). This document is evergreen: it is updated in the same pull request as the code that changes it, and the table below shows what exists today. Decisions are recorded in [`adr/`](adr/README.md), proposals in [`rfcs/`](rfcs/README.md), and the wire protocol in [`protocol.md`](protocol.md).
+
+| Package | Status |
+|---|---|
+| `artifactr.core` | Planned (RFC-0001 phase 1) |
+| `artifactr.workspace` | Planned (phase 2) |
+| `artifactr.agent` | Planned (phase 3) |
+| `artifactr.sql` | Planned (phase 4) |
+| `artifactr.fastapi`, `artifactr.mcp` | Planned (phase 5) |
+| `examples/docplan` | Planned (phase 6) |
 
 ## What artifactr is
 
@@ -69,9 +78,9 @@ Dependencies point one way. Each layer is usable without the ones above it.
 Core holds every rule as plain functions over immutable values. Storage and transport belong to the host, which loads state, calls core, and saves what core returns inside its own transaction.
 
 ```python
-result = core.commit(command, current=state, actor=actor)   # CommitResult, or raises a Rejection
-notes  = core.change_notes(envelopes, since=seq, focus=artifact_ids, viewer=actor)
-plan   = core.resume(hello, head_seq=head)
+result = core.commit(command, current=state, actor=actor)  # CommitResult, or raises a Rejection
+notes = core.change_notes(envelopes, since=seq, focus=artifact_ids, viewer=actor)
+plan = core.resume(hello, head_seq=head)
 ```
 
 - `commit` validates the command, applies the artifact type's write policy, checks the base version, applies the patch, validates the result against the type, and returns a `CommitResult`: the outcome (`Applied` or `Proposed`), the new revisions, and the events to append.
@@ -197,13 +206,14 @@ artifactr plugs into pydantic-ai as one **capability**, `ArtifactWorkspace`. A t
 agent = Agent(
     "anthropic:claude-sonnet-5-5",
     deps_type=Session[AppDeps],
-    capabilities=[ArtifactWorkspace(types=[Doc, Plan], toolsets=[plan_tools])],
+    toolsets=[plan_tools],
+    capabilities=[ArtifactWorkspace(types=[Doc, Plan])],
 )
 ```
 
 | Capability hook | What `ArtifactWorkspace` does |
 |---|---|
-| `get_toolset` | Generic tools (list, read, edit document text, propose) plus the application's toolsets. |
+| `get_toolset` | Generic tools: list, read, edit document text, propose. Application toolsets are registered on the agent itself ([ADR-0017](adr/0017-application-toolsets-and-capability-events.md)). |
 | `get_instructions` | Renders focused artifacts with `render_for_agent`, fresh from storage. Lists currently available actions as text, so tool definitions never change and the prompt cache stays warm. |
 | `before_run` | Records `run_started` and the user's message. Adds change notes since the thread's last-seen `seq` to the prompt. |
 | `for_run` | Subscribes to the workspace log for the duration of the run. Other actors' changes to focused artifacts, and new messages in this thread, are delivered into the live run with `ctx.enqueue(priority="asap")`. |
@@ -228,7 +238,7 @@ async def add_task(ctx: RunContext[Session[AppDeps]], plan_id: str, title: str) 
             return f"Proposed adding the task ({proposal_id}); the user will review it."
 ```
 
-Tools emit ephemeral progress, such as a draft of an artifact being generated, with `ctx.emit(...)` using a pydantic-ai `CustomEvent` subclass. Those reach the live channel only, never the log.
+Application tools emit ephemeral progress, such as a draft of an artifact being generated, with `ctx.emit(...)` and a pydantic-ai `CustomEvent` subclass. artifactr's own tools and hooks emit `CapabilityEvent`s in the `artifactr` namespace, as pydantic-ai requires of capabilities ([ADR-0017](adr/0017-application-toolsets-and-capability-events.md)). Both reach the live channel only, never the log.
 
 ### Change notes and steering
 
@@ -331,12 +341,15 @@ Observability uses pydantic-ai's built-in OpenTelemetry instrumentation. The cap
 
 ## Build plan
 
+The phases, their exit criteria and their progress are tracked in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md).
+
 1. `artifactr.core` and its conformance fixtures.
 2. `artifactr.workspace` with in-memory storage.
 3. `artifactr.agent` on pydantic-ai 2.x.
 4. `artifactr.sql` and migrations.
 5. `artifactr.fastapi` and `artifactr.mcp`, plus protocol schema generation.
-6. `examples/docplan` and the CLI; then remove the prototype in `src/`.
+6. `examples/docplan` and the CLI.
+7. The documentation website and brand.
 
 ## Decisions
 
@@ -355,6 +368,10 @@ Observability uses pydantic-ai's built-in OpenTelemetry instrumentation. The cap
 | [0011](adr/0011-workspace-scoped-artifacts-and-tenant-handles.md) | Workspace-scoped artifacts and tenant-scoped handles |
 | [0012](adr/0012-surfaces-websocket-rest-mcp.md) | Surfaces: WebSocket thread protocol, REST commands, MCP |
 | [0013](adr/0013-library-with-reference-implementation.md) | A library with adapters and a reference implementation |
+| [0014](adr/0014-trunk-based-development-with-rfcs-and-adrs.md) | Trunk-based development with RFCs, ADRs and evergreen docs |
+| [0015](adr/0015-quality-gates.md) | Quality gates |
+| [0016](adr/0016-mit-license.md) | MIT license |
+| [0017](adr/0017-application-toolsets-and-capability-events.md) | Application toolsets register on the agent; the capability emits capability events |
 
 ## Open questions
 

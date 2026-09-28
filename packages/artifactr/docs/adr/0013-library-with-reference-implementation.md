@@ -67,6 +67,6 @@ Only Option A lets downstream projects share the hard parts (concurrency, the lo
 
 ## Action items
 
-1. [ ] Restructure `pyproject.toml`: remove the self-dependency, stop shipping `scripts/` in the wheel, declare the extras, set pytest's path to `src`.
+1. [x] Restructure `pyproject.toml`: remove the self-dependency, stop shipping `scripts/` in the wheel, declare the extras, set pytest's path to `src`.
 2. [ ] Create `examples/docplan` and port the CLI to it.
-3. [ ] Remove the prototype once `docplan` reaches parity.
+3. [x] Remove the prototype. Done up front rather than at parity; see [RFC-0001](../rfcs/0001-v0.1-implementation-plan.md#removing-the-prototype-up-front).

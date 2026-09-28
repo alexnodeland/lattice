@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-# Install python virtual environment
-uv venv --python 3.12
-
-# Install dependencies
-uv sync --all-groups
-
-# Install pre-commit hooks
-uv run pre-commit install
-
-sudo apt update
+# Same as `make install`, without assuming make is present in the base image.
+uv sync --all-groups --all-extras
+uv run pre-commit install --hook-type pre-commit --hook-type commit-msg

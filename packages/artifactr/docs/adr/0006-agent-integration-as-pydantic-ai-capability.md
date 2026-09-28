@@ -1,6 +1,6 @@
 # ADR-0006: Agent integration as a pydantic-ai capability
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0017](0017-application-toolsets-and-capability-events.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

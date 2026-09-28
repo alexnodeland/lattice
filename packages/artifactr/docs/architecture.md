@@ -7,7 +7,7 @@
 | `artifactr.core` | Implemented |
 | `artifactr.workspace` | Implemented, with in-memory storage |
 | `artifactr.agent` | Implemented |
-| `artifactr.sql` | Planned (phase 4) |
+| `artifactr.sql` | Implemented, on PostgreSQL and SQLite |
 | `artifactr.fastapi`, `artifactr.mcp` | Implemented |
 | `examples/docplan` | Implemented: server, terminal client and tests |
 
@@ -68,7 +68,7 @@ Dependencies point one way. Each layer is usable without the ones above it.
 |---|---|---|
 | `artifactr.core` | pydantic, jsonpatch | Every rule. Pure, synchronous, no I/O, no pydantic-ai. |
 | `artifactr.workspace` | core | `Workspaces`, `Workspace`, storage protocols, in-memory storage. |
-| `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async | Durable storage and migrations. |
+| `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | Durable storage on PostgreSQL and SQLite, and its migrations. |
 | `artifactr.agent` | workspace, pydantic-ai | The `ArtifactWorkspace` capability, `Session`, live-output helpers. |
 | `artifactr.fastapi` (extra) | agent, FastAPI | The thread protocol over WebSocket, and REST commands. |
 | `artifactr.mcp` (extra) | workspace, mcp | Artifacts as MCP resources, commands as MCP tools. |
@@ -293,7 +293,7 @@ The run holds a thread claim, not a socket: if the connection that started it dr
 - **Type allowlist.** `Workspaces(storage, types=[Doc, Plan])` rejects creating any other artifact type, even one registered elsewhere in the process.
 - **Optimistic concurrency.** Every edit names the version it was based on. A stale edit is rejected with the changes made since, so the agent retries against fresh state and a UI can rebase or ask the person.
 - **One active run per thread**, enforced by `Workspace.claim_thread`: a storage lease with a time-to-live, renewed while held, that works across replicas and lapses if its holder dies. Concurrency happens across threads. A message sent during a run steers it instead of queueing.
-- **Sequencing.** `seq` is assigned inside the commit transaction (`UPDATE workspace SET head_seq = head_seq + :n RETURNING head_seq`), giving a gap-free total order per workspace. This serializes commits within one workspace; tokens are not in the log, so commit volume stays modest.
+- **Sequencing.** `seq` is assigned inside the commit transaction, which holds its workspace's lock from the moment it begins (in SQL, the workspace row, locked `FOR UPDATE`). The lock's holder advances the workspace's `head_seq`, giving a gap-free total order per workspace. This serializes commits within one workspace; tokens are not in the log, so commit volume stays modest.
 
 ## Surfaces
 
@@ -353,9 +353,23 @@ class Storage(Protocol):
 Two implementations ship:
 
 - **`InMemoryStorage`** (`artifactr.workspace`), for tests, examples and single-process prototypes. A per-workspace `asyncio.Lock` serializes transactions and an `asyncio.Condition` wakes subscribers. Its clock is injectable, so tests control lease expiry.
-- **`SqlStorage`** (`artifactr.sql`, planned for phase 4): SQLAlchemy 2 async with Alembic migrations, locking the workspace row per transaction.
+- **`SqlStorage`** (`artifactr.sql`), for production: SQLAlchemy 2 async, with the same code on PostgreSQL and SQLite ([ADR-0021](adr/0021-sql-storage.md)).
 
-The workspace behaviour suite in `tests/workspace/` runs against every implementation.
+```python
+engine = create_async_engine("postgresql+asyncpg://localhost/app")  # artifactr[postgres]
+await migrate(engine)  # the packaged Alembic migrations, up to the latest
+workspaces = Workspaces(SqlStorage(engine))
+```
+
+`SqlStorage` works like this:
+
+- **Locking.** A transaction creates its workspace's row if the workspace is new, then locks it (`SELECT ... FOR UPDATE`) before it loads anything. `save` assigns `seq` from the row's `head_seq`. PostgreSQL runs at its default `READ COMMITTED` isolation. SQLite has no row locks, so engines from `create_sqlite_engine` begin every transaction with `BEGIN IMMEDIATE`, which takes the database's write lock instead.
+- **Tables.** Every primary key starts with the tenant and the workspace, and every table name with `artifactr_`. Entities are stored as the JSON of their Pydantic models, beside the columns that reads filter on (kind, archived, status, thread). Lists come back oldest first, by a creation position counted on the workspace row.
+- **Subscriptions** read the log a page at a time. Once caught up, they wait for a commit through the same `SqlStorage`, which wakes them at once, or poll every `poll_interval` (0.5 s by default) for commits from other processes.
+- **Leases** are rows, taken with a conditional update or an insert, so two processes racing for a lease cannot both win.
+- **Migrations** ship in the package and record their version in `artifactr_alembic_version`, apart from the application's own. `migrate(engine)` upgrades a database; `create_schema(engine)` creates the tables without migrations, for tests and prototypes. A test checks that the migrations build exactly the models' schema.
+
+The workspace behaviour suite in `tests/workspace/` runs against every implementation: in memory, on SQLite, and on PostgreSQL.
 
 ## Dependencies
 
@@ -365,6 +379,8 @@ The workspace behaviour suite in `tests/workspace/` runs against every implement
 | jsonpatch | RFC 6902 apply and diff in core | 1.33 |
 | pydantic-ai-slim | Agent runtime: capabilities, toolsets, deferred tools, message history | 2.51 |
 | SQLAlchemy (asyncio) | SQL storage | 2.1 |
+| Alembic | SQL migrations | 1.20 |
+| asyncpg, aiosqlite | PostgreSQL and SQLite drivers (extras; the library imports neither) | 0.31, 0.22 |
 | FastAPI | WebSocket and REST adapter | 0.141 |
 | mcp | MCP server (`MCPServer`, subscriptions) | 2.2 |
 
@@ -375,7 +391,8 @@ Observability uses pydantic-ai's built-in OpenTelemetry instrumentation. The cap
 ## Testing
 
 - **Core:** conformance fixtures, plus property tests (hypothesis) that patches round-trip: applying `diff(a, b)` to `a` gives `b`.
-- **Workspace:** one suite runs against both in-memory and SQL storage.
+- **Workspace:** one suite runs against in-memory storage, SQLite and PostgreSQL. SQLite alone reaches the coverage gate; PostgreSQL runs when `ARTIFACTR_TEST_POSTGRES_URL` is set, and always in CI.
+- **SQL:** concurrent transactions, lease races and cross-process subscriptions on both databases, and a check that the migrations build exactly the models' schema.
 - **Agent:** scripted runs with pydantic-ai's `TestModel` and `FunctionModel`, so no test calls a model API. Assertions are on the events written, including conflicts, steering and deferred pauses.
 - **Adapters:** WebSocket contract tests with FastAPI's `TestClient`, and an MCP client round-trip.
 - **Protocol:** the JSON Schema in `schemas/` is generated from the models and checked in. CI fails if it drifts.
@@ -416,6 +433,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0018](adr/0018-core-host-contract.md) | Core's host contract: needs, commit and record |
 | [0019](adr/0019-storage-protocol-and-workspace-handles.md) | One storage protocol behind workspace handles |
 | [0020](adr/0020-running-agents-in-threads.md) | Running agents in threads |
+| [0021](adr/0021-sql-storage.md) | SQL storage with one dialect-neutral implementation |
 | [0022](adr/0022-surfaces-over-one-command-handler.md) | Surfaces over one command handler |
 | [0024](adr/0024-reference-implementation-as-a-workspace-member.md) | The reference implementation as a workspace member |
 
@@ -425,5 +443,6 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 - **Very hot workspaces.** Assigning `seq` serializes commits per workspace. If that becomes a bottleneck, the log could be sharded by artifact group behind the same per-workspace cursor.
 - **Change-note volume.** With many concurrent chats, notes may need coalescing beyond focus filtering.
 - **Crash recovery for runs.** A run interrupted by a process crash is recorded as failed when its lease expires. pydantic-ai's durable execution integrations (Temporal, DBOS, Prefect) could make such runs resumable.
+- **Pushing log updates across processes.** `SqlStorage` subscriptions learn about commits from other processes by polling. PostgreSQL's `LISTEN/NOTIFY` could wake them at once: an optimisation behind the same `subscribe`, with polling kept for SQLite and as a fallback ([ADR-0021](adr/0021-sql-storage.md)).
 - **Cross-process runs.** Runs are tasks in the process that started them, so `Runner.stop` and `Runner.watch` reach only local runs. A pub/sub channel would make both work across replicas.
 - **`jsonpatch` maintenance.** It is stable but rarely updated; its surface is small enough to vendor if needed.

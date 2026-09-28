@@ -11,6 +11,7 @@ from artifactr.core import (
     Applied,
     Artifact,
     CreateArtifact,
+    EditArtifact,
     MarkdownArtifact,
     NotFound,
     ProposeChange,
@@ -34,7 +35,15 @@ async def test_create_then_read_typed(ws: Workspace) -> None:
     assert created == Applied(artifact_id="n1", version=1, seq=1)
     note = await ws.get(Note, "n1")
     assert (note.version, note.data.title, note.updated_by) == (1, "Plan", ALICE)
-    assert (await ws.artifact("n1")).kind == "note"
+    assert type(note.data) is Note
+    assert (await ws.artifact("n1")).model_dump(mode="json") == {
+        "id": "n1",
+        "version": 1,
+        "data": {"text": "Ship Friday", "title": "Plan"},
+        "updated_by": {"kind": "user", "id": "alice", "name": "Alice"},
+        "archived": False,
+        "kind": "note",
+    }
 
 
 async def test_reading_as_the_wrong_type_is_not_found(ws: Workspace) -> None:
@@ -119,6 +128,8 @@ async def test_agents_propose_and_people_resolve(ws: Workspace) -> None:
     assert isinstance(proposed, Proposed)
     [pending] = await ws.proposals()
     assert (pending.id, pending.thread_id) == (proposed.proposal_id, thread.id)
+    assert isinstance(pending.change, EditArtifact)
+    assert pending.change.summary == "checked 'Docs'", "the stored change keeps its summary"
     assert await ws.proposal(pending.id) == pending
     resolved = await ws.commit(RespondToProposal(proposal_id=pending.id, decision="accept"))
     assert (resolved.decision, resolved.version) == ("accept", 2)
@@ -157,6 +168,19 @@ async def test_runs_and_history_are_recorded_together(ws: Workspace) -> None:
     assert (chunk.seq, chunk.messages) == (3, b'[{"kind":"request"}]')
     with pytest.raises(NotFound):
         await ws.run("run_nope")
+
+
+async def test_runs_are_listed_by_thread_and_status(ws: Workspace) -> None:
+    one, two = await ws.create_thread(), await ws.create_thread()
+    for run_id, thread in (("run_1", one), ("run_2", two), ("run_3", one)):
+        agent = ws.as_actor(AgentActor(thread_id=thread.id, run_id=run_id))
+        await agent.record(RunStarted(run_id=run_id, thread_id=thread.id))
+    agent = ws.as_actor(AgentActor(thread_id=one.id, run_id="run_1"))
+    await agent.record(RunEnded(run_id="run_1", thread_id=one.id, status="completed"))
+    assert [r.id for r in await ws.runs()] == ["run_1", "run_2", "run_3"]
+    assert [r.id for r in await ws.runs(thread_id=one.id)] == ["run_1", "run_3"]
+    assert [r.id for r in await ws.runs(status="running")] == ["run_2", "run_3"]
+    assert [r.id for r in await ws.runs(thread_id=one.id, status="running")] == ["run_3"]
 
 
 async def test_history_needs_a_thread(ws: Workspace) -> None:
@@ -224,9 +248,10 @@ async def test_a_thread_is_claimed_by_one_run_at_a_time(ws: Workspace) -> None:
 
 async def test_a_claim_is_renewed_while_held(ws: Workspace) -> None:
     thread = await ws.create_thread()
-    ttl = timedelta(milliseconds=60)
+    # Renewed every ttl/3, so the claim lapses only if a renewal stalls for most of the ttl.
+    ttl = timedelta(milliseconds=300)
     async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl):
-        await asyncio.sleep(0.15)  # longer than the ttl: only renewal keeps the claim
+        await asyncio.sleep(0.5)  # longer than the ttl: only renewal keeps the claim
         with pytest.raises(ThreadBusy):
             async with ws.claim_thread(thread.id, holder="run_2", ttl=ttl):
                 pass

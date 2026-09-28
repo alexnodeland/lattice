@@ -29,6 +29,8 @@ dependencies = [
 
 [project.optional-dependencies]
 sql = ["sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
+sqlite = ["artifactr[sql]", "aiosqlite>=0.22"]
+postgres = ["artifactr[sql]", "asyncpg>=0.31"]
 fastapi = ["fastapi>=0.141"]
 mcp = ["mcp>=2.2"]
 
@@ -124,7 +126,8 @@ markers = [
 
 [tool.coverage.run]
 branch = true
-source = ["artifactr", "docplan"]
+# By path rather than package name, so the migrations Alembic loads from files are measured too.
+source = ["src/artifactr", "examples/docplan/src/docplan"]
 
 [tool.coverage.report]
 fail_under = 100

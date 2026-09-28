@@ -8,7 +8,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0002](0002-single-write-path.md) | One write path: commands through `Workspace.commit` | Accepted |
 | [0003](0003-artifact-types-as-pydantic-subclasses.md) | Artifact types are Pydantic subclasses with library-defined patch kinds | Accepted |
 | [0004](0004-optimistic-concurrency-and-revisions.md) | Optimistic concurrency and append-only revisions | Accepted |
-| [0005](0005-one-event-log-per-workspace.md) | One durable event log per workspace | Accepted |
+| [0005](0005-one-event-log-per-workspace.md) | One durable event log per workspace | Accepted, amended by 0021 |
 | [0006](0006-agent-integration-as-pydantic-ai-capability.md) | Agent integration as a pydantic-ai capability | Accepted, amended by 0017 |
 | [0007](0007-caller-owned-live-output.md) | Live output is owned by the caller, not the log | Accepted |
 | [0008](0008-agent-perception-and-steering.md) | Agent perception: change notes, fresh rendering, steering | Accepted |
@@ -24,6 +24,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0018](0018-core-host-contract.md) | Core's host contract: needs, commit and record | Accepted |
 | [0019](0019-storage-protocol-and-workspace-handles.md) | One storage protocol behind workspace handles | Accepted |
 | [0020](0020-running-agents-in-threads.md) | Running agents in threads | Accepted |
+| [0021](0021-sql-storage.md) | SQL storage with one dialect-neutral implementation | Accepted |
 | [0022](0022-surfaces-over-one-command-handler.md) | Surfaces over one command handler | Accepted |
 | [0024](0024-reference-implementation-as-a-workspace-member.md) | The reference implementation as a workspace member | Accepted |
 

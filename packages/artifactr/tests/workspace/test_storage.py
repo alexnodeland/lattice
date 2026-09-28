@@ -16,7 +16,8 @@ from artifactr.core import (
     commit,
     needs,
 )
-from artifactr.workspace import InMemoryStorage, Scope, Storage, Workspace, Workspaces
+from artifactr.workspace import Scope, Storage, Workspace, Workspaces
+from tests.workspace.conftest import StorageFactory
 
 ALICE = UserActor(id="alice")
 SCOPE = Scope("tenant_a", "ws_1")
@@ -93,11 +94,13 @@ async def test_leases_belong_to_their_holder(storage: Storage) -> None:
     await storage.release_lease(SCOPE, "missing", "b")
 
 
-async def test_an_expired_lease_can_be_taken() -> None:
+async def test_an_expired_lease_can_be_taken(storage_factory: StorageFactory) -> None:
     now = datetime(2026, 9, 28, tzinfo=UTC)
-    storage = InMemoryStorage(clock=lambda: now)
+    storage = storage_factory(lambda: now)
     assert await storage.acquire_lease(SCOPE, "k", "a", timedelta(seconds=30))
-    now += timedelta(seconds=31)
+    now += timedelta(seconds=29)
+    assert not await storage.acquire_lease(SCOPE, "k", "b", timedelta(seconds=30))
+    now += timedelta(seconds=2)
     assert await storage.acquire_lease(SCOPE, "k", "b", timedelta(seconds=30))
 
 

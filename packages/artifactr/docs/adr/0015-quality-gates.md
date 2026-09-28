@@ -76,4 +76,4 @@ For a library whose value is behavioural consistency, the cost of full branch co
 
 1. [x] Configure coverage, pyright, ruff and pytest in `pyproject.toml`.
 2. [x] Add the CI workflow with the Python version matrix.
-3. [ ] Add the PostgreSQL job when SQL storage lands (RFC-0001 phase 4).
+3. [x] Add the PostgreSQL job when SQL storage lands (RFC-0001 phase 4).

@@ -23,7 +23,21 @@ Run `make` on its own to list every command:
 | `make test` | Run the tests with the 100% branch-coverage gate |
 | `make check` | Everything CI runs |
 | `make schema` | Regenerate `schemas/artifactr.v1.json` from the protocol models (a test fails if it drifts) |
+| `make pg-up` / `make pg-down` | Start or stop a PostgreSQL container for the SQL tests (needs Docker) |
+| `make test-pg` | Run the tests on PostgreSQL as well as SQLite |
 | `make changelog` | Regenerate `CHANGELOG.md` from commit history |
+
+### Testing SQL storage on PostgreSQL
+
+The storage tests run against in-memory storage, SQLite and PostgreSQL. SQLite needs nothing extra, and it alone reaches the coverage gate. The PostgreSQL tests run only when `ARTIFACTR_TEST_POSTGRES_URL` is set (otherwise pytest reports them as deselected), and CI always runs them. Locally:
+
+```bash
+make pg-up          # postgres:17 on localhost:54329
+make test-pg        # the whole suite, with the PostgreSQL tests included
+make pg-down
+```
+
+To use another database, set `ARTIFACTR_TEST_POSTGRES_URL` yourself, for example `postgresql+asyncpg://user:password@host:5432/db`. Each test creates its own schema there and drops it afterwards.
 
 ## How work flows: trunk-based development
 

@@ -101,7 +101,17 @@ fastapi = [
 mcp = [
     { name = "mcp" },
 ]
+postgres = [
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
 sql = [
+    { name = "alembic" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
+sqlite = [
+    { name = "aiosqlite" },
     { name = "alembic" },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
@@ -136,7 +146,11 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiosqlite", marker = "extra == 'sqlite'", specifier = ">=0.22" },
     { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.20" },
+    { name = "artifactr", extras = ["sql"], marker = "extra == 'postgres'" },
+    { name = "artifactr", extras = ["sql"], marker = "extra == 'sqlite'" },
+    { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.141" },
     { name = "jsonpatch", specifier = ">=1.33" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.2" },
@@ -144,7 +158,7 @@ requires-dist = [
     { name = "pydantic-ai-slim", specifier = ">=2.51" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
 ]
-provides-extras = ["sql", "fastapi", "mcp"]
+provides-extras = ["sql", "sqlite", "postgres", "fastapi", "mcp"]
 
 [package.metadata.requires-dev]
 dev = [

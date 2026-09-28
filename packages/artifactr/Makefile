@@ -5,7 +5,12 @@
 .DEFAULT_GOAL := help
 UV ?= uv
 
-.PHONY: help install fmt lint typecheck test check schema changelog clean
+# The PostgreSQL that `make pg-up` starts for the SQL tests.
+PG_CONTAINER ?= artifactr-postgres
+PG_PORT ?= 54329
+PG_URL ?= postgresql+asyncpg://postgres:artifactr@localhost:$(PG_PORT)/postgres
+
+.PHONY: help install fmt lint typecheck test check schema pg-up pg-down test-pg changelog clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -32,6 +37,16 @@ check: lint typecheck test ## Run everything CI runs
 
 schema: ## Regenerate the protocol JSON Schema from the frame models
 	$(UV) run python -m artifactr.core.schema > schemas/artifactr.v1.json
+
+pg-up: ## Start a PostgreSQL container for the SQL tests (needs Docker)
+	docker run --rm -d --name $(PG_CONTAINER) -p $(PG_PORT):5432 -e POSTGRES_PASSWORD=artifactr postgres:17
+	@until docker exec $(PG_CONTAINER) pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; do sleep 1; done
+
+pg-down: ## Stop the PostgreSQL container
+	docker stop $(PG_CONTAINER)
+
+test-pg: ## Run the tests on PostgreSQL as well as SQLite (after make pg-up)
+	ARTIFACTR_TEST_POSTGRES_URL=$(PG_URL) $(UV) run pytest --cov --cov-report=term-missing
 
 changelog: ## Regenerate CHANGELOG.md from conventional commits
 	$(UV) run git-cliff --output CHANGELOG.md

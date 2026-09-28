@@ -48,4 +48,4 @@ Implementing the workspace layer (RFC-0001 phase 2) required settling what [ADR-
 ## Action items
 
 1. [x] Implement `Storage`, `Workspaces`, `Workspace` and `InMemoryStorage` (RFC-0001 phase 2).
-2. [ ] Implement `SqlStorage` against the same behaviour suite (phase 4).
+2. [x] Implement `SqlStorage` against the same behaviour suite (phase 4).

@@ -23,6 +23,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"artifactr.core", "artifactr.workspace", "artifactr.agent"},
         {"pydantic", "pydantic_ai"},
     ),
+    "sql": ({"artifactr.core", "artifactr.workspace", "artifactr.sql"}, {"sqlalchemy", "alembic"}),
     "fastapi": (
         {"artifactr.core", "artifactr.workspace", "artifactr.agent", "artifactr.fastapi"},
         {"fastapi", "starlette", "pydantic"},

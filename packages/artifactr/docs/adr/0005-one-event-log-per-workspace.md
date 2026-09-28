@@ -1,6 +1,6 @@
 # ADR-0005: One durable event log per workspace
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0021](0021-sql-storage.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

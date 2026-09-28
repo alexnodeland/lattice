@@ -32,7 +32,7 @@ from artifactr.core import (
 )
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
 
-__version__ = version("artifactr")
+__version__ = version("artifactr-ai")
 
 __all__ = [
     "Actor",

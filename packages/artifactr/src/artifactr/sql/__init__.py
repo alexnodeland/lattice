@@ -1,6 +1,6 @@
 """SQL storage: workspaces in PostgreSQL or SQLite, through SQLAlchemy 2's asyncio extension.
 
-Install ``artifactr[postgres]`` (asyncpg) or ``artifactr[sqlite]`` (aiosqlite). Upgrade the
+Install ``artifactr-ai[postgres]`` (asyncpg) or ``artifactr-ai[sqlite]`` (aiosqlite). Upgrade the
 database with :func:`migrate`, then open workspaces over a :class:`SqlStorage`::
 
     engine = create_async_engine("postgresql+asyncpg://localhost/app")

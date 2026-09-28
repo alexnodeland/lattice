@@ -4,35 +4,35 @@ This page builds a small application: a launch plan that a person and an agent w
 
 ## Install
 
-artifactr needs Python 3.12 or newer. It is pre-release and not yet published to PyPI, so install it from GitHub:
+artifactr needs Python 3.12 or newer. It is distributed as `artifactr-ai` and imported as `artifactr`. Until it is published to PyPI, install it from GitHub:
 
 === "uv"
 
     ```bash
-    uv add "artifactr @ git+https://github.com/alexnodeland/artifactr"
+    uv add "artifactr-ai @ git+https://github.com/alexnodeland/artifactr"
     ```
 
 === "pip"
 
     ```bash
-    pip install "artifactr @ git+https://github.com/alexnodeland/artifactr"
+    pip install "artifactr-ai @ git+https://github.com/alexnodeland/artifactr"
     ```
 
-!!! warning "Not `pip install artifactr`"
+!!! warning "`artifactr-ai`, not `artifactr`"
 
-    The name `artifactr` on PyPI belongs to an unrelated project. Until this library is published, install it from the repository as shown above.
+    The name `artifactr` on PyPI belongs to an unrelated project, so this library is distributed as `artifactr-ai`. Its import name is still `artifactr`.
 
 The core install covers artifact types, workspaces with in-memory storage, and the pydantic-ai integration. The adapters are optional extras:
 
 | Extra | Adds | Install |
 |---|---|---|
-| `fastapi` | The WebSocket thread protocol and REST endpoints, as a FastAPI router | `"artifactr[fastapi] @ git+https://github.com/alexnodeland/artifactr"` |
-| `mcp` | An MCP server for external agents | `"artifactr[mcp] @ git+https://github.com/alexnodeland/artifactr"` |
-| `postgres` | [SQL storage](guides/storage.md#sql-storage) on PostgreSQL, with asyncpg | `"artifactr[postgres] @ git+https://github.com/alexnodeland/artifactr"` |
-| `sqlite` | SQL storage on SQLite, with aiosqlite | `"artifactr[sqlite] @ git+https://github.com/alexnodeland/artifactr"` |
-| `sql` | SQL storage without a driver, if you bring your own | `"artifactr[sql] @ git+https://github.com/alexnodeland/artifactr"` |
+| `fastapi` | The WebSocket thread protocol and REST endpoints, as a FastAPI router | `"artifactr-ai[fastapi] @ git+https://github.com/alexnodeland/artifactr"` |
+| `mcp` | An MCP server for external agents | `"artifactr-ai[mcp] @ git+https://github.com/alexnodeland/artifactr"` |
+| `postgres` | [SQL storage](guides/storage.md#sql-storage) on PostgreSQL, with asyncpg | `"artifactr-ai[postgres] @ git+https://github.com/alexnodeland/artifactr"` |
+| `sqlite` | SQL storage on SQLite, with aiosqlite | `"artifactr-ai[sqlite] @ git+https://github.com/alexnodeland/artifactr"` |
+| `sql` | SQL storage without a driver, if you bring your own | `"artifactr-ai[sql] @ git+https://github.com/alexnodeland/artifactr"` |
 
-Combine extras with commas, as in `artifactr[fastapi,postgres]`. You also need the pydantic-ai extra for your model provider, such as `pydantic-ai-slim[anthropic]` or `pydantic-ai-slim[openai]`, and its API key in the environment.
+Combine extras with commas, as in `artifactr-ai[fastapi,postgres]`. You also need the pydantic-ai extra for your model provider, such as `pydantic-ai-slim[anthropic]` or `pydantic-ai-slim[openai]`, and its API key in the environment.
 
 ## 1. Define an artifact type
 

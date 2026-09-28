@@ -21,10 +21,10 @@ In most chat applications the conversation is the only channel. artifactr adds a
 
 ## Install
 
-Python 3.12 or newer. artifactr is not on PyPI yet, and **the `artifactr` name on PyPI belongs to an unrelated project**, so install from this repository:
+Python 3.12 or newer. artifactr is distributed as **`artifactr-ai`** and imported as `artifactr` (the name `artifactr` on PyPI is an unrelated project). Until it is on PyPI, install it from this repository:
 
 ```bash
-uv add "artifactr[fastapi] @ git+https://github.com/alexnodeland/artifactr"
+uv add "artifactr-ai[fastapi] @ git+https://github.com/alexnodeland/artifactr"
 ```
 
 Extras: `fastapi` (WebSocket and REST), `mcp` (external agents), `postgres` or `sqlite` (SQL storage with a driver), and `sql` (SQL storage without one).

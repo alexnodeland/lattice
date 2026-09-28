@@ -6,7 +6,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-    "artifactr[fastapi,mcp,sqlite,postgres]",
+    "artifactr-ai[fastapi,mcp,sqlite,postgres]",
     "pydantic-ai-slim[anthropic,openai]>=2.51",
     "uvicorn[standard]>=0.54",
     "websockets>=17.1",
@@ -20,7 +20,7 @@ docplan-serve = "docplan.app:main"
 docplan = "docplan.cli:main"
 
 [tool.uv.sources]
-artifactr = { workspace = true }
+artifactr-ai = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]

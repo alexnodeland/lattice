@@ -168,9 +168,11 @@ nav:
           - adr/0018-core-host-contract.md
           - adr/0019-storage-protocol-and-workspace-handles.md
           - adr/0020-running-agents-in-threads.md
+          - adr/0021-sql-storage.md
           - adr/0022-surfaces-over-one-command-handler.md
           - adr/0023-documentation-site.md
           - adr/0024-reference-implementation-as-a-workspace-member.md
+          - adr/0025-distribution-name.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

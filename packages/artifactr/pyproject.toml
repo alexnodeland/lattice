@@ -1,5 +1,5 @@
 [project]
-name = "artifactr"
+name = "artifactr-ai"
 version = "0.1.0.dev0"
 description = "Build chat applications where people and agents collaborate through shared, versioned artifacts."
 readme = "README.md"
@@ -29,8 +29,8 @@ dependencies = [
 
 [project.optional-dependencies]
 sql = ["sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
-sqlite = ["artifactr[sql]", "aiosqlite>=0.22"]
-postgres = ["artifactr[sql]", "asyncpg>=0.31"]
+sqlite = ["artifactr-ai[sql]", "aiosqlite>=0.22"]
+postgres = ["artifactr-ai[sql]", "asyncpg>=0.31"]
 fastapi = ["fastapi>=0.141"]
 mcp = ["mcp>=2.2"]
 
@@ -63,6 +63,10 @@ dev = [
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
+
+# Distributed as artifactr-ai (ADR-0025); imported as artifactr.
+[tool.uv.build-backend]
+module-name = "artifactr"
 
 # The reference implementation is a workspace member, built on the public API only.
 [tool.uv.workspace]

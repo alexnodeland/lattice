@@ -356,7 +356,7 @@ Two implementations ship:
 - **`SqlStorage`** (`artifactr.sql`), for production: SQLAlchemy 2 async, with the same code on PostgreSQL and SQLite ([ADR-0021](adr/0021-sql-storage.md)).
 
 ```python
-engine = create_async_engine("postgresql+asyncpg://localhost/app")  # artifactr[postgres]
+engine = create_async_engine("postgresql+asyncpg://localhost/app")  # artifactr-ai[postgres]
 await migrate(engine)  # the packaged Alembic migrations, up to the latest
 workspaces = Workspaces(SqlStorage(engine))
 ```
@@ -437,6 +437,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0022](adr/0022-surfaces-over-one-command-handler.md) | Surfaces over one command handler |
 | [0023](adr/0023-documentation-site.md) | The documentation site |
 | [0024](adr/0024-reference-implementation-as-a-workspace-member.md) | The reference implementation as a workspace member |
+| [0025](adr/0025-distribution-name.md) | Distributed as artifactr-ai, imported as artifactr |
 
 ## Open questions
 

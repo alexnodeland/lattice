@@ -22,7 +22,7 @@ def create_sqlite_engine(url: str | URL, **kwargs: Any) -> AsyncEngine:
 
     Args:
         url: A SQLite URL for an async driver, such as ``sqlite+aiosqlite:///app.db``
-            (install ``artifactr[sqlite]``).
+            (install ``artifactr-ai[sqlite]``).
         **kwargs: Passed to :func:`sqlalchemy.ext.asyncio.create_async_engine`.
 
     Returns:

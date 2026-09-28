@@ -39,6 +39,7 @@ from artifactr.core import (
     Revision,
     Run,
     RunId,
+    RunStatus,
     State,
     TenantId,
     Thread,
@@ -53,7 +54,7 @@ from artifactr.core import (
     record,
 )
 from artifactr.core.commands import AnswerDeferred, SetFocus, SetThreadMode
-from artifactr.workspace.storage import Scope, Storage
+from artifactr.workspace.storage import HistoryChunk, Scope, Storage
 
 
 class ThreadBusy(InvalidState):
@@ -288,8 +289,14 @@ class Workspace:
             raise NotFound("run", run_id)
         return run
 
-    async def history(self, thread_id: ThreadId) -> Sequence[bytes]:
-        """Return a thread's serialized model messages, one chunk per recorded run segment."""
+    async def runs(
+        self, *, thread_id: ThreadId | None = None, status: RunStatus | None = None
+    ) -> list[Run]:
+        """Return runs, optionally of one thread and with one status, oldest first."""
+        return await self._storage.runs(self._scope, thread_id=thread_id, status=status)
+
+    async def history(self, thread_id: ThreadId) -> Sequence[HistoryChunk]:
+        """Return a thread's history: serialized model messages, one chunk per run segment."""
         return await self._storage.history(self._scope, thread_id)
 
     # ─── the log ──────────────────────────────────────────────────────────────

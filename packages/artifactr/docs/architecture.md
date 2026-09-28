@@ -6,7 +6,7 @@
 |---|---|
 | `artifactr.core` | Implemented |
 | `artifactr.workspace` | Implemented, with in-memory storage |
-| `artifactr.agent` | Planned (phase 3) |
+| `artifactr.agent` | Implemented |
 | `artifactr.sql` | Planned (phase 4) |
 | `artifactr.fastapi`, `artifactr.mcp` | Planned (phase 5) |
 | `examples/docplan` | Planned (phase 6) |
@@ -213,26 +213,27 @@ As a result:
 
 ## The agent
 
-artifactr plugs into pydantic-ai as one **capability**, `ArtifactWorkspace`. A turn is an ordinary `agent.run(...)`; there is no custom runner, and the capability composes with any others the application uses.
+artifactr plugs into pydantic-ai as one **capability**, `ArtifactWorkspace` ([ADR-0006](adr/0006-agent-integration-as-pydantic-ai-capability.md)). A turn is an ordinary `agent.run(...)`, and the capability composes with any others the application uses. A `Runner` drives runs in threads for the surfaces ([ADR-0020](adr/0020-running-agents-in-threads.md)).
 
 ```python
 agent = Agent(
     "anthropic:claude-sonnet-5-5",
     deps_type=Session[AppDeps],
-    toolsets=[plan_tools],
+    toolsets=[plan_tools],  # the application's own tools
     capabilities=[ArtifactWorkspace(types=[Doc, Plan])],
 )
+runner = Runner(agent, app=AppDeps(...))
+
+handle = await runner.send(workspace, thread_id, "Draft a launch plan")
 ```
 
 | Capability hook | What `ArtifactWorkspace` does |
 |---|---|
-| `get_toolset` | Generic tools: list, read, edit document text, propose. Application toolsets are registered on the agent itself ([ADR-0017](adr/0017-application-toolsets-and-capability-events.md)). |
-| `get_instructions` | Renders focused artifacts with `render_for_agent`, fresh from storage. Lists currently available actions as text, so tool definitions never change and the prompt cache stays warm. |
-| `before_run` | Records `run_started` and the user's message. Adds change notes since the thread's last-seen `seq` to the prompt. |
-| `for_run` | Subscribes to the workspace log for the duration of the run. Other actors' changes to focused artifacts, and new messages in this thread, are delivered into the live run with `ctx.enqueue(priority="asap")`. |
-| `on_tool_execute_error` | Turns `VersionConflict` into `ModelRetry` with a summary of what changed, so tools never catch it themselves. |
-| `on_event` | Records tool calls and results as durable events. |
-| `after_run`, `on_run_error` | Stores the run's new `ModelMessage`s, records the final assistant message, and records `run_ended` with its status and usage. |
+| `get_toolset` | The generic tools: `list_artifacts`, `read_artifact`, `create_artifact`, `edit_text` (which can also propose), `archive_artifact`, and optionally `ask_user`. Their definitions never change, so the prompt cache stays warm. Application toolsets are registered on the agent itself ([ADR-0017](adr/0017-application-toolsets-and-capability-events.md)). |
+| `get_instructions` | Renders, fresh from storage for every model request, the artifacts the thread follows, the kinds of artifact the agent can create, the thread's mode, and the agent's proposals awaiting review. |
+| `wrap_run` | Records `run_started`, then briefs the agent: change notes since the thread's last-seen `seq` are enqueued before the first request. Watches the log for the run's duration (see below). When the run ends, records the agent's reply as `message_posted`, then `run_paused` with the deferred requests or `run_ended` with usage, storing the run's new `ModelMessage`s in the same transaction. A cancelled run is recorded as `stopped`, and one that raised as `failed`. |
+| `before_tool_execute`, `after_tool_execute` | Record every tool call and result, the application's included, as `tool_called` and `tool_returned`. |
+| `on_tool_execute_error` | Turns any `Rejection` into `ModelRetry` with the rejection's message (for a `VersionConflict`, adding "read the artifact again"), so tools never catch rejections themselves. Other exceptions are recorded and fail the run. |
 
 Tools are plain pydantic-ai tools over `RunContext[Session]`:
 
@@ -251,42 +252,39 @@ async def add_task(ctx: RunContext[Session[AppDeps]], plan_id: str, title: str) 
             return f"Proposed adding the task ({proposal_id}); the user will review it."
 ```
 
-Application tools emit ephemeral progress, such as a draft of an artifact being generated, with `ctx.emit(...)` and a pydantic-ai `CustomEvent` subclass. artifactr's own tools and hooks emit `CapabilityEvent`s in the `artifactr` namespace, as pydantic-ai requires of capabilities ([ADR-0017](adr/0017-application-toolsets-and-capability-events.md)). Both reach the live channel only, never the log.
+`ctx.deps.workspace` acts as the agent (an `AgentActor` for this thread and run), so everything a tool commits is attributed to it. Reading, creating or editing an artifact through the generic tools also adds it to the thread's focus, so the agent hears about later changes to it.
+
+Application tools emit ephemeral progress with `ctx.emit(...)`. `ArtifactDraft(kind=..., snapshot=...)` is a ready-made `CustomEvent` for a draft of an artifact being generated; other `CustomEvent`s reach live channels as `app_live` frames. Neither ever reaches the log.
 
 ### Change notes and steering
 
-- When a run starts, the agent receives notes such as *"alice edited plan-1 (v7 → v8): marked 'Ship v1' done; added task 'Write changelog'."* Notes cover only the artifacts the thread is focused on and exclude the agent's own changes.
-- While a run is active, the same notes, and any new message the person sends in the thread, are enqueued into the live run and reach the model at its next request. A person can steer a long run without stopping it.
-- Focused artifacts are rendered from storage, never cached across runs or connections.
+- When a run starts, the agent receives the notes it has missed, such as *"Alice changed plan_1 (plan, v7 → v8): completed Ship v1"*. They cover only the artifacts the thread follows (plus artifacts created in the thread), exclude the agent's own changes, and are delivered as a user-prompt part wrapped in `<workspace-changes>` tags, so they are stored in history with the rest of the conversation.
+- The last-seen point is the `seq` at which the thread's history was last saved, so nothing is reported twice and nothing is skipped.
+- While a run is in progress, a watcher subscribes to the log. Others' changes to followed artifacts are delivered the same way, and a new message in the thread is delivered as-is: a person can steer a long run without stopping it. Both use `ctx.enqueue(priority="asap")`, so they reach the model at its next request.
 
 ### Proposals and pausing
 
-- Each artifact type declares a `write_policy`: `"direct"` or `"propose"`. A thread can be switched into suggest mode, which forces proposals for every type.
-- Proposals do not block the run. The agent keeps working; the person accepts, rejects or edits the proposal whenever and from any surface; the outcome reaches the agent as a change note. When a proposal is accepted with edits, the note includes the person's changes as a diff.
-- Blocking points, such as a question the agent needs answered or a tool that requires approval, use pydantic-ai's deferred tools (`CallDeferred`, `ApprovalRequired`). The run ends with `DeferredToolRequests`, recorded as `run_paused`. When the answers arrive from any surface, the host resumes with `agent.run(..., deferred_tool_results=...)` under the same artifactr `run_id`. The pause survives restarts because nothing waits in memory.
+- Each artifact type declares a `write_policy`: `"direct"` or `"propose"`. A thread can be switched into suggest mode, which forces proposals for every type. `edit_text(..., propose=True)` proposes explicitly.
+- Proposals do not block the run. The agent keeps working; the person accepts, rejects or edits the proposal whenever and from any surface; the outcome reaches the agent as a change note. When a proposal is accepted with edits, the note includes the person's changes.
+- Blocking points use pydantic-ai's deferred tools: `ask_user` (or any tool raising `CallDeferred`) asks a question, and tools declared `requires_approval=True` need approval. The agent's `output_type` must include `DeferredToolRequests`. The run ends with `DeferredToolRequests`, recorded as `run_paused` with its history. Answers arrive as `answer_deferred` commands from any surface; once every request is answered, `Runner.resume` continues the run under the same `run_id` with `deferred_tool_results`. The pause survives restarts because nothing waits in memory.
+- A chat message sent while a run is paused is the reply: it answers the pending questions and declines pending approvals with the message as the reason, and the run resumes. The conversation history therefore never ends in an unanswered tool call.
 
 ## Live output
 
-The event log carries durable domain events only. Token-level output belongs to whoever drives the run, passed as an independent parameter:
+The event log carries durable domain events only. Token-level output belongs to whoever drives the run ([ADR-0007](adr/0007-caller-owned-live-output.md)). pydantic-ai hands the run's event stream to its caller through `event_stream_handler`, and `forward_live(channel)` sends it to a `LiveChannel` as protocol live frames:
 
 ```python
-async with ws.open_run(thread_id) as run:  # lease: one active run per thread
-    await agent.run(
-        prompt,
-        deps=run.session,
-        message_history=await run.history(),
-        event_stream_handler=forward_live(channel),  # caller-owned
-    )
+await agent.run(
+    prompt,
+    deps=Session.start(workspace, thread_id, app=deps),
+    message_history=await load_history(workspace, thread_id),
+    event_stream_handler=forward_live(channel),  # caller-owned
+)
 ```
 
-`forward_live` maps pydantic-ai stream events (text and thinking deltas, tool-call argument deltas, and `CustomEvent`s emitted by tools) to the protocol's live frames and sends them to a `LiveChannel`:
+The `Runner` does this for every run it starts, sending frames to its `FanoutChannel`, an in-process fan-out keyed by `run_id`. Any connection can `runner.watch(run_id)` to receive a run's frames until it ends; watchers that fall behind lose their oldest frames rather than slowing the run. `NullChannel` drops frames for headless runs, and a pub/sub channel (Redis, NATS) can fan out across replicas.
 
-- `WebSocketChannel`: the connection that started the run.
-- `FanoutChannel`: in-process fan-out keyed by `run_id`, so other clients watching the thread can attach.
-- A pub/sub implementation (Redis, NATS) for fan-out across replicas, as an optional add-on.
-- `NullChannel` for headless runs.
-
-The run holds a lease, not a socket: if the connection that started it drops, the run continues and the channel detaches. Losing live frames is harmless, because the durable `message_posted`, `tool_returned` and `artifact_changed` events are authoritative. A client that reconnects mid-run replays the log from its last `seq` and reattaches to the run's live channel if the run is still active.
+The run holds a thread claim, not a socket: if the connection that started it drops, the run continues. Losing live frames is harmless, because the durable `message_posted`, `tool_returned` and `artifact_changed` events are authoritative. A client that reconnects mid-run replays the log from its last `seq` and watches the run again if it is still active.
 
 ## Tenancy and concurrency
 
@@ -401,6 +399,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0017](adr/0017-application-toolsets-and-capability-events.md) | Application toolsets register on the agent; the capability emits capability events |
 | [0018](adr/0018-core-host-contract.md) | Core's host contract: needs, commit and record |
 | [0019](adr/0019-storage-protocol-and-workspace-handles.md) | One storage protocol behind workspace handles |
+| [0020](adr/0020-running-agents-in-threads.md) | Running agents in threads |
 
 ## Open questions
 
@@ -408,4 +407,5 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 - **Very hot workspaces.** Assigning `seq` serializes commits per workspace. If that becomes a bottleneck, the log could be sharded by artifact group behind the same per-workspace cursor.
 - **Change-note volume.** With many concurrent chats, notes may need coalescing beyond focus filtering.
 - **Crash recovery for runs.** A run interrupted by a process crash is recorded as failed when its lease expires. pydantic-ai's durable execution integrations (Temporal, DBOS, Prefect) could make such runs resumable.
+- **Cross-process runs.** Runs are tasks in the process that started them, so `Runner.stop` and `Runner.watch` reach only local runs. A pub/sub channel would make both work across replicas.
 - **`jsonpatch` maintenance.** It is stable but rarely updated; its surface is small enough to vendor if needed.

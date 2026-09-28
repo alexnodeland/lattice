@@ -24,6 +24,7 @@ from artifactr.core import (
     Revision,
     Run,
     RunId,
+    RunStatus,
     State,
     Thread,
     ThreadId,
@@ -31,7 +32,7 @@ from artifactr.core import (
     scope_of,
 )
 from artifactr.core.actors import Actor
-from artifactr.workspace.storage import Scope
+from artifactr.workspace.storage import HistoryChunk, Scope
 
 Clock = Callable[[], datetime]
 """Returns the current time; injectable so tests control expiry."""
@@ -53,7 +54,9 @@ class _Data:
     threads: dict[ThreadId, Thread] = field(default_factory=dict[ThreadId, Thread])
     runs: dict[RunId, Run] = field(default_factory=dict[RunId, Run])
     log: list[Envelope] = field(default_factory=list[Envelope])
-    history: dict[ThreadId, list[bytes]] = field(default_factory=dict[ThreadId, list[bytes]])
+    history: dict[ThreadId, list[HistoryChunk]] = field(
+        default_factory=dict[ThreadId, list[HistoryChunk]]
+    )
     leases: dict[str, tuple[str, datetime]] = field(default_factory=dict[str, tuple[str, datetime]])
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     appended: asyncio.Condition = field(default_factory=asyncio.Condition)
@@ -113,8 +116,10 @@ class _Transaction:
         for result in self._results:
             _apply(self._data, result)
         self._data.log.extend(self._envelopes)
+        head = len(self._data.log)
         for thread_id, messages in self._history:
-            self._data.history.setdefault(thread_id, []).append(messages)
+            chunk = HistoryChunk(seq=head, messages=messages)
+            self._data.history.setdefault(thread_id, []).append(chunk)
 
 
 def _latest[K, V](pending: dict[K, V], committed: dict[K, V], key: K) -> V | None:
@@ -204,6 +209,21 @@ class InMemoryStorage:
         """Return a run, or None."""
         return self._data(scope).runs.get(run_id)
 
+    async def runs(
+        self,
+        scope: Scope,
+        *,
+        thread_id: ThreadId | None = None,
+        status: RunStatus | None = None,
+    ) -> list[Run]:
+        """Return runs, optionally of one thread and with one status, oldest first."""
+        return [
+            run
+            for run in self._data(scope).runs.values()
+            if (thread_id is None or run.thread_id == thread_id)
+            and (status is None or run.status == status)
+        ]
+
     async def head_seq(self, scope: Scope) -> int:
         """Return the log's latest ``seq``, or 0 if it is empty."""
         return len(self._data(scope).log)
@@ -231,8 +251,8 @@ class InMemoryStorage:
             await data.appended.wait_for(lambda: len(data.log) > cursor)
             return data.log[cursor:]
 
-    async def history(self, scope: Scope, thread_id: ThreadId) -> Sequence[bytes]:
-        """Return a thread's serialized model messages, one chunk per append, in order."""
+    async def history(self, scope: Scope, thread_id: ThreadId) -> Sequence[HistoryChunk]:
+        """Return a thread's history chunks, in the order they were appended."""
         return list(self._data(scope).history.get(thread_id, []))
 
     async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:

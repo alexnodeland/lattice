@@ -153,7 +153,8 @@ async def test_runs_and_history_are_recorded_together(ws: Workspace) -> None:
     ended = RunEnded(run_id="run_1", thread_id=thread.id, status="completed")
     await agent.record(ended, history=b'[{"kind":"request"}]')
     assert (await ws.run("run_1")).status == "completed"
-    assert await ws.history(thread.id) == [b'[{"kind":"request"}]']
+    [chunk] = await ws.history(thread.id)
+    assert (chunk.seq, chunk.messages) == (3, b'[{"kind":"request"}]')
     with pytest.raises(NotFound):
         await ws.run("run_nope")
 

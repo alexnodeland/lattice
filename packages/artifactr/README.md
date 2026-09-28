@@ -22,10 +22,12 @@ agent = Agent(
     toolsets=[plan_tools],
     capabilities=[ArtifactWorkspace(types=[Doc, Plan])],
 )
+runner = Runner(agent, app=AppDeps())
 
 ws = await workspaces.open(tenant_id, workspace_id, actor=user)
 plan = await ws.get(Plan, plan_id)
 await ws.commit(plan.edit(lambda p: p.add_task("Ship v1")))  # versioned, attributed, published
+await runner.send(ws, thread_id, "Break the launch into tasks")  # the agent sees what changed
 ```
 
 ## Documentation

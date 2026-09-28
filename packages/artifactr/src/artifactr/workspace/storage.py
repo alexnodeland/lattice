@@ -23,6 +23,7 @@ from artifactr.core import (
     Revision,
     Run,
     RunId,
+    RunStatus,
     State,
     TenantId,
     Thread,
@@ -31,6 +32,16 @@ from artifactr.core import (
     WorkspaceId,
 )
 from artifactr.core.actors import Actor
+
+
+@dataclass(frozen=True)
+class HistoryChunk:
+    """Serialized model messages from one run segment, and the ``seq`` they were saved at."""
+
+    seq: int
+    """The log's head when the chunk was saved: everything up to it happened before."""
+
+    messages: bytes
 
 
 @dataclass(frozen=True)
@@ -112,6 +123,16 @@ class Storage(Protocol):
         """Return a run, or None."""
         ...
 
+    async def runs(
+        self,
+        scope: Scope,
+        *,
+        thread_id: ThreadId | None = None,
+        status: RunStatus | None = None,
+    ) -> list[Run]:
+        """Return runs, optionally of one thread and with one status, oldest first."""
+        ...
+
     async def head_seq(self, scope: Scope) -> int:
         """Return the log's latest ``seq``, or 0 if it is empty."""
         ...
@@ -130,8 +151,8 @@ class Storage(Protocol):
         """
         ...
 
-    async def history(self, scope: Scope, thread_id: ThreadId) -> Sequence[bytes]:
-        """Return a thread's serialized model messages, one chunk per append, in order."""
+    async def history(self, scope: Scope, thread_id: ThreadId) -> Sequence[HistoryChunk]:
+        """Return a thread's history chunks, in the order they were appended."""
         ...
 
     async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:

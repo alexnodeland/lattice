@@ -86,6 +86,8 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D", "ARG"]
+# pydantic-ai hides a tool's RunContext from the model, so tool docstrings don't document it.
+"src/artifactr/agent/tools.py" = ["D417"]
 
 # ─── types ────────────────────────────────────────────────────────────────────
 

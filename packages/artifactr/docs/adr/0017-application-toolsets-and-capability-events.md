@@ -55,4 +55,4 @@ Routing application toolsets through the capability would make every application
 ## Action items
 
 1. [x] Update [architecture.md](../architecture.md) and the README example.
-2. [ ] Implement the `artifactr` capability event family in RFC-0001 phase 3.
+2. [x] Phase 3: the capability's hooks and tools emit no events of their own in v0.1 (everything durable goes to the log). Application tools emit `ArtifactDraft` and their own `CustomEvent`s ([ADR-0020](0020-running-agents-in-threads.md)).

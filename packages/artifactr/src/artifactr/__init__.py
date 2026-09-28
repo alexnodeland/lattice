@@ -2,11 +2,12 @@
 
 The names most applications need are available here. Everything else lives in the layer
 packages: :mod:`artifactr.core` (pure rules), :mod:`artifactr.workspace` (scoped handles and
-storage), and the optional adapters.
+storage), :mod:`artifactr.agent` (the pydantic-ai integration), and the optional adapters.
 """
 
 from importlib.metadata import version
 
+from artifactr.agent import ArtifactDraft, ArtifactWorkspace, RunHandle, Runner, Session
 from artifactr.core import (
     Actor,
     AgentActor,
@@ -38,6 +39,8 @@ __all__ = [
     "AgentActor",
     "Applied",
     "Artifact",
+    "ArtifactDraft",
+    "ArtifactWorkspace",
     "ExternalAgentActor",
     "InMemoryStorage",
     "JsonPatch",
@@ -47,6 +50,9 @@ __all__ = [
     "Recorded",
     "Rejection",
     "Resolved",
+    "RunHandle",
+    "Runner",
+    "Session",
     "SystemActor",
     "TextEdit",
     "TextEdits",

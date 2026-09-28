@@ -107,10 +107,10 @@ A `patch` is one of:
 
 ### `live`: ephemeral
 
-Live frames carry a run's token-level output. They have no `seq`, are not stored, and delivery is best-effort. `after_seq` is the last durable `seq` at emission, as an ordering hint.
+Live frames carry a run's token-level output. They have no `seq`, are not stored, and delivery is best-effort: a watcher that falls behind loses its oldest frames. Within one run they arrive in order. The models are `LiveFrame` and `LiveEvent` in `artifactr.core`.
 
 ```json
-{"type": "live", "run_id": "run_42", "after_seq": 1042, "event": {"type": "text_delta", "part": 0, "delta": "Here is the"}}
+{"type": "live", "run_id": "run_42", "event": {"type": "text_delta", "part": 0, "delta": "Here is the"}}
 ```
 
 | `event.type` | Fields | Source |
@@ -120,8 +120,8 @@ Live frames carry a run's token-level output. They have no `seq`, are not stored
 | `thinking_delta` | `part`, `delta` | `PartDeltaEvent` |
 | `tool_args_delta` | `part`, `delta` | `PartDeltaEvent` |
 | `part_ended` | `part` | `PartEndEvent` |
-| `draft` | `artifact_id?`, `kind`, `data` | a tool's `ctx.emit(...)`: a full snapshot of an artifact being generated, not yet committed |
-| `app_live` | `name`, `data` | other application `CustomEvent`s |
+| `draft` | `artifact_id?`, `kind`, `data` | an application tool's `ctx.emit(ArtifactDraft(...))`: a full snapshot of an artifact being generated, not yet committed |
+| `app_live` | `name`, `data` | other application `CustomEvent`s; `data` holds the event's own fields |
 
 Durable events supersede live frames. When the agent's `message_posted` arrives, it is the authoritative text for that message. When `artifact_changed` arrives, it replaces any `draft` for that artifact.
 
@@ -165,7 +165,7 @@ Every command frame carries a client-chosen `command_id`, which is also an idemp
 | `type` | Fields | Effect |
 |---|---|---|
 | `create_thread` | `thread_id?`, `title?` | `thread_created` |
-| `post_message` | `thread_id`, `content`, `message_id?` | `message_posted`. Starts a run if the thread has none active; otherwise the message steers the active run. |
+| `post_message` | `thread_id`, `content`, `message_id?` | `message_posted`. Starts a run if the thread is idle, steers the running run if there is one, and answers a paused run's pending requests (declining approvals, with the message as the reason) before resuming it. |
 | `set_focus` | `thread_id`, `artifact_ids` | `focus_changed` |
 | `set_thread_mode` | `thread_id`, `mode` (`edit`, `suggest`) | `thread_mode_changed` |
 | `create_artifact` | `kind`, `data`, `artifact_id?`, `thread_id?`, `proposal_id?` | `artifact_created`, or `proposal_created` under the type's write policy |

@@ -32,6 +32,9 @@ footer = """
         {% if release.previous.version -%}
             [{{ release.version | trim_start_matches(pat="v") }}]: \
                 https://github.com/alexnodeland/artifactr/compare/{{ release.previous.version }}...{{ release.version }}
+        {% else -%}
+            [{{ release.version | trim_start_matches(pat="v") }}]: \
+                https://github.com/alexnodeland/artifactr/releases/tag/{{ release.version }}
         {% endif -%}
     {% else -%}
         {% if release.previous.version -%}

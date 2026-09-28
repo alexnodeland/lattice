@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0] - 2026-09-28
 
 ### Features
 
@@ -26,10 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Publish the site at artifactr.alexnodeland.com from main ([#19](https://github.com/alexnodeland/artifactr/pull/19))
 - Add the documentation site and brand ([#16](https://github.com/alexnodeland/artifactr/pull/16))
 - Add architecture, thread protocol and ADRs for the library design
 
 ### Miscellaneous
 
+- Distribute as artifactr-ai, imported as artifactr ([#18](https://github.com/alexnodeland/artifactr/pull/18))
+- Wrap up v0.1: evergreen status, open questions and changelog ([#17](https://github.com/alexnodeland/artifactr/pull/17))
 - **deps**: Update only the lockfile, keeping supported version ranges ([#5](https://github.com/alexnodeland/artifactr/pull/5))
 - Lay the foundation for the v0.1 library ([#2](https://github.com/alexnodeland/artifactr/pull/2))
+
+[0.1.0]: https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0

@@ -1,6 +1,6 @@
 [project]
 name = "artifactr-ai"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Build chat applications where people and agents collaborate through shared, versioned artifacts."
 readme = "README.md"
 license = "MIT"
@@ -9,7 +9,7 @@ authors = [{ name = "Alex Nodeland", email = "alex@ournature.studio" }]
 requires-python = ">=3.12"
 keywords = ["agents", "llm", "collaboration", "artifacts", "pydantic-ai", "mcp"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Framework :: Pydantic :: 2",
     "Framework :: FastAPI",
     "Intended Audience :: Developers",

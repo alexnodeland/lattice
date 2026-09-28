@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-artifactr is pre-release. Security fixes are made on `main` and released in the next version. Once 1.0 ships, the latest minor release receives fixes.
+artifactr is in alpha (0.x). Security fixes are made on `main` and released in the next version. Once 1.0 ships, the latest minor release receives fixes.
 
 ## Reporting a vulnerability
 

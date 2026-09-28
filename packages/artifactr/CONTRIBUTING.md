@@ -9,7 +9,7 @@ You need [uv](https://docs.astral.sh/uv/) and `make`. Everything else is install
 ```bash
 git clone git@github.com:alexnodeland/artifactr.git
 cd artifactr
-make install        # every dependency group and extra, plus the git hooks
+make install        # the library, the example app, every group and extra, and the git hooks
 make check          # lint, types and tests: the same gates as CI
 ```
 
@@ -19,7 +19,7 @@ Run `make` on its own to list every command:
 |---|---|
 | `make fmt` | Format the code and apply safe lint fixes |
 | `make lint` | Check formatting and lint rules |
-| `make typecheck` | Type-check with pyright (strict for `src/`) |
+| `make typecheck` | Type-check with pyright (strict for `src/` and the example's code) |
 | `make test` | Run the tests with the 100% branch-coverage gate |
 | `make check` | Everything CI runs |
 | `make schema` | Regenerate `schemas/artifactr.v1.json` from the protocol models (a test fails if it drifts) |

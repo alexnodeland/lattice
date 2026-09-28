@@ -11,7 +11,9 @@ from pathlib import Path
 
 import pytest
 
-SRC = Path(__file__).parent.parent / "src" / "artifactr"
+ROOT = Path(__file__).parent.parent
+SRC = ROOT / "src" / "artifactr"
+EXAMPLE = ROOT / "examples" / "docplan" / "src" / "docplan"
 
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (artifactr packages it may import, third-party packages it may import)
@@ -57,3 +59,15 @@ def test_layer_imports_only_what_it_may(layer: str) -> None:
                 assert any(name == p or name.startswith(f"{p}.") for p in own), f"{where}: above"
             else:
                 assert root in third_party, f"{where}: not a dependency of this layer"
+
+
+PUBLIC = {"artifactr", *(f"artifactr.{package}" for package in (*LAYERS, "sql"))}
+
+
+def test_the_reference_implementation_uses_only_the_public_api() -> None:
+    modules = sorted(EXAMPLE.rglob("*.py"))
+    assert modules, "the reference implementation has no modules"
+    for path in modules:
+        for name in _imports(path):
+            if name.split(".")[0] == "artifactr":
+                assert name in PUBLIC, f"{path.relative_to(ROOT)} imports {name}, not a package"

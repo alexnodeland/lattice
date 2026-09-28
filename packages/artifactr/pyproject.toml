@@ -60,12 +60,16 @@ dev = [
 requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
 
+# The reference implementation is a workspace member, built on the public API only.
+[tool.uv.workspace]
+members = ["examples/docplan"]
+
 # ─── lint and format ──────────────────────────────────────────────────────────
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["src", "tests"]
+src = ["src", "tests", "examples/docplan/src"]
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -91,14 +95,16 @@ known-third-party = ["fastapi", "mcp"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D", "ARG"]
+"examples/*/tests/**" = ["D", "ARG"]
 # pydantic-ai hides a tool's RunContext from the model, so tool docstrings don't document it.
 "src/artifactr/agent/tools.py" = ["D417"]
+"examples/docplan/src/docplan/agent.py" = ["D417"]
 
 # ─── types ────────────────────────────────────────────────────────────────────
 
 [tool.pyright]
-include = ["src", "tests"]
-strict = ["src"]
+include = ["src", "tests", "examples"]
+strict = ["src", "examples/docplan/src"]
 typeCheckingMode = "standard"
 pythonVersion = "3.12"
 venvPath = "."
@@ -107,7 +113,7 @@ venv = ".venv"
 # ─── tests and coverage ───────────────────────────────────────────────────────
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "examples/docplan/tests"]
 addopts = ["--strict-markers", "--strict-config", "-ra"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -118,7 +124,7 @@ markers = [
 
 [tool.coverage.run]
 branch = true
-source = ["artifactr"]
+source = ["artifactr", "docplan"]
 
 [tool.coverage.report]
 fail_under = 100

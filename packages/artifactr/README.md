@@ -4,7 +4,7 @@ A Python library for building chat applications in which people and agents colla
 
 The chat is one channel. The artifacts (documents, plans, specs, anything with structure) are a second one. artifactr makes every edit to them versioned, attributed, visible to every participant, and fed back into the agent's context, so each side can see how the other is thinking.
 
-> **Status:** pre-release. The design is accepted and being built in the phases tracked by [RFC-0001](docs/rfcs/0001-v0.1-implementation-plan.md); the API below is the target.
+> **Status:** pre-release. v0.1 is being built in the phases tracked by [RFC-0001](docs/rfcs/0001-v0.1-implementation-plan.md).
 
 ## A taste of the API
 
@@ -28,6 +28,17 @@ ws = await workspaces.open(tenant_id, workspace_id, actor=user)
 plan = await ws.get(Plan, plan_id)
 await ws.commit(plan.edit(lambda p: p.add_task("Ship v1")))  # versioned, attributed, published
 await runner.send(ws, thread_id, "Break the launch into tasks")  # the agent sees what changed
+```
+
+## Try it
+
+[`examples/docplan`](examples/docplan/README.md) is a complete application built on the library: a person and an agent co-write a document and plan its work, over WebSocket, REST and MCP, with a terminal client.
+
+```sh
+make install
+export ANTHROPIC_API_KEY=...
+uv run docplan-serve            # in one terminal
+uv run docplan --user alice     # in another
 ```
 
 ## Documentation

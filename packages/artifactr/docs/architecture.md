@@ -9,7 +9,7 @@
 | `artifactr.agent` | Implemented |
 | `artifactr.sql` | Planned (phase 4) |
 | `artifactr.fastapi`, `artifactr.mcp` | Implemented |
-| `examples/docplan` | Planned (phase 6) |
+| `examples/docplan` | Implemented: server, terminal client and tests |
 
 ## What artifactr is
 
@@ -17,7 +17,7 @@ artifactr is a Python library for building chat applications in which a person a
 
 The chat is one channel of communication. The artifacts are a second one. When the agent restructures a plan, or a person rewrites a paragraph the agent drafted, the edit says something about how each side is thinking. artifactr makes those edits first-class: versioned, attributed to whoever made them, visible to every participant, and fed back into the agent's context.
 
-The library provides the machinery; applications provide the artifact types. A reference implementation, [`examples/docplan`](#build-plan) (a Markdown document plus a structured plan), is built on the library's public API as one implementation of it.
+The library provides the machinery; applications provide the artifact types. A reference implementation, [`examples/docplan`](../examples/docplan/README.md) (a Markdown document plus a structured plan), is built on the library's public API as one implementation of it ([ADR-0024](adr/0024-reference-implementation-as-a-workspace-member.md)).
 
 ### Goals
 
@@ -417,6 +417,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0019](adr/0019-storage-protocol-and-workspace-handles.md) | One storage protocol behind workspace handles |
 | [0020](adr/0020-running-agents-in-threads.md) | Running agents in threads |
 | [0022](adr/0022-surfaces-over-one-command-handler.md) | Surfaces over one command handler |
+| [0024](adr/0024-reference-implementation-as-a-workspace-member.md) | The reference implementation as a workspace member |
 
 ## Open questions
 

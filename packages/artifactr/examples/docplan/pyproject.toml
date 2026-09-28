@@ -1,0 +1,27 @@
+[project]
+name = "docplan"
+version = "0.1.0"
+description = "artifactr's reference implementation: a person and an agent co-write a doc and plan the work."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "artifactr[fastapi,mcp]",
+    "pydantic-ai-slim[anthropic,openai]>=2.51",
+    "uvicorn[standard]>=0.54",
+    "websockets>=17.1",
+    "rich>=15.0",
+    "prompt-toolkit>=3.0.53",
+    "httpx>=0.28",
+]
+
+[project.scripts]
+docplan-serve = "docplan.app:main"
+docplan = "docplan.cli:main"
+
+[tool.uv.sources]
+artifactr = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"

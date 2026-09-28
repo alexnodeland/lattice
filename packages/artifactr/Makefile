@@ -10,8 +10,8 @@ UV ?= uv
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-install: ## Install every dependency group and extra, plus the git hooks
-	$(UV) sync --all-groups --all-extras
+install: ## Install every package, dependency group and extra, plus the git hooks
+	$(UV) sync --all-groups --all-extras --all-packages
 	$(UV) run pre-commit install --hook-type pre-commit --hook-type commit-msg
 
 fmt: ## Format the code and apply safe lint fixes
@@ -22,7 +22,7 @@ lint: ## Check formatting and lint rules
 	$(UV) run ruff format --check .
 	$(UV) run ruff check .
 
-typecheck: ## Type-check (strict for src/)
+typecheck: ## Type-check (strict for the library and the example's code)
 	$(UV) run pyright
 
 test: ## Run the tests with the 100% branch-coverage gate

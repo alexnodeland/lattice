@@ -23,7 +23,12 @@ from pydantic_ai import (
     ToolDefinition,
 )
 from pydantic_ai.capabilities import AbstractCapability
-from pydantic_ai.capabilities.abstract import ValidatedToolArgs, WrapRunHandler
+from pydantic_ai.capabilities.abstract import (
+    ValidatedToolArgs,
+    WrapRunHandler,
+    WrapToolExecuteHandler,
+)
+from pydantic_ai.exceptions import ToolFailedError, ToolRetryError
 
 from artifactr.agent.session import Session, last_seen
 from artifactr.agent.tools import artifact_tools
@@ -215,6 +220,25 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         summary = _clip(json.dumps(args, default=str), self.max_summary_chars)
         await ctx.deps.workspace.record(self._tool_called(ctx, call, summary))
         return args
+
+    @override
+    async def wrap_tool_execute(
+        self,
+        ctx: Context,
+        *,
+        call: ToolCallPart,
+        tool_def: ToolDefinition,
+        args: ValidatedToolArgs,
+        handler: WrapToolExecuteHandler,
+    ) -> Any:
+        """Record a tool's own ``ModelRetry`` or ``ToolFailed``, which skip the error hook."""
+        try:
+            return await handler(args)
+        except (ToolRetryError, ToolFailedError) as error:
+            status = "retry" if isinstance(error, ToolRetryError) else "error"
+            summary = _clip(str(error), self.max_summary_chars)
+            await ctx.deps.workspace.record(self._tool_returned(ctx, call, status, summary))
+            raise
 
     @override
     async def after_tool_execute(

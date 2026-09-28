@@ -4,7 +4,7 @@ import asyncio
 from typing import Any
 
 import pytest
-from pydantic_ai import FunctionToolset, ModelRequest, RunContext
+from pydantic_ai import FunctionToolset, ModelRequest, ModelRetry, RunContext, ToolFailed
 
 from artifactr.agent import Session
 from artifactr.core import (
@@ -83,6 +83,37 @@ async def test_a_rejected_tool_call_becomes_a_retry(
     statuses = [event_as(e, ToolReturned).status for e in log if e.event.type == "tool_returned"]
     assert statuses == ["retry", "ok"]
     assert (await ws.get(Note, "n1")).data.text == "Ship Monday"
+
+
+async def test_a_tool_that_asks_for_a_retry_or_fails_is_recorded(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    tools = FunctionToolset[Session[Gate]]()
+
+    @tools.tool
+    async def pick(ctx: RunContext[Session[Gate]], task: str) -> str:
+        if task == "missing":
+            raise ToolFailed("the service is down")
+        if task != "t1":
+            raise ModelRetry(f"there is no task {task}")
+        return "picked"
+
+    script = Script(
+        call("pick", task="t9"),
+        call("pick", call_id="c2", task="missing"),
+        call("pick", call_id="c3", task="t1"),
+        say("Done."),
+    )
+    await make_agent(script, tools=[tools]).run("go", deps=Session.start(ws, thread.id, app=gate))
+    returned = [
+        event_as(e, ToolReturned) for e in await ws.read() if e.event.type == "tool_returned"
+    ]
+    assert [(r.status, r.summary) for r in returned] == [
+        ("retry", "there is no task t9"),
+        ("error", "the service is down"),
+        ("ok", "picked"),
+    ]
+    assert types(await ws.read()).count("tool_called") == 3, "every call has one result"
 
 
 async def test_a_version_conflict_tells_the_agent_to_read_again(

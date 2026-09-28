@@ -1,5 +1,6 @@
 """The server end to end: the agent drafts a doc, proposes a plan, and a person reviews it."""
 
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -11,6 +12,7 @@ from mcp import Client
 import docplan.app
 from artifactr import new_id
 from conftest import Script, call, say, wait_for
+from docplan.app import create_app, open_database
 
 BASE = "/v1/workspaces/main"
 
@@ -91,6 +93,21 @@ def test_demo_authentication_trusts_the_caller(
     client.post(f"{BASE}/commands", json=frame, headers=headers, params=params)
     [created] = client.get(f"{BASE}/events").json()
     assert created["actor"]["id"] == user
+
+
+def test_workspaces_can_live_in_a_database(
+    tmp_path: Path, script: Script, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DOCPLAN_DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path / 'docplan.db'}")
+    with TestClient(create_app(model=script.model), headers={"x-user": "alice"}) as client:
+        command(client, type="create_artifact", kind="doc", data={"title": "Kept"})
+    with TestClient(create_app(model=script.model), headers={"x-user": "alice"}) as client:
+        [doc] = client.get(f"{BASE}/artifacts").json()
+    assert doc["data"]["title"] == "Kept", "a restarted server finds it"
+
+
+def test_other_databases_get_a_plain_async_engine() -> None:
+    assert open_database("postgresql+asyncpg://localhost/docplan").dialect.name == "postgresql"
 
 
 def test_the_root_describes_the_surfaces(client: TestClient) -> None:

@@ -652,7 +652,7 @@ name = "docplan"
 version = "0.1.0"
 source = { editable = "examples/docplan" }
 dependencies = [
-    { name = "artifactr", extra = ["fastapi", "mcp"] },
+    { name = "artifactr", extra = ["fastapi", "mcp", "postgres", "sqlite"] },
     { name = "httpx" },
     { name = "prompt-toolkit" },
     { name = "pydantic-ai-slim", extra = ["anthropic", "openai"] },
@@ -663,7 +663,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "artifactr", extras = ["fastapi", "mcp"], editable = "." },
+    { name = "artifactr", extras = ["fastapi", "mcp", "sqlite", "postgres"], editable = "." },
     { name = "httpx", specifier = ">=0.28" },
     { name = "prompt-toolkit", specifier = ">=3.0.53" },
     { name = "pydantic-ai-slim", extras = ["anthropic", "openai"], specifier = ">=2.51" },

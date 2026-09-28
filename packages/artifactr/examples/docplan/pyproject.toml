@@ -6,7 +6,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-    "artifactr[fastapi,mcp]",
+    "artifactr[fastapi,mcp,sqlite,postgres]",
     "pydantic-ai-slim[anthropic,openai]>=2.51",
     "uvicorn[standard]>=0.54",
     "websockets>=17.1",

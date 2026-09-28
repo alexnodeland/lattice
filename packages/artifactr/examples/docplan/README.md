@@ -10,7 +10,7 @@ It is a small, complete application built only on artifactr's public API:
 |---|---|---|
 | Artifact types | [`artifacts.py`](src/docplan/artifacts.py) | A Markdown `Doc`, and a `Plan` with `write_policy="propose"`, its own methods, `render_for_agent` and `describe_change` |
 | Agent | [`agent.py`](src/docplan/agent.py) | A pydantic-ai agent with the `ArtifactWorkspace` capability, plus the plan's own tools |
-| Server | [`app.py`](src/docplan/app.py) | FastAPI with the thread protocol over WebSocket, REST at `/v1`, and MCP at `/mcp` |
+| Server | [`app.py`](src/docplan/app.py) | FastAPI with the thread protocol over WebSocket, REST at `/v1`, and MCP at `/mcp`, over in-memory or SQL storage |
 | Terminal client | [`cli.py`](src/docplan/cli.py) | A chat client that speaks the thread protocol |
 
 ## Run it
@@ -55,8 +55,18 @@ The plan's write policy is `propose`, so the agent's changes to it wait for your
 it edits directly. Edit anything yourself and the agent sees what you changed on its next turn. When
 the agent asks a question, your next message answers it.
 
-The server listens on `DOCPLAN_HOST` and `DOCPLAN_PORT` (default `127.0.0.1:8000`) and keeps
-everything in memory.
+The server listens on `DOCPLAN_HOST` and `DOCPLAN_PORT` (default `127.0.0.1:8000`).
+
+### Keep workspaces in a database
+
+By default everything lives in memory and is gone when the server stops. Set
+`DOCPLAN_DATABASE_URL` to keep it in SQLite or PostgreSQL. The server migrates the database to
+artifactr's schema when it starts.
+
+```sh
+DOCPLAN_DATABASE_URL=sqlite+aiosqlite:///docplan.db uv run docplan-serve
+DOCPLAN_DATABASE_URL=postgresql+asyncpg://user:password@localhost/docplan uv run docplan-serve
+```
 
 ### Client commands
 

@@ -54,4 +54,4 @@
 
 1. [x] Create `examples/docplan` as a workspace member with its server, client, README and tests.
 2. [x] Enforce public-API-only imports in the layering test.
-3. [ ] Let docplan use `artifactr.sql` storage by configuration (after phase 4).
+3. [x] Let docplan use `artifactr.sql` storage by configuration (`DOCPLAN_DATABASE_URL`).

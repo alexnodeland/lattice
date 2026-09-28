@@ -20,7 +20,15 @@ from collections.abc import Callable, Mapping
 from types import MappingProxyType
 from typing import Any, ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, SerializeAsAny, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    SerializeAsAny,
+    ValidationError,
+    computed_field,
+)
 
 from artifactr.core.actors import Actor
 from artifactr.core.commands import ArchiveArtifact, CreateArtifact, EditArtifact
@@ -107,9 +115,10 @@ class Versioned[A: Artifact](BaseModel):
     updated_by: Actor
     archived: bool = False
 
+    @computed_field
     @property
     def kind(self) -> str:
-        """The artifact's registered type name."""
+        """The artifact's registered type name. Serialized, so readers can tell types apart."""
         return self.data.kind
 
     def edit(

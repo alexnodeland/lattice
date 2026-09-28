@@ -68,7 +68,8 @@ def test_reads(client: TestClient) -> None:
     everything = client.get(f"{BASE}/artifacts", params={"include_archived": True, "kind": "note"})
     assert [a["id"] for a in everything.json()] == ["n1", "n2"]
     assert client.get(f"{BASE}/artifacts", params={"kind": "checklist"}).json() == []
-    assert client.get(f"{BASE}/artifacts/n1").json()["data"]["text"] == "Monday"
+    n1 = client.get(f"{BASE}/artifacts/n1").json()
+    assert (n1["kind"], n1["data"]["text"]) == ("note", "Monday")
     assert client.get(f"{BASE}/artifacts/nope").status_code == 404
     assert [r["version"] for r in client.get(f"{BASE}/artifacts/n1/revisions").json()] == [1, 2]
     assert client.get(f"{BASE}/artifacts/nope/revisions").status_code == 404

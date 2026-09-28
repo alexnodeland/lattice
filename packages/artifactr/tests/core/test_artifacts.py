@@ -123,6 +123,8 @@ def test_create_artifact_builds_a_command() -> None:
     assert create_artifact(Note()).artifact_id.startswith("art_")
 
 
-def test_versioned_serializes_the_concrete_type() -> None:
+def test_versioned_serializes_the_concrete_type_and_its_kind() -> None:
     stored = Versioned[Artifact](id="n1", version=1, data=Note(title="x"), updated_by=ALICE)
-    assert stored.model_dump(mode="json")["data"] == {"text": "", "title": "x"}
+    dumped = stored.model_dump(mode="json")
+    assert (dumped["kind"], dumped["data"]) == ("note", {"text": "", "title": "x"})
+    assert Versioned[Note].model_validate(dumped) == stored

@@ -183,7 +183,8 @@ async def test_artifacts_are_resources_of_their_tenant(
     async with Client(mcp.server) as client:
         result = await client.read_resource(artifact_uri("tenant", "w1", "n1"))
         body = json.loads(result.contents[0].text)  # type: ignore[union-attr]
-        assert (body["id"], body["version"], body["data"]["text"]) == ("n1", 1, "hello")
+        assert (body["id"], body["kind"], body["version"]) == ("n1", "note", 1)
+        assert body["data"]["text"] == "hello"
         with pytest.raises(MCPError):
             await client.read_resource(artifact_uri("tenant", "w1", "nope"))
         identity.tenant = "intruder"

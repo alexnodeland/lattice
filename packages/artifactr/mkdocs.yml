@@ -6,7 +6,7 @@ site_description: >-
   Build chat applications where people and agents collaborate through shared, versioned
   artifacts.
 site_author: Alex Nodeland
-site_url: https://alexnodeland.github.io/artifactr/
+site_url: https://artifactr.alexnodeland.com/
 repo_url: https://github.com/alexnodeland/artifactr
 repo_name: alexnodeland/artifactr
 edit_uri: edit/main/docs/
@@ -173,6 +173,7 @@ nav:
           - adr/0023-documentation-site.md
           - adr/0024-reference-implementation-as-a-workspace-member.md
           - adr/0025-distribution-name.md
+          - adr/0026-publishing-the-documentation-site.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

@@ -4,6 +4,7 @@
 </picture>
 
 <p>
+  <a href="https://artifactr.alexnodeland.com"><img alt="Docs" src="https://img.shields.io/badge/docs-artifactr.alexnodeland.com-2D2A8C"></a>
   <a href="https://github.com/alexnodeland/artifactr/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/alexnodeland/artifactr/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <img alt="Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-2D2A8C">
   <img alt="Coverage: 100%" src="https://img.shields.io/badge/coverage-100%25-2D2A8C">
@@ -113,7 +114,7 @@ Set `DOCPLAN_DATABASE_URL` (for example `sqlite+aiosqlite:///docplan.db`) to kee
 
 ## Documentation
 
-The documentation site is built from [`docs/`](docs/index.md); run `make docs-serve` to read it locally at <http://localhost:8000>.
+The documentation site is at **<https://artifactr.alexnodeland.com>**. It is built from [`docs/`](docs/index.md) and published from `main` on every push; run `make docs-serve` to read it locally at <http://localhost:8000>.
 
 - [Getting started](docs/getting-started.md) and the [guides](docs/guides/artifact-types.md): artifact types, workspaces, storage, the agent, live output, serving, MCP, security and testing.
 - [Architecture](docs/architecture.md): concepts, layers, the write path, the agent, tenancy and concurrency.

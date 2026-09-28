@@ -438,6 +438,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0023](adr/0023-documentation-site.md) | The documentation site |
 | [0024](adr/0024-reference-implementation-as-a-workspace-member.md) | The reference implementation as a workspace member |
 | [0025](adr/0025-distribution-name.md) | Distributed as artifactr-ai, imported as artifactr |
+| [0026](adr/0026-publishing-the-documentation-site.md) | Publishing the documentation site from main |
 
 ## Open questions
 

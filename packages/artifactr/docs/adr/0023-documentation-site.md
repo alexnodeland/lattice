@@ -1,6 +1,6 @@
 # ADR-0023: The documentation site
 
-**Status:** Accepted
+**Status:** Accepted, amended by [0026](0026-publishing-the-documentation-site.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 
@@ -101,4 +101,4 @@ The two limits found in the spike have narrow fixes. The Griffe extension keeps 
 
 1. [x] Build the site, the brand and the branded README (RFC-0001 phase 7).
 2. [x] Build the site in strict mode in CI.
-3. [ ] Decide whether to publish the site, then enable GitHub Pages and run the Docs workflow.
+3. [x] Decide whether to publish the site, then enable GitHub Pages and run the Docs workflow ([ADR-0026](0026-publishing-the-documentation-site.md)).

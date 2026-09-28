@@ -56,7 +56,10 @@
             "type": "proposal_created",
             "proposal_id": "prp_b",
             "rationale": "Monday is safer",
-            "thread_id": null
+            "thread_id": null,
+            "change": {
+              "summary": "edited text (1 replacement)"
+            }
           }
         ],
         "proposals": [
@@ -67,7 +70,10 @@
               "kind": "user",
               "id": "bob"
             },
-            "rationale": "Monday is safer"
+            "rationale": "Monday is safer",
+            "change": {
+              "summary": "edited text (1 replacement)"
+            }
           }
         ]
       }
@@ -578,6 +584,165 @@
             "data": {
               "text": "Ship v2 on Monday."
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "accepting with changes describes what was applied, not what was proposed",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prp_e",
+            "change": {
+              "type": "edit_artifact",
+              "artifact_id": "note_1",
+              "base_version": 1,
+              "patch": {
+                "kind": "text_edits",
+                "field": "text",
+                "edits": [
+                  {
+                    "old": "Friday",
+                    "new": "Monday"
+                  }
+                ]
+              },
+              "proposal_id": "prp_e",
+              "summary": "moved the launch to Monday"
+            },
+            "proposed_by": {
+              "kind": "agent",
+              "thread_id": "thr_1",
+              "run_id": "run_1"
+            },
+            "status": "pending",
+            "thread_id": "thr_1"
+          }
+        ]
+      },
+      "command": {
+        "type": "respond_to_proposal",
+        "proposal_id": "prp_e",
+        "decision": "accept",
+        "changes": {
+          "kind": "text_edits",
+          "edits": [
+            {
+              "old": "v1",
+              "new": "v2"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "resolved",
+          "version": 2
+        },
+        "events": [
+          {
+            "type": "artifact_changed",
+            "summary": "replace /text"
+          },
+          {
+            "type": "proposal_resolved"
+          }
+        ]
+      }
+    },
+    {
+      "name": "accepting as proposed keeps the proposal's summary",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prp_e",
+            "change": {
+              "type": "edit_artifact",
+              "artifact_id": "note_1",
+              "base_version": 1,
+              "patch": {
+                "kind": "text_edits",
+                "field": "text",
+                "edits": [
+                  {
+                    "old": "Friday",
+                    "new": "Monday"
+                  }
+                ]
+              },
+              "proposal_id": "prp_e",
+              "summary": "moved the launch to Monday"
+            },
+            "proposed_by": {
+              "kind": "agent",
+              "thread_id": "thr_1",
+              "run_id": "run_1"
+            },
+            "status": "pending",
+            "thread_id": "thr_1"
+          }
+        ]
+      },
+      "command": {
+        "type": "respond_to_proposal",
+        "proposal_id": "prp_e",
+        "decision": "accept"
+      },
+      "expect": {
+        "outcome": {
+          "type": "resolved",
+          "version": 2
+        },
+        "events": [
+          {
+            "type": "artifact_changed",
+            "summary": "moved the launch to Monday"
+          },
+          {
+            "type": "proposal_resolved"
           }
         ]
       }

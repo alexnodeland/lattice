@@ -240,8 +240,15 @@ def _propose(
     if not isinstance(change, CreateArtifact):
         _check_version(_current(state, change.artifact_id), change.base_version)
     thread_id = _context_thread_id(change.thread_id, actor)
-    # The change must apply now; what it would produce is discarded until someone accepts it.
-    _apply_change(change, None, state, actor, thread_id=thread_id, proposal_id=proposal_id)
+    # The change must apply now; what it would produce is discarded until someone accepts it,
+    # except the summary of an edit, which tells reviewers what they are asked to accept.
+    dry_run = _apply_change(
+        change, None, state, actor, thread_id=thread_id, proposal_id=proposal_id
+    )
+    if isinstance(change, EditArtifact) and change.summary is None:
+        [changed] = dry_run.events
+        assert isinstance(changed, ArtifactChanged)
+        change = change.model_copy(update={"summary": changed.summary})
     proposal = Proposal(
         id=proposal_id,
         change=change,
@@ -331,7 +338,8 @@ def _apply_change(
                 change.patch,
                 changes,
                 actor=actor,
-                summary=change.summary,
+                # A reviewer's changes make the proposal's summary stale: describe the result.
+                summary=change.summary if changes is None else None,
                 thread_id=thread_id,
                 proposal_id=proposal_id,
             )

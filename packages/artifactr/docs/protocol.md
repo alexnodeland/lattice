@@ -88,7 +88,7 @@ Every durable event arrives in the same envelope. The stored envelope and the wi
 | `artifact_created` | workspace | `artifact_id`, `kind`, `version`, `data`, `proposal_id?` |
 | `artifact_changed` | workspace | `artifact_id`, `kind`, `version`, `patch`, `summary`, `proposal_id?` |
 | `artifact_archived` | workspace | `artifact_id`, `kind`, `version`, `proposal_id?` |
-| `proposal_created` | workspace | `proposal_id`, `change` (the proposed `create_artifact`, `edit_artifact` or `archive_artifact` command), `rationale?` |
+| `proposal_created` | workspace | `proposal_id`, `change` (the proposed `create_artifact`, `edit_artifact` or `archive_artifact` command; a proposed edit always carries a `summary`, generated when the proposer gave none), `rationale?` |
 | `proposal_resolved` | workspace | `proposal_id`, `decision` (`accept`, `reject`), `proposed_by`, `artifact_id`, `changes?`, `reason?`, `version?` |
 | `run_started` | run | `run_id`, `thread_id`, `trigger` (`message`, `resume`, `api`) |
 | `tool_called` | run | `run_id`, `thread_id`, `tool_call_id`, `tool_name`, `args_summary` |
@@ -184,7 +184,7 @@ The command is one of the `Command` models in `artifactr.core`, or `stop_run` or
 | `edit_artifact` | `artifact_id`, `base_version`, `patch`, `summary?`, `thread_id?`, `proposal_id?` | `artifact_changed`, or `proposal_created` under the type's write policy |
 | `archive_artifact` | `artifact_id`, `base_version`, `thread_id?`, `proposal_id?` | `artifact_archived`, or `proposal_created` under the type's write policy |
 | `propose_change` | `change` (a `create_artifact`, `edit_artifact` or `archive_artifact` command), `rationale?`, `proposal_id?` | `proposal_created`, whatever the write policy |
-| `respond_to_proposal` | `proposal_id`, `decision` (`accept`, `reject`), `changes?`, `reason?` | `proposal_resolved`, plus the artifact event when accepted |
+| `respond_to_proposal` | `proposal_id`, `decision` (`accept`, `reject`), `changes?`, `reason?` | `proposal_resolved`, plus the artifact event when accepted. Accepted with `changes`, the edit's summary describes what was applied. |
 | `answer_deferred` | `run_id`, `tool_call_id`, `answer` or `approved` | `deferred_answered`. Once every pending request is answered, the paused run resumes. |
 | `stop_run` | `run_id` | Cancels a run of this workspace that is running in the serving process; `run_ended` with status `stopped`. |
 | `watch_run` | `run_id` | Attaches this socket to the run's live frames, starting with what the run has produced so far. WebSocket only. |

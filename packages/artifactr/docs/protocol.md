@@ -1,6 +1,6 @@
 # Thread protocol v1
 
-> **Status:** draft. Field names may change before the first release; the structure is settled by [ADR-0005](adr/0005-one-event-log-per-workspace.md), [ADR-0007](adr/0007-caller-owned-live-output.md) and [ADR-0012](adr/0012-surfaces-websocket-rest-mcp.md).
+> **Status:** v1, implemented by `artifactr.fastapi` and `artifactr.mcp`, with its JSON Schema in `schemas/artifactr.v1.json`. Its structure is settled by [ADR-0005](adr/0005-one-event-log-per-workspace.md), [ADR-0007](adr/0007-caller-owned-live-output.md), [ADR-0012](adr/0012-surfaces-websocket-rest-mcp.md) and [ADR-0022](adr/0022-surfaces-over-one-command-handler.md). Field names may still change before the first release; after it, v1 changes only additively (see [Versioning and schema](#versioning-and-schema)).
 
 Clients connect to a workspace over WebSocket. They receive the workspace's durable events with resume, send commands, and receive live frames for runs they are watching. REST exposes the same commands and the same reads.
 

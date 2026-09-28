@@ -1,0 +1,1572 @@
+{
+  "description": "Creating, editing and archiving artifacts, including write policies.",
+  "cases": [
+    {
+      "name": "a person creates an artifact",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "command": {
+        "type": "create_artifact",
+        "artifact_id": "note_2",
+        "kind": "note",
+        "data": {
+          "title": "Ideas",
+          "text": "- one"
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "applied",
+          "artifact_id": "note_2",
+          "version": 1
+        },
+        "events": [
+          {
+            "type": "artifact_created",
+            "artifact_id": "note_2",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Ideas",
+              "text": "- one"
+            },
+            "thread_id": null,
+            "run_id": null,
+            "proposal_id": null
+          }
+        ],
+        "artifacts": [
+          {
+            "id": "note_2",
+            "version": 1,
+            "archived": false,
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ],
+        "revisions": [
+          {
+            "artifact_id": "note_2",
+            "version": 1,
+            "patch": null,
+            "actor": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "creating fills in defaults before storing",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "command": {
+        "type": "create_artifact",
+        "artifact_id": "note_2",
+        "kind": "note",
+        "data": {}
+      },
+      "expect": {
+        "outcome": {
+          "type": "applied"
+        },
+        "events": [
+          {
+            "type": "artifact_created",
+            "data": {
+              "title": "",
+              "text": ""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "an unknown artifact type is rejected",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "command": {
+        "type": "create_artifact",
+        "artifact_id": "x_1",
+        "kind": "spreadsheet",
+        "data": {}
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "artifact type",
+          "id": "spreadsheet"
+        }
+      }
+    },
+    {
+      "name": "data that does not validate is rejected",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "command": {
+        "type": "create_artifact",
+        "artifact_id": "note_2",
+        "kind": "note",
+        "data": {
+          "title": 5
+        }
+      },
+      "expect": {
+        "rejection": {
+          "type": "validation_failed",
+          "message": "invalid note data"
+        }
+      }
+    },
+    {
+      "name": "an existing artifact id is rejected",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "create_artifact",
+        "artifact_id": "note_1",
+        "kind": "note",
+        "data": {}
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state"
+        }
+      }
+    },
+    {
+      "name": "the agent creates a direct artifact in an edit-mode thread",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "create_artifact",
+        "artifact_id": "note_2",
+        "kind": "note",
+        "data": {
+          "text": "draft"
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "applied",
+          "version": 1
+        },
+        "events": [
+          {
+            "type": "artifact_created",
+            "thread_id": "thr_1",
+            "run_id": "run_1"
+          }
+        ],
+        "artifacts": [
+          {
+            "updated_by": {
+              "kind": "agent",
+              "thread_id": "thr_1",
+              "run_id": "run_1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "the agent's creation of a propose-policy artifact becomes a proposal",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "create_artifact",
+        "artifact_id": "list_2",
+        "kind": "checklist",
+        "data": {
+          "title": "Beta"
+        },
+        "proposal_id": "prp_1"
+      },
+      "expect": {
+        "outcome": {
+          "type": "proposed",
+          "proposal_id": "prp_1"
+        },
+        "events": [
+          {
+            "type": "proposal_created",
+            "proposal_id": "prp_1",
+            "thread_id": "thr_1",
+            "run_id": "run_1",
+            "change": {
+              "type": "create_artifact",
+              "artifact_id": "list_2",
+              "kind": "checklist"
+            }
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prp_1",
+            "status": "pending",
+            "thread_id": "thr_1",
+            "proposed_by": {
+              "kind": "agent",
+              "thread_id": "thr_1",
+              "run_id": "run_1"
+            }
+          }
+        ],
+        "artifacts": []
+      }
+    },
+    {
+      "name": "an external agent's creation of a propose-policy artifact becomes a proposal",
+      "actor": {
+        "kind": "external_agent",
+        "client_id": "claude-code"
+      },
+      "command": {
+        "type": "create_artifact",
+        "artifact_id": "list_2",
+        "kind": "checklist",
+        "data": {},
+        "proposal_id": "prp_1"
+      },
+      "expect": {
+        "outcome": {
+          "type": "proposed"
+        },
+        "events": [
+          {
+            "type": "proposal_created",
+            "thread_id": null,
+            "run_id": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "a person's creation of a propose-policy artifact applies directly",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "command": {
+        "type": "create_artifact",
+        "artifact_id": "list_2",
+        "kind": "checklist",
+        "data": {}
+      },
+      "expect": {
+        "outcome": {
+          "type": "applied",
+          "version": 1
+        }
+      }
+    },
+    {
+      "name": "the agent's thread must exist",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_x"
+      },
+      "command": {
+        "type": "create_artifact",
+        "artifact_id": "note_2",
+        "kind": "note",
+        "data": {}
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "thread",
+          "id": "thr_x"
+        }
+      }
+    },
+    {
+      "name": "a proposal id that already exists is rejected",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prp_1",
+            "change": {
+              "type": "archive_artifact",
+              "artifact_id": "note_1",
+              "base_version": 1,
+              "proposal_id": "prp_1"
+            },
+            "proposed_by": {
+              "kind": "agent",
+              "thread_id": "thr_1",
+              "run_id": "run_1"
+            },
+            "status": "rejected"
+          }
+        ]
+      },
+      "command": {
+        "type": "create_artifact",
+        "artifact_id": "list_2",
+        "kind": "checklist",
+        "data": {},
+        "proposal_id": "prp_1"
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state",
+          "message": "proposal prp_1 already exists"
+        }
+      }
+    },
+    {
+      "name": "a person edits text with an anchored replacement",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "note_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "text_edits",
+          "field": "text",
+          "edits": [
+            {
+              "old": "Friday",
+              "new": "Monday"
+            }
+          ]
+        },
+        "proposal_id": "prp_new"
+      },
+      "expect": {
+        "outcome": {
+          "type": "applied",
+          "artifact_id": "note_1",
+          "version": 2
+        },
+        "events": [
+          {
+            "type": "artifact_changed",
+            "artifact_id": "note_1",
+            "kind": "note",
+            "version": 2,
+            "summary": "edited text (1 replacement)",
+            "patch": {
+              "kind": "text_edits",
+              "field": "text",
+              "edits": [
+                {
+                  "old": "Friday",
+                  "new": "Monday"
+                }
+              ]
+            },
+            "proposal_id": null
+          }
+        ],
+        "artifacts": [
+          {
+            "id": "note_1",
+            "version": 2,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Monday."
+            }
+          }
+        ],
+        "revisions": [
+          {
+            "version": 2,
+            "patch": {
+              "kind": "text_edits",
+              "field": "text",
+              "edits": [
+                {
+                  "old": "Friday",
+                  "new": "Monday"
+                }
+              ]
+            },
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Monday."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "an edit's own summary is used",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "note_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "text_edits",
+          "field": "text",
+          "edits": [
+            {
+              "old": "Friday",
+              "new": "Monday"
+            }
+          ]
+        },
+        "proposal_id": "prp_new",
+        "summary": "Moved the launch"
+      },
+      "expect": {
+        "outcome": {
+          "type": "applied"
+        },
+        "events": [
+          {
+            "summary": "Moved the launch"
+          }
+        ]
+      }
+    },
+    {
+      "name": "an edit made in a thread records that thread",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ],
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "note_1",
+        "base_version": 1,
+        "thread_id": "thr_1",
+        "patch": {
+          "kind": "text_edits",
+          "field": "text",
+          "edits": [
+            {
+              "old": "Friday",
+              "new": "Monday"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "applied"
+        },
+        "events": [
+          {
+            "type": "artifact_changed",
+            "thread_id": "thr_1",
+            "run_id": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "the artifact type describes its own changes",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "list_1",
+            "kind": "checklist",
+            "version": 1,
+            "data": {
+              "title": "Launch",
+              "items": {
+                "t1": {
+                  "title": "Write docs",
+                  "done": false
+                }
+              }
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "list_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "json_patch",
+          "ops": [
+            {
+              "op": "replace",
+              "path": "/items/t1/done",
+              "value": true
+            }
+          ]
+        },
+        "proposal_id": "prp_new"
+      },
+      "expect": {
+        "outcome": {
+          "type": "applied",
+          "version": 2
+        },
+        "events": [
+          {
+            "summary": "checked 'Write docs'"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a patch is described when nothing else describes the change",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "list_1",
+            "kind": "checklist",
+            "version": 1,
+            "data": {
+              "title": "Launch",
+              "items": {
+                "t1": {
+                  "title": "Write docs",
+                  "done": false
+                }
+              }
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "list_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "json_patch",
+          "ops": [
+            {
+              "op": "replace",
+              "path": "/title",
+              "value": "Launch v2"
+            }
+          ]
+        },
+        "proposal_id": "prp_new"
+      },
+      "expect": {
+        "outcome": {
+          "type": "applied"
+        },
+        "events": [
+          {
+            "summary": "replace /title"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a stale base version is a conflict",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 3,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            },
+            "archived": false
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "note_1",
+        "base_version": 2,
+        "patch": {
+          "kind": "text_edits",
+          "field": "text",
+          "edits": [
+            {
+              "old": "Friday",
+              "new": "Monday"
+            }
+          ]
+        },
+        "proposal_id": "prp_new"
+      },
+      "expect": {
+        "rejection": {
+          "type": "version_conflict",
+          "artifact_id": "note_1",
+          "base": 2,
+          "head": 3
+        }
+      }
+    },
+    {
+      "name": "editing a missing artifact is rejected",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "note_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "text_edits",
+          "field": "text",
+          "edits": [
+            {
+              "old": "Friday",
+              "new": "Monday"
+            }
+          ]
+        },
+        "proposal_id": "prp_new"
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "artifact",
+          "id": "note_1"
+        }
+      }
+    },
+    {
+      "name": "editing an archived artifact is rejected",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 2,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            },
+            "archived": true
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "note_1",
+        "base_version": 2,
+        "patch": {
+          "kind": "text_edits",
+          "field": "text",
+          "edits": [
+            {
+              "old": "Friday",
+              "new": "Monday"
+            }
+          ]
+        },
+        "proposal_id": "prp_new"
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state",
+          "message": "artifact note_1 is archived"
+        }
+      }
+    },
+    {
+      "name": "an anchor that is not found fails",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "note_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "text_edits",
+          "edits": [
+            {
+              "old": "Sunday",
+              "new": "Monday"
+            }
+          ]
+        },
+        "proposal_id": "prp_new"
+      },
+      "expect": {
+        "rejection": {
+          "type": "patch_failed",
+          "message": "the anchor 'Sunday' is not found"
+        }
+      }
+    },
+    {
+      "name": "a JSON patch that does not apply fails",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "note_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "json_patch",
+          "ops": [
+            {
+              "op": "remove",
+              "path": "/missing"
+            }
+          ]
+        },
+        "proposal_id": "prp_new"
+      },
+      "expect": {
+        "rejection": {
+          "type": "patch_failed"
+        }
+      }
+    },
+    {
+      "name": "text edits need a text field",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "list_1",
+            "kind": "checklist",
+            "version": 1,
+            "data": {
+              "title": "Launch",
+              "items": {
+                "t1": {
+                  "title": "Write docs",
+                  "done": false
+                }
+              }
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "list_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "text_edits",
+          "field": "items",
+          "edits": [
+            {
+              "old": "a",
+              "new": "b"
+            }
+          ]
+        },
+        "proposal_id": "prp_new"
+      },
+      "expect": {
+        "rejection": {
+          "type": "patch_failed",
+          "message": "'items' is not a text field"
+        }
+      }
+    },
+    {
+      "name": "a result that does not validate is rejected",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "note_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "json_patch",
+          "ops": [
+            {
+              "op": "replace",
+              "path": "/title",
+              "value": 5
+            }
+          ]
+        },
+        "proposal_id": "prp_new"
+      },
+      "expect": {
+        "rejection": {
+          "type": "validation_failed"
+        }
+      }
+    },
+    {
+      "name": "an edit that changes nothing is rejected",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "note_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "text_edits",
+          "edits": [
+            {
+              "old": "Friday",
+              "new": "Friday"
+            }
+          ]
+        },
+        "proposal_id": "prp_new"
+      },
+      "expect": {
+        "rejection": {
+          "type": "patch_failed",
+          "message": "the change leaves the artifact unchanged"
+        }
+      }
+    },
+    {
+      "name": "when validation normalizes the data, the recorded patch reproduces what is stored",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "counter_1",
+            "kind": "counter",
+            "version": 1,
+            "data": {
+              "count": 1
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "counter_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "json_patch",
+          "ops": [
+            {
+              "op": "replace",
+              "path": "/count",
+              "value": "3"
+            }
+          ]
+        },
+        "proposal_id": "prp_new"
+      },
+      "expect": {
+        "outcome": {
+          "type": "applied",
+          "version": 2
+        },
+        "events": [
+          {
+            "patch": {
+              "kind": "json_patch",
+              "ops": [
+                {
+                  "op": "replace",
+                  "path": "/count",
+                  "value": 3
+                }
+              ]
+            }
+          }
+        ],
+        "artifacts": [
+          {
+            "data": {
+              "count": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "the agent edits a direct artifact in an edit-mode thread",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ],
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "note_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "text_edits",
+          "field": "text",
+          "edits": [
+            {
+              "old": "Friday",
+              "new": "Monday"
+            }
+          ]
+        },
+        "proposal_id": "prp_new"
+      },
+      "expect": {
+        "outcome": {
+          "type": "applied",
+          "version": 2
+        },
+        "events": [
+          {
+            "type": "artifact_changed",
+            "thread_id": "thr_1",
+            "run_id": "run_1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the agent's edit in a suggest-mode thread becomes a proposal",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_s",
+        "run_id": "run_s"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ],
+        "threads": [
+          {
+            "id": "thr_s",
+            "title": "Review",
+            "mode": "suggest"
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "note_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "text_edits",
+          "field": "text",
+          "edits": [
+            {
+              "old": "Friday",
+              "new": "Monday"
+            }
+          ]
+        },
+        "proposal_id": "prp_s"
+      },
+      "expect": {
+        "outcome": {
+          "type": "proposed",
+          "proposal_id": "prp_s"
+        },
+        "events": [
+          {
+            "type": "proposal_created",
+            "thread_id": "thr_s",
+            "run_id": "run_s",
+            "change": {
+              "type": "edit_artifact",
+              "artifact_id": "note_1",
+              "base_version": 1
+            }
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prp_s",
+            "thread_id": "thr_s"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the agent's edit to a propose-policy artifact becomes a proposal",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "list_1",
+            "kind": "checklist",
+            "version": 1,
+            "data": {
+              "title": "Launch",
+              "items": {
+                "t1": {
+                  "title": "Write docs",
+                  "done": false
+                }
+              }
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ],
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "list_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "json_patch",
+          "ops": [
+            {
+              "op": "replace",
+              "path": "/title",
+              "value": "Go"
+            }
+          ]
+        },
+        "proposal_id": "prp_l"
+      },
+      "expect": {
+        "outcome": {
+          "type": "proposed",
+          "proposal_id": "prp_l"
+        },
+        "artifacts": []
+      }
+    },
+    {
+      "name": "a proposal must apply when it is made",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "list_1",
+            "kind": "checklist",
+            "version": 1,
+            "data": {
+              "title": "Launch",
+              "items": {
+                "t1": {
+                  "title": "Write docs",
+                  "done": false
+                }
+              }
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ],
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "edit_artifact",
+        "artifact_id": "list_1",
+        "base_version": 1,
+        "patch": {
+          "kind": "json_patch",
+          "ops": [
+            {
+              "op": "remove",
+              "path": "/nope"
+            }
+          ]
+        },
+        "proposal_id": "prp_new"
+      },
+      "expect": {
+        "rejection": {
+          "type": "patch_failed"
+        }
+      }
+    },
+    {
+      "name": "a person archives an artifact",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "archive_artifact",
+        "artifact_id": "note_1",
+        "base_version": 1
+      },
+      "expect": {
+        "outcome": {
+          "type": "applied",
+          "version": 2
+        },
+        "events": [
+          {
+            "type": "artifact_archived",
+            "artifact_id": "note_1",
+            "kind": "note",
+            "version": 2
+          }
+        ],
+        "artifacts": [
+          {
+            "version": 2,
+            "archived": true,
+            "data": {
+              "text": "Ship v1 on Friday."
+            }
+          }
+        ],
+        "revisions": [
+          {
+            "version": 2,
+            "archived": true,
+            "patch": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "archiving at a stale version is a conflict",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 2,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            },
+            "archived": false
+          }
+        ]
+      },
+      "command": {
+        "type": "archive_artifact",
+        "artifact_id": "note_1",
+        "base_version": 1
+      },
+      "expect": {
+        "rejection": {
+          "type": "version_conflict",
+          "base": 1,
+          "head": 2
+        }
+      }
+    },
+    {
+      "name": "the agent's archive of a propose-policy artifact becomes a proposal",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "list_1",
+            "kind": "checklist",
+            "version": 1,
+            "data": {
+              "title": "Launch",
+              "items": {
+                "t1": {
+                  "title": "Write docs",
+                  "done": false
+                }
+              }
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ],
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "archive_artifact",
+        "artifact_id": "list_1",
+        "base_version": 1,
+        "proposal_id": "prp_x"
+      },
+      "expect": {
+        "outcome": {
+          "type": "proposed",
+          "proposal_id": "prp_x"
+        },
+        "events": [
+          {
+            "type": "proposal_created",
+            "change": {
+              "type": "archive_artifact"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

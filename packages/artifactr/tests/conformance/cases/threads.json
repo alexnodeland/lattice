@@ -1,0 +1,404 @@
+{
+  "description": "Threads, messages, focus and modes.",
+  "cases": [
+    {
+      "name": "a thread is created",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "command": {
+        "type": "create_thread",
+        "thread_id": "thr_2",
+        "title": "Beta"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "thread_created",
+            "thread_id": "thr_2",
+            "title": "Beta"
+          }
+        ],
+        "threads": [
+          {
+            "id": "thr_2",
+            "title": "Beta",
+            "mode": "edit",
+            "focus": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "a thread id must be new",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "create_thread",
+        "thread_id": "thr_1"
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state"
+        }
+      }
+    },
+    {
+      "name": "a person posts a message",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "post_message",
+        "thread_id": "thr_1",
+        "message_id": "msg_1",
+        "content": "Let's ship Monday"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "message_posted",
+            "thread_id": "thr_1",
+            "message_id": "msg_1",
+            "content": "Let's ship Monday",
+            "run_id": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "the agent's message carries its run",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "post_message",
+        "thread_id": "thr_1",
+        "message_id": "msg_2",
+        "content": "Done."
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "run_id": "run_1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "posting to a missing thread is rejected",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "command": {
+        "type": "post_message",
+        "thread_id": "thr_9",
+        "content": "hi"
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "thread",
+          "id": "thr_9"
+        }
+      }
+    },
+    {
+      "name": "focus is set, without duplicates",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ],
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          },
+          {
+            "id": "list_1",
+            "kind": "checklist",
+            "version": 1,
+            "data": {
+              "title": "Launch",
+              "items": {
+                "t1": {
+                  "title": "Write docs",
+                  "done": false
+                }
+              }
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "set_focus",
+        "thread_id": "thr_1",
+        "artifact_ids": [
+          "note_1",
+          "list_1",
+          "note_1"
+        ]
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "focus_changed",
+            "artifact_ids": [
+              "note_1",
+              "list_1"
+            ]
+          }
+        ],
+        "threads": [
+          {
+            "id": "thr_1",
+            "focus": [
+              "note_1",
+              "list_1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "setting the same focus records nothing",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit",
+            "focus": [
+              "note_1"
+            ]
+          }
+        ],
+        "artifacts": [
+          {
+            "id": "note_1",
+            "kind": "note",
+            "version": 1,
+            "data": {
+              "title": "Plan",
+              "text": "Ship v1 on Friday."
+            },
+            "updated_by": {
+              "kind": "user",
+              "id": "alice",
+              "name": "Alice"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "set_focus",
+        "thread_id": "thr_1",
+        "artifact_ids": [
+          "note_1"
+        ]
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [],
+        "threads": []
+      }
+    },
+    {
+      "name": "focus on a missing artifact is rejected",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "set_focus",
+        "thread_id": "thr_1",
+        "artifact_ids": [
+          "note_1"
+        ]
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "artifact"
+        }
+      }
+    },
+    {
+      "name": "focus in a missing thread is rejected",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "command": {
+        "type": "set_focus",
+        "thread_id": "thr_9",
+        "artifact_ids": []
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "thread"
+        }
+      }
+    },
+    {
+      "name": "a thread switches to suggest mode",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "set_thread_mode",
+        "thread_id": "thr_1",
+        "mode": "suggest"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "thread_mode_changed",
+            "thread_id": "thr_1",
+            "mode": "suggest"
+          }
+        ],
+        "threads": [
+          {
+            "mode": "suggest"
+          }
+        ]
+      }
+    },
+    {
+      "name": "setting the same mode records nothing",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "set_thread_mode",
+        "thread_id": "thr_1",
+        "mode": "edit"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": []
+      }
+    }
+  ]
+}

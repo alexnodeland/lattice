@@ -4,7 +4,7 @@
 
 | Package | Status |
 |---|---|
-| `artifactr.core` | Planned (RFC-0001 phase 1) |
+| `artifactr.core` | Implemented |
 | `artifactr.workspace` | Planned (phase 2) |
 | `artifactr.agent` | Planned (phase 3) |
 | `artifactr.sql` | Planned (phase 4) |
@@ -75,29 +75,34 @@ Dependencies point one way. Each layer is usable without the ones above it.
 
 ### `artifactr.core`: sans-IO
 
-Core holds every rule as plain functions over immutable values. Storage and transport belong to the host, which loads state, calls core, and saves what core returns inside its own transaction.
+Core holds every rule as plain functions over immutable values. Storage and transport belong to the host, which asks core what to load, loads it, lets core decide, and saves what core returns inside its own transaction ([ADR-0018](adr/0018-core-host-contract.md)):
 
 ```python
-result = core.commit(command, current=state, actor=actor)  # CommitResult, or raises a Rejection
-notes = core.change_notes(envelopes, since=seq, focus=artifact_ids, viewer=actor)
-plan = core.resume(hello, head_seq=head)
+state = State()
+while missing := core.needs(command, actor=actor, state=state):
+    state = load(missing, into=state)  # the host's I/O
+result = core.commit(command, state, actor=actor)  # CommitResult, or raises a Rejection
+save(result)  # entities and events, in one transaction
 ```
 
-- `commit` validates the command, applies the artifact type's write policy, checks the base version, applies the patch, validates the result against the type, and returns a `CommitResult`: the outcome (`Applied` or `Proposed`), the new revisions, and the events to append.
-- `respond` applies a person's decision on a proposal, including any changes they made to it, rebased onto the artifact's current version.
-- `change_notes` turns a slice of the log into short, attributed notes for the agent. It keeps only artifacts the thread is focused on and drops the viewer's own changes.
-- `resume` decides what a reconnecting client needs: a replay range or, if that range is no longer retained, a snapshot.
+- `needs` returns the ids of the artifacts, proposals, threads and runs a command depends on. Some commands only know their full needs once their first entities are loaded (accepting a proposal needs the proposal before it knows which artifact), so hosts loop until nothing is missing.
+- `commit` decides a command. For artifact changes it applies the type's write policy, checks the base version, applies the patch, and validates the result against the type. It returns a `CommitResult`: the outcome (`Applied`, `Proposed`, `Resolved` or `Recorded`), the entities to save, the revisions to append, and the events to log. Accepting or rejecting a proposal is the `RespondToProposal` command; an accepted change is rebased onto the artifact's current version, with the person's own changes layered on top.
+- `record` decides a fact about an agent run (`RunStarted`, `ToolCalled`, `ToolReturned`, `RunPaused`, `RunEnded`) or an application `AppEvent`. Only the thread's own agent, or the system, may record facts about its runs.
+- `change_notes` turns a slice of the log into short, attributed notes for a viewer. It keeps changes by other participants to the artifacts the viewer follows (and artifacts created in the viewer's thread), proposals others made on them, and decisions on the viewer's own proposals; several changes to one artifact become one note.
+- `resume` decides where a reconnecting client's replay starts, and whether it must reset because it has seen events the log does not have.
 
-Rejections are exceptions with typed fields: `VersionConflict(base, head, changes_since)`, `ValidationFailed(errors)`, `PatchFailed(reason)`, `NotFound`, `Forbidden`.
+Commands carry the ids of everything they create, including the proposal id to use if a write policy turns the change into a proposal. The same command against the same state therefore always yields the same result. Ids are plain strings; aliases such as `ArtifactId` document intent.
 
-Because core is pure, its behaviour is pinned by a **conformance suite** of JSON fixtures: given a state and a command, expect these events or this rejection. The fixtures are the language-neutral specification. Any future port of core, or a hot path rewritten as a native extension, must pass them.
+Rejections are exceptions with a stable `code` and typed details: `VersionConflict` (`base`, `head`), `ValidationFailed` (Pydantic's `errors`), `PatchFailed`, `NotFound` (`entity`, `id`), `Forbidden`, `InvalidState`, and `UnsupportedProtocol`. Their `payload()` is what the protocol sends to clients.
 
-Core events form a **closed** discriminated union, so pyright checks `match event:` blocks ending in `assert_never` for exhaustiveness. Applications extend the log through one **open** family, `AppEvent`, whose unknown tags degrade to a raw payload instead of failing. This mirrors how pydantic-ai separates its own events from application `CustomEvent`s.
+Because core is pure, its behaviour is pinned by a **conformance suite** of JSON fixtures in `tests/conformance/cases/`: given an actor, the entities that exist and a command, expect these events and entities or this rejection. The fixtures are the language-neutral specification. Any future port of core, or a hot path rewritten as a native extension, must pass them.
+
+Core events form a **closed** discriminated union (`KnownEvent`), so pyright checks `match event:` blocks ending in `assert_never` for exhaustiveness. Applications extend the log through one **open** family, `AppEvent`. An event type from a newer protocol version validates as `UnknownEvent` rather than failing, and round-trips unchanged. This mirrors how pydantic-ai separates its own events from application `CustomEvent`s.
 
 ### Defining an artifact type
 
 ```python
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, Self
 
 from pydantic import BaseModel
 
@@ -125,17 +130,25 @@ class Plan(Artifact):  # registered as "plan"
         lines += [f"- [{t.status}] {t.title} ({tid})" for tid, t in self.tasks.items()]
         return "\n".join(lines)
 
+    def describe_change(self, before: Self) -> str | None:
+        done = [
+            t.title
+            for tid, t in self.tasks.items()
+            if t.status == "done" and tid in before.tasks and before.tasks[tid].status != "done"
+        ]
+        return f"completed {', '.join(done)}" if done else None
+
 
 class Doc(MarkdownArtifact):  # registered as "doc"; edited with anchored text replacements
     pass
 ```
 
-Registration happens in `__pydantic_init_subclass__`, Pydantic's hook that runs after the model's fields are built. The type name is derived from the class name and can be overridden with `class Plan(Artifact, name="...")`, the same convention pydantic-ai uses for `CustomEvent`.
+Registration happens in `__pydantic_init_subclass__`, Pydantic's hook that runs after the model's fields are built. The type name is derived from the class name in snake case and can be overridden with `class Plan(Artifact, name="...")`, the same convention pydantic-ai uses for `CustomEvent`. Intermediate base classes pass `abstract=True`. `describe_change(before)` is an optional hook that summarizes a change in the type's own words; without it, the summary is generated from the patch.
 
 The library defines the patch kinds:
 
 - **JSON Patch** (RFC 6902) for `Artifact` subclasses. `Versioned[T].edit(fn)` copies the data, lets `fn` mutate the copy, and diffs the result into a patch against the current version.
-- **Anchored text edits** for `MarkdownArtifact`. Each edit replaces an exact string that must occur exactly once, the edit form language models perform most reliably.
+- **Anchored text edits** for any text field, such as a `MarkdownArtifact`'s `text`. Each edit replaces an exact string that must occur exactly once, the edit form language models perform most reliably. An empty anchor writes into an empty field.
 
 Agents do not write raw JSON Patch. They get domain tools from the application (`add_task`, `set_status`) or the generic text-edit tool for documents, and those tools produce patches.
 
@@ -161,7 +174,7 @@ erDiagram
 - **Artifacts belong to the workspace**, not to a chat, so several chats and people can work on the same plan. A thread lists the artifacts it is focused on.
 - **Revisions are append-only.** Every committed change writes a revision with its version, patch, resulting data and actor. Reverting writes a new revision; versions never go backwards.
 - **One event log per workspace**, with a single gap-free `seq`. Events carry an optional `thread_id` and `run_id`, and subscribers filter on them.
-- **Proposals** are durable objects that reference an artifact and the version they were based on.
+- **Proposals** are durable objects that wrap the command they would execute (create, edit or archive), with its base version, the proposer and a rationale.
 - **Model history** (pydantic-ai `ModelMessage`s, serialized with `ModelMessagesTypeAdapter`) is stored per thread next to the log, not reconstructed from it.
 
 ## The write path
@@ -190,7 +203,7 @@ sequenceDiagram
     end
 ```
 
-`Workspace.commit` returns `Applied(version, seq)` when the change was written, or `Proposed(proposal_id, seq)` when the artifact type's write policy turned it into a proposal. Run lifecycle facts (a run started, a tool was called) are recorded through `Workspace.record`, which uses the same transaction and sequencing. Nothing else writes to storage.
+`Workspace.commit` returns the command's outcome with the `seq` of its last event: `Applied(artifact_id, version)` when a change was written, `Proposed(proposal_id)` when the artifact type's write policy turned it into a proposal, `Resolved(proposal_id, decision, version)` for an answered proposal, and `Recorded()` for everything else. Run lifecycle facts (a run started, a tool was called) are recorded through `Workspace.record`, which calls `core.record` under the same transaction and sequencing. Nothing else writes to storage.
 
 As a result:
 
@@ -273,7 +286,7 @@ async with ws.open_run(thread_id) as run:  # lease: one active run per thread
 - A pub/sub implementation (Redis, NATS) for fan-out across replicas, as an optional add-on.
 - `NullChannel` for headless runs.
 
-The run holds a lease, not a socket: if the connection that started it drops, the run continues and the channel detaches. Losing live frames is harmless, because the durable `assistant_message`, `tool_returned` and `artifact_changed` events are authoritative. A client that reconnects mid-run replays the log from its last `seq` and reattaches to the run's live channel if the run is still active.
+The run holds a lease, not a socket: if the connection that started it drops, the run continues and the channel detaches. Losing live frames is harmless, because the durable `message_posted`, `tool_returned` and `artifact_changed` events are authoritative. A client that reconnects mid-run replays the log from its last `seq` and reattaches to the run's live channel if the run is still active.
 
 ## Tenancy and concurrency
 
@@ -372,6 +385,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0015](adr/0015-quality-gates.md) | Quality gates |
 | [0016](adr/0016-mit-license.md) | MIT license |
 | [0017](adr/0017-application-toolsets-and-capability-events.md) | Application toolsets register on the agent; the capability emits capability events |
+| [0018](adr/0018-core-host-contract.md) | Core's host contract: needs, commit and record |
 
 ## Open questions
 

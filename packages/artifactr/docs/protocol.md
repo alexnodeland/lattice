@@ -27,7 +27,7 @@ sequenceDiagram
 ```
 
 ```json
-{"type": "hello", "protocol": "artifactr.v1", "resume_after_seq": 1041, "threads": ["th_9"]}
+{"type": "hello", "protocol": "artifactr.v1", "resume_after_seq": 1041, "threads": ["thr_9"]}
 ```
 
 ```json
@@ -36,13 +36,14 @@ sequenceDiagram
   "protocol": "artifactr.v1",
   "workspace_id": "ws_1",
   "head_seq": 1057,
-  "active_runs": [{"run_id": "run_42", "thread_id": "th_9"}]
+  "reset": false,
+  "active_runs": [{"run_id": "run_42", "thread_id": "thr_9"}]
 }
 ```
 
 - **The server owns the protocol version.** An unsupported `protocol` closes the socket with `4400`.
 - **Resume is by `seq`, never by timestamp.** The server subscribes to the log from `resume_after_seq` before replaying, so no event can fall between replay and live delivery.
-- `resume_after_seq` of `0` replays from the beginning of retained history. If the requested position is older than retention, the server sends a `snapshot` frame and then events after the snapshot's `seq`.
+- `resume_after_seq` of `0` replays from the beginning of retained history. If the client has seen events this log does not have (its position is past `head_seq`, for example after the server's data was reset), or the position is older than retention, `welcome` carries `reset: true`: the client discards what it holds and rebuilds from the replay. The decision is `artifactr.core.resume`.
 - `threads` filters thread-scoped events (messages, runs). Workspace-scoped events (artifacts, proposals) are always delivered.
 - A `hello` not received within the server's timeout closes the socket with `4408`.
 
@@ -50,51 +51,59 @@ sequenceDiagram
 
 ### `event`: durable
 
-Every durable event arrives in the same envelope. The stored envelope and the wire frame have the same shape.
+Every durable event arrives in the same envelope. The stored envelope and the wire frame have the same shape; the models are `Envelope` and `Event` in `artifactr.core`.
 
 ```json
 {
   "type": "event",
   "seq": 1042,
-  "id": "01J9ZK4Q7V3M8X2R5T6Y0B1C2D",
+  "id": "6f1c0f7e-3b0e-4a8a-9d7b-1a2b3c4d5e6f",
   "ts": "2026-09-28T14:03:11.204Z",
   "workspace_id": "ws_1",
-  "thread_id": "th_9",
+  "thread_id": "thr_9",
   "run_id": "run_42",
-  "actor": {"kind": "agent", "run_id": "run_42"},
+  "actor": {"kind": "agent", "thread_id": "thr_9", "run_id": "run_42", "name": "assistant"},
   "event": {
     "type": "artifact_changed",
     "artifact_id": "plan_1",
     "kind": "plan",
     "version": 8,
-    "patch_kind": "json_patch",
-    "patch": [{"op": "replace", "path": "/tasks/t3/status", "value": "done"}],
-    "summary": "Marked 'Ship v1' done"
+    "patch": {"kind": "json_patch", "ops": [{"op": "replace", "path": "/tasks/t3/status", "value": "done"}]},
+    "summary": "completed Ship v1",
+    "proposal_id": null,
+    "thread_id": "thr_9",
+    "run_id": "run_42"
   }
 }
 ```
 
-`actor.kind` is one of `user`, `agent`, `external_agent` or `system`.
+`actor.kind` is one of `user` (`id`, `name?`), `agent` (`thread_id`, `run_id?`, `name`), `external_agent` (`client_id`, `name?`) or `system` (`name`). Every event of one thread's agent is the same participant, whatever its run.
 
 | `event.type` | Scope | Fields |
 |---|---|---|
-| `thread_created` | thread | `title` |
-| `focus_changed` | thread | `artifact_ids` |
-| `user_message` | thread | `message_id`, `content`, `client_message_id?` |
-| `assistant_message` | thread, run | `message_id`, `content` |
-| `run_started` | thread, run | `trigger` (`message`, `resume`, `api`) |
-| `tool_called` | run | `tool_call_id`, `tool_name`, `args_summary` |
-| `tool_returned` | run | `tool_call_id`, `status` (`ok`, `error`, `retry`), `summary` |
-| `run_paused` | run | `requests`: list of `{tool_call_id, kind: question \| approval, prompt, schema?}` |
-| `run_ended` | run | `status` (`completed`, `stopped`, `failed`), `usage` |
-| `artifact_created` | workspace | `artifact_id`, `kind`, `version`, `data` |
-| `artifact_changed` | workspace | `artifact_id`, `kind`, `version`, `patch_kind`, `patch`, `summary` |
-| `artifact_archived` | workspace | `artifact_id`, `version` |
-| `proposal_created` | workspace | `proposal_id`, `artifact_id?`, `kind`, `base_version`, `patch_kind`, `patch`, `rationale?` |
-| `proposal_resolved` | workspace | `proposal_id`, `decision` (`accepted`, `rejected`), `changes?`, `version?` |
-| `app_event` | any | `name`, `data` |
+| `thread_created` | thread | `thread_id`, `title` |
+| `thread_mode_changed` | thread | `thread_id`, `mode` (`edit`, `suggest`) |
+| `focus_changed` | thread | `thread_id`, `artifact_ids` |
+| `message_posted` | thread | `thread_id`, `message_id`, `content`, `run_id?`. The author is the envelope's actor. |
+| `artifact_created` | workspace | `artifact_id`, `kind`, `version`, `data`, `proposal_id?` |
+| `artifact_changed` | workspace | `artifact_id`, `kind`, `version`, `patch`, `summary`, `proposal_id?` |
+| `artifact_archived` | workspace | `artifact_id`, `kind`, `version`, `proposal_id?` |
+| `proposal_created` | workspace | `proposal_id`, `change` (the proposed `create_artifact`, `edit_artifact` or `archive_artifact` command), `rationale?` |
+| `proposal_resolved` | workspace | `proposal_id`, `decision` (`accept`, `reject`), `proposed_by`, `artifact_id`, `changes?`, `reason?`, `version?` |
+| `run_started` | run | `run_id`, `thread_id`, `trigger` (`message`, `resume`, `api`) |
+| `tool_called` | run | `run_id`, `thread_id`, `tool_call_id`, `tool_name`, `args_summary` |
+| `tool_returned` | run | `run_id`, `thread_id`, `tool_call_id`, `status` (`ok`, `error`, `retry`), `summary` |
+| `run_paused` | run | `run_id`, `thread_id`, `requests`: list of `{tool_call_id, tool_name, kind: question \| approval, args}` |
+| `deferred_answered` | run | `run_id`, `thread_id`, `tool_call_id`, `answer?`, `approved?` |
+| `run_ended` | run | `run_id`, `thread_id`, `status` (`completed`, `stopped`, `failed`), `usage?`, `error?` |
+| `app_event` | any | `name`, `data`, `thread_id?`, `run_id?` |
 
-`patch_kind` is `json_patch` (RFC 6902) or `text_edits` (a list of `{old, new}` replacements, where each `old` occurs exactly once in the document).
+Artifact and proposal events are workspace-scoped, and also carry the `thread_id` and `run_id` they originated in, when there is one.
+
+A `patch` is one of:
+
+- `{"kind": "json_patch", "ops": [...]}`: RFC 6902 operations over the artifact's JSON data.
+- `{"kind": "text_edits", "field": "text", "edits": [{"old": "...", "new": "..."}]}`: anchored replacements in one text field, where each `old` occurs exactly once when applied. An empty `old` writes into an empty field.
 
 ### `live`: ephemeral
 
@@ -114,7 +123,7 @@ Live frames carry a run's token-level output. They have no `seq`, are not stored
 | `draft` | `artifact_id?`, `kind`, `data` | a tool's `ctx.emit(...)`: a full snapshot of an artifact being generated, not yet committed |
 | `app_live` | `name`, `data` | other application `CustomEvent`s |
 
-Durable events supersede live frames. When `assistant_message` arrives, it is the authoritative text for that message. When `artifact_changed` arrives, it replaces any `draft` for that artifact.
+Durable events supersede live frames. When the agent's `message_posted` arrives, it is the authoritative text for that message. When `artifact_changed` arrives, it replaces any `draft` for that artifact.
 
 Clients receive live frames for runs in the threads they subscribed to. `watch_run` attaches to a specific run.
 
@@ -123,7 +132,7 @@ Clients receive live frames for runs in the threads they subscribed to. `watch_r
 Every command gets exactly one result.
 
 ```json
-{"type": "command_result", "command_id": "c_17", "ok": true, "outcome": "applied", "seq": 1043}
+{"type": "command_result", "command_id": "c_17", "ok": true, "outcome": {"type": "applied", "artifact_id": "plan_1", "version": 9, "seq": 1043}}
 ```
 
 ```json
@@ -131,11 +140,11 @@ Every command gets exactly one result.
   "type": "command_result",
   "command_id": "c_18",
   "ok": false,
-  "rejection": {"type": "version_conflict", "base": 7, "head": 8, "changes_since": [1042]}
+  "rejection": {"type": "version_conflict", "message": "artifact plan_1 is at version 8, but the change was based on 7", "artifact_id": "plan_1", "base": 7, "head": 8}
 }
 ```
 
-`outcome` is `applied` or `proposed`. `rejection.type` is one of `version_conflict`, `validation_failed`, `patch_failed`, `not_found` or `forbidden`.
+`outcome.type` is `applied` (`artifact_id`, `version`), `proposed` (`proposal_id`), `resolved` (`proposal_id`, `decision`, `version?`) or `recorded`. `rejection.type` is one of `version_conflict`, `validation_failed`, `patch_failed`, `not_found`, `forbidden` or `invalid_state`; every rejection has a `message` and its typed details.
 
 ### `replay_complete` and `snapshot`
 
@@ -151,20 +160,22 @@ The snapshot's contents are an [open question](architecture.md#open-questions).
 
 ## Client frames: commands
 
-Every command carries a client-chosen `command_id`, which is also an idempotency key: the server deduplicates repeated ids within a window.
+Every command frame carries a client-chosen `command_id`, which is also an idempotency key: the server deduplicates repeated ids within a window. The rest of the frame is the command itself, as defined by the `Command` models in `artifactr.core`. Ids of anything a command creates (`artifact_id`, `thread_id`, `message_id`, `proposal_id`) may be chosen by the client; the server generates any that are omitted.
 
 | `type` | Fields | Effect |
 |---|---|---|
-| `create_thread` | `title?` | `thread_created` |
-| `post_message` | `thread_id`, `content`, `client_message_id?` | `user_message`. Starts a run if the thread has none active; otherwise the message steers the active run. |
-| `stop_run` | `run_id` | Cancels the run; `run_ended` with status `stopped`. |
-| `answer` | `run_id`, `tool_call_id`, `answer` or `approved` | Records the answer. Once every pending request is answered, the paused run resumes. |
-| `create_artifact` | `kind`, `data` | `artifact_created` |
-| `edit_artifact` | `artifact_id`, `base_version`, `patch_kind`, `patch` | `artifact_changed`, or `proposal_created` under the type's write policy |
-| `archive_artifact` | `artifact_id`, `base_version` | `artifact_archived` |
-| `respond_to_proposal` | `proposal_id`, `decision`, `changes?` | `proposal_resolved`, plus `artifact_changed` when accepted |
+| `create_thread` | `thread_id?`, `title?` | `thread_created` |
+| `post_message` | `thread_id`, `content`, `message_id?` | `message_posted`. Starts a run if the thread has none active; otherwise the message steers the active run. |
 | `set_focus` | `thread_id`, `artifact_ids` | `focus_changed` |
-| `watch_run` | `run_id` | Attaches this socket to the run's live frames |
+| `set_thread_mode` | `thread_id`, `mode` (`edit`, `suggest`) | `thread_mode_changed` |
+| `create_artifact` | `kind`, `data`, `artifact_id?`, `thread_id?`, `proposal_id?` | `artifact_created`, or `proposal_created` under the type's write policy |
+| `edit_artifact` | `artifact_id`, `base_version`, `patch`, `summary?`, `thread_id?`, `proposal_id?` | `artifact_changed`, or `proposal_created` under the type's write policy |
+| `archive_artifact` | `artifact_id`, `base_version`, `thread_id?`, `proposal_id?` | `artifact_archived`, or `proposal_created` under the type's write policy |
+| `propose_change` | `change` (a `create_artifact`, `edit_artifact` or `archive_artifact` command), `rationale?`, `proposal_id?` | `proposal_created`, whatever the write policy |
+| `respond_to_proposal` | `proposal_id`, `decision` (`accept`, `reject`), `changes?`, `reason?` | `proposal_resolved`, plus the artifact event when accepted |
+| `answer_deferred` | `run_id`, `tool_call_id`, `answer` or `approved` | `deferred_answered`. Once every pending request is answered, the paused run resumes. |
+| `stop_run` | `run_id` | Cancels the run; `run_ended` with status `stopped`. Handled by the transport, not core. |
+| `watch_run` | `run_id` | Attaches this socket to the run's live frames. Handled by the transport, not core. |
 
 ```json
 {
@@ -172,8 +183,7 @@ Every command carries a client-chosen `command_id`, which is also an idempotency
   "command_id": "c_18",
   "artifact_id": "plan_1",
   "base_version": 7,
-  "patch_kind": "json_patch",
-  "patch": [{"op": "add", "path": "/tasks/t9", "value": {"title": "Write changelog"}}]
+  "patch": {"kind": "json_patch", "ops": [{"op": "add", "path": "/tasks/t9", "value": {"title": "Write changelog"}}]}
 }
 ```
 
@@ -202,7 +212,7 @@ REST mirrors the commands and exposes reads. Command bodies are the same JSON as
 | `GET /v1/workspaces/{workspace_id}/events?after_seq=&thread_id=&limit=` | A page of the log, as envelopes. |
 | `GET /v1/workspaces/{workspace_id}/threads/{thread_id}` | Thread metadata and focus. |
 
-Rejections map to HTTP status codes: `version_conflict` → 409, `validation_failed` and `patch_failed` → 422, `not_found` → 404, `forbidden` → 403.
+Rejections map to HTTP status codes: `version_conflict` and `invalid_state` → 409, `validation_failed` and `patch_failed` → 422, `not_found` → 404, `forbidden` → 403.
 
 ## MCP mapping
 
@@ -213,7 +223,7 @@ External agents connect over MCP with the same authority as any other actor.
 | Resource `artifact://{workspace_id}/{artifact_id}` | The current version: JSON, or Markdown for documents. The version number is in the resource metadata. |
 | Resource template `artifact://{workspace_id}/{artifact_id}/revisions/{version}` | A past revision. |
 | `subscriptions/listen` and resource-updated notifications | Driven by `artifact_changed` and `artifact_archived`, through a `SubscriptionBus` fed by the log. |
-| Tools `list_artifacts`, `read_artifact`, `edit_document`, `edit_artifact`, `propose_edit`, `respond_to_proposal`, `post_message` | Commands, attributed to an `external_agent` actor for the MCP client. |
+| Tools `list_artifacts`, `read_artifact`, `edit_text`, `edit_artifact`, `propose_change`, `respond_to_proposal`, `post_message` | Commands, attributed to an `external_agent` actor for the MCP client. |
 
 ## Versioning and schema
 

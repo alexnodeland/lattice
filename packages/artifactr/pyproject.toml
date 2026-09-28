@@ -78,6 +78,7 @@ select = [
 ignore = [
     "D105", # magic methods document themselves
     "D107", # __init__ is documented on the class
+    "N818", # exceptions are named for what happened (VersionConflict), not with an Error suffix
 ]
 
 [tool.ruff.lint.pydocstyle]

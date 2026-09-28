@@ -1,0 +1,3 @@
+"""Minimal type stubs for the parts of jsonpointer that artifactr uses."""
+
+class JsonPointerException(Exception): ...

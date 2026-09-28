@@ -1,0 +1,1008 @@
+{
+  "description": "Agent runs: their lifecycle facts, pauses and answers.",
+  "cases": [
+    {
+      "name": "a question is answered",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "question": "Which day?"
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_q",
+        "answer": "Monday"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "deferred_answered",
+            "run_id": "run_p",
+            "thread_id": "thr_1",
+            "tool_call_id": "call_q",
+            "answer": "Monday",
+            "approved": null
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_p",
+            "status": "paused",
+            "answers": {
+              "call_q": {
+                "answer": "Monday",
+                "approved": null
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "a tool call is approved",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "question": "Which day?"
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_a",
+        "approved": true
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "runs": [
+          {
+            "answers": {
+              "call_a": {
+                "approved": true
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "answering a missing run is rejected",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_q",
+        "answer": "x"
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "run",
+          "id": "run_p"
+        }
+      }
+    },
+    {
+      "name": "only a paused run can be answered",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "running",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "question": "Which day?"
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_q",
+        "answer": "x"
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state",
+          "message": "run run_p is running, not paused"
+        }
+      }
+    },
+    {
+      "name": "answering an unknown request is rejected",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "question": "Which day?"
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_zz",
+        "answer": "x"
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "deferred request"
+        }
+      }
+    },
+    {
+      "name": "a request is answered only once",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "question": "Which day?"
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {
+              "call_q": {
+                "answer": "Friday"
+              }
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_q",
+        "answer": "Monday"
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state"
+        }
+      }
+    },
+    {
+      "name": "an approval needs a decision",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "question": "Which day?"
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_a",
+        "answer": "yes"
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state",
+          "message": "an approval needs approved=true or false"
+        }
+      }
+    },
+    {
+      "name": "a question is not approved",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "question": "Which day?"
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "command": {
+        "type": "answer_deferred",
+        "run_id": "run_p",
+        "tool_call_id": "call_q",
+        "approved": true
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state",
+          "message": "a question is answered with answer, not approved"
+        }
+      }
+    },
+    {
+      "name": "a run starts",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "record": {
+        "type": "run_started",
+        "run_id": "run_1",
+        "thread_id": "thr_1"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "run_started",
+            "run_id": "run_1",
+            "trigger": "message"
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "running",
+            "pending": [],
+            "answers": {}
+          }
+        ]
+      }
+    },
+    {
+      "name": "a paused run resumes",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_p"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "question": "Which day?"
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "record": {
+        "type": "run_started",
+        "run_id": "run_p",
+        "thread_id": "thr_1",
+        "trigger": "resume"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "runs": [
+          {
+            "id": "run_p",
+            "status": "running",
+            "pending": [],
+            "answers": {}
+          }
+        ]
+      }
+    },
+    {
+      "name": "a running run cannot start again",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "running"
+          }
+        ]
+      },
+      "record": {
+        "type": "run_started",
+        "run_id": "run_1",
+        "thread_id": "thr_1"
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state"
+        }
+      }
+    },
+    {
+      "name": "a run cannot move to another thread",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_s"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_s",
+            "title": "Review",
+            "mode": "suggest"
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "question": "Which day?"
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "record": {
+        "type": "run_started",
+        "run_id": "run_p",
+        "thread_id": "thr_s"
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state",
+          "message": "run run_p belongs to thread thr_1"
+        }
+      }
+    },
+    {
+      "name": "a run needs its thread",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_9"
+      },
+      "record": {
+        "type": "run_started",
+        "run_id": "run_9",
+        "thread_id": "thr_9"
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "thread"
+        }
+      }
+    },
+    {
+      "name": "a running run records a tool call",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "running"
+          }
+        ]
+      },
+      "record": {
+        "type": "tool_called",
+        "run_id": "run_1",
+        "thread_id": "thr_1",
+        "tool_call_id": "call_1",
+        "tool_name": "read_artifact"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "tool_called",
+            "tool_name": "read_artifact"
+          }
+        ],
+        "runs": []
+      }
+    },
+    {
+      "name": "a paused run cannot call tools",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "question": "Which day?"
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "record": {
+        "type": "tool_called",
+        "run_id": "run_p",
+        "thread_id": "thr_1",
+        "tool_call_id": "call_1",
+        "tool_name": "x"
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state",
+          "message": "run run_p is paused"
+        }
+      }
+    },
+    {
+      "name": "tool results need a known run",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "record": {
+        "type": "tool_returned",
+        "run_id": "run_1",
+        "thread_id": "thr_1",
+        "tool_call_id": "call_1",
+        "status": "ok"
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "run"
+        }
+      }
+    },
+    {
+      "name": "run facts must name the run's own thread",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_s"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "running"
+          }
+        ]
+      },
+      "record": {
+        "type": "tool_returned",
+        "run_id": "run_1",
+        "thread_id": "thr_s",
+        "tool_call_id": "call_1",
+        "status": "error"
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state",
+          "message": "run run_1 belongs to thread thr_1"
+        }
+      }
+    },
+    {
+      "name": "a run pauses on deferred requests",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "running"
+          }
+        ]
+      },
+      "record": {
+        "type": "run_paused",
+        "run_id": "run_1",
+        "thread_id": "thr_1",
+        "requests": [
+          {
+            "tool_call_id": "call_q",
+            "tool_name": "ask_user",
+            "kind": "question",
+            "args": {
+              "question": "Which day?"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "runs": [
+          {
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "question": "Which day?"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "a paused run can end",
+      "actor": {
+        "kind": "system"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "question": "Which day?"
+                }
+              },
+              {
+                "tool_call_id": "call_a",
+                "tool_name": "delete_note",
+                "kind": "approval",
+                "args": {
+                  "id": "note_1"
+                }
+              }
+            ],
+            "answers": {}
+          }
+        ]
+      },
+      "record": {
+        "type": "run_ended",
+        "run_id": "run_p",
+        "thread_id": "thr_1",
+        "status": "stopped"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "runs": [
+          {
+            "status": "stopped",
+            "pending": [],
+            "answers": {}
+          }
+        ]
+      }
+    },
+    {
+      "name": "a finished run cannot end again",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "completed"
+          }
+        ]
+      },
+      "record": {
+        "type": "run_ended",
+        "run_id": "run_1",
+        "thread_id": "thr_1",
+        "status": "failed"
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state"
+        }
+      }
+    },
+    {
+      "name": "people cannot record run facts",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "running"
+          }
+        ]
+      },
+      "record": {
+        "type": "tool_called",
+        "run_id": "run_1",
+        "thread_id": "thr_1",
+        "tool_call_id": "c",
+        "tool_name": "x"
+      },
+      "expect": {
+        "rejection": {
+          "type": "forbidden"
+        }
+      }
+    },
+    {
+      "name": "another thread's agent cannot record run facts",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_s",
+        "run_id": "run_s"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "running"
+          }
+        ]
+      },
+      "record": {
+        "type": "run_ended",
+        "run_id": "run_1",
+        "thread_id": "thr_1",
+        "status": "completed"
+      },
+      "expect": {
+        "rejection": {
+          "type": "forbidden"
+        }
+      }
+    },
+    {
+      "name": "anyone can record an application event",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "record": {
+        "type": "app_event",
+        "name": "exported",
+        "data": {
+          "format": "pdf"
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "app_event",
+            "name": "exported",
+            "data": {
+              "format": "pdf"
+            },
+            "thread_id": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "an application event can belong to a thread",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "record": {
+        "type": "app_event",
+        "name": "pinned",
+        "thread_id": "thr_1"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "thread_id": "thr_1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "an application event's thread must exist",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "record": {
+        "type": "app_event",
+        "name": "pinned",
+        "thread_id": "thr_9"
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "thread"
+        }
+      }
+    }
+  ]
+}

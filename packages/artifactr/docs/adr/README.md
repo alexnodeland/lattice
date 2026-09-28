@@ -21,5 +21,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0015](0015-quality-gates.md) | Quality gates | Accepted |
 | [0016](0016-mit-license.md) | MIT license | Accepted |
 | [0017](0017-application-toolsets-and-capability-events.md) | Application toolsets register on the agent; the capability emits capability events | Accepted |
+| [0018](0018-core-host-contract.md) | Core's host contract: needs, commit and record | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

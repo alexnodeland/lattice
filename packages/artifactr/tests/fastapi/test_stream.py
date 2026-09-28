@@ -182,6 +182,49 @@ def test_runs_in_progress_are_listed_and_watched() -> None:
             assert {"type": "text_delta", "part": 0, "delta": "Released."} in deltas
 
 
+def test_only_runs_in_followed_threads_are_watched() -> None:
+    latch = Latch()
+    app, _ = build(Script(call("hold"), say("Released.")), latch=latch)
+    with TestClient(app) as client:
+        _post(client, "c1", type="create_thread", thread_id="t1")
+        _post(client, "c2", type="create_thread", thread_id="t2")
+        _post(client, "c3", type="post_message", thread_id="t1", content="Go")
+        wait_for(latch.entered.is_set)
+        with client.websocket_connect(STREAM) as ws:
+            ws.send_json(hello(threads=["t2"]))
+            [active] = ws.receive_json()["active_runs"]
+            assert active["thread_id"] == "t1", "every running run is listed"
+            _receive_until(ws, "replay_complete")
+            latch.released.set()
+            wait_for(lambda: _runs_ended(client) == 1)
+            _post(client, "c4", type="set_thread_mode", thread_id="t2", mode="suggest")
+            frames = _until_event(ws, "thread_mode_changed")
+    assert [f["type"] for f in frames] == ["event"], "no live frames from t1's run"
+
+
+def test_replayed_runs_are_not_watched(monkeypatch: pytest.MonkeyPatch) -> None:
+    app, runner = build(Script(say("Hi.")))
+    watched: list[str] = []
+    watch = runner.watch
+    monkeypatch.setattr(runner, "watch", lambda run_id: watched.append(run_id) or watch(run_id))
+    with TestClient(app) as client:
+        _post(client, "c1", type="create_thread", thread_id="t1")
+        _post(client, "c2", type="post_message", thread_id="t1", content="Hi")
+        wait_for(lambda: _runs_ended(client) == 1)
+        with client.websocket_connect(STREAM) as ws:
+            ws.send_json(hello(threads=["t1"]))
+            replayed = _receive_until(ws, "replay_complete")
+            assert "run_started" in [f["event"]["type"] for f in replayed if f["type"] == "event"]
+            ws.send_json(command("c3", type="set_thread_mode", thread_id="t1", mode="suggest"))
+            _until_event(ws, "thread_mode_changed")
+    assert watched == [], "an ended run in the replay is not watched"
+
+
+def _runs_ended(client: TestClient) -> int:
+    log = client.get("/v1/workspaces/w1/events").json()
+    return sum(envelope["event"]["type"] == "run_ended" for envelope in log)
+
+
 def test_a_client_that_cannot_keep_up_is_disconnected() -> None:
     app, _ = build(Script(), outbox_size=1)
     with TestClient(app) as client:

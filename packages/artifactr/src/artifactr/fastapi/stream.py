@@ -109,8 +109,10 @@ class Stream:
         )
         self._spawn(self._write())
         self._spawn(self._follow(workspace, plan.replay_after, head, hello.threads))
+        # Runs that started up to head_seq are watched from this list; later ones as they start.
         for run in running:
-            self._watch(run.id)
+            if hello.threads is None or run.thread_id in hello.threads:
+                self._watch(run.id)
         await self._read(workspace)
 
     async def _hello(self) -> Hello | None:
@@ -136,7 +138,7 @@ class Stream:
         async for envelope in workspace.subscribe(after_seq=after):
             if delivered_to(envelope, threads):
                 self._put(EventFrame(**dict(envelope)))
-                if isinstance(envelope.event, RunStarted):
+                if isinstance(envelope.event, RunStarted) and envelope.seq > head:
                     self._watch(envelope.event.run_id)
             if replaying and envelope.seq >= head:
                 self._put(ReplayComplete(up_to_seq=head))

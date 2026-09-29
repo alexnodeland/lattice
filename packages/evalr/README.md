@@ -4,6 +4,7 @@
 </picture>
 
 <p>
+  <a href="https://evalr.alexnodeland.com"><img alt="Docs" src="https://img.shields.io/badge/docs-evalr.alexnodeland.com-00704F"></a>
   <a href="https://github.com/alexnodeland/evalr/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/alexnodeland/evalr/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <img alt="Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-00704F">
   <img alt="Coverage: 100%" src="https://img.shields.io/badge/coverage-100%25-00704F">
@@ -99,7 +100,7 @@ It needs `OPENAI_API_KEY` (or another provider's, with the models renamed) and `
 
 ## Documentation
 
-The documentation is built from [`docs/`](docs/index.md); run `make docs-serve` to read it locally at <http://localhost:8000>.
+The documentation site is at **<https://evalr.alexnodeland.com>**. It is built from [`docs/`](docs/index.md) and published from `main` on every push; run `make docs-serve` to read it locally at <http://localhost:8000>.
 
 - [Getting started](docs/getting-started.md), [concepts](docs/concepts.md) and the [guides](docs/guides/verdicts.md): verdicts, evaluators, DSPy judges, decision evaluators, calibration, datasets, feedback sources, scores, experiments, metrics, workflow measures, online evaluation and testing.
 - [Architecture](docs/architecture.md): concepts, packages and what exists today.

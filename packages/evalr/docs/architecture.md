@@ -1,6 +1,6 @@
 # Architecture
 
-> **Status:** v0.1 is built, as planned in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), except its documentation site (phase 6). This document is evergreen: it is updated in the same pull request as the code that changes it, and the table below shows what exists today. Decisions are recorded in [`adr/`](adr/README.md), and proposals in [`rfcs/`](rfcs/README.md).
+> **Status:** v0.1 is built, as planned in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and documented at [evalr.alexnodeland.com](https://evalr.alexnodeland.com). This document is evergreen: it is updated in the same pull request as the code that changes it, and the table below shows what exists today. Decisions are recorded in [`adr/`](adr/README.md), and proposals in [`rfcs/`](rfcs/README.md).
 
 | Package | Status |
 |---|---|
@@ -376,3 +376,7 @@ evalr uses the OpenTelemetry API only, under the `evalr` scope, and never config
 ## Quality
 
 The gates are those of artifactr and reflexr ([ADR-0005](adr/0005-quality-gates-and-license.md)): pyright strict with no suppressions, 100% line and branch coverage, warnings as errors, and no network in tests. Jev is tested through the TypeSafe SDK's transport, DSPy with its dummy language model, Langfuse with fakes and an in-memory span exporter, and Hugging Face with local datasets.
+
+## Documentation
+
+The documentation site is built from `docs/` with Zensical, in strict mode in CI, and published from `main` on every push at <https://evalr.alexnodeland.com> ([ADR-0010](adr/0010-documentation-site.md)). The API reference is generated from the docstrings of each package's `__all__`, and the guides' examples are run offline, against the in-memory adapters and fakes, before they are published.

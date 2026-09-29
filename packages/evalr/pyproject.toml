@@ -35,7 +35,8 @@ hf = ["datasets>=5.0"]
 all = ["evalr[dspy,jev,langfuse,hf]"]
 
 [project.urls]
-Homepage = "https://github.com/alexnodeland/evalr"
+Homepage = "https://evalr.alexnodeland.com"
+Documentation = "https://evalr.alexnodeland.com"
 Repository = "https://github.com/alexnodeland/evalr"
 Issues = "https://github.com/alexnodeland/evalr/issues"
 Changelog = "https://github.com/alexnodeland/evalr/blob/main/CHANGELOG.md"

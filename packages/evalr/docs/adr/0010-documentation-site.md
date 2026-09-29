@@ -69,5 +69,5 @@ Publishing from every push to `main` follows from evergreen documentation: a gui
 
 1. [x] Build the site, the brand and the branded README (RFC-0001 phase 6).
 2. [x] Build the site in strict mode in CI.
-3. [ ] Deploy the site on pushes to `main`, and point the project's URLs at it.
+3. [x] Deploy the site on pushes to `main`, and point the project's URLs at it.
 4. [ ] Consider versioned documentation once there are several releases.

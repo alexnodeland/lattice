@@ -46,6 +46,7 @@ test = [
     "pytest-asyncio>=1.4",
     "pytest-cov>=7.1",
     "hypothesis>=6.168",
+    "opentelemetry-sdk>=1.30",
 ]
 lint = ["ruff>=0.16", "pyright>=1.1.414"]
 dev = [

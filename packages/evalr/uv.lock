@@ -603,6 +603,7 @@ langfuse = [
 dev = [
     { name = "git-cliff" },
     { name = "hypothesis" },
+    { name = "opentelemetry-sdk" },
     { name = "pre-commit" },
     { name = "pyright" },
     { name = "pytest" },
@@ -616,6 +617,7 @@ lint = [
 ]
 test = [
     { name = "hypothesis" },
+    { name = "opentelemetry-sdk" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -637,6 +639,7 @@ provides-extras = ["dspy", "jev", "langfuse", "hf", "all"]
 dev = [
     { name = "git-cliff", specifier = ">=2.14" },
     { name = "hypothesis", specifier = ">=6.168" },
+    { name = "opentelemetry-sdk", specifier = ">=1.30" },
     { name = "pre-commit", specifier = ">=4.6" },
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1" },
@@ -650,6 +653,7 @@ lint = [
 ]
 test = [
     { name = "hypothesis", specifier = ">=6.168" },
+    { name = "opentelemetry-sdk", specifier = ">=1.30" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "pytest-cov", specifier = ">=7.1" },

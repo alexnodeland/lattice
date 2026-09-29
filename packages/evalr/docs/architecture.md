@@ -302,7 +302,7 @@ result.verdicts("helpfulness-judge")  # by example id
 A formatter renders an input as the text a judge reads. A decision model's state is limited (Jev's to 32K tokens), and a language model's context costs money, so formatters work within a budget.
 
 - `InputFormatter(max_tokens=30_000, count_tokens=estimate_tokens)` renders each field as a section headed by its name and description: strings as they are, lists one item to a line, anything else as JSON. `fields(input)` renders the fields separately, for judges that read them one by one.
-- Over budget, the longest list loses its oldest items, after the first (usually the request), with a marker saying how many were omitted. Then the longest remaining text is shortened in the middle. The result always fits.
+- Over budget, the longest list loses its oldest items, after the first (usually the request), with a marker saying how many were omitted. Only if that is not enough is the longest remaining text shortened in the middle, so a list that windowing alone can fit is never also cut. The result always fits.
 - `estimate_tokens` counts one token per three bytes of UTF-8, which overestimates English and is close for scripts of three bytes a character, so a budget measured with it is rarely exceeded. Where the limit is exact, pass the model's tokenizer as `count_tokens`.
 - Summarizing, rather than windowing, is a formatter too: any callable from the input to text fits the `Formatter` protocol.
 

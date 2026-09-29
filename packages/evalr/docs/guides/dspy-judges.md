@@ -60,7 +60,7 @@ A judge's version is a hash of its program (instructions, demonstrations and fie
 An input is a Pydantic model, and a judge reads it as text. A formatter renders it within a token budget, because a language model's context costs money and a decision model's is limited (Jev's to 32K tokens). `DspyJudge` uses an `InputFormatter`, which renders each field of the input as one of the signature's inputs:
 
 - Strings are used as they are, lists one item to a line, and anything else as JSON.
-- When the whole is over budget, the longest list loses its oldest items first, keeping the first (usually the request) and marking how many were left out. Then the longest remaining text is shortened in the middle. The result always fits.
+- When the whole is over budget, the longest list loses its oldest items first, keeping the first (usually the request) and marking how many were left out. Only if that is not enough is the longest remaining text shortened in the middle, so a list that windowing alone can fit is never also cut. The result always fits.
 - Tokens are estimated as one per three bytes of UTF-8 (`estimate_tokens`), which overestimates English, so a budget measured this way is rarely exceeded. Where the limit is exact, pass the model's tokenizer.
 
 ```python

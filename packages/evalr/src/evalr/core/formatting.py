@@ -8,7 +8,7 @@ first item and the most recent ones; then the longest text is shortened in the m
 
 import json
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -62,10 +62,13 @@ class InputFormatter:
     def __call__(self, input: BaseModel, /) -> str:
         """Render the input as one text with a section per field, within the budget."""
         headings = _headings(input)
+
+        def render(fields: Mapping[str, str]) -> str:
+            return "\n\n".join(f"{headings[name]}\n{value}" for name, value in fields.items())
+
         overhead = self.count_tokens("\n\n".join(headings.values()))
-        fields = self._fit(input, self.max_tokens - overhead)
-        text = "\n\n".join(f"{headings[name]}\n{value}" for name, value in fields.items())
-        return _shorten(text, self.max_tokens, self.count_tokens)
+        fields = self._fit(input, overhead, lambda fields: self.count_tokens(render(fields)))
+        return _shorten(render(fields), self.max_tokens, self.count_tokens)
 
     def fields(self, input: BaseModel) -> dict[str, str]:
         """Render each field of the input separately, within the budget together.
@@ -73,19 +76,27 @@ class InputFormatter:
         Judges that read an input field by field (such as a DSPy signature with one input field
         per field of the model) use this instead of the single text.
         """
-        return self._fit(input, self.max_tokens)
+        return self._fit(input, 0, lambda fields: sum(map(self.count_tokens, fields.values())))
 
-    def _fit(self, input: BaseModel, budget: int) -> dict[str, str]:
+    def _fit(
+        self, input: BaseModel, overhead: int, measure: Callable[[Mapping[str, str]], int]
+    ) -> dict[str, str]:
+        """Window long lists, then shorten long texts, until ``measure`` is within the budget.
+
+        Lists are windowed first on an estimate, item by item with its line break, which is
+        cheap for long lists; then on the rendered fields, marker included, so that a list
+        which windowing alone can fit is never also cut in the middle.
+        """
         items = {name: _items(value) for name, value in input.model_dump(mode="json").items()}
-        tokens = {name: [self.count_tokens(i) for i in values] for name, values in items.items()}
+        tokens = {
+            name: [self.count_tokens(f"{i}\n") for i in values] for name, values in items.items()
+        }
         sizes = {name: sum(counts) for name, counts in tokens.items()}
         omitted = dict.fromkeys(items, 0)
         total = sum(sizes.values())
-        while total > budget:
-            windowable = [name for name, values in items.items() if len(values) > 2]
-            if not windowable:
-                break
-            name = max(windowable, key=sizes.__getitem__)
+        while (
+            total > self.max_tokens - overhead and (name := _windowable(items, sizes)) is not None
+        ):
             del items[name][1]
             removed = tokens[name].pop(1)
             sizes[name] -= removed
@@ -93,13 +104,30 @@ class InputFormatter:
             omitted[name] += 1
 
         rendered = {name: _join(values, omitted[name]) for name, values in items.items()}
-        while (excess := sum(map(self.count_tokens, rendered.values())) - budget) > 0:
-            name = max(rendered, key=lambda n: self.count_tokens(rendered[n]))
-            size = self.count_tokens(rendered[name])
-            if size == 0:
+        sizes = {name: self.count_tokens(text) for name, text in rendered.items()}
+        while (
+            measure(rendered) > self.max_tokens and (name := _windowable(items, sizes)) is not None
+        ):
+            del items[name][1]
+            omitted[name] += 1
+            rendered[name] = _join(items[name], omitted[name])
+            sizes[name] = self.count_tokens(rendered[name])
+
+        while (excess := measure(rendered) - self.max_tokens) > 0:
+            name = max(rendered, key=sizes.__getitem__)
+            if sizes[name] == 0:
                 break
-            rendered[name] = _shorten(rendered[name], max(size - excess, 0), self.count_tokens)
+            rendered[name] = _shorten(
+                rendered[name], max(sizes[name] - excess, 0), self.count_tokens
+            )
+            sizes[name] = self.count_tokens(rendered[name])
         return rendered
+
+
+def _windowable(items: Mapping[str, list[str]], sizes: Mapping[str, int]) -> str | None:
+    """The largest field that is a list with an item to drop, keeping its first and last."""
+    windowable = [name for name, values in items.items() if len(values) > 2]
+    return max(windowable, key=sizes.__getitem__) if windowable else None
 
 
 def _headings(input: BaseModel) -> dict[str, str]:

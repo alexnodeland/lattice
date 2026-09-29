@@ -130,3 +130,38 @@ def test_the_rendered_text_always_fits_the_budget(n: int, size: int, budget: int
     value = transcript(n, size)
     assert estimate_tokens(formatter(value)) <= budget
     assert sum(map(estimate_tokens, formatter.fields(value).values())) <= budget
+
+
+class Log(BaseModel):
+    title: str = Field(description="What it is about")
+    lines: list[str] = Field(description="Oldest first")
+
+
+def smallest_window(lines: list[str]) -> str:
+    return "\n".join([lines[0], f"[... {len(lines) - 2} earlier items omitted ...]", lines[-1]])
+
+
+def test_a_list_that_windowing_fits_is_not_also_shortened() -> None:
+    lines = [f"{i}:xxx" for i in range(40)]
+    formatter = InputFormatter(max_tokens=48)
+    text = formatter(Log(title="Refund", lines=lines))
+    fields = formatter.fields(Log(title="Refund", lines=lines))
+    assert "[... shortened ...]" not in text
+    assert "[... shortened ...]" not in fields["lines"]
+    assert text.endswith("\n39:xxx")
+    assert estimate_tokens(text) <= 48
+    assert sum(map(estimate_tokens, fields.values())) <= 48
+
+
+@settings(max_examples=200)
+@given(st.integers(3, 80), st.integers(0, 20), st.integers(10, 400))
+def test_windowing_alone_is_enough_whenever_it_can_be(n: int, size: int, budget: int) -> None:
+    lines = [f"{i}:" + "x" * size for i in range(n)]
+    value = Log(title="Refund", lines=lines)
+    formatter = InputFormatter(max_tokens=budget)
+    window = smallest_window(lines)
+    whole = f"## title: What it is about\nRefund\n\n## lines: Oldest first\n{window}"
+    if estimate_tokens(whole) <= budget:
+        assert "[... shortened ...]" not in formatter(value)
+    if estimate_tokens("Refund") + estimate_tokens(window) <= budget:
+        assert "[... shortened ...]" not in formatter.fields(value)["lines"]

@@ -43,4 +43,4 @@ Writing this twice would drift. Putting it in core would saddle every user with 
 
 ## Action items
 
-1. [ ] Build evalr (evalr RFC-0001), then artifactr's `[evals]` extra (RFC-0002 phase A5).
+1. [x] Build evalr (evalr RFC-0001), then artifactr's `[evals]` extra (RFC-0002 phase A5; [ADR-0044](0044-the-evalr-adapter.md)).

@@ -21,7 +21,15 @@ from artifactr.agent.live import (
     forward_live,
     to_live,
 )
-from artifactr.agent.runner import RunHandle, Runner, Sent, TurnContext
+from artifactr.agent.runner import (
+    EndedTurn,
+    RunHandle,
+    Runner,
+    Sent,
+    TurnContext,
+    TurnEvaluator,
+    TurnOutcome,
+)
 from artifactr.agent.session import Session, Trigger, last_seen, load_history
 from artifactr.agent.tools import (
     artifact_text,
@@ -34,6 +42,7 @@ from artifactr.agent.tools import (
 __all__ = [
     "ArtifactDraft",
     "ArtifactWorkspace",
+    "EndedTurn",
     "FanoutChannel",
     "LiveChannel",
     "NullChannel",
@@ -44,6 +53,8 @@ __all__ = [
     "Session",
     "Trigger",
     "TurnContext",
+    "TurnEvaluator",
+    "TurnOutcome",
     "artifact_text",
     "artifact_tools",
     "describe_outcome",

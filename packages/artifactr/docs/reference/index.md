@@ -19,6 +19,7 @@ The packages are layers. Each depends only on the ones below it, so each is usab
 | [`artifactr.langfuse`](langfuse.md) | Langfuse behind the score ports, a span filter for whole traces, and a turn's trace attributes | `langfuse` extra |
 | [`artifactr.litellm`](litellm.md) | A model over a LiteLLM proxy, and a capability for each request's metadata, key and guardrails | `litellm` extra |
 | [`artifactr.mcp`](mcp.md) | An MCP server for external agents | `mcp` extra |
+| [`artifactr.evals`](evals.md) | evalr for artifactr: datasets from the log, experiments that replay turns, online evaluation of turns, and the end-to-end measures | `evals` extra |
 
 The wire formats have their own pages: the [thread protocol](../protocol.md) and its [JSON Schema](schema.md).
 

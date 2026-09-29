@@ -59,6 +59,12 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {*INNER, "artifactr.scores", "artifactr.langfuse"},
         {"langfuse", "opentelemetry"},
     ),
+    # The evalr adapter: a feedback source, experiment tasks, a TurnEvaluator and measures.
+    # Only this layer may import evalr.
+    "evals": (
+        {*INNER, "artifactr.evals"},
+        {"evalr", "pydantic", "pydantic_ai", *OTEL_API},
+    ),
 }
 
 

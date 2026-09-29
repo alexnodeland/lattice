@@ -133,6 +133,8 @@ if sent.run is not None:  # None when the message steered a running run
 
 One run is active per thread. The runner claims the thread with a lease in storage, renewed while the run lasts, so the rule holds across processes. A message sent while another process holds the claim steers that run instead of starting a second. Runs are asyncio tasks in the process that started them, so `stop` and `watch` reach only local runs.
 
+A runner's `evaluators` judge each turn as it ends, in the background, and record their verdicts as feedback; see [Online evaluation](evaluation.md#online-evaluation).
+
 ### Running without a runner
 
 The capability works in any pydantic-ai run. Build the session with `Session.start` and pass the thread's history yourself:

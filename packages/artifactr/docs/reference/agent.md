@@ -34,6 +34,12 @@ See [Running the agent](../guides/agent.md#running-the-agent).
 
 ::: artifactr.agent.TurnContext
 
+::: artifactr.agent.TurnEvaluator
+
+::: artifactr.agent.EndedTurn
+
+::: artifactr.agent.TurnOutcome
+
 ## Live output
 
 See [Live output](../guides/live-output.md).

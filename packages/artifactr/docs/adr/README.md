@@ -47,5 +47,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0041](0041-dashboards-generated-tested-and-released.md) | Dashboards generated, tested and released | Accepted |
 | [0042](0042-typed-run-failures.md) | Typed run failures | Accepted |
 | [0043](0043-the-litellm-adapter.md) | The LiteLLM adapter | Accepted |
+| [0044](0044-the-evalr-adapter.md) | The evalr adapter | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

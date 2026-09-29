@@ -50,6 +50,7 @@ langfuse = [
 litellm = [
     "pydantic-ai-slim[openai]>=2.51",
 ]
+evals = ["evalr>=0.1.0.dev0"]
 
 [project.urls]
 Homepage = "https://artifactr.alexnodeland.com"
@@ -78,6 +79,10 @@ dev = [
     "pre-commit>=4.6",
     "git-cliff>=2.14",
 ]
+
+# evalr is not published yet: the [evals] extra resolves it from GitHub, pinned (ADR-0044).
+[tool.uv.sources]
+evalr = { git = "https://github.com/alexnodeland/evalr", rev = "62582e2a677947bbb540e367e28bb6ad7d33b7f9" }
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]

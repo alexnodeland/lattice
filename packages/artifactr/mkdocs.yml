@@ -150,6 +150,7 @@ nav:
       - artifactr.otel: reference/otel.md
       - artifactr.langfuse: reference/langfuse.md
       - artifactr.litellm: reference/litellm.md
+      - artifactr.evals: reference/evals.md
       - Thread protocol: protocol.md
       - Protocol JSON Schema: reference/schema.md
   - Design:
@@ -199,6 +200,7 @@ nav:
           - adr/0041-dashboards-generated-tested-and-released.md
           - adr/0042-typed-run-failures.md
           - adr/0043-the-litellm-adapter.md
+          - adr/0044-the-evalr-adapter.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

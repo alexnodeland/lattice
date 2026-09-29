@@ -15,21 +15,24 @@ Each turn (a run started by a message, or resumed by answers) is traced as its o
 ``invoke_workflow turn`` span linked to the span that started it (ADR-0035). The thread is the
 session: it is the turn's ``session.id`` and pydantic-ai's ``conversation_id``, and it is placed
 in OpenTelemetry baggage for the turn's duration.
+
+When a turn ends, the Runner hands it to its evaluators, which judge it in the background
+(ADR-0044), so evaluation never slows or fails the turn.
 """
 
 import asyncio
 import contextlib
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any
+from typing import Any, Literal, Protocol
 
 from opentelemetry import baggage, trace
 from opentelemetry import context as otel_context
 from opentelemetry.metrics import MeterProvider
-from opentelemetry.trace import Link, SpanContext, StatusCode, TracerProvider
+from opentelemetry.trace import Link, Span, SpanContext, StatusCode, TracerProvider
 from pydantic_ai import Agent, AgentRunResult, DeferredToolRequests, DeferredToolResults, ToolDenied
 
 from artifactr.agent.live import FanoutChannel, forward_live
@@ -72,6 +75,39 @@ It is a port (ADR-0034): a backend that attributes a turn in its own way, such a
 propagated trace attributes, implements it, and the Runner stays free of the backend.
 """
 
+type TurnOutcome = Literal["completed", "paused", "failed", "stopped"]
+"""How a turn ended: the agent finished, paused on questions, raised, or was stopped."""
+
+
+@dataclass(frozen=True)
+class EndedTurn:
+    """A turn that has ended, as the Runner hands it to its evaluators."""
+
+    session: Session[Any]
+    """The turn's session: its workspace handle (acting as the agent), thread and run."""
+
+    outcome: TurnOutcome
+    """How the turn ended."""
+
+    span: SpanContext
+    """The turn's ``invoke_workflow turn`` span, on whose trace evaluations are recorded."""
+
+
+class TurnEvaluator(Protocol):
+    """Judges turns after they end: a port (ADR-0034, ADR-0044).
+
+    ``artifactr.evals.OnlineEvaluator`` adapts evalr's online evaluation to it; the Runner
+    knows nothing of evalr.
+    """
+
+    def submit(self, turn: EndedTurn) -> object:
+        """Start judging a turn that ended, in the background, and return at once.
+
+        It must not wait for the evaluation: the Runner calls it as the turn ends. A failure
+        it raises is recorded on the turn's span, never raised to the turn.
+        """
+        ...
+
 
 @dataclass(frozen=True)
 class RunHandle:
@@ -110,6 +146,8 @@ class Runner[AppDepsT]:
         tracer_provider: Where turn spans go. Defaults to the global tracer provider.
         meter_provider: Where turn metrics go. Defaults to the global meter provider.
         turn_context: Entered around each turn, inside its span.
+        evaluators: Given each turn as it ends, to judge it in the background, such as
+            ``artifactr.evals.OnlineEvaluator``s.
     """
 
     def __init__(
@@ -123,9 +161,11 @@ class Runner[AppDepsT]:
         tracer_provider: TracerProvider | None = None,
         meter_provider: MeterProvider | None = None,
         turn_context: TurnContext | None = None,
+        evaluators: Sequence[TurnEvaluator] = (),
     ) -> None:
         self._agent = agent
         self._turn_context = turn_context
+        self._evaluators = tuple(evaluators)
         self._app = app
         self.live = live or FanoutChannel()
         self._agent_name = agent_name
@@ -324,7 +364,7 @@ class Runner[AppDepsT]:
             ),
         }
         started = time.perf_counter()
-        outcome = "failed"
+        outcome: TurnOutcome = "failed"
         with self._telemetry.tracer.start_as_current_span(
             "invoke_workflow turn",
             context=otel_context.Context(),
@@ -364,6 +404,15 @@ class Runner[AppDepsT]:
                 counted = {**tenancy, TURN_TRIGGER: session.trigger, TURN_OUTCOME: outcome}
                 self._telemetry.add(TURNS, 1, counted)
                 self._telemetry.record(TURN_DURATION, time.perf_counter() - started, counted)
+                self._submit(EndedTurn(session, outcome, span.get_span_context()), span)
+
+    def _submit(self, turn: EndedTurn, span: Span) -> None:
+        """Hand an ended turn to each evaluator; a failing one is recorded, never raised."""
+        for evaluator in self._evaluators:
+            try:
+                evaluator.submit(turn)
+            except Exception as error:
+                span.record_exception(error)
 
     def _finished(self, run_id: RunId, task: "asyncio.Task[AgentRunResult[Any]]") -> None:
         self._runs.pop(run_id, None)

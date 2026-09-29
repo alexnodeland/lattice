@@ -1,6 +1,6 @@
 # Architecture
 
-> **Status:** v0.1 is built, as planned in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and released as 0.1.0. [RFC-0002](rfcs/0002-observability-feedback-and-evaluation.md) has since added observability, typed feedback and the LLM gateway; its `[evals]` extra waits on evalr. This document is evergreen: it is updated in the same pull request as the code that changes it, and the table below shows what exists today. Decisions are recorded in [`adr/`](adr/README.md), proposals in [`rfcs/`](rfcs/README.md), and the wire protocol in [`protocol.md`](protocol.md).
+> **Status:** v0.1 is built, as planned in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and released as 0.1.0. [RFC-0002](rfcs/0002-observability-feedback-and-evaluation.md) has since added observability, typed feedback, the LLM gateway, and the `[evals]` extra over evalr. This document is evergreen: it is updated in the same pull request as the code that changes it, and the table below shows what exists today. Decisions are recorded in [`adr/`](adr/README.md), proposals in [`rfcs/`](rfcs/README.md), and the wire protocol in [`protocol.md`](protocol.md).
 
 | Package | Status |
 |---|---|
@@ -12,7 +12,7 @@
 | `artifactr.sql` | Implemented, on PostgreSQL and SQLite |
 | `artifactr.fastapi`, `artifactr.mcp` | Implemented |
 | `artifactr.otel`, `artifactr.langfuse`, `artifactr.litellm` | Implemented: the OpenTelemetry SDK, Langfuse and LiteLLM adapters |
-| `artifactr.evals` | Planned: RFC-0002 phase A5, over evalr |
+| `artifactr.evals` | Implemented: datasets from the log, experiments, online evaluation and the end-to-end measures, over evalr |
 | `examples/docplan` | Implemented: server, terminal client and tests; observed, rated and routed when configured |
 
 ## What artifactr is
@@ -67,6 +67,7 @@ graph TD
     otel["artifactr.otel<br/>OpenTelemetry SDK"] --> telemetry
     langfuse["artifactr.langfuse<br/>Langfuse"] --> scores
     litellm["artifactr.litellm<br/>LiteLLM"] --> agent
+    evals["artifactr.evals<br/>evalr"] --> agent
     workspace --> telemetry["artifactr.telemetry<br/>OpenTelemetry API"]
     telemetry --> core["artifactr.core<br/>pure, synchronous rules"]
 ```
@@ -80,12 +81,13 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.core` | pydantic, jsonpatch | Inner | Every rule. Pure, synchronous, no I/O, no pydantic-ai, no OpenTelemetry. |
 | `artifactr.telemetry` | core, the OpenTelemetry API | Inner; its port is the OpenTelemetry API | Span attribution, the metric registry, and recording through the API. |
 | `artifactr.workspace` | core, telemetry | Inner; owns the `Storage` port | `Workspaces`, `Workspace`, storage protocols, in-memory storage. |
-| `artifactr.agent` | workspace, telemetry, pydantic-ai | Inner; owns the `TurnContext` port | The `ArtifactWorkspace` capability, `Session`, `Runner`, live-output helpers. |
+| `artifactr.agent` | workspace, telemetry, pydantic-ai | Inner; owns the `TurnContext` and `TurnEvaluator` ports | The `ArtifactWorkspace` capability, `Session`, `Runner`, live-output helpers. |
 | `artifactr.scores` | workspace | Inner; owns the `ScoreSink` and `ScoreConfigStore` ports | Feedback as scores, and the mirror that sends a workspace's feedback to a sink. |
 | `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | Adapter for `Storage` | Durable storage on PostgreSQL and SQLite, and its migrations. |
 | `artifactr.otel` (extra) | telemetry, the OpenTelemetry SDK, exporters and instrumentations | Adapter for the OpenTelemetry API | `configure_telemetry`: providers, OTLP export, instrumentations and metric views, for applications. |
 | `artifactr.litellm` (extra) | agent, pydantic-ai's OpenAI support | Adapter for pydantic-ai's `Model` | `litellm_model` and the `LiteLLMGateway` capability: each request's tenancy, session, trace, key and guardrails, and guardrail blocks as typed failures ([ADR-0043](adr/0043-the-litellm-adapter.md)). |
 | `artifactr.langfuse` (extra) | scores, agent, langfuse | Adapter for `ScoreSink`, `ScoreConfigStore` and `TurnContext` | Feedback as Langfuse scores and score configs, a span filter that keeps whole traces, and each turn's trace attributes ([ADR-0039](adr/0039-the-langfuse-adapter.md)). |
+| `artifactr.evals` (extra) | agent, evalr | Adapter for `TurnEvaluator`, and for evalr's `FeedbackSource` and experiment `Task` | Datasets from the log, experiments that replay turns, online evaluation of turns with verdicts recorded as feedback, and the end-to-end measures ([ADR-0044](adr/0044-the-evalr-adapter.md)). |
 | `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
 | `artifactr.mcp` (extra) | agent, mcp | Driving adapter | Artifacts as MCP resources, commands as MCP tools. |
 
@@ -316,6 +318,13 @@ Feedback is the `give_feedback` command, so it goes through the one write path a
 
 Score ids are derived from the envelope's id, so mirroring the log again replaces scores rather than adding more. `sync_score_configs` creates each type's score configs in a `ScoreConfigStore`. `ScoreSink` and `ScoreConfigStore` are ports: `artifactr.langfuse` adapts Langfuse to them.
 
+**Evaluation.** With the `[evals]` extra, feedback feeds evalr, the eval kit shared with reflexr ([ADR-0029](adr/0029-evalr-shared-eval-kit.md), [ADR-0044](adr/0044-the-evalr-adapter.md)):
+
+- **Datasets:** `LogFeedbackSource` is evalr's `FeedbackSource` over a workspace's log. Each piece of one feedback type is an example: the feedback is its verdict, and the application builds its input from a `FeedbackContext`, the envelope plus the target's context. A target's context is read as of the target's end (a turn up to its run's last event, a message up to itself, an artifact version up to its change, a thread up to the feedback), with the thread's transcript, the run's events, the artifacts the thread followed then, and for an artifact version its revision. Evaluators' own verdicts are left out unless asked for.
+- **Experiments:** `replay_task` is an evalr `Task` that seeds an isolated in-memory workspace with an example's thread (its followed artifacts, then its messages as the agent's history), sends the turn's message to a candidate agent through a `Runner`, and hands the turn's run, events, revisions and reply to an output builder.
+- **Online evaluation:** `Runner(evaluators=[...])` takes `TurnEvaluator`s, a port. As each turn ends, inside its span, the `Runner` hands each one the turn, and a failure is recorded on the span, never raised. `OnlineEvaluator` adapts evalr's `OnlineEvaluation`: in the background, sampled and within a budget, it builds the input from the turn's context, has evalr judge it, and gives each verdict as feedback from `EvaluatorActor(name, version)`, so the mirror scores verdicts like people's feedback.
+- **End-to-end measures:** `thread_sessions` and `artifact_histories` put the log into evalr's inputs, for drop-off and the rewrite rate. A version is written by whoever wrote its content: an accepted proposal is its proposer's, and one accepted with the reviewer's changes is the proposal and the person's rewrite at once. `TaskCompletion` is evalr's task-completion verdict as a feedback type, and `completion_transcript` builds a judge's input from a thread's transcript and final artifacts.
+
 ## The LLM gateway
 
 Agents reach models through a LiteLLM proxy, which owns routing, budgets, rate limits and guardrails ([ADR-0031](adr/0031-litellm-proxy-first.md)). The `[litellm]` extra's `litellm_model` is a pydantic-ai model over the proxy, and its `LiteLLMGateway` capability adds to each request, in `before_model_request`, the tenant, workspace, thread and run as LiteLLM metadata and tags, the thread as the session, the person as the user, the trace id and trace context, the workspace's guardrails from an application policy, and the tenant's virtual key from an application callback ([ADR-0043](adr/0043-the-litellm-adapter.md)). A request a guardrail blocks fails the run with the reason `guardrail_blocked` and is not retried ([ADR-0042](adr/0042-typed-run-failures.md)).
@@ -485,7 +494,7 @@ They read Prometheus through the data source uid `prometheus`, as stackr provisi
 
 The `[otel]` extra's `configure_telemetry(...)` is for applications and the reference implementation; no part of the library requires it. It sets up the tracer, meter and logger providers with the service's resource, OTLP over HTTP, the metric views, a `BaggageSpanProcessor` that copies a turn's `session.id` onto every span in it (database and HTTP spans included), the open instrumentations for FastAPI, SQLAlchemy, asyncpg, httpx and httpx2, and pydantic-ai's `InstrumentationSettings`. It returns a handle that instruments FastAPI apps and SQLAlchemy engines created later, gives agents pydantic-ai's `Instrumentation` capability, and shuts everything down.
 
-The `Runner` takes a `turn_context`: an async context entered around each turn, inside its span, given the run's session. It is a port for backends that attribute a turn in their own way, such as Langfuse's propagated trace attributes.
+The `Runner` takes a `turn_context`: an async context entered around each turn, inside its span, given the run's session. It is a port for backends that attribute a turn in their own way, such as Langfuse's propagated trace attributes. Its `evaluators` are another port, for judging turns after they end (see [Feedback](#feedback)).
 
 ### Langfuse
 
@@ -504,6 +513,7 @@ Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opent
 | FastAPI | WebSocket and REST adapter | 0.141 |
 | mcp | MCP server (`MCPServer`, subscriptions) | 2.2 |
 | langfuse (extra) | Traces, scores and score configs in Langfuse | 4.15 |
+| evalr (extra) | Evaluators, datasets, experiments, online evaluation and end-to-end measures; pinned by revision until published | 0.1 |
 | opentelemetry-api | Spans and metrics, through the API only | 1.45 |
 
 Python 3.12+. Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical with mkdocstrings for the documentation site ([ADR-0023](adr/0023-documentation-site.md)).
@@ -515,6 +525,7 @@ Python 3.12+. Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical wi
 - **SQL:** concurrent transactions, lease races and cross-process subscriptions on both databases, and a check that the migrations build exactly the models' schema.
 - **Agent:** scripted runs with pydantic-ai's `TestModel` and `FunctionModel`, so no test calls a model API. Assertions are on the events written, including conflicts, steering and deferred pauses.
 - **Adapters:** WebSocket contract tests with FastAPI's `TestClient`, and an MCP client round-trip.
+- **Evaluation:** the feedback source passes evalr's `check_feedback_source` contract; experiments run through evalr's in-memory tracker, and evaluators are evalr's `FunctionEvaluator`s.
 - **Telemetry:** spans and metrics are asserted through the OpenTelemetry SDK's `InMemorySpanExporter` and `InMemoryMetricReader`, and the registry's cardinality policy is checked for every metric.
 - **Protocol:** the JSON Schema in `schemas/` is generated from the models and checked in. CI fails if it drifts.
 
@@ -579,6 +590,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0041](adr/0041-dashboards-generated-tested-and-released.md) | Dashboards generated, tested and released |
 | [0042](adr/0042-typed-run-failures.md) | Typed run failures |
 | [0043](adr/0043-the-litellm-adapter.md) | The LiteLLM adapter |
+| [0044](adr/0044-the-evalr-adapter.md) | The evalr adapter |
 
 ## Open questions
 

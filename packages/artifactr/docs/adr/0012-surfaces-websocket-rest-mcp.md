@@ -98,6 +98,15 @@ The router took an `authorize(tenant_id, workspace_id, actor)` hook, but `Artifa
 
 reflexr made the same change for its tools and resource reads in its ADR-0011.
 
+## Amendment (2026-09-29): MCP reads what REST reads, and says why it refuses
+
+MCP clients could read artifacts and pending proposals, but not revisions, threads or runs, and a resource read the server refused failed with `INTERNAL_ERROR`, as a crash does ([#49](https://github.com/alexnodeland/artifactr/issues/49)).
+
+- **Reads.** `list_revisions`, `list_threads`, `get_thread` and `get_run` return what REST's reads return, as JSON, or JSON lines for a list, as reflexr's MCP reads do. `list_proposals` takes REST's `status`, and `list_artifacts` its `include_archived`. They ask `authorize` and are scoped to the client's tenant like every other tool. `read_events`, the log's read, came the same day with [ADR-0005](0005-one-event-log-per-workspace.md)'s amendment, and returns JSON lines the same way, so MCP now reads everything REST does.
+- **Commands.** Every tool carries out its command through the runner, and those that change something take an optional `command_id`, deduplicated as REST's is ([ADR-0022](0022-surfaces-over-one-command-handler.md)).
+- **Refusals.** A resource read of a missing artifact, of another tenant's, or in a workspace `authorize` refuses fails with `INVALID_PARAMS`, which the MCP SDK uses for a missing resource, and a refused `subscriptions/listen` fails the same way. The error's `data` holds the URI and the rejection as REST's error body has it, so a client can tell `not_found` from `forbidden`, and `INTERNAL_ERROR` means only that the server failed. The resource handler raises the protocol error itself, since the SDK maps every other `ResourceError` to `INTERNAL_ERROR`.
+- **One resolution per read.** A resource read resolves its client once, and opens the workspace for it.
+
 ## Action items
 
 1. [x] Implement the WebSocket endpoint and REST routes in `artifactr.fastapi`.

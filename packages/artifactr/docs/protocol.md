@@ -146,7 +146,7 @@ Every command gets exactly one result.
 }
 ```
 
-`outcome.type` is `applied` (`artifact_id`, `version`), `proposed` (`proposal_id`), `resolved` (`proposal_id`, `decision`, `version?`) or `recorded`. `rejection.type` is one of `version_conflict`, `validation_failed`, `patch_failed`, `not_found`, `forbidden` or `invalid_state`; every rejection has a `message` and its typed details.
+`outcome.type` is `applied` (`artifact_id`, `version`), `proposed` (`proposal_id`), `resolved` (`proposal_id`, `decision`, `version?`) or `recorded` (`run_id?`: the run a `post_message` or `answer_deferred` started or resumed, or `null` when it steered the thread's active run or left a paused run's requests unanswered). `rejection.type` is one of `version_conflict`, `validation_failed`, `patch_failed`, `not_found`, `forbidden` or `invalid_state`; every rejection has a `message` and its typed details.
 
 ### `replay_complete`
 
@@ -168,7 +168,7 @@ A frame the server could not parse, or a command that failed unexpectedly on the
 
 ## Client frames: commands
 
-After `hello`, a client sends command frames. Each wraps one command with a client-chosen `command_id`, which correlates it with its `command_result` and is also an idempotency key: the server remembers recent ids (per process) and answers a repeated id with the original result instead of running the command again.
+After `hello`, a client sends command frames. Each wraps one command with a client-chosen `command_id`, which correlates it with its `command_result` and is also an idempotency key: the server remembers recent results, keyed by tenant, workspace, sender and `command_id`, and answers a repeated id with the original result, outcome or rejection, instead of running the command again. REST, the WebSocket and MCP share that memory ([Deduplication](#deduplication)).
 
 ```json
 {"type": "command", "command_id": "c_17", "command": {"type": "post_message", "thread_id": "thr_9", "content": "Draft the plan"}}
@@ -206,6 +206,10 @@ The command is one of the `Command` models in `artifactr.core`, or `stop_run` or
 ```
 
 Every command is carried out by `artifactr.agent.Runner.execute`, whichever transport it arrives on, so it behaves identically everywhere.
+
+### Deduplication
+
+Every surface hands a command with its id to `Runner.execute_once`, which carries it out the first time the id is seen and remembers the result in the runner's `CommandResults`. A command is known by the tenant and workspace it was sent to, the sender (its actor's participant, so a changed display name does not matter) and its `command_id`; a repeated id returns the first result whatever command it comes with. By default the runner remembers the 10,000 most recent results in its process (`InMemoryCommandResults`), so a retry that reaches another process, or arrives after the result was forgotten, runs again, and so does one that arrives while the first is still being carried out.
 
 ## Close codes
 
@@ -246,14 +250,25 @@ External agents connect over MCP (`artifactr.mcp.ArtifactrMcp`) with the same au
 | MCP | artifactr |
 |---|---|
 | Resource template `artifactr://{tenant_id}/{workspace_id}/artifacts/{artifact_id}` | The artifact's current `Versioned` JSON. Only readable by clients of that tenant, in a workspace `authorize` allows. |
-| `subscriptions/listen` and resource-updated notifications | Published for `artifact_created`, `artifact_changed` and `artifact_archived` in every workspace a client has used, through the server's `SubscriptionBus`. A `listen` request that names an artifact of another tenant, or of a workspace `authorize` refuses, fails with `INVALID_PARAMS` and the message a read of it would fail with. |
-| Tools `list_artifacts`, `read_artifact`, `create_artifact`, `edit_text`, `edit_artifact`, `archive_artifact` | Artifact commands. The edit tools take an optional `base_version` (required for `edit_artifact`) and `propose` with `rationale`. |
-| Tools `list_proposals`, `respond_to_proposal` | Review others' proposals. |
-| Tool `post_message` | A message in a thread, handled like any other: it starts, steers or answers the thread's agent. |
+| `subscriptions/listen` and resource-updated notifications | Published for `artifact_created`, `artifact_changed` and `artifact_archived` in every workspace a client has used, through the server's `SubscriptionBus`. A `listen` request that names an artifact of another tenant, or of a workspace `authorize` refuses, fails as a read of it would. |
+| Tools `list_artifacts`, `read_artifact`, `create_artifact`, `edit_text`, `edit_artifact`, `archive_artifact` | Artifact commands and reads. `list_artifacts` takes REST's `kind` and `include_archived`. The edit tools take an optional `base_version` (required for `edit_artifact`) and `propose` with `rationale`. |
+| Tool `list_revisions` | `GET .../artifacts/{artifact_id}/revisions`, as JSON lines. |
+| Tools `list_proposals`, `respond_to_proposal` | Review others' proposals. `list_proposals` takes REST's `status`, `pending` by default. |
+| Tools `list_threads`, `get_thread` | `GET .../threads` and `GET .../threads/{thread_id}`, as JSON lines and JSON. |
+| Tool `post_message` | A message in a thread, handled like any other: it starts, steers or answers the thread's agent. The reply names the run it started. |
+| Tool `get_run` | `GET .../runs/{run_id}`, as JSON. |
 | Tool `give_feedback` | Feedback of an application's type on an artifact version, a thread, a turn or a message. |
 | Tool `read_events` | `GET .../events`, as JSON lines, with its window, `threads` and tail. It returns 50 when given neither `limit` nor `last`. |
 
+Every tool that changes something (`create_artifact`, `edit_text`, `edit_artifact`, `archive_artifact`, `respond_to_proposal`, `post_message`, `give_feedback`) takes an optional `command_id`, the command frame's idempotency key: a retry with the same id returns the first result ([Deduplication](#deduplication)). The MCP request id cannot serve, since a retry is a new request.
+
 Rejections are returned as tool errors carrying the rejection's message. A workspace `authorize` refuses is a tool error too, carrying `this workspace is not yours to use`, the message of REST's 403.
+
+A resource read of an artifact that does not exist, of another tenant, or in a workspace `authorize` refuses fails with the JSON-RPC error `INVALID_PARAMS` (`-32602`), as the MCP SDK reports a missing resource, and a `subscriptions/listen` request that names one fails the same way. The error's `data` holds the `uri` and the `rejection`, the same object as REST's error body, so a client can tell `not_found` from `forbidden`. `INTERNAL_ERROR` means only that the server failed.
+
+```json
+{"code": -32602, "message": "artifact plan_9 does not exist", "data": {"uri": "artifactr://acme/ws_1/artifacts/plan_9", "rejection": {"type": "not_found", "message": "artifact plan_9 does not exist", "entity": "artifact", "id": "plan_9"}}}
+```
 
 ## Versioning and schema
 

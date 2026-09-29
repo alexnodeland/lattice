@@ -141,6 +141,10 @@ class Recorded(_Outcome):
     """The command was recorded; it changed no artifact."""
 
     type: Literal["recorded"] = "recorded"
+    run_id: RunId | None = None
+    """The run a message or an answer started or resumed, set by the runner; ``None`` when it
+    started none: it steered the thread's active run, or left a paused run's requests
+    unanswered."""
 
 
 Outcome = Annotated[Applied | Proposed | Resolved | Recorded, Field(discriminator="type")]

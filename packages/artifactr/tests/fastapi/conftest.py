@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from pydantic_ai import Agent, FunctionToolset, RunContext
 from starlette.requests import HTTPConnection
 
-from artifactr.agent import ArtifactWorkspace, Runner, Session
+from artifactr.agent import ArtifactWorkspace, CommandResults, Runner, Session
 from artifactr.core import Actor, TenantId, UserActor, WorkspaceId
 from artifactr.fastapi import Unauthorized, artifactr_router
 from artifactr.workspace import InMemoryStorage, Workspaces
@@ -57,7 +57,11 @@ async def authorize(tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor
 
 
 def build(
-    script: Script, *, latch: Latch | None = None, **options: Any
+    script: Script,
+    *,
+    latch: Latch | None = None,
+    results: CommandResults | None = None,
+    **options: Any,
 ) -> tuple[FastAPI, Runner[Latch]]:
     agent: Agent[Session[Latch], Any] = Agent(
         script.model,
@@ -65,7 +69,7 @@ def build(
         toolsets=[latch_tools()],
         capabilities=[ArtifactWorkspace(types=[Note, Checklist])],
     )
-    runner = Runner(agent, app=latch or Latch())
+    runner = Runner(agent, app=latch or Latch(), results=results)
     workspaces = Workspaces(InMemoryStorage(), types=[Note, Checklist])
     app = FastAPI()
     router = artifactr_router(

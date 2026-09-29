@@ -1868,6 +1868,17 @@
     "Recorded": {
       "description": "The command was recorded; it changed no artifact.",
       "properties": {
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "seq": {
           "anyOf": [
             {

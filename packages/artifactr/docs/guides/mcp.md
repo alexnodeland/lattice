@@ -51,7 +51,7 @@ Clients then connect to `https://your-host/mcp/` with any MCP client that speaks
   ```
 
 - **`authorize(tenant_id, workspace_id, actor)`**, optional, decides which workspaces of its tenant a client may use ([Authorization](#authorization)).
-- **`runner`** carries out messages, so an external agent can talk to the thread's built-in agent: its `post_message` starts, steers or answers a run like any other message.
+- **`runner`** carries out every tool's command, so an external agent can talk to the thread's built-in agent: its `post_message` starts, steers or answers a run like any other message. The runner also remembers commands' results, so a retried tool call with a `command_id` is carried out once ([Retries](#retries)).
 - **`name`** is the server's name (`"artifactr"`), and **`bus`** is where resource notifications go (in-process by default).
 
 ## Authorization
@@ -69,31 +69,58 @@ async def authorize(tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor
 mcp = ArtifactrMcp(workspaces, runner, resolve=resolve_client, authorize=authorize)
 ```
 
-It is asked on every tool call and resource read that names a workspace, before anything is read or written, and when a client subscribes to an artifact's changes. A refusal is a tool error carrying the message of the router's 403, `Error executing tool list_artifacts: this workspace is not yours to use`. A refused resource read fails with the same message, and so does a `subscriptions/listen` request that names an artifact of a refused workspace. Listing the tools and the resource template names no workspace, so neither is asked. Without `authorize`, a client may use every workspace of the tenant `resolve` returns.
+It is asked on every tool call and resource read that names a workspace, before anything is read or written, and when a client subscribes to an artifact's changes. A refusal is a tool error carrying the message of the router's 403, `Error executing tool list_artifacts: this workspace is not yours to use`. A refused resource read fails with the same message, and so does a `subscriptions/listen` request that names an artifact of a refused workspace ([Resources](#resources)). Listing the tools and the resource template names no workspace, so neither is asked. Without `authorize`, a client may use every workspace of the tenant `resolve` returns.
 
 Pass the router and the server the same function, so a client cannot reach over MCP what REST and the WebSocket refuse it.
 
 ## What a client sees
 
-The server's instructions tell the client how to behave: read before changing, prefer small edits, pass the version it read, and expect some types to take proposals only.
+The server's instructions tell the client how to behave: read before changing, prefer small edits, pass the version it read, expect some types to take proposals only, and give each change a `command_id`.
+
+The tools that change something:
 
 | Tool | Does |
 |---|---|
-| `list_artifacts(workspace_id, kind=None)` | Lists the workspace's artifacts |
-| `read_artifact(workspace_id, artifact_id)` | Reads an artifact's current version, rendered for agents |
 | `create_artifact(workspace_id, kind, data)` | Creates an artifact of a type the workspace accepts |
 | `edit_text(workspace_id, artifact_id, old, new, base_version=None, field="text", summary=None, propose=False, rationale=None)` | Replaces one exact passage of a text field |
 | `edit_artifact(workspace_id, artifact_id, base_version, ops, summary=None, propose=False, rationale=None)` | Applies JSON Patch operations |
 | `archive_artifact(workspace_id, artifact_id)` | Archives an artifact |
-| `list_proposals(workspace_id)` | Lists the proposals awaiting review |
 | `respond_to_proposal(workspace_id, proposal_id, decision, reason=None)` | Accepts or rejects someone else's proposal |
-| `post_message(workspace_id, thread_id, content)` | Posts a message in a thread |
+| `post_message(workspace_id, thread_id, content)` | Posts a message in a thread, and says which run it started |
 | `give_feedback(workspace_id, feedback_type, target, value=None)` | Gives feedback of an application's type on an artifact, thread, turn or message |
-| `read_events(workspace_id, after_seq=0, before_seq=None, threads=None, limit=None, last=None)` | Reads envelopes, oldest first, as JSON lines, as `GET /v1/workspaces/{workspace_id}/events` reads them: the window `after_seq < seq < before_seq`, for `threads`, the first `limit` or the last `last`. Without either, the first 50. To read back from the latest events, give `last`, then `before_seq` the oldest `seq` returned. |
 
-A rejection comes back as a tool error carrying its message, such as a version conflict telling the client to read again.
+Each also takes an optional `command_id` ([Retries](#retries)). The reads cover [REST](serving.md#rest)'s reads of artifacts, revisions, proposals, threads, runs and the log:
+
+| Tool | Returns |
+|---|---|
+| `list_artifacts(workspace_id, kind=None, include_archived=False)` | The workspace's artifacts, one per line, archived ones marked |
+| `read_artifact(workspace_id, artifact_id)` | An artifact's current version, rendered for agents |
+| `list_revisions(workspace_id, artifact_id)` | An artifact's revisions, oldest first, as JSON lines |
+| `list_proposals(workspace_id, status="pending")` | Proposals with a status (`pending`, `accepted` or `rejected`), or all of them with `null` |
+| `list_threads(workspace_id)` | The workspace's threads, oldest first, as JSON lines |
+| `get_thread(workspace_id, thread_id)` | A thread, with its mode and focus, as JSON |
+| `get_run(workspace_id, run_id)` | A run, with any requests it is paused on, as JSON |
+| `read_events(workspace_id, after_seq=0, before_seq=None, threads=None, limit=None, last=None)` | Envelopes of the log, oldest first, as JSON lines, as `GET /v1/workspaces/{workspace_id}/events` reads them: the window `after_seq < seq < before_seq`, for `threads`, the first `limit` or the last `last`. Without either, the first 50. To read back from the latest events, give `last`, then `before_seq` the oldest `seq` returned |
+
+The JSON is what the REST endpoint returns. A rejection comes back as a tool error carrying its message, such as a version conflict telling the client to read again.
+
+## Retries
+
+Agents retry tool calls, and transports drop replies. Give each call that changes something a `command_id` of the client's choosing, and the same id when retrying it: the server carries the command out once, and answers the retry with the first result, including a rejection. It is the `command_id` of REST's command frames, and one memory serves every surface, keyed by the tenant, the workspace, the client and the id ([Deduplication](../protocol.md#deduplication)). A call without a `command_id` is carried out every time.
+
+```python
+message = {"workspace_id": "launch", "thread_id": "thr_1", "content": "Draft the plan"}
+first = await client.call_tool("post_message", {**message, "command_id": "c_7"})
+again = await client.call_tool("post_message", {**message, "command_id": "c_7"})  # posted once
+```
+
+`post_message` says which run the message started, so the client can follow it with `get_run`.
+
+## Resources
 
 Each artifact is also a resource at `artifactr://{tenant_id}/{workspace_id}/artifacts/{artifact_id}`, whose content is the artifact's current version as JSON. A client may read, and subscribe to, the artifacts of its own tenant only, in the workspaces `authorize` allows. Once a client has used a workspace, every change to its artifacts is published as a resource-updated notification for that URI, so subscribed clients know to read again. `artifact_uri(tenant_id, workspace_id, artifact_id)` builds the URI.
+
+A read the server refuses (an artifact that does not exist, another tenant's, or one in a workspace `authorize` refuses) fails with the JSON-RPC error `INVALID_PARAMS`, as the MCP SDK reports a missing resource. The error's `data` holds the `uri` and the `rejection` as REST reports it, whose `type` is `not_found` or `forbidden`. A `subscriptions/listen` request that names such an artifact fails the same way. `INTERNAL_ERROR` means the server itself failed.
 
 ## Rules for external agents
 

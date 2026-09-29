@@ -81,7 +81,7 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.core` | pydantic, jsonpatch | Inner | Every rule. Pure, synchronous, no I/O, no pydantic-ai, no OpenTelemetry. |
 | `artifactr.telemetry` | core, the OpenTelemetry API | Inner; its port is the OpenTelemetry API | Span attribution, the metric registry, and recording through the API. |
 | `artifactr.workspace` | core, telemetry | Inner; owns the `Storage` port | `Workspaces`, `Workspace`, storage protocols, in-memory storage. |
-| `artifactr.agent` | workspace, telemetry, pydantic-ai | Inner; owns the `TurnContext` and `TurnEvaluator` ports | The `ArtifactWorkspace` capability, `Session`, `Runner`, live-output helpers. |
+| `artifactr.agent` | workspace, telemetry, pydantic-ai | Inner; owns the `TurnContext`, `TurnEvaluator` and `CommandResults` ports | The `ArtifactWorkspace` capability, `Session`, `Runner`, live-output helpers, and the memory of commands' results. |
 | `artifactr.scores` | workspace | Inner; owns the `ScoreSink` and `ScoreConfigStore` ports | Feedback as scores, and the mirror that sends a workspace's feedback to a sink. |
 | `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | Adapter for `Storage` | Durable storage on PostgreSQL and SQLite, and its migrations. |
 | `artifactr.otel` (extra) | telemetry, the OpenTelemetry SDK, exporters and instrumentations | Adapter for the OpenTelemetry API | `configure_telemetry`: providers, OTLP export, instrumentations and metric views, for applications. |
@@ -89,7 +89,7 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.langfuse` (extra) | scores, agent, langfuse | Adapter for `ScoreSink`, `ScoreConfigStore` and `TurnContext` | Feedback as Langfuse scores and score configs, a span filter that keeps whole traces, and each turn's trace attributes ([ADR-0039](adr/0039-the-langfuse-adapter.md)). |
 | `artifactr.evals` (extra) | agent, evalr | Adapter for `TurnEvaluator`, and for evalr's `FeedbackSource` and experiment `Task` | Datasets from the log, experiments that replay turns, online evaluation of turns with verdicts recorded as feedback, and the end-to-end measures ([ADR-0044](adr/0044-the-evalr-adapter.md)). |
 | `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
-| `artifactr.mcp` (extra) | agent, mcp | Driving adapter | Artifacts as MCP resources, commands as MCP tools. |
+| `artifactr.mcp` (extra) | agent, mcp | Driving adapter | Artifacts as MCP resources, commands and reads as MCP tools. |
 
 ### `artifactr.core`: sans-IO
 
@@ -357,13 +357,13 @@ The run holds a thread claim, not a socket: if the connection that started it dr
 
 ## Surfaces
 
-Every surface is a thin adapter: it authenticates, asks whether the client may use the workspace, turns its input into commands, and hands them to `Runner.execute` ([ADR-0022](adr/0022-surfaces-over-one-command-handler.md)). Messages therefore start, steer or answer runs the same way everywhere, and every other command is a plain `Workspace.commit`. Authentication and authorization are the host's: the router takes `resolve_actor` and the MCP server `resolve`, and both take the same `authorize(tenant_id, workspace_id, actor)` hook (`artifactr.workspace.Authorize`), which the MCP server also asks before a resource read or subscription ([ADR-0012](adr/0012-surfaces-websocket-rest-mcp.md)).
+Every surface is a thin adapter: it authenticates, asks whether the client may use the workspace, turns its input into commands, and hands them to `Runner.execute`, through `Runner.execute_once` when the client gave a `command_id` ([ADR-0022](adr/0022-surfaces-over-one-command-handler.md)). Messages therefore start, steer or answer runs the same way everywhere, and every other command is a plain `Workspace.commit`. Authentication and authorization are the host's: the router takes `resolve_actor` and the MCP server `resolve`, and both take the same `authorize(tenant_id, workspace_id, actor)` hook (`artifactr.workspace.Authorize`), which the MCP server also asks before a resource read or subscription ([ADR-0012](adr/0012-surfaces-websocket-rest-mcp.md)).
 
 | Surface | Package | Role |
 |---|---|---|
 | WebSocket | `artifactr.fastapi` | The thread protocol ([`protocol.md`](protocol.md)): `hello` and `welcome`, replay from a `seq` (or none, from the head of the log) then live events on one subscription, command frames and results, and live frames for runs in followed threads or on request. |
 | REST | `artifactr.fastapi` | The same command frames at `POST .../commands`, and reads of artifacts, revisions, the log (a window of it, for some threads, from its start or its end), threads, proposals and runs. |
-| MCP | `artifactr.mcp` | External agents join as `ExternalAgentActor`s: artifacts are resources at `artifactr://{tenant}/{workspace}/artifacts/{id}`, commands are tools, and artifact changes become resource-updated notifications on the server's `SubscriptionBus`. |
+| MCP | `artifactr.mcp` | External agents join as `ExternalAgentActor`s: artifacts are resources at `artifactr://{tenant}/{workspace}/artifacts/{id}`, commands are tools that take an optional `command_id`, REST's reads (artifacts, revisions, the log, threads, proposals and runs) are tools too, and artifact changes become resource-updated notifications on the server's `SubscriptionBus`. |
 
 ```python
 app = FastAPI(lifespan=lifespan)
@@ -375,7 +375,7 @@ app.mount(
 )  # run mcp.lifespan() in the app's lifespan
 ```
 
-The WebSocket session reads with a single task and runs each command as its own task, so a `stop_run` is never stuck behind a slow command. All outgoing frames pass through one bounded outbox and one writer; a client too slow to keep up is disconnected (close code 4429) rather than holding events back, and resumes by `seq` when it reconnects. Recently seen `command_id`s are remembered per process, so a retried command returns its original result.
+The WebSocket session reads with a single task and runs each command as its own task, so a `stop_run` is never stuck behind a slow command. All outgoing frames pass through one bounded outbox and one writer; a client too slow to keep up is disconnected (close code 4429) rather than holding events back, and resumes by `seq` when it reconnects. `Runner.execute_once` remembers each command's result in a `CommandResults` port, keyed by tenant, workspace, sender and `command_id`, so a retried command returns its original result on every surface. The default adapter, `InMemoryCommandResults`, keeps the 10,000 most recent per process.
 
 The protocol's frames are Pydantic models in `artifactr.core.protocol`. `schemas/artifactr.v1.json` is generated from them (`make schema`) for clients to generate types from, and a test fails if it drifts.
 
@@ -608,6 +608,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 - **Crash recovery for runs.** A run interrupted by a process crash is recorded as failed when its lease expires. pydantic-ai's durable execution integrations (Temporal, DBOS, Prefect) could make such runs resumable.
 - **Pushing log updates across processes.** `SqlStorage` subscriptions learn about commits from other processes by polling. PostgreSQL's `LISTEN/NOTIFY` could wake them at once: an optimisation behind the same `subscribe`, with polling kept for SQLite and as a fallback ([ADR-0021](adr/0021-sql-storage.md)).
 - **Cross-process runs.** Runs are tasks in the process that started them, so `Runner.stop` and `Runner.watch` reach only local runs. A pub/sub channel would make both work across replicas.
+- **Cross-process deduplication.** `InMemoryCommandResults` remembers results in one process, and a retry that arrives while the first attempt is still being carried out runs again. A `CommandResults` over shared storage, with a claim on a command while it runs, would close both gaps ([ADR-0022](adr/0022-surfaces-over-one-command-handler.md)).
 - **`jsonpatch` maintenance.** It is stable but rarely updated; its surface is small enough to vendor if needed.
 - **The session on database and HTTP spans in a real deployment.** A `BaggageSpanProcessor` carries a turn's `session.id` onto every span in it, as a test shows in process ([ADR-0035](adr/0035-a-turn-is-its-own-trace.md)). Whether a deployed Collector and Langfuse keep it end to end is left for stackr's integration tests.
 - **Guardrail error shapes.** A guardrail block is recognised as an HTTP 400 whose error mentions a guardrail ([ADR-0043](adr/0043-the-litellm-adapter.md)). If LiteLLM adds a typed error code for blocks, the gateway should use it.

@@ -10,7 +10,7 @@ from mcp import Client
 from mcp.server.mcpserver import Context
 from mcp.server.subscriptions import InMemorySubscriptionBus, ResourceUpdated, ServerEvent
 from mcp.shared.exceptions import MCPError
-from mcp.types import TextContent, TextResourceContents
+from mcp.types import INVALID_PARAMS, TextContent, TextResourceContents
 from pydantic_ai import ToolCallPart
 from starlette.requests import Request
 
@@ -45,8 +45,10 @@ class Identity:
     def __init__(self) -> None:
         self.tenant: TenantId = "tenant"
         self.actor = CLAUDE
+        self.resolved = 0
 
     async def resolve(self, ctx: Context) -> tuple[TenantId, ExternalAgentActor]:
+        self.resolved += 1
         return self.tenant, self.actor
 
 
@@ -93,6 +95,15 @@ async def _call(client: Client, tool: str, **args: Any) -> tuple[bool, str]:
     return result.is_error, content.text
 
 
+async def _wait_for_run(ws: Workspace, run_id: str) -> None:
+    """Wait until a run the server started has ended."""
+    for _ in range(200):
+        if any(run.id == run_id and run.status != "running" for run in await ws.runs()):
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError(f"run {run_id} did not end")
+
+
 async def test_artifact_tools(mcp: ArtifactrMcp) -> None:
     async with Client(mcp.server) as client:
         tools = {tool.name for tool in (await client.list_tools()).tools}
@@ -134,6 +145,9 @@ async def test_artifact_tools(mcp: ArtifactrMcp) -> None:
         assert (await _call(client, "archive_artifact", artifact_id=artifact_id))[1].endswith(
             "version 4."
         )
+        assert (await _call(client, "list_artifacts"))[1] == "There are no artifacts yet."
+        archived = await _call(client, "list_artifacts", include_archived=True)
+        assert archived == (False, f"- {artifact_id} (note, v4, archived)")
         assert (await _call(client, "create_artifact", kind="spreadsheet", data={}))[0] is True
         assert (await _call(client, "read_artifact", artifact_id="nope"))[0] is True
         assert (await _call(client, "archive_artifact", artifact_id="nope"))[0] is True
@@ -162,6 +176,36 @@ async def test_agents_read_the_log_from_its_end_and_backwards(
         assert both == (True, "Error executing tool read_events: give limit or last, not both")
 
 
+async def test_a_retried_command_is_carried_out_once(mcp: ArtifactrMcp, ws: Workspace) -> None:
+    async with Client(mcp.server) as client:
+        schema = next(t for t in (await client.list_tools()).tools if t.name == "post_message")
+        assert (
+            "retry with the same id"
+            in schema.input_schema["properties"]["command_id"]["description"]
+        )
+        create = {"kind": "note", "data": {"text": "Ship Friday"}, "command_id": "c1"}
+        created = await _call(client, "create_artifact", **create)
+        assert await _call(client, "create_artifact", **create) == created, "the first result"
+        [note] = await ws.artifacts()
+        edit = {"artifact_id": note.id, "old": "Friday", "new": "Monday", "command_id": "c2"}
+        assert (await _call(client, "edit_text", **edit))[1].endswith("version 2.")
+        stale = {**edit, "base_version": 1, "command_id": "c3"}
+        conflict = await _call(client, "edit_text", **stale)
+        assert conflict[0] is True
+        assert await _call(client, "edit_text", **stale) == conflict, "a rejection is remembered"
+        await _call(client, "archive_artifact", artifact_id=note.id, command_id="c4")
+        assert (await _call(client, "archive_artifact", artifact_id=note.id, command_id="c4"))[
+            1
+        ].endswith("version 3."), "not archived twice"
+        thread = await ws.create_thread("Launch")
+        post = {"thread_id": thread.id, "content": "Plan it", "command_id": "c5"}
+        posted = await _call(client, "post_message", **post)
+        assert await _call(client, "post_message", **post) == posted, "the run it started"
+        run_id = posted[1].removeprefix("Posted; the agent started run ").rstrip(".")
+        await _wait_for_run(ws, run_id)
+    assert [e.event.type for e in await ws.read()].count("message_posted") == 2, "one, and a reply"
+
+
 async def test_proposals_are_reviewed_by_someone_else(
     mcp: ArtifactrMcp, identity: Identity, ws: Workspace
 ) -> None:
@@ -181,8 +225,8 @@ async def test_proposals_are_reviewed_by_someone_else(
         proposal_id = proposed[1].split()[2].rstrip(".")
         await _call(client, "create_artifact", kind="checklist", data={"title": "Beta"})
         listed = (await _call(client, "list_proposals"))[1].splitlines()
-        assert listed[0] == f"- {proposal_id}: edit_artifact n1 by Claude Code (safer)"
-        assert listed[1].endswith("by Claude Code")
+        assert listed[0] == f"- {proposal_id}: edit_artifact n1 by Claude Code, pending (safer)"
+        assert listed[1].endswith("by Claude Code, pending")
         own = await _call(client, "respond_to_proposal", proposal_id=proposal_id, decision="accept")
         assert own[0] is True, "a proposal is resolved by someone other than its author"
         identity.actor = REVIEWER
@@ -195,6 +239,15 @@ async def test_proposals_are_reviewed_by_someone_else(
             client, "respond_to_proposal", proposal_id=checklist.id, decision="reject"
         )
         assert rejected == (False, f"Rejected {checklist.id}.")
+        assert (await _call(client, "list_proposals"))[1] == "No proposals are awaiting review."
+        accepted_only = (await _call(client, "list_proposals", status="accepted"))[1]
+        assert (
+            accepted_only == f"- {proposal_id}: edit_artifact n1 by Claude Code, accepted (safer)"
+        )
+        assert len((await _call(client, "list_proposals", status=None))[1].splitlines()) == 2
+        assert (await _call(client, "list_proposals", status="rejected"))[1].endswith("rejected")
+        elsewhere = await _call(client, "list_proposals", workspace_id="w2", status=None)
+        assert elsewhere == (False, "No proposals have been made.")
 
 
 async def test_messages_reach_the_threads_agent(mcp: ArtifactrMcp, ws: Workspace) -> None:
@@ -205,7 +258,40 @@ async def test_messages_reach_the_threads_agent(mcp: ArtifactrMcp, ws: Workspace
         assert steered[1] == "Posted; the agent already working in this thread will see it."
         started = await _call(client, "post_message", thread_id=thread.id, content="Plan it")
         assert started[1].startswith("Posted; the agent started run run_")
+        run_id = started[1].removeprefix("Posted; the agent started run ").rstrip(".")
+        await _wait_for_run(ws, run_id)
+        error, run = await _call(client, "get_run", run_id=run_id)
+        assert not error
+        assert json.loads(run) == (await ws.run(run_id)).model_dump(mode="json")
+        assert json.loads(run)["status"] == "completed"
         assert (await _call(client, "post_message", thread_id="nope", content="hi"))[0] is True
+        assert (await _call(client, "get_run", run_id="run_nope"))[0] is True
+
+
+async def test_threads_and_revisions_are_read_as_rest_reads_them(
+    mcp: ArtifactrMcp, ws: Workspace
+) -> None:
+    async with Client(mcp.server) as client:
+        assert await _call(client, "list_threads") == (False, "There are no threads yet.")
+        first = await ws.create_thread("Launch")
+        second = await ws.create_thread("Hiring")
+        lines = (await _call(client, "list_threads"))[1].splitlines()
+        assert [json.loads(line)["id"] for line in lines] == [first.id, second.id]
+        error, thread = await _call(client, "get_thread", thread_id=first.id)
+        assert (error, json.loads(thread)) == (False, first.model_dump(mode="json"))
+        assert (await _call(client, "get_thread", thread_id="nope"))[0] is True
+        await ws.create(Note(text="Ship Friday"), artifact_id="n1")
+        await ws.commit((await ws.artifact("n1")).edit_text("Friday", "Monday"))
+        error, revisions = await _call(client, "list_revisions", artifact_id="n1")
+        assert not error
+        expected = [r.model_dump(mode="json") for r in await ws.revisions("n1")]
+        assert [json.loads(line) for line in revisions.splitlines()] == expected
+        assert [r["version"] for r in expected] == [1, 2]
+        missing = await _call(client, "list_revisions", artifact_id="nope")
+        assert missing == (
+            True,
+            "Error executing tool list_revisions: artifact nope does not exist",
+        )
 
 
 async def test_artifacts_are_resources_of_their_tenant(
@@ -213,19 +299,34 @@ async def test_artifacts_are_resources_of_their_tenant(
 ) -> None:
     await ws.create(Note(text="hello"), artifact_id="n1")
     async with Client(mcp.server) as client:
+        resolved = identity.resolved
         result = await client.read_resource(artifact_uri("tenant", "w1", "n1"))
+        assert identity.resolved == resolved + 1, "a read resolves its client once"
         contents = result.contents[0]
         assert isinstance(contents, TextResourceContents)
         body = json.loads(contents.text)
         assert (body["id"], body["kind"], body["version"]) == ("n1", "note", 1)
         assert body["data"]["text"] == "hello"
-        with pytest.raises(MCPError):
-            await client.read_resource(artifact_uri("tenant", "w1", "nope"))
+        missing = artifact_uri("tenant", "w1", "nope")
+        with pytest.raises(MCPError, match="artifact nope does not exist") as read:
+            await client.read_resource(missing)
+        assert read.value.code == INVALID_PARAMS, "a refusal, not a failure of the server"
+        assert read.value.data == {
+            "uri": missing,
+            "rejection": {
+                "type": "not_found",
+                "message": "artifact nope does not exist",
+                "entity": "artifact",
+                "id": "nope",
+            },
+        }
         async with client.listen(resource_subscriptions=[artifact_uri("tenant", "w1", "n1")]):
             pass
         identity.tenant = "intruder"
-        with pytest.raises(MCPError):
+        with pytest.raises(MCPError, match="tenant tenant are not available") as other:
             await client.read_resource(artifact_uri("tenant", "w1", "n1"))
+        assert other.value.code == INVALID_PARAMS
+        assert other.value.data["rejection"]["type"] == "forbidden"
         with pytest.raises(MCPError, match="artifact resources of tenant tenant are not available"):
             async with client.listen(resource_subscriptions=[artifact_uri("tenant", "w1", "n1")]):
                 pass
@@ -255,6 +356,7 @@ async def test_authorize_decides_which_workspaces_a_client_may_use(
     tools: dict[str, dict[str, Any]] = {
         "list_artifacts": {},
         "read_artifact": n1,
+        "list_revisions": n1,
         "create_artifact": {"kind": "note", "data": {"text": "leak"}},
         "edit_text": {**n1, "old": "classified", "new": "public"},
         "edit_artifact": {**n1, "base_version": 1, "ops": replace},
@@ -264,6 +366,9 @@ async def test_authorize_decides_which_workspaces_a_client_may_use(
         "give_feedback": {"feedback_type": "helpfulness", "target": on_thread, "value": {}},
         "post_message": {"thread_id": thread.id, "content": "hi"},
         "read_events": {},
+        "list_threads": {},
+        "get_thread": {"thread_id": thread.id},
+        "get_run": {"run_id": "run_1"},
     }
     try:
         async with Client(mcp.server) as client:
@@ -273,11 +378,17 @@ async def test_authorize_decides_which_workspaces_a_client_may_use(
                 error, text = await _call(client, tool, **{**args, "workspace_id": "secret"})
                 assert (error, text.endswith(FORBIDDEN)) == (True, True), tool
             uri = artifact_uri("tenant", "secret", "n1")
-            with pytest.raises(MCPError, match=FORBIDDEN):
+            with pytest.raises(MCPError, match=FORBIDDEN) as read:
                 await client.read_resource(uri)
-            with pytest.raises(MCPError, match=FORBIDDEN):
+            forbidden = {"type": "forbidden", "message": FORBIDDEN}
+            assert (read.value.code, read.value.data) == (
+                INVALID_PARAMS,
+                {"uri": uri, "rejection": forbidden},
+            )
+            with pytest.raises(MCPError, match=FORBIDDEN) as listen:
                 async with client.listen(resource_subscriptions=[uri]):
                     pass
+            assert listen.value.data == read.value.data, "a subscription is refused as a read is"
             assert (await _call(client, "list_artifacts"))[0] is False  # w1 is followed now
             await asyncio.sleep(0)
             await secret.create(Note(), artifact_id="n2")

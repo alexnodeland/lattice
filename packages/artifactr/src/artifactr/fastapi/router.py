@@ -1,6 +1,5 @@
 """The router: REST endpoints and the WebSocket stream."""
 
-from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from typing import Annotated, Any, Literal
 
@@ -56,7 +55,6 @@ def artifactr_router(
     authorize: Authorize | None = None,
     hello_timeout: float = 10.0,
     outbox_size: int = 1000,
-    remembered_commands: int = 10_000,
     tracer_provider: TracerProvider | None = None,
     meter_provider: MeterProvider | None = None,
 ) -> APIRouter:
@@ -64,12 +62,11 @@ def artifactr_router(
 
     Args:
         workspaces: Opens tenant-scoped workspaces.
-        runner: Carries out commands and runs the agent.
+        runner: Carries out commands, once per ``command_id``, and runs the agent.
         resolve_actor: Authenticates each request and connection.
         authorize: Whether an actor may use a workspace; allows everything if omitted.
         hello_timeout: Seconds a new connection has to send ``hello``.
         outbox_size: Frames buffered for a slow connection before it is closed (4429).
-        remembered_commands: Command ids remembered for deduplication, per process.
         tracer_provider: Where ``artifactr.stream`` spans go. Defaults to the global one.
         meter_provider: Where connection metrics go. Defaults to the global one.
 
@@ -77,7 +74,6 @@ def artifactr_router(
     ``artifactr.stream`` span are attributed to the tenant, workspace and actor.
     """
     router = APIRouter()
-    results = _Results(remembered_commands)
     telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
 
     async def open_workspace(connection: HTTPConnection, workspace_id: WorkspaceId) -> Workspace:
@@ -96,26 +92,13 @@ def artifactr_router(
     current_workspace = Depends(workspace_dependency)
 
     async def execute(workspace: Workspace, frame: CommandFrame) -> CommandResult:
-        key = (workspace.workspace_id, repr(workspace.actor), frame.command_id)
-        if (remembered := results.get(key)) is not None:
-            return remembered
         if isinstance(frame.command, WatchRun):
-            result = CommandResult(
+            return CommandResult(
                 command_id=frame.command_id,
                 ok=False,
                 rejection={"type": "invalid_state", "message": "watch_run needs a WebSocket"},
             )
-        else:
-            try:
-                outcome = await runner.execute(workspace, frame.command)
-            except Rejection as rejection:
-                result = CommandResult(
-                    command_id=frame.command_id, ok=False, rejection=rejection.payload()
-                )
-            else:
-                result = CommandResult(command_id=frame.command_id, ok=True, outcome=outcome)
-        results.put(key, result)
-        return result
+        return await runner.execute_once(workspace, frame.command, command_id=frame.command_id)
 
     @router.post("/workspaces/{workspace_id}/commands")
     async def post_command(
@@ -225,19 +208,3 @@ async def _or_http[T](awaitable: Awaitable[T]) -> T:
     except Rejection as rejection:
         status = STATUS_CODES.get(rejection.code, 400)
         raise HTTPException(status_code=status, detail=rejection.payload()) from rejection
-
-
-class _Results:
-    """Recently seen command results, so a repeated ``command_id`` is not executed twice."""
-
-    def __init__(self, capacity: int) -> None:
-        self._capacity = capacity
-        self._results: OrderedDict[tuple[str, str, str], CommandResult] = OrderedDict()
-
-    def get(self, key: tuple[str, str, str]) -> CommandResult | None:
-        return self._results.get(key)
-
-    def put(self, key: tuple[str, str, str], result: CommandResult) -> None:
-        self._results[key] = result
-        if len(self._results) > self._capacity:
-            self._results.popitem(last=False)

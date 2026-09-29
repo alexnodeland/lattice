@@ -32,6 +32,12 @@ See [Running the agent](../guides/agent.md#running-the-agent).
 
 ::: artifactr.agent.Sent
 
+::: artifactr.agent.CommandResults
+
+::: artifactr.agent.InMemoryCommandResults
+
+::: artifactr.agent.CommandKey
+
 ::: artifactr.agent.TurnContext
 
 ::: artifactr.agent.TurnEvaluator

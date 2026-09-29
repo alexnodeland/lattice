@@ -82,12 +82,20 @@ curl -X POST localhost:8000/v1/workspaces/launch/commands \
 ```
 
 ```json
-{"type": "command_result", "command_id": "c_1", "ok": true, "outcome": {"seq": 12, "type": "recorded"}, "rejection": null}
+{"type": "command_result", "command_id": "c_1", "ok": true, "outcome": {"seq": 12, "type": "recorded", "run_id": "run_8"}, "rejection": null}
 ```
+
+A message's outcome names the run it started or resumed, which `GET /workspaces/{workspace_id}/runs/{run_id}` reads; `run_id` is `null` when the message steered the thread's active run instead.
 
 A rejection answers with its status code (`STATUS_CODES`): 409 for `version_conflict` and `invalid_state`, 422 for `validation_failed` and `patch_failed`, 404 for `not_found` and 403 for `forbidden`. The body is still a `command_result`, with `ok: false` and the rejection's details.
 
-`command_id` is chosen by the client and doubles as an idempotency key: the server remembers the most recent results (10,000 by default, per process), keyed by workspace, actor and `command_id`, and answers a repeated id with the original result instead of running the command twice. Retry a command that timed out with the same id.
+`command_id` is chosen by the client and doubles as an idempotency key: the runner remembers the most recent results, keyed by tenant, workspace, sender and `command_id`, and answers a repeated id with the original result instead of running the command twice. Retry a command that timed out with the same id. The memory is the runner's, so REST, the WebSocket and [MCP](mcp.md#retries) share it. By default it holds the 10,000 most recent results in the process; pass the runner another `CommandResults` to change that:
+
+```python
+from artifactr.agent import InMemoryCommandResults
+
+runner = Runner(agent, app=None, results=InMemoryCommandResults(capacity=50_000))
+```
 
 ## The WebSocket
 
@@ -123,10 +131,9 @@ The [thread protocol](../protocol.md) specifies every frame and close code, and 
 |---|---|---|
 | `hello_timeout` | 10 seconds | How long a new connection has to send `hello` before it is closed (4408) |
 | `outbox_size` | 1,000 frames | How far a connection may fall behind before it is closed (4429); it reconnects and resumes by `seq` |
-| `remembered_commands` | 10,000 | Command results remembered for deduplication, per process |
 
 Each connection reads frames in one task and runs each command as its own task, so a `stop_run` is never stuck behind a slow command. All outgoing frames go through one bounded outbox. A client too slow to keep up is disconnected rather than allowed to hold events back or grow the server's memory, and nothing is lost, because it resumes from the log.
 
 ## More than one process
 
-The log, the proposals and the thread claims live in storage, so several server processes can serve one workspace once storage is shared. Two things are per process in v0.1: command deduplication, and runs with their live output (`stop_run` and `watch_run` reach only runs in the process that serves the request). Route a workspace's connections to one process, or accept those limits, until a shared channel exists ([open questions](../architecture.md#open-questions)).
+The log, the proposals and the thread claims live in storage, so several server processes can serve one workspace once storage is shared. Two things are per process in v0.1: command deduplication, with the default `InMemoryCommandResults`, and runs with their live output (`stop_run` and `watch_run` reach only runs in the process that serves the request). Route a workspace's connections to one process, or accept those limits, until a shared channel exists ([open questions](../architecture.md#open-questions)).

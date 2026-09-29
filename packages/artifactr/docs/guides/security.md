@@ -25,7 +25,7 @@ The [reference implementation](../reference-implementation.md) trusts an `x-user
 
 ## Authorization
 
-Within a tenant, decide who may use which workspace with an `authorize(tenant_id, workspace_id, actor)` hook, which the router and `ArtifactrMcp` both take. Over REST, `False` answers 403, and over the WebSocket it closes the connection with 4403. Over MCP, it is asked on every tool call, resource read and resource subscription that names a workspace, and a refusal is a tool error, or a failed read or subscription, with the same message. Without it, any authenticated actor may use every workspace of its own tenant. Pass the same function to both surfaces, so a client cannot reach over one what the other refuses it.
+Within a tenant, decide who may use which workspace with an `authorize(tenant_id, workspace_id, actor)` hook, which the router and `ArtifactrMcp` both take. Over REST, `False` answers 403, and over the WebSocket it closes the connection with 4403. Over MCP, it is asked on every tool call, resource read and resource subscription that names a workspace, and a refusal is a tool error, or a read or subscription failing with `INVALID_PARAMS`, with the same message. Without it, any authenticated actor may use every workspace of its own tenant. Pass the same function to both surfaces, so a client cannot reach over one what the other refuses it.
 
 Finer rules come from the library itself:
 

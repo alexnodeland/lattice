@@ -28,6 +28,7 @@ from artifactr.core import (
     LiveFrame,
     PartEnded,
     PartStarted,
+    Recorded,
     RunEnded,
     RunPaused,
     StopRun,
@@ -288,9 +289,12 @@ async def test_a_chat_reply_fills_only_unanswered_requests(
     assert handle is not None
     await handle.wait()
     first = AnswerDeferred(run_id=handle.run_id, tool_call_id="q1", answer="Monday")
-    assert (await runner.answer(ws, first)).run is None
-    resumed = (await runner.send(ws, thread.id, "9am")).run
+    unanswered = await runner.answer(ws, first)
+    assert (unanswered.run, unanswered.outcome.run_id) == (None, None), "q2 is still open"
+    replied = await runner.send(ws, thread.id, "9am")
+    resumed = replied.run
     assert resumed is not None
+    assert replied.outcome.run_id == handle.run_id, "the reply resumed the paused run"
     await resumed.wait()
     answers = (await ws.run(handle.run_id)).status
     assert answers == "completed"
@@ -323,7 +327,7 @@ async def test_execute_routes_answers_and_stops(
     answered = await runner.execute(
         ws, AnswerDeferred(run_id=paused.id, tool_call_id="q1", answer="Monday")
     )
-    assert answered.type == "recorded"
+    assert answered == Recorded(seq=answered.seq, run_id=paused.id), "it resumed the run"
     handle = runner.running(thread.id)
     assert handle is not None
     await handle.wait()

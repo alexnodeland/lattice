@@ -22,6 +22,7 @@ from artifactr.agent.live import (
     to_live,
 )
 from artifactr.agent.models import Respond, function_model
+from artifactr.agent.results import CommandKey, CommandResults, InMemoryCommandResults
 from artifactr.agent.runner import (
     EndedTurn,
     RunHandle,
@@ -43,8 +44,11 @@ from artifactr.agent.tools import (
 __all__ = [
     "ArtifactDraft",
     "ArtifactWorkspace",
+    "CommandKey",
+    "CommandResults",
     "EndedTurn",
     "FanoutChannel",
+    "InMemoryCommandResults",
     "LiveChannel",
     "NullChannel",
     "Respond",

@@ -22,8 +22,10 @@ from artifactr.core import (
     ArtifactId,
     CreateArtifact,
     EditArtifact,
+    Outcome,
     ProposeChange,
     Proposed,
+    Resolved,
     SetFocus,
     Versioned,
 )
@@ -154,12 +156,23 @@ async def _follow(ctx: RunContext[Session[Any]], artifact_id: ArtifactId) -> Non
         )
 
 
-async def list_artifacts_text(workspace: Workspace, kind: str | None = None) -> str:
-    """List a workspace's artifacts as text, one per line."""
-    artifacts = [a for a in await workspace.artifacts() if kind is None or a.kind == kind]
+async def list_artifacts_text(
+    workspace: Workspace, kind: str | None = None, *, include_archived: bool = False
+) -> str:
+    """List a workspace's artifacts as text, one per line.
+
+    Args:
+        workspace: The workspace to list.
+        kind: Only list artifacts of this kind.
+        include_archived: List archived artifacts too, marked as archived.
+    """
+    listed = await workspace.artifacts(include_archived=include_archived)
+    artifacts = [a for a in listed if kind is None or a.kind == kind]
     if not artifacts:
         return "There are no artifacts yet."
-    return "\n".join(f"- {a.id} ({a.kind}, v{a.version})" for a in artifacts)
+    return "\n".join(
+        f"- {a.id} ({a.kind}, v{a.version}{', archived' if a.archived else ''})" for a in artifacts
+    )
 
 
 def artifact_text(artifact: Versioned[Artifact]) -> str:
@@ -182,11 +195,21 @@ async def submit(
     return await workspace.commit(change)
 
 
-def describe_outcome(outcome: Applied | Proposed) -> str:
-    """Tell a model what its change did."""
-    if isinstance(outcome, Applied):
-        return f"Done: {outcome.artifact_id} is now at version {outcome.version}."
-    return (
-        f"Proposed as {outcome.proposal_id}. A person will review it; you will be told whether "
-        "it was accepted."
-    )
+def describe_outcome(outcome: Outcome) -> str:
+    """Tell a model what its command did."""
+    match outcome:
+        case Applied():
+            return f"Done: {outcome.artifact_id} is now at version {outcome.version}."
+        case Proposed():
+            return (
+                f"Proposed as {outcome.proposal_id}. A person will review it; you will be told "
+                "whether it was accepted."
+            )
+        case Resolved(decision="reject"):
+            return f"Rejected {outcome.proposal_id}."
+        case Resolved():
+            return (
+                f"Accepted {outcome.proposal_id}: the artifact is now at version {outcome.version}."
+            )
+        case _:  # recorded: a command that changed no artifact
+            return "Done."

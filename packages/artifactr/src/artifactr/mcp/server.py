@@ -4,28 +4,24 @@ import asyncio
 import contextlib
 import re
 from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
 from mcp.server.mcpserver import Context, MCPServer
-from mcp.server.mcpserver.exceptions import ResourceError, ToolError
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.subscriptions import InMemorySubscriptionBus, ResourceUpdated, SubscriptionBus
 from mcp.shared.exceptions import MCPError
 from mcp.types import INVALID_PARAMS, SubscriptionsListenRequestParams
+from pydantic import BaseModel, Field
 from starlette.applications import Starlette
 from starlette.requests import Request
 
-from artifactr.agent import (
-    Runner,
-    artifact_text,
-    describe_outcome,
-    list_artifacts_text,
-    submit,
-)
+from artifactr.agent import Runner, artifact_text, describe_outcome, list_artifacts_text
 from artifactr.core import (
     ArtifactArchived,
     ArtifactChanged,
     ArtifactCreated,
+    Command,
     CreateArtifact,
     EditArtifact,
     ExternalAgentActor,
@@ -33,6 +29,10 @@ from artifactr.core import (
     Forbidden,
     GiveFeedback,
     JsonPatch,
+    Outcome,
+    PostMessage,
+    ProposeChange,
+    Recorded,
     Rejection,
     RespondToProposal,
     TenantId,
@@ -56,8 +56,18 @@ INSTRUCTIONS = (
     "This server is a shared workspace of artifacts that people and agents edit together. "
     "Read an artifact before changing it, prefer small precise edits, and pass the version "
     "you read so conflicting edits are caught. Some artifact types only accept proposals, "
-    "which a person reviews."
+    "which a person reviews. Give each change a command_id of your own, and the same one if "
+    "you retry it, so that it is made once."
 )
+
+_CommandId = Annotated[
+    str | None,
+    Field(
+        description="An id of your choosing for this change. A retry with the same id returns "
+        "the first result instead of making the change again."
+    ),
+]
+"""A command tool's optional ``command_id``: the idempotency key of REST's command frames."""
 
 
 _READ_LIMIT = 50
@@ -65,6 +75,13 @@ _READ_LIMIT = 50
 
 _FORBIDDEN = "this workspace is not yours to use"
 """Why ``authorize`` refused, as the router's 403 says it."""
+
+_NO_PROPOSALS = {
+    "pending": "No proposals are awaiting review.",
+    "accepted": "No proposals have been accepted.",
+    "rejected": "No proposals have been rejected.",
+    None: "No proposals have been made.",
+}
 
 _ARTIFACT_URI = re.compile(r"artifactr://(?P<tenant>[^/]+)/(?P<workspace>[^/]+)/artifacts/[^/]+")
 
@@ -86,12 +103,14 @@ class ArtifactrMcp:
 
     Args:
         workspaces: Opens tenant-scoped workspaces.
-        runner: Carries out messages, so external agents can talk to the built-in agent.
+        runner: Carries out every tool's command, so a message reaches the thread's agent, and a
+            command sent with a ``command_id`` is carried out once, as on REST.
         resolve: Authenticates each request.
         authorize: Whether a client may use a workspace of its tenant: the router's hook, asked
             on every tool call, resource read and resource subscription that names a workspace;
-            allows everything if omitted. A refusal is a tool error, or a failed resource read
-            or subscription, carrying the ``forbidden`` rejection's message.
+            allows everything if omitted. A refusal is a tool error, or a resource read or
+            subscription failing with ``INVALID_PARAMS``, carrying the ``forbidden`` rejection's
+            message.
         name: The server's name.
         bus: Where resource-change notifications go; in-process by default.
     """
@@ -145,13 +164,18 @@ class ArtifactrMcp:
     ) -> bool:
         return self._authorize is None or await self._authorize(tenant_id, workspace_id, actor)
 
-    async def _open(self, ctx: Context, workspace_id: WorkspaceId) -> Workspace:
-        """Open a workspace for the request's client, and follow its changes.
+    async def _open(
+        self,
+        ctx: Context,
+        workspace_id: WorkspaceId,
+        client: tuple[TenantId, ExternalAgentActor] | None = None,
+    ) -> Workspace:
+        """Open a workspace for the request's client, resolving it unless it is given.
 
         Raises:
             Forbidden: If ``authorize`` refuses the client this workspace.
         """
-        tenant_id, actor = await self._resolve(ctx)
+        tenant_id, actor = client or await self._resolve(ctx)
         annotate(attribution(tenant_id=tenant_id, workspace_id=workspace_id, actor=actor))
         if not await self._allows(tenant_id, workspace_id, actor):
             raise Forbidden(_FORBIDDEN)
@@ -172,6 +196,22 @@ class ArtifactrMcp:
     async def _workspace(self, ctx: Context, workspace_id: WorkspaceId) -> Workspace:
         """Open a workspace for a tool, whose refusal is a tool error."""
         return await _tool(self._open(ctx, workspace_id))
+
+    async def _execute(
+        self, workspace: Workspace, command: Command, command_id: str | None
+    ) -> Outcome:
+        """Carry out a tool's command through the runner, once per ``command_id`` if given.
+
+        Raises:
+            ToolError: If the command is rejected, now or when it was first carried out.
+        """
+        if command_id is None:
+            return await _tool(self._runner.execute(workspace, command))
+        result = await self._runner.execute_once(workspace, command, command_id=command_id)
+        if result.outcome is not None:
+            return result.outcome
+        rejection = result.rejection or {}
+        raise ToolError(str(rejection.get("message")))
 
     async def _check_subscriptions(
         self, ctx: ServerRequestContext[Any, Any], call_next: CallNext
@@ -198,17 +238,20 @@ class ArtifactrMcp:
         tenant_id, actor = await self._resolve(context)
         for (tenant, workspace_id), uri in scopes.items():
             if tenant != tenant_id:
-                raise MCPError(INVALID_PARAMS, _unavailable(tenant), data={"uri": uri})
+                raise _refused(uri, Forbidden(_unavailable(tenant)))
             if not await self._allows(tenant_id, workspace_id, actor):
-                raise MCPError(INVALID_PARAMS, _FORBIDDEN, data={"uri": uri})
+                raise _refused(uri, Forbidden(_FORBIDDEN))
 
     def _register(self) -> None:
         server = self.server
 
         @server.tool()
-        async def list_artifacts(workspace_id: str, ctx: Context, kind: str | None = None) -> str:
-            """List a workspace's artifacts, optionally of one kind."""
-            return await list_artifacts_text(await self._workspace(ctx, workspace_id), kind)
+        async def list_artifacts(
+            workspace_id: str, ctx: Context, kind: str | None = None, include_archived: bool = False
+        ) -> str:
+            """List a workspace's artifacts, optionally of one kind, and archived ones too."""
+            workspace = await self._workspace(ctx, workspace_id)
+            return await list_artifacts_text(workspace, kind, include_archived=include_archived)
 
         @server.tool()
         async def read_artifact(workspace_id: str, artifact_id: str, ctx: Context) -> str:
@@ -217,13 +260,27 @@ class ArtifactrMcp:
             return await _tool(_read(workspace, artifact_id))
 
         @server.tool()
+        async def list_revisions(workspace_id: str, artifact_id: str, ctx: Context) -> str:
+            """List an artifact's revisions, oldest first, as JSON lines.
+
+            Each has its version, its data, the patch that made it and who made it.
+            """
+            workspace = await self._workspace(ctx, workspace_id)
+            await _tool(workspace.artifact(artifact_id))  # it must exist, as REST checks
+            return _json_lines(await workspace.revisions(artifact_id))
+
+        @server.tool()
         async def create_artifact(
-            workspace_id: str, kind: str, data: dict[str, Any], ctx: Context
+            workspace_id: str,
+            kind: str,
+            data: dict[str, Any],
+            ctx: Context,
+            command_id: _CommandId = None,
         ) -> str:
             """Create an artifact of a kind the workspace accepts, from its JSON data."""
             workspace = await self._workspace(ctx, workspace_id)
             command = CreateArtifact(kind=kind, data=data)
-            return describe_outcome(await _tool(workspace.commit(command)))
+            return describe_outcome(await self._execute(workspace, command, command_id))
 
         @server.tool()
         async def edit_text(
@@ -237,6 +294,7 @@ class ArtifactrMcp:
             summary: str | None = None,
             propose: bool = False,
             rationale: str | None = None,
+            command_id: _CommandId = None,
         ) -> str:
             """Replace the one exact occurrence of ``old`` in a text field with ``new``.
 
@@ -247,8 +305,8 @@ class ArtifactrMcp:
             edit = artifact.edit_text(old, new, field=field, summary=summary)
             if base_version is not None:
                 edit = edit.model_copy(update={"base_version": base_version})
-            outcome = submit(workspace, edit, propose=propose, rationale=rationale)
-            return describe_outcome(await _tool(outcome))
+            command = _proposed(edit, rationale) if propose else edit
+            return describe_outcome(await self._execute(workspace, command, command_id))
 
         @server.tool()
         async def edit_artifact(
@@ -260,6 +318,7 @@ class ArtifactrMcp:
             summary: str | None = None,
             propose: bool = False,
             rationale: str | None = None,
+            command_id: _CommandId = None,
         ) -> str:
             """Apply RFC 6902 JSON Patch operations to an artifact's data at ``base_version``."""
             workspace = await self._workspace(ctx, workspace_id)
@@ -269,25 +328,33 @@ class ArtifactrMcp:
                 patch=JsonPatch(ops=tuple(ops)),
                 summary=summary,
             )
-            outcome = submit(workspace, edit, propose=propose, rationale=rationale)
-            return describe_outcome(await _tool(outcome))
+            command = _proposed(edit, rationale) if propose else edit
+            return describe_outcome(await self._execute(workspace, command, command_id))
 
         @server.tool()
-        async def archive_artifact(workspace_id: str, artifact_id: str, ctx: Context) -> str:
+        async def archive_artifact(
+            workspace_id: str, artifact_id: str, ctx: Context, command_id: _CommandId = None
+        ) -> str:
             """Archive an artifact that is no longer needed. It stays readable."""
             workspace = await self._workspace(ctx, workspace_id)
             artifact = await _tool(workspace.artifact(artifact_id))
-            return describe_outcome(await _tool(workspace.commit(artifact.archive())))
+            outcome = await self._execute(workspace, artifact.archive(), command_id)
+            return describe_outcome(outcome)
 
         @server.tool()
-        async def list_proposals(workspace_id: str, ctx: Context) -> str:
-            """List the proposals awaiting review."""
-            proposals = await (await self._workspace(ctx, workspace_id)).proposals()
+        async def list_proposals(
+            workspace_id: str,
+            ctx: Context,
+            status: Literal["pending", "accepted", "rejected"] | None = "pending",
+        ) -> str:
+            """List proposals with a status, pending by default; ``null`` lists them all."""
+            workspace = await self._workspace(ctx, workspace_id)
+            proposals = await workspace.proposals(status=status)
             if not proposals:
-                return "No proposals are awaiting review."
+                return _NO_PROPOSALS[status]
             return "\n".join(
-                f"- {p.id}: {p.change.type} {p.artifact_id} by {p.proposed_by.display_name}"
-                + (f" ({p.rationale})" if p.rationale else "")
+                f"- {p.id}: {p.change.type} {p.artifact_id} by {p.proposed_by.display_name}, "
+                f"{p.status}" + (f" ({p.rationale})" if p.rationale else "")
                 for p in proposals
             )
 
@@ -298,14 +365,12 @@ class ArtifactrMcp:
             decision: Literal["accept", "reject"],
             ctx: Context,
             reason: str | None = None,
+            command_id: _CommandId = None,
         ) -> str:
             """Accept or reject a proposal made by someone else."""
             workspace = await self._workspace(ctx, workspace_id)
             command = RespondToProposal(proposal_id=proposal_id, decision=decision, reason=reason)
-            resolved = await _tool(workspace.commit(command))
-            if resolved.version is None:
-                return f"Rejected {proposal_id}."
-            return f"Accepted {proposal_id}: the artifact is now at version {resolved.version}."
+            return describe_outcome(await self._execute(workspace, command, command_id))
 
         @server.tool()
         async def give_feedback(
@@ -314,6 +379,7 @@ class ArtifactrMcp:
             target: FeedbackTarget,
             ctx: Context,
             value: dict[str, Any] | None = None,
+            command_id: _CommandId = None,
         ) -> str:
             """Give feedback of an application-defined type on an artifact, thread, turn or message.
 
@@ -321,19 +387,43 @@ class ArtifactrMcp:
             """
             workspace = await self._workspace(ctx, workspace_id)
             command = GiveFeedback(feedback_type=feedback_type, target=target, value=value or {})
-            await _tool(workspace.commit(command))
+            await self._execute(workspace, command, command_id)
             return f"Recorded {feedback_type} feedback on the {target.kind}."
 
         @server.tool()
+        async def list_threads(workspace_id: str, ctx: Context) -> str:
+            """List the workspace's threads, oldest first, as JSON lines."""
+            threads = await (await self._workspace(ctx, workspace_id)).threads()
+            return _json_lines(threads) or "There are no threads yet."
+
+        @server.tool()
+        async def get_thread(workspace_id: str, thread_id: str, ctx: Context) -> str:
+            """Return a thread as JSON: its title, its mode, and the artifacts it follows."""
+            workspace = await self._workspace(ctx, workspace_id)
+            return (await _tool(workspace.thread(thread_id))).model_dump_json()
+
+        @server.tool()
         async def post_message(
-            workspace_id: str, thread_id: str, content: str, ctx: Context
+            workspace_id: str,
+            thread_id: str,
+            content: str,
+            ctx: Context,
+            command_id: _CommandId = None,
         ) -> str:
             """Post a message in a thread. The thread's agent reads it and may reply."""
             workspace = await self._workspace(ctx, workspace_id)
-            sent = await _tool(self._runner.send(workspace, thread_id, content))
-            if sent.run is None:
+            command = PostMessage(thread_id=thread_id, content=content)
+            outcome = await self._execute(workspace, command, command_id)
+            run_id = outcome.run_id if isinstance(outcome, Recorded) else None
+            if run_id is None:
                 return "Posted; the agent already working in this thread will see it."
-            return f"Posted; the agent started run {sent.run.run_id}."
+            return f"Posted; the agent started run {run_id}."
+
+        @server.tool()
+        async def get_run(workspace_id: str, run_id: str, ctx: Context) -> str:
+            """Return a run as JSON: its status, and any requests it is paused on."""
+            workspace = await self._workspace(ctx, workspace_id)
+            return (await _tool(workspace.run(run_id))).model_dump_json()
 
         @server.tool()
         async def read_events(
@@ -364,7 +454,7 @@ class ArtifactrMcp:
                     last=last,
                 )
             )
-            return "\n".join(e.model_dump_json() for e in found) or "No events."
+            return _json_lines(found) or "No events."
 
         @server.resource(
             "artifactr://{tenant_id}/{workspace_id}/artifacts/{artifact_id}",
@@ -375,23 +465,38 @@ class ArtifactrMcp:
             tenant_id: str, workspace_id: str, artifact_id: str, ctx: Context
         ) -> str:
             try:
-                workspace = await self._resource_workspace(ctx, tenant_id, workspace_id)
+                resolved, actor = await self._resolve(ctx)
+                if resolved != tenant_id:
+                    raise Forbidden(_unavailable(tenant_id))
+                workspace = await self._open(ctx, workspace_id, (resolved, actor))
                 artifact = await workspace.artifact(artifact_id)
             except Rejection as rejection:
-                raise ResourceError(rejection.message) from rejection
+                uri = artifact_uri(tenant_id, workspace_id, artifact_id)
+                raise _refused(uri, rejection) from rejection
             return artifact.model_dump_json()
-
-    async def _resource_workspace(
-        self, ctx: Context, tenant_id: TenantId, workspace_id: WorkspaceId
-    ) -> Workspace:
-        resolved, _ = await self._resolve(ctx)
-        if resolved != tenant_id:
-            raise ResourceError(_unavailable(tenant_id))
-        return await self._open(ctx, workspace_id)
 
 
 def _unavailable(tenant_id: TenantId) -> str:
     return f"artifact resources of tenant {tenant_id} are not available"
+
+
+def _refused(uri: str, rejection: Rejection) -> MCPError:
+    """A resource read or subscription the server refuses, as the protocol error to raise.
+
+    It is ``INVALID_PARAMS``, as the SDK reports a missing resource, so clients can tell a
+    refusal from a failure of the server (``INTERNAL_ERROR``). Its data carries the URI and
+    the rejection, as REST's error body does.
+    """
+    data = {"uri": uri, "rejection": rejection.payload()}
+    return MCPError(INVALID_PARAMS, rejection.message, data=data)
+
+
+def _proposed(change: EditArtifact, rationale: str | None) -> ProposeChange:
+    return ProposeChange(change=change, rationale=rationale)
+
+
+def _json_lines(models: Sequence[BaseModel]) -> str:
+    return "\n".join(model.model_dump_json() for model in models)
 
 
 async def _read(workspace: Workspace, artifact_id: str) -> str:

@@ -11,6 +11,10 @@ comes from:
 Runs are asyncio tasks in this process. Their live frames go to :attr:`Runner.live`, where any
 connection can :meth:`Runner.watch` them.
 
+Surfaces send each command with the id its client chose to :meth:`Runner.execute_once`, which
+remembers results in :class:`~artifactr.agent.CommandResults`, so a retried command is carried
+out once (ADR-0022).
+
 Each turn (a run started by a message, or resumed by answers) is traced as its own trace, an
 ``invoke_workflow turn`` span linked to the span that started it (ADR-0035). The thread is the
 session: it is the turn's ``session.id`` and pydantic-ai's ``conversation_id``, and it is placed
@@ -36,16 +40,19 @@ from opentelemetry.trace import Link, Span, SpanContext, StatusCode, TracerProvi
 from pydantic_ai import Agent, AgentRunResult, DeferredToolRequests, DeferredToolResults, ToolDenied
 
 from artifactr.agent.live import FanoutChannel, forward_live
+from artifactr.agent.results import CommandKey, CommandResults, InMemoryCommandResults
 from artifactr.agent.session import Session, Trigger, load_history
 from artifactr.core import (
     AnswerDeferred,
     Command,
+    CommandResult,
     LiveFrame,
     MessageId,
     NotFound,
     Outcome,
     PostMessage,
     Recorded,
+    Rejection,
     Run,
     RunId,
     StopRun,
@@ -127,7 +134,7 @@ class Sent:
     """What posting a message, or an answer, did."""
 
     outcome: Recorded
-    """The recorded message or answer."""
+    """The recorded message or answer, with the ``run_id`` of :attr:`run`, if there is one."""
 
     run: RunHandle | None
     """The run it started or resumed, or ``None`` when it started none, which is not a failure:
@@ -156,6 +163,8 @@ class Runner[AppDepsT]:
         turn_context: Entered around each turn, inside its span.
         evaluators: Given each turn as it ends, to judge it in the background, such as
             ``artifactr.evals.OnlineEvaluator``s.
+        results: Where :meth:`execute_once` remembers commands' results. Defaults to the
+            10,000 most recent, in this process.
     """
 
     def __init__(
@@ -170,8 +179,10 @@ class Runner[AppDepsT]:
         meter_provider: MeterProvider | None = None,
         turn_context: TurnContext | None = None,
         evaluators: Sequence[TurnEvaluator] = (),
+        results: CommandResults | None = None,
     ) -> None:
         self._agent = agent
+        self._results = results or InMemoryCommandResults()
         self._turn_context = turn_context
         self._evaluators = tuple(evaluators)
         self._app = app
@@ -208,6 +219,34 @@ class Runner[AppDepsT]:
             case _:
                 return await workspace.commit(command)
 
+    async def execute_once(
+        self, workspace: Workspace, command: Command | StopRun, *, command_id: str
+    ) -> CommandResult:
+        """Carry out a command the first time its id is seen, and return its result.
+
+        A command is known by its tenant, workspace, sender (the handle's actor, as a
+        participant) and ``command_id``. The first time, it is carried out by :meth:`execute`
+        and its result, outcome or rejection, is remembered. A repeated id returns the
+        remembered result and carries nothing out, whatever command it comes with. REST, the
+        WebSocket and MCP all call this, so a retry is safe on every surface.
+        """
+        key = CommandKey(
+            tenant_id=workspace.tenant_id,
+            workspace_id=workspace.workspace_id,
+            participant=workspace.actor.participant,
+            command_id=command_id,
+        )
+        if (remembered := await self._results.get(key)) is not None:
+            return remembered
+        try:
+            outcome = await self.execute(workspace, command)
+        except Rejection as rejection:
+            result = CommandResult(command_id=command_id, ok=False, rejection=rejection.payload())
+        else:
+            result = CommandResult(command_id=command_id, ok=True, outcome=outcome)
+        await self._results.put(key, result)
+        return result
+
     async def send(
         self,
         workspace: Workspace,
@@ -223,7 +262,7 @@ class Runner[AppDepsT]:
         posted = await workspace.commit(message)
         paused = await workspace.runs(thread_id=thread_id, status="paused")
         if paused:
-            return Sent(posted, await self._reply(workspace, paused[-1], content))
+            return _sent(posted, await self._reply(workspace, paused[-1], content))
         run = await self._start(
             workspace,
             thread_id,
@@ -232,12 +271,12 @@ class Runner[AppDepsT]:
             trigger="message",
             watch_after=posted.seq,
         )
-        return Sent(posted, run)
+        return _sent(posted, run)
 
     async def answer(self, workspace: Workspace, command: AnswerDeferred) -> Sent:
         """Answer one of a paused run's requests, resuming the run once all are answered."""
         answered = await workspace.commit(command)
-        return Sent(answered, await self.resume(workspace, command.run_id))
+        return _sent(answered, await self.resume(workspace, command.run_id))
 
     async def resume(self, workspace: Workspace, run_id: RunId) -> RunHandle | None:
         """Resume a paused run whose requests are all answered; otherwise do nothing."""
@@ -426,6 +465,12 @@ class Runner[AppDepsT]:
         self._runs.pop(run_id, None)
         if not task.cancelled():
             task.exception()  # the capability recorded any failure; mark it retrieved
+
+
+def _sent(recorded: Recorded, run: RunHandle | None) -> Sent:
+    """What a message or an answer did, with the run it started or resumed in its outcome."""
+    run_id = None if run is None else run.run_id
+    return Sent(recorded.model_copy(update={"run_id": run_id}), run)
 
 
 def _approval(run: Run, tool_call_id: str) -> bool | ToolDenied:

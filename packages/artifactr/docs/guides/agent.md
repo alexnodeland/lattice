@@ -28,7 +28,7 @@ runner = Runner(agent, app=AppDeps(search=SearchClient()))
 
 - **`deps_type=Session[AppDeps]`.** The run's dependencies are a `Session`: `workspace` (a handle acting as this thread's agent), `thread_id`, `run_id`, and `app`, your own dependencies. Use `Session[None]` if you have none.
 - **`ArtifactWorkspace(types=...)`** lists the artifact types the agent may create. `ask=True` adds the `ask_user` tool (see [Pausing](#pausing-for-people)); `max_render_chars` (4,000) limits how much of each followed artifact goes into the instructions; `max_summary_chars` (200) limits how much of each tool call's arguments and result is recorded.
-- **`Runner(agent, app=...)`** passes `app` to every run as `ctx.deps.app`. Its other options are `agent_name` (how the agent is named in the workspace, `"assistant"` by default), `claim_ttl` (how long a thread claim survives a dead process, 30 seconds) and `live` (where live output goes; see [Live output](live-output.md)).
+- **`Runner(agent, app=...)`** passes `app` to every run as `ctx.deps.app`. Its other options are `agent_name` (how the agent is named in the workspace, `"assistant"` by default), `claim_ttl` (how long a thread claim survives a dead process, 30 seconds), `live` (where live output goes; see [Live output](live-output.md)) and `results` (where commands' results are remembered, so a retried command is carried out once; see [Serving](serving.md#rest)).
 
 The capability composes with any other capabilities, toolsets, output types and model settings the agent has. A turn is an ordinary pydantic-ai run.
 
@@ -119,7 +119,7 @@ if sent.run is not None:  # None when the message steered a running run
     result = await sent.run.wait()
 ```
 
-`send` returns a `Sent`: the recorded message (`outcome`) and the `RunHandle` it started or resumed, if any. `RunHandle.wait()` returns pydantic-ai's result when the run finishes or pauses. The run's reply is posted to the thread as a `message_posted` event by the agent.
+`send` returns a `Sent`: the recorded message (`outcome`, whose `run_id` names the run) and the `RunHandle` it started or resumed, if any. `RunHandle.wait()` returns pydantic-ai's result when the run finishes or pauses. The run's reply is posted to the thread as a `message_posted` event by the agent.
 
 `sent.run` is `None` when the message or answer started no run, which is not a failure:
 
@@ -138,6 +138,7 @@ A message in an idle thread, such as one just created, starts a run unless anoth
 | `watch(run_id)` | Yields the run's live output; see [Live output](live-output.md) |
 | `running(thread_id)` | This process's run in a thread, if any |
 | `execute(workspace, command)` | Carries out any command the way every surface does |
+| `execute_once(workspace, command, command_id=...)` | Carries it out the first time its id is seen, and returns its `command_result`; a repeated id returns the first result. Every surface calls this |
 
 One run is active per thread. The runner claims the thread with a lease in storage, renewed while the run lasts, so the rule holds across processes. A message sent while another process holds the claim steers that run instead of starting a second. Runs are asyncio tasks in the process that started them, so `stop` and `watch` reach only local runs.
 

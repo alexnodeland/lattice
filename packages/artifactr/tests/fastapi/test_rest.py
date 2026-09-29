@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 import artifactr.fastapi
 import artifactr.workspace
+from artifactr.agent import InMemoryCommandResults
 from tests.agent.conftest import Script, call, say
 from tests.fastapi.conftest import build, command, wait_for
 
@@ -20,12 +21,16 @@ def test_a_command_is_executed_once_per_id(client: TestClient) -> None:
         "type": "command_result",
         "command_id": "c1",
         "ok": True,
-        "outcome": {"type": "recorded", "seq": 1},
+        "outcome": {"type": "recorded", "seq": 1, "run_id": None},
         "rejection": None,
     }
     again = client.post(f"{BASE}/commands", json=create)
     assert again.json() == first.json(), "a repeated command id returns the same result"
     assert len(client.get(f"{BASE}/events").json()) == 1
+    bob = client.post(f"{BASE}/commands", json=create, headers={"x-user": "bob"})
+    assert bob.status_code == 409, "another person's c1 is another command: t1 exists"
+    elsewhere = client.post(f"{BASE}/commands", json=create, headers={"x-tenant": "other"})
+    assert elsewhere.json()["ok"], "and so is c1 in another tenant's w1"
 
 
 def test_rejections_map_to_status_codes(client: TestClient) -> None:
@@ -122,13 +127,15 @@ def test_a_posted_message_runs_the_agent() -> None:
             f"{BASE}/commands",
             json=command("c2", type="post_message", thread_id="t1", content="Draft"),
         )
-        assert posted.json()["outcome"]["type"] == "recorded"
+        outcome = posted.json()["outcome"]
+        assert outcome["type"] == "recorded"
+        run_id = outcome["run_id"]
 
         def ended() -> bool:
             return "run_ended" in [e["event"]["type"] for e in client.get(f"{BASE}/events").json()]
 
         wait_for(ended)
-        [run_id] = {e["run_id"] for e in client.get(f"{BASE}/events").json() if e["run_id"]}
+        assert {e["run_id"] for e in client.get(f"{BASE}/events").json() if e["run_id"]} == {run_id}
         assert client.get(f"{BASE}/runs/{run_id}").json()["status"] == "completed"
         stop = client.post(f"{BASE}/commands", json=command("c3", type="stop_run", run_id=run_id))
         assert stop.status_code == 404, "a finished run cannot be stopped"
@@ -141,7 +148,7 @@ def test_a_posted_message_runs_the_agent() -> None:
 
 
 def test_only_recent_command_ids_are_remembered() -> None:
-    app, _ = build(Script(), remembered_commands=1)
+    app, _ = build(Script(), results=InMemoryCommandResults(capacity=1))
     with TestClient(app) as client:
         first = command("c1", type="create_thread", thread_id="t1")
         client.post(f"{BASE}/commands", json=first)
@@ -160,7 +167,7 @@ def test_feedback_is_a_command_like_any_other(client: TestClient) -> None:
         value={"rating": 5},
     )
     given = client.post(f"{BASE}/commands", json=feedback)
-    assert given.json()["outcome"] == {"type": "recorded", "seq": 2}
+    assert given.json()["outcome"] == {"type": "recorded", "seq": 2, "run_id": None}
     [event] = client.get(f"{BASE}/events", params={"after_seq": 1}).json()
     assert event["event"]["type"] == "feedback_given"
     assert event["actor"]["id"] == "alice"

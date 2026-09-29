@@ -30,6 +30,7 @@ And ADR-0006 made evaluators adapters of one port, composed rather than special-
   | anything else, including text | left out |
 
   A field left out keeps its default in the verdict, so a required field the view would leave out is refused when the evaluator is built, with a message saying to give it a default or judge the type with a language model.
+
 - **Confidence on a verdict is the probability that the value is right.** For a choice that is the model's probability of the choice; for a yes-or-no field, evalr recovers the model's probability of yes from pydantic-ai's threshold-relative confidence, and records the probability of the answer given.
 - **The evaluator hands off by raising the core's `HandOff`**: when pydantic-ai raises `DecisionHandOff` (with routes or tools), and when any field's confidence is below the evaluator's `min_confidence`. Service failures are not hand-offs; they propagate.
 - **The language-model fallback is a second evaluator, composed by the core's `Fallback`**: `Fallback(DecisionEvaluator(...), DspyJudge(...))`. The fallback judges the whole verdict type, including the text fields the view leaves out.

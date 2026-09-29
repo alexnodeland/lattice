@@ -22,7 +22,7 @@ Run `make` on its own to list every command:
 | `make typecheck` | Type-check with pyright (strict for `src/`) |
 | `make test` | Run the tests with the 100% branch-coverage gate |
 | `make check` | Everything CI runs |
-| `make docs` | Build the documentation site in strict mode, as CI does |
+| `make docs` | Build the documentation site in strict mode and check that its lists rendered, as CI does |
 | `make docs-serve` | Serve the documentation site with live reload at <http://localhost:8000> |
 | `make changelog` | Regenerate `CHANGELOG.md` from commit history |
 
@@ -70,12 +70,14 @@ A library without type information gets minimal stubs in `typings/` for the part
 
 An RFC proposes; ADRs record what was decided; the architecture docs describe what exists now. A PR that changes behaviour described in the architecture docs updates them in the same PR, never in a later cleanup. Accepted ADRs are not edited; a changed decision gets a new ADR that supersedes or amends the old one.
 
+Markdown is read on GitHub and on the documentation site, which renders it with Python-Markdown. Put a blank line before every list, including one that follows a paragraph, and indent a nested item by its parent's text: two spaces after `-`, three after `1.`. `make docs` fails on a list that rendered as text.
+
 ## Quality gates
 
 These are enforced by CI and described in [ADR-0005][adr-0005]:
 
 - **100% line and branch coverage** of `src/evalr`. Code that cannot be reached by a test is usually code that should not exist. The only exclusions are configured in `pyproject.toml` (type-checking blocks, protocol stubs, overloads, `assert_never`).
-- **pyright strict** for `src/`, standard for `tests/`, with no inline suppressions in either.
+- **pyright strict** for `src/` and `scripts/`, standard for `tests/`, with no inline suppressions anywhere: no `# type: ignore`, `# pyright: ignore`, `# noqa` or `# pragma: no cover`. Restructure the code instead; `tests/test_quality.py` fails on any.
 - **ruff** for formatting and linting, with Google-style docstrings on public API.
 - **Warnings are errors** in the test suite.
 - **No network in tests.** Jev is tested through the TypeSafe SDK's mock transport, DSPy with its dummy language model, Langfuse with fakes and an in-memory span exporter, and Hugging Face with local datasets.

@@ -65,6 +65,14 @@ Publishing from every push to `main` follows from evergreen documentation: a gui
 - Harder: Zensical is young. Upgrades should be checked with a strict build like any other dependency update.
 - The site can describe features that are on `main` but not in a release. Revisit with versioned documentation once there are several releases.
 
+## Amendment (2026-09-29): lists render as they do on GitHub
+
+Python-Markdown, which the site uses, needs four spaces to nest a list and a blank line before a list that follows a paragraph; GitHub needs neither. The repository's Markdown nests by two spaces, so most nested lists on the site were flat, and a few lists rendered as a paragraph of "- " text.
+
+- **The `mdx_truly_sane_lists` extension** makes two spaces nest, as on GitHub. A nested item is indented by its parent's text: two spaces after `-`, three after `1.`.
+- **A blank line goes before every list.** The pages that lacked one are fixed.
+- **`scripts/check_site.py` checks the built site** in `make docs` and in CI: a paragraph or list item containing a line that starts with a list marker is a list that rendered as text, and fails the build. reflexr made the same change in its ADR-0032.
+
 ## Action items
 
 1. [x] Build the site, the brand and the branded README (RFC-0001 phase 6).

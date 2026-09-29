@@ -144,7 +144,7 @@ async def test_feedback_reaches_langfuse_on_its_trace(backend: Backend) -> None:
             feedback_type="helpfulness", target=TurnTarget(run_id="run_1"), value={"rating": 5}
         )
     )
-    mirror = FeedbackMirror(ws, LangfuseScores(backend.client))
+    mirror = FeedbackMirror(ws, LangfuseScores(backend.client), cursor="langfuse")
     [envelope] = await ws.read(after_seq=await ws.head_seq() - 1)
     [sent] = await mirror.mirror(envelope)
     backend.client.flush()

@@ -10,7 +10,7 @@ that lock. Subscriptions poll the log, and wake at once for commits made through
 import asyncio
 import contextlib
 import uuid
-from collections.abc import AsyncGenerator, AsyncIterator, Callable, Collection, Sequence
+from collections.abc import AsyncGenerator, Callable, Collection, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Literal
@@ -43,6 +43,7 @@ from artifactr.core import (
 from artifactr.core.actors import Actor
 from artifactr.sql.tables import (
     ArtifactRow,
+    CursorRow,
     EntityRow,
     EventRow,
     HistoryRow,
@@ -209,17 +210,23 @@ class _Transaction:
 
 async def _lock_workspace(session: AsyncSession, scope: Scope) -> WorkspaceRow:
     """Lock the workspace's row, creating it first if the workspace is new."""
-    key = (scope.tenant_id, scope.workspace_id)
-    while (workspace := await session.get(WorkspaceRow, key, with_for_update=True)) is None:
-        # A concurrent transaction may create the row first. Then the insert fails, and the
+    new = WorkspaceRow(
+        tenant_id=scope.tenant_id, workspace_id=scope.workspace_id, head_seq=0, last_position=0
+    )
+    return await _locked(session, WorkspaceRow, (scope.tenant_id, scope.workspace_id), new)
+
+
+async def _locked[R: ScopedRow](
+    session: AsyncSession, model: type[R], key: tuple[str, ...], new: R
+) -> R:
+    """Lock a row (``SELECT ... FOR UPDATE``), inserting ``new`` first if it does not exist."""
+    while (row := await session.get(model, key, with_for_update=True)) is None:
+        # A concurrent transaction may insert the row first. Then this insert fails, and the
         # next lookup waits for that transaction to end and locks its row instead.
-        new = WorkspaceRow(
-            tenant_id=scope.tenant_id, workspace_id=scope.workspace_id, head_seq=0, last_position=0
-        )
         with contextlib.suppress(IntegrityError):
             async with session.begin_nested():
                 session.add(new)
-    return workspace
+    return row
 
 
 def _scoped[R: ScopedRow](model: type[R], scope: Scope) -> Select[R]:
@@ -403,7 +410,7 @@ class SqlStorage:
         envelopes = [Envelope.model_validate(row.envelope) for row in await self._all(query)]
         return envelopes if last is None else envelopes[::-1]
 
-    async def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncIterator[Envelope]:
+    async def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncGenerator[Envelope]:
         """Yield stored envelopes after ``after_seq``, then each new one as it commits.
 
         New envelopes arrive at once when they were committed through this storage, and
@@ -469,6 +476,26 @@ class SqlStorage:
             await connection.execute(
                 delete(LeaseRow).where(*_lease(scope, key), LeaseRow.holder == holder)
             )
+
+    async def cursor(self, scope: Scope, name: str) -> int:
+        """Return how far a named consumer of the log has got: the ``seq`` saved, or 0."""
+        async with self._sessions() as session:
+            cursor = await session.get(CursorRow, (scope.tenant_id, scope.workspace_id, name))
+        return 0 if cursor is None else cursor.seq
+
+    async def save_cursor(self, scope: Scope, name: str, seq: int) -> None:
+        """Save how far a named consumer of the log has got; a cursor only moves forward.
+
+        The cursor's row is locked while it is compared, so saves from several processes
+        leave the furthest.
+        """
+        key = (scope.tenant_id, scope.workspace_id, name)
+        new = CursorRow(
+            tenant_id=scope.tenant_id, workspace_id=scope.workspace_id, name=name, seq=seq
+        )
+        async with self._sessions() as session, session.begin():
+            cursor = await _locked(session, CursorRow, key, new)
+            cursor.seq = max(cursor.seq, seq)
 
     async def _one[R: EntityRow, T](
         self, model: type[R], scope: Scope, entity_id: str, convert: Callable[[R], T]

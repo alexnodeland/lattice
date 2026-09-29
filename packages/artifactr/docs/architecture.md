@@ -82,9 +82,9 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.telemetry` | core, the OpenTelemetry API | Inner; its port is the OpenTelemetry API | Span attribution, the metric registry, and recording through the API. |
 | `artifactr.workspace` | core, telemetry | Inner; owns the `Storage` port | `Workspaces`, `Workspace`, storage protocols, in-memory storage. |
 | `artifactr.agent` | workspace, telemetry, pydantic-ai | Inner; owns the `TurnContext`, `TurnEvaluator` and `CommandResults` ports | The `ArtifactWorkspace` capability, `Session`, `Runner`, live-output helpers, and the memory of commands' results. |
-| `artifactr.scores` (needs evalr, from the `langfuse` or `evals` extra) | workspace, evalr's core | Uses evalr's `ScoreSink` and `ScoreConfigStore` ports | Feedback as scores, named as each type is registered, and the mirror that records a workspace's feedback in a sink. |
+| `artifactr.scores` (needs evalr, from the `langfuse` or `evals` extra) | telemetry, workspace, evalr's core | Uses evalr's `ScoreSink` and `ScoreConfigStore` ports | Feedback as scores, named as each type is registered, and the mirror that records a workspace's feedback in a sink. |
 | `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | Adapter for `Storage` | Durable storage on PostgreSQL and SQLite, and its migrations. |
-| `artifactr.otel` (extra) | telemetry, the OpenTelemetry SDK, exporters and instrumentations | Adapter for the OpenTelemetry API | `configure_telemetry`: providers, OTLP export, instrumentations and metric views, for applications. |
+| `artifactr.otel` (extra) | telemetry, the OpenTelemetry SDK, exporters and instrumentations | Adapter for the OpenTelemetry API | `configure_telemetry`: providers, OTLP export, instrumentations and metric views, for applications, composed with other libraries' contributions ([ADR-0046](adr/0046-telemetry-that-composes-across-libraries.md)). |
 | `artifactr.litellm` (extra) | agent, pydantic-ai's OpenAI support | Adapter for pydantic-ai's `Model` | `litellm_model` and the `LiteLLMGateway` capability: each request's tenancy, session, trace, key and guardrails, and guardrail blocks as typed failures ([ADR-0043](adr/0043-the-litellm-adapter.md)). |
 | `artifactr.langfuse` (extra) | scores, agent, langfuse, evalr's core | Adapter for evalr's `ScoreSink` and `ScoreConfigStore`, and for `TurnContext` | Feedback as Langfuse scores and score configs, a span filter that keeps whole traces, and each turn's trace attributes ([ADR-0039](adr/0039-the-langfuse-adapter.md)). |
 | `artifactr.evals` (extra) | agent, evalr | Adapter for `TurnEvaluator`, and for evalr's `FeedbackSource` and experiment `Task` | Datasets from the log, experiments that replay turns, online evaluation of turns with verdicts recorded as feedback, and the end-to-end measures ([ADR-0044](adr/0044-the-evalr-adapter.md)). |
@@ -317,7 +317,7 @@ Feedback is the `give_feedback` command, so it goes through the one write path a
 | An artifact version | The trace the version was committed in; else the session of the agent that wrote it |
 | A thread | The thread's session |
 
-Score ids are derived from the envelope's id in artifactr's own namespace, so mirroring the log again replaces scores rather than adding more. A score has no evaluator; where the feedback came from (tenant, workspace, type, target, actor and `seq`) is its `source`, recorded as metadata. `sync_score_configs` creates each type's missing score configs in a `ScoreConfigStore`, through evalr's `sync_score_configs`. `ScoreSink` and `ScoreConfigStore` are evalr's ports: `artifactr.langfuse` adapts Langfuse to them, and passes evalr's contract suites for both. `artifactr.scores` re-exports evalr's `Score`, `ScoreConfig`, `ScoreSink`, `ScoreConfigStore`, `ScoreType` (as `ScoreDataType`) and `MAX_TEXT`, which it has always offered. It needs evalr, so it is used through the `langfuse` or `evals` extra; the inner layers never import it.
+Score ids are derived from the envelope's id in artifactr's own namespace, so mirroring the log again replaces scores rather than adding more. A mirror keeps a named cursor in the workspace, saved after it records a piece of feedback and every 500 other envelopes, and carries on after it when it restarts; mirroring is at least once ([ADR-0046](adr/0046-telemetry-that-composes-across-libraries.md)). A score has no evaluator; where the feedback came from (tenant, workspace, type, target, actor and `seq`) is its `source`, recorded as metadata. `sync_score_configs` creates each type's missing score configs in a `ScoreConfigStore`, through evalr's `sync_score_configs`. `ScoreSink` and `ScoreConfigStore` are evalr's ports: `artifactr.langfuse` adapts Langfuse to them, and passes evalr's contract suites for both. `artifactr.scores` re-exports evalr's `Score`, `ScoreConfig`, `ScoreSink`, `ScoreConfigStore`, `ScoreType` (as `ScoreDataType`) and `MAX_TEXT`, which it has always offered. It needs evalr, so it is used through the `langfuse` or `evals` extra; the inner layers never import it.
 
 **Evaluation.** With the `[evals]` extra, feedback feeds evalr, the eval kit shared with reflexr ([ADR-0029](adr/0029-evalr-shared-eval-kit.md), [ADR-0044](adr/0044-the-evalr-adapter.md)):
 
@@ -409,8 +409,9 @@ class Storage(Protocol):
     ) -> list[Envelope]: ...
     def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncIterator[Envelope]: ...
     async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool: ...
+    async def save_cursor(self, scope: Scope, name: str, seq: int) -> None: ...
 
-    # plus reads: artifact(s), revisions, thread(s), proposal(s), run, head_seq, history
+    # plus reads: artifact(s), revisions, thread(s), proposal(s), run, head_seq, history, cursor
 ```
 
 - **Transactions serialize per workspace from the moment they begin**, so what a transaction loads cannot change before it saves. Writes are staged and applied atomically when the block exits normally; an exception rolls back entities, log and history together.
@@ -418,6 +419,7 @@ class Storage(Protocol):
 - **`read` takes a window of the log** (`after_seq < seq < before_seq`), for some threads by `delivered_to`'s rule, and its first `limit` or last `last` envelopes, oldest first. Storage filters, so a tail read of a long log reads only its tail; `Workspace.read` refuses both `limit` and `last`.
 - **`subscribe(after_seq)` replays, then follows live**, on one iterator. Because a subscription starts from a `seq`, there is no gap to manage between history and live events. It is the only read path for replay, live fan-out, hooks, MCP notifications and change notes.
 - **Leases** back `Workspace.claim_thread`: a time-limited, renewed claim that holds across processes and lapses if its holder dies.
+- **Cursors** record how far a named consumer of the log has got, such as a feedback mirror. A cursor only moves forward, so a consumer running in several processes cannot move it back ([ADR-0046](adr/0046-telemetry-that-composes-across-libraries.md)).
 - **History** is opaque bytes (pydantic-ai `ModelMessage`s serialized by the agent layer), appended in the same transaction as the run fact that ends each run segment.
 
 Two implementations ship:
@@ -435,7 +437,7 @@ workspaces = Workspaces(SqlStorage(engine))
 
 - **Locking.** A transaction creates its workspace's row if the workspace is new, then locks it (`SELECT ... FOR UPDATE`) before it loads anything. `save` assigns `seq` from the row's `head_seq`. PostgreSQL runs at its default `READ COMMITTED` isolation. SQLite has no row locks, so engines from `create_sqlite_engine` begin every transaction with `BEGIN IMMEDIATE`, which takes the database's write lock instead.
 - **Tables.** Every primary key starts with the tenant and the workspace, and every table name with `artifactr_`. Entities are stored as the JSON of their Pydantic models, beside the columns that reads filter on (kind, archived, status, thread, and each event's type and thread). Lists come back oldest first, by a creation position counted on the workspace row. `artifactr_messages` holds the message ids used in each workspace, so checking an id is one key lookup.
-- **Subscriptions** read the log a page at a time. Once caught up, they wait for a commit through the same `SqlStorage`, which wakes them at once, or poll every `poll_interval` (0.5 s by default) for commits from other processes.
+- **Subscriptions** read the log a page at a time. Once caught up, they wait for a commit through the same `SqlStorage`, which wakes them at once, or poll every `poll_interval` (0.5 s by default) for commits from other processes. `Workspace.subscribe` reads untraced, so polls make no traces.
 - **Leases** are rows, taken with a conditional update or an insert, so two processes racing for a lease cannot both win.
 - **Migrations** ship in the package and record their version in `artifactr_alembic_version`, apart from the application's own. `migrate(engine)` upgrades a database; `create_schema(engine)` creates the tables without migrations, for tests and prototypes. A test checks that the migrations build exactly the models' schema.
 
@@ -502,13 +504,17 @@ They read Prometheus through the data source uid `prometheus`, as stackr provisi
 
 ### Configuring the SDK
 
-The `[otel]` extra's `configure_telemetry(...)` is for applications and the reference implementation; no part of the library requires it. It sets up the tracer, meter and logger providers with the service's resource, OTLP over HTTP, the metric views, a `BaggageSpanProcessor` that copies a turn's `session.id` onto every span in it (database and HTTP spans included), the open instrumentations for FastAPI, SQLAlchemy, asyncpg, httpx and httpx2, and pydantic-ai's `InstrumentationSettings`. It returns a handle that instruments FastAPI apps and SQLAlchemy engines created later, gives agents pydantic-ai's `Instrumentation` capability, and shuts everything down.
+The `[otel]` extra's `configure_telemetry(...)` is for applications and the reference implementation; no part of the library requires it. It sets up the tracer, meter and logger providers with the service's resource, OTLP over HTTP, the metric views, a `BaggageSpanProcessor` that copies a turn's `session.id` onto every span in it (database and HTTP spans included), the open instrumentations for FastAPI, SQLAlchemy, httpx and httpx2, and pydantic-ai's `InstrumentationSettings`. It returns a handle that instruments FastAPI apps and SQLAlchemy engines created later, gives agents pydantic-ai's `Instrumentation` capability, and shuts everything down.
+
+It composes with reflexr's, which is built the same way ([ADR-0046](adr/0046-telemetry-that-composes-across-libraries.md)). `artifactr.otel.telemetry()` is artifactr's contribution: its metric views, a span filter for its traces (the scopes in `TRACE_SCOPES`), and the instrumentations it advises. `configure_telemetry(*contributions)` takes other libraries' contributions, such as `reflexr.otel.telemetry()`, and adds its own. It reads them through the `TelemetryContribution` protocol, so neither library imports the other.
+
+**Polling is untraced.** Subscriptions and the feedback mirror poll storage inside `untraced()`, which makes every span started in it a child of a span that is never sampled. Under a parent-based sampler, the SDK's default, an idle application exports no spans, and the instrumentations' metrics are still recorded (a sampler such as `always_on` or `traceidratio` would trace polls again). The work a poll finds is traced where it happens, never inside `untraced()`.
 
 The `Runner` takes a `turn_context`: an async context entered around each turn, inside its span, given the run's session. It is a port for backends that attribute a turn in their own way, such as Langfuse's propagated trace attributes. Its `evaluators` are another port, for judging turns after they end (see [Feedback](#feedback)).
 
 ### Langfuse
 
-Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opentelemetry-observability-with-langfuse.md), [ADR-0039](adr/0039-the-langfuse-adapter.md)). The `[langfuse]` extra adds `should_export_span`, a filter that keeps artifactr's, pydantic-graph's, the MCP SDK's and the HTTP and database instrumentations' spans as well as Langfuse's default LLM spans, so traces stay whole; `langfuse_turn`, a `TurnContext` that propagates each turn's session, user, tags (tenant, workspace, the kinds of artifact followed), trace name and metadata; and `LangfuseScores` and `LangfuseScoreConfigs`, which put feedback in Langfuse through evalr's score ports, sending a yes or no as 1 or 0. `configure_telemetry(langfuse=True)` adds Langfuse to the same tracer provider. A Collector can also send plain OTLP to Langfuse's HTTP endpoint, with the `x-langfuse-ingestion-version: 4` header.
+Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opentelemetry-observability-with-langfuse.md), [ADR-0039](adr/0039-the-langfuse-adapter.md)). The `[langfuse]` extra adds `should_export_span`, a filter that keeps artifactr's, pydantic-graph's, the MCP SDK's and the HTTP and database instrumentations' spans as well as Langfuse's default LLM spans, so traces stay whole; `langfuse_turn`, a `TurnContext` that propagates each turn's session, user, tags (tenant, workspace, the kinds of artifact followed), trace name and metadata; and `LangfuseScores` and `LangfuseScoreConfigs`, which put feedback in Langfuse through evalr's score ports, sending a yes or no as 1 or 0. `configure_telemetry(langfuse="traces")` adds Langfuse to the same tracer provider, keeping a span if any library's contribution keeps it. A Collector can also send plain OTLP to Langfuse's HTTP endpoint, with the `x-langfuse-ingestion-version: 4` header; then `langfuse="scores"` sends Langfuse no spans, and the client only sets trace attributes and records scores.
 
 ## Dependencies
 
@@ -602,6 +608,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0043](adr/0043-the-litellm-adapter.md) | The LiteLLM adapter |
 | [0044](adr/0044-the-evalr-adapter.md) | The evalr adapter |
 | [0045](adr/0045-a-message-id-is-used-once.md) | A message id is used once in a workspace |
+| [0046](adr/0046-telemetry-that-composes-across-libraries.md) | Telemetry that composes across libraries, untraced polling and mirror cursors |
 
 ## Open questions
 

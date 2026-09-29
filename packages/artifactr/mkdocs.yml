@@ -207,6 +207,7 @@ nav:
           - adr/0042-typed-run-failures.md
           - adr/0043-the-litellm-adapter.md
           - adr/0044-the-evalr-adapter.md
+          - adr/0046-telemetry-that-composes-across-libraries.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

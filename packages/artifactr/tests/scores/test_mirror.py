@@ -1,6 +1,7 @@
 """The feedback mirror: which trace or session each piece of feedback is scored on."""
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -32,6 +33,7 @@ ALICE = UserActor(id="alice")
 FIRST = "4bf92f3577b34da6a3ce929d0e0e4736"
 SECOND = "0af7651916cd43dd8448eb211c80319c"
 RATING: dict[str, Any] = {"rating": 4}
+CURSOR = "langfuse"
 
 
 @pytest.fixture
@@ -46,7 +48,7 @@ async def ws(storage: InMemoryStorage) -> Workspace:
 
 
 async def mirrored(ws: Workspace, sink: InMemoryScoreSink, *, after_seq: int = 0) -> list[Score]:
-    mirror = FeedbackMirror(ws, sink)
+    mirror = FeedbackMirror(ws, sink, cursor=CURSOR)
     return [s for e in await ws.read(after_seq=after_seq) for s in await mirror.mirror(e)]
 
 
@@ -155,7 +157,7 @@ async def test_types_this_process_does_not_know_are_skipped(ws: Workspace) -> No
             feedback_type="retired", target=ThreadTarget(thread_id="thr_1"), value={}
         ),
     )
-    assert await FeedbackMirror(ws, InMemoryScoreSink()).scores(unknown) == []
+    assert await FeedbackMirror(ws, InMemoryScoreSink(), cursor=CURSOR).scores(unknown) == []
 
 
 async def test_a_timestamp_without_a_time_zone_is_taken_as_utc(ws: Workspace) -> None:
@@ -170,14 +172,14 @@ async def test_a_timestamp_without_a_time_zone_is_taken_as_utc(ws: Workspace) ->
             feedback_type="helpfulness", target=ThreadTarget(thread_id="thr_1"), value=RATING
         ),
     )
-    [score] = await FeedbackMirror(ws, InMemoryScoreSink()).scores(envelope)
+    [score] = await FeedbackMirror(ws, InMemoryScoreSink(), cursor=CURSOR).scores(envelope)
     assert score.timestamp == given.replace(tzinfo=UTC)
 
 
 async def test_following_the_log(ws: Workspace) -> None:
     thread = await ws.create_thread()
     sink = InMemoryScoreSink()
-    follower = asyncio.create_task(FeedbackMirror(ws, sink).follow())
+    follower = asyncio.create_task(FeedbackMirror(ws, sink, cursor=CURSOR).follow())
     await ws.commit(
         GiveFeedback(
             feedback_type="helpfulness", target=ThreadTarget(thread_id=thread.id), value=RATING
@@ -191,6 +193,102 @@ async def test_following_the_log(ws: Workspace) -> None:
     with pytest.raises(asyncio.CancelledError):
         await follower
     assert [s.name for s in sink.scores.values()] == ["helpfulness.rating"]
+
+
+async def following(
+    mirror: FeedbackMirror, done: Callable[[], Awaitable[bool]], **options: Any
+) -> None:
+    """Follow the log until ``done``, then stop, as a restarting application would."""
+    follower = asyncio.create_task(mirror.follow(**options))
+    for _ in range(200):
+        if await done():
+            break
+        await asyncio.sleep(0.01)
+    follower.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await follower
+    assert await done()
+
+
+async def rate(ws: Workspace, thread_id: str, stars: int) -> int:
+    await ws.commit(
+        GiveFeedback(
+            feedback_type="helpfulness",
+            target=ThreadTarget(thread_id=thread_id),
+            value={"rating": stars},
+        )
+    )
+    return await ws.head_seq()
+
+
+async def test_a_restarted_mirror_carries_on_after_its_cursor(ws: Workspace) -> None:
+    thread = await ws.create_thread()
+    first = await rate(ws, thread.id, 4)
+    before = InMemoryScoreSink()
+
+    async def recorded_first() -> bool:
+        return await ws.cursor(CURSOR) == first
+
+    await following(FeedbackMirror(ws, before, cursor=CURSOR), recorded_first)
+    assert len(before.scores) == 1
+    second = await rate(ws, thread.id, 2)
+    after = InMemoryScoreSink()
+
+    async def recorded_second() -> bool:
+        return await ws.cursor(CURSOR) == second
+
+    await following(FeedbackMirror(ws, after, cursor=CURSOR), recorded_second)
+    assert [s.value for s in after.scores.values()] == [2.0], "the first is not sent again"
+
+
+async def test_the_cursor_is_saved_now_and_then_without_feedback(
+    ws: Workspace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("artifactr.scores.mirror.SAVE_EVERY", 3)
+    for _ in range(7):
+        await ws.create_thread()
+
+    async def saved_twice() -> bool:
+        return await ws.cursor(CURSOR) == 6
+
+    await following(FeedbackMirror(ws, InMemoryScoreSink(), cursor=CURSOR), saved_twice)
+
+
+async def test_each_mirror_of_a_workspace_has_its_own_cursor(ws: Workspace) -> None:
+    thread = await ws.create_thread()
+    head = await rate(ws, thread.id, 4)
+
+    async def warehouse_is_done() -> bool:
+        return await ws.cursor("warehouse") == head
+
+    await following(FeedbackMirror(ws, InMemoryScoreSink(), cursor="warehouse"), warehouse_is_done)
+    assert await ws.cursor(CURSOR) == 0
+
+
+async def test_a_mirror_without_a_cursor_starts_over(ws: Workspace) -> None:
+    thread = await ws.create_thread()
+    await rate(ws, thread.id, 4)
+    for _ in range(2):
+        sink = InMemoryScoreSink()
+
+        async def recorded(sink: InMemoryScoreSink = sink) -> bool:
+            return bool(sink.scores)
+
+        await following(FeedbackMirror(ws, sink, cursor=None), recorded)
+    assert await ws.cursor(CURSOR) == 0
+
+
+async def test_mirroring_again_from_the_start_leaves_the_cursor(ws: Workspace) -> None:
+    thread = await ws.create_thread()
+    first = await rate(ws, thread.id, 4)
+    await ws.save_cursor(CURSOR, first + 5)  # as if another process had got further
+    sink = InMemoryScoreSink()
+
+    async def recorded() -> bool:
+        return bool(sink.scores)
+
+    await following(FeedbackMirror(ws, sink, cursor=CURSOR), recorded, after_seq=0)
+    assert await ws.cursor(CURSOR) == first + 5
 
 
 async def test_score_configs_are_created_once() -> None:

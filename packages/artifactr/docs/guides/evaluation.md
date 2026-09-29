@@ -99,11 +99,13 @@ import asyncio
 
 from artifactr.scores import FeedbackMirror
 
-mirror = FeedbackMirror(workspace, sink)
+mirror = FeedbackMirror(workspace, sink, cursor="warehouse")
 task = asyncio.create_task(mirror.follow())  # until cancelled
 ```
 
-A turn's feedback lands on the trace of the run's latest attempt, a message's on the trace of the run that posted it, and an artifact version's on the trace it was committed in. Score ids are derived from the feedback's envelope, so a mirror can start over from the beginning of the log without duplicating anything. Each score has no evaluator; where the feedback came from (the tenant, workspace, type, target, actor and position in the log) is its `source`, which a sink records as the score's metadata. `sync_score_configs(store)` creates the score configs of every registered feedback type that a `ScoreConfigStore` lacks, and never changes one it has.
+A turn's feedback lands on the trace of the run's latest attempt, a message's on the trace of the run that posted it, and an artifact version's on the trace it was committed in. Score ids are derived from the feedback's envelope, so a mirror can start over from the beginning of the log without duplicating anything.
+
+A mirror keeps a cursor in its workspace, so a restarted mirror carries on where it was instead of mirroring the whole log again ([ADR-0046](../adr/0046-telemetry-that-composes-across-libraries.md)). It saves the cursor after it records a piece of feedback's scores, and after every 500 other envelopes. Mirroring is at least once: a mirror stopped between recording and saving records that feedback again, and the sink replaces the scores. Each mirror names its cursor, and each mirror of a workspace, one per sink, needs its own: two sharing a name would skip feedback after a restart. `cursor=None` keeps none, and starts from the beginning every time. `follow(after_seq=0)` mirrors everything again, but leaves the cursor where it is until it passes it, so a restart carries on from the cursor; to mirror everything again across restarts, give the mirror a new cursor name. A mirror polls the log untraced, so an idle one makes no traces. Each score has no evaluator; where the feedback came from (the tenant, workspace, type, target, actor and position in the log) is its `source`, which a sink records as the score's metadata. `sync_score_configs(store)` creates the score configs of every registered feedback type that a `ScoreConfigStore` lacks, and never changes one it has.
 
 The sink and the store are small protocols, so any backend can implement them, and evalr's contract suites (`evalr.contracts.check_score_sink` and `check_score_config_store`) check one:
 
@@ -133,7 +135,8 @@ from artifactr.scores import FeedbackMirror, sync_score_configs
 
 langfuse = langfuse_client(tracer_provider=telemetry.tracer_provider)  # or telemetry.langfuse
 await sync_score_configs(LangfuseScoreConfigs(langfuse))  # once, at startup
-mirror = asyncio.create_task(FeedbackMirror(workspace, LangfuseScores(langfuse)).follow())
+mirror = FeedbackMirror(workspace, LangfuseScores(langfuse), cursor="langfuse")
+task = asyncio.create_task(mirror.follow())
 ```
 
 Score configs give Langfuse each score's type, range and categories, so its UI can offer the same scales for annotation. Langfuse accepts config names of up to 35 characters; a longer `{type}.{field}` raises, and a shorter `name=` on the feedback type fixes it. Scores are queued by the Langfuse client and sent in the background; call `langfuse.flush()` before a short-lived process exits.

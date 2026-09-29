@@ -20,6 +20,18 @@ The `otel` extra. See [Observability](../guides/observability.md).
 
 ::: artifactr.otel.installed
 
+::: artifactr.otel.LangfuseMode
+
+## Libraries' contributions
+
+See [ADR-0046](../adr/0046-telemetry-that-composes-across-libraries.md).
+
+::: artifactr.otel.telemetry
+
+::: artifactr.otel.TelemetryContribution
+
+::: artifactr.otel.Contribution
+
 ## Metric views
 
 ::: artifactr.otel.metric_views

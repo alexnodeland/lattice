@@ -162,3 +162,13 @@ class LeaseRow(ScopedRow):
     key: Mapped[str] = mapped_column(primary_key=True)
     holder: Mapped[str]
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class CursorRow(ScopedRow):
+    """How far a named consumer of the log, such as a feedback mirror, has got."""
+
+    __tablename__ = "artifactr_cursors"
+
+    name: Mapped[str] = mapped_column(primary_key=True)
+    seq: Mapped[int] = mapped_column(BigInteger)
+    """The ``seq`` of the last envelope the consumer is done with."""

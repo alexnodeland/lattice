@@ -96,7 +96,10 @@ docplan reports to OpenTelemetry when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, thro
 HTTP requests as traces, artifactr's metrics, and its logs. With `LANGFUSE_PUBLIC_KEY` and
 `LANGFUSE_SECRET_KEY` (and `LANGFUSE_BASE_URL`) set too, it files each turn in Langfuse under its
 thread and user, creates the score configs of its feedback types, and mirrors the `main`
-workspace's feedback to Langfuse scores on the trace of the turn it is about.
+workspace's feedback to Langfuse scores on the trace of the turn it is about. Where a Collector
+sends Langfuse the traces already, as stackr's does, set `DOCPLAN_LANGFUSE=scores` so docplan
+sends Langfuse only its scores and each turn's session, user and tags, not the spans a second
+time; `compose.stackr.yaml` sets it.
 
 With a LiteLLM proxy at `DOCPLAN_LITELLM_URL`, the agent calls its model group
 `DOCPLAN_LITELLM_MODEL` (`claude-sonnet` by default) with the key `DOCPLAN_LITELLM_KEY`, and every

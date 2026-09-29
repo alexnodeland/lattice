@@ -8,8 +8,9 @@ import importlib.util
 import logging
 import os
 from collections.abc import Callable, Collection, Mapping, Sequence
+from dataclasses import dataclass
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Literal, Self
+from typing import TYPE_CHECKING, Any, Final, Literal, Protocol, Self
 
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
@@ -23,12 +24,12 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import MetricReader, PeriodicExportingMetricReader
 from opentelemetry.sdk.metrics.view import View
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
+from opentelemetry.sdk.trace import ReadableSpan, SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
 from pydantic_ai.capabilities import Instrumentation
 from pydantic_ai.models.instrumented import InstrumentationSettings
 
-from artifactr.telemetry import METRICS, SCOPE, MetricsDetail, kept_attributes
+from artifactr.telemetry import METRICS, SCOPE, MetricsDetail, is_trace_scope, kept_attributes
 from artifactr.telemetry.attributes import SESSION_ID
 
 if TYPE_CHECKING:
@@ -43,6 +44,10 @@ Instrumented = Literal["fastapi", "sqlalchemy", "asyncpg", "httpx"]
 INSTRUMENTED: tuple[Instrumented, ...] = ("fastapi", "sqlalchemy", "asyncpg", "httpx")
 """Every library ``configure_telemetry`` can instrument."""
 
+_ADVISED: Final[frozenset[Instrumented]] = frozenset({"fastapi", "sqlalchemy", "httpx"})
+"""The instrumentations that trace artifactr's work: its surfaces, its SQL storage and its model
+calls. Not asyncpg as well as SQLAlchemy, which would record every query twice."""
+
 _MODULES: dict[Instrumented, tuple[str, ...]] = {
     "fastapi": ("fastapi",),
     "sqlalchemy": ("sqlalchemy",),
@@ -50,6 +55,15 @@ _MODULES: dict[Instrumented, tuple[str, ...]] = {
     # pydantic-ai's model providers use httpx2, and need httpx only for an optional extra.
     "httpx": ("httpx", "httpx2"),
 }
+
+LangfuseMode = Literal["traces", "scores"]
+"""What an application sends Langfuse itself.
+
+- ``"traces"``: the traces, filtered by the contributions' span filters, as well as each turn's
+  and run's session, user and tags, and scores
+- ``"scores"``: the session, user and tags, set on the spans the Collector sends Langfuse, and
+  scores, but no spans: for a Collector that sends Langfuse every trace already
+"""
 
 BAGGAGE_KEYS: frozenset[str] = frozenset({SESSION_ID})
 """The baggage entries copied onto every span: the session, which a turn places in baggage."""
@@ -59,6 +73,72 @@ _EXCLUDED_ASGI_SPANS: list[Literal["receive", "send"]] = ["receive", "send"]
 _SKIP_SQLALCHEMY_VERSION_CHECK = True
 """The SQLAlchemy instrumentation declares support below 2.1, which artifactr requires, but
 works with 2.1 (the tests check), so its version check is skipped."""
+
+
+class TelemetryContribution(Protocol):
+    """What ``configure_telemetry`` reads from a library's contribution: the port (ADR-0046).
+
+    It reads these four fields and nothing else, so any value that has them will do:
+    artifactr's :func:`telemetry`, reflexr's ``reflexr.otel.telemetry()``, which neither
+    library imports, or an application's own :class:`Contribution` for its metrics. Both
+    libraries' ``MetricsDetail`` is ``"workspace" | "tenant" | "none"``: part of the contract.
+    """
+
+    @property
+    def name(self) -> str:
+        """The library's name, which is its instrumentation scope; one contribution per name."""
+        ...
+
+    @property
+    def metric_views(self) -> Callable[[MetricsDetail], Sequence[View]]:
+        """Return the views that apply the library's metric cardinality policy at a detail."""
+        ...
+
+    @property
+    def should_export_span(self) -> Callable[[ReadableSpan], bool]:
+        """Return whether a span belongs in the library's traces: Langfuse's span filter."""
+        ...
+
+    @property
+    def instrument(self) -> frozenset[str]:
+        """The instrumentations the library advises: those that trace its work.
+
+        Names ``configure_telemetry`` does not know (see :data:`Instrumented`) are ignored.
+        """
+        ...
+
+
+@dataclass(frozen=True)
+class Contribution:
+    """A library's contribution to an application's telemetry.
+
+    Args:
+        name: The library's name, which is its instrumentation scope.
+        metric_views: Returns the views that keep only the attributes the library's metrics
+            may carry at a level of detail.
+        should_export_span: Whether a span belongs in the library's traces.
+        instrument: The instrumentations the library advises.
+    """
+
+    name: str
+    metric_views: Callable[[MetricsDetail], Sequence[View]]
+    should_export_span: Callable[[ReadableSpan], bool]
+    instrument: frozenset[Instrumented]
+
+
+def telemetry() -> Contribution:
+    """Return artifactr's contribution, for any library's ``configure_telemetry``.
+
+    Its views apply artifactr's metric cardinality policy, its span filter keeps the scopes in
+    ``artifactr.telemetry.TRACE_SCOPES``, and it advises the FastAPI, SQLAlchemy and httpx
+    instrumentations.
+    """
+    return Contribution(
+        name=SCOPE,
+        metric_views=metric_views,
+        should_export_span=_in_artifactrs_traces,
+        instrument=_ADVISED,
+    )
 
 
 def metric_views(detail: MetricsDetail = "workspace") -> list[View]:
@@ -88,6 +168,10 @@ def installed() -> set[Instrumented]:
 
 def _found(module: str) -> bool:
     return importlib.util.find_spec(module) is not None
+
+
+def _in_artifactrs_traces(span: ReadableSpan) -> bool:
+    return is_trace_scope(span.instrumentation_scope.name if span.instrumentation_scope else "")
 
 
 class TelemetryHandle:
@@ -127,7 +211,7 @@ class TelemetryHandle:
         self.instrumentation = instrumentation
         """pydantic-ai's instrumentation settings over these providers."""
         self.langfuse = langfuse
-        """The Langfuse client, when traces also go to Langfuse."""
+        """The Langfuse client, when the application sends Langfuse its traces or its scores."""
         self._cleanups: list[Callable[[], object]] = []
         if langfuse is not None:
             self._cleanups.append(langfuse.shutdown)
@@ -251,7 +335,7 @@ class TelemetryHandle:
 
 
 def configure_telemetry(
-    *,
+    *contributions: TelemetryContribution,
     service_name: str,
     service_version: str | None = None,
     environment: str | None = None,
@@ -266,58 +350,69 @@ def configure_telemetry(
     metric_reader: MetricReader | None = None,
     log_exporter: LogRecordExporter | None = None,
     span_processors: Sequence[SpanProcessor] = (),
-    langfuse: bool = False,
+    langfuse: LangfuseMode | None = None,
     langfuse_options: Mapping[str, Any] | None = None,
     set_global: bool = True,
 ) -> TelemetryHandle:
     """Set up OpenTelemetry for an application: providers, OTLP export and instrumentation.
 
     Call it once, as early as the application starts, before it creates its FastAPI app and
-    agents. It sets up:
+    agents, with the contributions of the other libraries the application uses, such as
+    ``reflexr.otel.telemetry()``; artifactr's own is always included. reflexr's
+    ``configure_telemetry`` takes the same contributions and does the same. It sets up:
 
     - tracer, meter and logger providers, with ``service.name``, ``service.version`` and
       ``deployment.environment.name`` on their resource
     - OTLP over HTTP to ``otlp_endpoint``, or to the endpoint the ``OTEL_EXPORTER_OTLP_*``
       environment variables name (a local Collector by default)
-    - views that apply artifactr's metric cardinality policy at ``metrics_detail``
+    - every contribution's views, which apply each library's metric cardinality policy at
+      ``metrics_detail``
     - a baggage processor that copies a turn's session onto every span in it
-    - the open instrumentations for FastAPI, SQLAlchemy, asyncpg, httpx and httpx2, with the
-      stable HTTP semantic conventions (``OTEL_SEMCONV_STABILITY_OPT_IN=http``, unless it is
-      set already)
+    - the open instrumentations the contributions advise (FastAPI, SQLAlchemy, httpx and
+      httpx2), or those ``instrument`` names, with the stable HTTP semantic conventions
+      (``OTEL_SEMCONV_STABILITY_OPT_IN=http``, unless it is set already)
     - pydantic-ai's instrumentation settings, which :meth:`TelemetryHandle.capability` wraps
       for an agent
-    - with ``langfuse=True``, a Langfuse client on the same tracer provider, which keeps whole
-      traces (``artifactr.langfuse``, the ``[langfuse]`` extra)
+    - with ``langfuse``, a Langfuse client on the same tracer provider (``artifactr.langfuse``,
+      the ``[langfuse]`` extra), which sends Langfuse whole traces, or only scores
 
     Nothing in artifactr requires it: it is one way to configure the SDK, which artifactr
     only ever records to through the API.
 
     Args:
+        *contributions: Other libraries' contributions (:class:`TelemetryContribution`), or
+            the application's own. One is kept per name, the first given, and artifactr's
+            own, :func:`telemetry`, is added unless one is named ``artifactr``.
         service_name: The service's name, as it appears in every backend.
         service_version: The service's version.
         environment: The deployment environment, such as ``production``.
         otlp_endpoint: The OTLP/HTTP base URL, such as ``http://collector:4318``. Defaults to
             the ``OTEL_EXPORTER_OTLP_ENDPOINT`` environment variable.
         otlp_headers: Headers for every OTLP request, such as a backend's credentials.
-        instrument: Which libraries to instrument. Defaults to those that are installed.
+        instrument: Which libraries to instrument. Defaults to those the contributions advise
+            that are installed.
         engines: SQLAlchemy engines that already exist, to trace their queries.
         include_content: Whether pydantic-ai records prompts, completions and tool arguments.
-        metrics_detail: How much tenancy detail artifactr's metrics keep.
+        metrics_detail: How much tenancy detail the libraries' metrics keep.
         logs: Whether to export the ``logging`` module's records through OTLP.
         span_exporter: Where spans go instead of OTLP, such as an in-memory exporter in tests.
         metric_reader: How metrics are read instead of a periodic OTLP export.
         log_exporter: Where log records go instead of OTLP.
         span_processors: More span processors to add, such as a backend's own.
-        langfuse: Whether to send traces to Langfuse too, with ``artifactr.langfuse``'s span
-            filter. Its keys come from the ``LANGFUSE_*`` environment variables or
+        langfuse: What the application sends Langfuse itself (:data:`LangfuseMode`):
+            ``"traces"``, with a span filter that keeps a span any contribution keeps, and
+            Langfuse's own LLM spans; or ``"scores"``, when the Collector sends Langfuse the
+            traces. Its keys come from the ``LANGFUSE_*`` environment variables or
             ``langfuse_options``.
-        langfuse_options: Passed to ``Langfuse(...)``.
+        langfuse_options: Passed to ``Langfuse(...)``; a ``should_export_span`` here replaces
+            the filter ``langfuse`` chooses.
         set_global: Whether to make the providers the global ones, which artifactr, pydantic-ai
             and the instrumentations default to.
 
     Returns:
         A handle that shuts it all down.
     """
+    chosen = _one_per_library(contributions)
     attributes = {
         "service.name": service_name,
         "service.version": service_version,
@@ -338,9 +433,8 @@ def configure_telemetry(
     reader = metric_reader or PeriodicExportingMetricReader(
         OTLPMetricExporter(endpoint=_signal(otlp_endpoint, "metrics"), headers=headers)
     )
-    meter_provider = MeterProvider(
-        resource=resource, metric_readers=[reader], views=metric_views(metrics_detail)
-    )
+    views = [view for each in chosen for view in each.metric_views(metrics_detail)]
+    meter_provider = MeterProvider(resource=resource, metric_readers=[reader], views=views)
 
     logger_provider: LoggerProvider | None = None
     log_handler: logging.Handler | None = None
@@ -360,10 +454,20 @@ def configure_telemetry(
 
     os.environ.setdefault("OTEL_SEMCONV_STABILITY_OPT_IN", "http")
     client = None
-    if langfuse:
-        from artifactr.langfuse import langfuse_client
+    if langfuse is not None:
+        from artifactr.langfuse import langfuse_client, no_spans
+        from artifactr.langfuse.tracing import span_filter
 
-        client = langfuse_client(tracer_provider=tracer_provider, **dict(langfuse_options or {}))
+        keep = (
+            span_filter(*(each.should_export_span for each in chosen))
+            if langfuse == "traces"
+            else no_spans
+        )
+        options = {"should_export_span": keep, **(langfuse_options or {})}
+        client = langfuse_client(tracer_provider=tracer_provider, **options)
+    advised: set[Instrumented] = {
+        name for name in installed() if any(name in each.instrument for each in chosen)
+    }
     return TelemetryHandle(
         tracer_provider=tracer_provider,
         meter_provider=meter_provider,
@@ -374,11 +478,21 @@ def configure_telemetry(
             include_content=include_content,
             include_binary_content=include_content,
         ),
-        instrument=installed() if instrument is None else instrument,
+        instrument=advised if instrument is None else instrument,
         engines=engines,
         log_handler=log_handler,
         langfuse=client,
     )
+
+
+def _one_per_library(
+    contributions: Sequence[TelemetryContribution],
+) -> list[TelemetryContribution]:
+    """The contributions, the first of each name, with artifactr's own unless one was given."""
+    by_name: dict[str, TelemetryContribution] = {}
+    for contribution in (*contributions, telemetry()):
+        by_name.setdefault(contribution.name, contribution)
+    return list(by_name.values())
 
 
 def _remove(handler: logging.Handler) -> None:

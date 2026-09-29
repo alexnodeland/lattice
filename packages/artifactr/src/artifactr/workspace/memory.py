@@ -7,7 +7,7 @@ restarts and cannot be shared between processes.
 
 import asyncio
 import uuid
-from collections.abc import AsyncGenerator, AsyncIterator, Callable, Collection, Sequence
+from collections.abc import AsyncGenerator, Callable, Collection, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -61,6 +61,7 @@ class _Data:
         default_factory=dict[ThreadId, list[HistoryChunk]]
     )
     leases: dict[str, tuple[str, datetime]] = field(default_factory=dict[str, tuple[str, datetime]])
+    cursors: dict[str, int] = field(default_factory=dict[str, int])
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     appended: asyncio.Condition = field(default_factory=asyncio.Condition)
 
@@ -257,7 +258,7 @@ class InMemoryStorage:
             return found[max(len(found) - last, 0) :]
         return found if limit is None else found[:limit]
 
-    async def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncIterator[Envelope]:
+    async def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncGenerator[Envelope]:
         """Yield stored envelopes after ``after_seq``, then each new one as it commits."""
         data = self._data(scope)
         cursor = after_seq
@@ -292,3 +293,12 @@ class InMemoryStorage:
         leases = self._data(scope).leases
         if key in leases and leases[key][0] == holder:
             del leases[key]
+
+    async def cursor(self, scope: Scope, name: str) -> int:
+        """Return how far a named consumer of the log has got: the ``seq`` saved, or 0."""
+        return self._data(scope).cursors.get(name, 0)
+
+    async def save_cursor(self, scope: Scope, name: str, seq: int) -> None:
+        """Save how far a named consumer of the log has got; a cursor only moves forward."""
+        cursors = self._data(scope).cursors
+        cursors[name] = max(cursors.get(name, 0), seq)

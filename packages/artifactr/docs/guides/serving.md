@@ -109,7 +109,7 @@ A client connects to `/v1/workspaces/{workspace_id}/stream` with the subprotocol
 
 The server answers `welcome`, with the log's head and the runs in progress, then replays every event after `resume_after_seq`, then sends `replay_complete`. From then on the client receives events as they commit, `command_result` frames for its commands, and live frames for runs in the threads it follows. It sends commands as command frames, and can attach to any run's live output with a `watch_run` command.
 
-Replay and live delivery are one subscription to the log, so nothing falls between them. A client that reconnects says `hello` with its last `seq` and continues where it left off; if the server has lost events the client saw, `welcome` says `reset: true` and the client rebuilds from the replay.
+Replay and live delivery are one subscription to the log, so nothing falls between them. A client that reconnects says `hello` with its last `seq` and continues where it left off; if the server has lost events the client saw, `welcome` says `reset: true` and the client rebuilds from the replay. The subscription reads the log untraced, so a connection that is only waiting makes no traces, however often SQL storage polls for it ([Observability](observability.md#polling)).
 
 A client that needs only what happens from now on, such as a terminal that starts a new thread, says `hello` with `from_head: true` instead:
 

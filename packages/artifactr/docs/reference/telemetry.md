@@ -24,6 +24,16 @@ Tracing and metrics through the OpenTelemetry API. See [Observability](../guides
 
 ::: artifactr.telemetry.SCOPED
 
+## Traces
+
+Which spans are artifactr's, and polling that makes no traces. See [ADR-0046](../adr/0046-telemetry-that-composes-across-libraries.md).
+
+::: artifactr.telemetry.TRACE_SCOPES
+
+::: artifactr.telemetry.is_trace_scope
+
+::: artifactr.telemetry.untraced
+
 ## Attributes
 
 ::: artifactr.telemetry.attributes

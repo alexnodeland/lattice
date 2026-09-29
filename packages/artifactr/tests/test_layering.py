@@ -39,7 +39,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "sql": ({"artifactr.core", "artifactr.workspace", "artifactr.sql"}, {"sqlalchemy", "alembic"}),
     # Feedback as scores: the mirror, on evalr's mapping and ports (ADR-0038).
     "scores": (
-        {"artifactr.core", "artifactr.workspace", "artifactr.scores"},
+        {"artifactr.core", "artifactr.telemetry", "artifactr.workspace", "artifactr.scores"},
         {"pydantic", "evalr.core"},
     ),
     "fastapi": (

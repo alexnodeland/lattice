@@ -1,6 +1,7 @@
-"""The storage contract, below the workspace: transactions, reads and leases."""
+"""The storage contract, below the workspace: transactions, reads, leases and cursors."""
 
-from collections.abc import AsyncIterator
+import asyncio
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
@@ -164,9 +165,31 @@ async def test_an_expired_lease_can_be_taken(storage_factory: StorageFactory) ->
     assert await storage.acquire_lease(SCOPE, "k", "b", timedelta(seconds=30))
 
 
+async def test_cursors_only_move_forward(storage: Storage) -> None:
+    assert await storage.cursor(SCOPE, "mirror") == 0
+    await storage.save_cursor(SCOPE, "mirror", 5)
+    await storage.save_cursor(SCOPE, "mirror", 3)
+    assert await storage.cursor(SCOPE, "mirror") == 5, "a lagging consumer cannot move it back"
+    await storage.save_cursor(SCOPE, "mirror", 8)
+    assert await storage.cursor(SCOPE, "mirror") == 8
+    assert await storage.cursor(SCOPE, "another") == 0
+    assert await storage.cursor(Scope("tenant_b", "ws_1"), "mirror") == 0, "per workspace"
+
+
+async def test_concurrent_saves_of_a_cursor_leave_the_furthest(storage: Storage) -> None:
+    await asyncio.gather(*(storage.save_cursor(SCOPE, "mirror", seq) for seq in (3, 4, 1, 2)))
+    assert await storage.cursor(SCOPE, "mirror") == 4
+
+
+async def test_a_handle_saves_its_workspaces_cursors(ws: Workspace, storage: Storage) -> None:
+    await ws.save_cursor("mirror", 2)
+    assert await ws.cursor("mirror") == 2
+    assert await storage.cursor(SCOPE, "mirror") == 2
+
+
 async def test_a_subscription_ends_when_its_storage_stream_ends() -> None:
     class FiniteStorage:
-        async def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncIterator[Envelope]:
+        async def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncGenerator[Envelope]:
             yield Envelope(
                 seq=1,
                 id="e1",

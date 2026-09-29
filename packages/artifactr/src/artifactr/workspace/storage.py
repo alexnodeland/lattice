@@ -6,7 +6,7 @@ implement :class:`Storage` themselves; the workspace behaviour suite in the test
 what an implementation must do.
 """
 
-from collections.abc import AsyncIterator, Collection, Sequence
+from collections.abc import AsyncGenerator, Collection, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import timedelta
@@ -174,7 +174,7 @@ class Storage(Protocol):
         """
         ...
 
-    def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncIterator[Envelope]:
+    def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncGenerator[Envelope]:
         """Yield envelopes with ``seq`` greater than ``after_seq``.
 
         First the stored ones, then each new one as it is committed. The iterator runs until
@@ -192,4 +192,16 @@ class Storage(Protocol):
 
     async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
         """Release a lease if ``holder`` has it."""
+        ...
+
+    async def cursor(self, scope: Scope, name: str) -> int:
+        """Return how far a named consumer of the log has got: the ``seq`` saved, or 0."""
+        ...
+
+    async def save_cursor(self, scope: Scope, name: str, seq: int) -> None:
+        """Save how far a named consumer of the log has got, such as a feedback mirror.
+
+        A cursor only moves forward: saving a ``seq`` below the saved one leaves it, so a
+        consumer running in several processes cannot move it back.
+        """
         ...

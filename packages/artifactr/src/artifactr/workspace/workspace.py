@@ -93,6 +93,7 @@ from artifactr.telemetry.attributes import (
     WORKSPACE_ID,
 )
 from artifactr.telemetry.metrics import COMMANDS, COMMIT_DURATION
+from artifactr.telemetry.traces import untraced
 from artifactr.workspace.storage import HistoryChunk, Scope, Storage
 
 Authorize = Callable[[TenantId, WorkspaceId, Actor], Awaitable[bool]]
@@ -476,11 +477,19 @@ class Workspace:
     ) -> AsyncIterator[Envelope]:
         """Yield envelopes after ``after_seq``: the stored ones, then new ones as they commit.
 
-        Replay and live delivery are the same stream, so nothing falls between them.
+        Replay and live delivery are the same stream, so nothing falls between them. Reading
+        the log is untraced, so a subscription that polls storage makes no trace per poll
+        (ADR-0046); what the subscriber does with each envelope is traced as usual.
         """
-        async for envelope in self._storage.subscribe(self._scope, after_seq=after_seq):
-            if delivered_to(envelope, threads):
-                yield envelope
+        stream = self._storage.subscribe(self._scope, after_seq=after_seq)
+        async with contextlib.aclosing(stream) as envelopes:
+            while True:
+                with untraced():
+                    envelope = await anext(envelopes, None)
+                if envelope is None:
+                    return
+                if delivered_to(envelope, threads):
+                    yield envelope
 
     async def change_notes(
         self,
@@ -498,6 +507,22 @@ class Workspace:
         """
         envelopes = await self._storage.read(self._scope, after_seq=after_seq)
         return change_notes(envelopes, viewer=viewer or self._actor, focus=focus)
+
+    async def cursor(self, name: str) -> int:
+        """Return how far a named consumer of the log has got: the ``seq`` it saved, or 0.
+
+        A consumer, such as a feedback mirror, saves its cursor with :meth:`save_cursor` and
+        carries on after it when it starts again.
+        """
+        return await self._storage.cursor(self._scope, name)
+
+    async def save_cursor(self, name: str, seq: int) -> None:
+        """Save how far a named consumer of the log has got: it is done with ``seq``.
+
+        A cursor only moves forward: saving a ``seq`` below the saved one leaves it, so a
+        consumer that runs in several processes, each at its own pace, cannot move it back.
+        """
+        await self._storage.save_cursor(self._scope, name, seq)
 
     # ─── runs ─────────────────────────────────────────────────────────────────
 
@@ -526,9 +551,11 @@ class Workspace:
             await self._storage.release_lease(self._scope, key, holder)
 
     async def _renew(self, key: str, holder: str, ttl: timedelta) -> None:
-        while True:
-            await asyncio.sleep(ttl.total_seconds() / 3)
-            await self._storage.acquire_lease(self._scope, key, holder, ttl)
+        # Renewing is bookkeeping, not part of the turn that holds the thread.
+        with untraced():
+            while True:
+                await asyncio.sleep(ttl.total_seconds() / 3)
+                await self._storage.acquire_lease(self._scope, key, holder, ttl)
 
 
 def _check_page(

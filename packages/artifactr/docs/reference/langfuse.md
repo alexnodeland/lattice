@@ -14,7 +14,7 @@ The `langfuse` extra. See [Observability](../guides/observability.md#langfuse) a
 
 ::: artifactr.langfuse.should_export_span
 
-::: artifactr.langfuse.KEPT_SCOPES
+::: artifactr.langfuse.no_spans
 
 ::: artifactr.langfuse.langfuse_turn
 

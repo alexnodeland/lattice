@@ -49,5 +49,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0043](0043-the-litellm-adapter.md) | The LiteLLM adapter | Accepted |
 | [0044](0044-the-evalr-adapter.md) | The evalr adapter | Accepted |
 | [0045](0045-a-message-id-is-used-once.md) | A message id is used once in a workspace | Accepted |
+| [0046](0046-telemetry-that-composes-across-libraries.md) | Telemetry that composes across libraries, untraced polling and mirror cursors | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

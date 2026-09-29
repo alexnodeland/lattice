@@ -8,7 +8,9 @@ Workspaces are kept in memory, or in the database at ``DOCPLAN_DATABASE_URL`` (f
 
 With ``OTEL_EXPORTER_OTLP_ENDPOINT`` set, docplan reports its traces, metrics and logs there;
 with ``LANGFUSE_PUBLIC_KEY`` too, it files each turn in Langfuse and mirrors the ``main``
-workspace's feedback to Langfuse scores. stackr's stack provides both.
+workspace's feedback to Langfuse scores. stackr's stack provides both, and its Collector sends
+Langfuse every trace, so with ``DOCPLAN_LANGFUSE=scores`` docplan sends Langfuse only the
+scores and each turn's session, user and tags.
 
 With ``DOCPLAN_EVAL_SAMPLE_RATE`` set, a judge judges that share of the agent's turns as they
 end, and its verdicts are feedback beside people's (see :mod:`docplan.evals`).
@@ -38,7 +40,7 @@ from artifactr.evals import TaskCompletion
 from artifactr.fastapi import artifactr_router
 from artifactr.langfuse import LangfuseScoreConfigs, LangfuseScores, langfuse_turn
 from artifactr.mcp import ArtifactrMcp
-from artifactr.otel import TelemetryHandle, configure_telemetry
+from artifactr.otel import LangfuseMode, TelemetryHandle, configure_telemetry
 from artifactr.scores import FeedbackMirror, sync_score_configs
 from artifactr.sql import SqlStorage, create_sqlite_engine, migrate
 from artifactr.workspace import Storage
@@ -119,7 +121,7 @@ def create_app(
                 configs = LangfuseScoreConfigs(langfuse)
                 await sync_score_configs(configs, [Rating, EditSize, TaskCompletion])
                 workspace = await workspaces.open(TENANT, MIRRORED, actor=SystemActor())
-                mirror = FeedbackMirror(workspace, LangfuseScores(langfuse))
+                mirror = FeedbackMirror(workspace, LangfuseScores(langfuse), cursor="langfuse")
                 stack.push_async_callback(_cancel, asyncio.create_task(mirror.follow()))
             if judging is not None:  # finish judging before the database closes
                 stack.push_async_callback(judging.drain)
@@ -157,15 +159,20 @@ def telemetry_from_environment() -> TelemetryHandle | None:
     """Set up OpenTelemetry, and Langfuse, as the environment asks.
 
     OpenTelemetry when ``OTEL_EXPORTER_OTLP_ENDPOINT`` is set, and Langfuse with it when
-    ``LANGFUSE_PUBLIC_KEY`` is set; otherwise, nothing.
+    ``LANGFUSE_PUBLIC_KEY`` is set; otherwise, nothing. docplan sends Langfuse its traces, or,
+    with ``DOCPLAN_LANGFUSE=scores``, only its scores and each turn's session, user and tags,
+    for a Collector that sends Langfuse the traces already.
     """
     if not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
         return None
+    langfuse: LangfuseMode | None = None
+    if os.environ.get("LANGFUSE_PUBLIC_KEY"):
+        langfuse = "scores" if os.environ.get("DOCPLAN_LANGFUSE") == "scores" else "traces"
     return configure_telemetry(
         service_name="docplan",
         service_version=version("docplan"),
         environment=os.environ.get("DOCPLAN_ENVIRONMENT", "development"),
-        langfuse=bool(os.environ.get("LANGFUSE_PUBLIC_KEY")),
+        langfuse=langfuse,
     )
 
 

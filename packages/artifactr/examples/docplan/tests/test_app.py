@@ -160,11 +160,15 @@ def test_main_sets_up_telemetry_from_the_environment(monkeypatch: pytest.MonkeyP
 
     monkeypatch.setattr(docplan.app, "configure_telemetry", configure)
     monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: None)
-    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+    for name in ("OTEL_EXPORTER_OTLP_ENDPOINT", "LANGFUSE_PUBLIC_KEY", "DOCPLAN_LANGFUSE"):
+        monkeypatch.delenv(name, raising=False)
     assert docplan.app.telemetry_from_environment() is None
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318")
+    docplan.app.main()
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-1")
     docplan.app.main()
-    [options] = configured
-    assert (options["service_name"], options["langfuse"]) == ("docplan", True)
-    assert shut_down == [True]
+    monkeypatch.setenv("DOCPLAN_LANGFUSE", "scores")
+    docplan.app.main()
+    assert [options["langfuse"] for options in configured] == [None, "traces", "scores"]
+    assert {options["service_name"] for options in configured} == {"docplan"}
+    assert shut_down == [True, True, True]

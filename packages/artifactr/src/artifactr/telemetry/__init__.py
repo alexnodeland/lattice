@@ -7,6 +7,8 @@ no SDK configured, recording is a no-op. Applications configure the SDK themselv
 
 - :mod:`artifactr.telemetry.attributes` names every attribute artifactr sets.
 - :mod:`artifactr.telemetry.metrics` is the metric registry and its cardinality policy.
+- :mod:`artifactr.telemetry.traces` names the spans in artifactr's traces, and runs polling
+  untraced.
 """
 
 from artifactr.telemetry.attributes import attribution
@@ -29,12 +31,14 @@ from artifactr.telemetry.recording import (
     record_events,
 )
 from artifactr.telemetry.spans import command_attributes, outcome_attributes
+from artifactr.telemetry.traces import TRACE_SCOPES, is_trace_scope, untraced
 
 __all__ = [
     "EXTERNAL_METRICS",
     "METRICS",
     "SCOPE",
     "SCOPED",
+    "TRACE_SCOPES",
     "VERSION",
     "Instrument",
     "Metric",
@@ -45,7 +49,9 @@ __all__ = [
     "command_attributes",
     "current_trace_id",
     "current_traceparent",
+    "is_trace_scope",
     "kept_attributes",
     "outcome_attributes",
     "record_events",
+    "untraced",
 ]

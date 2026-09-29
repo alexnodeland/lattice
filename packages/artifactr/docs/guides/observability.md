@@ -32,7 +32,7 @@ It sets up:
 
 - tracer, meter and logger providers, with `service.name`, `service.version` and `deployment.environment.name` on their resource, made global unless `set_global=False`
 - OTLP over HTTP for traces, metrics and logs, to `otlp_endpoint` or wherever the `OTEL_EXPORTER_OTLP_*` environment variables point (`otlp_headers` adds credentials)
-- the open instrumentations for FastAPI, SQLAlchemy, asyncpg, httpx and httpx2 (pydantic-ai's model providers use httpx2), for whichever of them is installed, using the stable HTTP semantic conventions
+- the open instrumentations artifactr advises, FastAPI, SQLAlchemy, httpx and httpx2 (pydantic-ai's model providers use httpx2), for whichever of them is installed, using the stable HTTP semantic conventions; `instrument=` names others, such as `asyncpg` for an application that queries with asyncpg directly (SQLAlchemy's spans already cover the queries artifactr makes through it)
 - views that apply artifactr's metric cardinality policy (see [Metrics](#metrics))
 - a baggage span processor that copies a turn's `session.id` onto every span in it
 - pydantic-ai's instrumentation settings: `telemetry.capability()` is its `Instrumentation` capability for your agents, with prompts and completions left out unless `include_content=True`
@@ -48,9 +48,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
 ```
 
+### With reflexr, or other libraries
+
+An application that uses reflexr too configures telemetry once, with reflexr's contribution ([ADR-0046](../adr/0046-telemetry-that-composes-across-libraries.md)):
+
+```python
+import reflexr.otel
+from artifactr.otel import configure_telemetry
+
+telemetry = configure_telemetry(reflexr.otel.telemetry(), service_name="app")
+```
+
+`artifactr.otel.telemetry()` is artifactr's contribution, and `configure_telemetry` always adds it. Each contribution brings its library's metric views, a span filter for its traces, and the instrumentations it advises. `configure_telemetry` installs every library's views, instruments what any of them advises, and, with Langfuse, keeps a span that any of them keeps. reflexr's `configure_telemetry` takes artifactr's contribution the same way, so either library's will do. An application can contribute its own metric views too, with a `Contribution`.
+
 ### Configuring the SDK yourself
 
-`configure_telemetry` is a convenience; artifactr only ever records through the OpenTelemetry API, so any SDK configuration works. `Workspaces`, `Runner` and `artifactr_router` use the global providers, or the ones you pass as `tracer_provider=` and `meter_provider=`. Add pydantic-ai's capability yourself, `Instrumentation(settings=InstrumentationSettings(tracer_provider=..., meter_provider=...))`, and `artifactr.otel.metric_views(detail)` to your `MeterProvider` to limit metric detail. Never call `Agent.instrument_all()` from a library; it instruments every agent in the process.
+`configure_telemetry` is a convenience; artifactr only ever records through the OpenTelemetry API, so any SDK configuration works. `Workspaces`, `Runner` and `artifactr_router` use the global providers, or the ones you pass as `tracer_provider=` and `meter_provider=`. Add pydantic-ai's capability yourself, `Instrumentation(settings=InstrumentationSettings(tracer_provider=..., meter_provider=...))`, and every library's `metric_views(detail)` to your `MeterProvider` to limit metric detail. Keep a parent-based sampler, the SDK's default, so that polling stays untraced (see [Polling](#polling)). Never call `Agent.instrument_all()` from a library; it instruments every agent in the process.
 
 ## Traces
 
@@ -82,6 +95,10 @@ artifactr's spans carry ids, kinds, versions and counts, never content. Prompts,
 Each run records the trace of each attempt in `Run.trace_ids`, and each revision the trace it was committed in, so feedback can be attached to the trace it is about.
 
 Each envelope records the W3C trace context of the span that committed it, as `traceparent`: a command's `artifactr.commit` span, or the current span for a fact the agent records. reflexr's envelopes carry the same field, so code that follows the log, such as a bridge into reflexr, can link its spans to the request or turn that wrote an event. `current_traceparent()` returns the current span's context.
+
+### Polling
+
+Subscriptions and the feedback mirror poll storage: SQL storage reads the log every `poll_interval` for other processes' commits. They poll untraced, inside `artifactr.telemetry.untraced()`, which makes every span started in it a child of a span that is never sampled. So the database instrumentation records no span for a poll, and an idle application exports none; the instrumentations' metrics, such as the connection pool's, are still recorded. What a poll finds is traced where it happens: a commit in its request's trace, a turn in its own. Don't commit or publish inside `untraced()` yourself: its trace ids belong to the unsampled parent, so a revision or envelope would point at a trace that was never recorded. A sampler that ignores the parent, such as `always_on` or `traceidratio`, would trace each poll again.
 
 ## Metrics
 
@@ -122,11 +139,11 @@ Langfuse is the primary backend for artifactr's traces and feedback ([ADR-0039](
 from artifactr.langfuse import langfuse_turn
 from artifactr.otel import configure_telemetry
 
-telemetry = configure_telemetry(service_name="docplan", langfuse=True)  # keys: LANGFUSE_* variables
+telemetry = configure_telemetry(service_name="docplan", langfuse="traces")  # keys: LANGFUSE_*
 runner = Runner(agent, app=deps, turn_context=langfuse_turn)
 ```
 
-- **Whole traces.** Langfuse's default keeps only LLM spans. `should_export_span`, which `configure_telemetry(langfuse=True)` and `langfuse_client(...)` install, also keeps artifactr's spans, pydantic-graph's, the MCP SDK's and the FastAPI, SQLAlchemy, asyncpg and httpx instrumentations', so a turn in Langfuse shows its commits, queries and HTTP calls around the model calls.
+- **Whole traces.** Langfuse's default keeps only LLM spans. With `langfuse="traces"`, Langfuse also keeps every span a library's contribution keeps: for artifactr, the scopes in `artifactr.telemetry.TRACE_SCOPES`, which are artifactr's, pydantic-graph's, the MCP SDK's and the FastAPI, SQLAlchemy, asyncpg and httpx instrumentations'. So a turn in Langfuse shows its commits, queries and HTTP calls around the model calls. `langfuse_client(...)` installs the same filter for artifactr alone, `should_export_span`.
 - **Sessions and users.** `langfuse_turn` propagates each turn's attributes to every span in it: the thread as the session, the person who sent the message as the user, the trace name `turn`, tags for the tenant, the workspace and the kinds of artifact the thread follows (`tenant:acme`, `workspace:launch`, `kind:plan`), and artifactr's ids as metadata. Values are made ASCII and cut to 200 characters, as Langfuse requires. They stay in the process; nothing is sent as baggage.
 - **Feedback as scores.** See [Evaluation](evaluation.md#scores-in-langfuse).
 
@@ -134,7 +151,7 @@ Configuring the SDK yourself, create the client with `langfuse_client(tracer_pro
 
 ### Through a Collector
 
-A Collector can send the same traces to Langfuse over plain OTLP instead. Langfuse accepts OTLP over HTTP only, and needs its ingestion version header:
+A Collector can send the same traces to Langfuse over plain OTLP instead, as stackr's does. Then send Langfuse no spans of your own, or each would arrive twice, with `langfuse="scores"`: the client still sets each turn's session, user and tags on its spans, which reach Langfuse through the Collector, and records scores. Configuring the SDK yourself, pass `langfuse_client(tracer_provider=..., should_export_span=no_spans)`. Langfuse accepts OTLP over HTTP only, and needs its ingestion version header:
 
 ```yaml
 exporters:

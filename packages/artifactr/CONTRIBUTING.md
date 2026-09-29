@@ -112,7 +112,7 @@ These are enforced by CI and described in [ADR-0015][adr-0015]:
 - **100% branch coverage** of `src/artifactr`. Code that cannot be reached by a test is usually code that should not exist. The only exclusions are configured in `pyproject.toml` (type-checking blocks, protocol stubs, overloads, `assert_never`).
 - **pyright strict** for `src/`, standard for `tests/`.
 - **ruff** for formatting and linting, with Google-style docstrings on public API.
-- **No inline suppressions** in `src/`, `tests/` or `examples/`: no `# type: ignore`, `# pyright: ignore`, `# noqa` or `# pragma: no cover`. Restructure the code instead; `tests/test_quality.py` fails on any. Per-file ignores in `pyproject.toml` are configuration, reviewed as such.
+- **No inline suppressions** in `src/`, `tests/`, `examples/` or `scripts/`: no `# type: ignore`, `# pyright: ignore`, `# noqa` or `# pragma: no cover`. Restructure the code instead; `tests/test_quality.py` fails on any. Per-file ignores in `pyproject.toml` are configuration, reviewed as such.
 - **Warnings are errors** in the test suite.
 - Core behaviour is specified by **conformance fixtures**; a change to core behaviour changes a fixture.
 

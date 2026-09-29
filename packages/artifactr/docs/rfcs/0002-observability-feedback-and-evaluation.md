@@ -1,6 +1,6 @@
 # RFC-0002: Observability, feedback, evaluation and the LLM gateway
 
-**Status:** Accepted
+**Status:** Implemented
 **Author:** Alex Nodeland
 **Created:** 2026-09-28
 **Discussion:** accepted on 2026-09-28

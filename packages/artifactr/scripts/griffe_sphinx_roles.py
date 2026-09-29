@@ -1,9 +1,10 @@
 """A Griffe extension that turns Sphinx cross-reference roles into mkdocstrings cross-references.
 
 artifactr's docstrings follow the Google style but refer to other objects with Sphinx roles,
-such as ``:class:`Workspace``` or ``:meth:`~artifactr.agent.Runner.execute```. The API reference
-renders docstrings as Markdown, where those roles would show up literally. This extension
-rewrites each role into a Markdown cross-reference (``[Workspace][artifactr.workspace.Workspace]``)
+such as ``:class:`Workspace```, ``:meth:`~artifactr.agent.Runner.execute``` or
+``:meth:`execute <artifactr.agent.Runner.execute>```. The API reference renders docstrings as
+Markdown, where those roles would show up literally. This extension rewrites each role into a
+Markdown cross-reference (``[`Workspace`][artifactr.workspace.Workspace]``)
 resolved in the scope of the object whose docstring contains it, so the library's docstrings
 stay as they are.
 
@@ -17,7 +18,8 @@ from typing import Any
 import griffe
 
 _ROLE = re.compile(
-    r":(?P<role>class|meth|func|mod|attr|data|exc|obj):`(?P<tilde>~?)(?P<target>[\w.]+)`"
+    r":(?P<role>class|meth|func|mod|attr|data|exc|obj):"
+    r"`(?:(?P<title>[^<`]+?)\s*<(?P<titled>[\w.]+)>|(?P<tilde>~?)(?P<target>[\w.]+))`"
 )
 
 # The modules the reference renders a page for; other modules are internal.
@@ -48,13 +50,16 @@ def _rewrite(obj: griffe.Object, *, seen: set[str]) -> None:
     if obj.docstring is not None:
         obj.docstring.value = _ROLE.sub(lambda match: _reference(obj, match), obj.docstring.value)
     for member in obj.members.values():
-        if not member.is_alias:
-            _rewrite(member, seen=seen)  # type: ignore[arg-type]
+        if isinstance(member, griffe.Object):
+            _rewrite(member, seen=seen)
 
 
 def _reference(obj: griffe.Object, match: re.Match[str]) -> str:
-    target = match["target"]
-    label = target.rsplit(".", 1)[-1] if match["tilde"] else target
+    if match["titled"] is not None:
+        target, label = match["titled"], " ".join(match["title"].split())
+    else:
+        target = match["target"]
+        label = target.rsplit(".", 1)[-1] if match["tilde"] else target
     path = _resolve(obj, target)
     if path is None or (match["role"] == "mod" and path not in _PUBLIC_MODULES):
         return f"`{label}`"

@@ -135,8 +135,8 @@ known-third-party = ["fastapi", "mcp", "langfuse"]
 # ─── types ────────────────────────────────────────────────────────────────────
 
 [tool.pyright]
-include = ["src", "tests", "examples"]
-strict = ["src", "examples/docplan/src"]
+include = ["src", "tests", "examples", "scripts"]
+strict = ["src", "examples/docplan/src", "scripts"]
 typeCheckingMode = "standard"
 pythonVersion = "3.12"
 venvPath = "."

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
+from evalr.memory import InMemoryScoreSink
 from opentelemetry.sdk.trace import TracerProvider
 
 from artifactr.core import (
@@ -25,7 +26,7 @@ from artifactr.core import (
 from artifactr.scores import FeedbackMirror, Score, sync_score_configs
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
 from tests.artifact_types import Accuracy, Helpfulness, Note
-from tests.scores.fakes import FakeConfigStore, FakeSink
+from tests.scores.fakes import seeded
 
 ALICE = UserActor(id="alice")
 FIRST = "4bf92f3577b34da6a3ce929d0e0e4736"
@@ -44,7 +45,7 @@ async def ws(storage: InMemoryStorage) -> Workspace:
     return await traced.open("t1", "w1", actor=ALICE)
 
 
-async def mirrored(ws: Workspace, sink: FakeSink, *, after_seq: int = 0) -> list[Score]:
+async def mirrored(ws: Workspace, sink: InMemoryScoreSink, *, after_seq: int = 0) -> list[Score]:
     mirror = FeedbackMirror(ws, sink)
     return [s for e in await ws.read(after_seq=after_seq) for s in await mirror.mirror(e)]
 
@@ -67,7 +68,7 @@ async def test_turn_and_message_feedback_is_scored_on_the_runs_latest_trace(
     )
     message = MessageTarget(message_id="m1", thread_id=thread.id, run_id="run_1")
     await ws.commit(GiveFeedback(feedback_type="helpfulness", target=message, value=RATING))
-    sink = FakeSink()
+    sink = InMemoryScoreSink()
     turn, on_message = await mirrored(ws, sink, after_seq=head)
     assert (turn.name, turn.value, turn.data_type) == ("helpfulness.rating", 4.0, "NUMERIC")
     assert (turn.trace_id, turn.session_id) == (SECOND, None), "the attempt that finished"
@@ -94,7 +95,7 @@ async def test_without_a_trace_feedback_is_scored_on_the_session(ws: Workspace) 
     ):
         feedback = {"rating": 2, "reason": "slow"}
         await ws.commit(GiveFeedback(feedback_type="helpfulness", target=target, value=feedback))
-    scores = await mirrored(ws, FakeSink())
+    scores = await mirrored(ws, InMemoryScoreSink())
     assert len(scores) == 6
     assert {(s.trace_id, s.session_id) for s in scores} == {(None, thread.id)}
     assert {s.name for s in scores} == {"helpfulness.rating", "helpfulness.reason"}
@@ -114,7 +115,7 @@ async def test_artifact_feedback_is_scored_on_the_trace_of_the_version(
     for artifact_id in ("n1", "n2", "n3"):
         target = ArtifactTarget(artifact_id=artifact_id, version=1)
         await ws.commit(GiveFeedback(feedback_type="accuracy", target=target, value={"correct": 1}))
-    scores = await mirrored(ws, FakeSink())
+    scores = await mirrored(ws, InMemoryScoreSink())
     [revision] = await ws.revisions("n1")
     assert revision.trace_id is not None
     on_draft = [s for s in scores if s.trace_id == revision.trace_id]
@@ -136,7 +137,7 @@ async def test_mirroring_again_replaces_scores(ws: Workspace) -> None:
             feedback_type="helpfulness", target=ThreadTarget(thread_id=thread.id), value=RATING
         )
     )
-    sink = FakeSink()
+    sink = InMemoryScoreSink()
     first = await mirrored(ws, sink)
     second = await mirrored(ws, sink)
     assert [s.id for s in first] == [s.id for s in second]
@@ -154,12 +155,28 @@ async def test_types_this_process_does_not_know_are_skipped(ws: Workspace) -> No
             feedback_type="retired", target=ThreadTarget(thread_id="thr_1"), value={}
         ),
     )
-    assert await FeedbackMirror(ws, FakeSink()).scores(unknown) == []
+    assert await FeedbackMirror(ws, InMemoryScoreSink()).scores(unknown) == []
+
+
+async def test_a_timestamp_without_a_time_zone_is_taken_as_utc(ws: Workspace) -> None:
+    given = datetime(2026, 9, 29, 9, 30)
+    envelope = Envelope(
+        seq=1,
+        id="e1",
+        ts=given,
+        workspace_id="w1",
+        actor=ALICE,
+        event=FeedbackGiven(
+            feedback_type="helpfulness", target=ThreadTarget(thread_id="thr_1"), value=RATING
+        ),
+    )
+    [score] = await FeedbackMirror(ws, InMemoryScoreSink()).scores(envelope)
+    assert score.timestamp == given.replace(tzinfo=UTC)
 
 
 async def test_following_the_log(ws: Workspace) -> None:
     thread = await ws.create_thread()
-    sink = FakeSink()
+    sink = InMemoryScoreSink()
     follower = asyncio.create_task(FeedbackMirror(ws, sink).follow())
     await ws.commit(
         GiveFeedback(
@@ -177,7 +194,7 @@ async def test_following_the_log(ws: Workspace) -> None:
 
 
 async def test_score_configs_are_created_once() -> None:
-    store = FakeConfigStore("helpfulness.rating")
+    store = seeded("helpfulness.rating")
     created = await sync_score_configs(store, [Helpfulness, Accuracy])
     assert created == [
         "helpfulness.reason",

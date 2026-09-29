@@ -8,7 +8,7 @@
 | `artifactr.telemetry` | Implemented: spans, attribution and the metric registry ([RFC-0002](rfcs/0002-observability-feedback-and-evaluation.md)) |
 | `artifactr.workspace` | Implemented, with in-memory storage |
 | `artifactr.agent` | Implemented |
-| `artifactr.scores` | Implemented: feedback as scores, the mirror and its ports |
+| `artifactr.scores` | Implemented: the mirror that scores feedback, on evalr's mapping and ports |
 | `artifactr.sql` | Implemented, on PostgreSQL and SQLite |
 | `artifactr.fastapi`, `artifactr.mcp` | Implemented |
 | `artifactr.otel`, `artifactr.langfuse`, `artifactr.litellm` | Implemented: the OpenTelemetry SDK, Langfuse and LiteLLM adapters |
@@ -63,7 +63,7 @@ graph TD
     mcp --> workspace
     agent --> workspace["artifactr.workspace<br/>scoped handles, storage protocols"]
     sql["artifactr.sql<br/>SQLAlchemy storage"] --> workspace
-    scores["artifactr.scores<br/>feedback as scores"] --> workspace
+    scores["artifactr.scores<br/>feedback as scores, on evalr"] --> workspace
     otel["artifactr.otel<br/>OpenTelemetry SDK"] --> telemetry
     langfuse["artifactr.langfuse<br/>Langfuse"] --> scores
     litellm["artifactr.litellm<br/>LiteLLM"] --> agent
@@ -82,11 +82,11 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.telemetry` | core, the OpenTelemetry API | Inner; its port is the OpenTelemetry API | Span attribution, the metric registry, and recording through the API. |
 | `artifactr.workspace` | core, telemetry | Inner; owns the `Storage` port | `Workspaces`, `Workspace`, storage protocols, in-memory storage. |
 | `artifactr.agent` | workspace, telemetry, pydantic-ai | Inner; owns the `TurnContext`, `TurnEvaluator` and `CommandResults` ports | The `ArtifactWorkspace` capability, `Session`, `Runner`, live-output helpers, and the memory of commands' results. |
-| `artifactr.scores` | workspace | Inner; owns the `ScoreSink` and `ScoreConfigStore` ports | Feedback as scores, and the mirror that sends a workspace's feedback to a sink. |
+| `artifactr.scores` (needs evalr, from the `langfuse` or `evals` extra) | workspace, evalr's core | Uses evalr's `ScoreSink` and `ScoreConfigStore` ports | Feedback as scores, named as each type is registered, and the mirror that records a workspace's feedback in a sink. |
 | `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | Adapter for `Storage` | Durable storage on PostgreSQL and SQLite, and its migrations. |
 | `artifactr.otel` (extra) | telemetry, the OpenTelemetry SDK, exporters and instrumentations | Adapter for the OpenTelemetry API | `configure_telemetry`: providers, OTLP export, instrumentations and metric views, for applications. |
 | `artifactr.litellm` (extra) | agent, pydantic-ai's OpenAI support | Adapter for pydantic-ai's `Model` | `litellm_model` and the `LiteLLMGateway` capability: each request's tenancy, session, trace, key and guardrails, and guardrail blocks as typed failures ([ADR-0043](adr/0043-the-litellm-adapter.md)). |
-| `artifactr.langfuse` (extra) | scores, agent, langfuse | Adapter for `ScoreSink`, `ScoreConfigStore` and `TurnContext` | Feedback as Langfuse scores and score configs, a span filter that keeps whole traces, and each turn's trace attributes ([ADR-0039](adr/0039-the-langfuse-adapter.md)). |
+| `artifactr.langfuse` (extra) | scores, agent, langfuse, evalr's core | Adapter for evalr's `ScoreSink` and `ScoreConfigStore`, and for `TurnContext` | Feedback as Langfuse scores and score configs, a span filter that keeps whole traces, and each turn's trace attributes ([ADR-0039](adr/0039-the-langfuse-adapter.md)). |
 | `artifactr.evals` (extra) | agent, evalr | Adapter for `TurnEvaluator`, and for evalr's `FeedbackSource` and experiment `Task` | Datasets from the log, experiments that replay turns, online evaluation of turns with verdicts recorded as feedback, and the end-to-end measures ([ADR-0044](adr/0044-the-evalr-adapter.md)). |
 | `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
 | `artifactr.mcp` (extra) | agent, mcp | Driving adapter | Artifacts as MCP resources, commands and reads as MCP tools. |
@@ -307,7 +307,7 @@ class Helpfulness(Feedback, name="helpfulness", targets={"turn", "thread"}):
 
 Feedback is the `give_feedback` command, so it goes through the one write path and every surface has it. Core checks the type is registered and declares the target's kind, validates the value, and checks the target exists, then records `feedback_given` with the validated value. An evaluator's verdict is an instance of the same types, given by an `EvaluatorActor(name, version)`, which may give feedback and nothing else; people's and evaluators' judgements can then be compared directly. Feedback is counted in `artifactr.feedback` by type, target and kind of actor.
 
-**Scores.** Evaluation backends see feedback as scores, one per field, named `{type}.{field}` and typed by the field: bounded numbers are numeric, `bool` boolean, `Literal` and `Enum` categorical, `str` text ([ADR-0038](adr/0038-feedback-as-scores.md)). `artifactr.scores.FeedbackMirror` follows a workspace's log and sends each `feedback_given`'s scores to a `ScoreSink`, attached to a trace or else a session:
+**Scores.** Evaluation backends see feedback as scores, one per field, named `{type}.{field}` and typed by the field: numbers are numeric, `bool` boolean, `Literal` and `Enum` categorical, `str` text ([ADR-0038](adr/0038-feedback-as-scores.md)). The mapping and the ports are evalr's, shared with reflexr and with evalr's evaluators, so a person's scores and an evaluator's match by construction; `artifactr.scores` passes each type's registered name as the `{type}`. `artifactr.scores.FeedbackMirror` follows a workspace's log and records each `feedback_given`'s scores in a `ScoreSink`, attached to a trace or else a session:
 
 | Target | Scored on |
 |---|---|
@@ -316,7 +316,7 @@ Feedback is the `give_feedback` command, so it goes through the one write path a
 | An artifact version | The trace the version was committed in; else the session of the agent that wrote it |
 | A thread | The thread's session |
 
-Score ids are derived from the envelope's id, so mirroring the log again replaces scores rather than adding more. `sync_score_configs` creates each type's score configs in a `ScoreConfigStore`. `ScoreSink` and `ScoreConfigStore` are ports: `artifactr.langfuse` adapts Langfuse to them.
+Score ids are derived from the envelope's id in artifactr's own namespace, so mirroring the log again replaces scores rather than adding more. A score has no evaluator; where the feedback came from (tenant, workspace, type, target, actor and `seq`) is its `source`, recorded as metadata. `sync_score_configs` creates each type's missing score configs in a `ScoreConfigStore`, through evalr's `sync_score_configs`. `ScoreSink` and `ScoreConfigStore` are evalr's ports: `artifactr.langfuse` adapts Langfuse to them, and passes evalr's contract suites for both. `artifactr.scores` re-exports evalr's `Score`, `ScoreConfig`, `ScoreSink`, `ScoreConfigStore`, `ScoreType` (as `ScoreDataType`) and `MAX_TEXT`, which it has always offered. It needs evalr, so it is used through the `langfuse` or `evals` extra; the inner layers never import it.
 
 **Evaluation.** With the `[evals]` extra, feedback feeds evalr, the eval kit shared with reflexr ([ADR-0029](adr/0029-evalr-shared-eval-kit.md), [ADR-0044](adr/0044-the-evalr-adapter.md)):
 
@@ -506,7 +506,7 @@ The `Runner` takes a `turn_context`: an async context entered around each turn, 
 
 ### Langfuse
 
-Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opentelemetry-observability-with-langfuse.md), [ADR-0039](adr/0039-the-langfuse-adapter.md)). The `[langfuse]` extra adds `should_export_span`, a filter that keeps artifactr's, pydantic-graph's, the MCP SDK's and the HTTP and database instrumentations' spans as well as Langfuse's default LLM spans, so traces stay whole; `langfuse_turn`, a `TurnContext` that propagates each turn's session, user, tags (tenant, workspace, the kinds of artifact followed), trace name and metadata; and `LangfuseScores` and `LangfuseScoreConfigs`, which put feedback in Langfuse through the score ports. `configure_telemetry(langfuse=True)` adds Langfuse to the same tracer provider. A Collector can also send plain OTLP to Langfuse's HTTP endpoint, with the `x-langfuse-ingestion-version: 4` header.
+Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opentelemetry-observability-with-langfuse.md), [ADR-0039](adr/0039-the-langfuse-adapter.md)). The `[langfuse]` extra adds `should_export_span`, a filter that keeps artifactr's, pydantic-graph's, the MCP SDK's and the HTTP and database instrumentations' spans as well as Langfuse's default LLM spans, so traces stay whole; `langfuse_turn`, a `TurnContext` that propagates each turn's session, user, tags (tenant, workspace, the kinds of artifact followed), trace name and metadata; and `LangfuseScores` and `LangfuseScoreConfigs`, which put feedback in Langfuse through evalr's score ports, sending a yes or no as 1 or 0. `configure_telemetry(langfuse=True)` adds Langfuse to the same tracer provider. A Collector can also send plain OTLP to Langfuse's HTTP endpoint, with the `x-langfuse-ingestion-version: 4` header.
 
 ## Dependencies
 
@@ -521,7 +521,7 @@ Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opent
 | FastAPI | WebSocket and REST adapter | 0.141 |
 | mcp | MCP server (`MCPServer`, subscriptions) | 2.2 |
 | langfuse (extra) | Traces, scores and score configs in Langfuse | 4.15 |
-| evalr (extra) | Evaluators, datasets, experiments, online evaluation and end-to-end measures; pinned by revision until published | 0.1 |
+| evalr (extras) | Evaluators, datasets, experiments, online evaluation and end-to-end measures (`evals`); the score mapping and ports (`langfuse`, `evals`); pinned by revision until published | 0.1 |
 | opentelemetry-api | Spans and metrics, through the API only | 1.45 |
 
 Python 3.12+. Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical with mkdocstrings for the documentation site ([ADR-0023](adr/0023-documentation-site.md)).
@@ -533,7 +533,7 @@ Python 3.12+. Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical wi
 - **SQL:** concurrent transactions, lease races and cross-process subscriptions on both databases, and a check that the migrations build exactly the models' schema.
 - **Agent:** scripted runs with pydantic-ai's `TestModel`, and `FunctionModel`s built by `function_model`, which streams as the `Runner` needs, so no test calls a model API. Assertions are on the events written, including conflicts, steering and deferred pauses.
 - **Adapters:** WebSocket contract tests with FastAPI's `TestClient`, and an MCP client round-trip.
-- **Evaluation:** the feedback source passes evalr's `check_feedback_source` contract; experiments run through evalr's in-memory tracker, and evaluators are evalr's `FunctionEvaluator`s.
+- **Evaluation:** the feedback source passes evalr's `check_feedback_source` contract, and the Langfuse score adapters its `check_score_sink` and `check_score_config_store`; experiments run through evalr's in-memory tracker, and evaluators are evalr's `FunctionEvaluator`s.
 - **Telemetry:** spans and metrics are asserted through the OpenTelemetry SDK's `InMemorySpanExporter` and `InMemoryMetricReader`, and the registry's cardinality policy is checked for every metric.
 - **Protocol:** the JSON Schema in `schemas/` is generated from the models and checked in. CI fails if it drifts.
 

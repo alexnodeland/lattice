@@ -5,8 +5,8 @@ An adapter (ADR-0034) that files artifactr's traces and feedback in Langfuse:
 - :func:`should_export_span` keeps whole traces, not only their LLM spans
 - :func:`langfuse_turn` is a ``TurnContext`` for the ``Runner`` that sets each turn's session,
   user, tags and metadata
-- :class:`LangfuseScores` and :class:`LangfuseScoreConfigs` implement the score ports, so a
-  ``FeedbackMirror`` records feedback as Langfuse scores
+- :class:`LangfuseScores` and :class:`LangfuseScoreConfigs` implement evalr's score ports, so
+  a ``FeedbackMirror`` records feedback as Langfuse scores
 
 ::
 

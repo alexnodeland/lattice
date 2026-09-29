@@ -12,11 +12,11 @@ The packages are layers. Each depends only on the ones below it, so each is usab
 | [`artifactr.telemetry`](telemetry.md) | Tracing and metrics through the OpenTelemetry API: span attribution and the metric registry | core |
 | [`artifactr.workspace`](workspace.md) | Tenant-scoped workspace handles, the storage protocol and in-memory storage | core |
 | [`artifactr.agent`](agent.md) | The pydantic-ai capability, the session, the runner and live output | core |
-| [`artifactr.scores`](scores.md) | Feedback as scores: the mapping, the mirror that follows the log, and the ports scores leave through | core |
+| [`artifactr.scores`](scores.md) | Feedback as scores: the mirror that follows the log, on evalr's mapping and ports | `langfuse` or `evals` extra |
 | [`artifactr.sql`](sql.md) | SQL storage on PostgreSQL and SQLite, and its migrations | `sql`, `postgres` or `sqlite` extra |
 | [`artifactr.fastapi`](fastapi.md) | The thread protocol over WebSocket, and REST, as a FastAPI router | `fastapi` extra |
 | [`artifactr.otel`](otel.md) | `configure_telemetry`: the OpenTelemetry SDK, exporters and instrumentations, and metric views | `otel` extra |
-| [`artifactr.langfuse`](langfuse.md) | Langfuse behind the score ports, a span filter for whole traces, and a turn's trace attributes | `langfuse` extra |
+| [`artifactr.langfuse`](langfuse.md) | Langfuse behind evalr's score ports, a span filter for whole traces, and a turn's trace attributes | `langfuse` extra |
 | [`artifactr.litellm`](litellm.md) | A model over a LiteLLM proxy, and a capability for each request's metadata, key and guardrails | `litellm` extra |
 | [`artifactr.mcp`](mcp.md) | An MCP server for external agents | `mcp` extra |
 | [`artifactr.evals`](evals.md) | evalr for artifactr: datasets from the log, experiments that replay turns, online evaluation of turns, and the end-to-end measures | `evals` extra |

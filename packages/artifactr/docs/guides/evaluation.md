@@ -88,9 +88,11 @@ It is also counted in the `artifactr.feedback` metric, by type, target and kind 
 
 ## Scores
 
-Evaluation backends see feedback as scores: one per field, named `{type}.{field}`, typed by the field ([ADR-0038](../adr/0038-feedback-as-scores.md)). `Helpfulness` above becomes `helpfulness.rating`, a numeric score from 1 to 5, and `helpfulness.reason`, a text score. Booleans are 1 or 0, `Literal` and `Enum` fields are categories, and fields left empty are not scored.
+Evaluation backends see feedback as scores: one per field, named `{type}.{field}`, typed by the field ([ADR-0038](../adr/0038-feedback-as-scores.md)). `Helpfulness` above becomes `helpfulness.rating`, a numeric score from 1 to 5, and `helpfulness.reason`, a text score. Booleans are yes or no (1 or 0 in Langfuse), `Literal` and `Enum` fields are categories, text is cut at 500 characters, and fields left empty are not scored.
 
-`artifactr.scores.FeedbackMirror` follows a workspace's log and sends each piece of feedback's scores to a `ScoreSink`, attached to the trace the feedback is about when there is one, and to the session (the thread) otherwise:
+The mapping and the ports are [evalr](https://github.com/alexnodeland/evalr)'s, shared with reflexr and with evalr's own evaluators, so an evaluator's `helpfulness.rating` and a person's are the same score ([evalr's scores guide](https://evalr.alexnodeland.com/guides/scores/)). `artifactr.scores` needs evalr, which the `langfuse` and `evals` extras install; it names each type's scores as the type is registered, and re-exports evalr's `Score`, `ScoreConfig`, `ScoreSink` and `ScoreConfigStore`.
+
+`artifactr.scores.FeedbackMirror` follows a workspace's log and records each piece of feedback's scores in a `ScoreSink`, attached to the trace the feedback is about when there is one, and to the session (the thread) otherwise:
 
 ```python
 import asyncio
@@ -101,22 +103,27 @@ mirror = FeedbackMirror(workspace, sink)
 task = asyncio.create_task(mirror.follow())  # until cancelled
 ```
 
-A turn's feedback lands on the trace of the run's latest attempt, a message's on the trace of the run that posted it, and an artifact version's on the trace it was committed in. Score ids are derived from the feedback's envelope, so a mirror can start over from the beginning of the log without duplicating anything. `sync_score_configs(store)` creates the score configs of every registered feedback type that a `ScoreConfigStore` lacks.
+A turn's feedback lands on the trace of the run's latest attempt, a message's on the trace of the run that posted it, and an artifact version's on the trace it was committed in. Score ids are derived from the feedback's envelope, so a mirror can start over from the beginning of the log without duplicating anything. Each score has no evaluator; where the feedback came from (the tenant, workspace, type, target, actor and position in the log) is its `source`, which a sink records as the score's metadata. `sync_score_configs(store)` creates the score configs of every registered feedback type that a `ScoreConfigStore` lacks, and never changes one it has.
 
-The sink and the store are small protocols, so any backend can implement them:
+The sink and the store are small protocols, so any backend can implement them, and evalr's contract suites (`evalr.contracts.check_score_sink` and `check_score_config_store`) check one:
 
 ```python
+from collections.abc import Sequence
+
 from artifactr.scores import Score
 
 
 class PrintingSink:
-    async def send(self, score: Score) -> None:
-        print(score.name, score.value, score.trace_id or score.session_id)
+    async def record(self, scores: Sequence[Score], /) -> None:
+        for score in scores:
+            print(score.name, score.value, score.trace_id or score.session_id)
 ```
+
+For tests, `evalr.memory` has an `InMemoryScoreSink` and an `InMemoryScoreConfigStore`.
 
 ## Scores in Langfuse
 
-With the `langfuse` extra, feedback becomes Langfuse scores beside the traces it judges. `LangfuseScores` is a `ScoreSink`, and `LangfuseScoreConfigs` a `ScoreConfigStore`:
+With the `langfuse` extra, feedback becomes Langfuse scores beside the traces it judges. `LangfuseScores` is a `ScoreSink`, and `LangfuseScoreConfigs` a `ScoreConfigStore`, both passing evalr's contract suites:
 
 ```python
 import asyncio

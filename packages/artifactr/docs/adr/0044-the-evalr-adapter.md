@@ -54,6 +54,10 @@ reflexr's `[evals]` extra made the same kind of choices for workflows; this reco
 - Harder: a replay starts from the thread's messages, not the original run's tool calls, which a model history rebuilt from text cannot carry.
 - Harder: evalr's `drain` returns only evaluations in progress; an application that wants every result reads the task `submit` returns.
 
+## Amendment (2026-09-29): the score mirror uses evalr too
+
+`artifactr.evals` is no longer the only package that imports evalr. The score mapping and ports moved to evalr ([ADR-0038](0038-feedback-as-scores.md), as amended), so `artifactr.scores` and `artifactr.langfuse` import `evalr.core`, and the `[langfuse]` extra depends on evalr. The inner layers still never import it. The git pin in `[tool.uv.sources]` serves both extras and moves in its own pull requests, as before.
+
 ## Action items
 
 1. [x] `artifactr.evals`: `LogFeedbackSource` (passing evalr's contract), `replay_task`, `OnlineEvaluator` behind the `Runner`'s `TurnEvaluator`, and the measures (RFC-0002 phase A5).

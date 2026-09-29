@@ -45,7 +45,7 @@ async def authorize(tenant_id: TenantId, workspace_id: str, actor: Actor) -> boo
 router = artifactr_router(workspaces, runner, resolve_actor=resolve_actor, authorize=authorize)
 ```
 
-A refusal answers 403. Without `authorize`, any authenticated actor may use any workspace of its own tenant. [Multi-tenancy and security](security.md) covers the rest.
+A refusal answers 403, or closes the WebSocket with 4403. Without `authorize`, any authenticated actor may use any workspace of its own tenant. `ArtifactrMcp` takes the same hook, so pass it the same function ([External agents over MCP](mcp.md#authorization)). [Multi-tenancy and security](security.md) covers the rest.
 
 ## REST
 

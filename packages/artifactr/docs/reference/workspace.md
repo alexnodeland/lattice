@@ -16,6 +16,8 @@ Tenant-scoped handles. See [Workspaces, commits and the log](../guides/workspace
 
 ::: artifactr.workspace.ThreadBusy
 
+::: artifactr.workspace.Authorize
+
 ## Storage
 
 The storage protocol, and the in-memory implementation. See [Storage](../guides/storage.md).

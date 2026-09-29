@@ -15,12 +15,7 @@ Every command, over either transport, goes through :meth:`artifactr.agent.Runner
 behaves identically (ADR-0012). See ``docs/protocol.md`` for the wire format.
 """
 
-from artifactr.fastapi.router import (
-    STATUS_CODES,
-    Authorize,
-    ResolveActor,
-    Unauthorized,
-    artifactr_router,
-)
+from artifactr.fastapi.router import STATUS_CODES, ResolveActor, Unauthorized, artifactr_router
+from artifactr.workspace import Authorize  # defined with the workspaces, for every surface
 
 __all__ = ["STATUS_CODES", "Authorize", "ResolveActor", "Unauthorized", "artifactr_router"]

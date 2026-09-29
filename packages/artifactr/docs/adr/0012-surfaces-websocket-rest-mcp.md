@@ -88,6 +88,16 @@ The workspace model (a server-owned, versioned, shared log) is the product. Adop
 - Harder: frontends need a client for our protocol; we provide a JSON Schema to generate types from.
 - Revisit SSE and the compatibility adapters after v1.
 
+## Amendment (2026-09-29): every surface takes the authorize hook
+
+The router took an `authorize(tenant_id, workspace_id, actor)` hook, but `ArtifactrMcp` did not, so an authenticated MCP client could use every workspace of its tenant however the application restricted REST and the WebSocket.
+
+- **`ArtifactrMcp(authorize=...)`** takes the router's hook and asks it on every tool call, resource read and resource subscription that names a workspace, before the workspace is opened or followed. A refusal is a tool error, or a failed resource read or subscription, carrying the message of the router's 403, "this workspace is not yours to use". Listing the tools and the resource template names no workspace, and is not asked. Without the hook, every workspace of the client's tenant is allowed, as before.
+- **A subscription is checked when it opens.** The MCP SDK serves `subscriptions/listen` itself, so a middleware on the server makes a resource read's checks for each artifact a stream names: that the artifact is the client's tenant's, and `authorize`. Until now a client could listen for changes to any tenant's artifacts, learning which changed and when. The check is made once per stream, as the WebSocket's is made once per connection. The SDK calls its middleware provisional; its version is pinned in `uv.lock`, and the tests exercise the check through the SDK's client.
+- **The hook's type, `Authorize`, lives in `artifactr.workspace`,** beside `Workspaces.open`, since an adapter may not import another ([ADR-0034](0034-ports-and-adapters-for-integrations.md)). `artifactr.fastapi.Authorize` is the same alias, re-exported.
+
+reflexr made the same change for its tools and resource reads in its ADR-0011.
+
 ## Action items
 
 1. [x] Implement the WebSocket endpoint and REST routes in `artifactr.fastapi`.

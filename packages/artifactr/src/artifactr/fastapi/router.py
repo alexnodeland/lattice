@@ -27,13 +27,10 @@ from artifactr.core import (
 )
 from artifactr.fastapi.stream import Stream
 from artifactr.telemetry import Telemetry, annotate, attribution
-from artifactr.workspace import Workspace, Workspaces
+from artifactr.workspace import Authorize, Workspace, Workspaces
 
 ResolveActor = Callable[[HTTPConnection], Awaitable[tuple[TenantId, Actor]]]
 """Authenticates a request or connection: returns its tenant and actor, or raises Unauthorized."""
-
-Authorize = Callable[[TenantId, WorkspaceId, Actor], Awaitable[bool]]
-"""Decides whether an actor may use a workspace of its tenant."""
 
 STATUS_CODES: dict[str, int] = {
     "version_conflict": 409,

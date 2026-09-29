@@ -38,8 +38,28 @@ app.mount("/mcp", mcp.http_app(streamable_http_path="/"))
 Clients then connect to `https://your-host/mcp/` with any MCP client that speaks Streamable HTTP. `mcp.server` is the underlying `MCPServer`, if you need to serve it another way.
 
 - **`resolve(ctx)`** authenticates each request and returns the client's tenant and its `ExternalAgentActor`. `ctx.headers` holds the HTTP request's headers. They are the client's own claims, so verify a credential rather than trusting a name.
+- **`authorize(tenant_id, workspace_id, actor)`**, optional, decides which workspaces of its tenant a client may use ([Authorization](#authorization)).
 - **`runner`** carries out messages, so an external agent can talk to the thread's built-in agent: its `post_message` starts, steers or answers a run like any other message.
 - **`name`** is the server's name (`"artifactr"`), and **`bus`** is where resource notifications go (in-process by default).
+
+## Authorization
+
+To decide which workspaces of its tenant a client may use, pass `authorize`, the same `artifactr.workspace.Authorize` hook the [router](serving.md#authentication-and-authorization) takes:
+
+```python
+from artifactr.core import Actor, WorkspaceId
+
+
+async def authorize(tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor) -> bool:
+    return await api_keys.may_use(actor, tenant_id, workspace_id)  # your access control
+
+
+mcp = ArtifactrMcp(workspaces, runner, resolve=resolve_client, authorize=authorize)
+```
+
+It is asked on every tool call and resource read that names a workspace, before anything is read or written, and when a client subscribes to an artifact's changes. A refusal is a tool error carrying the message of the router's 403, `Error executing tool list_artifacts: this workspace is not yours to use`. A refused resource read fails with the same message, and so does a `subscriptions/listen` request that names an artifact of a refused workspace. Listing the tools and the resource template names no workspace, so neither is asked. Without `authorize`, a client may use every workspace of the tenant `resolve` returns.
+
+Pass the router and the server the same function, so a client cannot reach over MCP what REST and the WebSocket refuse it.
 
 ## What a client sees
 
@@ -56,10 +76,11 @@ The server's instructions tell the client how to behave: read before changing, p
 | `list_proposals(workspace_id)` | Lists the proposals awaiting review |
 | `respond_to_proposal(workspace_id, proposal_id, decision, reason=None)` | Accepts or rejects someone else's proposal |
 | `post_message(workspace_id, thread_id, content)` | Posts a message in a thread |
+| `give_feedback(workspace_id, feedback_type, target, value=None)` | Gives feedback of an application's type on an artifact, thread, turn or message |
 
 A rejection comes back as a tool error carrying its message, such as a version conflict telling the client to read again.
 
-Each artifact is also a resource at `artifactr://{tenant_id}/{workspace_id}/artifacts/{artifact_id}`, whose content is the artifact's current version as JSON. A client may read resources of its own tenant only. Once a client has used a workspace, every change to its artifacts is published as a resource-updated notification for that URI, so subscribed clients know to read again. `artifact_uri(tenant_id, workspace_id, artifact_id)` builds the URI.
+Each artifact is also a resource at `artifactr://{tenant_id}/{workspace_id}/artifacts/{artifact_id}`, whose content is the artifact's current version as JSON. A client may read, and subscribe to, the artifacts of its own tenant only, in the workspaces `authorize` allows. Once a client has used a workspace, every change to its artifacts is published as a resource-updated notification for that URI, so subscribed clients know to read again. `artifact_uri(tenant_id, workspace_id, artifact_id)` builds the URI.
 
 ## Rules for external agents
 

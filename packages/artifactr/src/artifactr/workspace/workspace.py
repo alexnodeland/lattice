@@ -10,7 +10,15 @@ import asyncio
 import contextlib
 import dataclasses
 import time
-from collections.abc import AsyncGenerator, AsyncIterator, Callable, Collection, Iterable, Sequence
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Collection,
+    Iterable,
+    Sequence,
+)
 from datetime import timedelta
 from typing import Literal, cast, overload
 
@@ -80,6 +88,13 @@ from artifactr.telemetry.attributes import (
 )
 from artifactr.telemetry.metrics import COMMANDS, COMMIT_DURATION
 from artifactr.workspace.storage import HistoryChunk, Scope, Storage
+
+Authorize = Callable[[TenantId, WorkspaceId, Actor], Awaitable[bool]]
+"""Decides whether an actor may use a workspace of its tenant.
+
+The surfaces that serve workspaces, the FastAPI router and the MCP server, take one as their
+``authorize`` hook, and ask it before opening a workspace for a request.
+"""
 
 
 class ThreadBusy(InvalidState):

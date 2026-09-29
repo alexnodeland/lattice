@@ -3,17 +3,18 @@
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from typing import Any, cast
+from typing import Any
 
 import pytest
 from mcp import Client
 from mcp.server.mcpserver import Context
-from mcp.server.subscriptions import ResourceUpdated
+from mcp.server.subscriptions import InMemorySubscriptionBus, ResourceUpdated, ServerEvent
 from mcp.shared.exceptions import MCPError
 from mcp.types import TextContent, TextResourceContents
 from pydantic_ai import ToolCallPart
 
-from artifactr.core import ExternalAgentActor, TenantId, UserActor
+from artifactr.agent import Runner
+from artifactr.core import Actor, ExternalAgentActor, TenantId, UserActor, WorkspaceId
 from artifactr.mcp import ArtifactrMcp, artifact_uri
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
 from tests.agent.conftest import Gate, Script, call, make_agent, say
@@ -21,14 +22,20 @@ from tests.artifact_types import Checklist, Note
 
 CLAUDE = ExternalAgentActor(client_id="claude-code", name="Claude Code")
 REVIEWER = ExternalAgentActor(client_id="reviewer")
+ALICE = UserActor(id="alice", name="Alice")
+FORBIDDEN = "this workspace is not yours to use"
 
 
-class RecordingBus:
+class RecordingBus(InMemorySubscriptionBus):
+    """The in-process bus, remembering what was published."""
+
     def __init__(self) -> None:
-        self.events: list[Any] = []
+        super().__init__()
+        self.events: list[ServerEvent] = []
 
-    async def publish(self, event: Any) -> None:
+    async def publish(self, event: ServerEvent) -> None:
         self.events.append(event)
+        await super().publish(event)
 
 
 class Identity:
@@ -59,18 +66,16 @@ def workspaces() -> Workspaces:
 
 @pytest.fixture
 async def ws(workspaces: Workspaces) -> Workspace:
-    return await workspaces.open("tenant", "w1", actor=UserActor(id="alice", name="Alice"))
+    return await workspaces.open("tenant", "w1", actor=ALICE)
 
 
 @pytest.fixture
 async def mcp(
     workspaces: Workspaces, identity: Identity, bus: RecordingBus, gate: Gate
 ) -> AsyncIterator[ArtifactrMcp]:
-    from artifactr.agent import Runner
-
     script = Script(say("On it."), say("Also on it."))
     runner = Runner(make_agent(script), app=gate)
-    server = ArtifactrMcp(workspaces, runner, resolve=identity.resolve, bus=cast(Any, bus))
+    server = ArtifactrMcp(workspaces, runner, resolve=identity.resolve, bus=bus)
     yield server
     await server.aclose()
 
@@ -192,9 +197,76 @@ async def test_artifacts_are_resources_of_their_tenant(
         assert body["data"]["text"] == "hello"
         with pytest.raises(MCPError):
             await client.read_resource(artifact_uri("tenant", "w1", "nope"))
+        async with client.listen(resource_subscriptions=[artifact_uri("tenant", "w1", "n1")]):
+            pass
         identity.tenant = "intruder"
         with pytest.raises(MCPError):
             await client.read_resource(artifact_uri("tenant", "w1", "n1"))
+        with pytest.raises(MCPError, match="artifact resources of tenant tenant are not available"):
+            async with client.listen(resource_subscriptions=[artifact_uri("tenant", "w1", "n1")]):
+                pass
+        others = ["file:///elsewhere"]  # not an artifact, so not checked
+        async with client.listen(tools_list_changed=True, resource_subscriptions=others) as sub:
+            assert sub.honored.resource_subscriptions == others
+
+
+async def test_authorize_decides_which_workspaces_a_client_may_use(
+    workspaces: Workspaces, ws: Workspace, bus: RecordingBus, gate: Gate
+) -> None:
+    asked: list[tuple[TenantId, WorkspaceId, str]] = []
+
+    async def authorize(tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor) -> bool:
+        asked.append((tenant_id, workspace_id, actor.kind))
+        return workspace_id != "secret"
+
+    secret = await workspaces.open("tenant", "secret", actor=ALICE)
+    await secret.create(Note(text="classified"), artifact_id="n1")
+    thread = await secret.create_thread("Plans")
+    head = await secret.head_seq()
+    runner = Runner(make_agent(Script(say("On it."))), app=gate)
+    mcp = ArtifactrMcp(workspaces, runner, resolve=Identity().resolve, authorize=authorize, bus=bus)
+    n1 = {"artifact_id": "n1"}
+    replace = [{"op": "replace", "path": "/text", "value": "public"}]
+    on_thread = {"kind": "thread", "thread_id": thread.id}
+    tools: dict[str, dict[str, Any]] = {
+        "list_artifacts": {},
+        "read_artifact": n1,
+        "create_artifact": {"kind": "note", "data": {"text": "leak"}},
+        "edit_text": {**n1, "old": "classified", "new": "public"},
+        "edit_artifact": {**n1, "base_version": 1, "ops": replace},
+        "archive_artifact": n1,
+        "list_proposals": {},
+        "respond_to_proposal": {"proposal_id": "prp_1", "decision": "accept"},
+        "give_feedback": {"feedback_type": "helpfulness", "target": on_thread, "value": {}},
+        "post_message": {"thread_id": thread.id, "content": "hi"},
+    }
+    try:
+        async with Client(mcp.server) as client:
+            served = {tool.name for tool in (await client.list_tools()).tools}
+            assert served == set(tools), "every tool names a workspace"
+            for tool, args in tools.items():
+                error, text = await _call(client, tool, **{**args, "workspace_id": "secret"})
+                assert (error, text.endswith(FORBIDDEN)) == (True, True), tool
+            uri = artifact_uri("tenant", "secret", "n1")
+            with pytest.raises(MCPError, match=FORBIDDEN):
+                await client.read_resource(uri)
+            with pytest.raises(MCPError, match=FORBIDDEN):
+                async with client.listen(resource_subscriptions=[uri]):
+                    pass
+            assert (await _call(client, "list_artifacts"))[0] is False  # w1 is followed now
+            await asyncio.sleep(0)
+            await secret.create(Note(), artifact_id="n2")
+            await ws.create(Note(), artifact_id="n3")
+            for _ in range(50):
+                if bus.events:
+                    break
+                await asyncio.sleep(0.01)
+    finally:
+        await mcp.aclose()
+    assert asked.count(("tenant", "secret", "external_agent")) == len(tools) + 2
+    assert asked[-1] == ("tenant", "w1", "external_agent")
+    assert await secret.head_seq() == head + 1, "the client wrote nothing"
+    assert bus.events == [ResourceUpdated(uri=artifact_uri("tenant", "w1", "n3"))], "nor followed"
 
 
 async def test_changes_notify_resource_subscribers(

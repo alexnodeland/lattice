@@ -2,12 +2,16 @@
 
 import asyncio
 import contextlib
-from collections.abc import AsyncGenerator, Awaitable, Callable
+import re
+from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 from typing import Any, Literal
 
+from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ResourceError, ToolError
 from mcp.server.subscriptions import InMemorySubscriptionBus, ResourceUpdated, SubscriptionBus
+from mcp.shared.exceptions import MCPError
+from mcp.types import INVALID_PARAMS, SubscriptionsListenRequestParams
 from starlette.applications import Starlette
 
 from artifactr.agent import (
@@ -25,6 +29,7 @@ from artifactr.core import (
     EditArtifact,
     ExternalAgentActor,
     FeedbackTarget,
+    Forbidden,
     GiveFeedback,
     JsonPatch,
     Rejection,
@@ -33,7 +38,7 @@ from artifactr.core import (
     WorkspaceId,
 )
 from artifactr.telemetry import annotate, attribution
-from artifactr.workspace import Workspace, Workspaces
+from artifactr.workspace import Authorize, Workspace, Workspaces
 
 ResolveClient = Callable[[Context], Awaitable[tuple[TenantId, ExternalAgentActor]]]
 """Authenticates an MCP request: returns the client's tenant and actor."""
@@ -44,6 +49,12 @@ INSTRUCTIONS = (
     "you read so conflicting edits are caught. Some artifact types only accept proposals, "
     "which a person reviews."
 )
+
+
+_FORBIDDEN = "this workspace is not yours to use"
+"""Why ``authorize`` refused, as the router's 403 says it."""
+
+_ARTIFACT_URI = re.compile(r"artifactr://(?P<tenant>[^/]+)/(?P<workspace>[^/]+)/artifacts/[^/]+")
 
 
 def artifact_uri(tenant_id: TenantId, workspace_id: WorkspaceId, artifact_id: str) -> str:
@@ -65,6 +76,10 @@ class ArtifactrMcp:
         workspaces: Opens tenant-scoped workspaces.
         runner: Carries out messages, so external agents can talk to the built-in agent.
         resolve: Authenticates each request.
+        authorize: Whether a client may use a workspace of its tenant: the router's hook, asked
+            on every tool call, resource read and resource subscription that names a workspace;
+            allows everything if omitted. A refusal is a tool error, or a failed resource read
+            or subscription, carrying the ``forbidden`` rejection's message.
         name: The server's name.
         bus: Where resource-change notifications go; in-process by default.
     """
@@ -75,15 +90,22 @@ class ArtifactrMcp:
         runner: Runner[Any],
         *,
         resolve: ResolveClient,
+        authorize: Authorize | None = None,
         name: str = "artifactr",
         bus: SubscriptionBus | None = None,
     ) -> None:
         self._workspaces = workspaces
         self._runner = runner
         self._resolve = resolve
+        self._authorize = authorize
         self._bus = bus or InMemorySubscriptionBus()
         self._watchers: dict[tuple[TenantId, WorkspaceId], asyncio.Task[None]] = {}
-        self.server = MCPServer(name=name, instructions=INSTRUCTIONS, subscriptions=self._bus)
+        self.server = MCPServer(
+            name=name,
+            instructions=INSTRUCTIONS,
+            subscriptions=self._bus,
+            middleware=[self._check_subscriptions],
+        )
         self._register()
 
     def http_app(self, **options: Any) -> Starlette:
@@ -106,9 +128,21 @@ class ArtifactrMcp:
         await asyncio.gather(*self._watchers.values(), return_exceptions=True)
         self._watchers.clear()
 
+    async def _allows(
+        self, tenant_id: TenantId, workspace_id: WorkspaceId, actor: ExternalAgentActor
+    ) -> bool:
+        return self._authorize is None or await self._authorize(tenant_id, workspace_id, actor)
+
     async def _open(self, ctx: Context, workspace_id: WorkspaceId) -> Workspace:
+        """Open a workspace for the request's client, and follow its changes.
+
+        Raises:
+            Forbidden: If ``authorize`` refuses the client this workspace.
+        """
         tenant_id, actor = await self._resolve(ctx)
         annotate(attribution(tenant_id=tenant_id, workspace_id=workspace_id, actor=actor))
+        if not await self._allows(tenant_id, workspace_id, actor):
+            raise Forbidden(_FORBIDDEN)
         workspace = await self._workspaces.open(tenant_id, workspace_id, actor=actor)
         key = (tenant_id, workspace_id)
         if key not in self._watchers:
@@ -123,18 +157,51 @@ class ArtifactrMcp:
                 uri = artifact_uri(tenant_id, workspace.workspace_id, event.artifact_id)
                 await self._bus.publish(ResourceUpdated(uri=uri))
 
+    async def _workspace(self, ctx: Context, workspace_id: WorkspaceId) -> Workspace:
+        """Open a workspace for a tool, whose refusal is a tool error."""
+        return await _tool(self._open(ctx, workspace_id))
+
+    async def _check_subscriptions(
+        self, ctx: ServerRequestContext[Any, Any], call_next: CallNext
+    ) -> HandlerResult:
+        """Check a subscription to artifacts as a read of them is checked.
+
+        The MCP SDK serves ``subscriptions/listen`` itself, so this middleware asks, when a
+        stream opens, what reading each artifact it names would: its tenant, and ``authorize``.
+        A refusal fails the request, with the resource read's message.
+        """
+        if ctx.method == "subscriptions/listen":
+            params = SubscriptionsListenRequestParams.model_validate(ctx.params, by_name=False)
+            await self._check_uris(ctx, params.notifications.resource_subscriptions or ())
+        return await call_next(ctx)
+
+    async def _check_uris(self, ctx: ServerRequestContext[Any, Any], uris: Sequence[str]) -> None:
+        scopes: dict[tuple[str, str], str] = {}
+        for uri in uris:
+            if (match := _ARTIFACT_URI.fullmatch(uri)) is not None:
+                scopes.setdefault((match["tenant"], match["workspace"]), uri)
+        if not scopes:
+            return  # no artifact, so nothing of a workspace's to refuse
+        context = Context(request_context=ctx, mcp_server=self.server, subscriptions=self._bus)
+        tenant_id, actor = await self._resolve(context)
+        for (tenant, workspace_id), uri in scopes.items():
+            if tenant != tenant_id:
+                raise MCPError(INVALID_PARAMS, _unavailable(tenant), data={"uri": uri})
+            if not await self._allows(tenant_id, workspace_id, actor):
+                raise MCPError(INVALID_PARAMS, _FORBIDDEN, data={"uri": uri})
+
     def _register(self) -> None:
         server = self.server
 
         @server.tool()
         async def list_artifacts(workspace_id: str, ctx: Context, kind: str | None = None) -> str:
             """List a workspace's artifacts, optionally of one kind."""
-            return await list_artifacts_text(await self._open(ctx, workspace_id), kind)
+            return await list_artifacts_text(await self._workspace(ctx, workspace_id), kind)
 
         @server.tool()
         async def read_artifact(workspace_id: str, artifact_id: str, ctx: Context) -> str:
             """Read an artifact's current version. Pass that version to edits."""
-            workspace = await self._open(ctx, workspace_id)
+            workspace = await self._workspace(ctx, workspace_id)
             return await _tool(_read(workspace, artifact_id))
 
         @server.tool()
@@ -142,7 +209,7 @@ class ArtifactrMcp:
             workspace_id: str, kind: str, data: dict[str, Any], ctx: Context
         ) -> str:
             """Create an artifact of a kind the workspace accepts, from its JSON data."""
-            workspace = await self._open(ctx, workspace_id)
+            workspace = await self._workspace(ctx, workspace_id)
             command = CreateArtifact(kind=kind, data=data)
             return describe_outcome(await _tool(workspace.commit(command)))
 
@@ -163,7 +230,7 @@ class ArtifactrMcp:
 
             Pass the ``base_version`` you read to fail rather than overwrite a newer change.
             """
-            workspace = await self._open(ctx, workspace_id)
+            workspace = await self._workspace(ctx, workspace_id)
             artifact = await _tool(workspace.artifact(artifact_id))
             edit = artifact.edit_text(old, new, field=field, summary=summary)
             if base_version is not None:
@@ -183,7 +250,7 @@ class ArtifactrMcp:
             rationale: str | None = None,
         ) -> str:
             """Apply RFC 6902 JSON Patch operations to an artifact's data at ``base_version``."""
-            workspace = await self._open(ctx, workspace_id)
+            workspace = await self._workspace(ctx, workspace_id)
             edit = EditArtifact(
                 artifact_id=artifact_id,
                 base_version=base_version,
@@ -196,14 +263,14 @@ class ArtifactrMcp:
         @server.tool()
         async def archive_artifact(workspace_id: str, artifact_id: str, ctx: Context) -> str:
             """Archive an artifact that is no longer needed. It stays readable."""
-            workspace = await self._open(ctx, workspace_id)
+            workspace = await self._workspace(ctx, workspace_id)
             artifact = await _tool(workspace.artifact(artifact_id))
             return describe_outcome(await _tool(workspace.commit(artifact.archive())))
 
         @server.tool()
         async def list_proposals(workspace_id: str, ctx: Context) -> str:
             """List the proposals awaiting review."""
-            proposals = await (await self._open(ctx, workspace_id)).proposals()
+            proposals = await (await self._workspace(ctx, workspace_id)).proposals()
             if not proposals:
                 return "No proposals are awaiting review."
             return "\n".join(
@@ -221,7 +288,7 @@ class ArtifactrMcp:
             reason: str | None = None,
         ) -> str:
             """Accept or reject a proposal made by someone else."""
-            workspace = await self._open(ctx, workspace_id)
+            workspace = await self._workspace(ctx, workspace_id)
             command = RespondToProposal(proposal_id=proposal_id, decision=decision, reason=reason)
             resolved = await _tool(workspace.commit(command))
             if resolved.version is None:
@@ -240,7 +307,7 @@ class ArtifactrMcp:
 
             ``value`` holds the feedback type's fields.
             """
-            workspace = await self._open(ctx, workspace_id)
+            workspace = await self._workspace(ctx, workspace_id)
             command = GiveFeedback(feedback_type=feedback_type, target=target, value=value or {})
             await _tool(workspace.commit(command))
             return f"Recorded {feedback_type} feedback on the {target.kind}."
@@ -250,7 +317,7 @@ class ArtifactrMcp:
             workspace_id: str, thread_id: str, content: str, ctx: Context
         ) -> str:
             """Post a message in a thread. The thread's agent reads it and may reply."""
-            workspace = await self._open(ctx, workspace_id)
+            workspace = await self._workspace(ctx, workspace_id)
             sent = await _tool(self._runner.send(workspace, thread_id, content))
             if sent.run is None:
                 return "Posted; the agent already working in this thread will see it."
@@ -264,8 +331,8 @@ class ArtifactrMcp:
         async def artifact_resource(
             tenant_id: str, workspace_id: str, artifact_id: str, ctx: Context
         ) -> str:
-            workspace = await self._resource_workspace(ctx, tenant_id, workspace_id)
             try:
+                workspace = await self._resource_workspace(ctx, tenant_id, workspace_id)
                 artifact = await workspace.artifact(artifact_id)
             except Rejection as rejection:
                 raise ResourceError(rejection.message) from rejection
@@ -276,8 +343,12 @@ class ArtifactrMcp:
     ) -> Workspace:
         resolved, _ = await self._resolve(ctx)
         if resolved != tenant_id:
-            raise ResourceError(f"artifact resources of tenant {tenant_id} are not available")
+            raise ResourceError(_unavailable(tenant_id))
         return await self._open(ctx, workspace_id)
+
+
+def _unavailable(tenant_id: TenantId) -> str:
+    return f"artifact resources of tenant {tenant_id} are not available"
 
 
 async def _read(workspace: Workspace, artifact_id: str) -> str:

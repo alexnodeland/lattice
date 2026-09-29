@@ -4,6 +4,8 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+import artifactr.fastapi
+import artifactr.workspace
 from tests.agent.conftest import Script, call, say
 from tests.fastapi.conftest import build, command, wait_for
 
@@ -47,6 +49,7 @@ def test_rejections_map_to_status_codes(client: TestClient) -> None:
 
 
 def test_authentication_and_authorization(client: TestClient) -> None:
+    assert artifactr.fastapi.Authorize is artifactr.workspace.Authorize  # every surface's hook
     assert client.get(f"{BASE}/threads", headers={"x-token": "bad"}).status_code == 401
     assert client.get("/v1/workspaces/secret/threads").status_code == 403
 

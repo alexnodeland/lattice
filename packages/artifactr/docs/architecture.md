@@ -357,7 +357,7 @@ The run holds a thread claim, not a socket: if the connection that started it dr
 
 ## Surfaces
 
-Every surface is a thin adapter: it authenticates, turns its input into commands, and hands them to `Runner.execute` ([ADR-0022](adr/0022-surfaces-over-one-command-handler.md)). Messages therefore start, steer or answer runs the same way everywhere, and every other command is a plain `Workspace.commit`.
+Every surface is a thin adapter: it authenticates, asks whether the client may use the workspace, turns its input into commands, and hands them to `Runner.execute` ([ADR-0022](adr/0022-surfaces-over-one-command-handler.md)). Messages therefore start, steer or answer runs the same way everywhere, and every other command is a plain `Workspace.commit`. Authentication and authorization are the host's: the router takes `resolve_actor` and the MCP server `resolve`, and both take the same `authorize(tenant_id, workspace_id, actor)` hook (`artifactr.workspace.Authorize`), which the MCP server also asks before a resource read or subscription ([ADR-0012](adr/0012-surfaces-websocket-rest-mcp.md)).
 
 | Surface | Package | Role |
 |---|---|---|

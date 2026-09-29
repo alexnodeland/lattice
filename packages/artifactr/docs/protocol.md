@@ -240,18 +240,18 @@ Rejections map to HTTP status codes (`artifactr.fastapi.STATUS_CODES`): `version
 
 ## MCP mapping
 
-External agents connect over MCP (`artifactr.mcp.ArtifactrMcp`) with the same authority as any other actor. The host's `resolve(ctx)` returns the client's tenant and `ExternalAgentActor`, and every tool goes through the same workspace rules and `Runner`.
+External agents connect over MCP (`artifactr.mcp.ArtifactrMcp`) with the same authority as any other actor. The host's `resolve(ctx)` returns the client's tenant and `ExternalAgentActor`. An optional `authorize(tenant, workspace, actor)`, the same hook as REST's, is asked on every tool call, resource read and resource subscription that names a workspace. Every tool goes through the same workspace rules and `Runner`.
 
 | MCP | artifactr |
 |---|---|
-| Resource template `artifactr://{tenant_id}/{workspace_id}/artifacts/{artifact_id}` | The artifact's current `Versioned` JSON. Only readable by clients of that tenant. |
-| `subscriptions/listen` and resource-updated notifications | Published for `artifact_created`, `artifact_changed` and `artifact_archived` in every workspace a client has used, through the server's `SubscriptionBus`. |
+| Resource template `artifactr://{tenant_id}/{workspace_id}/artifacts/{artifact_id}` | The artifact's current `Versioned` JSON. Only readable by clients of that tenant, in a workspace `authorize` allows. |
+| `subscriptions/listen` and resource-updated notifications | Published for `artifact_created`, `artifact_changed` and `artifact_archived` in every workspace a client has used, through the server's `SubscriptionBus`. A `listen` request that names an artifact of another tenant, or of a workspace `authorize` refuses, fails with `INVALID_PARAMS` and the message a read of it would fail with. |
 | Tools `list_artifacts`, `read_artifact`, `create_artifact`, `edit_text`, `edit_artifact`, `archive_artifact` | Artifact commands. The edit tools take an optional `base_version` (required for `edit_artifact`) and `propose` with `rationale`. |
 | Tools `list_proposals`, `respond_to_proposal` | Review others' proposals. |
 | Tool `post_message` | A message in a thread, handled like any other: it starts, steers or answers the thread's agent. |
 | Tool `give_feedback` | Feedback of an application's type on an artifact version, a thread, a turn or a message. |
 
-Rejections are returned as tool errors carrying the rejection's message.
+Rejections are returned as tool errors carrying the rejection's message. A workspace `authorize` refuses is a tool error too, carrying `this workspace is not yours to use`, the message of REST's 403.
 
 ## Versioning and schema
 

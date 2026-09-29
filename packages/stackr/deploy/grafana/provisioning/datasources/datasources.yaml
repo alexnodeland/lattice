@@ -16,7 +16,10 @@ datasources:
     jsonData:
       httpMethod: POST
       prometheusType: Prometheus
-      # Exemplars on histograms link to the trace that produced them.
+      # Applications export metrics through the Collector once a minute (the OTel
+      # SDK's default), so a rate needs at least a minute of samples:
+      # $__rate_interval is at least four of these.
+      timeInterval: 60s
       # Exemplars link a histogram's samples to the trace that produced them:
       # `trace_id` from OTLP metrics, `traceID` from Tempo's metrics generator.
       exemplarTraceIdDestinations:

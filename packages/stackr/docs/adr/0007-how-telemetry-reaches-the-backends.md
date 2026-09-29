@@ -43,3 +43,7 @@ The OTLP receiver keeps one protocol from the application to Prometheus, uses on
 
 1. [x] The Collector's pipelines and Prometheus's receivers (RFC-0001 phase 1), checked by the smoke test.
 2. [ ] The Langfuse route for traces (phase 2).
+
+## Amendment (2026-09-29): a minute between samples
+
+Applications push metrics through the Collector at the OTel SDK's default interval, once a minute, so Prometheus holds one sample per series per minute. Grafana's Prometheus data source did not say so, and assumed its default of 15 seconds: `$__rate_interval` came out at one minute, one sample, and rate panels showed no data. The data source now sets `timeInterval: 60s`, so `$__rate_interval` covers at least four samples. artifactr's and reflexr's dashboards also give each query a one-minute minimum step, which is what found this.

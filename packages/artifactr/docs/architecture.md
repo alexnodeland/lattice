@@ -492,6 +492,8 @@ Python 3.12+. Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical wi
 - **Telemetry:** spans and metrics are asserted through the OpenTelemetry SDK's `InMemorySpanExporter` and `InMemoryMetricReader`, and the registry's cardinality policy is checked for every metric.
 - **Protocol:** the JSON Schema in `schemas/` is generated from the models and checked in. CI fails if it drifts.
 
+The contributor stack is `compose.yaml`: PostgreSQL for the tests, and docplan under the `app` profile. The dev container is built on it and joins stackr's network when stackr's stack runs ([ADR-0030](adr/0030-compose-and-dev-containers.md), [ADR-0040](adr/0040-joining-stackrs-network.md)). CI validates the Compose files without starting containers.
+
 ## Build plan
 
 The phases, their exit criteria and their progress are tracked in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md).
@@ -547,6 +549,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0037](adr/0037-feedback-targets-and-evaluators.md) | Feedback targets and evaluators |
 | [0038](adr/0038-feedback-as-scores.md) | Feedback as scores, through ports |
 | [0039](adr/0039-the-langfuse-adapter.md) | The Langfuse adapter |
+| [0040](adr/0040-joining-stackrs-network.md) | Joining stackr's network when it runs |
 
 ## Open questions
 

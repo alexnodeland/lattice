@@ -190,3 +190,6 @@ cython_debug/
 
 # Browser-automation logs from local tooling
 .playwright-mcp/
+
+# Written by .devcontainer/initialize.sh on the host.
+.devcontainer/stackr.generated.yaml

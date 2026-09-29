@@ -12,6 +12,7 @@ as they do on GitHub. Add a definition here for every link added to CONTRIBUTING
 
 [adr-0014]: ../adr/0014-trunk-based-development-with-rfcs-and-adrs.md
 [adr-0015]: ../adr/0015-quality-gates.md
+[adr-0030]: ../adr/0030-compose-and-dev-containers.md
 [adrs]: ../adr/README.md
 [architecture]: ../architecture.md
 [code-of-conduct]: code-of-conduct.md

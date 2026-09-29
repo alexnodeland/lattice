@@ -1,0 +1,22 @@
+# Run docplan on stackr's network, reporting to stackr's services. Use it with compose.yaml
+# while stackr's stack runs (its network is named `stackr`):
+#
+#   docker compose -f compose.yaml -f compose.stackr.yaml --profile app up -d
+#
+# LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY come from the host: the keys of a project in
+# stackr's Langfuse.
+
+services:
+  docplan:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      LANGFUSE_BASE_URL: http://langfuse-web:3000
+      LANGFUSE_PUBLIC_KEY:
+      LANGFUSE_SECRET_KEY:
+    networks:
+      - default
+      - stackr
+
+networks:
+  stackr:
+    external: true

@@ -25,7 +25,8 @@ Run `make` on its own to list every command:
 | `make docs` | Build the documentation site in strict mode, as CI does |
 | `make docs-serve` | Serve the documentation site with live reload at <http://localhost:8000> |
 | `make schema` | Regenerate `schemas/artifactr.v1.json` from the protocol models (a test fails if it drifts) |
-| `make pg-up` / `make pg-down` | Start or stop a PostgreSQL container for the SQL tests (needs Docker) |
+| `make pg-up` / `make pg-down` | Start or stop PostgreSQL for the SQL tests, from `compose.yaml` (needs Docker) |
+| `make app-up` | Build and start docplan, the reference app, on PostgreSQL, at <http://localhost:8000> |
 | `make test-pg` | Run the tests on PostgreSQL as well as SQLite |
 | `make changelog` | Regenerate `CHANGELOG.md` from commit history |
 
@@ -34,12 +35,36 @@ Run `make` on its own to list every command:
 The storage tests run against in-memory storage, SQLite and PostgreSQL. SQLite needs nothing extra, and it alone reaches the coverage gate. The PostgreSQL tests run only when `ARTIFACTR_TEST_POSTGRES_URL` is set (otherwise pytest reports them as deselected), and CI always runs them. Locally:
 
 ```bash
-make pg-up          # postgres:17 on localhost:54329
+make pg-up          # compose.yaml's postgres:17, on localhost:54329 (PG_PORT=... to move it)
 make test-pg        # the whole suite, with the PostgreSQL tests included
 make pg-down
 ```
 
 To use another database, set `ARTIFACTR_TEST_POSTGRES_URL` yourself, for example `postgresql+asyncpg://user:password@host:5432/db`. Each test creates its own schema there and drops it afterwards.
+
+### The contributor stack and the dev container
+
+`compose.yaml` holds what developing artifactr needs ([ADR-0030][adr-0030]): PostgreSQL by default, and docplan, the reference app, under the `app` profile.
+
+```bash
+docker compose up -d --wait                  # PostgreSQL, as make pg-up does
+docker compose --profile app up -d --build   # and docplan on :8000 (make app-up)
+```
+
+docplan picks its model from `DOCPLAN_MODEL` and the provider's key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) in your environment.
+
+The dev container (`.devcontainer/`) is built on the same file: PostgreSQL runs beside it, and `ARTIFACTR_TEST_POSTGRES_URL` points at it, so `make test` includes the PostgreSQL tests.
+
+**With stackr.** The observability and LLM infrastructure (the OpenTelemetry Collector, Grafana, Langfuse, LiteLLM) lives in [stackr](https://github.com/alexnodeland/stackr), not here. Its stack runs on a Docker network named `stackr`:
+
+- The dev container joins that network when it exists as the container is created, and sets `OTEL_EXPORTER_OTLP_ENDPOINT` to stackr's Collector and `LANGFUSE_BASE_URL` to its Langfuse. `.devcontainer/initialize.sh` checks on the host, so start stackr first, or rebuild the container after starting it.
+- docplan joins it with the stackr overlay:
+
+  ```bash
+  docker compose -f compose.yaml -f compose.stackr.yaml --profile app up -d --build
+  ```
+
+CI validates every Compose file without starting containers.
 
 ## How work flows: trunk-based development
 
@@ -113,6 +138,7 @@ By contributing, you agree that your contributions are licensed under the [MIT L
 
 [adr-0014]: docs/adr/0014-trunk-based-development-with-rfcs-and-adrs.md
 [adr-0015]: docs/adr/0015-quality-gates.md
+[adr-0030]: docs/adr/0030-compose-and-dev-containers.md
 [adrs]: docs/adr/README.md
 [architecture]: docs/architecture.md
 [code-of-conduct]: CODE_OF_CONDUCT.md

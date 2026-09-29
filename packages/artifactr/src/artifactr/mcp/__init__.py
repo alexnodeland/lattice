@@ -11,6 +11,6 @@ are tools, and changes arrive as resource-updated notifications::
         yield
 """
 
-from artifactr.mcp.server import INSTRUCTIONS, ArtifactrMcp, ResolveClient, artifact_uri
+from artifactr.mcp.server import INSTRUCTIONS, ArtifactrMcp, McpContext, ResolveClient, artifact_uri
 
-__all__ = ["INSTRUCTIONS", "ArtifactrMcp", "ResolveClient", "artifact_uri"]
+__all__ = ["INSTRUCTIONS", "ArtifactrMcp", "McpContext", "ResolveClient", "artifact_uri"]

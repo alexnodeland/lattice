@@ -13,6 +13,7 @@ from mcp.server.subscriptions import InMemorySubscriptionBus, ResourceUpdated, S
 from mcp.shared.exceptions import MCPError
 from mcp.types import INVALID_PARAMS, SubscriptionsListenRequestParams
 from starlette.applications import Starlette
+from starlette.requests import Request
 
 from artifactr.agent import (
     Runner,
@@ -40,7 +41,15 @@ from artifactr.core import (
 from artifactr.telemetry import annotate, attribution
 from artifactr.workspace import Authorize, Workspace, Workspaces
 
-ResolveClient = Callable[[Context], Awaitable[tuple[TenantId, ExternalAgentActor]]]
+type McpContext = Context[Any, Request]
+"""The context a :data:`ResolveClient` receives: the MCP SDK's ``Context`` of one request.
+
+Over HTTP, ``ctx.request_context.request`` is the Starlette ``Request`` the call arrived in, so
+an authenticator written for the router's ``HTTPConnection`` can take it once it is checked
+for ``None``, which it is in process, as in tests. ``ctx.headers`` holds its headers.
+"""
+
+ResolveClient = Callable[[McpContext], Awaitable[tuple[TenantId, ExternalAgentActor]]]
 """Authenticates an MCP request: returns the client's tenant and actor."""
 
 INSTRUCTIONS = (

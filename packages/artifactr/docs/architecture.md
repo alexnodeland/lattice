@@ -327,7 +327,7 @@ Score ids are derived from the envelope's id, so mirroring the log again replace
 
 ## The LLM gateway
 
-Agents reach models through a LiteLLM proxy, which owns routing, budgets, rate limits and guardrails ([ADR-0031](adr/0031-litellm-proxy-first.md)). The `[litellm]` extra's `litellm_model` is a pydantic-ai model over the proxy, and its `LiteLLMGateway` capability adds to each request, in `before_model_request`, the tenant, workspace, thread and run as LiteLLM metadata and tags, the thread as the session, the person as the user, the trace id and trace context, the workspace's guardrails from an application policy, and the tenant's virtual key from an application callback ([ADR-0043](adr/0043-the-litellm-adapter.md)). A request a guardrail blocks fails the run with the reason `guardrail_blocked` and is not retried ([ADR-0042](adr/0042-typed-run-failures.md)).
+Agents reach models through a LiteLLM proxy, which owns routing, budgets, rate limits and guardrails ([ADR-0031](adr/0031-litellm-proxy-first.md)). The `[litellm]` extra's `litellm_model` is a pydantic-ai model over the proxy, with default model settings like any other, and its `LiteLLMGateway` capability adds to each request, in `before_model_request`, the tenant, workspace, thread and run as LiteLLM metadata and tags, the thread as the session, the person as the user, the trace id and trace context, the workspace's guardrails from an application policy, and the tenant's virtual key from an application callback ([ADR-0043](adr/0043-the-litellm-adapter.md)). A request a guardrail blocks fails the run with the reason `guardrail_blocked` and is not retried ([ADR-0042](adr/0042-typed-run-failures.md)).
 
 ## Live output
 
@@ -531,7 +531,7 @@ Python 3.12+. Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical wi
 - **Core:** conformance fixtures, plus property tests (hypothesis) that patches round-trip: applying `diff(a, b)` to `a` gives `b`.
 - **Workspace:** one suite runs against in-memory storage, SQLite and PostgreSQL. SQLite alone reaches the coverage gate; PostgreSQL runs when `ARTIFACTR_TEST_POSTGRES_URL` is set, and always in CI.
 - **SQL:** concurrent transactions, lease races and cross-process subscriptions on both databases, and a check that the migrations build exactly the models' schema.
-- **Agent:** scripted runs with pydantic-ai's `TestModel` and `FunctionModel`, so no test calls a model API. Assertions are on the events written, including conflicts, steering and deferred pauses.
+- **Agent:** scripted runs with pydantic-ai's `TestModel`, and `FunctionModel`s built by `function_model`, which streams as the `Runner` needs, so no test calls a model API. Assertions are on the events written, including conflicts, steering and deferred pauses.
 - **Adapters:** WebSocket contract tests with FastAPI's `TestClient`, and an MCP client round-trip.
 - **Evaluation:** the feedback source passes evalr's `check_feedback_source` contract; experiments run through evalr's in-memory tracker, and evaluators are evalr's `FunctionEvaluator`s.
 - **Telemetry:** spans and metrics are asserted through the OpenTelemetry SDK's `InMemorySpanExporter` and `InMemoryMetricReader`, and the registry's cardinality policy is checked for every metric.

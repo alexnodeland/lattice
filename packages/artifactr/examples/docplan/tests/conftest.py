@@ -5,11 +5,10 @@ its next step.
 """
 
 import asyncio
-import json
 import socket
 import threading
 import time
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -17,8 +16,9 @@ import pytest
 import uvicorn
 from fastapi.testclient import TestClient
 from pydantic_ai import ModelMessage, ModelResponse, TextPart, ToolCallPart
-from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 
+from artifactr.agent import function_model
 from docplan.app import create_app
 
 
@@ -55,7 +55,7 @@ class Script:
 
     @property
     def model(self) -> FunctionModel:
-        return FunctionModel(self._respond, stream_function=self._stream)
+        return function_model(self._respond)
 
     async def _next(self, messages: list[ModelMessage]) -> ModelResponse:
         step = self.steps.pop(0)
@@ -72,15 +72,6 @@ class Script:
 
     async def _respond(self, messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
         return await self._next(messages)
-
-    async def _stream(self, messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[Any]:
-        for index, part in enumerate((await self._next(messages)).parts):
-            if isinstance(part, TextPart):
-                yield part.content
-            else:
-                assert isinstance(part, ToolCallPart)
-                args = json.dumps(part.args)
-                yield {index: DeltaToolCall(name=part.tool_name, json_args=args)}
 
 
 @pytest.fixture

@@ -40,6 +40,14 @@ See [Running the agent](../guides/agent.md#running-the-agent).
 
 ::: artifactr.agent.TurnOutcome
 
+## Scripted models
+
+See [Testing your application](../guides/testing.md#scripting-the-model).
+
+::: artifactr.agent.function_model
+
+::: artifactr.agent.Respond
+
 ## Live output
 
 See [Live output](../guides/live-output.md).

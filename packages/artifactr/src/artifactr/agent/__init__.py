@@ -21,6 +21,7 @@ from artifactr.agent.live import (
     forward_live,
     to_live,
 )
+from artifactr.agent.models import Respond, function_model
 from artifactr.agent.runner import (
     EndedTurn,
     RunHandle,
@@ -46,6 +47,7 @@ __all__ = [
     "FanoutChannel",
     "LiveChannel",
     "NullChannel",
+    "Respond",
     "RunFailure",
     "RunHandle",
     "Runner",
@@ -59,6 +61,7 @@ __all__ = [
     "artifact_tools",
     "describe_outcome",
     "forward_live",
+    "function_model",
     "last_seen",
     "list_artifacts_text",
     "load_history",

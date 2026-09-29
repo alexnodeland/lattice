@@ -14,6 +14,8 @@ The `mcp` extra. See [External agents over MCP](../guides/mcp.md).
 
 ::: artifactr.mcp.ResolveClient
 
+::: artifactr.mcp.McpContext
+
 ::: artifactr.mcp.artifact_uri
 
 ::: artifactr.mcp.INSTRUCTIONS

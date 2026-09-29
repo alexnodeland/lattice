@@ -121,6 +121,14 @@ if sent.run is not None:  # None when the message steered a running run
 
 `send` returns a `Sent`: the recorded message (`outcome`) and the `RunHandle` it started or resumed, if any. `RunHandle.wait()` returns pydantic-ai's result when the run finishes or pauses. The run's reply is posted to the thread as a `message_posted` event by the agent.
 
+`sent.run` is `None` when the message or answer started no run, which is not a failure:
+
+- the thread's run is already active, in this process or another, so the message steers it
+- an answer leaves some of the paused run's requests unanswered, so the run waits for them
+- another message or answer resumed the paused run first
+
+A message in an idle thread, such as one just created, starts a run unless another starts one first. Code that owns its thread, such as a test or an evaluation, can assert that `sent.run` is set.
+
 | Runner method | What it does |
 |---|---|
 | `send(workspace, thread_id, content)` | Posts a message and starts, steers or resumes a run |

@@ -34,6 +34,13 @@ LiteLLM reads per-request metadata (tenant, tags, session, trace) from the body'
 - Easier: spend, rate limits and guardrail hits break down by tenant and workspace in LiteLLM, and its logs join the turn's trace.
 - Harder: recognising a block depends on LiteLLM's error text mentioning the guardrail; a test pins the shape.
 
+## Amendment (2026-09-29): `litellm_model` takes model settings
+
+`litellm_model` took no model settings, so an application that wanted a temperature, or a reply the proxy mocks for a smoke test, had to set them on every agent with `Agent(model_settings=...)`. stackr's application template found it ([#51](https://github.com/alexnodeland/artifactr/issues/51)).
+
+- **`litellm_model(name, api_base=, api_key=, http_client=, settings=)`** passes `settings` to `OpenAIChatModel` as the model's defaults, as every pydantic-ai model takes them. pydantic-ai merges the model's, the agent's and the run's settings key by key, the run's winning, before `LiteLLMGateway` adds its metadata to the request's `extra_body`, so a model's `extra_body={"mock_response": ...}` reaches the proxy beside the gateway's metadata.
+- reflexr's `litellm_model` takes the same `settings`, with the same meaning (reflexr's ADR-0022, amended the same day).
+
 ## Action items
 
 1. [x] `litellm_model`, `LiteLLMGateway`, `GuardrailBlocked`, tested against a fake proxy.

@@ -14,6 +14,7 @@ from pydantic_ai.capabilities import Instrumentation
 from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.instrumented import InstrumentationSettings
+from pydantic_ai.settings import ModelSettings
 
 from artifactr.agent import ArtifactWorkspace, Runner, Session
 from artifactr.core import ExternalAgentActor, RunEnded, TenantId, UserActor, WorkspaceId
@@ -63,10 +64,14 @@ class FakeProxy:
         stream = "".join(f"data: {json.dumps(event)}\n\n" for event in events) + "data: [DONE]\n\n"
         return httpx2.Response(200, text=stream, headers={"content-type": "text/event-stream"})
 
-    def model(self) -> Any:
+    def model(self, settings: ModelSettings | None = None) -> Any:
         client = httpx2.AsyncClient(transport=httpx2.MockTransport(self.handle))
         return litellm_model(
-            "claude-sonnet", api_base="http://litellm.test", api_key="sk-proxy", http_client=client
+            "claude-sonnet",
+            api_base="http://litellm.test",
+            api_key="sk-proxy",
+            http_client=client,
+            settings=settings,
         )
 
 
@@ -124,6 +129,19 @@ async def test_each_request_carries_the_tenant_session_trace_key_and_guardrails(
     log = json.dumps([e.model_dump(mode="json") for e in await ws.read()])
     assert "sk-acme-secret" not in spans, "keys never reach spans"
     assert "sk-acme-secret" not in log, "or the log"
+
+
+async def test_the_models_settings_reach_the_proxy_beside_the_gateways() -> None:
+    proxy = FakeProxy()
+    settings = ModelSettings(temperature=0.0, extra_body={"mock_response": "Done."})
+    ws = await workspace("acme", "launch")
+    thread = await ws.create_thread()
+    runner = Runner(agent(proxy.model(settings), LiteLLMGateway(tenant_key=acme_key)), app=None)
+    await started(await runner.send(ws, thread.id, "Hello")).wait()
+    [(body, _)] = proxy.requests
+    assert body["temperature"] == 0.0
+    assert body["mock_response"] == "Done.", "a reply the proxy mocks, for smoke tests"
+    assert body["metadata"]["tenant_id"] == "acme", "beside the gateway's metadata"
 
 
 async def test_without_a_person_tenant_key_guardrails_or_trace() -> None:

@@ -3,7 +3,7 @@
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, assert_type
 
 import pytest
 from mcp import Client
@@ -12,10 +12,11 @@ from mcp.server.subscriptions import InMemorySubscriptionBus, ResourceUpdated, S
 from mcp.shared.exceptions import MCPError
 from mcp.types import TextContent, TextResourceContents
 from pydantic_ai import ToolCallPart
+from starlette.requests import Request
 
 from artifactr.agent import Runner
 from artifactr.core import Actor, ExternalAgentActor, TenantId, UserActor, WorkspaceId
-from artifactr.mcp import ArtifactrMcp, artifact_uri
+from artifactr.mcp import ArtifactrMcp, McpContext, artifact_uri
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
 from tests.agent.conftest import Gate, Script, call, make_agent, say
 from tests.artifact_types import Checklist, Note
@@ -315,6 +316,25 @@ async def test_the_http_app_runs_in_a_lifespan(mcp: ArtifactrMcp) -> None:
         await _call(client, "list_artifacts")
     async with mcp.lifespan():
         pass
+
+
+async def test_a_resolver_reads_its_request_without_a_cast(
+    workspaces: Workspaces, ws: Workspace, gate: Gate
+) -> None:
+    async def resolve(ctx: McpContext) -> tuple[TenantId, ExternalAgentActor]:
+        request = assert_type(ctx.request_context.request, Request | None)
+        name = "in process" if request is None else request.headers.get("x-client")
+        return "tenant", ExternalAgentActor(client_id="typed", name=name)
+
+    runner = Runner(make_agent(Script()), app=gate)
+    server = ArtifactrMcp(workspaces, runner, resolve=resolve)
+    try:
+        async with Client(server.server) as client:
+            await _call(client, "create_artifact", kind="note", data={"text": "hi"})
+    finally:
+        await server.aclose()
+    [note] = await ws.artifacts()
+    assert note.updated_by == ExternalAgentActor(client_id="typed", name="in process")
 
 
 def test_resource_uris_carry_the_tenant() -> None:

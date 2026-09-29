@@ -11,13 +11,12 @@ import contextlib
 from collections.abc import AsyncGenerator
 
 from fastapi import FastAPI
-from mcp.server.mcpserver import Context
 
 from artifactr.core import ExternalAgentActor, TenantId
-from artifactr.mcp import ArtifactrMcp
+from artifactr.mcp import ArtifactrMcp, McpContext
 
 
-async def resolve_client(ctx: Context) -> tuple[TenantId, ExternalAgentActor]:
+async def resolve_client(ctx: McpContext) -> tuple[TenantId, ExternalAgentActor]:
     client = await api_keys.verify((ctx.headers or {}).get("authorization"))  # your authentication
     return client.tenant_id, ExternalAgentActor(client_id=client.id, name=client.name)
 
@@ -37,7 +36,20 @@ app.mount("/mcp", mcp.http_app(streamable_http_path="/"))
 
 Clients then connect to `https://your-host/mcp/` with any MCP client that speaks Streamable HTTP. `mcp.server` is the underlying `MCPServer`, if you need to serve it another way.
 
-- **`resolve(ctx)`** authenticates each request and returns the client's tenant and its `ExternalAgentActor`. `ctx.headers` holds the HTTP request's headers. They are the client's own claims, so verify a credential rather than trusting a name.
+- **`resolve(ctx)`** authenticates each request and returns the client's tenant and its `ExternalAgentActor`. `ctx.headers` holds the HTTP request's headers. They are the client's own claims, so verify a credential rather than trusting a name. `ctx` is an `McpContext`, the MCP SDK's `Context` with its request typed. Over HTTP, `ctx.request_context.request` is the Starlette `Request`, so an authenticator written for the router's `resolve_actor` can take it without a cast. Check it for `None` first: the in-process client that tests use has no HTTP request.
+
+  ```python
+  from mcp.server.mcpserver.exceptions import ToolError
+
+
+  async def resolve_client(ctx: McpContext) -> tuple[TenantId, ExternalAgentActor]:
+      request = ctx.request_context.request  # a starlette Request, or None
+      if request is None:
+          raise ToolError("connect over HTTP")
+      user = await authenticate(request)  # the function resolve_actor uses
+      return user.tenant_id, ExternalAgentActor(client_id=user.id, name=f"{user.name} (MCP)")
+  ```
+
 - **`authorize(tenant_id, workspace_id, actor)`**, optional, decides which workspaces of its tenant a client may use ([Authorization](#authorization)).
 - **`runner`** carries out messages, so an external agent can talk to the thread's built-in agent: its `post_message` starts, steers or answers a run like any other message.
 - **`name`** is the server's name (`"artifactr"`), and **`bus`** is where resource notifications go (in-process by default).

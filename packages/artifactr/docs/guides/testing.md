@@ -62,15 +62,17 @@ The override applies to runs the `Runner` starts inside the `with` block, since 
 
 ## Scripting the model
 
-To test what the agent does (which tools it calls, what it proposes, how it reacts to a rejection), script the model's responses with pydantic-ai's `FunctionModel`. The `Runner` streams every run, so the model needs a `stream_function` as well. This `Script` is the pattern artifactr's own tests use, in [`tests/agent/conftest.py`](https://github.com/alexnodeland/artifactr/blob/main/tests/agent/conftest.py):
+To test what the agent does (which tools it calls, what it proposes, how it reacts to a rejection), script the model's responses. pydantic-ai's `FunctionModel` answers each request with a function of yours, but the `Runner` streams every run, so the model needs a stream function too. `artifactr.agent.function_model` builds both from one function, sync or async, that returns a `ModelResponse`: the stream carries its text, its thinking and its tool calls.
+
+A `Script` that answers each request with the next response is then a few lines, as in artifactr's own [`tests/agent/conftest.py`](https://github.com/alexnodeland/artifactr/blob/main/tests/agent/conftest.py):
 
 ```python
-import json
-from collections.abc import AsyncIterator
 from typing import Any
 
 from pydantic_ai import ModelMessage, ModelResponse, TextPart, ToolCallPart
-from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
+from pydantic_ai.models.function import AgentInfo, FunctionModel
+
+from artifactr.agent import function_model
 
 
 class Script:
@@ -82,22 +84,11 @@ class Script:
 
     @property
     def model(self) -> FunctionModel:
-        return FunctionModel(self._respond, stream_function=self._stream)
-
-    def _next(self, messages: list[ModelMessage]) -> ModelResponse:
-        self.requests.append(list(messages))
-        return self.responses.pop(0)
+        return function_model(self._respond)
 
     def _respond(self, messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-        return self._next(messages)
-
-    async def _stream(self, messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[Any]:
-        for index, part in enumerate(self._next(messages).parts):
-            if isinstance(part, TextPart):
-                yield part.content
-            elif isinstance(part, ToolCallPart):
-                args = json.dumps(part.args)
-                yield {index: DeltaToolCall(part.tool_name, args, tool_call_id=part.tool_call_id)}
+        self.requests.append(list(messages))
+        return self.responses.pop(0)
 
 
 def say(text: str) -> ModelResponse:

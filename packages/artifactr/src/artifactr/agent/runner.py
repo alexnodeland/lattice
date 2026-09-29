@@ -130,7 +130,15 @@ class Sent:
     """The recorded message or answer."""
 
     run: RunHandle | None
-    """The run it started or resumed; None if it steered a running run or awaits more answers."""
+    """The run it started or resumed, or ``None`` when it started none, which is not a failure:
+
+    - The thread's run is already active, in this process or another, so the message steers it.
+    - An answer leaves some of the paused run's requests unanswered, so the run waits for them.
+    - Another message or answer resumed the paused run first.
+
+    A message in an idle thread, such as one just created, starts a run unless another starts
+    one first, so code that owns its thread can assert that ``run`` is set.
+    """
 
 
 class Runner[AppDepsT]:

@@ -1,8 +1,7 @@
 """A scripted model and fixtures for agent tests: no test calls a model API."""
 
 import asyncio
-import json
-from collections.abc import AsyncIterator, Callable, Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import pytest
@@ -17,9 +16,9 @@ from pydantic_ai import (
     ToolCallPart,
     ToolReturnPart,
 )
-from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from artifactr.agent import ArtifactWorkspace, RunHandle, Runner, Sent, Session
+from artifactr.agent import ArtifactWorkspace, RunHandle, Runner, Sent, Session, function_model
 from artifactr.core import Envelope, Thread, UserActor
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
 from tests.artifact_types import Checklist, Note
@@ -46,28 +45,12 @@ class Script:
 
     @property
     def model(self) -> FunctionModel:
-        return FunctionModel(self._respond, stream_function=self._stream)
+        return function_model(self._respond)
 
-    def _next(self, messages: list[ModelMessage]) -> ModelResponse:
+    def _respond(self, messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
         self.requests.append(list(messages))
         step = self.steps.pop(0)
         return step(messages) if callable(step) else step
-
-    def _respond(self, messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-        return self._next(messages)
-
-    async def _stream(self, messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[Any]:
-        for index, part in enumerate(self._next(messages).parts):
-            if isinstance(part, TextPart):
-                yield part.content
-            elif isinstance(part, ToolCallPart):
-                yield {
-                    index: DeltaToolCall(
-                        name=part.tool_name,
-                        json_args=json.dumps(part.args),
-                        tool_call_id=part.tool_call_id,
-                    )
-                }
 
     def instructions(self, request: int) -> str:
         last = self.requests[request][-1]

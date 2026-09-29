@@ -288,7 +288,7 @@ services:
       retries: 30
 
   clickhouse:
-    image: clickhouse/clickhouse-server:26.8.14
+    image: clickhouse/clickhouse-server:26.9.2.8
     profiles: [langfuse]
     restart: unless-stopped
     user: "101:101"

@@ -19,6 +19,7 @@ __all__ = [
     "measure_rewrites",
     "rewrite_evaluator",
     "rewrite_rate",
+    "share_changed",
 ]
 
 
@@ -63,9 +64,15 @@ def measure_drop_off(session: Session, *, window: timedelta, now: datetime) -> D
     return DropOff(outcome="pending")
 
 
-def drop_off_rate(verdicts: Iterable[Verdict[DropOff]]) -> float | None:
-    """The share of decided sessions that dropped off; ``None`` if none is decided."""
-    outcomes = [v.value.outcome for v in verdicts if v.value.outcome != "pending"]
+def drop_off_rate(verdicts: Iterable[Verdict[DropOff] | DropOff]) -> float | None:
+    """The share of decided sessions that dropped off; ``None`` if none is decided.
+
+    Args:
+        verdicts: One per session: an evaluator's verdict, or a plain value, such as one from
+            ``measure_drop_off``.
+    """
+    values = [v if isinstance(v, DropOff) else v.value for v in verdicts]
+    outcomes = [v.outcome for v in values if v.outcome != "pending"]
     return outcomes.count("dropped") / len(outcomes) if outcomes else None
 
 
@@ -94,8 +101,8 @@ def measure_rewrites(history: History, *, window: timedelta, threshold: float = 
     """Count the agent's revisions that a person substantially rewrote within a window.
 
     A person's revision rewrites the agent's when it comes within ``window`` after it, before
-    the agent writes again, and changes at least ``threshold`` of its text (one minus
-    ``difflib``'s similarity ratio). Of several such revisions, the last counts.
+    the agent writes again, and changes at least ``threshold`` of its text, as
+    ``share_changed`` measures it. Of several such revisions, the last counts.
 
     Args:
         history: The artifact's revisions.
@@ -114,7 +121,7 @@ def measure_rewrites(history: History, *, window: timedelta, threshold: float = 
                 break
             if later.role == "person":
                 edits.append(later)
-        if edits and _changed(revision.text, edits[-1].text) >= threshold:
+        if edits and share_changed(revision.text, edits[-1].text) >= threshold:
             rewritten += 1
     return Rewrites(
         agent_revisions=written,
@@ -123,13 +130,42 @@ def measure_rewrites(history: History, *, window: timedelta, threshold: float = 
     )
 
 
-def _changed(before: str, after: str) -> float:
-    return 1.0 - SequenceMatcher(None, before, after).ratio()
+def share_changed(before: str, after: str) -> float:
+    """The share of a text that an edit changed, from 0 (none of it) to 1 (all of it).
+
+    It is one minus the texts' similarity: twice the characters they share, over the characters
+    in both. It aligns lines, then compares characters within the lines that changed, with
+    ``difflib``'s autojunk heuristic off. On a text of 200 characters or more, that heuristic
+    ignores every character that makes up more than 1% of it, which calls a small change to a
+    table or a checklist a rewrite.
+
+    Args:
+        before: The text as it was.
+        after: The text as it became.
+    """
+    old, new = before.splitlines(keepends=True), after.splitlines(keepends=True)
+    same = 0
+    for tag, i1, i2, j1, j2 in SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
+        a, b = "".join(old[i1:i2]), "".join(new[j1:j2])
+        same += len(a) if tag == "equal" else _matching(a, b)
+    total = len(before) + len(after)
+    return 1.0 - 2 * same / total if total else 0.0
 
 
-def rewrite_rate(verdicts: Iterable[Verdict[Rewrites]]) -> float | None:
-    """Rewritten over agent revisions across artifacts; ``None`` without any agent revision."""
-    values = [v.value for v in verdicts]
+def _matching(before: str, after: str) -> int:
+    """How many characters two texts share, as ``difflib`` matches them without autojunk."""
+    blocks = SequenceMatcher(None, before, after, autojunk=False).get_matching_blocks()
+    return sum(block.size for block in blocks)
+
+
+def rewrite_rate(verdicts: Iterable[Verdict[Rewrites] | Rewrites]) -> float | None:
+    """Rewritten over agent revisions across artifacts; ``None`` without any agent revision.
+
+    Args:
+        verdicts: One per artifact: an evaluator's verdict, or a plain value, such as one from
+            ``measure_rewrites``.
+    """
+    values = [v if isinstance(v, Rewrites) else v.value for v in verdicts]
     written = sum(v.agent_revisions for v in values)
     return sum(v.rewritten for v in values) / written if written else None
 
@@ -137,7 +173,10 @@ def rewrite_rate(verdicts: Iterable[Verdict[Rewrites]]) -> float | None:
 def rewrite_evaluator(
     *, window: timedelta, threshold: float = 0.2
 ) -> FunctionEvaluator[History, Rewrites]:
-    """Rewrites as an evaluator, versioned by its window and threshold."""
+    """Rewrites as an evaluator, versioned by its window and threshold.
+
+    The leading number is the measure's own version, bumped when its computation changes.
+    """
 
     def rewrites(history: History) -> Rewrites:
         return measure_rewrites(history, window=window, threshold=threshold)
@@ -146,5 +185,5 @@ def rewrite_evaluator(
         rewrites,
         verdict_type=Rewrites,
         name="rewrites",
-        version=f"1:{window.total_seconds():g}s:{threshold:g}",
+        version=f"2:{window.total_seconds():g}s:{threshold:g}",
     )

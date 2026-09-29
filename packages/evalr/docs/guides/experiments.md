@@ -44,8 +44,8 @@ result = await tracker.run_experiment(
     metadata={"prompt": "v2"},
 )
 
-verdicts = result.verdicts("helpfulness-decision").values()
-ratings = [verdict.value.rating for verdict in verdicts if isinstance(verdict.value, Helpfulness)]
+verdicts = result.verdicts("helpfulness-decision", verdict_type=Helpfulness)
+ratings = [verdict.value.rating for verdict in verdicts.values()]
 print(result.run_name, len(result.items), sum(ratings) / len(ratings))
 ```
 
@@ -59,7 +59,7 @@ print(result.run_name, len(result.items), sum(ratings) / len(ratings))
 | `errors` | What failed: the task, or an evaluator by name, with its message |
 | `trace_id` | The trace the example ran in, when there was one |
 
-`result.verdicts(evaluator)` collects one evaluator's verdicts by example id. An experiment can mix evaluators of different verdict types, so their values are typed as `BaseModel`: check the type, as above, before reading a field.
+`result.verdicts(evaluator, verdict_type=)` collects one evaluator's verdicts by example id, typed as the evaluator's verdict type, so their fields can be read as above. It checks that each verdict is of that type, and raises `TypeError` for one that is not. An experiment's evaluators can give different verdict types, so without `verdict_type` the verdicts are typed as `BaseModel`, for code that handles any verdict, such as [scoring](scores.md) them.
 
 - **A failure fails only its own item.** A task that raises leaves the item with no output and records the error; an evaluator that raises (or hands off) records its error while the other evaluators still judge.
 - **Every example runs in its own trace**, and the task's own spans (the agent, its tools, its database calls) nest under it, so each verdict links to exactly what it judged.
@@ -87,8 +87,8 @@ candidate = await tracker.run_experiment(
 
 
 def resolved_share(run: ExperimentResult[Thread]) -> float:
-    verdicts = [v.value for v in run.verdicts("helpfulness-decision").values()]
-    return sum(v.resolved for v in verdicts if isinstance(v, Helpfulness)) / len(verdicts)
+    verdicts = run.verdicts("helpfulness-decision", verdict_type=Helpfulness).values()
+    return sum(v.value.resolved for v in verdicts) / len(verdicts)
 
 
 print(resolved_share(baseline), resolved_share(candidate))

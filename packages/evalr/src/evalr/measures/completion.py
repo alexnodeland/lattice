@@ -20,7 +20,14 @@ class TaskCompletion(BaseModel):
     reason: str | None = Field(default=None, description="Why, in a sentence")
 
 
-def completion_rate(verdicts: Iterable[Verdict[TaskCompletion]]) -> float | None:
-    """The share of sessions judged completed; ``None`` for none."""
-    values = [v.value.completed for v in verdicts]
-    return sum(values) / len(values) if values else None
+def completion_rate(
+    verdicts: Iterable[Verdict[TaskCompletion] | TaskCompletion],
+) -> float | None:
+    """The share of sessions completed; ``None`` for none.
+
+    Args:
+        verdicts: One per session: an evaluator's verdict, or a plain value, such as a person's
+            feedback.
+    """
+    values = [v if isinstance(v, TaskCompletion) else v.value for v in verdicts]
+    return sum(v.completed for v in values) / len(values) if values else None

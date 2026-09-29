@@ -88,6 +88,8 @@ graph LR
 
 Every package may also use the core's own dependencies, pydantic and the OpenTelemetry API. A test enforces the table: what each package imports, that no adapter package imports another, and that nothing imports artifactr or reflexr. The `[all]` extra installs every integration.
 
+The top-level package, `evalr`, re-exports every type in `evalr.core`, which a test enforces, and the functions most applications call. The individual metrics, the tracing helpers, the parts of the score mapping, `split_bucket` and the constants are imported from `evalr.core`.
+
 ## Verdicts
 
 A verdict type is any Pydantic model: an application's feedback type, a library's `Feedback` subclass, or an ad-hoc model. evalr needs nothing from the libraries ([ADR-0001](adr/0001-typed-verdicts-over-any-pydantic-model.md)).
@@ -296,11 +298,12 @@ result = await tracker.run_experiment(
     evaluators=[judge, decider],
     metadata={"prompt": "v2"},
 )
-result.verdicts("helpfulness-judge")  # by example id
+result.verdicts("helpfulness-judge", verdict_type=Helpfulness)  # by example id
 ```
 
 - The task receives the whole example (input, people's verdict, reference) and returns what the evaluators judge. A task that returns the example's input unchanged measures the evaluators themselves against people's verdicts.
 - The result has one `ItemResult` per example in the dataset's order: the output, one verdict per evaluator that succeeded, the errors, and the item's trace. A failing task or evaluator fails only its own item.
+- `result.verdicts(evaluator)` gives one evaluator's verdicts by example id, typed as `BaseModel`, since an experiment's evaluators can give different verdict types. With `verdict_type=`, they are typed as that type, and a verdict of another type raises `TypeError`.
 - `InMemoryExperimentTracker` runs in the process, at most `max_concurrency` examples at once, each in a span named `evalr.experiment.item {name}`, so verdicts record the item's trace. Runs are named `{name} #{n}` unless named, and kept in `runs`.
 - `LangfuseExperimentTracker(client)` (`evalr.langfuse`) runs through Langfuse's experiment API, so results show beside each item's trace. Each example is a local item (its input, `{"verdict", "reference"}` as the expected output, and its id in the metadata) with a trace of its own; the task runs in the item's task span, and each evaluator in a span named after it, so everything they call nests under the item, and the verdicts record its trace. Every verdict becomes the item's scores, named `{type}.{field}`; Langfuse's evaluations hold no text, so the verdict's text fields become the comment of its other scores. The SDK runs an experiment on an event loop of its own, in a worker thread; evalr runs the task and evaluators back on the caller's loop, where their clients live, carrying the trace context across. Runs are named by Langfuse (`{name} - {time}`) unless named.
 
@@ -325,11 +328,14 @@ A formatter renders an input as the text a judge reads. A decision model's state
 
 | Measure | Verdict | How |
 |---|---|---|
-| Task completion | `TaskCompletion`: `completed`, `quality` from 1 to 5, `reason` | Judged: any evaluator over a `Transcript`, such as `DspyJudge(TaskCompletion, inputs=Transcript)`. `completion_rate` is the share completed. |
+| Task completion | `TaskCompletion`: `completed`, `quality` from 1 to 5, `reason` | Judged: any evaluator over a `Transcript`, such as `DspyJudge(TaskCompletion, inputs=Transcript)`, or given by people. `completion_rate` is the share completed. |
 | Drop-off | `DropOff`: `outcome` (`continued`, `dropped`, `pending`) and `cause` (`no_reply`, `unresolved_proposal`) | Computed by `measure_drop_off(session, window=, now=)`: dropped when the agent acted last and no person acted within the window, or a proposal stayed unresolved longer than it; pending until the window has passed. `drop_off_rate` counts decided sessions only. |
-| Rewrites | `Rewrites`: `agent_revisions`, `rewritten`, `rate` | Computed by `measure_rewrites(history, window=, threshold=0.2)`: an agent's revision is rewritten when a person's revision within the window, before the agent writes again, changes at least the threshold's share of its text (one minus `difflib`'s similarity; the last such revision counts). `rewrite_rate` pools revisions across artifacts. |
+| Rewrites | `Rewrites`: `agent_revisions`, `rewritten`, `rate` | Computed by `measure_rewrites(history, window=, threshold=0.2)`: an agent's revision is rewritten when a person's revision within the window, before the agent writes again, changes at least the threshold's share of its text, by `share_changed` (the last such revision counts). `rewrite_rate` pools revisions across artifacts. |
 
-`drop_off_evaluator(window=, now=)` and `rewrite_evaluator(window=, threshold=)` wrap the computed measures as function evaluators, versioned by their settings, so they run in experiments and online like any evaluator. The tests compute all three on logs recorded in artifactr's and reflexr's shapes, read without importing either library.
+- **Rates read verdicts or values.** `completion_rate`, `drop_off_rate` and `rewrite_rate` take, one per session or artifact, an evaluator's `Verdict` or the verdict type's value itself, such as people's feedback or a measure computed directly. A made-up `people()` evaluator was not added: it would pass people's feedback off as an evaluator's. A library's feedback type that subclasses the measure's type, such as artifactr's `TaskCompletion`, counts as one.
+- **`share_changed(before, after)`** is the share of a text an edit changed. It aligns lines, then compares characters within the lines that changed, with `difflib`'s autojunk heuristic off.
+- `drop_off_evaluator(window=, now=)` and `rewrite_evaluator(window=, threshold=)` wrap the computed measures as function evaluators, versioned by their settings (`drop-off` at `1:3600s`, `rewrites` at `2:3600s:0.2`), so they run in experiments and online like any evaluator. The leading number is the measure's own version, bumped when its computation changes.
+- The tests compute all three on logs recorded in artifactr's and reflexr's shapes, read without importing either library.
 
 ## Metrics
 

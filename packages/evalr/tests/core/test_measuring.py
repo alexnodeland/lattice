@@ -78,11 +78,17 @@ async def test_best_of_keeps_the_given_evaluator_on_a_tie() -> None:
     assert chosen is first
 
 
-async def test_optimize_needs_labelled_examples_on_both_sides() -> None:
+async def test_a_small_dataset_is_measured_until_it_can_be_split() -> None:
+    few = dataset().filter(lambda e: e.id in {"d-0", "d-1"})
+    train, validate = few.labelled().split(0.2)
     evaluator = FunctionEvaluator(perfect, verdict_type=Helpfulness)
-    unlabelled = dataset().filter(lambda e: e.verdict is None)
-    with pytest.raises(ValueError, match="needs labelled examples"):
-        await optimize(evaluator, train=dataset(), validate=unlabelled, optimizer=BestOf([]))
+    with pytest.raises(
+        ValueError,
+        match=r"has 2 to train on and 0 to validate on: a small dataset can split with nothing on "
+        r"one side\. Until there are enough to split, measure the evaluator on all of them instead",
+    ):
+        await optimize(evaluator, train=train, validate=validate, optimizer=BestOf([]))
+    assert (await measure(evaluator, few)).agreement.score == 1.0
 
 
 async def test_optimize_refuses_shared_examples() -> None:

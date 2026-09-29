@@ -1,5 +1,6 @@
 import asyncio
 
+import pytest
 from pydantic import BaseModel
 
 from evalr.contracts import ContractInput, ContractVerdict
@@ -44,6 +45,36 @@ async def test_each_example_runs_in_its_own_span(spans: Spans) -> None:
     traces = {f"{context_of(s).trace_id:032x}" for s in items}
     assert {item.trace_id for item in result.items} == traces
     assert result.verdicts("judge").keys() == {"example-0", "example-1", "example-2"}
+
+
+class Length(BaseModel):
+    characters: int
+
+
+def length(output: Echo) -> Length:
+    return Length(characters=len(output.title))
+
+
+async def test_verdicts_are_typed_by_the_verdict_type_given() -> None:
+    result = await InMemoryExperimentTracker().run_experiment(
+        "exp",
+        dataset=contract_dataset("d", count=2),
+        task=echo,
+        evaluators=[
+            FunctionEvaluator(judge, verdict_type=ContractVerdict),
+            FunctionEvaluator(length, verdict_type=Length),
+        ],
+    )
+    judged = result.verdicts("judge", verdict_type=ContractVerdict)
+    ratings: list[int] = [verdict.value.rating for verdict in judged.values()]
+    assert ratings == [3, 3]
+    assert judged == result.verdicts("judge")
+    lengths = result.verdicts("length", verdict_type=Length)
+    assert [verdict.value.characters for verdict in lengths.values()] == [8, 8]
+    assert result.verdicts("length", verdict_type=BaseModel).keys() == {"example-0", "example-1"}
+    assert result.verdicts("nobody", verdict_type=Length) == {}
+    with pytest.raises(TypeError, match="length gave example-0 a verdict of type Length, not Echo"):
+        result.verdicts("length", verdict_type=Echo)
 
 
 async def test_runs_are_numbered_and_kept() -> None:

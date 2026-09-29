@@ -58,6 +58,8 @@ async def optimize[InputT: BaseModel, VerdictT: BaseModel, EvaluatorT](
 
     GEPA fits a DSPy judge; threshold calibration fits a decision evaluator. Only labelled
     examples are used, and no example may be in both sets, so the validation score is honest.
+    A small dataset can split with nothing on one side; until it has enough examples to split,
+    ``measure`` the evaluator on all of them instead.
 
     Args:
         evaluator: The evaluator to start from. It is not changed.
@@ -73,7 +75,11 @@ async def optimize[InputT: BaseModel, VerdictT: BaseModel, EvaluatorT](
     """
     train, validate = train.labelled(), validate.labelled()
     if not train or not validate:
-        raise ValueError("optimizing needs labelled examples to train on and to validate on")
+        raise ValueError(
+            f"optimizing needs labelled examples in both sets, and has {len(train)} to train on "
+            f"and {len(validate)} to validate on: a small dataset can split with nothing on one "
+            "side. Until there are enough to split, measure the evaluator on all of them instead"
+        )
     shared = sorted({e.id for e in train} & {e.id for e in validate})
     if shared:
         raise ValueError(f"examples in both the training and validation sets: {shared[:5]}")

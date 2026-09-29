@@ -21,19 +21,20 @@ evalr is built as ports and adapters ([Concepts](../concepts.md#ports-and-adapte
 
 ## The top-level package
 
-`evalr` re-exports the names most applications need, so `from evalr import Dataset, measure` works. Each is documented in `evalr.core`:
+`evalr` re-exports every type in `evalr.core`, and the functions most applications call, so `from evalr import Dataset, measure` works. The rest (the individual metrics, the tracing helpers, the parts of the score mapping, `split_bucket` and the constants) is imported from `evalr.core`, where every name is documented:
 
 | Name | Documented in |
 |---|---|
-| `Verdict` | [`evalr.core`: Verdicts](core.md#verdicts) |
+| `Verdict`, `Confidence` | [`evalr.core`: Verdicts](core.md#verdicts) |
 | `FieldKind`, `VerdictField`, `verdict_fields`, `UnsupportedField` | [`evalr.core`: Verdict fields](core.md#verdict-fields) |
 | `Evaluator`, `FunctionEvaluator`, `Fallback`, `HandOff` | [`evalr.core`: Evaluators](core.md#evaluators) |
-| `Example`, `Dataset`, `DatasetStore`, `DatasetNotFound`, `FeedbackSource`, `collect` | [`evalr.core`: Examples and datasets](core.md#examples-and-datasets) |
-| `InputFormatter` | [`evalr.core`: Formatters](core.md#formatters) |
-| `Score`, `ScoreSink`, `scores` | [`evalr.core`: Scores](core.md#scores) |
+| `Example`, `Dataset`, `DatasetStore`, `DatasetNotFound`, `DuplicateExample`, `FeedbackSource`, `collect` | [`evalr.core`: Examples and datasets](core.md#examples-and-datasets) |
+| `Formatter`, `InputFormatter`, `TokenCounter` | [`evalr.core`: Formatters](core.md#formatters) |
+| `Score`, `ScoreType`, `ScoreSink`, `scores` | [`evalr.core`: Scores](core.md#scores) |
 | `ScoreConfig`, `ScoreConfigStore`, `score_configs`, `sync_score_configs` | [`evalr.core`: Score configs](core.md#score-configs) |
-| `ExperimentTracker`, `ExperimentResult` | [`evalr.core`: Experiments](core.md#experiments) |
-| `measure`, `Optimizer`, `optimize` | [`evalr.core`: Measuring and optimizing](core.md#measuring-and-optimizing) |
-| `agreement`, `Agreement`, `calibration`, `evaluator_stats` | [`evalr.core`: Metrics](core.md#metrics) |
+| `ExperimentTracker`, `Task`, `ExperimentResult`, `ItemResult` | [`evalr.core`: Experiments](core.md#experiments) |
+| `measure`, `Measurement`, `Optimizer`, `optimize`, `Training`, `DatasetRef` | [`evalr.core`: Measuring and optimizing](core.md#measuring-and-optimizing) |
+| `agreement`, `Agreement`, `FieldAgreement`, `calibration`, `FieldCalibration`, `evaluator_stats`, `EvaluatorStats` | [`evalr.core`: Metrics](core.md#metrics) |
+| `Judging` | [`evalr.core`: Tracing](core.md#tracing) |
 
 `evalr.__version__` is the installed version.

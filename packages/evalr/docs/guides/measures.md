@@ -8,7 +8,7 @@ Some questions are about a whole workflow rather than one reply: did the session
 | [Drop-off](#drop-off) | `DropOff` | Computed from a `Session`'s activity |
 | [Rewrites](#rewrites) | `Rewrites` | Computed from an artifact's `History` |
 
-Each is a verdict type, so its results are verdicts: they are scored, run in [experiments](experiments.md) and [online](online.md), and summarized like any other.
+Each is a verdict type, so its results are verdicts: they are scored, run in [experiments](experiments.md) and [online](online.md), and summarized like any other. Each has a rate over many sessions or artifacts. A rate reads evaluators' verdicts and plain values alike, so people's feedback, or a measure computed directly, needs no evaluator to be summed up.
 
 ## The inputs
 
@@ -46,7 +46,25 @@ verdict = await completion.evaluate(transcript)
 print(completion_rate([verdict]))
 ```
 
-`TaskCompletion` has `completed` (the request was achieved), `quality` (how well, from 1 to 5) and an optional `reason`. A [decision evaluator](decision-evaluators.md) can judge it too, since its only text field is optional, and people can give it as feedback, so the judge can be [trained](dspy-judges.md#training-with-gepa) and [measured](metrics.md) like any other. `completion_rate(verdicts)` is the share judged completed, or `None` for none.
+`TaskCompletion` has `completed` (the request was achieved), `quality` (how well, from 1 to 5) and an optional `reason`. A [decision evaluator](decision-evaluators.md) can judge it too, since its only text field is optional, and people can give it as feedback, so the judge can be [trained](dspy-judges.md#training-with-gepa) and [measured](metrics.md) like any other.
+
+`completion_rate` is the share of sessions completed, or `None` for none. It reads one answer per session: an evaluator's verdict, or people's `TaskCompletion` feedback as it is:
+
+```python
+from evalr.measures import TaskCompletion, completion_rate
+
+people = [
+    TaskCompletion(completed=True, quality=4),
+    TaskCompletion(completed=False, quality=2, reason="The risks were missing"),
+]
+print(completion_rate(people))
+```
+
+```text
+0.5
+```
+
+A library's feedback type that subclasses `TaskCompletion`, as artifactr's does, counts as one. Where a session has several answers, such as a person who changed their mind, choose one per session first, such as the latest.
 
 ## Drop-off
 
@@ -110,11 +128,13 @@ print(measure_rewrites(history, window=timedelta(hours=1)))
 agent_revisions=2 rewritten=1 rate=0.5
 ```
 
-A person's revision rewrites the agent's when it comes within the window after it, before the agent writes again, and changes at least `threshold` of its text (0.2 by default): one minus `difflib`'s similarity ratio. Of several such revisions, the last counts. `rewrite_rate(verdicts)` pools the revisions of many artifacts: rewritten over all the agent's revisions.
+A person's revision rewrites the agent's when it comes within the window after it, before the agent writes again, and changes at least `threshold` of its text (0.2 by default). Of several such revisions, the last counts. `rewrite_rate(verdicts)` pools the revisions of many artifacts: rewritten over all the agent's revisions.
+
+`share_changed(before, after)` is how much of a text an edit changed, from 0 to 1. It aligns lines, then compares characters within the lines that changed, with `difflib`'s autojunk heuristic off, so a small change to a table or a checklist stays small. Use it to measure edits the same way elsewhere, such as in a function evaluator of your own.
 
 ## Measures as evaluators
 
-`drop_off_evaluator(window=, now=)` and `rewrite_evaluator(window=, threshold=)` wrap the computed measures as [function evaluators](function-evaluators.md), versioned by their settings (`drop-off` at `1:3600s`, `rewrites` at `1:3600s:0.2`), so a change of window is a new version:
+`drop_off_evaluator(window=, now=)` and `rewrite_evaluator(window=, threshold=)` wrap the computed measures as [function evaluators](function-evaluators.md), versioned by their settings (`drop-off` at `1:3600s`, `rewrites` at `2:3600s:0.2`), so a change of window is a new version. The leading number is the measure's own version, bumped when its computation changes.
 
 ```python
 from evalr.measures import drop_off_evaluator, drop_off_rate

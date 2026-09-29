@@ -94,7 +94,7 @@ trained = await optimize(
 )
 ```
 
-`dataset` is a [dataset](datasets.md) of threads with people's `Helpfulness` verdicts. `optimize` uses only the labelled examples, and refuses a training and validation set that share an example, so the validation score is honest.
+`dataset` is a [dataset](datasets.md) of threads with people's `Helpfulness` verdicts. `optimize` uses only the labelled examples, and refuses a training and validation set that share an example, so the validation score is honest. It also refuses a set with no labelled examples, which the [split](datasets.md#splits) of a small dataset can leave: until there are enough to split, [measure](metrics.md#measuring-an-evaluator) the judge on them all instead.
 
 - **The metric** is per-field agreement with people, from 0 to 1: the mean of [`field_agreement`](metrics.md#one-pair-of-verdicts). An answer that is not a valid verdict scores 0.
 - **The feedback** GEPA's reflection model reads names each field the judge got wrong, with both answers ("rating: you said 2, people said 4."), and quotes people's text fields ("People's reason: the refund took a week"), so it learns why people judged as they did. Give your verdict types a reason field, and ask people to fill it.

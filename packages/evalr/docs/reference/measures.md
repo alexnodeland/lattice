@@ -28,7 +28,7 @@ What the measures read, in terms any application's log can be put in.
 
 ## Task completion
 
-Judged, by any evaluator.
+Judged by any evaluator, or given by people.
 
 ::: evalr.measures.TaskCompletion
 
@@ -53,6 +53,8 @@ Computed from an artifact's revisions.
 ::: evalr.measures.Rewrites
 
 ::: evalr.measures.measure_rewrites
+
+::: evalr.measures.share_changed
 
 ::: evalr.measures.rewrite_evaluator
 

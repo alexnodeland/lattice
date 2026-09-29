@@ -80,7 +80,7 @@ An example goes to validation when `split_bucket(id, salt)`, a hash of its id pl
 - the split is the same in every process and on every machine
 - `split(0.2, salt="round-2")` gives an independent split of the same examples
 
-The fraction is an expected share: on a small dataset, the validation set can be larger or smaller than it suggests, or empty.
+The fraction is an expected share: on a small dataset, the validation set can be larger or smaller than it suggests, or empty. [`optimize`](dspy-judges.md#training-with-gepa) refuses a set with no labelled examples: until there are enough examples to split, [measure](metrics.md#measuring-an-evaluator) an evaluator on all of them instead.
 
 ## Stores
 

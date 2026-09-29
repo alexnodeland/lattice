@@ -5,7 +5,7 @@
 | Package | Status |
 |---|---|
 | `evalr.core` | Verdicts, field kinds, the evaluator protocol, function evaluators, datasets, splits and formatters implemented; the other ports and the metrics planned (phase 1) |
-| `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Planned (phase 1) |
+| `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Dataset stores and feedback sources implemented; the other ports planned (phase 1) |
 | `evalr.dspy` | Planned (phase 2) |
 | `evalr.decision` | Planned (phase 3) |
 | `evalr.langfuse`, `evalr.hf` | Planned (phase 4) |
@@ -146,6 +146,25 @@ A `Dataset[InputT, VerdictT]` is an immutable, named collection of examples with
 - `version` is a hash of the examples' content, independent of their order. A trained judge records the version it was trained on.
 - `split(validate=0.2, salt="")` sends an example to validation when `split_bucket(id, salt) < validate`, where the bucket is the first eight bytes of `sha256(salt, id)` as a fraction. So an example never moves between training and validation as others are added or removed, and raising the fraction only moves examples into validation. A different salt gives an independent split.
 - `labelled()` and `filter(predicate)` select examples. `records()` and `Dataset.from_records(...)` convert to and from JSON records, which the Langfuse and Hugging Face integrations build on.
+
+### Stores and sources
+
+A `DatasetStore` saves a dataset under its name and returns the revision it made; `load(name, input_type=, verdict_type=, revision=None)` loads the latest revision or the one given, validating the examples as the types given, and raises `DatasetNotFound` for an unknown name or revision. Every revision stays loadable after later saves, so an experiment or a trained judge can name the exact data it used, and saving the same content again changes nothing a load can see.
+
+| Adapter | Revision | Notes |
+|---|---|---|
+| `InMemoryDatasetStore` (`evalr.memory`) | The content hash | JSON records in memory, validated again on load |
+| `JsonlDatasetStore(root)` (`evalr.jsonl`) | The content hash | A directory per dataset: `dataset.json` names the latest revision and holds the description; each revision is `{hash}.jsonl`, one example to a line, written whole. Names are `/`-separated segments of letters, digits, `.`, `_` and `-`, so they stay under the root. |
+| Langfuse, Hugging Face (phase 4) | | |
+
+A `FeedbackSource[InputT, VerdictT]` yields examples from people's feedback: every example has a verdict, ids are stable, and iterating again yields the same examples. artifactr's and reflexr's `[evals]` extras implement it over their logs; `InMemoryFeedbackSource` holds a fixed list. `collect(name, source)` gathers one into a dataset.
+
+### Contract suites
+
+`evalr.contracts` holds a check per port, which raises `ContractViolation` where an adapter differs from the port's contract. The checks need no test framework, so the libraries run `check_feedback_source` against their own adapters.
+
+- `check_dataset_store(store)`: an unknown name is not found; a saved dataset loads back exactly (name, examples, description); saving again changes nothing; a changed dataset makes a new revision and the earlier one still loads; an unknown revision is not found; loading as a type the examples do not satisfy fails validation.
+- `check_feedback_source(source)`: ids are unique, inputs and verdicts are of the source's types, every example has a verdict, and iterating again yields the same examples.
 
 ## Formatters
 

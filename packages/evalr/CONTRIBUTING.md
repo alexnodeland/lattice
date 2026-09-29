@@ -46,13 +46,15 @@ fix(dspy): keep field descriptions in derived signatures
 docs(adr): record where trained judges are stored
 ```
 
-Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Scopes are package or area names: `core`, `dspy`, `decision`, `langfuse`, `hf`, `docs`, `adr`, `rfc`. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The changelog is generated from these messages.
+Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Scopes are package or area names: `core`, `memory`, `contracts`, `jsonl`, `dspy`, `decision`, `langfuse`, `hf`, `docs`, `adr`, `rfc`. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The changelog is generated from these messages.
 
 ## Dependencies
 
 `pyproject.toml` states the **oldest** versions evalr supports, as wide as correctness allows, so applications can resolve it alongside their own dependencies. `uv.lock` pins what CI and contributors run, and Dependabot keeps the lockfile (not the ranges) current. Raise a lower bound only when the code needs a newer feature or fix, in the same pull request as that code.
 
-The core depends on pydantic and the OpenTelemetry API only. Everything else is an extra (`dspy`, `jev`, `langfuse`, `hf`, or `all`), imported only by the package that adapts it; a test enforces the layering. evalr never imports artifactr or reflexr.
+The core depends on pydantic and the OpenTelemetry API only. Everything else is an extra (`dspy`, `jev`, `langfuse`, `hf`, or `all`), imported only by the adapter package that needs it ([ADR-0006][adr-0006]); a test enforces the layering. evalr never imports artifactr or reflexr.
+
+A new adapter implements a port from `evalr.core`, depends on nothing in evalr but the core, and passes the port's contract suite in `evalr.contracts`.
 
 ## Design: RFCs, ADRs and evergreen docs
 
@@ -99,6 +101,7 @@ By contributing, you agree that your contributions are licensed under the [MIT L
 
 [adr-0004]: docs/adr/0004-trunk-based-development-with-rfcs-and-adrs.md
 [adr-0005]: docs/adr/0005-quality-gates-and-license.md
+[adr-0006]: docs/adr/0006-ports-and-adapters.md
 [adrs]: docs/adr/README.md
 [architecture]: docs/architecture.md
 [code-of-conduct]: CODE_OF_CONDUCT.md

@@ -19,14 +19,18 @@ from importlib.metadata import version
 
 from evalr.core import (
     Dataset,
+    DatasetNotFound,
+    DatasetStore,
     Evaluator,
     Example,
+    FeedbackSource,
     FieldKind,
     FunctionEvaluator,
     InputFormatter,
     UnsupportedField,
     Verdict,
     VerdictField,
+    collect,
     verdict_fields,
 )
 
@@ -34,8 +38,11 @@ __version__ = version("evalr")
 
 __all__ = [
     "Dataset",
+    "DatasetNotFound",
+    "DatasetStore",
     "Evaluator",
     "Example",
+    "FeedbackSource",
     "FieldKind",
     "FunctionEvaluator",
     "InputFormatter",
@@ -43,5 +50,6 @@ __all__ = [
     "Verdict",
     "VerdictField",
     "__version__",
+    "collect",
     "verdict_fields",
 ]

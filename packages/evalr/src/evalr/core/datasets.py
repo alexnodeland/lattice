@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, JsonValue
 
 from evalr.core.fields import verdict_fields
 
-__all__ = ["Dataset", "DuplicateExample", "Example", "split_bucket"]
+__all__ = ["Dataset", "DatasetNotFound", "DuplicateExample", "Example", "split_bucket"]
 
 
 class Example[InputT: BaseModel, VerdictT: BaseModel](BaseModel, frozen=True):
@@ -40,6 +40,10 @@ class Example[InputT: BaseModel, VerdictT: BaseModel](BaseModel, frozen=True):
 
 class DuplicateExample(ValueError):
     """Two examples in one dataset share an id."""
+
+
+class DatasetNotFound(LookupError):
+    """A store has no dataset of that name, or no such revision of it."""
 
 
 def split_bucket(example_id: str, salt: str = "") -> float:
@@ -105,23 +109,22 @@ class Dataset[InputT: BaseModel, VerdictT: BaseModel]:
             duplicates = sorted(i for i, n in counts.items() if n > 1)
             raise DuplicateExample(f"{name}: duplicate example ids {duplicates}")
 
-    @classmethod
-    def from_records(
-        cls,
+    @staticmethod
+    def from_records[I: BaseModel, V: BaseModel](
         name: str,
         records: Iterable[Mapping[str, JsonValue]],
         *,
-        input_type: type[InputT],
-        verdict_type: type[VerdictT],
+        input_type: type[I],
+        verdict_type: type[V],
         description: str = "",
-    ) -> Self:
+    ) -> "Dataset[I, V]":
         """Load a dataset from JSON records, as written by ``records``.
 
         Raises:
             pydantic.ValidationError: A record is not a valid example of these types.
         """
         example_type = Example[input_type, verdict_type]
-        return cls(
+        return Dataset(
             name,
             (example_type.model_validate(r) for r in records),
             input_type=input_type,

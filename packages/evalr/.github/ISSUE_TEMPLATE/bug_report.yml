@@ -21,7 +21,7 @@ body:
     id: package
     attributes:
       label: Package
-      options: [core, dspy, decision, langfuse, hf, docs]
+      options: [core, memory, contracts, jsonl, dspy, decision, langfuse, hf, docs]
     validations:
       required: true
   - type: input

@@ -1,8 +1,7 @@
-"""The evaluator protocol, and evaluators that are plain functions."""
+"""Evaluators that are plain functions."""
 
 import inspect
 from collections.abc import Awaitable, Callable
-from typing import Protocol
 
 from opentelemetry import trace
 from pydantic import BaseModel
@@ -11,35 +10,7 @@ from evalr.core.fields import verdict_fields
 from evalr.core.tracing import get_tracer, judging
 from evalr.core.verdicts import Verdict
 
-__all__ = ["Evaluator", "FunctionEvaluator"]
-
-
-class Evaluator[InputT: BaseModel, VerdictT: BaseModel](Protocol):
-    """Anything that judges an input and returns a typed verdict.
-
-    DSPy judges, decision evaluators and function evaluators all implement it, and so can an
-    application's own. Evaluators are compared by name and version: a changed evaluator must
-    change its version, so that verdicts from before and after never mix.
-    """
-
-    @property
-    def name(self) -> str:
-        """The evaluator's name, recorded on every verdict."""
-        ...
-
-    @property
-    def version(self) -> str:
-        """The evaluator's version, recorded on every verdict."""
-        ...
-
-    @property
-    def verdict_type(self) -> type[VerdictT]:
-        """The Pydantic model the evaluator's verdicts are instances of."""
-        ...
-
-    async def evaluate(self, input: InputT, /) -> Verdict[VerdictT]:
-        """Judge one input."""
-        ...
+__all__ = ["FunctionEvaluator"]
 
 
 class FunctionEvaluator[InputT: BaseModel, VerdictT: BaseModel]:

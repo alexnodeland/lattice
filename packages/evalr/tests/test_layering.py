@@ -16,7 +16,12 @@ SRC = Path(__file__).parent.parent / "src" / "evalr"
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # package: (evalr packages it may import, third-party packages it may import)
     "core": ({"evalr.core"}, {"pydantic", "annotated_types", "opentelemetry"}),
+    "memory": ({"evalr.core", "evalr.memory"}, {"pydantic"}),
+    "contracts": ({"evalr.core", "evalr.contracts"}, {"pydantic"}),
+    "jsonl": ({"evalr.core", "evalr.jsonl"}, {"pydantic"}),
 }
+
+FORBIDDEN = {"artifactr", "reflexr"}
 
 
 def _imports(path: Path) -> set[str]:
@@ -49,3 +54,15 @@ def test_layer_imports_only_what_it_may(layer: str) -> None:
 def test_every_package_has_a_layer() -> None:
     packages = {p.name for p in SRC.iterdir() if (p / "__init__.py").exists()}
     assert packages == set(LAYERS)
+
+
+@pytest.mark.parametrize("layer", sorted(set(LAYERS) - {"core"}))
+def test_adapters_depend_inward_only(layer: str) -> None:
+    own, _ = LAYERS[layer]
+    assert own == {"evalr.core", f"evalr.{layer}"}
+
+
+def test_nothing_imports_the_libraries_that_depend_on_evalr() -> None:
+    for path in sorted(SRC.rglob("*.py")):
+        roots = {name.split(".")[0] for name in _imports(path)}
+        assert not roots & FORBIDDEN, f"{path.relative_to(SRC)} imports {roots & FORBIDDEN}"

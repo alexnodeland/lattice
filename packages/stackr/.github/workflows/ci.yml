@@ -71,9 +71,10 @@ jobs:
           - name: observability
             profiles: observability
             database: supabase
-          - name: everything on local Supabase
+          - name: everything on local Supabase, and an application
             profiles: observability langfuse gateway
             database: supabase
+            app: true
           - name: everything on PostgreSQL
             profiles: observability langfuse gateway
             database: postgres
@@ -98,6 +99,9 @@ jobs:
       - run: make env
       - run: make up
       - run: make smoke
+      # An application from the template, beside the whole stack (ADR-0011).
+      - if: matrix.app
+        run: make smoke-app
       - name: Logs
         if: failure()
         run: |

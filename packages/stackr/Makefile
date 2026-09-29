@@ -60,7 +60,7 @@ TRACES_EXPORTERS = [otlp_grpc/tempo$(if $(filter langfuse,$(PROFILES)),$(comma) 
 GATEWAY_TELEMETRY = $(if $(filter observability,$(PROFILES)),true,false)
 COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEMETRY=$(GATEWAY_TELEMETRY) $(DATABASE_ENV)
 
-.PHONY: help install env up down reset ps logs dashboards tenant validate smoke changelog clean
+.PHONY: help install env up down reset ps logs dashboards tenant validate smoke smoke-app changelog clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -109,6 +109,9 @@ validate: .env ## Validate every configuration without starting containers, as C
 
 smoke: ## Send test telemetry through the running stack and find it (PROFILES as for up)
 	$(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) scripts/smoke $(PROFILES) $(if $(NEEDS_DATABASE),database)
+
+smoke-app: ## Run an application from the template beside the running stack, and trace its agents
+	$(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) SUPABASE="$(SUPABASE)" scripts/smoke app
 
 changelog: ## Regenerate CHANGELOG.md from conventional commits
 	$(UV) run git-cliff --output CHANGELOG.md

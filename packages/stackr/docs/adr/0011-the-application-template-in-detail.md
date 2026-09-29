@@ -88,4 +88,4 @@ Other questions were new: how the two libraries share one application, how feedb
 ## Action items
 
 1. [x] The template, its checks in `make validate`, and CI's template job (RFC-0001 phase 5).
-2. [ ] `make smoke-app`, run by CI after the smoke test of everything on local Supabase.
+2. [x] `make smoke-app`, run by CI after the smoke test of everything on local Supabase.

@@ -17,6 +17,14 @@
 # routed to `default`, masked by `pii-mask`, priced and charged to the key;
 # `prompt-injection` blocks an injection; with observability, the gateway's
 # spans continue the caller's trace in Tempo (and Langfuse, with langfuse).
+# app (with every profile, on local Supabase): an application generated from
+# the template (both libraries, with evals) runs in its app profile beside the
+# stack. A request without a token is refused. A user signed in with local
+# Supabase Auth sends a message (artifactr) and opens a ticket (reflexr); each
+# starts an agent whose model request goes through the gateway on a
+# stackr-smoke key, mocked so no provider is called. Each agent's trace, with
+# the gateway's spans in it, is in Tempo and Langfuse, and the application's
+# metrics are in Prometheus.
 
 # The checks are called through `eventually`, which shellcheck can't follow.
 # shellcheck disable=SC2329
@@ -266,6 +274,173 @@ smoke_langfuse() {
   eventually "the same trace is in Tempo" tempo_has_trace_id
 }
 
+# --- app: an application from the template, in its app profile ----------------
+
+app_name=stackr-smoke-app
+app_port=${SMOKE_APP_PORT:-8800}
+app_url="http://127.0.0.1:$app_port"
+supabase_api="http://127.0.0.1:54321"
+
+# Values from a JSON document on stdin, by a Python expression over `data`.
+json_value() {
+  uv run --quiet python -c 'import json, sys; data = json.load(sys.stdin); print(eval(sys.argv[1]))' "$1"
+}
+
+# The application's API as the signed-in user; the token goes to curl on stdin.
+app_call() {
+  local path=$1
+  shift
+  printf 'header = "Authorization: Bearer %s"\nurl = "%s"\n' "$app_token" "$app_url$path" |
+    curl -fsS --config - "$@"
+}
+app_json() { app_call "$1" -H 'Content-Type: application/json' --data "$2" -o /dev/null; }
+
+# Local Supabase's Auth, with its local keys: the secret key administers users.
+supabase_auth() {
+  local key=$1 path=$2
+  shift 2
+  printf 'header = "apikey: %s"\nheader = "Authorization: Bearer %s"\nurl = "%s"\n' \
+    "$key" "$key" "$supabase_api/auth/v1$path" |
+    curl -fsS --config - -H 'Content-Type: application/json' "$@"
+}
+
+app_compose() { docker compose --project-directory "$app_dir" --profile app "$@"; }
+
+cleanup_app() {
+  [[ -n ${app_dir:-} ]] || return 0
+  app_compose down --volumes --rmi local >/dev/null 2>&1 || true
+  rm -rf "$(dirname "$app_dir")"
+  if [[ -n ${app_key:-} ]]; then
+    gateway_call "$(master_key)" /key/delete -o /dev/null -H 'Content-Type: application/json' \
+      --data "{\"keys\": [\"$app_key\"]}" || true
+  fi
+  if [[ -n ${app_user:-} ]]; then
+    supabase_auth "$supabase_secret" "/admin/users/$app_user" -X DELETE -o /dev/null || true
+  fi
+  # The application's tables, in its own schema on local Supabase's PostgreSQL.
+  docker compose run --rm --no-deps -T db-init psql --no-psqlrc -qc \
+    "DROP SCHEMA IF EXISTS stackr_smoke_app CASCADE" >/dev/null 2>&1 || true
+}
+
+artifactr_turn_trace() {
+  local ended
+  ended=$(app_call "/artifactr/v1/workspaces/$run_id/events" |
+    json_value 'next((e["event"]["run_id"] + " " + e["event"]["status"] for e in data if e["event"]["type"] == "run_ended"), "")')
+  [[ -n $ended ]] || return 1
+  if [[ ${ended#* } != completed ]]; then
+    log "FAIL: the notes agent's turn ended ${ended#* }"
+    status=1
+  fi
+  trace_id=$(app_call "/artifactr/v1/workspaces/$run_id/runs/${ended% *}" |
+    json_value '(data["trace_ids"] or ["none"])[-1]')
+}
+
+reflexr_run_trace() {
+  local run
+  run=$(app_call "/reflexr/v1/workspaces/$run_id/runs" |
+    json_value 'next((r["status"] + " " + (r["trace_ids"] or ["none"])[-1] for r in data if r["status"] in ("succeeded", "dead")), "")')
+  [[ -n $run ]] || return 1
+  if [[ ${run% *} != succeeded ]]; then
+    log "FAIL: the triage run ended ${run% *}"
+    status=1
+  fi
+  trace_id=${run#* }
+}
+
+# The trace has the application's spans and the gateway's.
+app_trace_in_tempo() { tempo_trace_has_service "$app_name" && tempo_trace_has_service litellm; }
+
+smoke_app() {
+  local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE supabase)}
+  if [[ $adapter != supabase ]]; then
+    log "FAIL: app: needs local Supabase, whose Auth signs its users in (STACKR_DATABASE=$adapter)"
+    return 1
+  fi
+  local supabase
+  read -ra supabase <<<"${SUPABASE:-supabase}"
+  unset DOCKER_DEFAULT_PLATFORM
+
+  app_dir="$(mktemp -d)/$app_name"
+  trap cleanup_app EXIT
+  log "app: generating $app_name from the template, and building it"
+  if ! uv run copier copy --quiet --defaults --vcs-ref HEAD --data project_name="stackr smoke app" \
+    --data libraries=both --data evals=true . "$app_dir" 2>/dev/null ||
+    ! (cd "$app_dir" && uv lock --quiet); then
+    log "FAIL: app: generating it from the template"
+    return 1
+  fi
+
+  app_key=$(uv run scripts/create-tenant stackr-smoke --max-budget 1 --allow-mock-responses \
+    --key-alias "$run_id-app" --quiet) || { log "FAIL: app: creating its gateway key"; return 1; }
+  (
+    umask 077
+    cat >"$app_dir/.env" <<ENV
+APP_PORT=$app_port
+OTEL_METRIC_EXPORT_INTERVAL=2000
+LANGFUSE_PUBLIC_KEY=$(setting LANGFUSE_PUBLIC_KEY '')
+LANGFUSE_SECRET_KEY=$(setting LANGFUSE_SECRET_KEY '')
+AUTH_ISSUER=$supabase_api/auth/v1
+LITELLM_API_KEY=$app_key
+LITELLM_MOCK_RESPONSE="stackr smoke ok"
+ENV
+  )
+  if ! app_compose up --detach --build --wait --wait-timeout 300 >/dev/null; then
+    log "FAIL: app: starting it in the app profile"
+    app_compose logs --no-color --tail=100 >&2 || true
+    return 1
+  fi
+  log "ok: the application runs in the app profile"
+
+  local code
+  code=$(curl -s -o /dev/null -w '%{http_code}' "$app_url/artifactr/v1/workspaces/$run_id/artifacts")
+  if [[ $code == 401 ]]; then
+    log "ok: a request without a token is refused"
+  else
+    log "FAIL: a request without a token answered $code, not 401"
+    status=1
+  fi
+
+  local keys
+  keys=$("${supabase[@]}" status -o env 2>/dev/null) || { log "FAIL: app: supabase status"; return 1; }
+  supabase_secret=$(sed -n 's/^SECRET_KEY="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' <<<"$keys")
+  local publishable password
+  publishable=$(sed -n 's/^PUBLISHABLE_KEY="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' <<<"$keys")
+  password=$(random_hex 16)
+  local user="{\"email\": \"$run_id@stackr.local\", \"password\": \"$password\""
+  local tenant='"email_confirm": true, "app_metadata": {"tenant_id": "stackr-smoke"}'
+  if ! app_user=$(supabase_auth "$supabase_secret" /admin/users --data "$user, $tenant}" |
+    json_value 'data["id"]') ||
+    ! app_token=$(supabase_auth "$publishable" "/token?grant_type=password" --data "$user}" |
+      json_value 'data["access_token"]'); then
+    log "FAIL: app: local Supabase didn't sign a user in"
+    return 1
+  fi
+  log "ok: local Supabase signed a user of the tenant stackr-smoke in"
+
+  log "app: a message to the notes agent, and a ticket for the triage agent"
+  app_json "/artifactr/v1/workspaces/$run_id/commands" \
+    '{"type": "command", "command_id": "c1", "command": {"type": "create_thread", "thread_id": "t1"}}'
+  app_json "/artifactr/v1/workspaces/$run_id/commands" \
+    '{"type": "command", "command_id": "c2", "command": {"type": "post_message", "thread_id": "t1", "content": "Say hello."}}'
+  app_json "/reflexr/v1/workspaces/$run_id/events" \
+    '{"event": {"type": "ticket.opened", "subject": "Smoke", "body": "Is the smoke test passing?"}}'
+
+  local agent
+  for agent in artifactr reflexr; do
+    if [[ $agent == artifactr ]]; then
+      eventually "the notes agent's turn ended" artifactr_turn_trace || continue
+    else
+      eventually "the triage agent's run ended" reflexr_run_trace || continue
+    fi
+    eventually "the $agent agent's trace, through the gateway, is in Tempo" app_trace_in_tempo
+    eventually "the $agent agent's trace is in Langfuse" langfuse_has_trace
+  done
+  eventually "the application's completed turn is counted in Prometheus" prometheus_has \
+    "artifactr_turns_total{job=\"$app_name\", artifactr_workspace_id=\"$run_id\", artifactr_turn_outcome=\"completed\"}"
+  eventually "the application's succeeded run is counted in Prometheus" prometheus_has \
+    "reflexr_runs_total{job=\"$app_name\", reflexr_workspace_id=\"$run_id\", reflexr_run_status=\"succeeded\"}"
+}
+
 profiles=("$@")
 ((${#profiles[@]} > 0)) || profiles=(observability)
 for profile in "${profiles[@]}"; do
@@ -274,6 +449,7 @@ for profile in "${profiles[@]}"; do
     database) smoke_database || status=1 ;;
     langfuse) smoke_langfuse || status=1 ;;
     gateway) smoke_gateway || status=1 ;;
+    app) smoke_app || status=1 ;;
     *)
       log "smoke: no checks for profile '$profile'"
       status=1

@@ -245,6 +245,7 @@ A generated application:
 | `make tenant NAME=acme` | Create a tenant's team and key on the gateway |
 | `make validate` | Check every configuration without starting containers |
 | `make smoke` | Send test telemetry through the running stack and check it arrives |
+| `make smoke-app` | Run an application from the template beside the running stack, and trace its agents through it |
 
 ## Validation
 
@@ -274,3 +275,5 @@ CI's **template** job generates each of the six variants (three choices of libra
 For the database adapter, it queries over `db-init`'s own connection that Langfuse's database exists, and with local Supabase that its API answers. For `langfuse` (with `observability`), it sends a trace with a known id to the Collector's HTTP port and finds it in Langfuse through the public API (`/api/public/v2/observations`) and in Tempo, which checks the Collector's route and credentials and Langfuse's ingestion end to end.
 
 For `gateway`, it checks that the proxy loaded both guardrails and both model groups, then creates a key on the `stackr-smoke` team (the only one allowed mocked responses) and sends a mocked request with a `traceparent`: it must be routed to `default`, masked by `pii-mask` and priced, the key's spend must be recorded, `prompt-injection` must block an injection, and the proxy's spans must continue the caller's trace in Tempo and Langfuse. No provider key is needed.
+
+For `app` (`make smoke-app`, with every profile on local Supabase), it generates an application with both libraries and evals, and runs it in its app profile beside the stack. A request without a token must be refused. It signs a user of the `stackr-smoke` tenant in with local Supabase Auth, posts a message to the notes agent and opens a ticket for the triage agent; each agent's model request goes through the gateway on a `stackr-smoke` key, with a mocked reply. Each agent's trace must be in Tempo, with the gateway's spans in it, and in Langfuse, and the completed turn and the succeeded run counted in Prometheus (`artifactr_turns_total` and `reflexr_runs_total`, for the run's own workspace). CI runs it after the smoke test of everything on local Supabase.

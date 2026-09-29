@@ -27,6 +27,7 @@ Run `make` on its own to list every command:
 | `make tenant NAME=acme` | Create a tenant's team and key on the gateway |
 | `make validate` | Validate every configuration without starting containers, as CI does |
 | `make smoke` | Send test telemetry through the running stack and check it arrives, as CI does |
+| `make smoke-app` | Run an application from the template beside the running stack, and trace its agents through the gateway, as CI does |
 | `make changelog` | Regenerate `CHANGELOG.md` from commit history |
 
 ## How work flows: trunk-based development
@@ -92,11 +93,11 @@ uv run copier copy --defaults --vcs-ref HEAD --data libraries=both . /tmp/my-app
 cd /tmp/my-app && make install && make check
 ```
 
-`make smoke` runs against a started stack (`make up`): it sends test telemetry through each profile and checks that it lands where it should. CI starts each profile and runs it.
+`make smoke` runs against a started stack (`make up`): it sends test telemetry through each profile and checks that it lands where it should. CI starts each profile and runs it. `make smoke-app`, against the whole stack on local Supabase, runs an application generated from the template in its app profile and traces its agents through the gateway.
 
 ## Definition of done
 
-- [ ] `make validate` passes locally, and `make smoke` for the profiles the change touches.
+- [ ] `make validate` passes locally, and `make smoke` for the profiles the change touches; `make smoke-app` too when the template changes.
 - [ ] Images are pinned, and new settings are in `.env.example`.
 - [ ] The architecture docs reflect the change.
 - [ ] New decisions have an ADR; substantial proposals had an RFC.

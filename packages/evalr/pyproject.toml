@@ -47,6 +47,9 @@ test = [
     "pytest-cov>=7.1",
     "hypothesis>=6.168",
     "opentelemetry-sdk>=1.30",
+    # Reference implementations the metrics are property-tested against.
+    "scipy>=1.16",
+    "scikit-learn>=1.7",
 ]
 lint = ["ruff>=0.16", "pyright>=1.1.414"]
 dev = [

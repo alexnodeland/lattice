@@ -4,7 +4,7 @@
 
 | Package | Status |
 |---|---|
-| `evalr.core` | Verdicts, field kinds, the evaluator, dataset store, feedback source, score sink and experiment tracker ports, function evaluators, datasets, splits, formatters and scores implemented; the optimizer port, `Fallback` and the metrics planned (phase 1) |
+| `evalr.core` | Verdicts, field kinds, the evaluator, dataset store, feedback source, score sink and experiment tracker ports, function evaluators, datasets, splits, formatters, scores and metrics implemented; the optimizer port and `Fallback` planned (phase 1) |
 | `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Dataset stores, feedback sources, score sinks and experiment trackers implemented; the optimizer port planned (phase 1) |
 | `evalr.dspy` | Planned (phase 2) |
 | `evalr.decision` | Planned (phase 3) |
@@ -214,6 +214,22 @@ A formatter renders an input as the text a judge reads. A decision model's state
 - Over budget, the longest list loses its oldest items, after the first (usually the request), with a marker saying how many were omitted. Then the longest remaining text is shortened in the middle. The result always fits.
 - `estimate_tokens` counts one token per three bytes of UTF-8, which overestimates English and is close for scripts of three bytes a character, so a budget measured with it is rarely exceeded. Where the limit is exact, pass the model's tokenizer as `count_tokens`.
 - Summarizing, rather than windowing, is a formatter too: any callable from the input to text fits the `Formatter` protocol.
+
+## Metrics
+
+Agreement compares an evaluator's verdicts with people's, field by field, with the measures that suit each kind. Calibration asks whether its confidence means what it says. Every measure that is undefined for its data (no pairs; kappa when both sides always give one label; Spearman when a side never varies) is `None`, not NaN, so results compare and serialize cleanly.
+
+| Function | Measures |
+|---|---|
+| `accuracy`, `cohen_kappa` | Binary and categorical fields. Kappa is agreement beyond what the two sides' label frequencies give by chance. |
+| `mean_absolute_error`, `spearman` | Ordinal and numeric fields. Spearman ranks tied values by their average rank. |
+| `brier_score`, `expected_calibration_error` | Confidence against correctness. A verdict's confidence is one probability per field, that its value is right, so both are top-label measures. Calibration error uses equal-width bins, closed below, the last including 1. |
+| `field_agreement(expected, predicted)`, `agreement_score` | One pair of verdicts, per field and overall, from 0 to 1: binary and categorical fields agree fully or not at all; bounded numbers lose agreement in proportion to the distance over their range; unbounded ones as `1 / (1 + distance)`; a missing prediction agrees not at all. Only fields people gave a value count. This is the metric optimizers fit judges to. |
+| `agreement(expected, predicted, verdict_type=)` | Per field over many pairs: `n`, `missing`, the mean per-pair `score`, and accuracy and kappa or mean absolute error and Spearman. A missing prediction counts as a wrong label for accuracy and kappa, and is left out of the error and correlation. |
+| `calibration(expected, verdicts, verdict_type=)` | Per field with confidence: accuracy, mean confidence, calibration error and Brier score. |
+| `evaluator_stats(verdicts)` | Per evaluator version: count, mean, median and 95th-percentile latency (nearest rank), and total and mean cost over the verdicts that report one. |
+
+The measures over pairs are property-tested against scikit-learn and SciPy, and calibration error against a NumPy computation.
 
 ## Observability
 

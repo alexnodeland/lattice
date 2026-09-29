@@ -18,6 +18,7 @@ See ``docs/architecture.md`` for the design.
 from importlib.metadata import version
 
 from evalr.core import (
+    Agreement,
     Dataset,
     DatasetNotFound,
     DatasetStore,
@@ -34,7 +35,10 @@ from evalr.core import (
     UnsupportedField,
     Verdict,
     VerdictField,
+    agreement,
+    calibration,
     collect,
+    evaluator_stats,
     scores,
     verdict_fields,
 )
@@ -42,6 +46,7 @@ from evalr.core import (
 __version__ = version("evalr")
 
 __all__ = [
+    "Agreement",
     "Dataset",
     "DatasetNotFound",
     "DatasetStore",
@@ -59,7 +64,10 @@ __all__ = [
     "Verdict",
     "VerdictField",
     "__version__",
+    "agreement",
+    "calibration",
     "collect",
+    "evaluator_stats",
     "scores",
     "verdict_fields",
 ]

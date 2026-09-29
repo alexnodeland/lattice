@@ -19,6 +19,7 @@ Grafana's dashboard JSON is long and repetitive, and hand edits to it drift: a p
   - exemplars on latency panels, which link to traces
 
   The JSON files are checked in, and a test fails if they differ from the script's output.
+
 - **The test checks every query:**
   - its series are Prometheus names of registry metrics (artifactr's own, or the external ones the registry lists), as the OTLP translation writes them
   - for artifactr's metrics, every label it matches or groups by is an attribute the registry declares, or a resource label

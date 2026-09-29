@@ -30,6 +30,7 @@
   - metadata for the tenant, workspace, thread, run and trigger
 
   Values are made ASCII and cut to 200 characters. Langfuse's baggage option would put them on outgoing HTTP requests.
+
 - **`configure_telemetry(langfuse=True)` puts Langfuse on the same tracer provider**, as a second span processor with the filter, so the Collector and Langfuse see the same spans, and shuts the client down with the rest. `langfuse_client(...)` does the same for applications that configure the SDK themselves.
 - **Score config names Langfuse refuses raise.** Langfuse accepts 35 characters from a small alphabet; a longer `{type}.{field}` raises with the fix (a shorter `name=`), because renaming it silently would break the link between scores and their config.
 

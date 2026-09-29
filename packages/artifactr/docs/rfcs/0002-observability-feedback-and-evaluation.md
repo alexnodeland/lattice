@@ -5,6 +5,7 @@
 **Created:** 2026-09-28
 **Discussion:** accepted on 2026-09-28
 **Siblings:**
+
 - [reflexr RFC-0002](https://github.com/alexnodeland/reflexr/blob/main/docs/rfcs/0002-observability-feedback-and-evaluation.md) makes the same changes in reflexr.
 - [evalr RFC-0001](https://github.com/alexnodeland/evalr/blob/main/docs/rfcs/0001-v0.1-implementation-plan.md) builds the shared eval kit.
 - [stackr RFC-0001](https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0001-v0.1-implementation-plan.md) builds the infrastructure template these run on.
@@ -71,6 +72,7 @@ The same capabilities are planned for reflexr, and the combined system will need
   - `artifactr.stream.connections` (up-down counter) and `artifactr.stream.disconnects` (by close code)
 
   pydantic-ai adds `gen_ai.client.token.usage` and `operation.cost`. Tempo's metrics generator adds span metrics and service graphs.
+
 - **Cardinality policy.** Thread, turn, run, artifact and message ids are **never** metric attributes; those granularities come from traces, linked through exemplars. Tenant and workspace are attributes by default, and `metrics_detail="workspace" | "tenant" | "none"` limits them for large deployments.
 - **Dashboards** live in `deploy/grafana/dashboards/`, provisioned in Compose:
   - Overview: all tenants

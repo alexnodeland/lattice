@@ -114,7 +114,13 @@ testpaths = ["tests"]
 addopts = ["--strict-markers", "--strict-config", "-ra"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # backoff (a Langfuse dependency, unmaintained since 2.2.1 in 2022) calls
+    # asyncio.iscoroutinefunction, which Python 3.14 deprecates. As an error, the warning would
+    # stop Langfuse's background uploads in the tests; outside them Python ignores it.
+    "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning:backoff",
+]
 
 [tool.coverage.run]
 branch = true

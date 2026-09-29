@@ -8,7 +8,7 @@
 | `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Implemented |
 | `evalr.dspy` | Implemented |
 | `evalr.decision` | Implemented |
-| `evalr.langfuse` | Dataset store implemented; score sink and experiment tracker planned (phase 4) |
+| `evalr.langfuse` | Implemented |
 | `evalr.hf` | Planned (phase 4) |
 | End-to-end measures and online helpers | Planned (phase 5) |
 
@@ -260,7 +260,8 @@ A `FeedbackSource[InputT, VerdictT]` yields examples from people's feedback: eve
 
 - A score's id is a UUID derived from its subject (a given key, else the verdict's trace, else a hash of the verdict), the evaluator, its version and the score's name. So recording a verdict again replaces its scores, and a new evaluator version adds new ones rather than overwriting.
 - The evaluator, its version and the field's confidence travel as the score's metadata.
-- A `ScoreSink` records scores, idempotently by id. `InMemoryScoreSink` keeps them by id; Langfuse is phase 4, and OpenTelemetry evaluation events phase 5.
+- A `ScoreSink` records scores, idempotently by id. `InMemoryScoreSink` keeps them by id. OpenTelemetry evaluation events are phase 5.
+- `LangfuseScoreSink(client)` (`evalr.langfuse`) records them with `create_score`, keeping each score's id as Langfuse's `score_id`, so recording a verdict again replaces its scores; the metadata carries the evaluator, version and confidence. Langfuse attaches scores to traces, so a score without one is refused. Langfuse sends in the background; `flush()` waits.
 
 ## Experiments
 
@@ -283,7 +284,8 @@ result.verdicts("helpfulness-judge")  # by example id
 
 - The task receives the whole example (input, people's verdict, reference) and returns what the evaluators judge. A task that returns the example's input unchanged measures the evaluators themselves against people's verdicts.
 - The result has one `ItemResult` per example in the dataset's order: the output, one verdict per evaluator that succeeded, the errors, and the item's trace. A failing task or evaluator fails only its own item.
-- `InMemoryExperimentTracker` runs in the process, at most `max_concurrency` examples at once, each in a span named `evalr.experiment.item {name}`, so verdicts record the item's trace. Runs are named `{name} #{n}` unless named, and kept in `runs`. Langfuse's experiments are phase 4.
+- `InMemoryExperimentTracker` runs in the process, at most `max_concurrency` examples at once, each in a span named `evalr.experiment.item {name}`, so verdicts record the item's trace. Runs are named `{name} #{n}` unless named, and kept in `runs`.
+- `LangfuseExperimentTracker(client)` (`evalr.langfuse`) runs through Langfuse's experiment API, so results show beside each item's trace. Each example is a local item (its input, `{"verdict", "reference"}` as the expected output, and its id in the metadata) with a trace of its own; the task runs in the item's task span, and each evaluator in a span named after it, so everything they call nests under the item, and the verdicts record its trace. Every verdict becomes the item's scores, named `{type}.{field}`; Langfuse's evaluations hold no text, so the verdict's text fields become the comment of its other scores. The SDK runs an experiment on an event loop of its own, in a worker thread; evalr runs the task and evaluators back on the caller's loop, where their clients live, carrying the trace context across. Runs are named by Langfuse (`{name} - {time}`) unless named.
 
 ## Formatters
 

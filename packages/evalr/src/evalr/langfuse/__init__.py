@@ -6,5 +6,14 @@ package adapts it to the ``DatasetStore``, ``ScoreSink`` and ``ExperimentTracker
 """
 
 from evalr.langfuse.datasets import ITEM_NAMESPACE, LangfuseDatasetStore, item_id
+from evalr.langfuse.experiments import LangfuseExperimentTracker, evaluations
+from evalr.langfuse.scores import LangfuseScoreSink
 
-__all__ = ["ITEM_NAMESPACE", "LangfuseDatasetStore", "item_id"]
+__all__ = [
+    "ITEM_NAMESPACE",
+    "LangfuseDatasetStore",
+    "LangfuseExperimentTracker",
+    "LangfuseScoreSink",
+    "evaluations",
+    "item_id",
+]

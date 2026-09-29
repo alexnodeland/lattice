@@ -27,6 +27,18 @@ Grafana's dashboard JSON is long and repetitive, and hand edits to it drift: a p
 - **Release assets:** when a release is published, a workflow attaches each dashboard file and a `artifactr-grafana-dashboards-<tag>.tar.gz` bundle to it. It can also be run by hand for an existing release. It never creates releases or tags.
 - CI checks the files are valid JSON without starting Grafana.
 
+### Amendment (2026-09-29): as stackr runs them
+
+reflexr's port of these dashboards, run against stackr's Prometheus and Grafana ([reflexr ADR-0038](https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0038-dashboards-generated-tested-and-released.md)), found three problems that artifactr's dashboards had too:
+
+- **The release asset is `artifactr-dashboards-<version>.tar.gz`**, with the tag's `v` left out: the archive stackr's `scripts/fetch-dashboards` downloads from the release tagged `v<version>`. stackr would never have found the `artifactr-grafana-dashboards-<tag>.tar.gz` bundle above. The workflow still attaches each dashboard file too, and still creates no releases or tags.
+- **Every query has a one-minute min step.** The OpenTelemetry SDK exports metrics once a minute by default, and stackr's data source leaves Grafana's scrape interval at 15 seconds, so `$__rate_interval` came out at one minute: most windows held one sample, and rate panels showed "No data". With the min step, Grafana makes `$__rate_interval` at least four minutes, so every rate spans several exports.
+- **`$job`'s "All" is the services artifactr's metrics come from** (those that record `artifactr.commands`), not `.*`. The external metrics' names are shared: stackr's LiteLLM proxy records `gen_ai.client.token.usage` too, and every FastAPI or SQLAlchemy service records the HTTP and database pool metrics, so "All" added other services' tokens, requests and connections to artifactr's. `$tenant` and `$workspace` keep `.*`, which also matches series without the label.
+
+The test now also checks that every query has the min step, that `$job`'s "All" is not `.*`, and that every legend names only labels its query groups by. It runs the workflow's packaging step, and checks the archive's name against stackr's and that stackr's filter finds every dashboard in it.
+
+To revisit: a deployment that exports metrics less often than once a minute needs a longer min step. stackr's data source could declare the export interval as its scrape interval instead, for every library's dashboards.
+
 ## Options considered
 
 | Option | Drift between dashboards | Drift from the registry |
@@ -44,3 +56,4 @@ Grafana's dashboard JSON is long and repetitive, and hand edits to it drift: a p
 ## Action items
 
 1. [x] Seven dashboards, the tests, CI's JSON check and the release workflow.
+2. [x] The archive name stackr fetches, the one-minute min step and `$job`'s "All", with tests (2026-09-29).

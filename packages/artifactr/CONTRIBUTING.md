@@ -25,7 +25,7 @@ Run `make` on its own to list every command:
 | `make docs` | Build the documentation site in strict mode and check that its lists rendered, as CI does |
 | `make docs-serve` | Serve the documentation site with live reload at <http://localhost:8000> |
 | `make schema` | Regenerate `schemas/artifactr.v1.json` from the protocol models (a test fails if it drifts) |
-| `make dashboards` | Regenerate the Grafana dashboards in `deploy/grafana/dashboards/` from `scripts/grafana_dashboards.py` (a test fails if they drift) |
+| `make dashboards` | Regenerate the Grafana dashboards in `deploy/grafana/dashboards/` from `scripts/grafana_dashboards.py` (a test fails if they drift). Each published release gets them as assets, and as `artifactr-dashboards-<version>.tar.gz` for stackr, from the `Release assets` workflow |
 | `make pg-up` / `make pg-down` | Start or stop PostgreSQL for the SQL tests, from `compose.yaml` (needs Docker) |
 | `make app-up` | Build and start docplan, the reference app, on PostgreSQL, at <http://localhost:8000> |
 | `make test-pg` | Run the tests on PostgreSQL as well as SQLite |

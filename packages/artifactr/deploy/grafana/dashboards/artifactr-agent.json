@@ -45,7 +45,7 @@
         "refresh": 2,
         "includeAll": true,
         "multi": true,
-        "allValue": ".*",
+        "allValue": null,
         "sort": 1,
         "current": {
           "selected": true,
@@ -116,6 +116,7 @@
           "refId": "A",
           "expr": "sum by (gen_ai_request_model, gen_ai_token_type) (rate(gen_ai_client_token_usage_sum{job=~\"$job\"}[$__rate_interval]))",
           "legendFormat": "{{gen_ai_request_model}} {{gen_ai_token_type}}",
+          "interval": "1m",
           "exemplar": false,
           "datasource": {
             "type": "prometheus",
@@ -159,6 +160,7 @@
           "refId": "A",
           "expr": "sum by (gen_ai_request_model) (rate(operation_cost_sum{job=~\"$job\"}[$__rate_interval]))",
           "legendFormat": "{{gen_ai_request_model}}",
+          "interval": "1m",
           "exemplar": false,
           "datasource": {
             "type": "prometheus",
@@ -202,6 +204,7 @@
           "refId": "A",
           "expr": "histogram_quantile(0.95, sum by (le, gen_ai_request_model) (rate(gen_ai_client_operation_time_to_first_chunk_seconds_bucket{job=~\"$job\"}[$__rate_interval])))",
           "legendFormat": "{{gen_ai_request_model}} p95",
+          "interval": "1m",
           "exemplar": false,
           "datasource": {
             "type": "prometheus",
@@ -245,6 +248,7 @@
           "refId": "A",
           "expr": "sum by (artifactr_tenant_id, gen_ai_token_type) (rate(artifactr_tokens_total{job=~\"$job\", artifactr_tenant_id=~\"$tenant\"}[$__rate_interval]))",
           "legendFormat": "{{artifactr_tenant_id}} {{gen_ai_token_type}}",
+          "interval": "1m",
           "exemplar": false,
           "datasource": {
             "type": "prometheus",
@@ -300,6 +304,7 @@
           "refId": "A",
           "expr": "sum by (artifactr_run_reason) (rate(artifactr_runs_total{job=~\"$job\", artifactr_tenant_id=~\"$tenant\", artifactr_run_status=\"failed\", artifactr_run_reason!=\"\"}[$__rate_interval]))",
           "legendFormat": "{{artifactr_run_reason}}",
+          "interval": "1m",
           "exemplar": false,
           "datasource": {
             "type": "prometheus",
@@ -343,6 +348,7 @@
           "refId": "A",
           "expr": "sum by (artifactr_run_status) (rate(artifactr_runs_total{job=~\"$job\", artifactr_tenant_id=~\"$tenant\"}[$__rate_interval]))",
           "legendFormat": "{{artifactr_run_status}}",
+          "interval": "1m",
           "exemplar": false,
           "datasource": {
             "type": "prometheus",
@@ -386,6 +392,7 @@
           "refId": "A",
           "expr": "histogram_quantile(0.5, sum by (le) (rate(artifactr_turn_duration_seconds_bucket{job=~\"$job\", artifactr_tenant_id=~\"$tenant\"}[$__rate_interval])))",
           "legendFormat": "p50",
+          "interval": "1m",
           "exemplar": true,
           "datasource": {
             "type": "prometheus",
@@ -396,6 +403,7 @@
           "refId": "B",
           "expr": "histogram_quantile(0.95, sum by (le) (rate(artifactr_turn_duration_seconds_bucket{job=~\"$job\", artifactr_tenant_id=~\"$tenant\"}[$__rate_interval])))",
           "legendFormat": "p95",
+          "interval": "1m",
           "exemplar": true,
           "datasource": {
             "type": "prometheus",
@@ -439,6 +447,7 @@
           "refId": "A",
           "expr": "(sum by (gen_ai_tool_name) (rate(artifactr_tool_calls_total{job=~\"$job\", artifactr_tenant_id=~\"$tenant\", artifactr_tool_status=\"error\"}[$__rate_interval]))) / clamp_min(sum by (gen_ai_tool_name) (rate(artifactr_tool_calls_total{job=~\"$job\", artifactr_tenant_id=~\"$tenant\"}[$__rate_interval])), 1e-9)",
           "legendFormat": "{{gen_ai_tool_name}}",
+          "interval": "1m",
           "exemplar": false,
           "datasource": {
             "type": "prometheus",
@@ -482,6 +491,7 @@
           "refId": "A",
           "expr": "sum by (gen_ai_tool_name) (rate(artifactr_tool_calls_total{job=~\"$job\", artifactr_tenant_id=~\"$tenant\", artifactr_tool_status=\"retry\"}[$__rate_interval]))",
           "legendFormat": "{{gen_ai_tool_name}}",
+          "interval": "1m",
           "exemplar": false,
           "datasource": {
             "type": "prometheus",

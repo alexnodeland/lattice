@@ -2,7 +2,12 @@
 
 import importlib.util
 import json
+import os
 import re
+import shutil
+import subprocess
+import tarfile
+import textwrap
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -13,12 +18,20 @@ from artifactr.telemetry import EXTERNAL_METRICS, METRICS, Metric
 
 ROOT = Path(__file__).parent.parent
 DASHBOARDS = ROOT / "deploy" / "grafana" / "dashboards"
+RELEASE_ASSETS = ROOT / ".github" / "workflows" / "release-assets.yml"
+
+STACKR_ARCHIVE = "{library}-dashboards-{version}.tar.gz"
+"""The archive stackr's ``scripts/fetch-dashboards`` downloads from the release tagged
+``v{version}``, with the version's ``v`` left out."""
 
 RESOURCE_LABELS = {"job", "instance", "le", "deployment_environment_name", "service_version"}
 """Labels every series has: from the resource (stackr's Prometheus promotes the last two)."""
 
 KEYWORDS = {"by", "without", "on", "ignoring", "group_left", "group_right", "bool", "and", "or"}
 KEYWORDS |= {"unless", "offset", "inf", "nan"}
+
+LEGEND = re.compile(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}")
+"""A label a legend shows, such as ``{{artifactr_tenant_id}}``."""
 
 SERIES: dict[str, Metric] = {
     series: metric
@@ -51,12 +64,12 @@ def _panels(panels: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return found
 
 
+def _targets(dashboard: dict[str, Any]) -> list[dict[str, Any]]:
+    return [target for panel in _panels(dashboard["panels"]) for target in panel.get("targets", [])]
+
+
 def _queries(dashboard: dict[str, Any]) -> list[str]:
-    queries = [
-        target["expr"]
-        for panel in _panels(dashboard["panels"])
-        for target in panel.get("targets", [])
-    ]
+    queries = [target["expr"] for target in _targets(dashboard)]
     for variable in dashboard["templating"]["list"]:
         selector, _ = _label_values(variable["query"]["query"])
         queries.append(selector)
@@ -94,6 +107,16 @@ def label_names(expr: str) -> set[str]:
     for grouping in re.findall(r"\b(?:by|without)\s*\(([^)]*)\)", expr):
         labels |= {label.strip() for label in grouping.split(",") if label.strip()}
     return labels
+
+
+def grouped_labels(expr: str) -> set[str]:
+    """The labels a PromQL expression's aggregations keep: those it groups ``by``."""
+    return {
+        label.strip()
+        for grouping in re.findall(r"\bby\s*\(([^)]*)\)", expr)
+        for label in grouping.split(",")
+        if label.strip()
+    }
 
 
 def _prometheus(attribute: str) -> str:
@@ -139,6 +162,75 @@ def test_every_query_reads_a_metric_in_the_registry(name: str) -> None:
         assert problems(query) == [], name
 
 
+@pytest.mark.parametrize("name", sorted(_dashboards()))
+def test_legends_name_only_labels_their_query_keeps(name: str) -> None:
+    for target in _targets(_dashboards()[name]):
+        legend = set(LEGEND.findall(target.get("legendFormat", "")))
+        assert legend <= grouped_labels(target["expr"]), (name, target["expr"])
+
+
+@pytest.mark.parametrize("name", sorted(_dashboards()))
+def test_every_query_has_a_one_minute_min_step(name: str) -> None:
+    # The SDK exports metrics every minute, and stackr's data source leaves Grafana's scrape
+    # interval at 15s, so without a min step $__rate_interval is 1m: most windows hold one
+    # sample, and rates come out empty. With it, $__rate_interval is at least 4m.
+    targets = _targets(_dashboards()[name])
+    assert targets
+    assert [target["expr"] for target in targets if target.get("interval") != "1m"] == []
+
+
+@pytest.mark.parametrize("name", sorted(_dashboards()))
+def test_all_services_are_artifactrs(name: str) -> None:
+    # Other services record the external metrics' names too (stackr's LiteLLM proxy records
+    # gen_ai_client_token_usage), so a `.*` "All" would add their series to artifactr's.
+    job, *others = _dashboards()[name]["templating"]["list"]
+    assert job["name"] == "job"
+    assert job["allValue"] is None, "All is artifactr's services, not every job in Prometheus"
+    selector, label = _label_values(job["query"]["query"])
+    assert label == "job"
+    assert {SERIES[series].name for series in metric_names(selector)} <= set(METRICS)
+    assert [variable["allValue"] for variable in others] == [".*"] * len(others)
+
+
+def _script(step: str) -> str:
+    """The shell script a step in the release workflow runs: one line, or a ``run: |`` block."""
+    found = re.search(
+        rf"^( *)- name: {re.escape(step)}\n\1  run: (?:\|\n((?:\1    .*\n)+)|(.+)\n)",
+        RELEASE_ASSETS.read_text(),
+        re.MULTILINE,
+    )
+    assert found, f"the release workflow has no step {step!r} that runs a script"
+    return textwrap.dedent(found.group(2) or found.group(3))
+
+
+def test_the_release_attaches_the_archive_stackr_fetches(tmp_path: Path) -> None:
+    shutil.copytree(DASHBOARDS, tmp_path / "deploy" / "grafana" / "dashboards")
+    github_env = tmp_path / "github.env"
+    environment = {**os.environ, "TAG": "v0.2.0", "GITHUB_ENV": str(github_env)}
+    subprocess.run(
+        ["bash", "-c", _script("Package them")], cwd=tmp_path, env=environment, check=True
+    )
+
+    archive = STACKR_ARCHIVE.format(library="artifactr", version="0.2.0")
+    assert [path.name for path in tmp_path.glob("*.tar.gz")] == [archive]
+    assert github_env.read_text() == f"ARCHIVE={archive}\n"
+    with tarfile.open(tmp_path / archive, "r:gz") as bundle:
+        # The files stackr installs: JSON, skipping hidden files such as macOS's `._*`.
+        installed = {
+            Path(member.name).name
+            for member in bundle.getmembers()
+            if member.isfile()
+            and member.name.endswith(".json")
+            and not Path(member.name).name.startswith(".")
+        }
+    assert installed == set(_dashboards())
+
+    workflow = RELEASE_ASSETS.read_text()
+    upload = 'gh release upload "$TAG" --clobber deploy/grafana/dashboards/*.json "$ARCHIVE"'
+    assert upload in workflow
+    assert re.findall(r"gh release (?:create|edit|delete)|git (?:tag|push)", workflow) == []
+
+
 def test_drift_is_caught() -> None:
     assert problems("sum(rate(artifactr_commands_total[5m]))") == []
     assert problems("sum(rate(artifactr_commits_total[5m]))") == [
@@ -177,4 +269,7 @@ def test_the_query_parser() -> None:
     )
     assert metric_names(expr) == {"a_bucket", "b_total"}
     assert label_names(expr) == {"le", "x", "j", "y"}
+    assert grouped_labels(expr) == {"le", "x"}
+    assert grouped_labels('sum(rate(a_total{t=~"$t"}[5m]))') == set()
+    assert LEGEND.findall("{{a}} by {{ b }} p95") == ["a", "b"]
     assert _label_values('label_values(m{job=~"$job"}, t)') == ('m{job=~"$job"}', "t")

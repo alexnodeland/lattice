@@ -97,7 +97,12 @@ pydantic-ai records `gen_ai.client.token.usage` and `operation.cost` per model r
 
 ### Dashboards
 
-Seven Grafana dashboards ship in [`deploy/grafana/dashboards/`](https://github.com/alexnodeland/artifactr/tree/main/deploy/grafana/dashboards): an overview of every tenant, one tenant, one workspace, the agent and its models, collaboration, the surfaces, and storage. They expect Prometheus with the data source uid `prometheus`, fed over OTLP (Prometheus's own OTLP receiver, or a Collector), which names the series as the registry predicts: `artifactr.commands` becomes `artifactr_commands_total`, `artifactr.commit.duration` becomes `artifactr_commit_duration_seconds`. [stackr](https://github.com/alexnodeland/stackr) provisions them; elsewhere, import the JSON files, or download them from a release's assets. Latency panels show exemplars, which link to the trace of a slow turn or commit.
+Seven Grafana dashboards ship in [`deploy/grafana/dashboards/`](https://github.com/alexnodeland/artifactr/tree/main/deploy/grafana/dashboards): an overview of every tenant, one tenant, one workspace, the agent and its models, collaboration, the surfaces, and storage. They expect Prometheus with the data source uid `prometheus`, fed over OTLP (Prometheus's own OTLP receiver, or a Collector), which names the series as the registry predicts: `artifactr.commands` becomes `artifactr_commands_total`, `artifactr.commit.duration` becomes `artifactr_commit_duration_seconds`. [stackr](https://github.com/alexnodeland/stackr) provisions them by version, from the `artifactr-dashboards-<version>.tar.gz` archive each release attaches; elsewhere, import the JSON files, or download them from a release's assets, one by one or in that archive. Latency panels show exemplars, which link to the trace of a slow turn or commit.
+
+Two of their settings follow from how metrics reach Prometheus:
+
+- **Every query has a one-minute min step.** The OpenTelemetry SDK exports metrics once a minute by default, so Grafana's `$__rate_interval` must span several exports; with the min step it is at least four minutes. Shorter windows hold one sample at most, and rate panels show "No data". If your application exports less often, raise the queries' min step.
+- **The Service variable's "All" is every service that records artifactr's metrics**, not every job in Prometheus. The names of pydantic-ai's metrics and of the HTTP and database pool metrics are shared with other services, such as stackr's LiteLLM proxy, which records `gen_ai.client.token.usage` too; "All" leaves theirs out.
 
 ## The session on every span
 

@@ -15,6 +15,9 @@ from typing import Any
 OUT = Path(__file__).parent.parent / "deploy" / "grafana" / "dashboards"
 PROMETHEUS = {"type": "prometheus", "uid": "prometheus"}
 RATE = "$__rate_interval"
+STEP = "1m"
+"""Each query's min step: the OpenTelemetry SDK exports metrics every minute by default, and
+Grafana makes ``$__rate_interval`` at least four steps, so every rate spans several exports."""
 
 # Selectors for the template variables each dashboard offers.
 JOB = 'job=~"$job"'
@@ -86,7 +89,7 @@ def stat(layout: Layout, title: str, expr: str, *, unit: str, description: str) 
             "title": title,
             "description": description,
             "datasource": PROMETHEUS,
-            "targets": [{"refId": "A", "expr": expr, "datasource": PROMETHEUS}],
+            "targets": [{"refId": "A", "expr": expr, "interval": STEP, "datasource": PROMETHEUS}],
             "fieldConfig": {"defaults": {"unit": unit}, "overrides": []},
             "options": {
                 "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
@@ -121,6 +124,7 @@ def series(
                     "refId": chr(ord("A") + index),
                     "expr": expr,
                     "legendFormat": legend,
+                    "interval": STEP,
                     "exemplar": exemplars,
                     "datasource": PROMETHEUS,
                 }
@@ -137,8 +141,12 @@ def series(
     )
 
 
-def variable(name: str, label: str, query: str) -> dict[str, Any]:
-    """A template variable whose values come from a label."""
+def variable(name: str, label: str, query: str, *, all_value: str | None = ".*") -> dict[str, Any]:
+    """A template variable whose values come from a label.
+
+    "All" matches any value, and series without the label, unless ``all_value`` is ``None``:
+    then it matches the values found.
+    """
     return {
         "name": name,
         "label": label,
@@ -149,7 +157,7 @@ def variable(name: str, label: str, query: str) -> dict[str, Any]:
         "refresh": 2,
         "includeAll": True,
         "multi": True,
-        "allValue": ".*",
+        "allValue": all_value,
         "sort": 1,
         "current": {"selected": True, "text": ["All"], "value": ["$__all"]},
     }
@@ -157,7 +165,13 @@ def variable(name: str, label: str, query: str) -> dict[str, Any]:
 
 def variables(scope: str) -> list[dict[str, Any]]:
     """The template variables down to ``scope``: job, then tenant, then workspace."""
-    found = [variable("job", "Service", "label_values(artifactr_commands_total, job)")]
+    found = [
+        # "All" is every service artifactr's metrics come from, not every job in Prometheus: the
+        # external metrics' names are shared. stackr's LiteLLM proxy records
+        # gen_ai_client_token_usage too, and every FastAPI or SQLAlchemy service records the HTTP
+        # and database pool metrics.
+        variable("job", "Service", "label_values(artifactr_commands_total, job)", all_value=None)
+    ]
     if scope in ("tenant", "workspace"):
         query = f"label_values(artifactr_commands_total{{{JOB}}}, artifactr_tenant_id)"
         found.append(variable("tenant", "Tenant", query))

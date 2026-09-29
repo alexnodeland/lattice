@@ -4,8 +4,8 @@
 
 | Package | Status |
 |---|---|
-| `evalr.core` | Verdicts, field kinds, the evaluator, dataset store, feedback source, score sink and experiment tracker ports, function evaluators, datasets, splits, formatters, scores and metrics implemented; the optimizer port and `Fallback` planned (phase 1) |
-| `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Dataset stores, feedback sources, score sinks and experiment trackers implemented; the optimizer port planned (phase 1) |
+| `evalr.core` | Implemented |
+| `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Implemented |
 | `evalr.dspy` | Planned (phase 2) |
 | `evalr.decision` | Planned (phase 3) |
 | `evalr.langfuse`, `evalr.hf` | Planned (phase 4) |
@@ -128,7 +128,22 @@ An evaluator returns a `Verdict[V]`, an immutable Pydantic model:
 |---|---|---|
 | `FunctionEvaluator` | A sync or async function of the input: a deterministic measure | Given; bump it when the function changes |
 | `DspyJudge` (phase 2) | A DSPy module whose signature comes from the input and verdict types | A hash of the compiled program |
-| `DecisionEvaluator` (phase 3) | A pydantic-ai agent on a decision model, with a language-model fallback | The decision model's id and its thresholds |
+| `DecisionEvaluator` (phase 3) | A pydantic-ai agent on a decision model | The decision model's id and its thresholds |
+| `Fallback(primary, fallback, min_confidence=)` | A composition: the primary judges, and hands off to the fallback | A hash of both evaluators' names and versions, and the threshold |
+
+An evaluator that declines an input raises `HandOff`. `Fallback` hands off when the primary raises it, or, with `min_confidence`, when any field of the primary's verdict is less confident than that. So a decision model backed by a language-model judge is `Fallback(DecisionEvaluator(...), DspyJudge(...), min_confidence=0.7)`: two adapters of one port, neither aware of the other. Each verdict records the evaluator that actually gave it, so the two are measured apart; the composition's span, `evalr.fallback {name}`, records whether and why it handed off. Any other failure propagates.
+
+### Measuring and optimizing
+
+`measure(evaluator, dataset)` judges every labelled example and returns a `Measurement`: the verdicts and errors by example id, agreement with people, calibration, and latency and cost per evaluator version. An example the evaluator fails on, or hands off, counts as a missing prediction.
+
+An `Optimizer[InputT, VerdictT, EvaluatorT]` fits an evaluator to people's verdicts: `optimize(evaluator, train=, validate=)` returns the fitted evaluator, with a new version if it changed, and leaves the one given alone. `optimize(evaluator, train=, validate=, optimizer=)` in the core uses only the labelled examples and refuses sets that share an example, so the validation score is honest.
+
+| Optimizer | Fits | Package |
+|---|---|---|
+| `BestOf(candidates)` | Any evaluator: picks, from it and the candidates, the one that agrees best with people on `train`, and measures the choice on `validate`. A tie keeps the evaluator given. | `evalr.memory` |
+| GEPA (phase 2) | A DSPy judge's instructions, from people's verdicts and their reasons | `evalr.dspy` |
+| Threshold calibration (phase 3) | A decision evaluator's thresholds | `evalr.decision` |
 
 ## Datasets
 
@@ -166,6 +181,8 @@ A `FeedbackSource[InputT, VerdictT]` yields examples from people's feedback: eve
 - `check_dataset_store(store)`: an unknown name is not found; a saved dataset loads back exactly (name, examples, description); saving again changes nothing; a changed dataset makes a new revision and the earlier one still loads; an unknown revision is not found; loading as a type the examples do not satisfy fails validation.
 - `check_feedback_source(source)`: ids are unique, inputs and verdicts are of the source's types, every example has a verdict, and iterating again yields the same examples.
 - `check_score_sink(sink, recorded)`: recording a score again replaces it, every score recorded is kept, and the latest value wins. A sink has no reads, so the caller says how to see what it holds.
+- `check_evaluator(evaluator, inputs)`: each verdict is of the verdict type, names the evaluator that gave it and its version, and records the trace it was judged in (the check judges inside a trace of its own, through the OpenTelemetry API); an evaluator may hand off some inputs but must judge one; judging does not change its name or version.
+- `check_optimizer(optimizer, evaluator, train=, validate=)`: the evaluator given is left alone, and the fitted one gives the same verdict type and passes `check_evaluator`.
 - `check_experiment_tracker(tracker)`: one item per example in the dataset's order; a failed task leaves no output and records its error; a failed evaluator records its error while the others still judge; verdicts record the item's trace; names and the dataset version are kept.
 
 ## Scores

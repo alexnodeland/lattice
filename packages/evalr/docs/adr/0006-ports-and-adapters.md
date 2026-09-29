@@ -106,7 +106,7 @@ evalr is small, but it sits between four external systems and two libraries that
 
 ## Action items
 
-1. [ ] Add the ports, `evalr.memory`, `evalr.jsonl`, `evalr.contracts`, `Fallback` and the layering rules (RFC-0001 phase 1).
+1. [x] Add the ports, `evalr.memory`, `evalr.jsonl`, `evalr.contracts`, `Fallback` and the layering rules (RFC-0001 phase 1).
 2. [ ] Implement the DSPy adapters: `DspyJudge` and GEPA (phase 2).
 3. [ ] Implement the decision adapters: `DecisionEvaluator` and threshold calibration (phase 3).
 4. [ ] Implement the Langfuse and Hugging Face adapters (phase 4).

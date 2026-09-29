@@ -12,6 +12,7 @@ The checks need no test framework.
 """
 
 from evalr.contracts.datasets import check_dataset_store
+from evalr.contracts.evaluators import check_evaluator, check_optimizer
 from evalr.contracts.experiments import ContractOutput, check_experiment_tracker
 from evalr.contracts.feedback import check_feedback_source
 from evalr.contracts.scores import check_score_sink
@@ -23,7 +24,9 @@ __all__ = [
     "ContractVerdict",
     "ContractViolation",
     "check_dataset_store",
+    "check_evaluator",
     "check_experiment_tracker",
     "check_feedback_source",
+    "check_optimizer",
     "check_score_sink",
 ]

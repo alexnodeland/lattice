@@ -29,4 +29,4 @@ artifactr and reflexr record typed feedback from people, as Pydantic models. Eva
 
 ## Action items
 
-1. [ ] Implement the core (RFC-0001 phase 1).
+1. [x] Implement the core (RFC-0001 phase 1).

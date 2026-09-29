@@ -18,7 +18,14 @@ from evalr.core.experiments import ExperimentResult, Task
 from evalr.core.scores import Score
 from evalr.core.verdicts import Verdict
 
-__all__ = ["DatasetStore", "Evaluator", "ExperimentTracker", "FeedbackSource", "ScoreSink"]
+__all__ = [
+    "DatasetStore",
+    "Evaluator",
+    "ExperimentTracker",
+    "FeedbackSource",
+    "Optimizer",
+    "ScoreSink",
+]
 
 
 class Evaluator[InputT: BaseModel, VerdictT: BaseModel](Protocol):
@@ -160,5 +167,31 @@ class ExperimentTracker(Protocol):
 
         Returns:
             One item per example, in the dataset's order.
+        """
+        ...
+
+
+class Optimizer[InputT: BaseModel, VerdictT: BaseModel, EvaluatorT](Protocol):
+    """Fits an evaluator to people's verdicts on a training set, checked on a validation set.
+
+    GEPA fits a DSPy judge's instructions; threshold calibration fits a decision evaluator's
+    thresholds. The evaluator given is not changed: the fitted one is returned, with a new
+    version if it differs.
+    """
+
+    async def optimize(
+        self,
+        evaluator: EvaluatorT,
+        /,
+        *,
+        train: Dataset[InputT, VerdictT],
+        validate: Dataset[InputT, VerdictT],
+    ) -> EvaluatorT:
+        """Fit the evaluator.
+
+        Args:
+            evaluator: The evaluator to start from.
+            train: Labelled examples to fit on.
+            validate: Labelled examples, none of them in ``train``, to check the fit on.
         """
         ...

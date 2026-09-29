@@ -13,12 +13,15 @@ import pytest
 
 SRC = Path(__file__).parent.parent / "src" / "evalr"
 
+# Every package may use the core's own dependencies.
+SHARED = {"pydantic", "opentelemetry"}
+
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
-    # package: (evalr packages it may import, third-party packages it may import)
-    "core": ({"evalr.core"}, {"pydantic", "annotated_types", "opentelemetry"}),
-    "memory": ({"evalr.core", "evalr.memory"}, {"pydantic", "opentelemetry"}),
-    "contracts": ({"evalr.core", "evalr.contracts"}, {"pydantic"}),
-    "jsonl": ({"evalr.core", "evalr.jsonl"}, {"pydantic"}),
+    # package: (evalr packages it may import, third-party packages it may import beyond SHARED)
+    "core": ({"evalr.core"}, {"annotated_types"}),
+    "memory": ({"evalr.core", "evalr.memory"}, set()),
+    "contracts": ({"evalr.core", "evalr.contracts"}, set()),
+    "jsonl": ({"evalr.core", "evalr.jsonl"}, set()),
 }
 
 FORBIDDEN = {"artifactr", "reflexr"}
@@ -48,7 +51,7 @@ def test_layer_imports_only_what_it_may(layer: str) -> None:
             if root == "evalr":
                 assert any(name == p or name.startswith(f"{p}.") for p in own), f"{where}: above"
             else:
-                assert root in third_party, f"{where}: not a dependency of this layer"
+                assert root in third_party | SHARED, f"{where}: not a dependency of this layer"
 
 
 def test_every_package_has_a_layer() -> None:

@@ -1,10 +1,11 @@
-"""Artifact types shared by the tests and the conformance fixtures."""
+"""Artifact and feedback types shared by the tests and the conformance fixtures."""
 
-from typing import ClassVar, Self
+from enum import StrEnum
+from typing import Annotated, ClassVar, Literal, Self
 
 from pydantic import BaseModel, Field
 
-from artifactr.core import Artifact, MarkdownArtifact, WritePolicy
+from artifactr.core import Artifact, Feedback, MarkdownArtifact, WritePolicy
 
 
 class Note(MarkdownArtifact, name="note"):
@@ -39,3 +40,24 @@ class Counter(Artifact, name="counter"):
     """A number, to exercise validation that normalizes data."""
 
     count: int = 0
+
+
+class Helpfulness(Feedback, name="helpfulness", targets={"turn", "thread", "message"}):
+    """A rating of how helpful the agent was."""
+
+    rating: Annotated[int, Field(ge=1, le=5)]
+    reason: str | None = None
+
+
+class Verdict(StrEnum):
+    RIGHT = "right"
+    WRONG = "wrong"
+
+
+class Accuracy(Feedback, name="accuracy", targets={"artifact"}):
+    """Whether an artifact version is correct."""
+
+    correct: bool
+    verdict: Verdict = Verdict.RIGHT
+    tone: Literal["formal", "casual"] = "formal"
+    confidence: Annotated[float, Field(ge=0, le=1)] = 1.0

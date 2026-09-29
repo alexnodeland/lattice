@@ -13,7 +13,14 @@ Every function here is pure. A host uses them in three steps:
 from collections.abc import Mapping
 from typing import assert_never
 
-from artifactr.core.actors import Actor, AgentActor, SystemActor, is_agent, same_participant
+from artifactr.core.actors import (
+    Actor,
+    AgentActor,
+    EvaluatorActor,
+    SystemActor,
+    is_agent,
+    same_participant,
+)
 from artifactr.core.artifacts import Artifact, Versioned, get_artifact_type, load_artifact
 from artifactr.core.commands import (
     AnswerDeferred,
@@ -22,6 +29,7 @@ from artifactr.core.commands import (
     CreateArtifact,
     CreateThread,
     EditArtifact,
+    GiveFeedback,
     PostMessage,
     ProposeChange,
     ProposedChange,
@@ -42,6 +50,7 @@ from artifactr.core.events import (
     ArtifactChanged,
     ArtifactCreated,
     DeferredAnswered,
+    FeedbackGiven,
     FocusChanged,
     MessagePosted,
     ProposalCreated,
@@ -54,6 +63,13 @@ from artifactr.core.events import (
     ThreadModeChanged,
     ToolCalled,
     ToolReturned,
+)
+from artifactr.core.feedback import (
+    ArtifactTarget,
+    MessageTarget,
+    ThreadTarget,
+    TurnTarget,
+    load_feedback,
 )
 from artifactr.core.ids import ArtifactId, ProposalId, RunId, ThreadId, TraceId
 from artifactr.core.patches import Patch, apply_patch, describe_patch, diff
@@ -132,6 +148,8 @@ def _wanted(item: Command | Fact, actor: Actor, state: State) -> Needs:
             )
         case AnswerDeferred():
             return Needs(runs=frozenset({item.run_id}))
+        case GiveFeedback():
+            return _feedback_needs(item.target)
         case RunStarted():
             return Needs(threads=frozenset({item.thread_id}), runs=frozenset({item.run_id}))
         case ToolCalled() | ToolReturned() | RunPaused() | RunEnded():
@@ -140,6 +158,21 @@ def _wanted(item: Command | Fact, actor: Actor, state: State) -> Needs:
             return Needs(threads=frozenset({item.thread_id}) if item.thread_id else frozenset())
         case _:
             assert_never(item)
+
+
+def _feedback_needs(target: ArtifactTarget | ThreadTarget | TurnTarget | MessageTarget) -> Needs:
+    match target:
+        case ArtifactTarget():
+            return Needs(artifacts=frozenset({target.artifact_id}))
+        case ThreadTarget():
+            return Needs(threads=frozenset({target.thread_id}))
+        case TurnTarget():
+            return Needs(runs=frozenset({target.run_id}))
+        case MessageTarget():
+            runs: frozenset[RunId] = frozenset({target.run_id} if target.run_id else ())
+            return Needs(threads=frozenset({target.thread_id}), runs=runs)
+        case _:
+            assert_never(target)
 
 
 def _context_threads(thread_id: ThreadId | None, actor: Actor) -> frozenset[ThreadId]:
@@ -160,6 +193,8 @@ def commit(command: Command, state: State, *, actor: Actor) -> CommitResult:
         Rejection: If the command cannot be applied; see :mod:`artifactr.core.errors`.
         NotLoaded: If ``state`` lacks something :func:`needs` asked for.
     """
+    if isinstance(actor, EvaluatorActor) and not isinstance(command, GiveFeedback):
+        raise Forbidden("an evaluator can only give feedback")
     match command:
         case CreateArtifact():
             return _create(command, state, actor)
@@ -181,6 +216,8 @@ def commit(command: Command, state: State, *, actor: Actor) -> CommitResult:
             return _set_thread_mode(command, state)
         case AnswerDeferred():
             return _answer(command, state)
+        case GiveFeedback():
+            return _give_feedback(command, state)
         case _:
             assert_never(command)
 
@@ -575,6 +612,51 @@ def _answer(command: AnswerDeferred, state: State) -> CommitResult:
         ),
         runs=(run.model_copy(update={"answers": {**run.answers, command.tool_call_id: answer}}),),
     )
+
+
+def _give_feedback(command: GiveFeedback, state: State) -> CommitResult:
+    feedback = load_feedback(command.feedback_type, command.target, command.value)
+    thread_id, run_id = _feedback_scope(command.target, state)
+    return CommitResult(
+        outcome=Recorded(),
+        events=(
+            FeedbackGiven(
+                feedback_type=command.feedback_type,
+                target=command.target,
+                value=feedback.model_dump(mode="json"),
+                thread_id=thread_id,
+                run_id=run_id,
+            ),
+        ),
+    )
+
+
+def _feedback_scope(
+    target: ArtifactTarget | ThreadTarget | TurnTarget | MessageTarget, state: State
+) -> tuple[ThreadId | None, RunId | None]:
+    """Check that feedback's target exists; return the thread and run it belongs to."""
+    match target:
+        case ArtifactTarget():
+            artifact = _loaded(state.artifacts, target.artifact_id, "artifact")
+            if artifact is None:
+                raise NotFound("artifact", target.artifact_id)
+            if target.version > artifact.version:
+                raise NotFound("artifact version", f"{target.artifact_id} v{target.version}")
+            return None, None
+        case ThreadTarget():
+            return _thread(state, target.thread_id).id, None
+        case TurnTarget():
+            run = _run(state, target.run_id)
+            return run.thread_id, run.id
+        case MessageTarget():
+            _thread(state, target.thread_id)
+            if target.run_id is not None:
+                run = _run(state, target.run_id)
+                if run.thread_id != target.thread_id:
+                    raise InvalidState(f"run {run.id} belongs to thread {run.thread_id}")
+            return target.thread_id, target.run_id
+        case _:
+            assert_never(target)
 
 
 # ─── record ───────────────────────────────────────────────────────────────────

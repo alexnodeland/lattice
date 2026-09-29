@@ -10,6 +10,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
+from artifactr.core.feedback import FeedbackTarget
 from artifactr.core.ids import (
     ArtifactId,
     MessageId,
@@ -144,6 +145,19 @@ class AnswerDeferred(_Command):
     approved: bool | None = None
 
 
+class GiveFeedback(_Command):
+    """Give feedback of a registered type on an artifact version, a thread, a turn or a message.
+
+    ``value`` holds the feedback type's fields; core validates it against the type, checks the
+    type can be given on the target, and checks the target exists.
+    """
+
+    type: Literal["give_feedback"] = "give_feedback"
+    feedback_type: str
+    target: FeedbackTarget
+    value: dict[str, JsonValue] = {}
+
+
 Command = Annotated[
     CreateArtifact
     | EditArtifact
@@ -154,7 +168,8 @@ Command = Annotated[
     | PostMessage
     | SetFocus
     | SetThreadMode
-    | AnswerDeferred,
+    | AnswerDeferred
+    | GiveFeedback,
     Field(discriminator="type"),
 ]
 """Any command, discriminated by ``type``."""

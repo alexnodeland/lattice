@@ -25,6 +25,8 @@ from artifactr.telemetry.attributes import (
     CHANGE,
     CLOSE_CODE,
     COMMAND_TYPE,
+    FEEDBACK_TARGET,
+    FEEDBACK_TYPE,
     GEN_AI_TOKEN_TYPE,
     GEN_AI_TOOL_NAME,
     OUTCOME,
@@ -193,6 +195,15 @@ PROPOSALS = _artifactr(
     PROPOSAL_ACTION,
     ACTOR_KIND,
 )
+FEEDBACK = _artifactr(
+    "artifactr.feedback",
+    "counter",
+    "{feedback}",
+    "Feedback given, by type, target and the kind of actor: people's and evaluators'.",
+    FEEDBACK_TYPE,
+    FEEDBACK_TARGET,
+    ACTOR_KIND,
+)
 STREAM_CONNECTIONS = _artifactr(
     "artifactr.stream.connections",
     "up_down_counter",
@@ -221,6 +232,7 @@ METRICS: Mapping[str, Metric] = MappingProxyType(
             MESSAGES,
             ARTIFACT_CHANGES,
             PROPOSALS,
+            FEEDBACK,
             STREAM_CONNECTIONS,
             STREAM_DISCONNECTS,
         )

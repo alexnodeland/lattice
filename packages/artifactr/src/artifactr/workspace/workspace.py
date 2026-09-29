@@ -30,6 +30,7 @@ from artifactr.core import (
     EditArtifact,
     Envelope,
     Fact,
+    GiveFeedback,
     InvalidState,
     Note,
     NotFound,
@@ -177,7 +178,13 @@ class Workspace:
 
     @overload
     async def commit(
-        self, command: CreateThread | PostMessage | SetFocus | SetThreadMode | AnswerDeferred
+        self,
+        command: CreateThread
+        | PostMessage
+        | SetFocus
+        | SetThreadMode
+        | AnswerDeferred
+        | GiveFeedback,
     ) -> Recorded: ...
 
     async def commit(self, command: Command) -> Outcome:

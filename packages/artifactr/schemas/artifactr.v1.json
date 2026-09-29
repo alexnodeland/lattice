@@ -460,6 +460,32 @@
     "ArtifactId": {
       "type": "string"
     },
+    "ArtifactTarget": {
+      "additionalProperties": false,
+      "description": "Feedback on one version of an artifact.",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "kind": {
+          "const": "artifact",
+          "default": "artifact",
+          "title": "Kind",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "version"
+      ],
+      "title": "ArtifactTarget",
+      "type": "object"
+    },
     "CommandFrame": {
       "description": "A client's command, with an id that correlates it with its result.\n\n``command_id`` is also an idempotency key: the server deduplicates repeated ids.",
       "properties": {
@@ -471,6 +497,7 @@
               "create_artifact": "#/$defs/CreateArtifact",
               "create_thread": "#/$defs/CreateThread",
               "edit_artifact": "#/$defs/EditArtifact",
+              "give_feedback": "#/$defs/GiveFeedback",
               "post_message": "#/$defs/PostMessage",
               "propose_change": "#/$defs/ProposeChange",
               "respond_to_proposal": "#/$defs/RespondToProposal",
@@ -511,6 +538,9 @@
             },
             {
               "$ref": "#/$defs/AnswerDeferred"
+            },
+            {
+              "$ref": "#/$defs/GiveFeedback"
             },
             {
               "$ref": "#/$defs/StopRun"
@@ -892,6 +922,31 @@
       "title": "ErrorFrame",
       "type": "object"
     },
+    "EvaluatorActor": {
+      "description": "An evaluator: a judge or decision model whose verdicts are recorded as feedback.\n\nEvaluators only give feedback; every other command from one is forbidden.",
+      "properties": {
+        "kind": {
+          "const": "evaluator",
+          "default": "evaluator",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "title": "EvaluatorActor",
+      "type": "object"
+    },
     "EventFrame": {
       "description": "A durable event, delivered in its envelope.",
       "properties": {
@@ -899,6 +954,7 @@
           "discriminator": {
             "mapping": {
               "agent": "#/$defs/AgentActor",
+              "evaluator": "#/$defs/EvaluatorActor",
               "external_agent": "#/$defs/ExternalAgentActor",
               "system": "#/$defs/SystemActor",
               "user": "#/$defs/UserActor"
@@ -917,6 +973,9 @@
             },
             {
               "$ref": "#/$defs/SystemActor"
+            },
+            {
+              "$ref": "#/$defs/EvaluatorActor"
             }
           ],
           "title": "Actor"
@@ -967,6 +1026,9 @@
             },
             {
               "$ref": "#/$defs/RunEnded"
+            },
+            {
+              "$ref": "#/$defs/FeedbackGiven"
             },
             {
               "$ref": "#/$defs/AppEvent"
@@ -1066,6 +1128,85 @@
       "title": "ExternalAgentActor",
       "type": "object"
     },
+    "FeedbackGiven": {
+      "description": "A person or an evaluator gave feedback. Who gave it is the envelope's actor.\n\nIt is thread-scoped when its target belongs to a thread (a thread, a turn or a message),\nand workspace-scoped for an artifact version.",
+      "properties": {
+        "feedback_type": {
+          "title": "Feedback Type",
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "target": {
+          "$ref": "#/$defs/FeedbackTarget"
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThreadId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "feedback_given",
+          "default": "feedback_given",
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Value",
+          "type": "object"
+        }
+      },
+      "required": [
+        "feedback_type",
+        "target",
+        "value"
+      ],
+      "title": "FeedbackGiven",
+      "type": "object"
+    },
+    "FeedbackTarget": {
+      "discriminator": {
+        "mapping": {
+          "artifact": "#/$defs/ArtifactTarget",
+          "message": "#/$defs/MessageTarget",
+          "thread": "#/$defs/ThreadTarget",
+          "turn": "#/$defs/TurnTarget"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ArtifactTarget"
+        },
+        {
+          "$ref": "#/$defs/ThreadTarget"
+        },
+        {
+          "$ref": "#/$defs/TurnTarget"
+        },
+        {
+          "$ref": "#/$defs/MessageTarget"
+        }
+      ]
+    },
     "FocusChanged": {
       "description": "The set of artifacts a thread is focused on changed.",
       "properties": {
@@ -1091,6 +1232,39 @@
         "artifact_ids"
       ],
       "title": "FocusChanged",
+      "type": "object"
+    },
+    "GiveFeedback": {
+      "additionalProperties": false,
+      "description": "Give feedback of a registered type on an artifact version, a thread, a turn or a message.\n\n``value`` holds the feedback type's fields; core validates it against the type, checks the\ntype can be given on the target, and checks the target exists.",
+      "properties": {
+        "feedback_type": {
+          "title": "Feedback Type",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/FeedbackTarget"
+        },
+        "type": {
+          "const": "give_feedback",
+          "default": "give_feedback",
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "default": {},
+          "title": "Value",
+          "type": "object"
+        }
+      },
+      "required": [
+        "feedback_type",
+        "target"
+      ],
+      "title": "GiveFeedback",
       "type": "object"
     },
     "Hello": {
@@ -1259,6 +1433,41 @@
         "content"
       ],
       "title": "MessagePosted",
+      "type": "object"
+    },
+    "MessageTarget": {
+      "additionalProperties": false,
+      "description": "Feedback on one message in a thread.\n\nMessages live only in the log, so the target names the thread they were posted in, and,\nfor the agent's messages, the run that posted them (the ``run_id`` of its\n``message_posted``), which links the feedback to the run's trace.",
+      "properties": {
+        "kind": {
+          "const": "message",
+          "default": "message",
+          "title": "Kind",
+          "type": "string"
+        },
+        "message_id": {
+          "$ref": "#/$defs/MessageId"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        }
+      },
+      "required": [
+        "message_id",
+        "thread_id"
+      ],
+      "title": "MessageTarget",
       "type": "object"
     },
     "PartEnded": {
@@ -1478,6 +1687,7 @@
           "discriminator": {
             "mapping": {
               "agent": "#/$defs/AgentActor",
+              "evaluator": "#/$defs/EvaluatorActor",
               "external_agent": "#/$defs/ExternalAgentActor",
               "system": "#/$defs/SystemActor",
               "user": "#/$defs/UserActor"
@@ -1496,6 +1706,9 @@
             },
             {
               "$ref": "#/$defs/SystemActor"
+            },
+            {
+              "$ref": "#/$defs/EvaluatorActor"
             }
           ],
           "title": "Proposed By"
@@ -2227,6 +2440,26 @@
       "title": "ThreadModeChanged",
       "type": "object"
     },
+    "ThreadTarget": {
+      "additionalProperties": false,
+      "description": "Feedback on a whole thread: the session.",
+      "properties": {
+        "kind": {
+          "const": "thread",
+          "default": "thread",
+          "title": "Kind",
+          "type": "string"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        }
+      },
+      "required": [
+        "thread_id"
+      ],
+      "title": "ThreadTarget",
+      "type": "object"
+    },
     "ToolArgsDelta": {
       "description": "More of a tool call's JSON arguments.",
       "properties": {
@@ -2341,6 +2574,26 @@
     "TraceId": {
       "pattern": "^[0-9a-f]{32}$",
       "type": "string"
+    },
+    "TurnTarget": {
+      "additionalProperties": false,
+      "description": "Feedback on the agent's turn: its run, which may span pauses.",
+      "properties": {
+        "kind": {
+          "const": "turn",
+          "default": "turn",
+          "title": "Kind",
+          "type": "string"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "TurnTarget",
+      "type": "object"
     },
     "UnknownEvent": {
       "additionalProperties": true,

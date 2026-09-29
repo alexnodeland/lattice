@@ -40,5 +40,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0034](0034-ports-and-adapters-for-integrations.md) | Ports and adapters for integrations | Accepted |
 | [0035](0035-a-turn-is-its-own-trace.md) | A turn is its own trace | Accepted |
 | [0036](0036-metric-cardinality-through-sdk-views.md) | Metric cardinality through SDK views | Accepted |
+| [0037](0037-feedback-targets-and-evaluators.md) | Feedback targets and evaluators | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

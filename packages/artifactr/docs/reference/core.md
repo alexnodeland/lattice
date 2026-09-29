@@ -42,6 +42,8 @@ Who did something. See [Opening a workspace](../guides/workspaces.md#opening-a-w
 
 ::: artifactr.core.SystemActor
 
+::: artifactr.core.EvaluatorActor
+
 ::: artifactr.core.is_agent
 
 ::: artifactr.core.same_participant
@@ -75,6 +77,34 @@ Intents to change a workspace. See [Commands and outcomes](../guides/workspaces.
 ::: artifactr.core.ThreadMode
 
 ::: artifactr.core.AnswerDeferred
+
+::: artifactr.core.GiveFeedback
+
+## Feedback
+
+Typed feedback on artifacts, threads, turns and messages. See [Evaluation](../guides/evaluation.md).
+
+::: artifactr.core.Feedback
+
+::: artifactr.core.FeedbackTarget
+
+::: artifactr.core.ArtifactTarget
+
+::: artifactr.core.ThreadTarget
+
+::: artifactr.core.TurnTarget
+
+::: artifactr.core.MessageTarget
+
+::: artifactr.core.TargetKind
+
+::: artifactr.core.TARGET_KINDS
+
+::: artifactr.core.feedback_types
+
+::: artifactr.core.get_feedback_type
+
+::: artifactr.core.load_feedback
 
 ## Outcomes
 
@@ -192,6 +222,8 @@ Facts on a workspace's log, and the envelope each travels in. See [The log](../g
 
 ::: artifactr.core.RunUsage
 
+::: artifactr.core.FeedbackGiven
+
 ::: artifactr.core.AppEvent
 
 ::: artifactr.core.scope_of
@@ -307,6 +339,8 @@ Identifiers are plain strings. These aliases say what a string identifies, and t
 ::: artifactr.core.ProposalId
 
 ::: artifactr.core.MessageId
+
+::: artifactr.core.TraceId
 
 ::: artifactr.core.new_id
 

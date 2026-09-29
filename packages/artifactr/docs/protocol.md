@@ -77,7 +77,7 @@ Every durable event arrives in the same envelope. The stored envelope and the wi
 }
 ```
 
-`actor.kind` is one of `user` (`id`, `name?`), `agent` (`thread_id`, `run_id?`, `name`), `external_agent` (`client_id`, `name?`) or `system` (`name`). Every event of one thread's agent is the same participant, whatever its run.
+`actor.kind` is one of `user` (`id`, `name?`), `agent` (`thread_id`, `run_id?`, `name`), `external_agent` (`client_id`, `name?`), `system` (`name`) or `evaluator` (`name`, `version`). Every event of one thread's agent is the same participant, whatever its run.
 
 | `event.type` | Scope | Fields |
 |---|---|---|
@@ -96,6 +96,7 @@ Every durable event arrives in the same envelope. The stored envelope and the wi
 | `run_paused` | run | `run_id`, `thread_id`, `requests`: list of `{tool_call_id, tool_name, kind: question \| approval, args}`, `usage?` |
 | `deferred_answered` | run | `run_id`, `thread_id`, `tool_call_id`, `answer?`, `approved?` |
 | `run_ended` | run | `run_id`, `thread_id`, `status` (`completed`, `stopped`, `failed`), `usage?`, `error?` |
+| `feedback_given` | thread, or workspace for an artifact | `feedback_type`, `target` (`{kind: artifact, artifact_id, version}`, `{kind: thread, thread_id}`, `{kind: turn, run_id}` or `{kind: message, message_id, thread_id, run_id?}`), `value` (the feedback type's fields, validated), `thread_id?`, `run_id?`. The judge is the envelope's actor. |
 | `app_event` | any | `name`, `data`, `thread_id?`, `run_id?` |
 
 Artifact and proposal events are workspace-scoped, and also carry the `thread_id` and `run_id` they originated in, when there is one.
@@ -186,6 +187,7 @@ The command is one of the `Command` models in `artifactr.core`, or `stop_run` or
 | `propose_change` | `change` (a `create_artifact`, `edit_artifact` or `archive_artifact` command), `rationale?`, `proposal_id?` | `proposal_created`, whatever the write policy |
 | `respond_to_proposal` | `proposal_id`, `decision` (`accept`, `reject`), `changes?`, `reason?` | `proposal_resolved`, plus the artifact event when accepted. Accepted with `changes`, the edit's summary describes what was applied. |
 | `answer_deferred` | `run_id`, `tool_call_id`, `answer` or `approved` | `deferred_answered`. Once every pending request is answered, the paused run resumes. |
+| `give_feedback` | `feedback_type`, `target`, `value` | `feedback_given`. The type must be registered and declare the target's kind, the value must validate against it, and the target must exist: an artifact at that version or later, a thread, a run, or a message's thread (and run, if given, in that thread). An `evaluator` actor may only give feedback. |
 | `stop_run` | `run_id` | Cancels a run of this workspace that is running in the serving process; `run_ended` with status `stopped`. |
 | `watch_run` | `run_id` | Attaches this socket to the run's live frames, starting with what the run has produced so far. WebSocket only. |
 
@@ -247,6 +249,7 @@ External agents connect over MCP (`artifactr.mcp.ArtifactrMcp`) with the same au
 | Tools `list_artifacts`, `read_artifact`, `create_artifact`, `edit_text`, `edit_artifact`, `archive_artifact` | Artifact commands. The edit tools take an optional `base_version` (required for `edit_artifact`) and `propose` with `rationale`. |
 | Tools `list_proposals`, `respond_to_proposal` | Review others' proposals. |
 | Tool `post_message` | A message in a thread, handled like any other: it starts, steers or answers the thread's agent. |
+| Tool `give_feedback` | Feedback of an application's type on an artifact version, a thread, a turn or a message. |
 
 Rejections are returned as tool errors carrying the rejection's message.
 

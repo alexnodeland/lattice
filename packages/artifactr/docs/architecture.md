@@ -39,14 +39,14 @@ The library provides the machinery; applications provide the artifact types. A r
 
 | Concept | What it is |
 |---|---|
-| **Actor** | Who did something: a user, the built-in agent (per run), an external agent connected over MCP, or the system. Every event is attributed to one. |
+| **Actor** | Who did something: a user, the built-in agent (per run), an external agent connected over MCP, the system, or an evaluator. Every event is attributed to one. |
 | **Artifact** | A Pydantic model subclass that defines one artifact type. Stored instances are `Versioned[T]`: the data plus its id, version and last actor. |
 | **Command** | An intent to change the workspace: edit an artifact, propose an edit, answer a proposal, post a message. Commands can be rejected. |
 | **Event** | A fact that happened, appended to the workspace's log with a sequence number (`seq`). Events are never rejected or rewritten. |
 | **Workspace** | A tenant-scoped handle over artifacts, threads and the event log. The only way to read or write. |
 | **Session** | The pydantic-ai dependencies for one agent run: a workspace handle bound to the agent's actor, the thread, the artifacts in focus, and the application's own deps. |
 
-Supporting types: `Envelope` (an event plus its `seq`, actor, timestamp and scope), `Proposal` (a suggested change awaiting a decision), and `Thread` (a chat).
+Supporting types: `Envelope` (an event plus its `seq`, actor, timestamp and scope), `Proposal` (a suggested change awaiting a decision), `Thread` (a chat), and `Feedback` (a typed judgement of an artifact version, a thread, a turn or a message).
 
 ## Layers
 
@@ -277,6 +277,25 @@ Application tools emit ephemeral progress with `ctx.emit(...)`. `ArtifactDraft(k
 - Blocking points use pydantic-ai's deferred tools: `ask_user` (or any tool raising `CallDeferred`) asks a question, and tools declared `requires_approval=True` need approval. The agent's `output_type` must include `DeferredToolRequests`. The run ends with `DeferredToolRequests`, recorded as `run_paused` with its history. Answers arrive as `answer_deferred` commands from any surface; once every request is answered, `Runner.resume` continues the run under the same `run_id` with `deferred_tool_results`. The pause survives restarts because nothing waits in memory.
 - A chat message sent while a run is paused is the reply: it answers the pending questions and declines pending approvals with the message as the reason, and the run resumes. The conversation history therefore never ends in an unanswered tool call.
 
+## Feedback
+
+People's reactions and evaluators' verdicts are typed like artifacts ([ADR-0028](adr/0028-typed-feedback-as-events.md), [ADR-0037](adr/0037-feedback-targets-and-evaluators.md)). A feedback type is a Pydantic subclass of `Feedback`, registered by name, that declares the targets it can be given on:
+
+```python
+class Helpfulness(Feedback, name="helpfulness", targets={"turn", "thread"}):
+    rating: Annotated[int, Field(ge=1, le=5)]
+    reason: str | None = None
+```
+
+| Target | Identifies | Scope of its `feedback_given` |
+|---|---|---|
+| `ArtifactTarget(artifact_id, version)` | One version of an artifact | Workspace |
+| `ThreadTarget(thread_id)` | A thread: the session | The thread |
+| `TurnTarget(run_id)` | The agent's run, across its pauses | The run's thread |
+| `MessageTarget(message_id, thread_id, run_id?)` | A message; `run_id` for the agent's, from its `message_posted` | The thread |
+
+Feedback is the `give_feedback` command, so it goes through the one write path and every surface has it. Core checks the type is registered and declares the target's kind, validates the value, and checks the target exists, then records `feedback_given` with the validated value. An evaluator's verdict is an instance of the same types, given by an `EvaluatorActor(name, version)`, which may give feedback and nothing else; people's and evaluators' judgements can then be compared directly. Feedback is counted in `artifactr.feedback` by type, target and kind of actor.
+
 ## Live output
 
 The event log carries durable domain events only. Token-level output belongs to whoever drives the run ([ADR-0007](adr/0007-caller-owned-live-output.md)). pydantic-ai hands the run's event stream to its caller through `event_stream_handler`, and `forward_live(channel)` sends it to a `LiveChannel` as protocol live frames:
@@ -414,6 +433,7 @@ The metric registry, `artifactr.telemetry.metrics`, declares every metric with i
 | `artifactr.messages` | counter | `artifactr.actor.kind` |
 | `artifactr.artifact.changes` | counter | `artifactr.artifact.kind`, `artifactr.change`, `artifactr.actor.kind` |
 | `artifactr.proposals` | counter | `artifactr.proposal.action`, `artifactr.actor.kind` |
+| `artifactr.feedback` | counter | `artifactr.feedback.type`, `artifactr.feedback.target`, `artifactr.actor.kind` |
 | `artifactr.stream.connections` | up-down counter | |
 | `artifactr.stream.disconnects` | counter | `artifactr.stream.close_code` |
 
@@ -503,6 +523,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0034](adr/0034-ports-and-adapters-for-integrations.md) | Ports and adapters for integrations |
 | [0035](adr/0035-a-turn-is-its-own-trace.md) | A turn is its own trace |
 | [0036](adr/0036-metric-cardinality-through-sdk-views.md) | Metric cardinality through SDK views |
+| [0037](adr/0037-feedback-targets-and-evaluators.md) | Feedback targets and evaluators |
 
 ## Open questions
 

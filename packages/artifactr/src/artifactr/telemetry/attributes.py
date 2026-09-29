@@ -94,6 +94,12 @@ RUN_STATUS: Final = "artifactr.run.status"
 TOOL_STATUS: Final = "artifactr.tool.status"
 """How a tool call ended: ``ok``, ``retry`` or ``error``."""
 
+FEEDBACK_TYPE: Final = "artifactr.feedback.type"
+"""A feedback type's registered name."""
+
+FEEDBACK_TARGET: Final = "artifactr.feedback.target"
+"""What feedback is about: ``artifact``, ``thread``, ``turn`` or ``message``."""
+
 CLOSE_CODE: Final = "artifactr.stream.close_code"
 """The WebSocket close code a thread-protocol connection ended with."""
 

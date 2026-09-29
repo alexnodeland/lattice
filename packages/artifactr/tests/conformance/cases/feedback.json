@@ -1,0 +1,585 @@
+{
+  "description": "Typed feedback: its types, targets and who may give it.",
+  "cases": [
+    {
+      "name": "a person rates the agent's turn",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "completed"
+          }
+        ]
+      },
+      "command": {
+        "type": "give_feedback",
+        "feedback_type": "helpfulness",
+        "target": {
+          "kind": "turn",
+          "run_id": "run_1"
+        },
+        "value": {
+          "rating": 4
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "feedback_given",
+            "feedback_type": "helpfulness",
+            "target": {
+              "kind": "turn",
+              "run_id": "run_1"
+            },
+            "value": {
+              "rating": 4,
+              "reason": null
+            },
+            "thread_id": "thr_1",
+            "run_id": "run_1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "feedback on a thread belongs to the thread",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "give_feedback",
+        "feedback_type": "helpfulness",
+        "target": {
+          "kind": "thread",
+          "thread_id": "thr_1"
+        },
+        "value": {
+          "rating": 5,
+          "reason": "quick"
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "feedback_given",
+            "value": {
+              "rating": 5,
+              "reason": "quick"
+            },
+            "thread_id": "thr_1",
+            "run_id": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "feedback on the agent's message links the run that posted it",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "completed"
+          }
+        ]
+      },
+      "command": {
+        "type": "give_feedback",
+        "feedback_type": "helpfulness",
+        "target": {
+          "kind": "message",
+          "message_id": "msg_7",
+          "thread_id": "thr_1",
+          "run_id": "run_1"
+        },
+        "value": {
+          "rating": 2
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "feedback_given",
+            "thread_id": "thr_1",
+            "run_id": "run_1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "feedback on a person's message names only its thread",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "give_feedback",
+        "feedback_type": "helpfulness",
+        "target": {
+          "kind": "message",
+          "message_id": "msg_1",
+          "thread_id": "thr_1"
+        },
+        "value": {
+          "rating": 3
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "feedback_given",
+            "thread_id": "thr_1",
+            "run_id": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "a message's run must belong to its thread",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_2",
+            "title": "Other",
+            "mode": "edit"
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "completed"
+          }
+        ]
+      },
+      "command": {
+        "type": "give_feedback",
+        "feedback_type": "helpfulness",
+        "target": {
+          "kind": "message",
+          "message_id": "msg_7",
+          "thread_id": "thr_2",
+          "run_id": "run_1"
+        },
+        "value": {
+          "rating": 2
+        }
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state",
+          "message": "run run_1 belongs to thread thr_1"
+        }
+      }
+    },
+    {
+      "name": "feedback on an earlier artifact version is workspace-scoped",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "n1",
+            "kind": "note",
+            "version": 2,
+            "data": {
+              "text": "Ship Monday",
+              "title": ""
+            },
+            "updated_by": {
+              "kind": "agent",
+              "thread_id": "thr_1",
+              "run_id": "run_1"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "give_feedback",
+        "feedback_type": "accuracy",
+        "target": {
+          "kind": "artifact",
+          "artifact_id": "n1",
+          "version": 1
+        },
+        "value": {
+          "correct": false
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "feedback_given",
+            "target": {
+              "kind": "artifact",
+              "artifact_id": "n1",
+              "version": 1
+            },
+            "value": {
+              "correct": false,
+              "verdict": "right",
+              "tone": "formal",
+              "confidence": 1.0
+            },
+            "thread_id": null,
+            "run_id": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "an artifact version that does not exist yet",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "artifacts": [
+          {
+            "id": "n1",
+            "kind": "note",
+            "version": 2,
+            "data": {
+              "text": "Ship Monday",
+              "title": ""
+            },
+            "updated_by": {
+              "kind": "agent",
+              "thread_id": "thr_1",
+              "run_id": "run_1"
+            }
+          }
+        ]
+      },
+      "command": {
+        "type": "give_feedback",
+        "feedback_type": "accuracy",
+        "target": {
+          "kind": "artifact",
+          "artifact_id": "n1",
+          "version": 3
+        },
+        "value": {
+          "correct": true
+        }
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "artifact version",
+          "id": "n1 v3"
+        }
+      }
+    },
+    {
+      "name": "feedback needs its artifact",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "command": {
+        "type": "give_feedback",
+        "feedback_type": "accuracy",
+        "target": {
+          "kind": "artifact",
+          "artifact_id": "n9",
+          "version": 1
+        },
+        "value": {
+          "correct": true
+        }
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "artifact",
+          "id": "n9"
+        }
+      }
+    },
+    {
+      "name": "feedback needs its run",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "command": {
+        "type": "give_feedback",
+        "feedback_type": "helpfulness",
+        "target": {
+          "kind": "turn",
+          "run_id": "run_9"
+        },
+        "value": {
+          "rating": 1
+        }
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "run",
+          "id": "run_9"
+        }
+      }
+    },
+    {
+      "name": "feedback needs its thread",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "command": {
+        "type": "give_feedback",
+        "feedback_type": "helpfulness",
+        "target": {
+          "kind": "thread",
+          "thread_id": "thr_9"
+        },
+        "value": {
+          "rating": 1
+        }
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "thread",
+          "id": "thr_9"
+        }
+      }
+    },
+    {
+      "name": "a type is given only on the targets it declares",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "completed"
+          }
+        ]
+      },
+      "command": {
+        "type": "give_feedback",
+        "feedback_type": "accuracy",
+        "target": {
+          "kind": "turn",
+          "run_id": "run_1"
+        },
+        "value": {
+          "correct": true
+        }
+      },
+      "expect": {
+        "rejection": {
+          "type": "validation_failed",
+          "message": "accuracy feedback is given on artifact, not on a turn",
+          "errors": []
+        }
+      }
+    },
+    {
+      "name": "an unknown feedback type",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "completed"
+          }
+        ]
+      },
+      "command": {
+        "type": "give_feedback",
+        "feedback_type": "vibes",
+        "target": {
+          "kind": "turn",
+          "run_id": "run_1"
+        },
+        "value": {}
+      },
+      "expect": {
+        "rejection": {
+          "type": "not_found",
+          "entity": "feedback type",
+          "id": "vibes"
+        }
+      }
+    },
+    {
+      "name": "feedback must validate against its type",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "completed"
+          }
+        ]
+      },
+      "command": {
+        "type": "give_feedback",
+        "feedback_type": "helpfulness",
+        "target": {
+          "kind": "turn",
+          "run_id": "run_1"
+        },
+        "value": {
+          "rating": 9
+        }
+      },
+      "expect": {
+        "rejection": {
+          "type": "validation_failed",
+          "message": "invalid helpfulness feedback"
+        }
+      }
+    },
+    {
+      "name": "an evaluator gives feedback",
+      "actor": {
+        "kind": "evaluator",
+        "name": "judge",
+        "version": "v3"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "completed"
+          }
+        ]
+      },
+      "command": {
+        "type": "give_feedback",
+        "feedback_type": "helpfulness",
+        "target": {
+          "kind": "turn",
+          "run_id": "run_1"
+        },
+        "value": {
+          "rating": 3
+        }
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "feedback_given"
+          }
+        ]
+      }
+    },
+    {
+      "name": "an evaluator only gives feedback",
+      "actor": {
+        "kind": "evaluator",
+        "name": "judge",
+        "version": "v3"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "post_message",
+        "thread_id": "thr_1",
+        "content": "Looks wrong."
+      },
+      "expect": {
+        "rejection": {
+          "type": "forbidden",
+          "message": "an evaluator can only give feedback"
+        }
+      }
+    }
+  ]
+}

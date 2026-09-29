@@ -14,6 +14,8 @@ from artifactr.core import (
     CreateArtifact,
     CreateThread,
     EditArtifact,
+    GiveFeedback,
+    MessageTarget,
     Outcome,
     PostMessage,
     ProposeChange,
@@ -27,12 +29,16 @@ from artifactr.core import (
     TenantId,
     TextEdits,
     ThreadId,
+    ThreadTarget,
+    TurnTarget,
     WorkspaceId,
 )
 from artifactr.telemetry.attributes import (
     ARTIFACT_ID,
     ARTIFACT_VERSION,
     COMMAND_TYPE,
+    FEEDBACK_TARGET,
+    FEEDBACK_TYPE,
     OUTCOME,
     PATCH_KIND,
     PATCH_SIZE,
@@ -64,6 +70,20 @@ def command_attributes(
             thread_id = command.thread_id
         case AnswerDeferred():
             run_id = command.run_id
+        case GiveFeedback():
+            details |= {FEEDBACK_TYPE: command.feedback_type, FEEDBACK_TARGET: command.target.kind}
+            match command.target:
+                case ThreadTarget(thread_id=thread_id):
+                    pass
+                case TurnTarget(run_id=run_id):
+                    pass
+                case MessageTarget(thread_id=thread_id, run_id=run_id):
+                    pass
+                case _:
+                    details |= {
+                        ARTIFACT_ID: command.target.artifact_id,
+                        ARTIFACT_VERSION: command.target.version,
+                    }
         case _:
             assert_never(command)
     if isinstance(actor, AgentActor):

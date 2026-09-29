@@ -119,3 +119,22 @@ def test_only_recent_command_ids_are_remembered() -> None:
         client.post(f"{BASE}/commands", json=command("c2", type="create_thread", thread_id="t2"))
         repeated = client.post(f"{BASE}/commands", json=first)
         assert repeated.status_code == 409, "c1 was forgotten, so it ran again and was rejected"
+
+
+def test_feedback_is_a_command_like_any_other(client: TestClient) -> None:
+    client.post(f"{BASE}/commands", json=command("c1", type="create_thread", thread_id="t1"))
+    feedback = command(
+        "c2",
+        type="give_feedback",
+        feedback_type="helpfulness",
+        target={"kind": "thread", "thread_id": "t1"},
+        value={"rating": 5},
+    )
+    given = client.post(f"{BASE}/commands", json=feedback)
+    assert given.json()["outcome"] == {"type": "recorded", "seq": 2}
+    [event] = client.get(f"{BASE}/events", params={"after_seq": 1}).json()
+    assert event["event"]["type"] == "feedback_given"
+    assert event["actor"]["id"] == "alice"
+    invalid = dict(feedback, command_id="c3")
+    invalid["command"] = dict(feedback["command"], value={"rating": 0})
+    assert client.post(f"{BASE}/commands", json=invalid).status_code == 422

@@ -10,8 +10,12 @@ from artifactr.core import (
     AppEvent,
     Applied,
     Artifact,
+    ArtifactTarget,
     CreateArtifact,
     EditArtifact,
+    EvaluatorActor,
+    FeedbackGiven,
+    GiveFeedback,
     MarkdownArtifact,
     NotFound,
     ProposeChange,
@@ -21,6 +25,8 @@ from artifactr.core import (
     RunEnded,
     RunStarted,
     SetFocus,
+    ThreadTarget,
+    TurnTarget,
     VersionConflict,
 )
 from artifactr.workspace import ThreadBusy, Workspace, Workspaces
@@ -261,3 +267,37 @@ async def test_a_claim_is_renewed_while_held(ws: Workspace) -> None:
 
 def test_subclassing_artifact_is_all_it_takes() -> None:
     assert issubclass(Note, Artifact)
+
+
+async def test_feedback_is_recorded_in_the_log_of_its_thread(ws: Workspace) -> None:
+    one, two = await ws.create_thread("one"), await ws.create_thread("two")
+    agent = ws.as_actor(AgentActor(thread_id=one.id, run_id="run_1"))
+    await agent.record(RunStarted(run_id="run_1", thread_id=one.id))
+    await ws.create(Note(text="Ship"), artifact_id="n1")
+    judge = ws.as_actor(EvaluatorActor(name="judge", version="v1"))
+    rated = await judge.commit(
+        GiveFeedback(
+            feedback_type="helpfulness", target=TurnTarget(run_id="run_1"), value={"rating": 4}
+        )
+    )
+    assert rated == Recorded(seq=5)
+    await ws.commit(
+        GiveFeedback(
+            feedback_type="accuracy",
+            target=ArtifactTarget(artifact_id="n1", version=1),
+            value={"correct": True},
+        )
+    )
+    await ws.commit(
+        GiveFeedback(
+            feedback_type="helpfulness", target=ThreadTarget(thread_id=two.id), value={"rating": 1}
+        )
+    )
+    turn, artifact, thread = await ws.read(after_seq=4)
+    assert isinstance(turn.event, FeedbackGiven)
+    assert (turn.thread_id, turn.run_id, turn.actor) == (one.id, "run_1", judge.actor)
+    assert turn.event.value == {"rating": 4, "reason": None}
+    assert artifact.thread_id is None, "feedback on an artifact is workspace-scoped"
+    followers_of_one = await ws.read(after_seq=4, threads={one.id})
+    assert followers_of_one == [turn, artifact]
+    assert thread.thread_id == two.id

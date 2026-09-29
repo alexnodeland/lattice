@@ -222,3 +222,26 @@ def test_resource_uris_carry_the_tenant() -> None:
 
 def test_the_agent_script_helpers_are_shared() -> None:
     assert call("x").parts[0].tool_name == "x"  # type: ignore[union-attr]
+
+
+async def test_external_agents_give_feedback(mcp: ArtifactrMcp, ws: Workspace) -> None:
+    thread = await ws.create_thread("Launch")
+    async with Client(mcp.server) as client:
+        given = await _call(
+            client,
+            "give_feedback",
+            feedback_type="helpfulness",
+            target={"kind": "thread", "thread_id": thread.id},
+            value={"rating": 4},
+        )
+        assert given == (False, "Recorded helpfulness feedback on the thread.")
+        invalid = await _call(
+            client,
+            "give_feedback",
+            feedback_type="helpfulness",
+            target={"kind": "thread", "thread_id": thread.id},
+        )
+        assert invalid[0] is True, "a rating is required"
+    [envelope] = await ws.read(after_seq=1)
+    assert envelope.actor == CLAUDE
+    assert envelope.event.type == "feedback_given"

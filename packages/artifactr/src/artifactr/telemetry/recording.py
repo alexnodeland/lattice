@@ -18,6 +18,7 @@ from artifactr.core import (
     ArtifactArchived,
     ArtifactChanged,
     ArtifactCreated,
+    FeedbackGiven,
     KnownEvent,
     MessagePosted,
     ProposalCreated,
@@ -32,6 +33,8 @@ from artifactr.telemetry.attributes import (
     ACTOR_KIND,
     ARTIFACT_KIND,
     CHANGE,
+    FEEDBACK_TARGET,
+    FEEDBACK_TYPE,
     GEN_AI_TOKEN_TYPE,
     GEN_AI_TOOL_NAME,
     PROPOSAL_ACTION,
@@ -40,6 +43,7 @@ from artifactr.telemetry.attributes import (
 )
 from artifactr.telemetry.metrics import (
     ARTIFACT_CHANGES,
+    FEEDBACK,
     MESSAGES,
     PROPOSALS,
     RUNS,
@@ -162,6 +166,13 @@ def record_events(
             case RunEnded():
                 telemetry.add(RUNS, 1, {**scope, RUN_STATUS: event.status})
                 _tokens(telemetry, event.usage, scope)
+            case FeedbackGiven():
+                attributes = {
+                    **by_actor,
+                    FEEDBACK_TYPE: event.feedback_type,
+                    FEEDBACK_TARGET: event.target.kind,
+                }
+                telemetry.add(FEEDBACK, 1, attributes)
             case _:
                 pass
 

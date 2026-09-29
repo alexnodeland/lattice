@@ -7,12 +7,16 @@ import pytest
 from artifactr.core import (
     AgentActor,
     AnswerDeferred,
+    ArtifactTarget,
     CreateArtifact,
     CreateThread,
     DeferredRequest,
     EditArtifact,
+    EvaluatorActor,
+    GiveFeedback,
     InvalidState,
     JsonPatch,
+    MessageTarget,
     NotFound,
     ProposeChange,
     RespondToProposal,
@@ -21,8 +25,10 @@ from artifactr.core import (
     RunStarted,
     RunUsage,
     SetFocus,
+    ThreadTarget,
     ToolCalled,
     ToolReturned,
+    TurnTarget,
     UserActor,
     VersionConflict,
 )
@@ -34,6 +40,8 @@ from artifactr.telemetry.attributes import (
     CHANGE,
     COMMAND_TYPE,
     ERROR_TYPE,
+    FEEDBACK_TARGET,
+    FEEDBACK_TYPE,
     GEN_AI_CONVERSATION_ID,
     GEN_AI_TOKEN_TYPE,
     GEN_AI_TOOL_NAME,
@@ -251,3 +259,36 @@ async def test_an_accepted_proposal_counts_as_accepted(ws: Workspace, recorder: 
     assert recorder.total("artifactr.proposals", {PROPOSAL_ACTION: "accepted"}) == 1
     with pytest.raises(InvalidState):
         await ws.commit(RespondToProposal(proposal_id=proposal.id, decision="accept"))
+
+
+async def test_feedback_is_traced_and_counted(ws: Workspace, recorder: Recorder) -> None:
+    thread = await ws.create_thread()
+    agent = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_1"))
+    await agent.record(RunStarted(run_id="run_1", thread_id=thread.id))
+    await ws.create(Note(text="a"), artifact_id="n1")
+    judge = ws.as_actor(EvaluatorActor(name="judge", version="v1"))
+    rating: dict[str, Any] = {"rating": 4}
+    for target in (
+        TurnTarget(run_id="run_1"),
+        ThreadTarget(thread_id=thread.id),
+        MessageTarget(message_id="m1", thread_id=thread.id, run_id="run_1"),
+    ):
+        await judge.commit(GiveFeedback(feedback_type="helpfulness", target=target, value=rating))
+    await ws.commit(
+        GiveFeedback(
+            feedback_type="accuracy",
+            target=ArtifactTarget(artifact_id="n1", version=1),
+            value={"correct": True},
+        )
+    )
+    turn, on_thread, message, artifact = recorder.spans("artifactr.commit give_feedback")
+    assert attributes(turn)[FEEDBACK_TYPE] == "helpfulness"
+    assert (attributes(turn)[FEEDBACK_TARGET], attributes(turn)[RUN_ID]) == ("turn", "run_1")
+    assert attributes(on_thread)[SESSION_ID] == thread.id
+    assert (attributes(message)[SESSION_ID], attributes(message)[RUN_ID]) == (thread.id, "run_1")
+    assert (attributes(artifact)[ARTIFACT_ID], attributes(artifact)[ARTIFACT_VERSION]) == ("n1", 1)
+    assert attributes(turn)[ACTOR_KIND] == "evaluator"
+    where = {FEEDBACK_TYPE: "helpfulness", ACTOR_KIND: "evaluator"}
+    assert recorder.total("artifactr.feedback", where) == 3
+    where = {FEEDBACK_TYPE: "accuracy", FEEDBACK_TARGET: "artifact", ACTOR_KIND: "user"}
+    assert recorder.total("artifactr.feedback", where) == 1

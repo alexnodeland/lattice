@@ -24,6 +24,8 @@ from artifactr.core import (
     CreateArtifact,
     EditArtifact,
     ExternalAgentActor,
+    FeedbackTarget,
+    GiveFeedback,
     JsonPatch,
     Rejection,
     RespondToProposal,
@@ -225,6 +227,23 @@ class ArtifactrMcp:
             if resolved.version is None:
                 return f"Rejected {proposal_id}."
             return f"Accepted {proposal_id}: the artifact is now at version {resolved.version}."
+
+        @server.tool()
+        async def give_feedback(
+            workspace_id: str,
+            feedback_type: str,
+            target: FeedbackTarget,
+            ctx: Context,
+            value: dict[str, Any] | None = None,
+        ) -> str:
+            """Give feedback of an application-defined type on an artifact, thread, turn or message.
+
+            ``value`` holds the feedback type's fields.
+            """
+            workspace = await self._open(ctx, workspace_id)
+            command = GiveFeedback(feedback_type=feedback_type, target=target, value=value or {})
+            await _tool(workspace.commit(command))
+            return f"Recorded {feedback_type} feedback on the {target.kind}."
 
         @server.tool()
         async def post_message(

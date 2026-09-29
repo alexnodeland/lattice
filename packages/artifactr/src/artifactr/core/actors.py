@@ -92,8 +92,33 @@ class SystemActor(BaseModel):
         return self.name
 
 
+class EvaluatorActor(BaseModel):
+    """An evaluator: a judge or decision model whose verdicts are recorded as feedback.
+
+    Evaluators only give feedback; every other command from one is forbidden.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    kind: Literal["evaluator"] = "evaluator"
+    name: str
+    version: str
+    """The evaluator's version, such as a hash of a trained judge, so verdicts never mix."""
+
+    @property
+    def participant(self) -> str:
+        """A key that is equal for every verdict of the same evaluator version."""
+        return f"evaluator:{self.name}@{self.version}"
+
+    @property
+    def display_name(self) -> str:
+        """How this actor is named in change notes."""
+        return f"{self.name}@{self.version}"
+
+
 Actor = Annotated[
-    UserActor | AgentActor | ExternalAgentActor | SystemActor, Field(discriminator="kind")
+    UserActor | AgentActor | ExternalAgentActor | SystemActor | EvaluatorActor,
+    Field(discriminator="kind"),
 ]
 """Any actor, discriminated by ``kind``."""
 

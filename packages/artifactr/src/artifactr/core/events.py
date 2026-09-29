@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Discriminator, Field, JsonValue, Tag
 
 from artifactr.core.actors import Actor
 from artifactr.core.commands import ProposedChange, ThreadMode
+from artifactr.core.feedback import FeedbackTarget
 from artifactr.core.ids import (
     ArtifactId,
     MessageId,
@@ -230,6 +231,25 @@ class RunEnded(_Event):
     error: str | None = None
 
 
+# ─── feedback ─────────────────────────────────────────────────────────────────
+
+
+class FeedbackGiven(_Event):
+    """A person or an evaluator gave feedback. Who gave it is the envelope's actor.
+
+    It is thread-scoped when its target belongs to a thread (a thread, a turn or a message),
+    and workspace-scoped for an artifact version.
+    """
+
+    type: Literal["feedback_given"] = "feedback_given"
+    feedback_type: str
+    target: FeedbackTarget
+    value: dict[str, JsonValue]
+    """The feedback's fields, as validated against its registered type."""
+    thread_id: ThreadId | None = None
+    run_id: RunId | None = None
+
+
 # ─── extension ────────────────────────────────────────────────────────────────
 
 
@@ -267,6 +287,7 @@ KnownEvent = (
     | RunPaused
     | DeferredAnswered
     | RunEnded
+    | FeedbackGiven
     | AppEvent
 )
 """Every event type this version defines."""
@@ -308,6 +329,7 @@ Event = Annotated[
     | Annotated[RunPaused, Tag("run_paused")]
     | Annotated[DeferredAnswered, Tag("deferred_answered")]
     | Annotated[RunEnded, Tag("run_ended")]
+    | Annotated[FeedbackGiven, Tag("feedback_given")]
     | Annotated[AppEvent, Tag("app_event")]
     | Annotated[UnknownEvent, Tag("unknown")],
     Discriminator(_event_tag),

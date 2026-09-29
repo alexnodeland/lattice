@@ -24,6 +24,7 @@ An actor is who does something, and every event is attributed to one:
 | `AgentActor(thread_id, run_id=None, name="assistant")` | A thread's built-in agent. Every run of one thread's agent is the same participant. |
 | `ExternalAgentActor(client_id, name=None)` | An agent connected over MCP |
 | `SystemActor(name="system")` | Your application itself, for automated changes |
+| `EvaluatorActor(name, version)` | A judge whose verdicts are recorded as feedback; it can only give feedback ([Evaluation](evaluation.md)) |
 
 `ws.as_actor(actor)` returns a handle on the same workspace acting as someone else. The agent layer uses it to act as the agent; you can use it for system jobs.
 
@@ -43,6 +44,7 @@ Commands are the only way anything changes ([ADR-0002](../adr/0002-single-write-
 | `SetFocus(thread_id, artifact_ids)` | Sets the artifacts a thread follows | `Recorded` |
 | `SetThreadMode(thread_id, mode)` | Switches a thread between `"edit"` and `"suggest"` | `Recorded` |
 | `AnswerDeferred(run_id, tool_call_id, answer?, approved?)` | Answers a paused run's question or approval | `Recorded` |
+| `GiveFeedback(feedback_type, target, value)` | Gives typed feedback on an artifact version, a thread, a turn or a message ([Evaluation](evaluation.md)) | `Recorded` |
 
 `Applied(artifact_id, version)` means a change was written; `Proposed(proposal_id)` means the artifact type's write policy turned an agent's change into a proposal; `Resolved(proposal_id, decision, version)` answers a proposal; `Recorded()` covers the rest. Every outcome carries the `seq` of the last event the command appended, or `None` if it appended none (setting a focus the thread already has, for example). `commit` is typed with overloads, so `await ws.commit(RespondToProposal(...))` is known to return `Resolved`.
 

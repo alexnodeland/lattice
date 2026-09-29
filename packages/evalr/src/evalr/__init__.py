@@ -18,9 +18,12 @@ See ``docs/architecture.md`` for the design.
 from importlib.metadata import version
 
 from evalr.core import (
+    Dataset,
     Evaluator,
+    Example,
     FieldKind,
     FunctionEvaluator,
+    InputFormatter,
     UnsupportedField,
     Verdict,
     VerdictField,
@@ -30,9 +33,12 @@ from evalr.core import (
 __version__ = version("evalr")
 
 __all__ = [
+    "Dataset",
     "Evaluator",
+    "Example",
     "FieldKind",
     "FunctionEvaluator",
+    "InputFormatter",
     "UnsupportedField",
     "Verdict",
     "VerdictField",

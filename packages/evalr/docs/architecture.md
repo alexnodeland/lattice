@@ -4,7 +4,7 @@
 
 | Package | Status |
 |---|---|
-| `evalr.core` | Verdicts, field kinds, the evaluator protocol and function evaluators implemented; datasets and metrics planned (phase 1) |
+| `evalr.core` | Verdicts, field kinds, the evaluator protocol, function evaluators, datasets, splits and formatters implemented; metrics planned (phase 1) |
 | `evalr.dspy` | Planned (phase 2) |
 | `evalr.decision` | Planned (phase 3) |
 | `evalr.langfuse`, `evalr.hf` | Planned (phase 4) |
@@ -101,6 +101,32 @@ An evaluator returns a `Verdict[V]`, an immutable Pydantic model:
 | `FunctionEvaluator` | A sync or async function of the input: a deterministic measure | Given; bump it when the function changes |
 | `DspyJudge` (phase 2) | A DSPy module whose signature comes from the input and verdict types | A hash of the compiled program |
 | `DecisionEvaluator` (phase 3) | A pydantic-ai agent on a decision model, with a language-model fallback | The decision model's id and its thresholds |
+
+## Datasets
+
+An `Example[InputT, VerdictT]` is one input with what is known about it:
+
+- `id`: stable for life, derived from the feedback or item it came from. Splits are hashed from it, and syncing uses it.
+- `input`: what an evaluator judges.
+- `verdict`: the verdict people gave, when there is one. Judges are trained and measured against it.
+- `reference`: a reference output for the system being evaluated, as JSON, for evaluators that compare against one.
+- `trace_id`: the trace the input came from, so datasets and experiments link back to it.
+- `metadata`: anything else, as JSON.
+
+A `Dataset[InputT, VerdictT]` is an immutable, named collection of examples with unique ids, and the input and verdict types they share.
+
+- `version` is a hash of the examples' content, independent of their order. A trained judge records the version it was trained on.
+- `split(validate=0.2, salt="")` sends an example to validation when `split_bucket(id, salt) < validate`, where the bucket is the first eight bytes of `sha256(salt, id)` as a fraction. So an example never moves between training and validation as others are added or removed, and raising the fraction only moves examples into validation. A different salt gives an independent split.
+- `labelled()` and `filter(predicate)` select examples. `records()` and `Dataset.from_records(...)` convert to and from JSON records, which the Langfuse and Hugging Face integrations build on.
+
+## Formatters
+
+A formatter renders an input as the text a judge reads. A decision model's state is limited (Jev's to 32K tokens), and a language model's context costs money, so formatters work within a budget.
+
+- `InputFormatter(max_tokens=30_000, count_tokens=estimate_tokens)` renders each field as a section headed by its name and description: strings as they are, lists one item to a line, anything else as JSON. `fields(input)` renders the fields separately, for judges that read them one by one.
+- Over budget, the longest list loses its oldest items, after the first (usually the request), with a marker saying how many were omitted. Then the longest remaining text is shortened in the middle. The result always fits.
+- `estimate_tokens` counts one token per three bytes of UTF-8, which overestimates English and is close for scripts of three bytes a character, so a budget measured with it is rarely exceeded. Where the limit is exact, pass the model's tokenizer as `count_tokens`.
+- Summarizing, rather than windowing, is a formatter too: any callable from the input to text fits the `Formatter` protocol.
 
 ## Observability
 

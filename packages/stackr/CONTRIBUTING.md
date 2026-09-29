@@ -4,7 +4,7 @@ Thanks for helping. This guide covers how to set up, how work flows into `main`,
 
 ## Set up
 
-You need Docker with Compose v2, [uv](https://docs.astral.sh/uv/) and `make`. The development tools are installed from `uv.lock`.
+You need Docker with Compose v2, [uv](https://docs.astral.sh/uv/) and `make`. The development tools are installed from `uv.lock`. Local Supabase needs the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) (`brew install supabase/tap/supabase`); without it, `make` runs the version pinned in `versions.env` through `npx`, which needs Node.
 
 ```bash
 git clone git@github.com:alexnodeland/stackr.git
@@ -19,9 +19,9 @@ Run `make` on its own to list every command:
 | Command | What it does |
 |---|---|
 | `make env` | Create or update `.env` from `.env.example`, generating local secrets |
-| `make up` | Start the stack; `make up PROFILES=observability` starts only the profiles you name |
-| `make down` | Stop the stack, keeping its data |
-| `make reset` | Stop the stack and delete its data volumes |
+| `make up` | Start the stack, with local Supabase; `make up PROFILES=observability` starts only the profiles you name |
+| `make down` | Stop the stack and local Supabase, keeping their data |
+| `make reset` | Stop the stack and local Supabase, and delete their data volumes |
 | `make ps` / `make logs` | Show the stack's containers, or follow their logs |
 | `make dashboards` | Download the libraries' Grafana dashboards at the releases pinned in `versions.env` |
 | `make validate` | Validate every configuration without starting containers, as CI does |
@@ -52,7 +52,7 @@ Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`
 
 ## Images and dependencies
 
-- **Every image is pinned** to a version tag, never `latest` alone. Where a registry publishes only `latest`, the image is pinned by digest as well.
+- **Every image is pinned** to a version tag, never `latest` alone. Where a registry publishes only `latest`, the image is pinned by digest as well. The Supabase CLI, which pins Supabase's images, is pinned in `versions.env`.
 - **Dependabot** proposes updates weekly for the images in `compose.yaml`, the GitHub Actions and the development tools in `uv.lock`. An update is merged when CI passes.
 
 ## Secrets
@@ -78,6 +78,7 @@ CI runs the same scripts as `make validate` and `make smoke`.
 - **yamllint** in strict mode over every YAML file.
 - **Compose configuration** for each profile on its own and all together, failing on warnings such as a variable missing from `.env`.
 - **Each service's configuration with its own validator**, from the image `compose.yaml` pins: the Collector, Prometheus, Tempo and Loki.
+- **The Supabase project's names** agree across `supabase/config.toml`, `compose.yaml` and the Makefile.
 - **Grafana dashboards:** valid JSON, unique uids, and only the provisioned data sources.
 - **shellcheck** for the shell scripts, and **ruff** for the Python ones.
 

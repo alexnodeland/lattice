@@ -26,27 +26,48 @@ jobs:
       - run: make validate
 
   smoke:
-    name: Smoke (${{ matrix.profiles }})
+    name: Smoke (${{ matrix.name }})
     needs: validate
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        profiles:
-          - observability
-          - observability postgres langfuse
+        include:
+          - name: observability
+            profiles: observability
+            database: supabase
+          - name: langfuse on local Supabase
+            profiles: observability langfuse
+            database: supabase
+          - name: langfuse on PostgreSQL
+            profiles: observability langfuse
+            database: postgres
+    env:
+      PROFILES: ${{ matrix.profiles }}
+      STACKR_DATABASE: ${{ matrix.database }}
+      # Local Supabase without the services the smoke test doesn't use.
+      SUPABASE_START_FLAGS: >-
+        -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta,storage-api,postgrest
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
       - run: uv sync --locked
+      - name: Read versions.env
+        run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+      - uses: supabase/setup-cli@v3
+        if: matrix.database == 'supabase' && contains(matrix.profiles, 'langfuse')
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
       - run: make env
-      - run: make up PROFILES="${{ matrix.profiles }}"
-      - run: make smoke PROFILES="${{ matrix.profiles }}"
+      - run: make up
+      - run: make smoke
       - name: Logs
         if: failure()
-        run: docker compose --profile '*' logs --no-color --tail=200
+        run: |
+          docker ps -a
+          docker compose --profile '*' logs --no-color --tail=200
       - name: Stop the stack
         if: always()
         run: make reset

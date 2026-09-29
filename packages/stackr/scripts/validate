@@ -43,6 +43,9 @@ check_compose "all profiles" --profile '*'
 step "Grafana dashboards"
 uv run scripts/check-config dashboards || fail "dashboards"
 
+step "The Supabase project"
+uv run scripts/check-config supabase || fail "supabase"
+
 step "Service configurations, with each service's own validator"
 # Each runs the image compose.yaml pins, offline, with the config mounted as
 # the service would see it.

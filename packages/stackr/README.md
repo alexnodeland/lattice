@@ -8,13 +8,13 @@ Part of a family with [artifactr](https://github.com/alexnodeland/artifactr) and
 
 ## Quick start
 
-You need Docker with Compose v2, [uv](https://docs.astral.sh/uv/) and `make`.
+You need Docker with Compose v2, [uv](https://docs.astral.sh/uv/), `make`, and the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) (or Node, to run it through `npx`).
 
 ```bash
 git clone https://github.com/alexnodeland/stackr.git
 cd stackr
 make env        # .env, with local secrets generated
-make up         # start the stack
+make up         # start the stack, with local Supabase
 make smoke      # send test telemetry through it and check it arrives
 make down       # stop it, keeping its data
 ```
@@ -25,6 +25,7 @@ Applications send OTLP to `localhost:4317` (gRPC) or `localhost:4318` (HTTP), or
 |---|---|---|
 | Grafana | <http://localhost:3000> | `admin`, `GRAFANA_ADMIN_PASSWORD` |
 | Langfuse | <http://localhost:3300> | `LANGFUSE_ADMIN_EMAIL`, `LANGFUSE_ADMIN_PASSWORD` |
+| Supabase Studio | <http://localhost:54323> | |
 
 Run `make` to list every command. [CONTRIBUTING](CONTRIBUTING.md) covers the workflow.
 

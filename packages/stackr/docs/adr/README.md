@@ -12,5 +12,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0006](0006-networks-and-published-ports.md) | Networks and published ports | Accepted |
 | [0007](0007-how-telemetry-reaches-the-backends.md) | How telemetry reaches the backends | Accepted |
 | [0008](0008-langfuse-and-its-services.md) | Langfuse and its services | Accepted |
+| [0009](0009-local-supabase-as-the-database-adapter.md) | Local Supabase as the database adapter | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

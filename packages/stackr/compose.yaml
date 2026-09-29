@@ -4,12 +4,12 @@
 # (ADR-0005). Only what a task needs runs:
 #   observability  the OpenTelemetry Collector (the telemetry port), with
 #                  Tempo, Prometheus, Loki, Pyroscope and Grafana behind it
-#   postgres       plain PostgreSQL, as the database adapter
 #   langfuse       Langfuse, behind the Collector for traces, with ClickHouse,
 #                  MinIO (the S3 port) and Valkey (the Redis protocol)
+#   postgres       plain PostgreSQL, the alternative database adapter
 #   smoke          telemetrygen, for scripts/smoke
-# Local Supabase runs beside this project through its CLI. `make up` starts
-# the stack; see docs/architecture.md.
+# The database adapter is local Supabase by default, run beside this project
+# by its CLI (supabase/). `make up` starts both; see docs/architecture.md.
 #
 # Published ports bind to STACKR_BIND (127.0.0.1 by default), and each is a
 # setting in .env (ADR-0006).
@@ -21,6 +21,13 @@ networks:
   # it as an external network and reach the services by name.
   default:
     name: stackr
+  # Local Supabase's network (ADR-0002). The services that use PostgreSQL join
+  # it to reach supabase_db_stackr-supabase by name. `make up` creates it when
+  # it's missing, so it exists with the plain PostgreSQL adapter too, and the
+  # Supabase CLI joins it rather than creating its own.
+  supabase:
+    name: supabase_network_stackr-supabase
+    external: true
 
 volumes:
   prometheus-data:
@@ -37,7 +44,8 @@ volumes:
 # Langfuse's web and worker share their settings. SALT and ENCRYPTION_KEY
 # must match between them and never change.
 x-langfuse-env: &langfuse-env
-  DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD:?run make env}@${POSTGRES_HOST:-postgres}:5432/langfuse
+  # yamllint disable-line rule:line-length
+  DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD:?run make env}@${STACKR_DB_HOST:-supabase_db_stackr-supabase}:5432/langfuse
   SALT: ${LANGFUSE_SALT:?run make env}
   ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?run make env}
   NEXTAUTH_URL: http://localhost:${LANGFUSE_PORT:-3300}
@@ -180,13 +188,14 @@ services:
       - loki
       - pyroscope
 
-  # The database port's plain PostgreSQL adapter.
+  # The database port's alternative adapter: plain PostgreSQL, selected with
+  # STACKR_DATABASE=postgres. Local Supabase is the default (supabase/).
   postgres:
     image: postgres:17.11-alpine
     profiles: [postgres]
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?run make env}
       TZ: UTC
       PGTZ: UTC
@@ -207,16 +216,20 @@ services:
     profiles: [langfuse]
     restart: "no"
     command: ["psql", "--no-psqlrc", "--quiet", "--file=/init.sql"]
+    # The adapter's host and admin password default to local Supabase's
+    # (whose local password is fixed); `make up` sets both for the plain
+    # PostgreSQL adapter.
     environment:
-      PGHOST: ${POSTGRES_HOST:-postgres}
+      PGHOST: ${STACKR_DB_HOST:-supabase_db_stackr-supabase}
       PGPORT: "5432"
       PGDATABASE: postgres
-      PGUSER: ${POSTGRES_ADMIN_USER:-postgres}
-      PGPASSWORD: ${POSTGRES_ADMIN_PASSWORD:?run make env}
+      PGUSER: postgres
+      PGPASSWORD: ${STACKR_DB_ADMIN_PASSWORD:-postgres}
       PGCONNECT_TIMEOUT: "10"
       LANGFUSE_DB_PASSWORD: ${LANGFUSE_DB_PASSWORD:?run make env}
     volumes:
       - ./deploy/postgres/init.sql:/init.sql:ro
+    networks: [default, supabase]
     depends_on:
       postgres:
         condition: service_healthy
@@ -294,6 +307,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *langfuse-env
+    networks: [default, supabase]
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3030/api/health"]
       interval: 5s
@@ -335,6 +349,7 @@ services:
       LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_ADMIN_PASSWORD:?run make env}
     ports:
       - ${STACKR_BIND:-127.0.0.1}:${LANGFUSE_PORT:-3300}:3000
+    networks: [default, supabase]
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/public/health"]
       interval: 5s

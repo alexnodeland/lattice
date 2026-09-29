@@ -20,4 +20,6 @@ You can expect an acknowledgement within a week. Once a fix is available, we wil
 
 stackr's defaults are for local development and single hosts. Published ports bind to `127.0.0.1` unless `STACKR_BIND` says otherwise, and secrets are generated on each machine into a gitignored `.env`. A default that exposes a service beyond the host, a committed secret, or a script that leaks a secret into logs or process listings is a vulnerability.
 
+Local Supabase is the known exception. Its CLI publishes its ports (54321 to 54327) on every interface, with Supabase's well-known local development keys and the fixed database password `postgres`. On a machine reachable from a network you don't trust, block those ports with a firewall, or use the plain PostgreSQL adapter (`STACKR_DATABASE=postgres`).
+
 Vulnerabilities in the services themselves (Supabase, LiteLLM, Langfuse, Grafana and the others) belong with those projects. Tell us as well when stackr's configuration makes one worse, or when a pinned image needs an update.

@@ -7,7 +7,9 @@
 # Tempo, Prometheus and Loki; the span metrics Tempo's metrics generator
 # derives from the trace, and the Collector's own metrics, in Prometheus; and
 # Grafana's provisioned data sources and dashboards.
-# postgres: PostgreSQL is ready, and db-init created Langfuse's database.
+# database: the database adapter (STACKR_DATABASE: supabase or postgres) has
+# the databases db-init creates, checked over db-init's own connection; with
+# local Supabase, its API gateway answers too.
 # langfuse (with observability): a trace with a known id, sent to the
 # Collector, is found in Langfuse through its public API, and in Tempo.
 
@@ -142,14 +144,23 @@ tempo_has_trace_id() {
 langfuse_database_ok() {
   curl -fsS -o /dev/null "$langfuse/api/public/health?failIfDatabaseUnavailable=true"
 }
-postgres_has_database() {
-  docker compose exec -T postgres psql -U "$(setting POSTGRES_ADMIN_USER postgres)" -d postgres -Atc \
-    "SELECT 1 FROM pg_database WHERE datname = '$1'" | grep -q 1
+# A query over db-init's connection to the adapter: its host, admin role and
+# networks, as `make` configures them.
+database_has() {
+  docker compose run --rm --no-deps -T db-init psql --no-psqlrc -Atc \
+    "SELECT 1 FROM pg_database WHERE datname = '$1'" 2>/dev/null | grep -q 1
+}
+# Local Supabase's API gateway: `[api] port` in supabase/config.toml.
+supabase_api_ok() {
+  curl -fsS -o /dev/null "http://127.0.0.1:54321/auth/v1/health"
 }
 
-smoke_postgres() {
-  eventually "PostgreSQL is ready" docker compose exec -T postgres pg_isready -q
-  eventually "db-init created Langfuse's database" postgres_has_database langfuse
+smoke_database() {
+  local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE supabase)}
+  eventually "db-init created Langfuse's database on $adapter" database_has langfuse
+  if [[ $adapter == supabase ]]; then
+    eventually "local Supabase's API answers" supabase_api_ok
+  fi
 }
 
 smoke_langfuse() {
@@ -167,7 +178,7 @@ status=0
 for profile in "${profiles[@]}"; do
   case $profile in
     observability) smoke_observability || status=1 ;;
-    postgres) smoke_postgres || status=1 ;;
+    database) smoke_database || status=1 ;;
     langfuse) smoke_langfuse || status=1 ;;
     *)
       log "smoke: no checks for profile '$profile'"

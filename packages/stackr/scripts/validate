@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Validate the stack's configuration without starting it. CI runs exactly this.
+#
+# Usage: scripts/validate   (after `make env`, so `.env` exists)
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+failures=0
+step() { printf '\n==> %s\n' "$*"; }
+fail() {
+  printf 'FAIL: %s\n' "$*" >&2
+  failures=$((failures + 1))
+}
+
+if [[ ! -f .env ]]; then
+  echo "validate: .env is missing; run \`make env\` first" >&2
+  exit 1
+fi
+
+step "YAML lint"
+uv run yamllint --strict . || fail "yamllint"
+
+step "Compose configuration, per profile"
+# Every profile on its own and all of them together, failing on warnings such
+# as a variable missing from .env.
+check_compose() {
+  local label=$1 output
+  shift
+  if ! output=$(docker compose "$@" config --quiet 2>&1); then
+    fail "compose ($label): $output"
+  elif [[ -n $output ]]; then
+    fail "compose ($label) warned: $output"
+  else
+    echo "ok: $label"
+  fi
+}
+check_compose "no profile"
+for profile in $(docker compose config --profiles); do
+  check_compose "$profile" --profile "$profile"
+done
+check_compose "all profiles" --profile '*'
+
+step "Grafana dashboards"
+dashboards=()
+if [[ -d deploy/grafana/dashboards ]]; then
+  while IFS= read -r file; do dashboards+=("$file"); done \
+    < <(find deploy/grafana/dashboards -name '*.json' | sort)
+fi
+if ((${#dashboards[@]} == 0)); then
+  echo "none yet"
+fi
+for file in "${dashboards[@]+"${dashboards[@]}"}"; do
+  if uv run python -m json.tool "$file" >/dev/null; then
+    echo "ok: $file"
+  else
+    fail "invalid JSON: $file"
+  fi
+done
+
+step "Shell scripts"
+shell_scripts=()
+while IFS= read -r file; do shell_scripts+=("$file"); done \
+  < <(grep -rlE '^#!/usr/bin/env (bash|sh)' scripts .devcontainer | sort)
+if uv run shellcheck "${shell_scripts[@]}"; then
+  echo "ok: ${shell_scripts[*]}"
+else
+  fail "shellcheck"
+fi
+
+step "Python scripts"
+if uv run ruff format --check . && uv run ruff check .; then
+  echo "ok"
+else
+  fail "ruff"
+fi
+
+if ((failures > 0)); then
+  printf '\nvalidate: %d check(s) failed\n' "$failures" >&2
+  exit 1
+fi
+printf '\nvalidate: all checks passed\n'

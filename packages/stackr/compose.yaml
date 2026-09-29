@@ -1,0 +1,15 @@
+# stackr: the services applications on artifactr, reflexr and evalr run on.
+#
+# Services are grouped in profiles (observability, langfuse, gateway), so only
+# what a task needs runs. Local Supabase runs beside this project through its
+# CLI. `make up` starts both; see docs/architecture.md.
+
+name: stackr
+
+networks:
+  # A fixed name, so the libraries' dev containers and applications can join
+  # it as an external network and reach the services by name.
+  default:
+    name: stackr
+
+services: {}

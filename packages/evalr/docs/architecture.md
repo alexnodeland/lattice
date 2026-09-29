@@ -6,7 +6,7 @@
 |---|---|
 | `evalr.core` | Implemented |
 | `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Implemented |
-| `evalr.dspy` | `DspyJudge` and GEPA implemented; saved judges planned (phase 2) |
+| `evalr.dspy` | Implemented |
 | `evalr.decision` | Planned (phase 3) |
 | `evalr.langfuse`, `evalr.hf` | Planned (phase 4) |
 | End-to-end measures and online helpers | Planned (phase 5) |
@@ -170,6 +170,19 @@ A fitted evaluator carries a `Training` record (core), so its version can be exp
 - **Budget:** one of `auto` (`"light"` by default), `max_metric_calls` or `max_full_evals`. `reflection_minibatch_size`, `use_merge` and `seed` pass through.
 - **Threads:** DSPy runs single-threaded (`num_threads=1`), so evaluation spans keep their trace context and a seed reproduces a run. The compile runs in a worker thread, off the event loop.
 - **The result** is a new judge (the one given is unchanged) with the trained program, a new version, and a `Training` record whose scores are GEPA's validation scores for the starting program and the chosen one.
+
+### Saved judges
+
+A trained judge is one JSON file ([ADR-0007](adr/0007-trained-judges-saved-as-json-files.md)), kept in the application's repository and reviewed like code:
+
+```python
+trained.save("judges/helpfulness.json")
+judge = DspyJudge.load("judges/helpfulness.json", Helpfulness, inputs=Thread, lm=lm)
+```
+
+- The file (`evalr.dspy.judge/1`) holds the name and version, the types' names, whether it reasons, DSPy's JSON state of the program, the `Training` record, and the DSPy and evalr versions. `snapshot()` and `DspyJudge.restore(...)` give the same document without a file, for other stores.
+- Loading derives the signature from the types given, loads the program's state and recomputes the version. If the types have changed since the judge was saved, the version differs and loading raises `JudgeMismatch`: the judge must be retrained rather than run against a signature it was not trained for.
+- Nothing in the file can run code or choose a model: the state is JSON (never a pickle), and any language-model configuration in it is dropped, so the judge uses the `lm` given, or DSPy's.
 
 ## Datasets
 

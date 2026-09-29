@@ -3,13 +3,17 @@
 import copy
 import hashlib
 import json
+import os
+from collections.abc import Mapping
 from contextlib import AbstractContextManager, nullcontext
 from enum import Enum
-from typing import Self
+from importlib.metadata import version as _distribution_version
+from pathlib import Path
+from typing import Any, Self, cast
 
 import dspy
 from opentelemetry import trace
-from pydantic import BaseModel
+from pydantic import BaseModel, JsonValue
 
 from evalr.core import (
     Example,
@@ -24,9 +28,42 @@ from evalr.core import (
 )
 from evalr.dspy.signatures import judge_signature
 
-__all__ = ["DspyJudge", "program_version"]
+__all__ = ["FORMAT", "DspyJudge", "JudgeMismatch", "SavedJudge", "program_version"]
+
+FORMAT = "evalr.dspy.judge/1"
+"""The format of a saved judge (ADR-0007)."""
 
 _EMPTY = frozenset({"", "none", "null"})
+
+
+class JudgeMismatch(ValueError):
+    """A saved judge does not match the types it is loaded with, or is not a judge at all."""
+
+
+class SavedJudge(BaseModel, frozen=True):
+    """A trained judge as JSON: its program, its types' names, and how it was trained.
+
+    Attributes:
+        format: ``evalr.dspy.judge/1``.
+        name: The judge's name.
+        version: A hash of the program and the types.
+        input_type: The input type's name.
+        verdict_type: The verdict type's name.
+        reasoning: Whether the program thinks step by step.
+        program: DSPy's JSON state of the program, without any language model.
+        training: How it was trained, if it was.
+        dependencies: The DSPy and evalr versions that saved it.
+    """
+
+    format: str = FORMAT
+    name: str
+    version: str
+    input_type: str
+    verdict_type: str
+    reasoning: bool
+    program: dict[str, JsonValue]
+    training: Training | None = None
+    dependencies: dict[str, str]
 
 
 class DspyJudge[InputT: BaseModel, VerdictT: BaseModel]:
@@ -80,6 +117,7 @@ class DspyJudge[InputT: BaseModel, VerdictT: BaseModel]:
         signature = judge_signature(inputs, verdict_type, instructions=instructions)
         self._verdict_type = verdict_type
         self._input_type = inputs
+        self._reasoning = reasoning
         self._program: dspy.Module = (
             dspy.ChainOfThought(signature) if reasoning else dspy.Predict(signature)
         )
@@ -150,6 +188,103 @@ class DspyJudge[InputT: BaseModel, VerdictT: BaseModel]:
         labels = example.verdict.model_dump(mode="json")
         return dspy.Example(**self.inputs(example.input), **labels).with_inputs(
             *self._input_type.model_fields
+        )
+
+    def snapshot(self) -> SavedJudge:
+        """The judge as JSON, for ``save`` or any other store (ADR-0007)."""
+        return SavedJudge(
+            name=self._name,
+            version=self._version,
+            input_type=self._input_type.__qualname__,
+            verdict_type=self._verdict_type.__qualname__,
+            reasoning=self._reasoning,
+            program=_without_lm(self._program.dump_state()),
+            training=self._training,
+            dependencies={"dspy": dspy.__version__, "evalr": _distribution_version("evalr")},
+        )
+
+    def save(self, path: str | os.PathLike[str]) -> None:
+        """Write the judge to a JSON file."""
+        Path(path).write_text(self.snapshot().model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+    @staticmethod
+    def restore[I: BaseModel, V: BaseModel](
+        saved: SavedJudge,
+        verdict_type: type[V],
+        *,
+        inputs: type[I],
+        name: str | None = None,
+        lm: dspy.BaseLM | None = None,
+        formatter: InputFormatter | None = None,
+        tracer_provider: trace.TracerProvider | None = None,
+    ) -> "DspyJudge[I, V]":
+        """Rebuild a saved judge for its types.
+
+        The signature is derived from the types given, the program's state is loaded into it
+        (never a language model: the judge uses ``lm``, or DSPy's), and the version is checked.
+
+        Args:
+            saved: The saved judge.
+            verdict_type: The verdict type it was trained for.
+            inputs: The input type it was trained for.
+            name: A new name; the saved one by default.
+            lm: The language model; DSPy's configured one by default.
+            formatter: Renders the input; ``InputFormatter()`` by default.
+            tracer_provider: Where evaluation spans go; the global provider by default.
+
+        Raises:
+            JudgeMismatch: It is not a saved judge, or the types have changed since it was
+                saved, so its program would not match them.
+        """
+        if saved.format != FORMAT:
+            raise JudgeMismatch(f"not a saved evalr judge: format {saved.format!r}")
+        judge = DspyJudge(
+            verdict_type,
+            inputs=inputs,
+            name=name or saved.name,
+            reasoning=saved.reasoning,
+            lm=lm,
+            formatter=formatter,
+            tracer_provider=tracer_provider,
+        )
+        judge._program.load_state(_without_lm(saved.program))
+        judge._version = program_version(judge._program, inputs, verdict_type)
+        if judge._version != saved.version:
+            raise JudgeMismatch(
+                f"{saved.name} was saved for {saved.input_type} and {saved.verdict_type} as they "
+                f"were then (version {saved.version}); as {inputs.__qualname__} and "
+                f"{verdict_type.__qualname__} are now it would be {judge._version}. "
+                "Retrain it for the types as they are."
+            )
+        judge._training = saved.training
+        return judge
+
+    @staticmethod
+    def load[I: BaseModel, V: BaseModel](
+        path: str | os.PathLike[str],
+        verdict_type: type[V],
+        *,
+        inputs: type[I],
+        name: str | None = None,
+        lm: dspy.BaseLM | None = None,
+        formatter: InputFormatter | None = None,
+        tracer_provider: trace.TracerProvider | None = None,
+    ) -> "DspyJudge[I, V]":
+        """Read a judge from a JSON file written by ``save``; see ``restore``.
+
+        Raises:
+            JudgeMismatch: It is not a saved judge, or the types have changed.
+            pydantic.ValidationError: The file is not valid JSON of a saved judge.
+        """
+        saved = SavedJudge.model_validate_json(Path(path).read_text(encoding="utf-8"))
+        return DspyJudge.restore(
+            saved,
+            verdict_type,
+            inputs=inputs,
+            name=name,
+            lm=lm,
+            formatter=formatter,
+            tracer_provider=tracer_provider,
         )
 
     def trained(self, program: dspy.Module, training: Training) -> Self:
@@ -233,3 +368,16 @@ def program_version(
         separators=(",", ":"),
     )
     return hashlib.sha256(canonical.encode()).hexdigest()[:12]
+
+
+def _without_lm(state: Mapping[str, object]) -> dict[str, Any]:
+    """A program's state with every language-model configuration dropped."""
+    result: dict[str, Any] = {}
+    for key, value in state.items():
+        if key == "lm":
+            result[key] = None
+        elif isinstance(value, dict):
+            result[key] = _without_lm(cast(dict[str, object], value))
+        else:
+            result[key] = value
+    return result

@@ -10,5 +10,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0004](0004-trunk-based-development-with-rfcs-and-adrs.md) | Trunk-based development with RFCs, ADRs and evergreen docs | Accepted |
 | [0005](0005-quality-gates-and-license.md) | Quality gates and license | Accepted |
 | [0006](0006-ports-and-adapters.md) | Ports and adapters | Accepted |
+| [0007](0007-trained-judges-saved-as-json-files.md) | Trained judges saved as JSON files | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

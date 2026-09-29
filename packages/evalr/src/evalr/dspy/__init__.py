@@ -7,13 +7,16 @@ types, with the verdict fields' descriptions as instructions. ``Gepa`` adapts DS
 """
 
 from evalr.dspy.gepa import FeedbackMetric, Gepa, feedback_metric
-from evalr.dspy.judges import DspyJudge, program_version
+from evalr.dspy.judges import FORMAT, DspyJudge, JudgeMismatch, SavedJudge, program_version
 from evalr.dspy.signatures import default_instructions, judge_signature
 
 __all__ = [
+    "FORMAT",
     "DspyJudge",
     "FeedbackMetric",
     "Gepa",
+    "JudgeMismatch",
+    "SavedJudge",
     "default_instructions",
     "feedback_metric",
     "judge_signature",

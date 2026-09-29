@@ -242,7 +242,7 @@ services:
   # `noeviction`, because queued jobs must not be dropped; the gateway's
   # entries expire by their TTLs.
   redis:
-    image: valkey/valkey:9.0.6-alpine
+    image: valkey/valkey:9.1.2-alpine
     profiles: [langfuse, gateway]
     restart: unless-stopped
     # The password goes into a config file, never onto the command line.

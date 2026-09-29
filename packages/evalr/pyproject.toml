@@ -1,0 +1,128 @@
+[project]
+name = "evalr"
+version = "0.1.0.dev0"
+description = "Typed evaluation of agent systems: DSPy judges optimized with GEPA, TypeSafe Jev decision models, datasets and experiments in Langfuse."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Alex Nodeland", email = "alex@ournature.studio" }]
+requires-python = ">=3.12"
+keywords = ["agents", "llm", "evaluation", "evals", "dspy", "gepa", "pydantic", "langfuse"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Framework :: Pydantic :: 2",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pydantic>=2.13",
+    "opentelemetry-api>=1.30",
+]
+
+[project.optional-dependencies]
+dspy = ["dspy>=3.4"]
+jev = ["pydantic-ai-slim[typesafe]>=2.51"]
+langfuse = ["langfuse>=4.15"]
+hf = ["datasets>=5.0"]
+all = ["evalr[dspy,jev,langfuse,hf]"]
+
+[project.urls]
+Homepage = "https://github.com/alexnodeland/evalr"
+Repository = "https://github.com/alexnodeland/evalr"
+Issues = "https://github.com/alexnodeland/evalr/issues"
+Changelog = "https://github.com/alexnodeland/evalr/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+test = [
+    "pytest>=9.1",
+    "pytest-asyncio>=1.4",
+    "pytest-cov>=7.1",
+    "hypothesis>=6.168",
+]
+lint = ["ruff>=0.16", "pyright>=1.1.414"]
+dev = [
+    { include-group = "test" },
+    { include-group = "lint" },
+    "pre-commit>=4.6",
+    "git-cliff>=2.14",
+]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+# ─── lint and format ──────────────────────────────────────────────────────────
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "N", "D", "UP", "B", "SIM", "RUF", "C4", "PIE", "RET",
+    "PT", "ASYNC", "PERF", "ARG", "T20", "ERA",
+]
+ignore = [
+    "D105", # magic methods document themselves
+    "D107", # __init__ is documented on the class
+    "N818", # exceptions are named for what happened (UnknownField), not with an Error suffix
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+# evalr.dspy and evalr.langfuse share their names with the libraries they adapt; without this,
+# isort's same-package detection files the libraries as first-party.
+known-third-party = ["dspy", "langfuse"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "ARG"]
+
+# ─── types ────────────────────────────────────────────────────────────────────
+
+[tool.pyright]
+include = ["src", "tests"]
+strict = ["src"]
+typeCheckingMode = "standard"
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+
+# ─── tests and coverage ───────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config", "-ra"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = ["src/evalr"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "@overload",
+    "assert_never\\(",
+    "raise NotImplementedError",
+    "^\\s*\\.\\.\\.$",
+    "class .*\\(Protocol.*\\):",
+]

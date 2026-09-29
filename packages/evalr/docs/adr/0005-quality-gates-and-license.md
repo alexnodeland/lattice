@@ -27,4 +27,4 @@ evalr decides which agents, prompts and models are better. Its metrics and evalu
 
 ## Action items
 
-1. [ ] Configure the gates and CI (RFC-0001 phase 0).
+1. [x] Configure the gates and CI (RFC-0001 phase 0).

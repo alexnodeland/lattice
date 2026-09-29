@@ -423,5 +423,5 @@ services:
 
   # Sends test telemetry for scripts/smoke; not a service.
   telemetrygen:
-    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.161.0
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.162.0
     profiles: [smoke]

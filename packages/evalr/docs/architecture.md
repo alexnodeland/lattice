@@ -6,7 +6,7 @@
 |---|---|
 | `evalr.core` | Implemented |
 | `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Implemented |
-| `evalr.dspy` | `DspyJudge` implemented; GEPA and saved judges planned (phase 2) |
+| `evalr.dspy` | `DspyJudge` and GEPA implemented; saved judges planned (phase 2) |
 | `evalr.decision` | Planned (phase 3) |
 | `evalr.langfuse`, `evalr.hf` | Planned (phase 4) |
 | End-to-end measures and online helpers | Planned (phase 5) |
@@ -156,8 +156,20 @@ An `Optimizer[InputT, VerdictT, EvaluatorT]` fits an evaluator to people's verdi
 | Optimizer | Fits | Package |
 |---|---|---|
 | `BestOf(candidates)` | Any evaluator: picks, from it and the candidates, the one that agrees best with people on `train`, and measures the choice on `validate`. A tie keeps the evaluator given. | `evalr.memory` |
-| GEPA (phase 2) | A DSPy judge's instructions, from people's verdicts and their reasons | `evalr.dspy` |
+| `Gepa(reflection_lm=, auto=)` | A DSPy judge's instructions, from people's verdicts and their reasons | `evalr.dspy` |
 | Threshold calibration (phase 3) | A decision evaluator's thresholds | `evalr.decision` |
+
+A fitted evaluator carries a `Training` record (core), so its version can be explained: the optimizer and its settings, the version it started from, the training and validation data (`DatasetRef`: name, content hash, size), and its agreement with people on the validation data before and after.
+
+### Training judges with GEPA
+
+`Gepa` adapts DSPy's GEPA to the `Optimizer` port. GEPA runs the judge on training examples, shows a reflection model where it disagreed with people and why, and rewrites the judge's instructions; a rewrite is kept only if it agrees better with people on the validation examples.
+
+- **The metric** (`feedback_metric(judge)`) is per-field agreement, the mean of `field_agreement`. An answer that is not a valid verdict scores 0.
+- **The feedback** names each field the judge got wrong, with both answers ("rating: you said 2, people said 4."), and quotes people's text fields, their reasons ("People's reason: the refund took a week"), so the reflection model learns why people judged as they did.
+- **Budget:** one of `auto` (`"light"` by default), `max_metric_calls` or `max_full_evals`. `reflection_minibatch_size`, `use_merge` and `seed` pass through.
+- **Threads:** DSPy runs single-threaded (`num_threads=1`), so evaluation spans keep their trace context and a seed reproduces a run. The compile runs in a worker thread, off the event loop.
+- **The result** is a new judge (the one given is unchanged) with the trained program, a new version, and a `Training` record whose scores are GEPA's validation scores for the starting program and the chosen one.
 
 ## Datasets
 

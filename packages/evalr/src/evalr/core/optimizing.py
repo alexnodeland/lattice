@@ -1,11 +1,48 @@
 """Fitting an evaluator to people's verdicts, through the ``Optimizer`` port."""
 
-from pydantic import BaseModel
+from typing import Self
+
+from pydantic import BaseModel, JsonValue
 
 from evalr.core.datasets import Dataset
 from evalr.core.ports import Optimizer
 
-__all__ = ["optimize"]
+__all__ = ["DatasetRef", "Training", "optimize"]
+
+
+class DatasetRef(BaseModel, frozen=True):
+    """Which data was used: a dataset's name, content hash and size."""
+
+    name: str
+    version: str
+    size: int
+
+    @classmethod
+    def of[InputT: BaseModel, VerdictT: BaseModel](cls, dataset: Dataset[InputT, VerdictT]) -> Self:
+        """Refer to a dataset."""
+        return cls(name=dataset.name, version=dataset.version, size=len(dataset))
+
+
+class Training(BaseModel, frozen=True):
+    """How a fitted evaluator was fitted, kept with it so its version can be explained.
+
+    Attributes:
+        optimizer: The optimizer's name, such as ``gepa`` or ``thresholds``.
+        settings: The optimizer's settings, as JSON.
+        base_version: The version of the evaluator it started from.
+        train: The data it was fitted on.
+        validation: The data it was checked on.
+        score_before: Agreement with people on the validation data before fitting, from 0 to 1.
+        score_after: Agreement after fitting.
+    """
+
+    optimizer: str
+    settings: dict[str, JsonValue]
+    base_version: str
+    train: DatasetRef
+    validation: DatasetRef
+    score_before: float | None
+    score_after: float | None
 
 
 async def optimize[InputT: BaseModel, VerdictT: BaseModel, EvaluatorT](

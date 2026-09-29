@@ -70,12 +70,10 @@ class ChainOfThought(Module):
 
 def context(**kwargs: Any) -> AbstractContextManager[None]: ...
 
-type GEPAFeedbackMetric = Callable[[Example, Prediction, Any, str | None, Any], float | Prediction]
-
 class GEPA:
     def __init__(
         self,
-        metric: GEPAFeedbackMetric,
+        metric: Callable[[Example, Prediction, Any, str | None, Any], float | Prediction],
         *,
         auto: Literal["light", "medium", "heavy"] | None = None,
         max_full_evals: int | None = None,

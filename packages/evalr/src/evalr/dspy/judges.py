@@ -1,17 +1,21 @@
 """DSPy judges: language-model evaluators whose signatures come from their types."""
 
+import copy
 import hashlib
 import json
 from contextlib import AbstractContextManager, nullcontext
 from enum import Enum
+from typing import Self
 
 import dspy
 from opentelemetry import trace
 from pydantic import BaseModel
 
 from evalr.core import (
+    Example,
     FieldKind,
     InputFormatter,
+    Training,
     Verdict,
     get_tracer,
     judging,
@@ -84,6 +88,7 @@ class DspyJudge[InputT: BaseModel, VerdictT: BaseModel]:
         self._formatter = formatter or InputFormatter()
         self._tracer = get_tracer(tracer_provider)
         self._version = program_version(self._program, inputs, verdict_type)
+        self._training: Training | None = None
 
     @property
     def name(self) -> str:
@@ -117,6 +122,11 @@ class DspyJudge[InputT: BaseModel, VerdictT: BaseModel]:
         return predictor.signature.instructions
 
     @property
+    def training(self) -> Training | None:
+        """How the judge was trained, if it was: the optimizer, the data and the scores."""
+        return self._training
+
+    @property
     def lm(self) -> dspy.BaseLM | None:
         """The language model, if the judge has its own."""
         return self._lm
@@ -128,6 +138,32 @@ class DspyJudge[InputT: BaseModel, VerdictT: BaseModel]:
     def inputs(self, input: InputT) -> dict[str, str]:
         """The program's inputs for an input: its fields as text, within the budget."""
         return self._formatter.fields(input)
+
+    def training_example(self, example: Example[InputT, VerdictT]) -> dspy.Example:
+        """An example as DSPy trains on it: the input's fields, and people's verdict as labels.
+
+        Raises:
+            ValueError: The example has no verdict.
+        """
+        if example.verdict is None:
+            raise ValueError(f"{example.id} has no verdict to train on")
+        labels = example.verdict.model_dump(mode="json")
+        return dspy.Example(**self.inputs(example.input), **labels).with_inputs(
+            *self._input_type.model_fields
+        )
+
+    def trained(self, program: dspy.Module, training: Training) -> Self:
+        """A copy of the judge with a trained program, versioned by it.
+
+        Args:
+            program: The trained program, of the same signature.
+            training: How it was trained.
+        """
+        judge = copy.copy(self)
+        judge._program = program
+        judge._version = program_version(program, self._input_type, self._verdict_type)
+        judge._training = training
+        return judge
 
     async def evaluate(self, input: InputT, /) -> Verdict[VerdictT]:
         """Judge one input.

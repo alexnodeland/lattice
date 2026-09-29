@@ -35,7 +35,7 @@ from evalr.core.metrics import (
     mean_absolute_error,
     spearman,
 )
-from evalr.core.optimizing import optimize
+from evalr.core.optimizing import DatasetRef, Training, optimize
 from evalr.core.ports import (
     DatasetStore,
     Evaluator,
@@ -54,6 +54,7 @@ __all__ = [
     "Confidence",
     "Dataset",
     "DatasetNotFound",
+    "DatasetRef",
     "DatasetStore",
     "DuplicateExample",
     "Evaluator",
@@ -79,6 +80,7 @@ __all__ = [
     "ScoreType",
     "Task",
     "TokenCounter",
+    "Training",
     "UnsupportedField",
     "Verdict",
     "VerdictField",

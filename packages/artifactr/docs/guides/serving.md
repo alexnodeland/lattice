@@ -38,14 +38,23 @@ The actor always comes from `resolve_actor`, never from the client's frames, so 
 To decide which workspaces an actor may use, pass `authorize`:
 
 ```python
+from artifactr.core import ExternalAgentActor
+
+
 async def authorize(tenant_id: TenantId, workspace_id: str, actor: Actor) -> bool:
-    return await memberships.exists(tenant_id, workspace_id, actor.id)
+    match actor:
+        case UserActor(id=user_id):
+            return await memberships.exists(tenant_id, workspace_id, user_id)
+        case ExternalAgentActor(client_id=client_id):
+            return await grants.exists(tenant_id, workspace_id, client_id)
+        case _:
+            return False
 
 
 router = artifactr_router(workspaces, runner, resolve_actor=resolve_actor, authorize=authorize)
 ```
 
-A refusal answers 403, or closes the WebSocket with 4403. Without `authorize`, any authenticated actor may use any workspace of its own tenant. `ArtifactrMcp` takes the same hook, so pass it the same function ([External agents over MCP](mcp.md#authorization)). [Multi-tenancy and security](security.md) covers the rest.
+People reach the router as `UserActor`s and MCP clients reach `ArtifactrMcp` as `ExternalAgentActor`s, which have a `client_id` instead of an `id`, so one function can serve both by matching on the kind. A refusal answers 403, or closes the WebSocket with 4403. Without `authorize`, any authenticated actor may use any workspace of its own tenant. `ArtifactrMcp` takes the same hook, so pass it the same function ([External agents over MCP](mcp.md#authorization)). [Multi-tenancy and security](security.md) covers the rest.
 
 ## REST
 

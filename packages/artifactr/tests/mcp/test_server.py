@@ -138,6 +138,29 @@ async def test_artifact_tools(mcp: ArtifactrMcp) -> None:
         assert (await _call(client, "archive_artifact", artifact_id="nope"))[0] is True
 
 
+async def test_agents_read_the_log_from_its_end_and_backwards(
+    mcp: ArtifactrMcp, ws: Workspace
+) -> None:
+    one = await ws.create_thread("one")
+    for number in range(59):
+        await ws.create_thread(f"thread {number}")
+
+    async def seqs(**args: Any) -> list[int]:
+        _, lines = await _call(client, "read_events", **args)
+        return [json.loads(line)["seq"] for line in lines.splitlines()]
+
+    async with Client(mcp.server) as client:
+        assert await seqs() == list(range(1, 51)), "the first 50 by default"
+        assert await seqs(limit=60) == list(range(1, 61))
+        assert await seqs(last=3) == [58, 59, 60]
+        assert await seqs(last=2, threads=[one.id]) == [1]
+        assert await seqs(last=2, before_seq=41) == [39, 40]
+        assert await seqs(after_seq=5, before_seq=8) == [6, 7]
+        assert await _call(client, "read_events", after_seq=60) == (False, "No events.")
+        both = await _call(client, "read_events", limit=1, last=1)
+        assert both == (True, "Error executing tool read_events: give limit or last, not both")
+
+
 async def test_proposals_are_reviewed_by_someone_else(
     mcp: ArtifactrMcp, identity: Identity, ws: Workspace
 ) -> None:
@@ -239,6 +262,7 @@ async def test_authorize_decides_which_workspaces_a_client_may_use(
         "respond_to_proposal": {"proposal_id": "prp_1", "decision": "accept"},
         "give_feedback": {"feedback_type": "helpfulness", "target": on_thread, "value": {}},
         "post_message": {"thread_id": thread.id, "content": "hi"},
+        "read_events": {},
     }
     try:
         async with Client(mcp.server) as client:

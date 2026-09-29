@@ -117,11 +117,17 @@ class RunRow(EntityRow):
 
 
 class EventRow(ScopedRow):
-    """One envelope in a workspace's log."""
+    """One envelope in a workspace's log, with the columns reads of some threads filter on."""
 
     __tablename__ = "artifactr_events"
 
     seq: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    event_type: Mapped[str]
+    """The event's type, which says whether it is workspace-scoped."""
+
+    thread_id: Mapped[str | None]
+    """The thread the event belongs to or originated in, as on its envelope."""
+
     envelope: Mapped[dict[str, Any]] = mapped_column(JSON)
 
 

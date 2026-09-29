@@ -6,7 +6,7 @@ implement :class:`Storage` themselves; the workspace behaviour suite in the test
 what an implementation must do.
 """
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Collection, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import timedelta
@@ -138,9 +138,30 @@ class Storage(Protocol):
         ...
 
     async def read(
-        self, scope: Scope, *, after_seq: int = 0, limit: int | None = None
+        self,
+        scope: Scope,
+        *,
+        after_seq: int = 0,
+        before_seq: int | None = None,
+        threads: Collection[ThreadId] | None = None,
+        limit: int | None = None,
+        last: int | None = None,
     ) -> list[Envelope]:
-        """Return logged envelopes with ``seq`` greater than ``after_seq``, in order."""
+        """Return logged envelopes in the window ``after_seq < seq < before_seq``, in order.
+
+        Args:
+            scope: The workspace whose log to read.
+            after_seq: Only envelopes after this ``seq``.
+            before_seq: Only envelopes before this ``seq``; ``None`` reads to the head.
+            threads: Only the envelopes a subscriber following these threads receives, by
+                :func:`~artifactr.core.delivered_to`'s rule; ``None`` reads every thread.
+            limit: At most this many: the first ones in the window that match.
+            last: At most this many: the last ones in the window that match, still returned
+                in order. This is the tail of the log.
+
+        Callers give at most one of ``limit`` and ``last``, and no negative numbers;
+        :meth:`~artifactr.workspace.Workspace.read` checks.
+        """
         ...
 
     def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncIterator[Envelope]:

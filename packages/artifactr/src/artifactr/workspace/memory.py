@@ -7,7 +7,7 @@ restarts and cannot be shared between processes.
 
 import asyncio
 import uuid
-from collections.abc import AsyncGenerator, AsyncIterator, Callable, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Collection, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -29,6 +29,7 @@ from artifactr.core import (
     Thread,
     ThreadId,
     Versioned,
+    delivered_to,
     scope_of,
 )
 from artifactr.core.actors import Actor
@@ -229,11 +230,25 @@ class InMemoryStorage:
         return len(self._data(scope).log)
 
     async def read(
-        self, scope: Scope, *, after_seq: int = 0, limit: int | None = None
+        self,
+        scope: Scope,
+        *,
+        after_seq: int = 0,
+        before_seq: int | None = None,
+        threads: Collection[ThreadId] | None = None,
+        limit: int | None = None,
+        last: int | None = None,
     ) -> list[Envelope]:
-        """Return logged envelopes with ``seq`` greater than ``after_seq``, in order."""
-        log = self._data(scope).log[after_seq:]
-        return log if limit is None else log[:limit]
+        """Return logged envelopes in the window ``after_seq < seq < before_seq``, in order.
+
+        Of those delivered to ``threads``, if given: the first ``limit`` or the last ``last``.
+        """
+        log = self._data(scope).log
+        window = log[after_seq : len(log) if before_seq is None else max(before_seq - 1, 0)]
+        found = [envelope for envelope in window if delivered_to(envelope, threads)]
+        if last is not None:
+            return found[max(len(found) - last, 0) :]
+        return found if limit is None else found[:limit]
 
     async def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncIterator[Envelope]:
         """Yield stored envelopes after ``after_seq``, then each new one as it commits."""

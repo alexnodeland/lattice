@@ -161,14 +161,28 @@ Every command and every fact about an agent run appends events to the workspace'
 | `actor` | Who did it |
 | `event` | The event itself, one of the types in `artifactr.core` |
 
-`read(after_seq=0, threads=None, limit=None)` returns a page of the log. `subscribe(after_seq=0, threads=None)` yields the stored envelopes after `after_seq` and then each new one as it commits, on one iterator, so nothing falls between catching up and following along:
+`read(after_seq=0, before_seq=None, threads=None, limit=None, last=None)` returns a page of the log ([below](#reading-a-window-or-the-tail)). `subscribe(after_seq=0, threads=None)` yields the stored envelopes after `after_seq` and then each new one as it commits, on one iterator, so nothing falls between catching up and following along:
 
 ```python
 async for envelope in ws.subscribe(after_seq=last_seen_seq, threads={thread.id}):
     handle(envelope)
 ```
 
-`threads` filters thread-scoped events (messages, runs, focus and mode) to the listed threads. Workspace-scoped events (artifacts and proposals) are always delivered, whichever thread they came from.
+`threads` filters thread-scoped events (messages, runs, focus and mode) to the listed threads. Workspace-scoped events (artifacts and proposals, whose types are in `artifactr.core.WORKSPACE_SCOPED`) are always delivered, whichever thread they came from.
+
+### Reading a window or the tail
+
+`read` takes a window of the log, the envelopes with `after_seq < seq < before_seq`, and returns them oldest first. Without `before_seq` the window runs to the head. `threads` filters it as above. `limit` takes the first so many that match, and `last` the last so many, which is the tail of the log. Storage does the filtering, so SQL storage reads only the envelopes it returns ([Storage](storage.md#how-it-behaves)).
+
+```python
+# The latest 50 events a thread's view shows, oldest first
+recent = await ws.read(threads={thread.id}, last=50)
+
+# The 50 before those: page backwards from the oldest seq you have
+earlier = await ws.read(threads={thread.id}, last=50, before_seq=recent[0].seq)
+```
+
+Give `limit` or `last`, not both: a read with both, or with a negative number, is refused with `ValidationFailed`. REST's `GET /v1/workspaces/{workspace_id}/events` takes the same parameters, with `thread_id` repeated for several threads ([Serving](serving.md#rest)), and so does the MCP tool `read_events` ([External agents over MCP](mcp.md#what-a-client-sees)).
 
 Core events form a closed set, so code that handles them can `match` exhaustively and pyright checks it. Applications record their own facts as `AppEvent`s, which any actor can record:
 

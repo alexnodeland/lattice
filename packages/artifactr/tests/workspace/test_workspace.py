@@ -2,6 +2,7 @@
 
 import asyncio
 from datetime import timedelta
+from typing import Any
 
 import pytest
 
@@ -27,6 +28,7 @@ from artifactr.core import (
     SetFocus,
     ThreadTarget,
     TurnTarget,
+    ValidationFailed,
     VersionConflict,
 )
 from artifactr.workspace import Storage, ThreadBusy, Workspace, Workspaces
@@ -189,6 +191,35 @@ async def test_runs_are_listed_by_thread_and_status(ws: Workspace) -> None:
     assert [r.id for r in await ws.runs(thread_id=one.id)] == ["run_1", "run_3"]
     assert [r.id for r in await ws.runs(status="running")] == ["run_2", "run_3"]
     assert [r.id for r in await ws.runs(thread_id=one.id, status="running")] == ["run_3"]
+
+
+async def test_reading_the_log_from_its_end(ws: Workspace) -> None:
+    one = await ws.create_thread("one")
+    two = await ws.create_thread("two")
+    await ws.post_message(one.id, "in one")
+    await ws.post_message(two.id, "in two")
+    tail = await ws.read(threads={one.id}, last=1)
+    assert [e.seq for e in tail] == [3]
+    earlier = await ws.read(threads={one.id}, last=5, before_seq=tail[0].seq)
+    assert [e.seq for e in earlier] == [1]
+    assert [e.seq for e in await ws.read(after_seq=1, before_seq=4, limit=1)] == [2]
+
+
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        ({"limit": 1, "last": 1}, "give limit or last, not both"),
+        ({"after_seq": -1}, "after_seq cannot be negative"),
+        ({"before_seq": -1}, "before_seq cannot be negative"),
+        ({"limit": -1}, "limit cannot be negative"),
+        ({"last": -1}, "last cannot be negative"),
+    ],
+)
+async def test_a_read_takes_limit_or_last_and_no_negative_numbers(
+    ws: Workspace, options: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(ValidationFailed, match=message):
+        await ws.read(**options)
 
 
 async def test_history_needs_a_thread(ws: Workspace) -> None:

@@ -10,7 +10,7 @@ that lock. Subscriptions poll the log, and wake at once for commits made through
 import asyncio
 import contextlib
 import uuid
-from collections.abc import AsyncGenerator, AsyncIterator, Callable, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Collection, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Literal
@@ -20,6 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from artifactr.core import (
+    WORKSPACE_SCOPED,
     Artifact,
     ArtifactId,
     CommitResult,
@@ -141,7 +142,13 @@ class _Transaction:
             for revision in result.revisions
         )
         self._session.add_all(
-            EventRow(**self._key, seq=envelope.seq, envelope=envelope.model_dump(mode="json"))
+            EventRow(
+                **self._key,
+                seq=envelope.seq,
+                event_type=envelope.event.type,
+                thread_id=envelope.thread_id,
+                envelope=envelope.model_dump(mode="json"),
+            )
             for envelope in envelopes
         )
         return envelopes
@@ -351,16 +358,32 @@ class SqlStorage:
         return head or 0
 
     async def read(
-        self, scope: Scope, *, after_seq: int = 0, limit: int | None = None
+        self,
+        scope: Scope,
+        *,
+        after_seq: int = 0,
+        before_seq: int | None = None,
+        threads: Collection[ThreadId] | None = None,
+        limit: int | None = None,
+        last: int | None = None,
     ) -> list[Envelope]:
-        """Return logged envelopes with ``seq`` greater than ``after_seq``, in order."""
-        query = (
-            _scoped(EventRow, scope)
-            .where(EventRow.seq > after_seq)
-            .order_by(EventRow.seq)
-            .limit(limit)
-        )
-        return [Envelope.model_validate(row.envelope) for row in await self._all(query)]
+        """Return logged envelopes in the window ``after_seq < seq < before_seq``, in order.
+
+        Of those delivered to ``threads``, if given: the first ``limit`` or the last ``last``.
+        The filter and both ends of the window are in the query, and the last are read
+        backwards from the end of the log.
+        """
+        query = _scoped(EventRow, scope).where(EventRow.seq > after_seq)
+        if before_seq is not None:
+            query = query.where(EventRow.seq < before_seq)
+        if threads is not None:
+            query = query.where(_delivered_to(threads))
+        if last is not None:
+            query = query.order_by(EventRow.seq.desc()).limit(last)
+        else:
+            query = query.order_by(EventRow.seq).limit(limit)
+        envelopes = [Envelope.model_validate(row.envelope) for row in await self._all(query)]
+        return envelopes if last is None else envelopes[::-1]
 
     async def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncIterator[Envelope]:
         """Yield stored envelopes after ``after_seq``, then each new one as it commits.
@@ -439,6 +462,15 @@ class SqlStorage:
     async def _all[R: ScopedRow](self, query: Select[R]) -> Sequence[R]:
         async with self._sessions() as session:
             return (await session.scalars(query)).all()
+
+
+def _delivered_to(threads: Collection[ThreadId]) -> ColumnElement[bool]:
+    """Whether a subscriber following ``threads`` receives an event, as ``delivered_to`` says."""
+    return or_(
+        EventRow.thread_id.is_(None),
+        EventRow.event_type.in_(sorted(WORKSPACE_SCOPED)),
+        EventRow.thread_id.in_(sorted(threads)),
+    )
 
 
 def _lease(scope: Scope, key: str) -> tuple[ColumnElement[bool], ...]:

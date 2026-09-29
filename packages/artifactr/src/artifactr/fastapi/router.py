@@ -158,12 +158,26 @@ def artifactr_router(
     @router.get("/workspaces/{workspace_id}/events")
     async def list_events(
         after_seq: int = 0,
+        before_seq: int | None = None,
         thread_id: Annotated[list[str] | None, Query()] = None,
         limit: int | None = None,
+        last: int | None = None,
         workspace: Workspace = current_workspace,
     ) -> list[Envelope]:
-        """Return a page of the log. ``thread_id`` may repeat."""
-        return await workspace.read(after_seq=after_seq, threads=thread_id, limit=limit)
+        """Return a page of the log, optionally for some threads. ``thread_id`` may repeat.
+
+        The window is ``after_seq < seq < before_seq``. ``limit`` returns its first envelopes,
+        ``last`` its last ones, oldest first either way.
+        """
+        return await _or_http(
+            workspace.read(
+                after_seq=after_seq,
+                before_seq=before_seq,
+                threads=thread_id,
+                limit=limit,
+                last=last,
+            )
+        )
 
     @router.get("/workspaces/{workspace_id}/threads")
     async def list_threads(workspace: Workspace = current_workspace) -> list[Thread]:

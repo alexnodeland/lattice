@@ -7,6 +7,8 @@ from typing import Any, cast
 import pytest
 
 from artifactr.core import (
+    AppEvent,
+    CreateArtifact,
     CreateThread,
     Envelope,
     MessagePosted,
@@ -68,6 +70,37 @@ async def test_reads_filter_and_page(storage: Storage) -> None:
         await _create_thread(storage, thread_id)
     assert [e.seq for e in await storage.read(SCOPE, after_seq=1, limit=1)] == [2]
     assert await storage.artifacts(SCOPE, kind="note") == []
+
+
+async def test_reads_take_a_window_for_some_threads_from_its_start_or_its_end(
+    storage: Storage, ws: Workspace
+) -> None:
+    one = await ws.create_thread("one")  # 1
+    two = await ws.create_thread("two")  # 2
+    await ws.post_message(one.id, "in one")  # 3
+    await ws.post_message(two.id, "in two")  # 4
+    await ws.commit(CreateArtifact(artifact_id="n1", kind="note", data={}, thread_id=two.id))  # 5
+    await ws.record(AppEvent(name="exported"))  # 6: no thread
+    await ws.post_message(two.id, "again in two")  # 7
+
+    async def seqs(**options: Any) -> list[int]:
+        return [envelope.seq for envelope in await storage.read(SCOPE, **options)]
+
+    assert await seqs(before_seq=3) == [1, 2]
+    assert await seqs(after_seq=2, before_seq=5) == [3, 4]
+    assert await seqs(before_seq=0) == []
+    assert await seqs(before_seq=100) == [1, 2, 3, 4, 5, 6, 7]
+    assert await seqs(threads={one.id}) == [1, 3, 5, 6], "the artifact event reaches everyone"
+    assert await seqs(threads=[one.id, two.id], after_seq=4) == [5, 6, 7]
+    assert await seqs(threads=()) == [5, 6]
+    assert await seqs(limit=2, threads={two.id}, after_seq=2) == [4, 5]
+    assert await seqs(limit=0) == []
+    assert await seqs(last=2) == [6, 7], "the tail, oldest first"
+    assert await seqs(last=2, threads={one.id}) == [5, 6]
+    assert await seqs(last=10, after_seq=4) == [5, 6, 7]
+    assert await seqs(last=0) == []
+    tail = await seqs(last=2, threads={one.id})
+    assert await seqs(last=2, threads={one.id}, before_seq=tail[0]) == [1, 3], "paging backwards"
 
 
 async def test_envelopes_are_stamped_and_scoped(storage: Storage) -> None:

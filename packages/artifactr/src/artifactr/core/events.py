@@ -11,7 +11,7 @@ timestamp, scope and actor. The envelope's shape is also the wire shape.
 
 from collections.abc import Collection
 from datetime import datetime
-from typing import Annotated, Literal, cast, get_args
+from typing import Annotated, Final, Literal, cast, get_args
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, JsonValue, Tag
 
@@ -356,22 +356,26 @@ class Envelope(BaseModel):
     event: Event
 
 
-_WORKSPACE_SCOPED = (
-    ArtifactCreated,
-    ArtifactChanged,
-    ArtifactArchived,
-    ProposalCreated,
-    ProposalResolved,
+WORKSPACE_SCOPED: Final = frozenset(
+    {
+        "artifact_created",
+        "artifact_changed",
+        "artifact_archived",
+        "proposal_created",
+        "proposal_resolved",
+    }
 )
+"""The types of the events every subscriber receives, whichever thread they originated in."""
 
 
 def delivered_to(envelope: Envelope, threads: Collection[ThreadId] | None) -> bool:
     """Return whether a subscriber following ``threads`` receives ``envelope``.
 
-    Workspace-scoped events (artifacts and proposals) reach every subscriber, whichever thread
-    they originated in. Thread-scoped events reach subscribers that follow their thread.
-    ``None`` follows every thread.
+    Workspace-scoped events (artifacts and proposals, whose types are in
+    :data:`WORKSPACE_SCOPED`) reach every subscriber, whichever thread they originated in.
+    Thread-scoped events reach subscribers that follow their thread. ``None`` follows every
+    thread. Storage applies the same rule when it reads the log for some threads.
     """
     if threads is None or envelope.thread_id is None:
         return True
-    return isinstance(envelope.event, _WORKSPACE_SCOPED) or envelope.thread_id in threads
+    return envelope.event.type in WORKSPACE_SCOPED or envelope.thread_id in threads

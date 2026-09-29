@@ -310,14 +310,21 @@ class Client:
     async def join(self, *, new_thread: bool) -> None:
         """Say hello, then create the thread, or render the replay of the thread rejoined.
 
-        The server sends the live output of the thread's runs, including one already running,
-        without being asked.
+        A new thread starts at the head of the log, since nothing before it concerns it, so
+        nothing is replayed. The server sends the live output of the thread's runs, including
+        one already running, without being asked.
         """
-        await self.send({"type": "hello", "protocol": PROTOCOL, "threads": [self.state.thread_id]})
+        await self.send(
+            {
+                "type": "hello",
+                "protocol": PROTOCOL,
+                "threads": [self.state.thread_id],
+                "from_head": new_thread,
+            }
+        )
         await self.socket.recv()  # welcome
         while (frame := json.loads(await self.socket.recv()))["type"] != "replay_complete":
-            if not new_thread:
-                self.renderer.frame(frame)
+            self.renderer.frame(frame)
         if new_thread:
             await self.send(command_frame(type="create_thread", thread_id=self.state.thread_id))
 

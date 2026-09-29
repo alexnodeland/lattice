@@ -1,8 +1,9 @@
 """The thread protocol: its frames, handshake and resume rule.
 
-A client says ``hello`` with the last ``seq`` it has seen; :func:`resume` decides where replay
-starts. Resume is by sequence number, never by timestamp (ADR-0005). The frame models here are
-the protocol's source of truth; ``schemas/artifactr.v1.json`` is generated from them.
+A client says ``hello`` with the last ``seq`` it has seen, or asks to start at the head of the
+log; :func:`resume` decides where replay starts. Resume is by sequence number, never by
+timestamp (ADR-0005). The frame models here are the protocol's source of truth;
+``schemas/artifactr.v1.json`` is generated from them.
 """
 
 from typing import Annotated, Final, Literal
@@ -10,7 +11,7 @@ from typing import Annotated, Final, Literal
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from artifactr.core.commands import Command
-from artifactr.core.errors import UnsupportedProtocol
+from artifactr.core.errors import UnsupportedProtocol, ValidationFailed
 from artifactr.core.events import Envelope
 from artifactr.core.ids import RunId, ThreadId, WorkspaceId
 from artifactr.core.live import LiveFrame
@@ -28,6 +29,12 @@ class Hello(BaseModel):
     type: Literal["hello"] = "hello"
     protocol: str
     resume_after_seq: int = Field(default=0, ge=0)
+    """The last ``seq`` the client has: everything after it is replayed."""
+
+    from_head: bool = False
+    """Start at the head of the log instead, replaying nothing. ``resume_after_seq`` must then
+    be 0; a client that reconnects resumes from ``welcome.head_seq`` with it."""
+
     threads: tuple[ThreadId, ...] | None = None
     """Thread-scoped events to receive; ``None`` means every thread."""
 
@@ -54,11 +61,16 @@ def resume(hello: Hello, *, head_seq: int, first_retained_seq: int = 1) -> Resum
 
     Raises:
         UnsupportedProtocol: If the client speaks another protocol version.
+        ValidationFailed: If the client asks to start at the head and to resume.
     """
     if hello.protocol != PROTOCOL:
         raise UnsupportedProtocol(
             f"this server speaks {PROTOCOL}; the client asked for {hello.protocol}"
         )
+    if hello.from_head:
+        if hello.resume_after_seq:
+            raise ValidationFailed("from_head replays nothing, so resume_after_seq must be 0", [])
+        return ResumePlan(replay_after=head_seq)
     oldest_resumable = first_retained_seq - 1
     if hello.resume_after_seq > head_seq or hello.resume_after_seq < oldest_resumable:
         # The client has seen events this log does not have, or ones it no longer keeps.

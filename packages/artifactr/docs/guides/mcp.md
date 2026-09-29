@@ -77,6 +77,7 @@ The server's instructions tell the client how to behave: read before changing, p
 | `respond_to_proposal(workspace_id, proposal_id, decision, reason=None)` | Accepts or rejects someone else's proposal |
 | `post_message(workspace_id, thread_id, content)` | Posts a message in a thread |
 | `give_feedback(workspace_id, feedback_type, target, value=None)` | Gives feedback of an application's type on an artifact, thread, turn or message |
+| `read_events(workspace_id, after_seq=0, before_seq=None, threads=None, limit=None, last=None)` | Reads envelopes, oldest first, as JSON lines, as `GET /v1/workspaces/{workspace_id}/events` reads them: the window `after_seq < seq < before_seq`, for `threads`, the first `limit` or the last `last`. Without either, the first 50. To read back from the latest events, give `last`, then `before_seq` the oldest `seq` returned. |
 
 A rejection comes back as a tool error carrying its message, such as a version conflict telling the client to read again.
 

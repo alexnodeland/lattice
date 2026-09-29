@@ -53,6 +53,7 @@ from artifactr.core.errors import (
     VersionConflict,
 )
 from artifactr.core.events import (
+    WORKSPACE_SCOPED,
     AppEvent,
     ArtifactArchived,
     ArtifactChanged,
@@ -169,6 +170,7 @@ from artifactr.core.state import (
 __all__ = [
     "PROTOCOL",
     "TARGET_KINDS",
+    "WORKSPACE_SCOPED",
     "ActiveRun",
     "Actor",
     "AgentActor",

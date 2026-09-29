@@ -19,7 +19,7 @@ sequenceDiagram
     participant S as Server
     C->>S: WebSocket upgrade (subprotocol artifactr.v1)
     S-->>C: accept (actor resolved)
-    C->>S: hello {protocol, resume_after_seq, threads}
+    C->>S: hello {protocol, resume_after_seq or from_head, threads}
     S-->>C: welcome {protocol, head_seq, active_runs}
     S-->>C: event frames with seq > resume_after_seq
     S-->>C: replay_complete {up_to_seq}
@@ -44,6 +44,7 @@ sequenceDiagram
 - **The server owns the protocol version.** An unsupported `protocol` closes the socket with `4400`.
 - **Resume is by `seq`, never by timestamp.** The server subscribes to the log from `resume_after_seq` before replaying, so no event can fall between replay and live delivery.
 - `resume_after_seq` of `0` replays from the beginning of retained history. If the client has seen events this log does not have (its position is past `head_seq`, for example after the server's data was reset), or the position is older than retention, `welcome` carries `reset: true`: the client discards what it holds and rebuilds from the replay. The decision is `artifactr.core.resume`.
+- `from_head: true` starts at the head of the log instead, for a client that needs only what happens from now on, such as a terminal starting a new thread. Nothing is replayed: `replay_complete` (`up_to_seq` is `head_seq`) follows `welcome` at once, and `reset` is `false`. `active_runs` are listed and watched as on any connection. The client's position is then `welcome.head_seq`, and it reconnects with `resume_after_seq` from there, so it does not miss what was committed while it was away. A `hello` with `from_head` and a nonzero `resume_after_seq` closes with `4400`.
 - `threads` filters thread-scoped events (messages, runs). Workspace-scoped events (artifacts, proposals) are always delivered.
 - A `hello` not received within the server's timeout closes the socket with `4408`.
 
@@ -212,7 +213,7 @@ Every command is carried out by `artifactr.agent.Runner.execute`, whichever tran
 |---|---|---|
 | `1000` | Normal closure | none |
 | `1001` | Server going away | reconnect and resume |
-| `4400` | The first frame was not a valid `hello`, or asked for an unsupported protocol version | fix or upgrade the client |
+| `4400` | The first frame was not a valid `hello`, asked for an unsupported protocol version, or asked both to start at the head and to resume | fix or upgrade the client |
 | `4401` | Unauthenticated | re-authenticate |
 | `4403` | Actor may not access this workspace | stop |
 | `4408` | `hello` not received in time | reconnect |
@@ -228,7 +229,7 @@ REST mirrors the commands and exposes reads; `artifactr.fastapi.artifactr_router
 | `GET /v1/workspaces/{workspace_id}/artifacts?kind=&include_archived=` | List artifacts. |
 | `GET /v1/workspaces/{workspace_id}/artifacts/{artifact_id}` | The current `Versioned` artifact: `id`, `kind`, `version`, `data`, `updated_by`, `archived`. |
 | `GET /v1/workspaces/{workspace_id}/artifacts/{artifact_id}/revisions` | Revision history. Each revision has the `trace_id` it was committed in, when it was traced. |
-| `GET /v1/workspaces/{workspace_id}/events?after_seq=&thread_id=&limit=` | A page of the log, as envelopes. `thread_id` may repeat. |
+| `GET /v1/workspaces/{workspace_id}/events?after_seq=&before_seq=&thread_id=&limit=&last=` | A page of the log, as envelopes, oldest first: the window `after_seq < seq < before_seq` (to the head without `before_seq`), for the threads `thread_id` names (it may repeat, and filters as `hello`'s `threads` does), and of those the first `limit` or the last `last`. `last` is the tail of the log; `last` with `before_seq` set to the oldest `seq` a client has pages backwards. Both `limit` and `last`, or a negative number, is `validation_failed`. |
 | `GET /v1/workspaces/{workspace_id}/threads` | Every thread. |
 | `GET /v1/workspaces/{workspace_id}/threads/{thread_id}` | A thread's mode and focus. |
 | `GET /v1/workspaces/{workspace_id}/proposals?status=` | Proposals, pending by default. |
@@ -250,6 +251,7 @@ External agents connect over MCP (`artifactr.mcp.ArtifactrMcp`) with the same au
 | Tools `list_proposals`, `respond_to_proposal` | Review others' proposals. |
 | Tool `post_message` | A message in a thread, handled like any other: it starts, steers or answers the thread's agent. |
 | Tool `give_feedback` | Feedback of an application's type on an artifact version, a thread, a turn or a message. |
+| Tool `read_events` | `GET .../events`, as JSON lines, with its window, `threads` and tail. It returns 50 when given neither `limit` nor `last`. |
 
 Rejections are returned as tool errors carrying the rejection's message. A workspace `authorize` refuses is a tool error too, carrying `this workspace is not yours to use`, the message of REST's 403.
 

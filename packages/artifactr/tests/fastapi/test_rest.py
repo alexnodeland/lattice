@@ -90,6 +90,28 @@ def test_reads(client: TestClient) -> None:
     assert client.get(f"{BASE}/runs/r1").status_code == 404
 
 
+def test_the_log_is_read_from_its_end_and_backwards(client: TestClient) -> None:
+    for number, thread_id in enumerate(("t1", "t2", "t3", "t4"), start=1):
+        client.post(
+            f"{BASE}/commands",
+            json=command(f"c{number}", type="create_thread", thread_id=thread_id),
+        )
+
+    def seqs(**params: int | list[str]) -> list[int]:
+        return [e["seq"] for e in client.get(f"{BASE}/events", params=params).json()]
+
+    assert seqs(last=2) == [3, 4]
+    assert seqs(last=2, thread_id=["t1", "t3"]) == [1, 3]
+    assert seqs(last=2, before_seq=3) == [1, 2]
+    assert seqs(after_seq=1, before_seq=4) == [2, 3]
+    both = client.get(f"{BASE}/events", params={"limit": 1, "last": 1})
+    assert (both.status_code, both.json()["detail"]) == (
+        422,
+        {"type": "validation_failed", "message": "give limit or last, not both", "errors": []},
+    )
+    assert client.get(f"{BASE}/events", params={"before_seq": -1}).status_code == 422
+
+
 def test_a_posted_message_runs_the_agent() -> None:
     app, _ = build(
         Script(call("create_artifact", kind="note", data={"text": "Plan"}), say("Done."))

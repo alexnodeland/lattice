@@ -66,7 +66,7 @@ Every path is relative to the router's prefix, `/v1` above:
 | `GET /workspaces/{workspace_id}/artifacts?kind=&include_archived=` | List current artifacts |
 | `GET /workspaces/{workspace_id}/artifacts/{artifact_id}` | One artifact's current version |
 | `GET /workspaces/{workspace_id}/artifacts/{artifact_id}/revisions` | Its revisions, oldest first |
-| `GET /workspaces/{workspace_id}/events?after_seq=&thread_id=&limit=` | A page of the log; `thread_id` may repeat |
+| `GET /workspaces/{workspace_id}/events?after_seq=&before_seq=&thread_id=&limit=&last=` | A page of the log, oldest first: the window `after_seq < seq < before_seq`, for the threads `thread_id` names (it may repeat), the first `limit` or the last `last` of it. Both `limit` and `last` is 422. |
 | `GET /workspaces/{workspace_id}/threads` | Every thread |
 | `GET /workspaces/{workspace_id}/threads/{thread_id}` | One thread, with its mode and focus |
 | `GET /workspaces/{workspace_id}/proposals?status=` | Proposals, pending by default |
@@ -100,6 +100,20 @@ A client connects to `/v1/workspaces/{workspace_id}/stream` with the subprotocol
 The server answers `welcome`, with the log's head and the runs in progress, then replays every event after `resume_after_seq`, then sends `replay_complete`. From then on the client receives events as they commit, `command_result` frames for its commands, and live frames for runs in the threads it follows. It sends commands as command frames, and can attach to any run's live output with a `watch_run` command.
 
 Replay and live delivery are one subscription to the log, so nothing falls between them. A client that reconnects says `hello` with its last `seq` and continues where it left off; if the server has lost events the client saw, `welcome` says `reset: true` and the client rebuilds from the replay.
+
+A client that needs only what happens from now on, such as a terminal that starts a new thread, says `hello` with `from_head: true` instead:
+
+```json
+{"type": "hello", "protocol": "artifactr.v1", "from_head": true, "threads": ["thr_2"]}
+```
+
+Nothing is replayed: `welcome` carries the head and the runs in progress, as always, and `replay_complete` follows at once. The client's position is then `welcome.head_seq`, and when it reconnects it says `hello` with `resume_after_seq` from there, not with `from_head` again, so it does not miss what was committed while it was away. A `hello` with both `from_head` and a `resume_after_seq` is closed with 4400.
+
+To show some history first, such as a thread's latest messages, read the tail over REST with `last`, then say `hello` with `resume_after_seq` set to the last `seq` it returned. The replay then brings whatever was committed in between, so nothing is lost:
+
+```text
+GET /v1/workspaces/launch/events?thread_id=thr_1&last=50
+```
 
 The [thread protocol](../protocol.md) specifies every frame and close code, and [`schemas/artifactr.v1.json`](../reference/schema.md) gives the JSON Schema to generate client types from.
 

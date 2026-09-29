@@ -361,8 +361,8 @@ Every surface is a thin adapter: it authenticates, asks whether the client may u
 
 | Surface | Package | Role |
 |---|---|---|
-| WebSocket | `artifactr.fastapi` | The thread protocol ([`protocol.md`](protocol.md)): `hello` and `welcome`, replay from a `seq` then live events on one subscription, command frames and results, and live frames for runs in followed threads or on request. |
-| REST | `artifactr.fastapi` | The same command frames at `POST .../commands`, and reads of artifacts, revisions, the log, threads, proposals and runs. |
+| WebSocket | `artifactr.fastapi` | The thread protocol ([`protocol.md`](protocol.md)): `hello` and `welcome`, replay from a `seq` (or none, from the head of the log) then live events on one subscription, command frames and results, and live frames for runs in followed threads or on request. |
+| REST | `artifactr.fastapi` | The same command frames at `POST .../commands`, and reads of artifacts, revisions, the log (a window of it, for some threads, from its start or its end), threads, proposals and runs. |
 | MCP | `artifactr.mcp` | External agents join as `ExternalAgentActor`s: artifacts are resources at `artifactr://{tenant}/{workspace}/artifacts/{id}`, commands are tools, and artifact changes become resource-updated notifications on the server's `SubscriptionBus`. |
 
 ```python
@@ -397,7 +397,14 @@ class Transaction(Protocol):
 class Storage(Protocol):
     def transaction(self, scope: Scope) -> AbstractAsyncContextManager[Transaction]: ...
     async def read(
-        self, scope: Scope, *, after_seq: int = 0, limit: int | None = None
+        self,
+        scope: Scope,
+        *,
+        after_seq: int = 0,
+        before_seq: int | None = None,
+        threads: Collection[ThreadId] | None = None,
+        limit: int | None = None,
+        last: int | None = None,
     ) -> list[Envelope]: ...
     def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncIterator[Envelope]: ...
     async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool: ...
@@ -406,6 +413,7 @@ class Storage(Protocol):
 ```
 
 - **Transactions serialize per workspace from the moment they begin**, so what a transaction loads cannot change before it saves. Writes are staged and applied atomically when the block exits normally; an exception rolls back entities, log and history together.
+- **`read` takes a window of the log** (`after_seq < seq < before_seq`), for some threads by `delivered_to`'s rule, and its first `limit` or last `last` envelopes, oldest first. Storage filters, so a tail read of a long log reads only its tail; `Workspace.read` refuses both `limit` and `last`.
 - **`subscribe(after_seq)` replays, then follows live**, on one iterator. Because a subscription starts from a `seq`, there is no gap to manage between history and live events. It is the only read path for replay, live fan-out, hooks, MCP notifications and change notes.
 - **Leases** back `Workspace.claim_thread`: a time-limited, renewed claim that holds across processes and lapses if its holder dies.
 - **History** is opaque bytes (pydantic-ai `ModelMessage`s serialized by the agent layer), appended in the same transaction as the run fact that ends each run segment.
@@ -424,7 +432,7 @@ workspaces = Workspaces(SqlStorage(engine))
 `SqlStorage` works like this:
 
 - **Locking.** A transaction creates its workspace's row if the workspace is new, then locks it (`SELECT ... FOR UPDATE`) before it loads anything. `save` assigns `seq` from the row's `head_seq`. PostgreSQL runs at its default `READ COMMITTED` isolation. SQLite has no row locks, so engines from `create_sqlite_engine` begin every transaction with `BEGIN IMMEDIATE`, which takes the database's write lock instead.
-- **Tables.** Every primary key starts with the tenant and the workspace, and every table name with `artifactr_`. Entities are stored as the JSON of their Pydantic models, beside the columns that reads filter on (kind, archived, status, thread). Lists come back oldest first, by a creation position counted on the workspace row.
+- **Tables.** Every primary key starts with the tenant and the workspace, and every table name with `artifactr_`. Entities are stored as the JSON of their Pydantic models, beside the columns that reads filter on (kind, archived, status, thread, and each event's type and thread). Lists come back oldest first, by a creation position counted on the workspace row.
 - **Subscriptions** read the log a page at a time. Once caught up, they wait for a commit through the same `SqlStorage`, which wakes them at once, or poll every `poll_interval` (0.5 s by default) for commits from other processes.
 - **Leases** are rows, taken with a conditional update or an insert, so two processes racing for a lease cannot both win.
 - **Migrations** ship in the package and record their version in `artifactr_alembic_version`, apart from the application's own. `migrate(engine)` upgrades a database; `create_schema(engine)` creates the tables without migrations, for tests and prototypes. A test checks that the migrations build exactly the models' schema.
@@ -596,7 +604,6 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 
 - **Log retention.** When old envelopes are compacted, `resume` falls back to a snapshot. The snapshot format is not yet specified.
 - **Very hot workspaces.** Assigning `seq` serializes commits per workspace. If that becomes a bottleneck, the log could be sharded by artifact group behind the same per-workspace cursor.
-- **Joining at the head of the log.** `hello` replays everything after `resume_after_seq`, which defaults to 0, and a client cannot ask to start at `head_seq`. So a client that only needs what happens from now on, such as a terminal starting a new thread, first receives every workspace-scoped event in the log. An additive `hello` option would let it skip the replay.
 - **Change-note volume.** With many concurrent chats, notes may need coalescing beyond focus filtering.
 - **Crash recovery for runs.** A run interrupted by a process crash is recorded as failed when its lease expires. pydantic-ai's durable execution integrations (Temporal, DBOS, Prefect) could make such runs resumable.
 - **Pushing log updates across processes.** `SqlStorage` subscriptions learn about commits from other processes by polling. PostgreSQL's `LISTEN/NOTIFY` could wake them at once: an optimisation behind the same `subscribe`, with polling kept for SQLite and as a fallback ([ADR-0021](adr/0021-sql-storage.md)).

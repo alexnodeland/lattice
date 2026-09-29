@@ -51,6 +51,9 @@ INSTRUCTIONS = (
 )
 
 
+_READ_LIMIT = 50
+"""How many envelopes ``read_events`` returns when it is given neither ``limit`` nor ``last``."""
+
 _FORBIDDEN = "this workspace is not yours to use"
 """Why ``authorize`` refused, as the router's 403 says it."""
 
@@ -322,6 +325,37 @@ class ArtifactrMcp:
             if sent.run is None:
                 return "Posted; the agent already working in this thread will see it."
             return f"Posted; the agent started run {sent.run.run_id}."
+
+        @server.tool()
+        async def read_events(
+            workspace_id: str,
+            ctx: Context,
+            after_seq: int = 0,
+            before_seq: int | None = None,
+            threads: list[str] | None = None,
+            limit: int | None = None,
+            last: int | None = None,
+        ) -> str:
+            """Read envelopes from a workspace's log, oldest first, as JSON lines.
+
+            The window is ``after_seq < seq < before_seq``. ``threads`` keeps those threads'
+            events and every artifact and proposal event. ``limit`` reads the window's first
+            envelopes and ``last`` its last ones; without either, the first 50. To read back
+            through the log, give ``last``, then ``before_seq`` the oldest ``seq`` returned.
+            """
+            workspace = await self._workspace(ctx, workspace_id)
+            if limit is None and last is None:
+                limit = _READ_LIMIT
+            found = await _tool(
+                workspace.read(
+                    after_seq=after_seq,
+                    before_seq=before_seq,
+                    threads=threads,
+                    limit=limit,
+                    last=last,
+                )
+            )
+            return "\n".join(e.model_dump_json() for e in found) or "No events."
 
         @server.resource(
             "artifactr://{tenant_id}/{workspace_id}/artifacts/{artifact_id}",

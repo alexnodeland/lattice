@@ -86,6 +86,7 @@ If your application runs Alembic's autogenerate on the same database, exclude th
 - **One writer per workspace at a time.** A transaction creates its workspace's row if the workspace is new, then locks it (`SELECT ... FOR UPDATE`) before loading anything, and `seq` is assigned from that row. On SQLite, the engine's `BEGIN IMMEDIATE` takes the database's write lock instead. Different workspaces commit independently on PostgreSQL.
 - **Subscriptions poll.** A subscription reads the log a page at a time. Once it has caught up, a commit made through the same `SqlStorage` wakes it at once, and commits from other processes are seen within `poll_interval` (half a second by default; `SqlStorage(engine, poll_interval=timedelta(seconds=0.2))` to change it).
 - **Entities are JSON.** Each artifact, proposal, thread and run is stored as its Pydantic model's JSON, beside the columns that reads filter on. Adding a field with a default to your artifact type needs no migration; changing data in ways your model no longer validates does, and that migration is yours.
+- **Reads of the log filter in the database.** Each envelope's event type and thread have columns of their own, so a read for some threads selects only what those threads' subscribers receive, and a read of the last so many reads the log backwards from the end.
 - **Leases are rows**, taken with a conditional update or an insert, so two processes racing for a thread claim cannot both win.
 
 The storage does not own the engine: dispose of it when your application shuts down, with `await engine.dispose()`.
@@ -106,6 +107,8 @@ async with storage.transaction(scope) as transaction:
 ```
 
 **`seq` is gap-free and assigned at save.** `Transaction.save` stores the result's entities and revisions and appends its events, returning the envelopes with their sequence numbers. The log is a total order per workspace.
+
+**`read(scope, after_seq=, before_seq=, threads=, limit=, last=)` reads a window of the log,** the envelopes with `after_seq < seq < before_seq`, oldest first. `threads` keeps what a subscriber following those threads receives, by `artifactr.core.delivered_to`'s rule. `limit` keeps the first so many that match, and `last` the last so many, still oldest first. Filter in the store rather than after reading, so that a tail read of a long log reads only its tail. `Workspace.read` checks the arguments first, so a storage never gets both `limit` and `last`, or a negative number.
 
 **`subscribe(scope, after_seq)` replays, then follows.** One iterator yields the stored envelopes after `after_seq` and then each new one as it commits. Replay for reconnecting clients, live fan-out, MCP notifications and the agent's change notes all read the log this way.
 

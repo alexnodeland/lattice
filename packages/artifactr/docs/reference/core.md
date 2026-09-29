@@ -230,6 +230,8 @@ Facts on a workspace's log, and the envelope each travels in. See [The log](../g
 
 ::: artifactr.core.delivered_to
 
+::: artifactr.core.WORKSPACE_SCOPED
+
 ## Rules
 
 The host contract: what to load, and how a command or a fact is decided ([ADR-0018](../adr/0018-core-host-contract.md)). `Workspace.commit` and `Workspace.record` use these; call them directly only when you write a host of your own.

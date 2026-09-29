@@ -71,6 +71,36 @@ def test_an_up_to_date_client_gets_replay_complete_at_once(client: TestClient) -
         assert ws.receive_json() == {"type": "replay_complete", "up_to_seq": 1}
 
 
+def test_a_client_from_the_head_replays_nothing_and_follows_live(client: TestClient) -> None:
+    _post(client, "c1", type="create_thread", thread_id="t1")
+    _post(client, "c2", type="create_artifact", artifact_id="n1", kind="note", data={})
+    with client.websocket_connect(STREAM) as ws:
+        ws.send_json(hello(from_head=True, threads=["t2"]))
+        welcome = ws.receive_json()
+        assert (welcome["head_seq"], welcome["reset"]) == (2, False)
+        assert ws.receive_json() == {"type": "replay_complete", "up_to_seq": 2}
+        _post(client, "c3", type="set_thread_mode", thread_id="t1", mode="suggest")  # not followed
+        _post(client, "c4", type="create_thread", thread_id="t2")
+        live = ws.receive_json()
+        assert (live["type"], live["seq"], live["event"]["type"]) == (
+            "event",
+            4,
+            "thread_created",
+        )
+
+
+def test_a_client_from_the_head_cannot_also_resume(client: TestClient) -> None:
+    _post(client, "c1", type="create_thread", thread_id="t1")
+    with client.websocket_connect(STREAM) as ws:
+        ws.send_json(hello(from_head=True, resume_after_seq=1))
+        with pytest.raises(WebSocketDisconnect) as closed:
+            ws.receive_json()
+    assert (closed.value.code, closed.value.reason) == (
+        4400,
+        "from_head replays nothing, so resume_after_seq must be 0",
+    )
+
+
 def test_a_client_ahead_of_the_log_is_reset(client: TestClient) -> None:
     with client.websocket_connect(STREAM) as ws:
         ws.send_json(hello(resume_after_seq=99))
@@ -178,6 +208,26 @@ def test_runs_in_progress_are_listed_and_watched() -> None:
             latch.released.set()
             frames = _until_event(ws, "run_ended")
             assert [f["ok"] for f in frames if f["type"] == "command_result"] == [True]
+            deltas = [f["event"] for f in frames if f["type"] == "live"]
+            assert {"type": "text_delta", "part": 0, "delta": "Released."} in deltas
+
+
+def test_a_client_from_the_head_still_watches_runs_in_progress() -> None:
+    latch = Latch()
+    app, _ = build(Script(call("hold"), say("Released.")), latch=latch)
+    with TestClient(app) as client:
+        _post(client, "c1", type="create_thread", thread_id="t1")
+        _post(client, "c2", type="post_message", thread_id="t1", content="Go")
+        wait_for(latch.entered.is_set)
+        with client.websocket_connect(STREAM) as ws:
+            ws.send_json(hello(from_head=True, threads=["t1"]))
+            welcome = ws.receive_json()
+            [active] = welcome["active_runs"]
+            assert active["thread_id"] == "t1"
+            latch.released.set()
+            frames = _until_event(ws, "run_ended")
+            head = welcome["head_seq"]
+            assert frames[0] == {"type": "replay_complete", "up_to_seq": head}, "nothing replayed"
             deltas = [f["event"] for f in frames if f["type"] == "live"]
             assert {"type": "text_delta", "part": 0, "delta": "Released."} in deltas
 

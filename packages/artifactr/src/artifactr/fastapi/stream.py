@@ -26,6 +26,7 @@ from artifactr.core import (
     RunStarted,
     ThreadId,
     UnsupportedProtocol,
+    ValidationFailed,
     WatchRun,
     Welcome,
     WorkspaceId,
@@ -123,8 +124,8 @@ class Stream:
         head = await workspace.head_seq()
         try:
             plan = resume(hello, head_seq=head)
-        except UnsupportedProtocol as unsupported:
-            await self._close(4400, unsupported.message)
+        except (UnsupportedProtocol, ValidationFailed) as refused:
+            await self._close(4400, refused.message)
             return
         running = await workspace.runs(status="running")
         self._put(

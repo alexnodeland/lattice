@@ -60,6 +60,7 @@ from artifactr.core import (
     TenantId,
     Thread,
     ThreadId,
+    ValidationFailed,
     Versioned,
     WorkspaceId,
     change_notes,
@@ -421,20 +422,35 @@ class Workspace:
         self,
         *,
         after_seq: int = 0,
+        before_seq: int | None = None,
         threads: Collection[ThreadId] | None = None,
         limit: int | None = None,
+        last: int | None = None,
     ) -> list[Envelope]:
-        """Return logged envelopes after ``after_seq``, in order.
+        """Return logged envelopes in the window ``after_seq < seq < before_seq``, in order.
 
         Args:
-            after_seq: Return envelopes with a greater ``seq``.
+            after_seq: Only envelopes after this ``seq``.
+            before_seq: Only envelopes before this ``seq``; ``None`` reads to the head.
             threads: Only thread-scoped events from these threads; workspace-scoped events
                 (artifacts, proposals) are always included. ``None`` includes every thread.
-            limit: The most envelopes to return.
+            limit: At most this many: the first ones in the window that match.
+            last: At most this many: the last ones in the window that match, still in order.
+                To page backwards, read ``last=n``, then ``last=n`` before the oldest ``seq``
+                returned.
+
+        Raises:
+            ValidationFailed: If both ``limit`` and ``last`` are given, or a number is negative.
         """
-        envelopes = await self._storage.read(self._scope, after_seq=after_seq)
-        matching = [envelope for envelope in envelopes if delivered_to(envelope, threads)]
-        return matching if limit is None else matching[:limit]
+        _check_page(after_seq=after_seq, before_seq=before_seq, limit=limit, last=last)
+        return await self._storage.read(
+            self._scope,
+            after_seq=after_seq,
+            before_seq=before_seq,
+            threads=threads,
+            limit=limit,
+            last=last,
+        )
 
     async def subscribe(
         self, *, after_seq: int = 0, threads: Collection[ThreadId] | None = None
@@ -494,6 +510,18 @@ class Workspace:
         while True:
             await asyncio.sleep(ttl.total_seconds() / 3)
             await self._storage.acquire_lease(self._scope, key, holder, ttl)
+
+
+def _check_page(
+    *, after_seq: int, before_seq: int | None, limit: int | None, last: int | None
+) -> None:
+    """Refuse a read of the log that gives both ``limit`` and ``last``, or a negative number."""
+    if limit is not None and last is not None:
+        raise ValidationFailed("give limit or last, not both", [])
+    given = {"after_seq": after_seq, "before_seq": before_seq, "limit": limit, "last": last}
+    for name, value in given.items():
+        if value is not None and value < 0:
+            raise ValidationFailed(f"{name} cannot be negative", [])
 
 
 def _traced(result: CommitResult) -> CommitResult:

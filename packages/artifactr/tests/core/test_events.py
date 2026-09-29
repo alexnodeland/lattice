@@ -1,14 +1,17 @@
 """Events: the closed union, forward compatibility, and envelopes."""
 
 from datetime import UTC, datetime
+from typing import get_args
 
 from pydantic import TypeAdapter
 
 from artifactr.core import (
+    WORKSPACE_SCOPED,
     AppEvent,
     ArtifactChanged,
     Envelope,
     Event,
+    KnownEvent,
     MessagePosted,
     RunEnded,
     TextEdit,
@@ -53,6 +56,12 @@ def test_scope_comes_from_the_event() -> None:
     assert scope_of(changed) == ("t1", None)
     assert scope_of(RunEnded(run_id="r1", thread_id="t1", status="completed")) == ("t1", "r1")
     assert scope_of(AppEvent(name="exported")) == (None, None)
+
+
+def test_artifact_and_proposal_events_are_workspace_scoped() -> None:
+    kinds = {member.model_fields["type"].default for member in get_args(KnownEvent)}
+    scoped = {kind for kind in kinds if kind.startswith(("artifact_", "proposal_"))}
+    assert scoped == WORKSPACE_SCOPED
 
 
 def test_envelopes_are_the_wire_shape() -> None:

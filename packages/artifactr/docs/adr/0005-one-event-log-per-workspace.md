@@ -24,6 +24,27 @@ Timestamps are not reliable cursors: clocks skew, and the time an event is creat
 - Core events form a closed discriminated union. Applications extend the log through one open family, `AppEvent`.
 - Token-level output is not in the log ([ADR-0007](0007-caller-owned-live-output.md)).
 
+### Amendment (2026-09-29): pages and tails of the log, and joining at its head
+
+`hello` replayed everything after `resume_after_seq`. So a client that needed only what happens next, such as docplan's terminal starting a new thread, first received every workspace-scoped event in the log ([#24](https://github.com/alexnodeland/artifactr/issues/24)). `Workspace.read` read the whole log and filtered threads in Python, so a page of one thread's events cost the whole log, and the tail could only be taken after reading everything. reflexr shares the protocol's shape, and made the same additions with the same names in its ADR-0011.
+
+- **`hello` takes `from_head`.** With `from_head: true`, a connection subscribes from `head_seq`: nothing is replayed, and `replay_complete` follows `welcome` at once. `active_runs` are listed and watched as on any connection.
+  - `core.resume` decides this. It refuses `from_head` with a nonzero `resume_after_seq`, and the stream closes with 4400.
+  - A client that reconnects resumes from its position, so it cannot skip what it missed by asking for the head again.
+  - It is a new optional field, so the protocol stays `artifactr.v1`.
+- **`subscribe` stays the only way to follow the log. A read takes a page of it**, and a client follows on from the page's last `seq`. `Storage.read`, `Workspace.read`, `GET /workspaces/{id}/events` and a new MCP tool, `read_events`, take:
+  - `after_seq` and a new `before_seq`, for the window `after_seq < seq < before_seq`;
+  - `threads`, which REST spells as a repeated `thread_id`;
+  - `limit` (the first so many) or a new `last` (the last so many, still oldest first).
+- **Using the tail.** `last` reads the tail, and `last` with `before_seq` set to the oldest `seq` a client has pages backwards.
+- **Checking arguments.** A read with both `limit` and `last`, or with a negative number, is `validation_failed`. `Workspace.read` checks this once, so storage adapters don't have to.
+- **Storage filters threads.** `threads` moved from the handle into the port, because the tail of a filtered log can't be taken after filtering in Python.
+  - SQL storage keeps each envelope's event type and thread in new columns, filled from the stored envelopes by migration 0002.
+  - It filters with `delivered_to`'s rule: an event with no thread, one whose type is in `core.WORKSPACE_SCOPED`, or one in one of the threads.
+  - It reads the last so many backwards from the end.
+- **No type filter.** Each library filters its reads the way its `hello` filters: reflexr by event type, artifactr by thread. Everything else has the same names in both.
+- **The stream has no tail of its own.** A tail read over REST, followed by `hello` with `resume_after_seq` set to the tail's last `seq`, shows recent history and then everything after it, with no gap. So `hello` needs only a place to start, not a count.
+
 ## Options considered
 
 ### Option A: One log per workspace (chosen)

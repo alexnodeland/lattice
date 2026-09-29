@@ -13,6 +13,7 @@ from artifactr.core import (
     TextEdits,
     UnsupportedProtocol,
     UserActor,
+    ValidationFailed,
     commit,
     needs,
     resume,
@@ -42,6 +43,17 @@ class TestResume:
     def test_the_server_owns_the_protocol_version(self) -> None:
         with pytest.raises(UnsupportedProtocol, match=r"speaks artifactr\.v1"):
             resume(Hello(protocol="artifactr.v0"), head_seq=0)
+        with pytest.raises(UnsupportedProtocol):
+            resume(Hello(protocol="artifactr.v0", from_head=True), head_seq=0)
+
+    def test_a_client_can_start_at_the_head_and_replay_nothing(self) -> None:
+        plan = resume(Hello(protocol=PROTOCOL, from_head=True), head_seq=57, first_retained_seq=10)
+        assert (plan.replay_after, plan.reset) == (57, False)
+        assert resume(Hello(protocol=PROTOCOL, from_head=True), head_seq=0).replay_after == 0
+
+    def test_a_client_cannot_start_at_the_head_and_resume(self) -> None:
+        with pytest.raises(ValidationFailed, match="resume_after_seq must be 0"):
+            resume(Hello(protocol=PROTOCOL, resume_after_seq=40, from_head=True), head_seq=57)
 
 
 class TestHostContract:

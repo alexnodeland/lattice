@@ -46,7 +46,7 @@ fix(dspy): keep field descriptions in derived signatures
 docs(adr): record where trained judges are stored
 ```
 
-Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Scopes are package or area names: `core`, `memory`, `contracts`, `jsonl`, `dspy`, `decision`, `langfuse`, `hf`, `docs`, `adr`, `rfc`. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The changelog is generated from these messages.
+Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Scopes are package or area names: `core`, `memory`, `contracts`, `jsonl`, `dspy`, `decision`, `langfuse`, `hf`, `measures`, `online`, `docs`, `adr`, `rfc`. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The changelog is generated from these messages.
 
 ## Dependencies
 

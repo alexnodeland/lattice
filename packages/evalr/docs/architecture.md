@@ -10,7 +10,8 @@
 | `evalr.decision` | Implemented |
 | `evalr.langfuse` | Implemented |
 | `evalr.hf` | Implemented |
-| End-to-end measures and online helpers | Planned (phase 5) |
+| `evalr.measures` | Implemented |
+| `evalr.online` | Planned (phase 5) |
 
 ## What evalr is
 
@@ -81,6 +82,7 @@ graph LR
 | `evalr.decision` | `[jev]` | core, pydantic-ai-slim with the typesafe extra |
 | `evalr.langfuse` | `[langfuse]` | core, langfuse |
 | `evalr.hf` | `[hf]` | core, datasets, huggingface_hub |
+| `evalr.measures` | | core |
 
 Every package may also use the core's own dependencies, pydantic and the OpenTelemetry API. A test enforces the table: what each package imports, that no adapter package imports another, and that nothing imports artifactr or reflexr. The `[all]` extra installs every integration.
 
@@ -303,6 +305,24 @@ A formatter renders an input as the text a judge reads. A decision model's state
 - Over budget, the longest list loses its oldest items, after the first (usually the request), with a marker saying how many were omitted. Then the longest remaining text is shortened in the middle. The result always fits.
 - `estimate_tokens` counts one token per three bytes of UTF-8, which overestimates English and is close for scripts of three bytes a character, so a budget measured with it is rarely exceeded. Where the limit is exact, pass the model's tokenizer as `count_tokens`.
 - Summarizing, rather than windowing, is a formatter too: any callable from the input to text fits the `Formatter` protocol.
+
+## End-to-end measures
+
+`evalr.measures` defines the family's end-to-end measures generically; each library's `[evals]` extra supplies the data, by putting its log into these inputs:
+
+| Input | Holds | artifactr | reflexr |
+|---|---|---|---|
+| `Session` | A timeline of `Activity`: when, who (`person`, `agent` or `system`), what (`message`, `proposal`, `resolution`, ...), and a `ref` pairing a proposal with its resolution | A thread | A causal chain |
+| `History` | An artifact's `Revision`s: when, who, and its whole text | An artifact | A report people edit |
+| `Transcript` | The request, the turns, and the result | A thread and its artifacts | A chain's events and reports |
+
+| Measure | Verdict | How |
+|---|---|---|
+| Task completion | `TaskCompletion`: `completed`, `quality` from 1 to 5, `reason` | Judged: any evaluator over a `Transcript`, such as `DspyJudge(TaskCompletion, inputs=Transcript)`. `completion_rate` is the share completed. |
+| Drop-off | `DropOff`: `outcome` (`continued`, `dropped`, `pending`) and `cause` (`no_reply`, `unresolved_proposal`) | Computed by `measure_drop_off(session, window=, now=)`: dropped when the agent acted last and no person acted within the window, or a proposal stayed unresolved longer than it; pending until the window has passed. `drop_off_rate` counts decided sessions only. |
+| Rewrites | `Rewrites`: `agent_revisions`, `rewritten`, `rate` | Computed by `measure_rewrites(history, window=, threshold=0.2)`: an agent's revision is rewritten when a person's revision within the window, before the agent writes again, changes at least the threshold's share of its text (one minus `difflib`'s similarity; the last such revision counts). `rewrite_rate` pools revisions across artifacts. |
+
+`drop_off_evaluator(window=, now=)` and `rewrite_evaluator(window=, threshold=)` wrap the computed measures as function evaluators, versioned by their settings, so they run in experiments and online like any evaluator. The tests compute all three on logs recorded in artifactr's and reflexr's shapes, read without importing either library.
 
 ## Metrics
 

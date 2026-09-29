@@ -1,0 +1,318 @@
+{
+  "library": "artifactr",
+  "recorded_until": "2026-09-20T11:00:00Z",
+  "events": [
+    {
+      "seq": 1,
+      "id": "e1",
+      "ts": "2026-09-20T09:00:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t1",
+      "run_id": null,
+      "actor": {
+        "kind": "user",
+        "user_id": "u-ana"
+      },
+      "event": {
+        "type": "thread_created",
+        "thread_id": "t1",
+        "title": "Launch plan"
+      }
+    },
+    {
+      "seq": 2,
+      "id": "e2",
+      "ts": "2026-09-20T09:01:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t1",
+      "run_id": null,
+      "actor": {
+        "kind": "user",
+        "user_id": "u-ana"
+      },
+      "event": {
+        "type": "message_posted",
+        "thread_id": "t1",
+        "message_id": "m1",
+        "content": "Draft a launch plan for Friday."
+      }
+    },
+    {
+      "seq": 3,
+      "id": "e3",
+      "ts": "2026-09-20T09:03:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t1",
+      "run_id": "r1",
+      "actor": {
+        "kind": "agent",
+        "agent": "planner",
+        "run_id": "r1"
+      },
+      "event": {
+        "type": "artifact_created",
+        "thread_id": "t1",
+        "run_id": "r1",
+        "artifact_id": "a1",
+        "kind": "document",
+        "version": 1,
+        "data": {
+          "text": "Launch on Friday. Email customers on Thursday. Post on social media."
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "id": "e4",
+      "ts": "2026-09-20T09:04:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t1",
+      "run_id": "r1",
+      "actor": {
+        "kind": "agent",
+        "agent": "planner",
+        "run_id": "r1"
+      },
+      "event": {
+        "type": "message_posted",
+        "thread_id": "t1",
+        "message_id": "m2",
+        "content": "Here is a draft plan.",
+        "run_id": "r1"
+      }
+    },
+    {
+      "seq": 5,
+      "id": "e5",
+      "ts": "2026-09-20T09:09:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t1",
+      "run_id": null,
+      "actor": {
+        "kind": "user",
+        "user_id": "u-ana"
+      },
+      "event": {
+        "type": "artifact_changed",
+        "thread_id": "t1",
+        "artifact_id": "a1",
+        "kind": "document",
+        "version": 2,
+        "patch": [
+          {
+            "op": "replace",
+            "path": "/text",
+            "value": "Ship Monday after QA signs off. Brief support first, then announce in the newsletter."
+          }
+        ],
+        "summary": "rewrote the plan"
+      }
+    },
+    {
+      "seq": 6,
+      "id": "e6",
+      "ts": "2026-09-20T09:10:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t1",
+      "run_id": null,
+      "actor": {
+        "kind": "user",
+        "user_id": "u-ana"
+      },
+      "event": {
+        "type": "message_posted",
+        "thread_id": "t1",
+        "message_id": "m3",
+        "content": "Thanks, I reworked it."
+      }
+    },
+    {
+      "seq": 7,
+      "id": "e7",
+      "ts": "2026-09-20T09:20:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t2",
+      "run_id": null,
+      "actor": {
+        "kind": "user",
+        "user_id": "u-ana"
+      },
+      "event": {
+        "type": "message_posted",
+        "thread_id": "t2",
+        "message_id": "m4",
+        "content": "Tighten the budget section."
+      }
+    },
+    {
+      "seq": 8,
+      "id": "e8",
+      "ts": "2026-09-20T09:22:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t2",
+      "run_id": "r2",
+      "actor": {
+        "kind": "agent",
+        "agent": "planner",
+        "run_id": "r2"
+      },
+      "event": {
+        "type": "artifact_created",
+        "thread_id": "t2",
+        "run_id": "r2",
+        "artifact_id": "a2",
+        "kind": "document",
+        "version": 1,
+        "data": {
+          "text": "Budget: 10k for ads, 5k for events."
+        }
+      }
+    },
+    {
+      "seq": 9,
+      "id": "e9",
+      "ts": "2026-09-20T09:23:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t2",
+      "run_id": "r2",
+      "actor": {
+        "kind": "agent",
+        "agent": "planner",
+        "run_id": "r2"
+      },
+      "event": {
+        "type": "proposal_created",
+        "thread_id": "t2",
+        "run_id": "r2",
+        "proposal_id": "p1",
+        "change": {
+          "artifact_id": "a2"
+        },
+        "rationale": "Cut events"
+      }
+    },
+    {
+      "seq": 10,
+      "id": "e10",
+      "ts": "2026-09-20T09:24:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t2",
+      "run_id": "r2",
+      "actor": {
+        "kind": "agent",
+        "agent": "planner",
+        "run_id": "r2"
+      },
+      "event": {
+        "type": "message_posted",
+        "thread_id": "t2",
+        "message_id": "m5",
+        "content": "I proposed cutting events.",
+        "run_id": "r2"
+      }
+    },
+    {
+      "seq": 11,
+      "id": "e11",
+      "ts": "2026-09-20T09:26:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t2",
+      "run_id": null,
+      "actor": {
+        "kind": "user",
+        "user_id": "u-ana"
+      },
+      "event": {
+        "type": "artifact_changed",
+        "thread_id": "t2",
+        "artifact_id": "a2",
+        "kind": "document",
+        "version": 2,
+        "patch": [
+          {
+            "op": "replace",
+            "path": "/text",
+            "value": "Budget: 10k for ads, 4k for events."
+          }
+        ],
+        "summary": "adjusted"
+      }
+    },
+    {
+      "seq": 12,
+      "id": "e12",
+      "ts": "2026-09-20T09:40:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t3",
+      "run_id": null,
+      "actor": {
+        "kind": "user",
+        "user_id": "u-ana"
+      },
+      "event": {
+        "type": "message_posted",
+        "thread_id": "t3",
+        "message_id": "m6",
+        "content": "Summarize the risks."
+      }
+    },
+    {
+      "seq": 13,
+      "id": "e13",
+      "ts": "2026-09-20T09:42:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t3",
+      "run_id": "r3",
+      "actor": {
+        "kind": "agent",
+        "agent": "planner",
+        "run_id": "r3"
+      },
+      "event": {
+        "type": "message_posted",
+        "thread_id": "t3",
+        "message_id": "m7",
+        "content": "The main risks are timing and support load.",
+        "run_id": "r3"
+      }
+    },
+    {
+      "seq": 14,
+      "id": "e14",
+      "ts": "2026-09-20T10:55:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t4",
+      "run_id": null,
+      "actor": {
+        "kind": "user",
+        "user_id": "u-ana"
+      },
+      "event": {
+        "type": "message_posted",
+        "thread_id": "t4",
+        "message_id": "m8",
+        "content": "Any updates?"
+      }
+    },
+    {
+      "seq": 15,
+      "id": "e15",
+      "ts": "2026-09-20T10:58:00Z",
+      "workspace_id": "w1",
+      "thread_id": "t4",
+      "run_id": "r4",
+      "actor": {
+        "kind": "agent",
+        "agent": "planner",
+        "run_id": "r4"
+      },
+      "event": {
+        "type": "message_posted",
+        "thread_id": "t4",
+        "message_id": "m9",
+        "content": "QA is on track.",
+        "run_id": "r4"
+      }
+    }
+  ]
+}

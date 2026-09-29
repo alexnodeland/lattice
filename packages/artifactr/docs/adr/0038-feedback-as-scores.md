@@ -47,4 +47,4 @@
 ## Action items
 
 1. [x] `artifactr.scores` and the `Runner`'s `turn_context`.
-2. [ ] The Langfuse adapter (RFC-0002 phase A3).
+2. [x] The Langfuse adapter (RFC-0002 phase A3).

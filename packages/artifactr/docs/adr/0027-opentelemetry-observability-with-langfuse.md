@@ -41,4 +41,4 @@ A research spike (2026-09-28) against the installed packages found:
 
 ## Action items
 
-1. [ ] Implement RFC-0002 phases A1, A3 and A4.
+1. [x] Implement RFC-0002 phases A1, A3 and A4.

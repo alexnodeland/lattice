@@ -1,6 +1,6 @@
 # Architecture
 
-> **Status:** v0.1 is built, as planned in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and released as 0.1.0. This document is evergreen: it is updated in the same pull request as the code that changes it, and the table below shows what exists today. Decisions are recorded in [`adr/`](adr/README.md), proposals in [`rfcs/`](rfcs/README.md), and the wire protocol in [`protocol.md`](protocol.md).
+> **Status:** v0.1 is built, as planned in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and released as 0.1.0. [RFC-0002](rfcs/0002-observability-feedback-and-evaluation.md) has since added observability, typed feedback and the LLM gateway; its `[evals]` extra waits on evalr. This document is evergreen: it is updated in the same pull request as the code that changes it, and the table below shows what exists today. Decisions are recorded in [`adr/`](adr/README.md), proposals in [`rfcs/`](rfcs/README.md), and the wire protocol in [`protocol.md`](protocol.md).
 
 | Package | Status |
 |---|---|
@@ -8,9 +8,12 @@
 | `artifactr.telemetry` | Implemented: spans, attribution and the metric registry ([RFC-0002](rfcs/0002-observability-feedback-and-evaluation.md)) |
 | `artifactr.workspace` | Implemented, with in-memory storage |
 | `artifactr.agent` | Implemented |
+| `artifactr.scores` | Implemented: feedback as scores, the mirror and its ports |
 | `artifactr.sql` | Implemented, on PostgreSQL and SQLite |
 | `artifactr.fastapi`, `artifactr.mcp` | Implemented |
-| `examples/docplan` | Implemented: server, terminal client and tests |
+| `artifactr.otel`, `artifactr.langfuse`, `artifactr.litellm` | Implemented: the OpenTelemetry SDK, Langfuse and LiteLLM adapters |
+| `artifactr.evals` | Planned: RFC-0002 phase A5, over evalr |
+| `examples/docplan` | Implemented: server, terminal client and tests; observed, rated and routed when configured |
 
 ## What artifactr is
 
@@ -519,7 +522,7 @@ The contributor stack is `compose.yaml`: PostgreSQL for the tests, and docplan u
 
 ## Build plan
 
-The phases, their exit criteria and their progress are tracked in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md).
+The phases, their exit criteria and their progress are tracked in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md) for v0.1, and in [RFC-0002](rfcs/0002-observability-feedback-and-evaluation.md) for observability, feedback, evaluation and the LLM gateway.
 
 1. `artifactr.core` and its conformance fixtures.
 2. `artifactr.workspace` with in-memory storage.
@@ -587,3 +590,6 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 - **Pushing log updates across processes.** `SqlStorage` subscriptions learn about commits from other processes by polling. PostgreSQL's `LISTEN/NOTIFY` could wake them at once: an optimisation behind the same `subscribe`, with polling kept for SQLite and as a fallback ([ADR-0021](adr/0021-sql-storage.md)).
 - **Cross-process runs.** Runs are tasks in the process that started them, so `Runner.stop` and `Runner.watch` reach only local runs. A pub/sub channel would make both work across replicas.
 - **`jsonpatch` maintenance.** It is stable but rarely updated; its surface is small enough to vendor if needed.
+- **The session on database and HTTP spans in a real deployment.** A `BaggageSpanProcessor` carries a turn's `session.id` onto every span in it, as a test shows in process ([ADR-0035](adr/0035-a-turn-is-its-own-trace.md)). Whether a deployed Collector and Langfuse keep it end to end is left for stackr's integration tests.
+- **Guardrail error shapes.** A guardrail block is recognised as an HTTP 400 whose error mentions a guardrail ([ADR-0043](adr/0043-the-litellm-adapter.md)). If LiteLLM adds a typed error code for blocks, the gateway should use it.
+- **Mirroring many workspaces.** A `FeedbackMirror` follows one workspace. Applications with many start one per active workspace; a shared follower across a tenant's workspaces would need a storage-level subscription.

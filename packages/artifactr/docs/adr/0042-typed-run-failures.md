@@ -32,4 +32,4 @@ The agent layer must not know about LiteLLM ([ADR-0034](0034-ports-and-adapters-
 ## Action items
 
 1. [x] `RunEnded.reason`, `RunFailure`, the metric attribute and the dashboard panel.
-2. [ ] `guardrail_blocked`, from the `[litellm]` extra (RFC-0002 phase A7).
+2. [x] `guardrail_blocked`, from the `[litellm]` extra (RFC-0002 phase A7).

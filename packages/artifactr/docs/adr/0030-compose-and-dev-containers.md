@@ -30,4 +30,4 @@ Working on artifactr needs PostgreSQL and the reference app. Evaluating and oper
 
 ## Action items
 
-1. [ ] Implement RFC-0002 phase A4.
+1. [x] Implement RFC-0002 phase A4.

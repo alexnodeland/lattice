@@ -31,4 +31,4 @@ People's reactions (a rating on a turn, a thumbs-down on an artifact version, a 
 
 ## Action items
 
-1. [ ] Implement RFC-0002 phase A2, and the mirror in phase A3.
+1. [x] Implement RFC-0002 phase A2, and the mirror in phase A3.

@@ -43,4 +43,4 @@ The surfaces (`artifactr.fastapi`, `artifactr.mcp`) are driving adapters over th
 ## Action items
 
 1. [x] `artifactr.telemetry` over the OpenTelemetry API; layering enforced.
-2. [ ] `artifactr.otel`, `artifactr.langfuse` and `artifactr.litellm`, each with its fakes and contract tests (RFC-0002 phases A1, A3 and A7).
+2. [x] `artifactr.otel`, `artifactr.langfuse` and `artifactr.litellm`, each with its fakes and contract tests (RFC-0002 phases A1, A3 and A7).

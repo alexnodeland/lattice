@@ -1,4 +1,4 @@
-"""The two artifact types, a Markdown document and a plan of tasks, and a rating of turns."""
+"""The two artifact types, a Markdown document and a plan of tasks, and the feedback on turns."""
 
 from typing import Annotated, ClassVar, Literal, Self
 
@@ -81,4 +81,15 @@ class Rating(Feedback, name="rating", targets={"turn"}):
     """How a person rated one of the agent's turns, with ``/rate`` in the terminal client."""
 
     stars: Annotated[int, Field(ge=1, le=5, description="From 1 (useless) to 5 (just right)")]
+    comment: str | None = None
+
+
+class EditSize(Feedback, name="edit_size", targets={"turn"}):
+    """Whether the agent changed more of the doc in a turn than the person asked for.
+
+    The agent is told to keep its edits small. People say when it did not with ``/edits``, and a
+    judge learns to say it too (see :mod:`docplan.evals`).
+    """
+
+    too_big: bool = Field(description="The turn changed more of the doc than the request needed")
     comment: str | None = None

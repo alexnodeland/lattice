@@ -9,9 +9,10 @@
 | Artifact types | [`artifacts.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/artifacts.py) | A Markdown `Doc` the agent edits directly, and a `Plan` with `write_policy = "propose"`, its own methods, `render_for_agent` and `describe_change` |
 | Agent | [`agent.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/agent.py) | A pydantic-ai agent with the `ArtifactWorkspace` capability and `ask_user`, plus the plan's own tools, `add_task` and `set_task_status` |
 | Server | [`app.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/app.py) | A FastAPI app with the thread protocol and REST at `/v1`, MCP at `/mcp`, and in-memory or SQL storage |
-| Terminal client | [`cli.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/cli.py) | A chat client that speaks the thread protocol as plain JSON frames, a template for a client in any language; `/rate` gives typed feedback on a turn |
+| Terminal client | [`cli.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/cli.py) | A chat client that speaks the thread protocol as plain JSON frames, a template for a client in any language; `/rate` and `/edits` give typed feedback on a turn, and `/done` on the thread |
 | Observability | [`app.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/app.py) | `configure_telemetry` when an OTLP endpoint is set; Langfuse's turn context, score configs and a feedback mirror when its keys are set; a LiteLLM proxy when one is configured |
-| Tests | [`tests/`](https://github.com/alexnodeland/artifactr/tree/main/examples/docplan/tests) | The real server and client over a real WebSocket, with a scripted model |
+| Evaluation | [`evals.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/evals.py), [`evaluate.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/evaluate.py) | The `[evals]` extra's whole loop: people's feedback as a dataset, a judge calibrated against it, an `OnlineEvaluator` on the `Runner`, a replay experiment and the end-to-end measures; `docplan-eval` runs each step |
+| Tests | [`tests/`](https://github.com/alexnodeland/artifactr/tree/main/examples/docplan/tests) | The real server and client over a real WebSocket, with a scripted model, and the evaluation loop offline |
 
 ## Run it
 
@@ -41,6 +42,28 @@ The same server speaks the other surfaces too: REST under `/v1` (the demo trusts
 
     docplan trusts whatever user the `x-user` header or `user` query parameter names, and puts everyone in one tenant. It shows where authentication plugs in, not how to do it. See [Multi-tenancy and security](guides/security.md).
 
+## Evaluate it
+
+docplan's agent is told to keep its edits small. People say when it did not with `/edits ok|big`, an `edit_size` on the turn, and whether a thread did what they asked with `/done yes|no 1-5`, a `task_completion`. [`evals.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/evals.py) closes the loop over that feedback with the `[evals]` extra ([Evaluation](guides/evaluation.md#evaluating-with-evalr)):
+
+1. `dataset` turns people's `edit_size` feedback into an evalr dataset with a `LogFeedbackSource`, and `turn_edits` builds each example's input from the turn as it ended: the request, and the docs before and after.
+2. `edit_size_judge` is a function evaluator of the same input, and `calibrate` has evalr's `BestOf` choose its threshold by agreement with people. With `DOCPLAN_JUDGE_MODEL` set and the `dspy` extra installed, the judge is a DSPy judge instead.
+3. With `DOCPLAN_EVAL_SAMPLE_RATE` set, the server's `Runner` judges that share of turns with an `OnlineEvaluator`, within `DOCPLAN_EVAL_BUDGET` a day, and records each verdict as feedback from the judge.
+4. `replay` replays the dataset's turns against an agent with `replay_task`, and the same judge judges them.
+5. `measures` computes task completion, drop-off (from `thread_sessions`) and the rewrite rate (from `artifact_histories`).
+
+`docplan-eval` runs the steps against the server's database:
+
+```bash
+export DOCPLAN_DATABASE_URL=sqlite+aiosqlite:///docplan.db
+DOCPLAN_EVAL_SAMPLE_RATE=1 uv run docplan-serve   # judge every turn; chat, then /edits and /done
+uv run docplan-eval judge                         # the dataset, and the judge that agrees best
+uv run docplan-eval replay                        # the turns replayed against the agent
+uv run docplan-eval measures                      # task completion, drop-off, rewrite rate
+```
+
+The [docplan README](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/README.md#evaluating-docplan) describes each variable and option.
+
 ## Test it
 
 The tests run the whole stack with a scripted `FunctionModel`, so they need no API key:
@@ -61,3 +84,4 @@ uv run pytest examples/docplan/tests
 | `DOCPLAN_DATABASE_URL` and the storage it selects | [Storage](guides/storage.md) |
 | `ArtifactrMcp` and `resolve_client` in `create_app` | [External agents over MCP](guides/mcp.md) |
 | The terminal client | The [thread protocol](protocol.md) |
+| `EditSize`, `docplan.evals` and `docplan-eval` | [Evaluation](guides/evaluation.md) |

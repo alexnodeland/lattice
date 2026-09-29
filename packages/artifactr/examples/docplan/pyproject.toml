@@ -6,7 +6,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-    "artifactr-ai[fastapi,mcp,sqlite,postgres,otel,langfuse,litellm]",
+    "artifactr-ai[fastapi,mcp,sqlite,postgres,otel,langfuse,litellm,evals]",
     "pydantic-ai-slim[anthropic,openai]>=2.51",
     "uvicorn[standard]>=0.54",
     "websockets>=17.1",
@@ -15,9 +15,14 @@ dependencies = [
     "httpx>=0.28",
 ]
 
+[project.optional-dependencies]
+# A DSPy judge, used instead of the function judge when DOCPLAN_JUDGE_MODEL is set.
+dspy = ["evalr[dspy]"]
+
 [project.scripts]
 docplan-serve = "docplan.app:main"
 docplan = "docplan.cli:main"
+docplan-eval = "docplan.evaluate:main"
 
 [tool.uv.sources]
 artifactr-ai = { workspace = true }

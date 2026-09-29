@@ -16,6 +16,7 @@ frames and render event and live frames as they arrive.
 import argparse
 import asyncio
 import json
+import re
 import sys
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -47,11 +48,18 @@ Type a message to talk to the agent. Commands:
   /reject ID [REASON]   reject a proposal
   /mode edit|suggest    let the agent edit, or make every change a proposal
   /rate 1-5 [COMMENT]   rate the agent's last turn
+  /edits ok|big [COMMENT]
+                        say whether the agent's last edits were too big
+  /done yes|no 1-5 [REASON]
+                        say whether the thread did what you asked, and how well
   /stop                 stop the agent
   /quit                 leave"""
 
 VIEWS = {"doc": Doc, "plan": Plan}
 """How ``/show`` renders each artifact kind."""
+
+DONE = re.compile(r"(?P<done>yes|no) (?P<quality>[1-5])(?:\s+(?P<reason>.+))?")
+"""``/done``'s arguments."""
 
 
 @dataclass(frozen=True)
@@ -106,8 +114,27 @@ def parse_line(line: str, state: State) -> Frame | Local | None:
                 target={"kind": "turn", "run_id": state.last_run},
                 value={"stars": int(stars), "comment": comment.strip() or None},
             )
-        case "rate" if state.last_run is None:
+        case "edits" if state.last_run and rest.partition(" ")[0] in ("ok", "big"):
+            size, _, comment = rest.partition(" ")
+            return command_frame(
+                type="give_feedback",
+                feedback_type="edit_size",
+                target={"kind": "turn", "run_id": state.last_run},
+                value={"too_big": size == "big", "comment": comment.strip() or None},
+            )
+        case "rate" | "edits" if state.last_run is None:
             return Local("note", "There is no turn to rate yet.")
+        case "done" if done := DONE.fullmatch(rest):
+            return command_frame(
+                type="give_feedback",
+                feedback_type="task_completion",
+                target={"kind": "thread", "thread_id": state.thread_id},
+                value={
+                    "completed": done["done"] == "yes",
+                    "quality": int(done["quality"]),
+                    "reason": done["reason"],
+                },
+            )
         case "stop" if state.active_run:
             return command_frame(type="stop_run", run_id=state.active_run)
         case "stop":
@@ -199,6 +226,13 @@ class Renderer:
             case "feedback_given" if event["feedback_type"] == "rating":
                 stars = event["value"]["stars"]
                 self._line(f"[dim]{who} rated the turn {'★' * stars}{'☆' * (5 - stars)}[/]")
+            case "feedback_given" if event["feedback_type"] == "edit_size":
+                size = "too big" if event["value"]["too_big"] else "fine"
+                self._line(f"[dim]{who} found the turn's edits {size}[/]")
+            case "feedback_given" if event["feedback_type"] == "task_completion":
+                done = "done" if event["value"]["completed"] else "not done"
+                quality = event["value"]["quality"]
+                self._line(f"[dim]{who} found the thread {done}, {quality}/5[/]")
             case "run_ended":
                 self._state.active_run = None
                 if event["status"] != "completed":

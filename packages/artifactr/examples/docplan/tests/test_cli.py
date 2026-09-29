@@ -21,6 +21,7 @@ from docplan.cli import Client, Local, Renderer, State, command_frame, parse_lin
 
 ALICE = {"kind": "user", "id": "alice", "name": "alice"}
 AGENT = {"kind": "agent", "thread_id": "thr_1", "run_id": "run_1", "name": "docplan"}
+JUDGE = {"kind": "evaluator", "name": "edit-size", "version": "1:0.5"}
 
 
 def terminal() -> tuple[Console, io.StringIO]:
@@ -80,6 +81,42 @@ def terminal() -> tuple[Console, io.StringIO]:
                 "value": {"stars": 2, "comment": None},
             },
         ),
+        (
+            "/edits big rewrote my intro",
+            {
+                "type": "give_feedback",
+                "feedback_type": "edit_size",
+                "target": {"kind": "turn", "run_id": "run_0"},
+                "value": {"too_big": True, "comment": "rewrote my intro"},
+            },
+        ),
+        (
+            "/edits ok",
+            {
+                "type": "give_feedback",
+                "feedback_type": "edit_size",
+                "target": {"kind": "turn", "run_id": "run_0"},
+                "value": {"too_big": False, "comment": None},
+            },
+        ),
+        (
+            "/done yes 4  ready to plan",
+            {
+                "type": "give_feedback",
+                "feedback_type": "task_completion",
+                "target": {"kind": "thread", "thread_id": "thr_1"},
+                "value": {"completed": True, "quality": 4, "reason": "ready to plan"},
+            },
+        ),
+        (
+            "/done no 2",
+            {
+                "type": "give_feedback",
+                "feedback_type": "task_completion",
+                "target": {"kind": "thread", "thread_id": "thr_1"},
+                "value": {"completed": False, "quality": 2, "reason": None},
+            },
+        ),
     ],
 )
 def test_lines_become_command_frames(line: str, command: dict[str, Any]) -> None:
@@ -102,6 +139,9 @@ def test_lines_become_command_frames(line: str, command: dict[str, Any]) -> None
         ("/mode fast", Local("help")),
         ("/dance", Local("help")),
         ("/rate 4", Local("note", "There is no turn to rate yet.")),
+        ("/edits ok", Local("note", "There is no turn to rate yet.")),
+        ("/done maybe 3", Local("help")),
+        ("/done yes 6", Local("help")),
     ],
 )
 def test_other_lines_are_handled_by_the_client(line: str, action: Local | None) -> None:
@@ -110,6 +150,7 @@ def test_other_lines_are_handled_by_the_client(line: str, action: Local | None) 
 
 def test_a_rating_needs_stars() -> None:
     assert parse_line("/rate great", State("thr_1", last_run="run_1")) == Local("help")
+    assert parse_line("/edits huge", State("thr_1", last_run="run_1")) == Local("help")
 
 
 # ─── rendering ────────────────────────────────────────────────────────────────
@@ -194,6 +235,20 @@ FRAMES: list[dict[str, Any]] = [
     event(AGENT, "run_3", type="run_ended", status="stopped"),
     event(AGENT, "run_4", type="run_ended", status="failed", error="model timed out"),
     event(ALICE, type="feedback_given", feedback_type="rating", value={"stars": 4}),
+    event(ALICE, type="feedback_given", feedback_type="edit_size", value={"too_big": True}),
+    event(JUDGE, type="feedback_given", feedback_type="edit_size", value={"too_big": False}),
+    event(
+        ALICE,
+        type="feedback_given",
+        feedback_type="task_completion",
+        value={"completed": True, "quality": 4},
+    ),
+    event(
+        ALICE,
+        type="feedback_given",
+        feedback_type="task_completion",
+        value={"completed": False, "quality": 2},
+    ),
     event(ALICE, type="feedback_given", feedback_type="other", value={}),
     {"type": "command_result", "command_id": "cmd_1", "ok": True},
     {
@@ -239,6 +294,10 @@ def test_frames_render_as_a_transcript() -> None:
         "docplan's run stopped",
         "docplan's run failed: model timed out",
         "alice rated the turn ★★★★☆",
+        "alice found the turn's edits too big",
+        "edit-size found the turn's edits fine",
+        "alice found the thread done, 4/5",
+        "alice found the thread not done, 2/5",
         "✗ nope",
         "✗ not a command frame",
     ]

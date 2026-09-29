@@ -8,7 +8,10 @@ Workspaces are kept in memory, or in the database at ``DOCPLAN_DATABASE_URL`` (f
 
 With ``OTEL_EXPORTER_OTLP_ENDPOINT`` set, docplan reports its traces, metrics and logs there;
 with ``LANGFUSE_PUBLIC_KEY`` too, it files each turn in Langfuse and mirrors the ``main``
-workspace's ratings to Langfuse scores. stackr's stack provides both.
+workspace's feedback to Langfuse scores. stackr's stack provides both.
+
+With ``DOCPLAN_EVAL_SAMPLE_RATE`` set, a judge judges that share of the agent's turns as they
+end, and its verdicts are feedback beside people's (see :mod:`docplan.evals`).
 
 Authentication here is a demo: the user is whatever the ``x-user`` header (or ``user`` query
 parameter) says, and every user shares one tenant. Real applications resolve actors from their
@@ -31,6 +34,7 @@ from starlette.requests import HTTPConnection
 
 from artifactr import InMemoryStorage, Runner, SystemActor, UserActor, Workspaces
 from artifactr.core import Actor, ExternalAgentActor, TenantId
+from artifactr.evals import TaskCompletion
 from artifactr.fastapi import artifactr_router
 from artifactr.langfuse import LangfuseScoreConfigs, LangfuseScores, langfuse_turn
 from artifactr.mcp import ArtifactrMcp
@@ -39,11 +43,12 @@ from artifactr.scores import FeedbackMirror, sync_score_configs
 from artifactr.sql import SqlStorage, create_sqlite_engine, migrate
 from artifactr.workspace import Storage
 from docplan.agent import build_agent
-from docplan.artifacts import Doc, Plan, Rating
+from docplan.artifacts import Doc, EditSize, Plan, Rating
+from docplan.evals import online_from_environment
 
 TENANT: TenantId = "demo"
 MIRRORED = "main"
-"""The workspace whose ratings are mirrored to Langfuse: the terminal client's default."""
+"""The workspace whose feedback is mirrored to Langfuse: the terminal client's default."""
 
 
 async def resolve_actor(connection: HTTPConnection) -> tuple[TenantId, Actor]:
@@ -74,6 +79,9 @@ def create_app(
             ``DOCPLAN_DATABASE_URL``. Without a storage or a URL, workspaces live in memory.
         telemetry: OpenTelemetry, set up by :func:`telemetry_from_environment`; also Langfuse
             when it has a client.
+
+    The agent's turns are judged online when ``DOCPLAN_EVAL_SAMPLE_RATE`` is set; see
+    :func:`docplan.evals.online_from_environment`.
     """
     database_url = database_url or os.environ.get("DOCPLAN_DATABASE_URL")
     engine = open_database(database_url) if storage is None and database_url else None
@@ -87,11 +95,13 @@ def create_app(
         }
     workspaces = Workspaces(storage or InMemoryStorage(), types=[Doc, Plan], **providers)
     langfuse = telemetry.langfuse if telemetry else None
+    judging = online_from_environment()
     runner = Runner(
         build_agent(model, capabilities=[telemetry.capability()] if telemetry else []),
         app=None,
         agent_name="docplan",
         turn_context=langfuse_turn if langfuse else None,
+        evaluators=[judging] if judging else [],
         **providers,
     )
     mcp = ArtifactrMcp(workspaces, runner, resolve=resolve_client)
@@ -106,10 +116,13 @@ def create_app(
                 stack.push_async_callback(engine.dispose)
             await stack.enter_async_context(mcp.lifespan())
             if langfuse is not None:
-                await sync_score_configs(LangfuseScoreConfigs(langfuse), [Rating])
+                configs = LangfuseScoreConfigs(langfuse)
+                await sync_score_configs(configs, [Rating, EditSize, TaskCompletion])
                 workspace = await workspaces.open(TENANT, MIRRORED, actor=SystemActor())
                 mirror = FeedbackMirror(workspace, LangfuseScores(langfuse))
                 stack.push_async_callback(_cancel, asyncio.create_task(mirror.follow()))
+            if judging is not None:  # finish judging before the database closes
+                stack.push_async_callback(judging.drain)
             yield
 
     app = FastAPI(title="docplan", lifespan=lifespan)

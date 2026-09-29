@@ -144,6 +144,8 @@ The `evals` extra connects artifactr to [evalr](https://github.com/alexnodeland/
 
 evalr is not on PyPI yet. artifactr's own development environment pins it by revision; an application installs it from GitHub alongside the extra, for example with `uv add "evalr @ git+https://github.com/alexnodeland/evalr"`.
 
+[docplan](../reference-implementation.md#evaluate-it), the reference implementation, runs the whole loop on one feedback type, in [`evals.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/evals.py): people's feedback becomes a dataset, a function judge is calibrated against it, the server judges its turns online, an experiment replays them, and the measures come from the log. Its tests run the loop offline, with scripted models.
+
 ### Datasets from the log
 
 A `LogFeedbackSource` is evalr's `FeedbackSource` over one workspace's log. Each piece of one feedback type becomes an evalr `Example`, with the feedback as its verdict and an input your code builds from what the feedback is about:

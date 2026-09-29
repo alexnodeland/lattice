@@ -76,7 +76,15 @@ def test_ratings_reach_langfuse_on_the_turns_trace(tmp_path: Path) -> None:
 
     try:
         with TestClient(app, headers={"x-user": "alice"}) as client:
-            assert langfuse.configs == ["rating.stars", "rating.comment"]
+            assert langfuse.configs == [
+                "rating.stars",
+                "rating.comment",
+                "edit_size.too_big",
+                "edit_size.comment",
+                "task_completion.completed",
+                "task_completion.quality",
+                "task_completion.reason",
+            ]
             command(client, type="create_thread", thread_id="t1")
             command(client, type="post_message", thread_id="t1", content="Hi")
             wait_for(lambda: ended(client))

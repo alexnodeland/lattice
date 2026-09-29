@@ -41,7 +41,10 @@ class Hold:
     released: threading.Event = field(default_factory=threading.Event)
 
 
-type Step = ModelResponse | Hold
+type Reply = Callable[[list[ModelMessage]], ModelResponse]
+"""A step that answers from the conversation so far, for runs that request concurrently."""
+
+type Step = ModelResponse | Hold | Reply
 
 
 class Script:
@@ -54,7 +57,7 @@ class Script:
     def model(self) -> FunctionModel:
         return FunctionModel(self._respond, stream_function=self._stream)
 
-    async def _next(self) -> ModelResponse:
+    async def _next(self, messages: list[ModelMessage]) -> ModelResponse:
         step = self.steps.pop(0)
         if isinstance(step, Hold):
             step.entered.set()
@@ -63,13 +66,15 @@ class Script:
             while not await asyncio.to_thread(step.released.wait, 0.01):
                 continue
             return step.then
-        return step
+        if isinstance(step, ModelResponse):
+            return step
+        return step(messages)
 
     async def _respond(self, messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-        return await self._next()
+        return await self._next(messages)
 
     async def _stream(self, messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[Any]:
-        for index, part in enumerate((await self._next()).parts):
+        for index, part in enumerate((await self._next(messages)).parts):
             if isinstance(part, TextPart):
                 yield part.content
             else:

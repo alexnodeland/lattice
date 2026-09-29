@@ -1,6 +1,6 @@
 # ADR-0011: The application template, in detail
 
-**Status:** Accepted
+**Status:** Accepted; partly superseded by [ADR-0013](0013-how-the-template-pins-the-libraries.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 
@@ -98,3 +98,10 @@ The maintainer decided to keep the libraries on GitHub rather than publish them 
 - **evalr follows reflexr.** Building the script found that the template's evalr pin can't follow evalr's `main`. The template installs reflexr's `[evals]` extra, and uv resolves reflexr's requirement on evalr with reflexr's own `[tool.uv.sources]`, which pins evalr to a commit; an application pinning evalr anywhere else has two URLs for one package, and uv refuses to lock it. The decision above, that an application declares evalr's source itself, stands, and the source must name the commit reflexr pins. So the script pins evalr to the commit the new reflexr's `pyproject.toml` pins, says so when evalr's `main` is elsewhere, and refuses an evalr revision that differs. evalr moves when reflexr moves its pin.
 - **`--check` reports without writing,** and exits 1 when a pin is behind. Neither `make validate` nor CI runs it: every pull request would fail as soon as a library merged something, for a reason unrelated to the change.
 - **A person runs it, and a pull request carries the bump.** No scheduled workflow opens bump pull requests: a workflow's token can open one only when the repository allows GitHub Actions to create pull requests, and that setting stays off. The pull request's Template and Smoke jobs, which generate applications on the new pins, are the test. When a library's `main` breaks the template, the same pull request fixes the template, or holds that library at its last good commit with `LIBRARY=REV`.
+
+## Amendment (2026-09-29): the reactor stops gracefully
+
+- **The reactor stops first, and never in the middle of a transaction.** `Automation.lifespan` runs reflexr's `reactor.serve(stop=, grace=)` ([reflexr#69](https://github.com/alexnodeland/reflexr/pull/69)) and, at shutdown, sets the event and awaits it before the feedback mirrors, the MCP server and the database close. Cancelling the reactor's task, as the template did, could land in a transaction and leave SQLite locked, which it caught and logged ([#17](https://github.com/alexnodeland/stackr/pull/17)).
+- **The shutdown fits the stop period.** The server lets open requests finish for `DRAIN` (2 seconds, `app.py`), then the reactor gives running actions `STOP_GRACE` (5 seconds, `automation.py`); both, with the rest of the shutdown, end within the app profile's `stop_grace_period`, Docker's 10 seconds, which its compose file states.
+
+The reflexr-only variant keeps a local streaming `function_model` for its tests, and types its MCP resolver with `Context[Any, Request]`, until reflexr has its own ([reflexr#77](https://github.com/alexnodeland/reflexr/issues/77), [reflexr#78](https://github.com/alexnodeland/reflexr/issues/78)).

@@ -1,9 +1,9 @@
 """Feedback as Langfuse scores: a mirror per workspace, from the first time it is used.
 
 People (and evaluators) give typed feedback in a workspace; the libraries' ``FeedbackMirror``
-follows a workspace's log and records each piece as scores on the trace it is about. A library
-mirrors one workspace at a time, so the application starts a mirror for each workspace it
-opens, until it stops.
+follows a workspace's log and records each piece as scores on the trace it is about, by evalr's
+score mapping. A library mirrors one workspace at a time, so the application starts a mirror for
+each workspace it opens, until it stops.
 """
 
 import asyncio

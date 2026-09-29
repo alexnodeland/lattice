@@ -212,26 +212,19 @@ cd my-app && git init && make install && make env && make check
 uvx copier update                                # later: the template's improvements
 ```
 
-| Question | Default | What it decides |
-|---|---|---|
-| `project_name`, `project_slug`, `description` | My App, `my-app` | The distribution, the package (`my_app`), the OpenTelemetry service and the Compose project |
-| `libraries` | `both` | `artifactr`, `reflexr`, or both side by side on one database and one telemetry setup |
-| `evals` | yes | An `evals/` directory with starter evalr experiments |
-| `python_version` | 3.12 | 3.12, 3.13 or 3.14 |
-| `app_port` | 8800 | The port the application is published on |
-| `artifactr_rev`, `reflexr_rev`, `evalr_rev` | Each library's `main` when the template was last updated, by `make bump-libraries` | The git revision `[tool.uv.sources]` pins, since the libraries aren't on PyPI |
+It asks for the application's name, slug and description, which libraries it uses (`artifactr`, `reflexr` or `both`), whether to include evals, the Python version and the published port; [Template questions](reference/template.md) lists each, generated from `copier.yml`. The libraries' revisions aren't questions: the template pins artifactr and reflexr to commits, which `make bump-libraries` moves to each library's `main` and `copier update` carries to applications, and evalr comes with them at the commit their own sources pin ([ADR-0013](adr/0013-how-the-template-pins-the-libraries.md)).
 
 A generated application:
 
 | Part | Where | What |
 |---|---|---|
-| Surfaces | `app.py`, `collaboration.py`, `automation.py` | FastAPI with each library's REST and WebSocket routes and MCP server under its name: `/artifactr/v1`, `/artifactr/mcp/`, `/reflexr/v1`, `/reflexr/mcp/`; the reactor runs while the application is up |
+| Surfaces | `app.py`, `collaboration.py`, `automation.py` | FastAPI with each library's REST and WebSocket routes and MCP server under its name: `/artifactr/v1`, `/artifactr/mcp/`, `/reflexr/v1`, `/reflexr/mcp/`; the reactor runs while the application is up, and stops gracefully with it, within the app profile's stop period |
 | Examples | `notes.py`, `tickets.py` | A `note` artifact type, its agent and a `rating` of turns; `ticket.opened` and `ticket.triaged` events, a `triage` rule, its agent, and a `triage-review` of runs |
 | Identity | `auth.py` | Supabase's access tokens, verified against its published keys (`AUTH_JWKS_URL`), or with a legacy HS256 secret (`AUTH_JWT_SECRET`); the user is `sub`, the tenant `app_metadata.tenant_id`; anything else is 401, the MCP servers included |
 | Database | `database.py` | The libraries' SQL storage on `DATABASE_URL`, migrated at startup, in a schema of the application's own (`DATABASE_SCHEMA`), since Supabase's Data API serves `public` |
 | Telemetry | `telemetry.py` | `configure_telemetry`, when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; Langfuse's client, when `LANGFUSE_PUBLIC_KEY` is set, for trace attributes and scores, while traces reach Langfuse through the Collector |
 | Gateway | `gateway.py` | Agents on `litellm_model("default")` with `LiteLLMGateway`: each request with its tenant's key and the `pii-mask` and `prompt-injection` guardrails |
-| Feedback | `scores.py` | A `FeedbackMirror` to Langfuse scores for each workspace the application uses, and the score configs, created at startup |
+| Feedback | `scores.py` | A `FeedbackMirror` to Langfuse scores for each workspace the application uses, a score per field by evalr's score mapping, and the score configs, created at startup |
 | Evals | `evals/` | The agents on a few examples, judged by evaluators of the feedback types: offline with a scripted model (`make evals`), or in Langfuse with the gateway's model (`make evals-langfuse`) |
 | Quality gates | `pyproject.toml`, `Makefile`, `.github/workflows/ci.yml`, `.pre-commit-config.yaml` | uv, ruff, pyright in strict mode, pytest with warnings as errors and 100% branch coverage, Conventional Commits; tests need no network or stack |
 | The `app` profile | `compose.yaml`, `Dockerfile`, `.env.example` | The application beside the stack (`make up`), on the `stackr` network and local Supabase's, where it reaches the stack's services by name |

@@ -2,7 +2,8 @@
 
 Telemetry is on when ``OTEL_EXPORTER_OTLP_ENDPOINT`` is set (stackr's Collector takes OTLP over
 HTTP on port 4318), so the application and its tests run without the stack. Langfuse is on
-when ``LANGFUSE_PUBLIC_KEY`` is set too.
+when ``LANGFUSE_PUBLIC_KEY`` is set too.{% if libraries == 'both' %} artifactr's ``configure_telemetry`` sets up the
+one handle both libraries use.{% endif %}
 
 Traces reach Langfuse through the Collector, which sends it every trace (stackr's ADR-0007), so
 the Langfuse client exports no spans of its own; it still sets each turn's and run's session,
@@ -14,15 +15,10 @@ trace of its own, many a second. The libraries' own spans still time their commi
 """
 
 from importlib.metadata import version
-from typing import Protocol
 
-from fastapi import FastAPI
-from langfuse import Langfuse
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
-from pydantic_ai.capabilities import Instrumentation
+from opentelemetry.sdk.trace import ReadableSpan
 
-from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.otel import Instrumented, configure_telemetry
+from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.otel import Instrumented, TelemetryHandle, configure_telemetry
 
 from {{ package_name }}.settings import Settings
 
@@ -30,27 +26,7 @@ INSTRUMENTED: tuple[Instrumented, ...] = ("fastapi", "httpx")
 """The libraries the application's telemetry instruments."""
 
 
-class Telemetry(Protocol):
-    """What the application uses of ``configure_telemetry``'s handle."""
-
-    tracer_provider: TracerProvider
-    meter_provider: MeterProvider
-    langfuse: Langfuse | None
-
-    def capability(self) -> Instrumentation:
-        """pydantic-ai's instrumentation, for an agent's capabilities."""
-        ...
-
-    def instrument_app(self, app: FastAPI) -> None:
-        """Trace and measure a FastAPI application's requests."""
-        ...
-
-    def shutdown(self) -> None:
-        """Flush and shut down."""
-        ...
-
-
-def configure(settings: Settings) -> Telemetry | None:
+def configure(settings: Settings) -> TelemetryHandle | None:
     """Set up OpenTelemetry, and Langfuse, as the settings ask; or nothing."""
     if not settings.telemetry:
         return None

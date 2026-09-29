@@ -67,36 +67,19 @@ app_port:
   validator: >-
     {% if app_port < 1024 or app_port > 65535 %}Choose a port from 1024 to 65535{% endif %}
 
-# The libraries are not on PyPI: each is pinned to a git revision of its repository, the
-# current `main` when the template was last updated. `copier update` keeps the revisions you
-# chose; change them here, or in pyproject.toml's [tool.uv.sources]. In stackr, `make
-# bump-libraries` moves these defaults: each library's to its `main`, and evalr's to the commit
-# reflexr pins, since reflexr's [evals] extra resolves evalr there.
+# Never asked, and not recorded in the answers. The libraries' commits are the template's, so
+# `copier update` moves them with its code; `make bump-libraries` moves them to each library's
+# main, and evalr comes with them (ADR-0013). The rest are derived from the answers.
 artifactr_rev:
   type: str
-  help: The artifactr revision to pin (a commit SHA)
-  default: 9c92a7f7685df14861dd1077539b595cb6c1ede4
-  when: "{{ libraries in ['artifactr', 'both'] }}"
-  validator: >-
-    {% if not (artifactr_rev | regex_search('^[0-9a-f]{40}$')) %}A full 40-character commit SHA{% endif %}
+  default: 6ec0bcebfb0b74088976da08a3632018f35b7f68
+  when: false
 
 reflexr_rev:
   type: str
-  help: The reflexr revision to pin (a commit SHA)
-  default: f91a89409e6d42c8d7ac0bca945856e39229476f
-  when: "{{ libraries in ['reflexr', 'both'] }}"
-  validator: >-
-    {% if not (reflexr_rev | regex_search('^[0-9a-f]{40}$')) %}A full 40-character commit SHA{% endif %}
+  default: 2f28e23d3ca1451d2d76fbf149b49f4363524f19
+  when: false
 
-evalr_rev:
-  type: str
-  help: The evalr revision to pin (a commit SHA)
-  default: 62582e2a677947bbb540e367e28bb6ad7d33b7f9
-  when: "{{ evals }}"
-  validator: >-
-    {% if not (evalr_rev | regex_search('^[0-9a-f]{40}$')) %}A full 40-character commit SHA{% endif %}
-
-# Derived, never asked, and not recorded in the answers.
 package_name:
   type: str
   default: "{{ project_slug | replace('-', '_') }}"

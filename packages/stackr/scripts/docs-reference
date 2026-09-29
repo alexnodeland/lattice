@@ -852,7 +852,7 @@ def block_template_revisions() -> str:
         for name, spec in copier_questions().items()
         if name.endswith("_rev")
     ]
-    return table(["Library", "Commit the template pins by default"], rows)
+    return table(["Library", "Commit the template pins"], rows)
 
 
 # --- the pages ----------------------------------------------------------------------------------

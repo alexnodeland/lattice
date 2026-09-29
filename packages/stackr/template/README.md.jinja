@@ -89,9 +89,13 @@ It talks to stackr's ports only, through the settings in `.env` ([`settings.py`]
 | Database | `DATABASE_URL`, `DATABASE_SCHEMA` | [`database.py`](src/{{ package_name }}/database.py): the libraries' SQL storage, migrated at startup, in a schema of its own outside the `public` schema Supabase's API serves |
 | Identity | `AUTH_JWKS_URL`, `AUTH_JWT_SECRET`, `AUTH_AUDIENCE`, `AUTH_ISSUER`, `AUTH_TENANT_CLAIM` | [`auth.py`](src/{{ package_name }}/auth.py): Supabase's ES256 tokens against its published keys, or HS256 tokens with a legacy secret |
 | LLM gateway | `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `LITELLM_TENANT_KEYS`, `LITELLM_MODEL`, `LITELLM_GUARDRAILS` | [`gateway.py`](src/{{ package_name }}/gateway.py): agents on the `default` model group, each request with its tenant's key and the `pii-mask` and `prompt-injection` guardrails |
-| Evaluation data | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | [`scores.py`](src/{{ package_name }}/scores.py): each workspace's feedback mirrored to Langfuse scores, on the traces it is about |
+| Evaluation data | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | [`scores.py`](src/{{ package_name }}/scores.py): each workspace's feedback mirrored to Langfuse scores on the traces it is about, a score per field by evalr's score mapping |
 
 The app profile ([`compose.yaml`](compose.yaml)) joins the stack's networks and reaches its services by name; `STACK_DATABASE_URL` points it at another database there.
+{%- if use_reflexr %}
+
+When the application stops, reflexr's reactor starts no new runs and gives the running ones `STOP_GRACE` to end ([`automation.py`](src/{{ package_name }}/automation.py)), within the app profile's `stop_grace_period`. A run still going then is recorded as an abandoned attempt, and the next start retries it after its rule's backoff.
+{%- endif %}
 {%- if evals %}
 
 ## Evaluation
@@ -113,4 +117,4 @@ make evals-langfuse   # in Langfuse, with the gateway's model, as .env configure
 ## Updating
 
 - **The template:** `uvx copier update` pulls in stackr's improvements, keeping your answers and your changes.
-- **The libraries:** they are pinned to git revisions in `pyproject.toml`'s `[tool.uv.sources]`. Change a `rev`, then `uv lock` and `make check`.
+- **The libraries:** they are pinned to git revisions in `pyproject.toml`'s `[tool.uv.sources]`, and evalr comes with them, at the commit they pin. `copier update` moves the pins with the template's code. To hold a library back, change its `rev`, then `uv lock` and `make check`.

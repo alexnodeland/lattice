@@ -17,15 +17,14 @@ from {{ package_name }}.settings import GatewaySettings
 
 
 def gateway_model(settings: GatewaySettings) -> Model:
-    """The model group agents use, through the gateway."""
-    return litellm_model(settings.model, api_base=settings.base_url, api_key=settings.api_key)
-
-
-def model_settings(settings: GatewaySettings) -> ModelSettings:
-    """What every model request adds: a mocked reply, when one is set for smoke tests."""
-    if settings.mock_response is None:
-        return ModelSettings()
-    return ModelSettings(extra_body={"mock_response": settings.mock_response})
+    """The model group agents use, through the gateway; with a mocked reply, for smoke tests."""
+    mock = settings.mock_response
+    return litellm_model(
+        settings.model,
+        api_base=settings.base_url,
+        api_key=settings.api_key,
+        settings=None if mock is None else ModelSettings(extra_body={"mock_response": mock}),
+    )
 
 
 class TenantKeys:

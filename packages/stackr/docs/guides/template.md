@@ -26,7 +26,8 @@ make check          # lint, types and tests, as its CI runs them
 | `evals` | Yes | An `evals/` directory with starter evalr experiments |
 | `python_version` | 3.12 | 3.12, 3.13 or 3.14 |
 | `app_port` | 8800 | The port the application is published on, on this machine |
-| `artifactr_rev`, `reflexr_rev`, `evalr_rev` | Each library's `main` when the template was last updated | The git commit each library is pinned to, since none is on PyPI yet |
+
+The libraries' revisions aren't questions: the template pins each library to the commit its code was written for ([The libraries' revisions](#the-libraries-revisions)).
 
 Answer non-interactively with `--defaults` and `--data`, as CI does:
 
@@ -34,19 +35,19 @@ Answer non-interactively with `--defaults` and `--data`, as CI does:
 uvx copier copy --defaults --data libraries=reflexr --data evals=false gh:alexnodeland/stackr my-app
 ```
 
-[Template questions](../reference/template.md) lists every question with its choices, validation and the files each answer generates.
+[Template questions](../reference/template.md) lists every question with its choices, validation and the files each answer generates, and the values derived from them.
 
 ## What it generates
 
 | Part | Where | What |
 |---|---|---|
-| Surfaces | `app.py`, `collaboration.py`, `automation.py` | FastAPI with each library's REST and WebSocket routes and MCP server, under its name: `/artifactr/v1`, `/artifactr/mcp/`, `/reflexr/v1`, `/reflexr/mcp/`. reflexr's reactor runs while the application is up |
+| Surfaces | `app.py`, `collaboration.py`, `automation.py` | FastAPI with each library's REST and WebSocket routes and MCP server, under its name: `/artifactr/v1`, `/artifactr/mcp/`, `/reflexr/v1`, `/reflexr/mcp/`. reflexr's reactor runs while the application is up, and stops gracefully when it stops |
 | Examples | `notes.py`, `tickets.py` | A `note` artifact type, its agent and a `rating` of turns (artifactr); `ticket.opened` and `ticket.triaged` events, a `triage` rule, its agent, and a `triage-review` of runs (reflexr) |
 | Identity | `auth.py` | Supabase's access tokens, verified against its published keys (`AUTH_JWKS_URL`), or with a legacy HS256 secret (`AUTH_JWT_SECRET`). The user is `sub` and the tenant `app_metadata.tenant_id`; anything else is 401, the MCP servers included |
 | Database | `database.py` | The libraries' SQL storage on `DATABASE_URL`, migrated at startup, in a schema of the application's own (`DATABASE_SCHEMA`) |
 | Telemetry | `telemetry.py` | `configure_telemetry` when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; Langfuse's client when `LANGFUSE_PUBLIC_KEY` is set too, for trace attributes and scores |
-| Gateway | `gateway.py` | Agents on `litellm_model("default")`, each request with its tenant's key and the `pii-mask` and `prompt-injection` guardrails |
-| Feedback | `scores.py` | Each workspace's feedback mirrored to Langfuse scores, from the first request that uses it, and the feedback types' score configs, created at startup |
+| Gateway | `gateway.py` | Agents on `litellm_model("default")`, each request with its tenant's key and the `pii-mask` and `prompt-injection` guardrails. A mocked reply, for smoke tests, is in the model's settings |
+| Feedback | `scores.py` | Each workspace's feedback mirrored to Langfuse scores, a score per field by evalr's score mapping, from the first request that uses it, and the feedback types' score configs, created at startup |
 | Evals | `evals/` | The agents on a few examples, judged by evaluators whose verdicts are the application's own feedback types: offline with a scripted model (`make evals`), or in Langfuse with the gateway's model (`make evals-langfuse`) |
 | Quality gates | `pyproject.toml`, `Makefile`, `.github/workflows/ci.yml`, `.pre-commit-config.yaml` | uv, ruff, pyright in strict mode, pytest with warnings as errors and 100% branch coverage, Conventional Commits. The tests need no network and no stack |
 | The `app` profile | `compose.yaml`, `Dockerfile` | The application beside the stack, on its networks |
@@ -90,6 +91,8 @@ The **app profile** is the application's own `compose.yaml`, not a service in st
 
 So start the stack first, with local Supabase: stackr's default `make up`. The image is built in two stages, the first with git to fetch the libraries at their pinned commits, so building it needs the network.
 
+**Stopping:** the server lets open requests finish for `DRAIN`, then the reactor stops before the database closes, giving running actions `STOP_GRACE` to end and recording those it then cancels as abandoned attempts, which the next start retries ([reflexr's graceful stop](https://github.com/alexnodeland/reflexr/blob/main/docs/guides/reactor.md#running-the-reactor)). Together, and with the rest of the shutdown, they must end within the app profile's `stop_grace_period`.
+
 The **dev container** is built on `.devcontainer/compose.yaml`. When the stack is running, its `initialize.sh` adds the stack's networks and the same addresses, so the application inside it reaches the stack by name; otherwise the dev container runs on its own.
 
 ## Keeping it up to date
@@ -104,19 +107,13 @@ pulls in the template's improvements since the application was generated, keepin
 
 ### The libraries' revisions
 
-Each library is pinned to a commit in `pyproject.toml`'s `[tool.uv.sources]`. `copier update` keeps the revisions you answered, even when the template's defaults move on, so to move a library forward, change its revision yourself:
+artifactr and reflexr are pinned to commits in `pyproject.toml`'s `[tool.uv.sources]` ([ADR-0013](../adr/0013-how-the-template-pins-the-libraries.md)). The pins are the template's, not answers, so `copier update` moves them with the template code written for them. evalr has no pin of its own: it comes with the libraries, at the commit their own `[tool.uv.sources]` pin.
 
-```bash
-uvx copier update --defaults --data artifactr_rev=<commit SHA>   # through Copier, recorded in the answers
-# or edit the rev in pyproject.toml's [tool.uv.sources]
-uv lock && make check
-```
+To hold a library back, or try another commit, edit its `rev` there, then `uv lock && make check`. `copier update` keeps the edit, and marks a conflict when the template moves that pin or the other library's, on the line beside it.
 
-A revision is a full 40-character commit SHA. When an application uses reflexr's `[evals]` extra, it declares evalr's source itself, since reflexr's `[tool.uv.sources]` doesn't apply to the application's own requirements. It pins the commit reflexr's sources pin, since uv resolves reflexr's own requirement on evalr with them and refuses two URLs for one package, so move evalr with reflexr.
+### In stackr: bumping the template's pins
 
-### In stackr: bumping the template's defaults
-
-The libraries install from GitHub rather than PyPI for now ([artifactr#23](https://github.com/alexnodeland/artifactr/issues/23)), so the template's `*_rev` defaults in `copier.yml` follow each library's `main` by hand. `make bump-libraries` does it:
+The libraries install from GitHub rather than PyPI for now ([artifactr#23](https://github.com/alexnodeland/artifactr/issues/23)), so the template's pins, `artifactr_rev` and `reflexr_rev` in `copier.yml`, follow each library's `main` by hand. `make bump-libraries` does it:
 
 ```bash
 make bump-libraries                                  # every library, to the commit its main points to
@@ -124,7 +121,7 @@ make bump-libraries BUMP_FLAGS=--check               # change nothing; fail if a
 make bump-libraries BUMP_FLAGS="artifactr=v0.1.0"    # artifactr only, to a tag, a branch or a commit SHA
 ```
 
-It runs `scripts/bump-libraries`, which resolves each library's `main` with `git ls-remote`, rewrites the defaults in `copier.yml`, regenerates the reference pages that show them (`make docs-reference`), and prints each pin it moved, with a link to what changed:
+It runs `scripts/bump-libraries`, which resolves each library's `main` with `git ls-remote`, rewrites the pins in `copier.yml`, regenerates the reference pages that show them (`make docs-reference`), and prints each pin it moved, with a link to what changed:
 
 ```text
 artifactr e890aca037c0 → 9c92a7f7685d  https://github.com/alexnodeland/artifactr/compare/e890aca037c0...9c92a7f7685d
@@ -132,11 +129,11 @@ artifactr e890aca037c0 → 9c92a7f7685d  https://github.com/alexnodeland/artifac
 
 Naming libraries moves only those; a commit SHA must be a full 40 characters, and is checked against the library's repository.
 
-**evalr follows reflexr.** The template installs reflexr's `[evals]` extra, and uv resolves reflexr's requirement on evalr with reflexr's own `[tool.uv.sources]`, which pins evalr to a commit. An application whose own evalr pin names another commit has two URLs for one package, and uv refuses to lock it. So the script pins evalr to the commit the new reflexr pins, not to evalr's `main`, and says so when the two differ; evalr moves when reflexr moves its pin. Asking for another evalr commit is an error.
+evalr moves when the libraries move their pins of it. When artifactr and reflexr pin different commits of evalr, `uv lock` fails in the Template jobs, naming both.
 
 Then run `make validate`, and open a pull request with the output in its description: CI's template job generates every variant on the new revisions and runs its checks, and the smoke job runs an application on them beside the stack. When a library's `main` breaks the template, either fix the template in the same pull request, or pin that library to its last good commit.
 
-Nothing runs this on a schedule, and CI doesn't run `--check`, which would fail every pull request as soon as a library merged something. Applications already generated keep their revisions until they move them, as above.
+Nothing runs this on a schedule, and CI doesn't run `--check`, which would fail every pull request as soon as a library merged something. Applications move to the new pins with `copier update`.
 
 ## How the template is checked
 

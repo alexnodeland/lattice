@@ -140,6 +140,7 @@ nav:
           - adr/0010-the-llm-gateway.md
           - adr/0011-the-application-template-in-detail.md
           - adr/0012-documentation-site.md
+          - adr/0013-how-the-template-pins-the-libraries.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

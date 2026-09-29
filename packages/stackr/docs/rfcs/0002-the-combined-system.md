@@ -218,7 +218,7 @@ This part depends on [reflexr #21][r-21]. Today, rules and schedules are the app
 5. **Install.** It installs the rule through #21's API, with its provenance: the artifact, the version, the proposal and the approver.
 6. **Confirm.** A notice in the thread names the rule and its version.
 
-Changing the rule means another proposal on the artifact, which installs a new version. Archiving the artifact disables the rule.
+Changing the rule means another proposal on the artifact, which installs a new version. Archiving the artifact archives the rule.
 
 **Limits** on chat rules:
 

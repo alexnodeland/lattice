@@ -12,7 +12,6 @@ from pydantic import Field
 from pydantic_ai import Agent
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.models import Model
-from pydantic_ai.settings import ModelSettings
 from pydantic_ai.usage import UsageLimits
 
 from reflexr import Event, Feedback, Rule, on, run
@@ -68,14 +67,12 @@ def build_triage_agent(
     model: Model,
     *,
     capabilities: Sequence[AbstractCapability[Reaction[None]]] = (),
-    model_settings: ModelSettings | None = None,
 ) -> Agent[Reaction[None], str]:
     """Build the triage agent.
 
     Args:
         model: The model: the gateway's model group, or a scripted one in tests.
         capabilities: More capabilities: the gateway's and telemetry's.
-        model_settings: Settings for every model request.
     """
     return Agent[Reaction[None], str](
         model,
@@ -84,7 +81,6 @@ def build_triage_agent(
         output_type=str,
         instructions=INSTRUCTIONS,
         capabilities=[EventContext(emit=[TicketTriaged]), *capabilities],
-        model_settings=model_settings,
     )
 
 

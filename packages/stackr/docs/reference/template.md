@@ -15,22 +15,21 @@ The application template's questions are in `copier.yml` at the repository's roo
 | `evals` | bool | yes |  | always | Include evaluation with evalr (an evals/ directory and a starter experiment)? |
 | `python_version` | str | `3.12` | `3.12`, `3.13`, `3.14` | always | The Python version it runs on |
 | `app_port` | int | `8800` |  | always | The port it is published on, on this machine |
-| `artifactr_rev` | str | `9c92a7f7685df14861dd1077539b595cb6c1ede4` |  | `libraries in ['artifactr', 'both']` | The artifactr revision to pin (a commit SHA) |
-| `reflexr_rev` | str | `f91a89409e6d42c8d7ac0bca945856e39229476f` |  | `libraries in ['reflexr', 'both']` | The reflexr revision to pin (a commit SHA) |
-| `evalr_rev` | str | `62582e2a677947bbb540e367e28bb6ad7d33b7f9` |  | `evals` | The evalr revision to pin (a commit SHA) |
 
 <!-- end generated -->
 
-Copier checks each answer: the name can't be empty; the slug is lowercase letters, digits and single dashes, starting with a letter, and at most 30 characters; the port is from 1024 to 65535; and each revision is a full 40-character commit SHA.
+Copier checks each answer: the name can't be empty; the slug is lowercase letters, digits and single dashes, starting with a letter, and at most 30 characters; and the port is from 1024 to 65535.
 
 ## Derived values
 
-These are computed from the answers, never asked, and not recorded in `.copier-answers.yml`.
+These are computed from the answers, or fixed by the template, as the libraries' revisions are ([ADR-0013](../adr/0013-how-the-template-pins-the-libraries.md)). They are never asked, and not recorded in `.copier-answers.yml`, so `copier update` moves them with the template.
 
 <!-- generated: template-derived -->
 
 | Value | Type | Derived as |
 |---|---|---|
+| `artifactr_rev` | str | `6ec0bcebfb0b74088976da08a3632018f35b7f68` |
+| `reflexr_rev` | str | `2f28e23d3ca1451d2d76fbf149b49f4363524f19` |
 | `package_name` | str | `{{ project_slug | replace('-', '_') }}` |
 | `use_artifactr` | bool | `{{ libraries in ['artifactr', 'both'] }}` |
 | `use_reflexr` | bool | `{{ libraries in ['reflexr', 'both'] }}` |

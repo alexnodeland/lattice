@@ -14,6 +14,10 @@ services:
     build: .
     image: {{ project_slug }}:local
     restart: unless-stopped
+{%- if use_reflexr %}
+    # Docker's default, stated for DRAIN in app.py and STOP_GRACE in automation.py, which must end within it.
+    stop_grace_period: 10s
+{%- endif %}
     env_file:
       - path: .env
         required: false

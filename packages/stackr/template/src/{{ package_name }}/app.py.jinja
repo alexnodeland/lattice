@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from {{ package_name }}.auth import TokenVerifier
 {%- if use_reflexr %}
-from {{ package_name }}.automation import Automation
+from {{ package_name }}.automation import STOP_GRACE, Automation
 {%- endif %}
 {%- if use_artifactr %}
 from {{ package_name }}.collaboration import Collaboration
@@ -38,10 +38,16 @@ from {{ package_name }}.collaboration import Collaboration
 from {{ package_name }}.database import create_schema, open_database
 from {{ package_name }}.gateway import gateway_model
 from {{ package_name }}.settings import Settings
-from {{ package_name }}.telemetry import Telemetry, configure
+from {{ package_name }}.telemetry import TelemetryHandle, configure
 
 TITLE = {{ project_name | tojson }}
 DISTRIBUTION = "{{ project_slug }}"
+
+DRAIN = 2
+"""Seconds the server lets open requests finish when the application stops, before it cancels
+them and the lifespan shuts down. {% if use_reflexr %}``DRAIN``, the reactor's ``STOP_GRACE`` and the rest of the
+shutdown must end within the app profile's ``stop_grace_period``.{% else %}``DRAIN`` and the rest of the shutdown must end within
+the time the platform gives a stopping process.{% endif %}"""
 
 
 class Part(Protocol):
@@ -64,9 +70,10 @@ def create_app(
     settings: Settings | None = None,
     *,
     model: Model | None = None,
-    telemetry: Telemetry | None = None,
+    telemetry: TelemetryHandle | None = None,
 {%- if use_reflexr %}
     poll_interval: timedelta = timedelta(seconds=1),
+    grace: timedelta = STOP_GRACE,
 {%- endif %}
 ) -> FastAPI:
     """Build the application.
@@ -78,6 +85,8 @@ def create_app(
         telemetry: OpenTelemetry and Langfuse, as ``telemetry.configure`` sets them up.
 {%- if use_reflexr %}
         poll_interval: How often the reactor looks for work.
+        grace: How long the reactor's running actions have to end when the application stops;
+            keep it below the time the platform gives a stopping process.
 {%- endif %}
     """
     settings = settings or Settings.from_environ()
@@ -108,6 +117,7 @@ def create_app(
             engine=engine,
             telemetry=telemetry,
             poll_interval=poll_interval,
+            grace=grace,
         ),
 {%- endif %}
     ]
@@ -159,7 +169,10 @@ def main() -> None:
     telemetry = configure(settings)
     try:
         uvicorn.run(
-            create_app(settings, telemetry=telemetry), host=settings.host, port=settings.port
+            create_app(settings, telemetry=telemetry),
+            host=settings.host,
+            port=settings.port,
+            timeout_graceful_shutdown=DRAIN,
         )
     finally:
         if telemetry is not None:

@@ -17,8 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 import {{ package_name }}.app
 import {{ package_name }}.telemetry
 from conftest import Script, app, bearer, settings
+from {{ package_name }}.app import DRAIN
 from {{ package_name }}.database import create_schema, open_database
-from {{ package_name }}.gateway import Guardrails, TenantKeys, gateway_model, model_settings
+from {{ package_name }}.gateway import Guardrails, TenantKeys, gateway_model
 from {{ package_name }}.settings import GatewaySettings, Settings
 from {{ package_name }}.telemetry import configure, through_the_collector
 
@@ -115,10 +116,9 @@ def test_the_gateway_model_is_the_configured_group() -> None:
 
 
 def test_a_mocked_reply_is_asked_for_only_when_set() -> None:
-    assert model_settings(GatewaySettings()) == {}
-    assert model_settings(GatewaySettings(mock_response="ok")) == {
-        "extra_body": {"mock_response": "ok"}
-    }
+    assert gateway_model(GatewaySettings()).settings is None
+    mocked = gateway_model(GatewaySettings(mock_response="ok"))
+    assert mocked.settings == {"extra_body": {"mock_response": "ok"}}
 
 
 async def test_tenants_use_their_keys_and_the_same_guardrails() -> None:
@@ -172,7 +172,12 @@ def test_main_serves_with_telemetry(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APP_HOST", "127.0.0.1")
     monkeypatch.setenv("APP_PORT", "9000")
     {{ package_name }}.app.main()
-    assert served == {"instrumented": True, "host": "127.0.0.1", "port": 9000}
+    assert served == {
+        "instrumented": True,
+        "host": "127.0.0.1",
+        "port": 9000,
+        "timeout_graceful_shutdown": DRAIN,
+    }
     assert shut_down == [True]
 
 
@@ -183,4 +188,4 @@ def test_main_serves_without_telemetry(monkeypatch: pytest.MonkeyPatch) -> None:
     for unset in ("APP_HOST", "APP_PORT", "OTEL_EXPORTER_OTLP_ENDPOINT"):
         monkeypatch.delenv(unset, raising=False)
     {{ package_name }}.app.main()
-    assert served == {"host": "127.0.0.1", "port": {{ app_port }}}
+    assert served == {"host": "127.0.0.1", "port": {{ app_port }}, "timeout_graceful_shutdown": DRAIN}

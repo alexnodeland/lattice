@@ -7,10 +7,13 @@ import httpx2
 from fastapi.testclient import TestClient
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
+from mcp.types import TextContent
 
 from artifactr import new_id
 
-from conftest import TENANT, TENANT_KEY, Script, app, bearer, call, say, settings, wait_for
+from conftest import TENANT, TENANT_KEY, Script, bearer, call, say, settings, wait_for
+from {{ package_name }}.auth import TokenVerifier
+from {{ package_name }}.collaboration import Collaboration
 
 BASE = "/artifactr/v1/workspaces/main"
 
@@ -55,15 +58,6 @@ def test_requests_carry_the_tenants_key_and_the_guardrails(
     assert sent["extra_headers"]["Authorization"] == f"Bearer {TENANT_KEY}"
     assert sent["extra_body"]["guardrails"] == ["pii-mask", "prompt-injection"]
     assert sent["extra_body"]["metadata"]["tenant_id"] == TENANT
-    assert "mock_response" not in sent["extra_body"]
-
-
-def test_a_mocked_reply_is_asked_for_when_set(script: Script) -> None:
-    with TestClient(app(script, settings(mock_response="ok")), headers=bearer()) as client:
-        command(client, type="create_thread", thread_id="t1")
-        script.steps += [say("ok")]
-        ask(client, "Hello")
-    assert script.settings[0]["extra_body"]["mock_response"] == "ok"
 
 
 def test_tenants_are_kept_apart(client: TestClient) -> None:
@@ -89,3 +83,19 @@ async def test_mcp_clients_act_for_the_user_of_their_token(server: str) -> None:
         "client_id": "bob",
         "name": "bob@example.com (MCP)",
     }
+
+
+async def test_mcp_clients_in_process_are_refused(script: Script) -> None:
+    config = settings()
+    collaboration = Collaboration(
+        name="{{ project_slug }}",
+        verifier=TokenVerifier.from_settings(config.auth),
+        model=script.model,
+        gateway=config.gateway,
+    )
+    async with Client(collaboration.mcp.server) as mcp:
+        refused = await mcp.call_tool("list_artifacts", {"workspace_id": "main"})
+    [content] = refused.content
+    assert refused.is_error
+    assert isinstance(content, TextContent)
+    assert "connect over HTTP" in content.text

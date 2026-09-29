@@ -81,7 +81,6 @@ def test_they_run_in_langfuse_with_the_gateways_model(monkeypatch: pytest.Monkey
     monkeypatch.setattr(evals.experiments, "Langfuse", Langfuse)
     monkeypatch.setattr(evals.experiments, "LangfuseExperimentTracker", tracker)
     monkeypatch.setattr(evals.experiments, "gateway_model", lambda settings: scripted())
-    monkeypatch.setenv("LITELLM_MOCK_RESPONSE", "ok")
     assert main(["--langfuse"]) == 0
     assert len(trackers) == 1
     assert flushed == [True]

@@ -1,6 +1,8 @@
 """reflexr's surfaces: an opened ticket fires the triage rule, and the agent triages it."""
 
-import asyncio
+import logging
+from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -9,9 +11,12 @@ import pytest
 from fastapi.testclient import TestClient
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
+from mcp.types import TextContent
 
-from conftest import TENANT, TENANT_KEY, Script, bearer, call, say, wait_for
-from {{ package_name }}.automation import _stop
+from conftest import TENANT, TENANT_KEY, Script, app, bearer, call, say, settings, wait_for
+from {{ package_name }}.auth import TokenVerifier
+from {{ package_name }}.automation import Automation
+from {{ package_name }}.settings import Settings
 
 BASE = "/reflexr/v1/workspaces/main"
 
@@ -82,14 +87,43 @@ async def test_mcp_clients_publish_for_the_user_of_their_token(server: str) -> N
     }
 
 
-async def test_a_reactor_that_fails_as_it_stops_is_logged(caplog: pytest.LogCaptureFixture) -> None:
-    async def interrupted() -> None:
-        try:
-            await asyncio.Event().wait()
-        except asyncio.CancelledError:
-            raise RuntimeError("database is locked") from None
+async def test_mcp_clients_in_process_are_refused(script: Script) -> None:
+    config = settings()
+    automation = Automation(
+        name="{{ project_slug }}",
+        verifier=TokenVerifier.from_settings(config.auth),
+        model=script.model,
+        gateway=config.gateway,
+    )
+    event = {"type": "ticket.triaged", "priority": "normal", "summary": "In process"}
+    async with Client(automation.mcp.server) as mcp:
+        refused = await mcp.call_tool("publish_event", {"workspace_id": "main", "event": event})
+    [content] = refused.content
+    assert refused.is_error
+    assert isinstance(content, TextContent)
+    assert "connect over HTTP" in content.text
 
-    work = asyncio.create_task(interrupted())
-    await asyncio.sleep(0)
-    await _stop(work)
-    assert "database is locked" in caplog.text
+
+def test_the_application_stops_cleanly_with_a_run_in_flight(
+    script: Script, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # On SQLite, where a reactor cancelled in the middle of a transaction left the database
+    # locked as it stopped.
+    config = Settings(
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'app.db'}", auth=settings().auth
+    )
+    script.steps += [say("Urgent: checkout is down.")]
+    script.delay = 3600  # the model answers long after the stop's grace
+    stopping = app(script, config, grace=timedelta(milliseconds=100))
+    with TestClient(stopping, headers=bearer()) as client:
+        publish(client, type="ticket.opened", subject="Checkout fails")
+        wait_for(lambda: script.settings)
+    assert not [record for record in caplog.records if record.levelno >= logging.WARNING]
+
+    # The stop recorded the attempt as abandoned and let go of its lease, so the next start
+    # tries the run again after the rule's backoff, not once the lease lapses.
+    script.delay = 0
+    with TestClient(app(script, config), headers=bearer()) as client:
+        wait_for(lambda: [run["status"] for run in runs(client)] == ["succeeded"])
+        [retried] = client.get(f"{BASE}/events", params={"type": "run_retrying"}).json()
+    assert (retried["event"]["attempt"], retried["event"]["reason"]) == (1, "abandoned")

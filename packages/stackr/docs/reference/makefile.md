@@ -47,7 +47,7 @@ Set a variable on the command line (`make up PROFILES=observability`) or in the 
 
 <!-- end generated -->
 
-`make tenant` also reads `NAME`, the tenant, and `TENANT_FLAGS`, the options `scripts/create-tenant` takes ([The LLM gateway](../guides/gateway.md#tenants)). `make bump-libraries` reads `BUMP_FLAGS`, the option and `LIBRARY=REV` pins `scripts/bump-libraries` takes ([The application template](../guides/template.md#in-stackr-bumping-the-templates-defaults)). `make smoke-app` reads `SMOKE_APP_PORT`, and both smoke targets `SMOKE_TIMEOUT` ([The smoke tests](../guides/smoke-tests.md)).
+`make tenant` also reads `NAME`, the tenant, and `TENANT_FLAGS`, the options `scripts/create-tenant` takes ([The LLM gateway](../guides/gateway.md#tenants)). `make bump-libraries` reads `BUMP_FLAGS`, the option and `LIBRARY=REV` pins `scripts/bump-libraries` takes ([The application template](../guides/template.md#in-stackr-bumping-the-templates-pins)). `make smoke-app` reads `SMOKE_APP_PORT`, and both smoke targets `SMOKE_TIMEOUT` ([The smoke tests](../guides/smoke-tests.md)).
 
 ## The file
 

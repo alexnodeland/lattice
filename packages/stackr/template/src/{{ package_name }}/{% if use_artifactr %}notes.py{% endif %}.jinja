@@ -11,7 +11,6 @@ from pydantic import Field
 from pydantic_ai import Agent, DeferredToolRequests
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.models import Model
-from pydantic_ai.settings import ModelSettings
 
 from artifactr import ArtifactWorkspace, Feedback, MarkdownArtifact, Session
 
@@ -45,14 +44,12 @@ def build_note_agent(
     model: Model,
     *,
     capabilities: Sequence[AbstractCapability[Session[None]]] = (),
-    model_settings: ModelSettings | None = None,
 ) -> Agent[Session[None], str | DeferredToolRequests]:
     """Build the notes agent.
 
     Args:
         model: The model: the gateway's model group, or a scripted one in tests.
         capabilities: More capabilities: the gateway's and telemetry's.
-        model_settings: Settings for every model request.
     """
     return Agent[Session[None], str | DeferredToolRequests](
         model,
@@ -60,5 +57,4 @@ def build_note_agent(
         instructions=INSTRUCTIONS,
         output_type=[str, DeferredToolRequests],
         capabilities=[ArtifactWorkspace(types=[Note], ask=True), *capabilities],
-        model_settings=model_settings,
     )

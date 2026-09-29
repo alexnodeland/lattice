@@ -3,9 +3,9 @@
 
 Usage: scripts/bump-libraries [--check] [LIBRARY=REV ...]
 
-The libraries (artifactr, reflexr and evalr) install from GitHub, not PyPI, so the template pins
-each to a commit of its repository: the `<library>_rev` defaults in copier.yml, which a generated
-application writes into its `[tool.uv.sources]` (ADR-0011). For each library, this script
+The libraries (artifactr and reflexr) install from GitHub, not PyPI, so the template pins each to
+a commit of its repository: the `<library>_rev` values in copier.yml, which a generated
+application writes into its `[tool.uv.sources]` (ADR-0013). For each library, this script
 resolves the commit its `main` points to with `git ls-remote`, rewrites that default in
 copier.yml, and regenerates the reference pages that show the pins (scripts/docs-reference). It
 prints each pin it moves as old → new, with a URL comparing the two commits.
@@ -19,13 +19,11 @@ A REV is a branch, a tag or a full 40-character commit SHA; a SHA is checked by 
 commit alone from the library's repository. Naming libraries moves only those. With `--check`
 nothing is written, and the script exits 1 when a pin is not at its target.
 
-evalr follows reflexr. The template installs reflexr's `[evals]` extra, and uv resolves it with
-reflexr's own `[tool.uv.sources]`, which pins evalr to a commit; an application that pins evalr
-anywhere else has two URLs for one package, and uv refuses it. So evalr's target is the commit
-the pinned reflexr's pyproject.toml names, not evalr's main, for as long as reflexr pins one.
+evalr is not pinned here: it comes with the libraries, at the commit their own
+`[tool.uv.sources]` pin. If the two pin different commits, `uv lock` fails in the pull request's
+Template jobs, naming both.
 
-Applications already generated keep the revisions they were generated with; the template's
-guide says how they move theirs.
+Applications move to the new pins with `copier update`.
 """
 
 from __future__ import annotations
@@ -35,17 +33,10 @@ import re
 import subprocess
 import sys
 import tempfile
-import tomllib
-import urllib.error
-import urllib.request
 from pathlib import Path
-from typing import Any
 
-LIBRARIES = ("artifactr", "reflexr", "evalr")
+LIBRARIES = ("artifactr", "reflexr")
 REPOSITORY = "https://github.com/alexnodeland/{library}"
-PYPROJECT = "https://raw.githubusercontent.com/alexnodeland/{library}/{sha}/pyproject.toml"
-# A library the template installs through another's extra, and so pins where that one does.
-FOLLOWS = {"evalr": "reflexr"}
 ROOT = Path(__file__).resolve().parent.parent
 COPIER = ROOT / "copier.yml"
 SHA = re.compile(r"[0-9a-f]{40}")
@@ -53,7 +44,7 @@ SHORT = 12
 
 
 def pin_line(library: str) -> re.Pattern[str]:
-    """The `default:` line of the library's `<library>_rev` question in copier.yml."""
+    """The `default:` line of the library's `<library>_rev` value in copier.yml."""
     return re.compile(
         rf"^(?P<prefix>{library}_rev:\n(?:[ \t]+.*\n)*?[ \t]+default:[ \t]+)(?P<rev>\S+)$", re.M
     )
@@ -115,20 +106,6 @@ def resolve(library: str, rev: str) -> str:
     )
 
 
-def pinned_by(leader: str, sha: str, library: str) -> str | None:
-    """The commit of `library` that `leader`'s pyproject.toml at `sha` pins, if it pins one."""
-    url = PYPROJECT.format(library=leader, sha=sha)
-    try:
-        with urllib.request.urlopen(url, timeout=60) as response:
-            project: dict[str, Any] = tomllib.loads(response.read().decode())
-    except (urllib.error.URLError, tomllib.TOMLDecodeError) as error:
-        raise SystemExit(f"bump-libraries: {leader}: {url}: {error}") from error
-    source = project.get("tool", {}).get("uv", {}).get("sources", {}).get(library)
-    if not isinstance(source, dict) or not isinstance(rev := source.get("rev"), str):
-        return None
-    return resolve(library, rev)
-
-
 def compare_url(library: str, old: str, new: str) -> str:
     return f"{REPOSITORY.format(library=library)}/compare/{old[:SHORT]}...{new[:SHORT]}"
 
@@ -160,27 +137,7 @@ def main() -> int:
 
     text = COPIER.read_text()
     old = {library: current_pin(text, library) for library in LIBRARIES}
-    new = dict(old)
-    # In LIBRARIES' order, so a library another follows is resolved first.
-    for library in LIBRARIES:
-        leader = FOLLOWS.get(library)
-        required = None
-        if leader is not None and (leader in targets or library in targets):
-            required = pinned_by(leader, new[leader], library)
-        if required is None:
-            if library in targets:
-                new[library] = resolve(library, targets[library])
-            continue
-        if library in targets and (wanted := resolve(library, targets[library])) != required:
-            at = f"{required[:SHORT]}, the commit {leader} {new[leader][:SHORT]} pins"
-            if library in named:
-                raise SystemExit(
-                    f"bump-libraries: {library}={named[library]}: the template installs "
-                    f"{leader}'s extra, so {library} must be at {at}; move {leader} to a commit "
-                    f"that pins {library} where you want it, and {library} follows"
-                )
-            say(f"{library} follows {leader}: {at} ({targets[library]} is {wanted[:SHORT]})")
-        new[library] = required
+    new = old | {library: resolve(library, rev) for library, rev in targets.items()}
 
     moved = [library for library in LIBRARIES if new[library] != old[library]]
     for library in LIBRARIES:

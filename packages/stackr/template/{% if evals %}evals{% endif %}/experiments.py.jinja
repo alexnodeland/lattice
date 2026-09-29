@@ -19,18 +19,18 @@ examples.
 
 import argparse
 import asyncio
-from collections.abc import {% if use_artifactr %}AsyncIterator, {% endif %}Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
 from langfuse import Langfuse
 from pydantic import BaseModel
-from pydantic_ai import ModelMessage{% if use_reflexr %}, ModelResponse, TextPart{% endif %}
+from pydantic_ai import ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models import Model
-from pydantic_ai.models.function import AgentInfo, FunctionModel
-from pydantic_ai.settings import ModelSettings
+from pydantic_ai.models.function import AgentInfo{% if not use_artifactr %}, FunctionModel{% endif %}
 
 {% if use_artifactr -%}
 from artifactr import InMemoryStorage, Runner, UserActor, Workspaces
+from artifactr.agent import function_model
 from artifactr.core import CreateThread
 {% endif -%}
 from evalr import Dataset, Example, ExperimentResult, ExperimentTracker, FunctionEvaluator
@@ -42,7 +42,7 @@ from reflexr.core import Event
 from reflexr.evals import Replay, replay_task
 {%- endif %}
 
-from {{ package_name }}.gateway import gateway_model, model_settings
+from {{ package_name }}.gateway import gateway_model
 {%- if use_artifactr %}
 from {{ package_name }}.notes import Note, Rating, build_note_agent
 {%- endif %}
@@ -58,11 +58,9 @@ from {{ package_name }}.tickets import (
 )
 {%- endif %}
 
-type Experiment = Callable[
-    [ExperimentTracker, Model, ModelSettings], Awaitable[ExperimentResult[Any]]
-]
-"""Runs one experiment with a tracker, and a model with its settings. Each has its own output
-type, and a result is invariant in it on Python 3.13 and later."""
+type Experiment = Callable[[ExperimentTracker, Model], Awaitable[ExperimentResult[Any]]]
+"""Runs one experiment with a tracker and a model. Each has its own output type, and a result is
+invariant in it on Python 3.13 and later."""
 {%- if use_artifactr %}
 
 
@@ -94,7 +92,7 @@ REQUESTS = Dataset(
 )
 
 
-def replying(model: Model, settings: ModelSettings) -> Task[Request, Rating, Reply]:
+def replying(model: Model) -> Task[Request, Rating, Reply]:
     """The task: the agent answers an example's message in a fresh workspace, in memory."""
 
     async def reply(example: Example[Request, Rating]) -> Reply:
@@ -102,7 +100,7 @@ def replying(model: Model, settings: ModelSettings) -> Task[Request, Rating, Rep
         person = UserActor(id="evals", name="evals")
         workspace = await workspaces.open("evals", example.id, actor=person)
         await workspace.commit(CreateThread(thread_id="thread"))
-        runner = Runner[None](build_note_agent(model, model_settings=settings), app=None)
+        runner = Runner[None](build_note_agent(model), app=None)
         sent = await runner.send(workspace, "thread", example.input.message)
         assert sent.run is not None, "a message in an idle thread starts a run"
         result = await sent.run.wait()
@@ -117,14 +115,12 @@ def rate_reply(reply: Reply) -> Rating:
     return Rating(stars=5 if 0 < words <= 60 else 2, comment=f"{words} words")
 
 
-async def notes_replies(
-    tracker: ExperimentTracker, model: Model, settings: ModelSettings
-) -> ExperimentResult[Reply]:
+async def notes_replies(tracker: ExperimentTracker, model: Model) -> ExperimentResult[Reply]:
     """How the notes agent replies."""
     return await tracker.run_experiment(
         "notes-replies",
         dataset=REQUESTS,
-        task=replying(model, settings),
+        task=replying(model),
         evaluators=[FunctionEvaluator(rate_reply, verdict_type=Rating)],
     )
 {%- endif %}
@@ -177,13 +173,11 @@ def review_triage(triage: Triage) -> TriageReview:
     return TriageReview(correct=correct, comment=triage.summary or None)
 
 
-async def ticket_triage(
-    tracker: ExperimentTracker, model: Model, settings: ModelSettings
-) -> ExperimentResult[Triage]:
+async def ticket_triage(tracker: ExperimentTracker, model: Model) -> ExperimentResult[Triage]:
     """How the triage agent triages tickets, each replayed in a workspace of its own."""
     task: Task[Ticket, TriageReview, Triage] = replay_task(
         rule=triage_rule,
-        action=triage_action(build_triage_agent(model, model_settings=settings)),
+        action=triage_action(build_triage_agent(model)),
         deps=None,
         events=opened,
         output=triaged,
@@ -212,30 +206,20 @@ EXPERIMENTS: list[Experiment] = [
 
 def scripted() -> Model:
     """A model that answers every request with the same sentence: for running offline."""
-{%- if use_reflexr %}
 
     def answer(_messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
         return ModelResponse(parts=[TextPart("Done: a short, scripted answer.")])
+{% if use_artifactr %}
+    # artifactr's runner streams every run, and function_model streams the answer.
+    return function_model(answer)
+{%- else %}
+    return FunctionModel(answer)
 {%- endif %}
-{%- if use_artifactr %}
-
-    # artifactr's runner streams the agent's answers.
-    async def stream(_messages: list[ModelMessage], _info: AgentInfo) -> AsyncIterator[str]:
-        yield "Done: a short, scripted answer."
-{%- endif %}
-
-    return FunctionModel(
-{%- if use_reflexr %}answer{% endif %}
-{%- if libraries == 'both' %}, {% endif %}
-{%- if use_artifactr %}stream_function=stream{% endif %})
 
 
-async def run(
-    tracker: ExperimentTracker, model: Model, settings: ModelSettings | None = None
-) -> list[ExperimentResult[Any]]:
+async def run(tracker: ExperimentTracker, model: Model) -> list[ExperimentResult[Any]]:
     """Run every experiment, one after another."""
-    chosen = settings or ModelSettings()
-    return [await experiment(tracker, model, chosen) for experiment in EXPERIMENTS]
+    return [await experiment(tracker, model) for experiment in EXPERIMENTS]
 
 
 def summary(result: ExperimentResult[Any]) -> str:
@@ -260,7 +244,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             gateway = Settings.from_environ().gateway
             tracker = LangfuseExperimentTracker(client)
-            results = asyncio.run(run(tracker, gateway_model(gateway), model_settings(gateway)))
+            results = asyncio.run(run(tracker, gateway_model(gateway)))
         finally:
             client.flush()
     else:

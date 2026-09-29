@@ -15,7 +15,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.otel import TelemetryHandle, configure_telemetry
 
-from conftest import Script, app, bearer, say, wait_for
+from conftest import TENANT, Script, app, bearer, say, wait_for
 from {{ package_name }}.scores import Mirrors, sync_configs
 
 
@@ -78,7 +78,8 @@ def test_feedback_becomes_scores_on_the_traces_it_is_about(
         return len(langfuse.scores) >= count
 
     with TestClient(app(script, telemetry=telemetry), headers=bearer()) as client:
-        expected: list[str] = []
+        # Each score's name, value and data type, and the feedback type its source names.
+        expected: dict[str, tuple[float, str, str]] = {}
 {%- if use_artifactr %}
         base = "/artifactr/v1/workspaces/main"
 
@@ -99,7 +100,7 @@ def test_feedback_becomes_scores_on_the_traces_it_is_about(
         rating = {"feedback_type": "rating", "target": target, "value": {"stars": 4}}
         rated = command(type="give_feedback", **rating)
         assert rated["ok"], rated
-        expected.append("rating.stars")
+        expected["rating.stars"] = (4, "NUMERIC", "rating")
         wait_for(lambda: scored(len(expected)))
 {%- endif %}
 {%- if use_reflexr %}
@@ -118,7 +119,8 @@ def test_feedback_becomes_scores_on_the_traces_it_is_about(
         }
         frame = {"type": "command", "command_id": str(uuid.uuid4()), "command": review}
         assert client.post(f"{events}/commands", json=frame).json()["ok"]
-        expected.append("triage-review.correct")
+        # A yes or no reaches Langfuse as 1 or 0.
+        expected["triage-review.correct"] = (1, "BOOLEAN", "triage-review")
         wait_for(lambda: scored(len(expected)))
 {%- endif %}
 
@@ -133,8 +135,13 @@ def test_feedback_becomes_scores_on_the_traces_it_is_about(
 {%- endif %}
     }
     assert set(langfuse.configs) == configs
-    assert sorted(score["name"] for score in langfuse.scores) == sorted(expected)
+    scores = {
+        score["name"]: (score["value"], score["dataType"], score["metadata"]["feedback_type"])
+        for score in langfuse.scores
+    }
+    assert scores == expected
     assert all(score["traceId"] for score in langfuse.scores), "each is on its trace"
+    assert {score["metadata"]["tenant_id"] for score in langfuse.scores} == {TENANT}
 
 
 async def test_a_workspace_is_mirrored_once() -> None:

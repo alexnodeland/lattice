@@ -99,7 +99,10 @@ class Telemetry:
         """Record a value in a histogram."""
         if (histogram := self._histograms.get(metric.name)) is None:
             histogram = self._histograms[metric.name] = self.meter.create_histogram(
-                metric.name, metric.unit, metric.description
+                metric.name,
+                metric.unit,
+                metric.description,
+                explicit_bucket_boundaries_advisory=metric.buckets,
             )
         histogram.record(value, _kept(metric, attributes))
 

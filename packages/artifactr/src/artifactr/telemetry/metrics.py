@@ -65,6 +65,7 @@ class Metric:
         attributes: The attributes it may carry. Anything else is dropped when it is recorded.
         scope: The instrumentation scope that records it: ``artifactr``, or the library whose
             metric a dashboard reads.
+        buckets: For a histogram, the bucket boundaries it advises the SDK to use.
     """
 
     name: str
@@ -73,6 +74,7 @@ class Metric:
     description: str
     attributes: frozenset[str] = frozenset()
     scope: str = SCOPE
+    buckets: tuple[float, ...] | None = None
 
     @property
     def prometheus_name(self) -> str:
@@ -97,9 +99,16 @@ class Metric:
 
 
 def _artifactr(
-    name: str, instrument: Instrument, unit: str, description: str, *attributes: str
+    name: str,
+    instrument: Instrument,
+    unit: str,
+    description: str,
+    *attributes: str,
+    buckets: tuple[float, ...] | None = None,
 ) -> Metric:
-    return Metric(name, instrument, unit, description, frozenset(attributes) | SCOPED)
+    return Metric(
+        name, instrument, unit, description, frozenset(attributes) | SCOPED, buckets=buckets
+    )
 
 
 COMMANDS = _artifactr(
@@ -119,6 +128,7 @@ COMMIT_DURATION = _artifactr(
     "How long committing a command took, storage included.",
     COMMAND_TYPE,
     OUTCOME,
+    buckets=(0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10),
 )
 TURNS = _artifactr(
     "artifactr.turns",
@@ -135,6 +145,7 @@ TURN_DURATION = _artifactr(
     "How long a turn took, from its start to its end or pause.",
     TURN_TRIGGER,
     TURN_OUTCOME,
+    buckets=(0.25, 0.5, 1, 2.5, 5, 10, 20, 30, 60, 120, 300, 600),
 )
 RUNS = _artifactr(
     "artifactr.runs",

@@ -4,37 +4,53 @@ artifactr traces every turn, command, agent run and tool call, and counts what h
 
 ## Turning it on
 
-Configure the OpenTelemetry SDK once, when the application starts, and give pydantic-ai's `Instrumentation` capability to your agent so its runs, model requests and tool calls are traced too:
+The `otel` extra sets up the OpenTelemetry SDK in one call. Call it once, as early as the application starts:
 
 ```python
-from opentelemetry import metrics, trace
-from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from pydantic_ai import Agent
-from pydantic_ai.capabilities import Instrumentation
-from pydantic_ai.models.instrumented import InstrumentationSettings
+from artifactr.otel import configure_telemetry
 
-tracer_provider = TracerProvider()
-tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
-meter_provider = MeterProvider(metric_readers=[PeriodicExportingMetricReader(OTLPMetricExporter())])
-trace.set_tracer_provider(tracer_provider)
-metrics.set_meter_provider(meter_provider)
+telemetry = configure_telemetry(
+    service_name="docplan",
+    service_version="1.4.0",
+    environment="production",
+    otlp_endpoint="http://otel-collector:4318",  # or set OTEL_EXPORTER_OTLP_ENDPOINT
+)
+
+engine = create_async_engine("postgresql+asyncpg://db/app")
+telemetry.instrument_engine(engine)
 
 agent = Agent(
     "anthropic:claude-sonnet-5-5",
     deps_type=Session[AppDeps],
-    capabilities=[
-        ArtifactWorkspace(types=[Doc, Plan]),
-        Instrumentation(settings=InstrumentationSettings(include_content=False)),
-    ],
+    capabilities=[ArtifactWorkspace(types=[Doc, Plan]), telemetry.capability()],
 )
+app = FastAPI(lifespan=lifespan)
+telemetry.instrument_app(app)
 ```
 
-`Workspaces`, `Runner` and `artifactr_router` use the global providers. To keep artifactr's telemetry apart, pass `tracer_provider=` and `meter_provider=` to each instead. Never call `Agent.instrument_all()` from a library; it instruments every agent in the process.
+It sets up:
+
+- tracer, meter and logger providers, with `service.name`, `service.version` and `deployment.environment.name` on their resource, made global unless `set_global=False`
+- OTLP over HTTP for traces, metrics and logs, to `otlp_endpoint` or wherever the `OTEL_EXPORTER_OTLP_*` environment variables point (`otlp_headers` adds credentials)
+- the open instrumentations for FastAPI, SQLAlchemy, asyncpg, httpx and httpx2 (pydantic-ai's model providers use httpx2), for whichever of them is installed, using the stable HTTP semantic conventions
+- views that apply artifactr's metric cardinality policy (see [Metrics](#metrics))
+- a baggage span processor that copies a turn's `session.id` onto every span in it
+- pydantic-ai's instrumentation settings: `telemetry.capability()` is its `Instrumentation` capability for your agents, with prompts and completions left out unless `include_content=True`
+
+Instrumentation patches libraries, which only reaches objects created afterwards through the patched names. Most applications import `FastAPI` and `create_async_engine` before they configure telemetry, so pass the application to `telemetry.instrument_app(app)` and each engine to `telemetry.instrument_engine(engine)` (or `engines=` when configuring). The SQLAlchemy instrumentation declares support for versions below 2.1; it works with 2.1, which artifactr requires, so its version check is skipped.
+
+Shut it down when the application stops, so buffered telemetry is flushed. `telemetry.shutdown()` does it, or use it as a context manager:
+
+```python
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    with telemetry:
+        yield
+```
+
+### Configuring the SDK yourself
+
+`configure_telemetry` is a convenience; artifactr only ever records through the OpenTelemetry API, so any SDK configuration works. `Workspaces`, `Runner` and `artifactr_router` use the global providers, or the ones you pass as `tracer_provider=` and `meter_provider=`. Add pydantic-ai's capability yourself, `Instrumentation(settings=InstrumentationSettings(tracer_provider=..., meter_provider=...))`, and `artifactr.otel.metric_views(detail)` to your `MeterProvider` to limit metric detail. Never call `Agent.instrument_all()` from a library; it instruments every agent in the process.
 
 ## Traces
 
@@ -69,7 +85,23 @@ Each run records the trace of each attempt in `Run.trace_ids`, and each revision
 
 artifactr's metrics are declared in a registry, `artifactr.telemetry.METRICS`, with the attributes each may carry. The [architecture](../architecture.md#metrics) lists them: commands and commit latency, turns and turn latency, runs by status, tool calls by tool and status, tokens, messages, artifact changes, proposals, and WebSocket connections.
 
-Thread, run, artifact and message ids are never metric attributes; they are in the traces. Tenant and workspace are attributes by default, which suits most deployments. With many workspaces, drop them from metrics with OpenTelemetry views; the registry's `kept_attributes(metric, "tenant")` says which attributes each metric keeps at a level of detail.
+Thread, run, artifact and message ids are never metric attributes; they are in the traces. Tenant and workspace are attributes by default, which suits most deployments. With many workspaces, keep less detail ([ADR-0036](../adr/0036-metric-cardinality-through-sdk-views.md)):
+
+```python
+telemetry = configure_telemetry(service_name="docplan", metrics_detail="tenant")  # or "none"
+```
+
+`metrics_detail` becomes OpenTelemetry views that drop the workspace (or the tenant too) before aggregation. Configuring the SDK yourself, pass `metric_views("tenant")` to the `MeterProvider`.
+
+pydantic-ai records `gen_ai.client.token.usage` and `operation.cost` per model request, by model. artifactr's `artifactr.tokens` counts the same tokens by tenant and workspace, from each run's recorded usage.
+
+## The session on every span
+
+During a turn, the thread id is in OpenTelemetry baggage as `session.id`. `configure_telemetry` adds a `BaggageSpanProcessor` that copies it onto every span started in the turn, so the database and HTTP spans of a turn carry the session too, not only artifactr's and pydantic-ai's. Baggage also travels on outgoing HTTP requests (to model providers, for example), so it holds only the thread id: no tenant, user or content.
+
+## Logs
+
+`configure_telemetry` exports the standard `logging` module's records through OTLP, with the trace and span they were logged in; pass `logs=False` to leave logging alone.
 
 ## Attributing your own spans
 

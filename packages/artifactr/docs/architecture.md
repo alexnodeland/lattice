@@ -60,6 +60,7 @@ graph TD
     mcp --> workspace
     agent --> workspace["artifactr.workspace<br/>scoped handles, storage protocols"]
     sql["artifactr.sql<br/>SQLAlchemy storage"] --> workspace
+    otel["artifactr.otel<br/>OpenTelemetry SDK"] --> telemetry
     workspace --> telemetry["artifactr.telemetry<br/>OpenTelemetry API"]
     telemetry --> core["artifactr.core<br/>pure, synchronous rules"]
 ```
@@ -75,6 +76,7 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.workspace` | core, telemetry | Inner; owns the `Storage` port | `Workspaces`, `Workspace`, storage protocols, in-memory storage. |
 | `artifactr.agent` | workspace, telemetry, pydantic-ai | Inner | The `ArtifactWorkspace` capability, `Session`, `Runner`, live-output helpers. |
 | `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | Adapter for `Storage` | Durable storage on PostgreSQL and SQLite, and its migrations. |
+| `artifactr.otel` (extra) | telemetry, the OpenTelemetry SDK, exporters and instrumentations | Adapter for the OpenTelemetry API | `configure_telemetry`: providers, OTLP export, instrumentations and metric views, for applications. |
 | `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
 | `artifactr.mcp` (extra) | agent, mcp | Driving adapter | Artifacts as MCP resources, commands as MCP tools. |
 
@@ -417,7 +419,11 @@ The metric registry, `artifactr.telemetry.metrics`, declares every metric with i
 
 pydantic-ai adds `gen_ai.client.token.usage` and `operation.cost` per model request, by model; the registry lists them, and the instrumentations' HTTP and database metrics, as external metrics the dashboards may read.
 
-**Cardinality.** Thread, turn, run, artifact and message ids are never metric attributes; those granularities come from traces. Tenant and workspace are attributes by default.
+**Cardinality.** Thread, turn, run, artifact and message ids are never metric attributes; those granularities come from traces. Tenant and workspace are attributes by default. `metrics_detail="workspace" | "tenant" | "none"` limits them, applied by OpenTelemetry views before aggregation (`artifactr.otel.metric_views`) rather than by the library ([ADR-0036](adr/0036-metric-cardinality-through-sdk-views.md)).
+
+### Configuring the SDK
+
+The `[otel]` extra's `configure_telemetry(...)` is for applications and the reference implementation; no part of the library requires it. It sets up the tracer, meter and logger providers with the service's resource, OTLP over HTTP, the metric views, a `BaggageSpanProcessor` that copies a turn's `session.id` onto every span in it (database and HTTP spans included), the open instrumentations for FastAPI, SQLAlchemy, asyncpg, httpx and httpx2, and pydantic-ai's `InstrumentationSettings`. It returns a handle that instruments FastAPI apps and SQLAlchemy engines created later, gives agents pydantic-ai's `Instrumentation` capability, and shuts everything down.
 
 ## Dependencies
 
@@ -496,6 +502,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0033](adr/0033-trace-links-on-runs-and-revisions.md) | Trace links on runs and revisions |
 | [0034](adr/0034-ports-and-adapters-for-integrations.md) | Ports and adapters for integrations |
 | [0035](adr/0035-a-turn-is-its-own-trace.md) | A turn is its own trace |
+| [0036](adr/0036-metric-cardinality-through-sdk-views.md) | Metric cardinality through SDK views |
 
 ## Open questions
 

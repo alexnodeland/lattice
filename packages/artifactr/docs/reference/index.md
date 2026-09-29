@@ -14,6 +14,7 @@ The packages are layers. Each depends only on the ones below it, so each is usab
 | [`artifactr.agent`](agent.md) | The pydantic-ai capability, the session, the runner and live output | core |
 | [`artifactr.sql`](sql.md) | SQL storage on PostgreSQL and SQLite, and its migrations | `sql`, `postgres` or `sqlite` extra |
 | [`artifactr.fastapi`](fastapi.md) | The thread protocol over WebSocket, and REST, as a FastAPI router | `fastapi` extra |
+| [`artifactr.otel`](otel.md) | `configure_telemetry`: the OpenTelemetry SDK, exporters and instrumentations, and metric views | `otel` extra |
 | [`artifactr.mcp`](mcp.md) | An MCP server for external agents | `mcp` extra |
 
 The wire formats have their own pages: the [thread protocol](../protocol.md) and its [JSON Schema](schema.md).

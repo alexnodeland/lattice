@@ -144,6 +144,7 @@ nav:
       - artifactr.sql: reference/sql.md
       - artifactr.fastapi: reference/fastapi.md
       - artifactr.mcp: reference/mcp.md
+      - artifactr.otel: reference/otel.md
       - Thread protocol: protocol.md
       - Protocol JSON Schema: reference/schema.md
   - Design:
@@ -185,6 +186,7 @@ nav:
           - adr/0033-trace-links-on-runs-and-revisions.md
           - adr/0034-ports-and-adapters-for-integrations.md
           - adr/0035-a-turn-is-its-own-trace.md
+          - adr/0036-metric-cardinality-through-sdk-views.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

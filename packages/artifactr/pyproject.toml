@@ -34,6 +34,16 @@ sqlite = ["artifactr-ai[sql]", "aiosqlite>=0.22"]
 postgres = ["artifactr-ai[sql]", "asyncpg>=0.31"]
 fastapi = ["fastapi>=0.141"]
 mcp = ["mcp>=2.2"]
+otel = [
+    "opentelemetry-exporter-otlp-proto-http>=1.45",
+    "opentelemetry-instrumentation-asyncpg>=0.66b0",
+    "opentelemetry-instrumentation-fastapi>=0.66b0",
+    "opentelemetry-instrumentation-httpx>=0.66b0",
+    "opentelemetry-instrumentation-logging>=0.66b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.66b0",
+    "opentelemetry-processor-baggage>=0.66b0",
+    "opentelemetry-sdk>=1.45",
+]
 
 [project.urls]
 Homepage = "https://artifactr.alexnodeland.com"

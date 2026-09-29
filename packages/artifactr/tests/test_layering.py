@@ -42,6 +42,11 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"fastapi", "starlette", "pydantic", *OTEL_API},
     ),
     "mcp": ({*INNER, "artifactr.mcp"}, {"mcp", "starlette", "pydantic", *OTEL_API}),
+    # The OpenTelemetry SDK adapter; it imports FastAPI and SQLAlchemy only to instrument them.
+    "otel": (
+        {"artifactr.core", "artifactr.telemetry", "artifactr.otel"},
+        {"opentelemetry", "pydantic_ai", "fastapi", "sqlalchemy"},
+    ),
 }
 
 

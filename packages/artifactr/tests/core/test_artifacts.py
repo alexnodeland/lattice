@@ -76,7 +76,9 @@ def test_unknown_types_and_invalid_data_are_rejected() -> None:
         get_artifact_type("nonexistent")
     with pytest.raises(ValidationFailed) as failed:
         load_artifact("note", {"title": 5})
-    assert failed.value.errors[0]["loc"] == ["title"]  # type: ignore[index]
+    error = failed.value.errors[0]
+    assert isinstance(error, dict)
+    assert error["loc"] == ["title"]
 
 
 def test_rendering_for_the_agent() -> None:

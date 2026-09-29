@@ -58,8 +58,10 @@ class Script:
         step = self.steps.pop(0)
         if isinstance(step, Hold):
             step.entered.set()
-            while not step.released.is_set():  # noqa: ASYNC110 (set from the test's thread)
-                await asyncio.sleep(0.01)
+            # The test releases it from its own thread. Waiting in slices keeps the wait
+            # cancellable, so stopping the run ends it.
+            while not await asyncio.to_thread(step.released.wait, 0.01):
+                continue
             return step.then
         return step
 

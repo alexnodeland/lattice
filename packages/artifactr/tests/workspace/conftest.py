@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-import tests.artifact_types  # noqa: F401  (registers the test artifact types)
 from artifactr.core import UserActor
 from artifactr.sql import SqlStorage, create_schema
 from artifactr.workspace import InMemoryStorage, Storage, Workspace, Workspaces

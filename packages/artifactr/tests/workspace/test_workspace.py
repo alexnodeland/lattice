@@ -29,7 +29,7 @@ from artifactr.core import (
     TurnTarget,
     VersionConflict,
 )
-from artifactr.workspace import ThreadBusy, Workspace, Workspaces
+from artifactr.workspace import Storage, ThreadBusy, Workspace, Workspaces
 from tests.artifact_types import Checklist, Counter, Item, Note
 from tests.workspace.conftest import ALICE
 
@@ -108,8 +108,8 @@ async def test_tenants_are_isolated(workspaces: Workspaces) -> None:
         await theirs.artifact("n1")
 
 
-async def test_only_the_applications_types_can_be_created(storage: object) -> None:
-    workspaces = Workspaces(storage, types=[Note])  # type: ignore[arg-type]
+async def test_only_the_applications_types_can_be_created(storage: Storage) -> None:
+    workspaces = Workspaces(storage, types=[Note])
     ws = await workspaces.open("t", "w", actor=ALICE)
     await ws.create(Note(), artifact_id="n1")
     with pytest.raises(NotFound, match="artifact type checklist"):

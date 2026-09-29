@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 from pydantic_ai import Agent, FunctionToolset, RunContext
 from starlette.requests import HTTPConnection
 
-import tests.artifact_types  # noqa: F401  (registers the test artifact types)
 from artifactr.agent import ArtifactWorkspace, Runner, Session
 from artifactr.core import Actor, TenantId, UserActor, WorkspaceId
 from artifactr.fastapi import Unauthorized, artifactr_router

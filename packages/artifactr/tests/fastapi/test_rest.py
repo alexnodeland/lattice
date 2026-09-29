@@ -1,5 +1,7 @@
 """REST: commands through the shared handler, and reads."""
 
+from typing import Any
+
 from fastapi.testclient import TestClient
 
 from tests.agent.conftest import Script, call, say
@@ -50,7 +52,9 @@ def test_authentication_and_authorization(client: TestClient) -> None:
 
 
 def test_reads(client: TestClient) -> None:
-    post = lambda cid, **c: client.post(f"{BASE}/commands", json=command(cid, **c))  # noqa: E731
+    def post(command_id: str, **fields: Any) -> None:
+        client.post(f"{BASE}/commands", json=command(command_id, **fields))
+
     post("c1", type="create_thread", thread_id="t1")
     post("c2", type="create_thread", thread_id="t2")
     post("c3", type="create_artifact", artifact_id="n1", kind="note", data={"text": "Friday"})

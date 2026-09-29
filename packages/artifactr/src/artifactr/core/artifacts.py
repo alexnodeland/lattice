@@ -77,14 +77,13 @@ class Artifact(BaseModel):
         """Return the text the agent sees for this artifact. Defaults to indented JSON."""
         return self.model_dump_json(indent=2)
 
-    def describe_change(self, before: Any) -> str | None:  # noqa: ARG002 (a hook)
+    def describe_change(self, before: Any) -> str | None:
         """Summarize the change from ``before`` to this state, or return None.
 
         ``before`` is always an instance of the same type. Annotate it as ``Self`` when you
         override this method; the base annotation is ``Any`` only so that overrides type-check.
         When this returns None, the summary is generated from the patch.
         """
-        return None
 
     def to_json(self) -> dict[str, JsonValue]:
         """Return the artifact's data as JSON-compatible values."""

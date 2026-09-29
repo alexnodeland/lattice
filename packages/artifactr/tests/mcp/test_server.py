@@ -10,8 +10,9 @@ from mcp import Client
 from mcp.server.mcpserver import Context
 from mcp.server.subscriptions import ResourceUpdated
 from mcp.shared.exceptions import MCPError
+from mcp.types import TextContent, TextResourceContents
+from pydantic_ai import ToolCallPart
 
-import tests.artifact_types  # noqa: F401  (registers the test artifact types)
 from artifactr.core import ExternalAgentActor, TenantId, UserActor
 from artifactr.mcp import ArtifactrMcp, artifact_uri
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
@@ -81,7 +82,9 @@ def gate() -> Gate:
 
 async def _call(client: Client, tool: str, **args: Any) -> tuple[bool, str]:
     result = await client.call_tool(tool, {"workspace_id": "w1", **args})
-    return result.is_error, result.content[0].text  # type: ignore[union-attr]
+    content = result.content[0]
+    assert isinstance(content, TextContent)
+    return result.is_error, content.text
 
 
 async def test_artifact_tools(mcp: ArtifactrMcp) -> None:
@@ -182,7 +185,9 @@ async def test_artifacts_are_resources_of_their_tenant(
     await ws.create(Note(text="hello"), artifact_id="n1")
     async with Client(mcp.server) as client:
         result = await client.read_resource(artifact_uri("tenant", "w1", "n1"))
-        body = json.loads(result.contents[0].text)  # type: ignore[union-attr]
+        contents = result.contents[0]
+        assert isinstance(contents, TextResourceContents)
+        body = json.loads(contents.text)
         assert (body["id"], body["kind"], body["version"]) == ("n1", "note", 1)
         assert body["data"]["text"] == "hello"
         with pytest.raises(MCPError):
@@ -221,7 +226,9 @@ def test_resource_uris_carry_the_tenant() -> None:
 
 
 def test_the_agent_script_helpers_are_shared() -> None:
-    assert call("x").parts[0].tool_name == "x"  # type: ignore[union-attr]
+    part = call("x").parts[0]
+    assert isinstance(part, ToolCallPart)
+    assert part.tool_name == "x"
 
 
 async def test_external_agents_give_feedback(mcp: ArtifactrMcp, ws: Workspace) -> None:

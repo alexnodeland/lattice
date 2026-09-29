@@ -2,7 +2,7 @@
 
 import pytest
 from pydantic import BaseModel
-from pydantic_ai import ModelRequest
+from pydantic_ai import ModelMessage, ModelRequest, ModelResponse
 
 from artifactr.agent import Session, last_seen, load_history
 from artifactr.core import AgentActor, RunEnded, Thread
@@ -137,10 +137,10 @@ async def test_structured_or_empty_outputs_post_no_message(
 
 
 async def test_a_failed_run_is_recorded(ws: Workspace, thread: Thread, gate: Gate) -> None:
-    def fail(messages: object) -> None:
+    def fail(messages: list[ModelMessage]) -> ModelResponse:
         raise RuntimeError("model unavailable")
 
-    runner = make_runner(make_agent(Script(fail)), gate)  # type: ignore[arg-type]
+    runner = make_runner(make_agent(Script(fail)), gate)
     handle = (await runner.send(ws, thread.id, "hi")).run
     assert handle is not None
     with pytest.raises(RuntimeError):
@@ -152,10 +152,10 @@ async def test_a_failed_run_is_recorded(ws: Workspace, thread: Thread, gate: Gat
 async def test_an_unwatched_failure_does_not_warn(
     ws: Workspace, thread: Thread, gate: Gate
 ) -> None:
-    def fail(messages: object) -> None:
+    def fail(messages: list[ModelMessage]) -> ModelResponse:
         raise RuntimeError("boom")
 
-    runner = make_runner(make_agent(Script(fail)), gate)  # type: ignore[arg-type]
+    runner = make_runner(make_agent(Script(fail)), gate)
     handle = (await runner.send(ws, thread.id, "hi")).run
     assert handle is not None
     while not handle.task.done():

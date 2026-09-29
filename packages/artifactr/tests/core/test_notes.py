@@ -43,14 +43,16 @@ def env(actor: Actor, event: KnownEvent) -> Envelope:
     )
 
 
-def changed(artifact_id: str, version: int, summary: str, **extra: object) -> ArtifactChanged:
+def changed(
+    artifact_id: str, version: int, summary: str, *, proposal_id: str | None = None
+) -> ArtifactChanged:
     return ArtifactChanged(
         artifact_id=artifact_id,
         kind="note",
         version=version,
         patch=PATCH,
         summary=summary,
-        **extra,  # type: ignore[arg-type]
+        proposal_id=proposal_id,
     )
 
 

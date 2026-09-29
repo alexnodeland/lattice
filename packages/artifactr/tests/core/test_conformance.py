@@ -13,7 +13,6 @@ from typing import Any
 import pytest
 from pydantic import BaseModel, TypeAdapter
 
-import tests.artifact_types  # noqa: F401  (registers the fixture artifact types)
 from artifactr.core import (
     Actor,
     Command,

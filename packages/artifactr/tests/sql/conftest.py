@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-import tests.artifact_types  # noqa: F401  (registers the test artifact types)
 from tests.databases import SQL_BACKENDS, empty_database
 
 

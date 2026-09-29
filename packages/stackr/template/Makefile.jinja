@@ -20,6 +20,7 @@ help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 install: ## Install the dependencies and the git hooks
+	@git rev-parse --git-dir >/dev/null 2>&1 || { echo 'make install: the git hooks need a git repository, and there is none here; run `git init` first' >&2; exit 1; }
 	$(UV) sync --all-groups
 	$(UV) run pre-commit install --hook-type pre-commit --hook-type commit-msg
 

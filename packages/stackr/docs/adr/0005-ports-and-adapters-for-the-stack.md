@@ -59,3 +59,13 @@ The ports are open protocols that the defaults already speak (OTLP, the OpenAI A
 3. [ ] The database port, with local Supabase and plain PostgreSQL as adapters (phase 3).
 4. [ ] The LLM gateway port (phase 4).
 5. [ ] The identity port, and an application template wired to the ports only (phase 5).
+
+## Amendment (2026-09-29): the template reads the settings of the ports it uses
+
+The decision said the application template generates applications "reading exactly the settings in the table". It reads the settings of five ports: telemetry, the LLM gateway, the database, identity (with the settings [ADR-0011](0011-the-application-template-in-detail.md) added) and evaluation data. It reads none for profiles (`PYROSCOPE_SERVER_ADDRESS`) or object storage (the `S3_*` settings), and that stays so for now:
+
+- **Nothing in a generated application uses them.** The libraries neither profile nor store objects, and neither do the template's examples. A setting that nothing reads documents a wiring that isn't there.
+- **Profiles need a native profiler.** Pyroscope's Python SDK, `pyroscope-io`, is a compiled agent that runs inside the application's process, with wheels for Linux and macOS only. Running it is a choice for an application that wants profiles, not a default for every one.
+- **The stack's object storage is Langfuse's.** MinIO holds one bucket, `langfuse`, reached with the stack's root credentials. An application that stores objects needs a bucket and credentials of its own, which the stack doesn't create.
+
+The two ports stay in the table as the contract for an application that does use them: it reads `PYROSCOPE_SERVER_ADDRESS` with a Pyroscope SDK, or the `S3_*` settings with an S3 client (`S3_FORCE_PATH_STYLE=true` for MinIO), and never names a vendor's endpoint. So the template is wired to these ports only, as decided, and reads the settings in the table for the ports it uses. When the libraries or the examples profile or store objects, the template reads those ports' settings too.

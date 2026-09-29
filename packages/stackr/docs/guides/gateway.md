@@ -55,6 +55,8 @@ LITELLM_BASE_URL=http://127.0.0.1:4400
 LITELLM_API_KEY=sk-...
 ```
 
+It reaches the gateway, and prints its address, where the stack publishes it: at `STACKR_BIND` when that names one address, and at `127.0.0.1` when it is `0.0.0.0`, every interface.
+
 | Option (in `TENANT_FLAGS`) | Default | |
 |---|---|---|
 | `--max-budget USD` | 10 | The team's budget per period |

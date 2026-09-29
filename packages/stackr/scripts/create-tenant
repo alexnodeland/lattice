@@ -19,8 +19,9 @@ Options:
   --allow-mock-responses  let the team's keys send `mock_response` (smoke tests only)
   --quiet                 print only the new key
 
-The master key and the gateway's port come from .env. The key is printed once,
-with the settings an application reads to use the gateway.
+The master key, the gateway's port and the address it is published on
+(`STACKR_BIND`, or 127.0.0.1 when that is 0.0.0.0) come from .env. The key is
+printed once, with the settings an application reads to use the gateway.
 """
 
 from __future__ import annotations
@@ -50,6 +51,12 @@ def settings() -> dict[str, str]:
         if match:
             values[match["key"]] = match["value"]
     return values
+
+
+def gateway_host(env: dict[str, str]) -> str:
+    """Where the gateway is published: STACKR_BIND, or this machine when that is every interface."""
+    bind = env.get("STACKR_BIND") or "127.0.0.1"
+    return "127.0.0.1" if bind == "0.0.0.0" else bind
 
 
 class Gateway:
@@ -100,7 +107,7 @@ def main() -> int:
     if not TENANT.match(args.tenant):
         parser.error("TENANT must be lowercase letters, digits and dashes")
     env = settings()
-    base_url = f"http://127.0.0.1:{env.get('LITELLM_PORT', '4400')}"
+    base_url = f"http://{gateway_host(env)}:{env.get('LITELLM_PORT', '4400')}"
     gateway = Gateway(base_url, env.get("LITELLM_MASTER_KEY", ""))
     team_id = f"tenant-{args.tenant}"
     key_alias = args.key_alias or f"{args.tenant}-default"

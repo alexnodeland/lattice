@@ -52,6 +52,9 @@ uv run scripts/check-config litellm || fail "litellm"
 step "The application template, rendered in every variant"
 uv run scripts/check-template || fail "template"
 
+step "The documentation's reference pages, against the files they describe"
+uv run scripts/docs-reference --check || fail "docs-reference"
+
 step "Service configurations, with each service's own validator"
 # Each runs the image compose.yaml pins, offline, with the config mounted as
 # the service would see it.

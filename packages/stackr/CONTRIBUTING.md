@@ -28,6 +28,9 @@ Run `make` on its own to list every command:
 | `make validate` | Validate every configuration without starting containers, as CI does |
 | `make smoke` | Send test telemetry through the running stack and check it arrives, as CI does |
 | `make smoke-app` | Run an application from the template beside the running stack, and trace its agents through the gateway, as CI does |
+| `make docs` | Build the [documentation site][site] strictly, as CI does |
+| `make docs-serve` | Serve the documentation site with live reload at <http://localhost:8000> |
+| `make docs-reference` | Regenerate the site's reference pages from the files they describe |
 | `make changelog` | Regenerate `CHANGELOG.md` from commit history |
 
 ## How work flows: trunk-based development
@@ -50,7 +53,7 @@ fix(gateway): reach local model servers through host.docker.internal
 docs(adr): record how metrics reach Prometheus
 ```
 
-Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Scopes are profile or area names: `compose`, `observability`, `langfuse`, `supabase`, `gateway`, `template`, `scripts`, `ci`, `docs`, `adr`, `rfc`. Mark breaking changes with `!` (`feat(gateway)!: ...`) and a `BREAKING CHANGE:` footer. The changelog is generated from these messages.
+Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Scopes are profile or area names: `compose`, `observability`, `langfuse`, `supabase`, `gateway`, `template`, `scripts`, `ci`, `docs`, `adr`, `rfc`. Mark breaking changes with `!` (`feat(gateway)!: ...`) and a `BREAKING CHANGE:` footer. The changelog is generated from these messages. Don't edit `CHANGELOG.md` by hand: the documentation site regenerates it from `main`'s history on every build, and `make changelog` regenerates the file before a release.
 
 ## Images and dependencies
 
@@ -68,8 +71,9 @@ Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`
 | **RFC** | Before a substantial change: a new service or profile, a new deployment target, changes to the application template's interface, cross-cutting behaviour | [`docs/rfcs/`][rfcs] |
 | **ADR** | When a decision is made, including decisions made while implementing an RFC | [`docs/adr/`][adrs] |
 | **Architecture docs** | Updated in the same PR as the change they describe | [`docs/architecture.md`][architecture] |
+| **Guides and reference** | Updated in the same PR as the change they describe | [`docs/guides/`][guides] and [`docs/reference/`][reference], published at [stackr.alexnodeland.com][site] |
 
-An RFC proposes; ADRs record what was decided; the architecture docs describe what exists now. A PR that changes what the architecture docs describe updates them in the same PR, never in a later cleanup. Accepted ADRs are not edited; a changed decision gets a new ADR that supersedes or amends the old one.
+An RFC proposes; ADRs record what was decided; the architecture docs, guides and reference describe what exists now. A PR that changes what they describe updates them in the same PR, never in a later cleanup. The reference pages' tables are generated from the files they describe: after changing one of those files, run `make docs-reference` and commit the result. Accepted ADRs are not edited; a changed decision gets a new ADR that supersedes or amends the old one.
 
 ## Quality gates
 
@@ -84,14 +88,17 @@ CI runs the same scripts as `make validate` and `make smoke`.
 - **The gateway's configuration:** fallbacks, guardrails and environment references, since LiteLLM has no validator and starts without a guardrail it can't load.
 - **Grafana dashboards:** valid JSON, unique uids, and only the provisioned data sources.
 - **The application template,** rendered in every variant: nothing left unrendered, and the generated Python, YAML, shell scripts and Compose file pass their linters.
+- **The documentation's reference pages** match the files they describe.
 - **shellcheck** for the shell scripts, and **ruff** for the Python ones.
 
 CI also generates each variant of the template and runs its own `make check`. To do the same locally, render one and check it:
 
 ```bash
 uv run copier copy --defaults --vcs-ref HEAD --data libraries=both . /tmp/my-app
-cd /tmp/my-app && make install && make check
+cd /tmp/my-app && git init && make install && make check
 ```
+
+`make docs` builds the documentation site as CI's Docs job does: the reference pages against their files, a strict build that fails on a broken link or anchor, and a check that every list rendered as a list. In Markdown, put a blank line before every list, and indent a nested item by its parent's text: two spaces after `-`, three after `1.`.
 
 `make smoke` runs against a started stack (`make up`): it sends test telemetry through each profile and checks that it lands where it should. CI starts each profile and runs it. `make smoke-app`, against the whole stack on local Supabase, runs an application generated from the template in its app profile and traces its agents through the gateway.
 
@@ -99,7 +106,7 @@ cd /tmp/my-app && make install && make check
 
 - [ ] `make validate` passes locally, and `make smoke` for the profiles the change touches; `make smoke-app` too when the template changes.
 - [ ] Images are pinned, and new settings are in `.env.example`.
-- [ ] The architecture docs reflect the change.
+- [ ] The architecture docs, guides and reference reflect the change, and `make docs` passes.
 - [ ] New decisions have an ADR; substantial proposals had an RFC.
 - [ ] The PR title is a Conventional Commit.
 
@@ -121,6 +128,9 @@ By contributing, you agree that your contributions are licensed under the [MIT L
 [architecture]: docs/architecture.md
 [code-of-conduct]: CODE_OF_CONDUCT.md
 [family-process]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0014-trunk-based-development-with-rfcs-and-adrs.md
+[guides]: docs/guides/stack.md
 [license]: LICENSE
+[reference]: docs/reference/index.md
 [rfcs]: docs/rfcs/README.md
 [security]: SECURITY.md
+[site]: https://stackr.alexnodeland.com

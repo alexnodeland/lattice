@@ -1,6 +1,6 @@
 # Architecture
 
-> **Status:** accepted design, being built in the phases tracked by [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). This document is evergreen: it is updated in the same pull request as the change it describes, and the table below shows what exists today. Decisions are recorded in [`adr/`](adr/README.md), and proposals in [`rfcs/`](rfcs/README.md).
+> **Status:** accepted design, built in the phases of [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). This document is evergreen: it is updated in the same pull request as the change it describes, and the table below shows what exists today. Decisions are recorded in [`adr/`](adr/README.md), and proposals in [`rfcs/`](rfcs/README.md).
 
 | Part | Status |
 |---|---|
@@ -11,7 +11,7 @@
 | `postgres` profile: plain PostgreSQL, the alternative database adapter | Implemented |
 | `gateway` profile: the LiteLLM proxy, with a team per tenant | Implemented |
 | The application template (Copier) and the `app` profile | Implemented |
-| Documentation site | Planned (phase 6) |
+| Documentation site, at <https://stackr.alexnodeland.com>, and the brand | Implemented |
 
 ## What stackr is
 
@@ -49,8 +49,10 @@ versions.env        versions pinned outside compose.yaml: the Supabase CLI, the 
 deploy/<service>/   each service's configuration, mounted read-only
 deploy/postgres/    init.sql: each service's role and database, created by db-init
 supabase/           the Supabase CLI project: config.toml (project id stackr-supabase) and seed.sql
-scripts/            setup-env, validate, smoke, fetch-dashboards, check-config and check-template, run by make and CI
-docs/               this document, ADRs and RFCs
+scripts/            setup-env, validate, smoke, fetch-dashboards, create-tenant, check-config, check-template,
+                    docs-reference and check_site.py, run by make and CI
+docs/               this document, ADRs and RFCs, and the documentation site's other pages
+mkdocs.yml          the documentation site's configuration, built with Zensical
 ```
 
 ## Conventions
@@ -167,6 +169,7 @@ The LiteLLM proxy is the LLM gateway port: an OpenAI-compatible API at <http://l
   | `prompt-injection` | Blocks jailbreak, system-prompt and data-exfiltration attempts, with HTTP 400 naming the guardrail |
 
   The response header `x-litellm-applied-guardrails` lists the guardrails that ran. Attaching guardrails to a team or key needs an Enterprise licence, so the libraries choose them per request, from each workspace's or rule's policy.
+
 - **Telemetry:** the proxy continues the caller's trace from its `traceparent` header, so one trace runs from the application through the proxy to the model call, in Tempo and Langfuse. Prompts and responses are not put on spans. Its metrics carry the tenant's team, not per-key ids. Both are on when the `observability` profile runs.
 - **State:** its database `litellm` on the database adapter, created by `db-init`; routing state and a 10-minute response cache in database 1 of the shared Valkey.
 
@@ -205,7 +208,7 @@ A Copier template generates an application on artifactr, reflexr or both, wired 
 
 ```bash
 uvx copier copy gh:alexnodeland/stackr my-app    # or a path to a clone of stackr
-cd my-app && make install && make env && make check
+cd my-app && git init && make install && make env && make check
 uvx copier update                                # later: the template's improvements
 ```
 
@@ -246,6 +249,8 @@ A generated application:
 | `make validate` | Check every configuration without starting containers |
 | `make smoke` | Send test telemetry through the running stack and check it arrives |
 | `make smoke-app` | Run an application from the template beside the running stack, and trace its agents through it |
+| `make docs` / `make docs-serve` | Build the documentation site strictly, as CI does, or serve it with live reload |
+| `make docs-reference` | Regenerate the documentation's reference pages from the configuration files they describe |
 
 ## Validation
 
@@ -260,9 +265,12 @@ CI checks the stack two ways on every pull request, with the same scripts as `ma
 - the Supabase project: its id differs from the Compose project's, and `compose.yaml` and the Makefile use the names it gives
 - the gateway's configuration, which has no validator of its own: fallbacks name existing model groups, guardrails use open-source integrations and valid modes, every `os.environ/` reference is set in `compose.yaml`, and no key is in the file
 - the application template, rendered in every variant (`scripts/check-template`): nothing is left unrendered, and the generated Python, YAML, shell scripts and Compose file pass ruff (with the generated project's settings), yamllint, shellcheck and `docker compose config`
+- the documentation's reference pages, against the files they describe (`scripts/docs-reference --check`)
 - the scripts, with shellcheck and ruff
 
 CI's **template** job generates each of the six variants (three choices of libraries, with and without evals), and the largest again on Python 3.14, and runs its `make check`: lint, strict types, and its tests with 100% coverage.
+
+CI's **docs** job builds the documentation site as `make docs` does: the reference pages against the files they describe, a strict build, and a check that no list rendered as text ([ADR-0012](adr/0012-documentation-site.md)).
 
 **With containers,** the smoke job starts each profile and runs `scripts/smoke`: `observability` alone, and everything on each database adapter. For `observability`, it sends a trace, a metric and a log through the Collector with `telemetrygen`, and finds:
 

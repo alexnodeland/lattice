@@ -1,7 +1,7 @@
 # stackr: everyday commands. `make` lists them.
 #
-# The tools (linters, pre-commit, git-cliff) run through uv, so their versions
-# are the ones in uv.lock. The stack itself needs Docker with Compose v2, and
+# The tools (linters, pre-commit, git-cliff, Zensical) run through uv, so their
+# versions are the ones in uv.lock. The stack itself needs Docker with Compose v2, and
 # the Supabase CLI for local Supabase.
 
 .DEFAULT_GOAL := help
@@ -60,10 +60,10 @@ TRACES_EXPORTERS = [otlp_grpc/tempo$(if $(filter langfuse,$(PROFILES)),$(comma) 
 GATEWAY_TELEMETRY = $(if $(filter observability,$(PROFILES)),true,false)
 COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEMETRY=$(GATEWAY_TELEMETRY) $(DATABASE_ENV)
 
-.PHONY: help install env up down reset ps logs dashboards tenant validate smoke smoke-app changelog clean
+.PHONY: help install env up down reset ps logs dashboards tenant validate smoke smoke-app docs docs-serve docs-reference changelog clean
 
 help: ## List the available commands
-	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 install: ## Install the development tools and the git hooks
 	$(UV) sync
@@ -113,9 +113,20 @@ smoke: ## Send test telemetry through the running stack and find it (PROFILES as
 smoke-app: ## Run an application from the template beside the running stack, and trace its agents
 	$(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) SUPABASE="$(SUPABASE)" scripts/smoke app
 
+docs: ## Build the documentation site strictly, and check its reference pages and lists, as CI does
+	$(UV) run scripts/docs-reference --check
+	$(UV) run zensical build --strict --clean
+	$(UV) run python scripts/check_site.py site
+
+docs-serve: ## Serve the documentation site with live reload at http://localhost:8000
+	$(UV) run zensical serve
+
+docs-reference: ## Regenerate the reference pages from the files they describe
+	$(UV) run scripts/docs-reference
+
 changelog: ## Regenerate CHANGELOG.md from conventional commits
 	$(UV) run git-cliff --output CHANGELOG.md
 	@$(UV) run python -c "import pathlib; p = pathlib.Path('CHANGELOG.md'); p.write_text(p.read_text().rstrip() + '\n')"
 
-clean: ## Remove tool caches
-	rm -rf .ruff_cache .cache
+clean: ## Remove tool caches and the built site
+	rm -rf .ruff_cache .cache site

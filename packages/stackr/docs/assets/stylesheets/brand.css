@@ -1,0 +1,90 @@
+/*
+ * stackr's colours on the Zensical theme. The palette and its rules are in
+ * docs/assets/brand/README.md: key is the working colour, and its tint marks interaction
+ * and highlights code.
+ */
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #1c1d26;
+  --md-primary-fg-color--light: #3a3c4a;
+  --md-primary-fg-color--dark: #0e0f14;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #ffffffb3;
+  --md-accent-fg-color: #6a6c7c;
+  --md-accent-fg-color--transparent: #6a6c7c1a;
+  --md-typeset-a-color: #1c1d26;
+  --md-code-bg-color: #f3f3f6;
+  --md-code-hl-color: #6a6c7c;
+  --md-code-hl-color--light: #6a6c7c1f;
+  --md-mermaid-node-bg-color: #1c1d2612;
+  --md-mermaid-node-fg-color: #1c1d26;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-hue: 235deg;
+  --md-default-bg-color: #15161b;
+  --md-default-bg-color--light: #15161bb3;
+  --md-default-bg-color--lighter: #15161b4d;
+  --md-default-bg-color--lightest: #15161b1f;
+  --md-primary-fg-color: #d9dae3;
+  --md-primary-fg-color--light: #ececf2;
+  --md-primary-fg-color--dark: #b9bbc8;
+  --md-primary-bg-color: #15161b;
+  --md-primary-bg-color--light: #15161bb3;
+  --md-accent-fg-color: #f1f1f6;
+  --md-accent-fg-color--transparent: #f1f1f61a;
+  --md-typeset-a-color: #d9dae3;
+  --md-code-bg-color: #1e1f26;
+  --md-code-hl-color: #8c8e9e;
+  --md-code-hl-color--light: #8c8e9e26;
+  --md-mermaid-node-bg-color: #d9dae31f;
+  --md-mermaid-node-fg-color: #d9dae3;
+  --md-footer-bg-color: #0f1014;
+  --md-footer-bg-color--dark: #0b0b0e;
+}
+
+/* The header logo: the mark's overprint is ink on paper, and light on screen. */
+[data-md-color-scheme="slate"] .md-logo img {
+  content: url("../brand/mark-dark.svg");
+}
+
+/* Headings in the text face, set a little tighter than body text. */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Links are key, like the text, so they are told apart by their underline. */
+.md-typeset a {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+/* The home page's title is the lockup; its heading stays for screen readers. */
+.md-typeset .stackr-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* The home page's opening: the lockup and the one-line description. */
+.md-typeset .stackr-hero {
+  margin: 0.5rem 0 2rem;
+}
+
+.md-typeset .stackr-hero img {
+  width: min(22rem, 100%);
+  height: auto;
+}
+
+.md-typeset .stackr-hero p {
+  max-width: 34em;
+  font-size: 1.15em;
+  line-height: 1.55;
+}

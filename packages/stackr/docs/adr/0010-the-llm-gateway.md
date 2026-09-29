@@ -26,6 +26,7 @@ Checking LiteLLM 1.103.0, the current release, against its source settled what t
   - the model groups `default` and `fast`, each falling back across providers in `router_settings.fallbacks`
 
   Applications name groups or aliases, never providers.
+
 - **A team per tenant,** with the id `tenant-<name>`, a budget per period, and optional rate limits and model list, created by `scripts/create-tenant` (`make tenant NAME=...`). It is idempotent: the team is looked up by id, and a key is created only for a new key alias, since a key's secret can't be read back. Applications use a team's keys; the master key only administers the proxy.
 - **Two guardrails, open source and in process:** `pii-mask` (masks email addresses, phone and social security numbers, card numbers and cloud and GitHub credentials) and `prompt-injection` (blocks jailbreak, system-prompt and data-exfiltration attempts), both from LiteLLM's content filter. They are off by default and chosen per request with `"guardrails": [...]`, which is how the libraries' `[litellm]` extras apply a workspace's or rule's policy. A blocked request is an HTTP 400 naming the guardrail. Presidio needs two more services and stays an option; licensed guardrails are not used.
 - **Guarding against silent failure:** `make validate` checks the configuration statically (model groups that fallbacks name, open guardrail integrations and modes, every `os.environ/` reference set in `compose.yaml`, no keys in the file), and the smoke test checks that the running proxy loaded every guardrail and model group.

@@ -7,6 +7,7 @@
 ## Context
 
 A new application on the libraries has to wire several things before it does anything useful:
+
 - authentication to actors
 - storage to Supabase
 - telemetry to the Collector

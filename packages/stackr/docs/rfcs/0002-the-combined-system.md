@@ -353,11 +353,11 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 | Namespaced event types | reflexr | [#45][r-45] | phase 1 (D6) | phase 1 waits |
 | Runtime rule management: per-tenant, versioned, installed through the API, not listed to other tenants | reflexr | [#21][r-21] | phase 5 | no rules from chat |
 | Telemetry setup that composes across both libraries, polling without a trace per poll, and mirror cursors | reflexr, artifactr | [reflexr #62][r-62], [artifactr #50][a-50] | phase 4 | links and tags, without the combined setup |
-| `traceparent` on artifactr envelopes | artifactr | issue to be filed on sign-off | phase 4, for links in the artifactr-to-reflexr direction | tags only, in that direction |
-| Durable message idempotency: core checks `message_id` | artifactr | issue to be filed on sign-off | phase 2 | the ledger's read-back |
-| Reserved publishers: a type only one source (or runs) may publish | reflexr | issue to be filed on sign-off | phase 5 | bridge rules check the envelope's actor, and re-read artifactr |
-| Workspace discovery: list a tenant's workspaces | artifactr | issue to be filed on sign-off | phase 3 | followers start on first use, and resume from the ledger |
-| Notices that don't start or steer a turn, marked as notices | artifactr | issue to be filed on sign-off | phase 2 | direct commits, which start no turn but still reach a running one |
+| `traceparent` on artifactr envelopes | artifactr | [#60][a-60] | phase 4, for links in the artifactr-to-reflexr direction | tags only, in that direction |
+| Durable message idempotency: core checks `message_id` | artifactr | [#61][a-61] | phase 2 | the ledger's read-back |
+| Reserved publishers: a type only one source (or runs) may publish | reflexr | [#72][r-72] | phase 5 | bridge rules check the envelope's actor, and re-read artifactr |
+| Workspace discovery: list a tenant's workspaces | artifactr | [#62][a-62] | phase 3 | followers start on first use, and resume from the ledger |
+| Notices that don't start or steer a turn, marked as notices | artifactr | [#63][a-63] | phase 2 | direct commits, which start no turn but still reach a running one |
 
 ## Phases
 
@@ -401,7 +401,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 
 - [x] Sign-off on D1 to D7 (2026-09-29)
 - [ ] Decide reflexr #45's namespaces
-- [ ] File the prerequisite issues: `traceparent` on artifactr envelopes, durable message idempotency, reserved publishers, workspace discovery, notices
+- [x] File the prerequisite issues: artifactr [#60][a-60], [#61][a-61], [#62][a-62] and [#63][a-63], and reflexr [#72][r-72]
 - [ ] Phase 1: inbound adapter
 - [ ] Phase 2: outbound adapter and loop control
 - [ ] Phase 3: template option, example and smoke test
@@ -415,6 +415,10 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 [a-adr-0034]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0034-ports-and-adapters-for-integrations.md
 [a-adr-0035]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0035-a-turn-is-its-own-trace.md
 [a-50]: https://github.com/alexnodeland/artifactr/issues/50
+[a-60]: https://github.com/alexnodeland/artifactr/issues/60
+[a-61]: https://github.com/alexnodeland/artifactr/issues/61
+[a-62]: https://github.com/alexnodeland/artifactr/issues/62
+[a-63]: https://github.com/alexnodeland/artifactr/issues/63
 [r-adr-0003]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0003-independent-sibling-of-artifactr.md
 [r-adr-0006]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0006-rules-as-typed-serializable-data.md
 [r-adr-0010]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0010-loop-and-spend-safety.md
@@ -425,3 +429,4 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 [r-21]: https://github.com/alexnodeland/reflexr/issues/21
 [r-45]: https://github.com/alexnodeland/reflexr/issues/45
 [r-62]: https://github.com/alexnodeland/reflexr/issues/62
+[r-72]: https://github.com/alexnodeland/reflexr/issues/72

@@ -34,6 +34,8 @@ from evalr.core import (
     InputFormatter,
     Optimizer,
     Score,
+    ScoreConfig,
+    ScoreConfigStore,
     ScoreSink,
     UnsupportedField,
     Verdict,
@@ -44,7 +46,9 @@ from evalr.core import (
     evaluator_stats,
     measure,
     optimize,
+    score_configs,
     scores,
+    sync_score_configs,
     verdict_fields,
 )
 
@@ -67,6 +71,8 @@ __all__ = [
     "InputFormatter",
     "Optimizer",
     "Score",
+    "ScoreConfig",
+    "ScoreConfigStore",
     "ScoreSink",
     "UnsupportedField",
     "Verdict",
@@ -78,6 +84,8 @@ __all__ = [
     "evaluator_stats",
     "measure",
     "optimize",
+    "score_configs",
     "scores",
+    "sync_score_configs",
     "verdict_fields",
 ]

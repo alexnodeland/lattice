@@ -40,6 +40,8 @@ class FakeLangfuse:
         self.history: dict[str, list[tuple[datetime, dict[str, Any] | None]]] = {}
         """Every version of every item, by id; ``None`` where the item was deleted."""
         self.scores: dict[str, dict[str, Any]] = {}
+        self.score_times: dict[str, str] = {}
+        """When each score was given, by id: its ingestion event's timestamp."""
         self.writes: list[str] = []
 
     def now(self) -> datetime:
@@ -162,6 +164,7 @@ class FakeLangfuse:
         for event in body["batch"]:
             if event["type"] == "score-create":
                 self.scores[event["body"]["id"]] = event["body"]
+                self.score_times[event["body"]["id"]] = event["timestamp"]
             successes.append({"id": event["id"], "status": 201})
         return httpx.Response(207, json={"successes": successes, "errors": []})
 

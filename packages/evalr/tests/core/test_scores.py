@@ -1,12 +1,20 @@
 import uuid
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Literal
 
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from evalr import Verdict, scores
-from evalr.core import SCORE_NAMESPACE, score_type_name
+from evalr.core import (
+    MAX_TEXT,
+    SCORE_NAMESPACE,
+    Score,
+    score_configs,
+    score_type_name,
+    score_values,
+)
 
 from .models import Helpfulness
 
@@ -116,3 +124,73 @@ def test_scores_of_the_shared_helpfulness_type() -> None:
         "helpfulness.resolved",
         "helpfulness.category",
     ]
+
+
+def test_empty_text_gives_no_score_and_long_text_is_cut() -> None:
+    assert "task_completion.note" not in {s.name for s in scores(verdict(note=""))}
+    [note] = [s for s in scores(verdict(note="x" * (MAX_TEXT + 1))) if s.data_type == "TEXT"]
+    assert note.value == "x" * MAX_TEXT
+
+
+def test_values_may_be_a_models_fields_or_its_json() -> None:
+    value = verdict().value
+    from_fields = score_values(TaskCompletion, dict(value))
+    from_json = score_values(TaskCompletion, value.model_dump(mode="json"))
+    assert from_fields == from_json
+    assert [v for _, v in from_json] == [True, 0.5, 3.0, "warm", "2", "fine"]
+    assert score_values(TaskCompletion, {"steps": 4}) == [(score_configs(TaskCompletion)[2], 4.0)]
+
+
+def test_configs_skip_the_fields_that_cannot_be_scored() -> None:
+    class Review(BaseModel):
+        tags: list[str]
+        rating: int = Field(ge=1, le=5, description="How good it was")
+        either: int | str = 0
+
+    [rating] = score_configs(Review)
+    assert (rating.name, rating.type_name, rating.field) == ("review.rating", "review", "rating")
+    assert (rating.data_type, rating.minimum, rating.maximum) == ("NUMERIC", 1.0, 5.0)
+    assert rating.description == "How good it was"
+    assert score_configs(Review, type_name="code_review")[0].name == "code_review.rating"
+
+
+def test_configs_keep_bounds_as_declared() -> None:
+    class Effort(BaseModel):
+        hours: int = Field(gt=0, lt=10)
+
+    [hours] = score_configs(Effort)
+    assert (hours.minimum, hours.maximum) == (0.0, 10.0)
+
+
+def test_a_literal_of_enum_members_has_their_values_as_categories() -> None:
+    class Mood(BaseModel):
+        tone: Literal[Tone.WARM, Tone.COLD]
+
+    [tone] = score_configs(Mood)
+    assert tone.categories == ("warm", "cold")
+    assert score_values(Mood, Mood(tone=Tone.COLD).model_dump(mode="json"))[0][1] == "cold"
+
+
+def test_feedback_scores_have_a_source_and_no_evaluator() -> None:
+    feedback = Score(
+        id="f",
+        name="helpfulness.rating",
+        value=4.0,
+        data_type="NUMERIC",
+        session_id="thread-1",
+        timestamp=datetime(2026, 9, 29, tzinfo=UTC),
+        source={"tenant_id": "acme", "actor": "alice"},
+    )
+    assert feedback.metadata == {"tenant_id": "acme", "actor": "alice"}
+    judged = scores(verdict())[0].model_copy(update={"source": {"run": "r1"}})
+    assert judged.metadata == {
+        "run": "r1",
+        "evaluator": "judge",
+        "version": "v1",
+        "confidence": 0.9,
+    }
+
+
+def test_a_scores_timestamp_needs_a_time_zone() -> None:
+    with pytest.raises(ValidationError, match="timezone"):
+        Score(id="f", name="a.b", value=1.0, data_type="NUMERIC", timestamp=datetime(2026, 9, 29))

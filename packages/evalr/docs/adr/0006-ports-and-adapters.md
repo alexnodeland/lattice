@@ -1,6 +1,6 @@
 # ADR-0006: Ports and adapters
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0011](0011-scores-shared-with-the-libraries.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

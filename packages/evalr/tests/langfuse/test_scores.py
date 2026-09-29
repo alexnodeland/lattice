@@ -1,4 +1,5 @@
 from collections.abc import Iterator, Sequence
+from datetime import UTC, datetime
 
 import pytest
 from langfuse import Langfuse
@@ -35,9 +36,10 @@ def received(server: FakeLangfuse) -> list[Score]:
                 name=body["name"],
                 value=value,
                 data_type=body["dataType"],
-                trace_id=body["traceId"],
-                evaluator=body["metadata"]["evaluator"],
-                version=body["metadata"]["version"],
+                trace_id=body.get("traceId"),
+                session_id=body.get("sessionId"),
+                evaluator=body["metadata"].get("evaluator"),
+                version=body["metadata"].get("version"),
                 confidence=body["metadata"].get("confidence"),
             )
         )
@@ -78,9 +80,33 @@ async def test_every_kind_of_score_arrives_typed(client: Langfuse, server: FakeL
         "version": "1",
         "confidence": 0.9,
     }
+    assert "sessionId" not in arrived["helpfulness.rating"]
 
 
-async def test_scores_need_a_trace(client: Langfuse) -> None:
+async def test_feedback_arrives_on_its_session_when_it_was_given(
+    client: Langfuse, server: FakeLangfuse
+) -> None:
+    given = datetime(2026, 9, 29, 12, 30, tzinfo=UTC)
+    feedback = Score(
+        id="7b0f3c52-1f0e-5b8a-9d4c-2a6e8f1b3c5d",
+        name="helpfulness.resolved",
+        value=False,
+        data_type="BOOLEAN",
+        session_id="thread-1",
+        timestamp=given,
+        source={"tenant_id": "acme", "actor": "alice"},
+    )
+    sink = LangfuseScoreSink(client)
+    await sink.record([feedback])
+    await sink.flush()
+    body = server.scores[feedback.id]
+    assert (body["sessionId"], body["value"], body["dataType"]) == ("thread-1", 0.0, "BOOLEAN")
+    assert "traceId" not in body
+    assert body["metadata"] == {"tenant_id": "acme", "actor": "alice"}
+    assert datetime.fromisoformat(server.score_times[feedback.id]) == given
+
+
+async def test_scores_need_a_trace_or_a_session(client: Langfuse) -> None:
     untraced = Verdict(value=Helpfulness(rating=1, resolved=False), evaluator="e", version="1")
-    with pytest.raises(ValueError, match="attaches scores to traces"):
+    with pytest.raises(ValueError, match="to traces or sessions"):
         await LangfuseScoreSink(client).record(scores(untraced, subject="s"))

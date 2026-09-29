@@ -8,7 +8,7 @@ evalr is built as ports and adapters ([Concepts](../concepts.md#ports-and-adapte
 
 | Package | What it holds | Install |
 |---|---|---|
-| [`evalr.core`](core.md) | Verdicts and field kinds, the ports, function evaluators and `Fallback`, examples, datasets and splits, formatters, scores, experiments' results, measuring and optimizing, the metrics, and tracing | core |
+| [`evalr.core`](core.md) | Verdicts and field kinds, the ports, function evaluators and `Fallback`, examples, datasets and splits, formatters, scores and score configs, experiments' results, measuring and optimizing, the metrics, and tracing | core |
 | [`evalr.memory`](memory.md) | In-memory adapters of every port, and `BestOf` | core |
 | [`evalr.contracts`](contracts.md) | A contract suite per port, which every adapter passes | core |
 | [`evalr.jsonl`](jsonl.md) | A dataset store on JSON Lines files | core |
@@ -31,6 +31,7 @@ evalr is built as ports and adapters ([Concepts](../concepts.md#ports-and-adapte
 | `Example`, `Dataset`, `DatasetStore`, `DatasetNotFound`, `FeedbackSource`, `collect` | [`evalr.core`: Examples and datasets](core.md#examples-and-datasets) |
 | `InputFormatter` | [`evalr.core`: Formatters](core.md#formatters) |
 | `Score`, `ScoreSink`, `scores` | [`evalr.core`: Scores](core.md#scores) |
+| `ScoreConfig`, `ScoreConfigStore`, `score_configs`, `sync_score_configs` | [`evalr.core`: Score configs](core.md#score-configs) |
 | `ExperimentTracker`, `ExperimentResult` | [`evalr.core`: Experiments](core.md#experiments) |
 | `measure`, `Optimizer`, `optimize` | [`evalr.core`: Measuring and optimizing](core.md#measuring-and-optimizing) |
 | `agreement`, `Agreement`, `calibration`, `evaluator_stats` | [`evalr.core`: Metrics](core.md#metrics) |

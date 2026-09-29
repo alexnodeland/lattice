@@ -1,61 +1,73 @@
-"""Scores: verdicts as the named values observability backends record.
+"""Scores: verdicts and people's feedback as the named values observability backends record.
 
-Every field of a verdict becomes one score, named ``{type}.{field}``, the convention artifactr and
-reflexr share for feedback. A field's kind decides the score's data type:
+Every field of a verdict, or of a piece of feedback, becomes one score named ``{type}.{field}``.
+The mapping is the one artifactr and reflexr use for feedback, and they build on it (ADR-0011).
+A field's kind decides the score's data type (``score_configs``):
 
 - binary fields are ``BOOLEAN``
 - ordinal and numeric fields are ``NUMERIC``
 - categorical fields are ``CATEGORICAL``, with the choice as a string
 - text fields are ``TEXT``
 
-A field left empty (``None``) gives no score. A score's id is derived from what it is about, the
-evaluator and the field, so recording a verdict again replaces its scores rather than adding
-more.
+A field left empty (``None`` or ``""``) gives no score, and a category or text longer than
+``MAX_TEXT`` characters is cut. A verdict's scores have ids derived from what the verdict is
+about, the evaluator and the field, so recording a verdict again replaces its scores rather than
+adding more.
 """
 
 import hashlib
-import re
 import uuid
+from collections.abc import Mapping
 from enum import Enum
-from typing import Annotated, Literal, cast
+from typing import Annotated, cast
 
-from pydantic import BaseModel, Field, JsonValue
+from pydantic import AwareDatetime, BaseModel, Field, JsonValue
 
-from evalr.core.fields import FieldKind, verdict_fields
+from evalr.core.fields import ScoreConfig, ScoreType, score_configs, score_type_name
 from evalr.core.verdicts import Verdict
 
-__all__ = ["SCORE_NAMESPACE", "Score", "ScoreType", "score_type_name", "scores"]
-
-type ScoreType = Literal["NUMERIC", "BOOLEAN", "CATEGORICAL", "TEXT"]
-"""A score's data type, as Langfuse and the OpenTelemetry conventions name them."""
+__all__ = [
+    "MAX_TEXT",
+    "SCORE_NAMESPACE",
+    "Score",
+    "ScoreType",
+    "score_type_name",
+    "score_values",
+    "scores",
+]
 
 SCORE_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "https://github.com/alexnodeland/evalr/scores")
-"""The namespace of score ids."""
+"""The namespace of the ids ``scores`` gives."""
 
-_DATA_TYPES: dict[FieldKind, ScoreType] = {
-    FieldKind.BINARY: "BOOLEAN",
-    FieldKind.CATEGORICAL: "CATEGORICAL",
-    FieldKind.ORDINAL: "NUMERIC",
-    FieldKind.NUMERIC: "NUMERIC",
-    FieldKind.TEXT: "TEXT",
-}
+MAX_TEXT = 500
+"""The longest category or text a score holds, in characters; longer ones are cut."""
 
 
 class Score(BaseModel, frozen=True):
-    """One field of one verdict, as a named value.
+    """One field of a verdict, or of a piece of people's feedback, as a named value.
+
+    A score is attached to a trace (and, within it, a span) or to a session. evalr's scores come
+    from verdicts and name the evaluator; the libraries' feedback mirrors make scores from
+    people's feedback, with no evaluator, and describe where it came from in ``source``.
 
     Attributes:
-        id: Derived from the subject, the evaluator and the name, so a store that upserts by id
-            keeps one score per field however often it is recorded.
+        id: Derived from what the score is about and its name, so a sink that upserts by id keeps
+            one score per field however often it is recorded.
         name: ``{type}.{field}``.
         value: A bool for ``BOOLEAN``, a float for ``NUMERIC``, and a string for ``CATEGORICAL``
             and ``TEXT``.
         data_type: How the value is to be read.
         trace_id: The trace the score is attached to, when there is one.
         span_id: The span within that trace the score judges, as 16 hex digits, when known.
-        evaluator: The evaluator that gave the verdict.
+        session_id: The session the score is attached to, such as a thread or a causal chain,
+            when it is about the session rather than one trace.
+        timestamp: When the score was given, with its time zone; when it is recorded, if
+            ``None``.
+        evaluator: The evaluator that gave the verdict; ``None`` for people's feedback.
         version: The evaluator's version.
         confidence: The evaluator's confidence in the field's value, when it has one.
+        source: Where the score came from, beyond an evaluator: the tenant, workspace and person
+            that gave a piece of feedback, for example.
     """
 
     id: str
@@ -64,28 +76,55 @@ class Score(BaseModel, frozen=True):
     data_type: ScoreType
     trace_id: str | None = None
     span_id: Annotated[str, Field(pattern=r"^[0-9a-f]{16}$")] | None = None
-    evaluator: str
-    version: str
+    session_id: str | None = None
+    timestamp: AwareDatetime | None = None
+    evaluator: str | None = None
+    version: str | None = None
     confidence: float | None = None
+    source: Mapping[str, str] = Field(default_factory=dict[str, str])
 
     @property
     def metadata(self) -> dict[str, JsonValue]:
-        """The evaluator, its version and the confidence, as score metadata."""
-        metadata: dict[str, JsonValue] = {"evaluator": self.evaluator, "version": self.version}
+        """The source, then the evaluator, its version and the confidence, as score metadata."""
+        metadata: dict[str, JsonValue] = dict(self.source)
+        if self.evaluator is not None:
+            metadata["evaluator"] = self.evaluator
+        if self.version is not None:
+            metadata["version"] = self.version
         if self.confidence is not None:
             metadata["confidence"] = self.confidence
         return metadata
 
 
-def score_type_name(verdict_type: type[BaseModel]) -> str:
-    """The name scores give a verdict type: its class name in snake case.
+def score_values(
+    verdict_type: type[BaseModel],
+    value: Mapping[str, object],
+    *,
+    type_name: str | None = None,
+) -> list[tuple[ScoreConfig, bool | float | str]]:
+    """Pair each field of a validated value that has a value with its config and score value.
 
-    ``Helpfulness`` is ``helpfulness`` and ``TaskCompletion`` is ``task_completion``, as the
-    libraries name their feedback types by default.
+    The libraries keep feedback as JSON, so ``value`` may be a model's JSON (an ``Enum`` as its
+    value) as well as its fields.
+
+    Args:
+        verdict_type: The value's type, which ``score_configs`` reads.
+        value: The value's fields, by name, validated as ``verdict_type``.
+        type_name: The ``{type}`` in the scores' names; ``score_type_name`` of the type by
+            default.
+
+    Returns:
+        A bool for each ``BOOLEAN`` score, a float for each ``NUMERIC`` one, and a string, cut at
+        ``MAX_TEXT`` characters, for each ``CATEGORICAL`` and ``TEXT`` one, in the order of the
+        type's fields. Fields that are ``None``, ``""`` or missing are left out.
     """
-    return re.sub(
-        r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", "_", verdict_type.__name__
-    ).lower()
+    result: list[tuple[ScoreConfig, bool | float | str]] = []
+    for config in score_configs(verdict_type, type_name=type_name):
+        raw = value.get(config.field)
+        if raw is None or raw == "":
+            continue
+        result.append((config, _value(config.data_type, raw)))
+    return result
 
 
 def scores(
@@ -108,46 +147,40 @@ def scores(
         span_id: The span the verdict judges, within that trace, when known.
 
     Returns:
-        The scores, in the order of the verdict type's fields.
+        The scores, in the order of the verdict type's fields, with values as ``score_values``
+        gives them.
     """
     value = verdict.value
-    prefix = type_name or score_type_name(type(value))
     trace = trace_id or verdict.trace_id
     key = subject or trace or _content_key(verdict)
-    result: list[Score] = []
-    for field in verdict_fields(type(value)):
-        raw: object = getattr(value, field.name)
-        if raw is None:
-            continue
-        name = f"{prefix}.{field.name}"
-        result.append(
-            Score(
-                id=str(
-                    uuid.uuid5(
-                        SCORE_NAMESPACE, f"{key}|{verdict.evaluator}|{verdict.version}|{name}"
-                    )
-                ),
-                name=name,
-                value=_value(field.kind, raw),
-                data_type=_DATA_TYPES[field.kind],
-                trace_id=trace,
-                span_id=span_id,
-                evaluator=verdict.evaluator,
-                version=verdict.version,
-                confidence=verdict.confidence.get(field.name),
-            )
+    return [
+        Score(
+            id=str(
+                uuid.uuid5(
+                    SCORE_NAMESPACE, f"{key}|{verdict.evaluator}|{verdict.version}|{config.name}"
+                )
+            ),
+            name=config.name,
+            value=score_value,
+            data_type=config.data_type,
+            trace_id=trace,
+            span_id=span_id,
+            evaluator=verdict.evaluator,
+            version=verdict.version,
+            confidence=verdict.confidence.get(config.field),
         )
-    return result
+        for config, score_value in score_values(type(value), dict(value), type_name=type_name)
+    ]
 
 
-def _value(kind: FieldKind, raw: object) -> bool | float | str:
-    match kind:
-        case FieldKind.BINARY:
+def _value(data_type: ScoreType, raw: object) -> bool | float | str:
+    match data_type:
+        case "BOOLEAN":
             return bool(raw)
-        case FieldKind.ORDINAL | FieldKind.NUMERIC:
+        case "NUMERIC":
             return float(cast(float, raw))
         case _:
-            return str(raw.value if isinstance(raw, Enum) else raw)
+            return str(raw.value if isinstance(raw, Enum) else raw)[:MAX_TEXT]
 
 
 def _content_key(verdict: Verdict[BaseModel]) -> str:

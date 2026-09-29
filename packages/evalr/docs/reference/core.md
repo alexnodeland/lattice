@@ -74,7 +74,7 @@ The text a judge reads for an input, within a token budget. See [What a judge re
 
 ## Scores
 
-Verdicts as named values, and the port they leave through. See [Scores and score sinks](../guides/scores.md).
+Verdicts and people's feedback as named values, how each field is scored, and the ports they leave through. artifactr and reflexr build their feedback mirrors on them ([ADR-0011](../adr/0011-scores-shared-with-the-libraries.md)). See [Scores and score sinks](../guides/scores.md).
 
 ::: evalr.core.Score
 
@@ -84,9 +84,25 @@ Verdicts as named values, and the port they leave through. See [Scores and score
 
 ::: evalr.core.scores
 
+::: evalr.core.score_values
+
 ::: evalr.core.score_type_name
 
 ::: evalr.core.SCORE_NAMESPACE
+
+::: evalr.core.MAX_TEXT
+
+## Score configs
+
+How each field of a type is scored, and the port that keeps it. See [Score configs](../guides/scores.md#score-configs).
+
+::: evalr.core.ScoreConfig
+
+::: evalr.core.score_configs
+
+::: evalr.core.ScoreConfigStore
+
+::: evalr.core.sync_score_configs
 
 ## Experiments
 

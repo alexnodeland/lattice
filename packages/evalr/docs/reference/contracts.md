@@ -20,6 +20,8 @@ See [Testing with the contracts](../guides/testing.md).
 
 ::: evalr.contracts.check_score_sink
 
+::: evalr.contracts.check_score_config_store
+
 ::: evalr.contracts.check_experiment_tracker
 
 ::: evalr.contracts.ContractViolation

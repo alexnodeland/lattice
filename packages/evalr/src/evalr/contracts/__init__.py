@@ -2,8 +2,8 @@
 
 Each check takes an adapter, exercises it through its port, and raises ``ContractViolation``
 where it behaves differently from the port's contract. evalr runs them against every adapter it
-ships; the libraries that implement ``FeedbackSource`` run ``check_feedback_source`` against
-theirs::
+ships; the libraries run them against theirs, such as ``check_feedback_source`` against their
+feedback sources and ``check_score_sink`` against their score sinks::
 
     async def test_the_feedback_source_meets_the_contract() -> None:
         await check_feedback_source(HelpfulnessFeedback(workspace))
@@ -15,7 +15,7 @@ from evalr.contracts.datasets import check_dataset_store
 from evalr.contracts.evaluators import check_evaluator, check_optimizer
 from evalr.contracts.experiments import ContractOutput, check_experiment_tracker
 from evalr.contracts.feedback import check_feedback_source
-from evalr.contracts.scores import check_score_sink
+from evalr.contracts.scores import check_score_config_store, check_score_sink
 from evalr.contracts.support import ContractInput, ContractVerdict, ContractViolation
 
 __all__ = [
@@ -28,5 +28,6 @@ __all__ = [
     "check_experiment_tracker",
     "check_feedback_source",
     "check_optimizer",
+    "check_score_config_store",
     "check_score_sink",
 ]

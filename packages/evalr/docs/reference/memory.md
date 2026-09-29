@@ -18,6 +18,8 @@ See [Testing with the contracts](../guides/testing.md).
 
 ::: evalr.memory.InMemoryScoreSink
 
+::: evalr.memory.InMemoryScoreConfigStore
+
 ::: evalr.memory.InMemoryExperimentTracker
 
 ## Optimizers

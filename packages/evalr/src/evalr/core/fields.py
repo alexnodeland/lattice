@@ -11,8 +11,13 @@ fill it and how it is scored:
 
 ``X | None`` is judged as ``X``, and may be left empty. Other types (lists, nested models, unions of
 several types) cannot be judged, and raise ``UnsupportedField``.
+
+``score_configs`` describes how each field is scored, as a backend records it: the score's name,
+data type, bounds and categories (ADR-0011). It is the mapping artifactr and reflexr use for their
+feedback types, so it skips the fields it cannot score rather than raising.
 """
 
+import re
 import types
 from dataclasses import dataclass
 from enum import Enum, StrEnum
@@ -23,7 +28,20 @@ import annotated_types
 from pydantic import BaseModel, JsonValue
 from pydantic.fields import FieldInfo
 
-__all__ = ["FieldKind", "UnsupportedField", "VerdictField", "canonical_fields", "verdict_fields"]
+__all__ = [
+    "FieldKind",
+    "ScoreConfig",
+    "ScoreType",
+    "UnsupportedField",
+    "VerdictField",
+    "canonical_fields",
+    "score_configs",
+    "score_type_name",
+    "verdict_fields",
+]
+
+type ScoreType = Literal["NUMERIC", "BOOLEAN", "CATEGORICAL", "TEXT"]
+"""A score's data type, as Langfuse and the OpenTelemetry conventions name them."""
 
 
 class FieldKind(StrEnum):
@@ -111,6 +129,113 @@ def canonical_fields(verdict_type: type[BaseModel]) -> list[JsonValue]:
         }
         for f in verdict_fields(verdict_type)
     ]
+
+
+_DATA_TYPES: dict[FieldKind, ScoreType] = {
+    FieldKind.BINARY: "BOOLEAN",
+    FieldKind.CATEGORICAL: "CATEGORICAL",
+    FieldKind.ORDINAL: "NUMERIC",
+    FieldKind.NUMERIC: "NUMERIC",
+    FieldKind.TEXT: "TEXT",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class ScoreConfig:
+    """How one field of a verdict or feedback type is scored, for a backend to read its scores by.
+
+    A backend that knows a score's config can check its values and offer its choices to people
+    scoring by hand. The libraries create them in Langfuse through a ``ScoreConfigStore``.
+
+    Attributes:
+        name: The score's name, ``{type}.{field}``.
+        type_name: The ``{type}``: the type's score name, or the name a library registers its
+            feedback type under.
+        field: The field's name.
+        data_type: How the field is scored.
+        description: The field's description, if it has one.
+        minimum: The lowest value of a numeric field, if it is bounded below. The bound is kept as
+            declared: ``gt=0`` is 0, even for an ``int``, where ``VerdictField.lower`` is 1.
+        maximum: The highest value of a numeric field, if it is bounded above, likewise.
+        categories: A categorical field's choices as strings, in declaration order: the
+            ``Literal``'s arguments or the ``Enum``'s values. Empty for other kinds.
+    """
+
+    name: str
+    type_name: str
+    field: str
+    data_type: ScoreType
+    description: str | None = None
+    minimum: float | None = None
+    maximum: float | None = None
+    categories: tuple[str, ...] = ()
+
+
+def score_type_name(verdict_type: type[BaseModel]) -> str:
+    """The name scores give a verdict type: its class name in snake case.
+
+    ``Helpfulness`` is ``helpfulness`` and ``TaskCompletion`` is ``task_completion``, as the
+    libraries name their feedback types by default.
+    """
+    return re.sub(
+        r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", "_", verdict_type.__name__
+    ).lower()
+
+
+def score_configs(
+    verdict_type: type[BaseModel], *, type_name: str | None = None
+) -> tuple[ScoreConfig, ...]:
+    """Describe how each field of a verdict or feedback type is scored, in declaration order.
+
+    Each field is scored by its kind, as ``verdict_fields`` reads it: binary fields are
+    ``BOOLEAN``, ordinal and numeric ones ``NUMERIC``, categorical ones ``CATEGORICAL`` and text
+    ones ``TEXT``. Unlike ``verdict_fields``, a field of a type that cannot be judged (a list, a
+    nested model, a union of several types) raises nothing: it is not scored. A library's feedback
+    type may have such fields, where a verdict type may not.
+
+    Args:
+        verdict_type: Any Pydantic model.
+        type_name: The ``{type}`` in the scores' names; ``score_type_name`` of the type by
+            default. Pass a library's registered feedback name where it differs.
+
+    Returns:
+        One config per field that can be scored.
+    """
+    return _score_configs(verdict_type, type_name or score_type_name(verdict_type))
+
+
+@cache
+def _score_configs(verdict_type: type[BaseModel], type_name: str) -> tuple[ScoreConfig, ...]:
+    configs: list[ScoreConfig] = []
+    for name, info in verdict_type.model_fields.items():
+        try:
+            field = _describe(verdict_type, name, info)
+        except UnsupportedField:
+            continue
+        data_type = _DATA_TYPES[field.kind]
+        minimum = maximum = None
+        if data_type == "NUMERIC":
+            # As declared, which is what the libraries have always created in Langfuse.
+            _, metadata, _ = _unwrap(info.annotation, list(info.metadata))
+            minimum, maximum = _bounds(_constraints(metadata), integer=False)
+        categorical = field.kind is FieldKind.CATEGORICAL
+        configs.append(
+            ScoreConfig(
+                name=f"{type_name}.{name}",
+                type_name=type_name,
+                field=name,
+                data_type=data_type,
+                description=field.description,
+                minimum=minimum,
+                maximum=maximum,
+                categories=tuple(map(_category, field.choices)) if categorical else (),
+            )
+        )
+    return tuple(configs)
+
+
+def _category(choice: object) -> str:
+    return str(choice.value if isinstance(choice, Enum) else choice)
 
 
 @cache

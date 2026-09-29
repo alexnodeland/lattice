@@ -9,12 +9,13 @@ from evalr.memory.datasets import InMemoryDatasetStore
 from evalr.memory.experiments import InMemoryExperimentTracker
 from evalr.memory.feedback import InMemoryFeedbackSource
 from evalr.memory.optimizers import BestOf
-from evalr.memory.scores import InMemoryScoreSink
+from evalr.memory.scores import InMemoryScoreConfigStore, InMemoryScoreSink
 
 __all__ = [
     "BestOf",
     "InMemoryDatasetStore",
     "InMemoryExperimentTracker",
     "InMemoryFeedbackSource",
+    "InMemoryScoreConfigStore",
     "InMemoryScoreSink",
 ]

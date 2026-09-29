@@ -8,6 +8,7 @@ evaluations are.
 
 from collections import defaultdict
 from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
 
 from opentelemetry import trace
 from opentelemetry._logs import LoggerProvider, get_logger
@@ -21,6 +22,11 @@ __all__ = ["EVALUATION_RESULT", "OtelEventSink"]
 EVALUATION_RESULT = "gen_ai.evaluation.result"
 """The event's name in the OpenTelemetry GenAI conventions."""
 
+_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+
+type _Verdict = tuple[str | None, str | None, str | None, str | None]
+"""What a score's verdict is keyed by: the evaluator, its version, the trace and the span."""
+
 
 class OtelEventSink:
     """Records scores as ``gen_ai.evaluation.result`` events, through the OpenTelemetry API.
@@ -33,11 +39,13 @@ class OtelEventSink:
     - ``gen_ai.evaluation.score.label``: a choice, or ``true`` or ``false``
     - ``gen_ai.evaluation.explanation``: the verdict's text fields, such as its reason; a text
       field's own event has its text alone
+    - ``session.id``: the session the score is attached to, when it has one
     - ``evalr.evaluator.name``, ``evalr.evaluator.version``, ``evalr.score.id`` and
-      ``evalr.confidence``: the rest
+      ``evalr.confidence``: the rest, where the score has them (people's feedback has no
+      evaluator)
 
-    Events are append-only; each carries its score's id, so a reader that keys by it keeps the
-    latest.
+    An event's time is the score's timestamp, when it has one. Events are append-only; each
+    carries its score's id, so a reader that keys by it keeps the latest.
     """
 
     def __init__(self, logger_provider: LoggerProvider | None = None) -> None:
@@ -50,7 +58,7 @@ class OtelEventSink:
 
     async def record(self, scores: Sequence[Score], /) -> None:
         """Emit an event for each score."""
-        explanations: dict[tuple[str, str, str | None, str | None], list[str]] = defaultdict(list)
+        explanations: dict[_Verdict, list[str]] = defaultdict(list)
         for score in scores:
             if score.data_type == "TEXT":
                 explanations[_verdict(score)].append(f"{score.name.split('.')[-1]}: {score.value}")
@@ -60,13 +68,14 @@ class OtelEventSink:
             else:
                 explanation = "\n".join(explanations[_verdict(score)])
             self._logger.emit(
+                timestamp=_nanoseconds(score.timestamp) if score.timestamp else None,
                 event_name=EVALUATION_RESULT,
                 context=_judged(score),
                 attributes=_attributes(score, explanation),
             )
 
 
-def _verdict(score: Score) -> tuple[str, str, str | None, str | None]:
+def _verdict(score: Score) -> _Verdict:
     return score.evaluator, score.version, score.trace_id, score.span_id
 
 
@@ -90,10 +99,14 @@ def _judged(score: Score) -> Context | None:
 def _attributes(score: Score, explanation: str) -> dict[str, AttributeValue]:
     attributes: dict[str, AttributeValue] = {
         "gen_ai.evaluation.name": score.name,
-        "evalr.evaluator.name": score.evaluator,
-        "evalr.evaluator.version": score.version,
         "evalr.score.id": score.id,
     }
+    if score.session_id is not None:
+        attributes["session.id"] = score.session_id
+    if score.evaluator is not None:
+        attributes["evalr.evaluator.name"] = score.evaluator
+    if score.version is not None:
+        attributes["evalr.evaluator.version"] = score.version
     value = score.value
     if isinstance(value, bool):
         attributes["gen_ai.evaluation.score.value"] = 1.0 if value else 0.0
@@ -107,3 +120,8 @@ def _attributes(score: Score, explanation: str) -> dict[str, AttributeValue]:
     if score.confidence is not None:
         attributes["evalr.confidence"] = score.confidence
     return attributes
+
+
+def _nanoseconds(moment: datetime) -> int:
+    """A time as nanoseconds since the epoch, as OpenTelemetry records it."""
+    return (moment - _EPOCH) // timedelta(microseconds=1) * 1_000

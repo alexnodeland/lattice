@@ -2,19 +2,21 @@
 
 Adapters implement them in their own packages (ADR-0006): DSPy judges and decision models are
 evaluators, Langfuse, Hugging Face and JSON Lines files are dataset stores, and artifactr and
-reflexr supply feedback sources. Every port has an in-memory adapter in ``evalr.memory`` and a
-contract suite in ``evalr.contracts`` that every adapter passes.
+reflexr supply feedback sources, score sinks and score config stores (ADR-0011). Every port has an
+in-memory adapter in ``evalr.memory`` and a contract suite in ``evalr.contracts`` that every
+adapter passes.
 
 Ports that do I/O are async. Adapters over synchronous SDKs run them in a worker thread.
 """
 
-from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Collection, Mapping, Sequence
 from typing import Protocol
 
 from pydantic import BaseModel
 
 from evalr.core.datasets import Dataset, Example
 from evalr.core.experiments import ExperimentResult, Task
+from evalr.core.fields import ScoreConfig
 from evalr.core.scores import Score
 from evalr.core.verdicts import Verdict
 
@@ -24,6 +26,7 @@ __all__ = [
     "ExperimentTracker",
     "FeedbackSource",
     "Optimizer",
+    "ScoreConfigStore",
     "ScoreSink",
 ]
 
@@ -125,13 +128,31 @@ class FeedbackSource[InputT: BaseModel, VerdictT: BaseModel](Protocol):
 
 
 class ScoreSink(Protocol):
-    """Records scores: verdicts as named values next to the traces they judge.
+    """Records scores: verdicts and feedback as named values, on the traces or sessions they judge.
 
-    Recording is idempotent by score id: recording a score again replaces it.
+    Recording is idempotent by score id: recording a score again replaces it. evalr's online
+    evaluation records verdicts' scores through it, and the libraries' feedback mirrors people's
+    feedback.
     """
 
     async def record(self, scores: Sequence[Score], /) -> None:
         """Record the scores."""
+        ...
+
+
+class ScoreConfigStore(Protocol):
+    """Keeps score configs, so a backend knows each score's data type, range and choices.
+
+    Configs are found by name and only ever created: ``sync_score_configs`` creates the ones a
+    store lacks, and leaves the others as they are.
+    """
+
+    async def names(self) -> Collection[str]:
+        """Return the names of the configs the store has, including any it has archived."""
+        ...
+
+    async def create(self, config: ScoreConfig, /) -> None:
+        """Create a config whose name the store does not have."""
         ...
 
 

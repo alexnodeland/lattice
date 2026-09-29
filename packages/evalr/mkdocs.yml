@@ -170,6 +170,7 @@ nav:
           - adr/0008-decision-only-views-and-hand-off-by-composition.md
           - adr/0009-online-evaluation.md
           - adr/0010-documentation-site.md
+          - adr/0011-scores-shared-with-the-libraries.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

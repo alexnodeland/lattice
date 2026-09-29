@@ -37,14 +37,20 @@ class Lossy(InMemoryScoreSink):
         await super().record(scores[1:])
 
 
+class Sessionless(InMemoryScoreSink):
+    async def record(self, scores: Sequence[Score], /) -> None:
+        await super().record([s.model_copy(update={"session_id": None}) for s in scores])
+
+
 @pytest.mark.parametrize(
     ("broken", "message"),
     [
         (Appending(), "replace it, not add another"),
         (Stubborn(), "latest value recorded must be kept"),
         (Lossy(), "every score recorded, and only those"),
+        (Sessionless(), "with its type, trace and session"),
     ],
-    ids=["appending", "stubborn", "lossy"],
+    ids=["appending", "stubborn", "lossy", "sessionless"],
 )
 async def test_a_broken_sink_fails_the_contract(
     broken: Appending | InMemoryScoreSink, message: str

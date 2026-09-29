@@ -17,9 +17,13 @@ from evalr.core.experiments import ExperimentResult, ItemResult, Task
 from evalr.core.feedback import collect
 from evalr.core.fields import (
     FieldKind,
+    ScoreConfig,
+    ScoreType,
     UnsupportedField,
     VerdictField,
     canonical_fields,
+    score_configs,
+    score_type_name,
     verdict_fields,
 )
 from evalr.core.formatting import Formatter, InputFormatter, TokenCounter, estimate_tokens
@@ -48,13 +52,16 @@ from evalr.core.ports import (
     ExperimentTracker,
     FeedbackSource,
     Optimizer,
+    ScoreConfigStore,
     ScoreSink,
 )
-from evalr.core.scores import SCORE_NAMESPACE, Score, ScoreType, score_type_name, scores
+from evalr.core.scores import MAX_TEXT, SCORE_NAMESPACE, Score, score_values, scores
+from evalr.core.syncing import sync_score_configs
 from evalr.core.tracing import SCOPE, Judging, current_trace_id, get_tracer, judging
 from evalr.core.verdicts import Confidence, Verdict
 
 __all__ = [
+    "MAX_TEXT",
     "SCOPE",
     "SCORE_NAMESPACE",
     "Agreement",
@@ -83,6 +90,8 @@ __all__ = [
     "Measurement",
     "Optimizer",
     "Score",
+    "ScoreConfig",
+    "ScoreConfigStore",
     "ScoreSink",
     "ScoreType",
     "Task",
@@ -109,9 +118,12 @@ __all__ = [
     "mean_absolute_error",
     "measure",
     "optimize",
+    "score_configs",
     "score_type_name",
+    "score_values",
     "scores",
     "spearman",
     "split_bucket",
+    "sync_score_configs",
     "verdict_fields",
 ]

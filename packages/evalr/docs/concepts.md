@@ -52,7 +52,7 @@ An **optimizer** fits an evaluator to people's verdicts on a training set, check
 
 ## Using evaluators
 
-- **Scores.** Every verdict becomes one score per field, named `{type}.{field}` like people's feedback, recorded through a score sink next to the trace it judges. [Scores and score sinks](guides/scores.md)
+- **Scores.** Every verdict becomes one score per field, named `{type}.{field}`, recorded through a score sink next to the trace it judges. artifactr and reflexr score people's feedback with the same mapping, so the two sit side by side. [Scores and score sinks](guides/scores.md)
 - **Experiments.** A task (the system under evaluation) runs on every example of a dataset, and every evaluator judges each output, in memory or in Langfuse. [Experiments](guides/experiments.md)
 - **Online evaluation.** Evaluators judge a sample of live traffic, within a budget, in the trace of what they judge. [Online evaluation](guides/online.md)
 - **Workflow measures.** Task completion, drop-off and rewrites, defined in terms any application's log can be put in. [Workflow measures](guides/measures.md)
@@ -70,10 +70,10 @@ graph LR
         hf["evalr.hf<br/>Hugging Face datasets"]
         jsonl["evalr.jsonl<br/>JSON Lines datasets"]
         memory["evalr.memory<br/>in-memory, every port"]
-        libs["artifactr, reflexr<br/>[evals] extras"]
+        libs["artifactr, reflexr<br/>[evals] and [langfuse] extras"]
     end
     subgraph core["evalr.core"]
-        ports["Evaluator, Optimizer, DatasetStore,<br/>ScoreSink, ExperimentTracker,<br/>FeedbackSource, Formatter"]
+        ports["Evaluator, Optimizer, DatasetStore,<br/>ScoreSink, ScoreConfigStore,<br/>ExperimentTracker, FeedbackSource,<br/>Formatter"]
         values["verdicts, datasets, splits,<br/>formatters, metrics"]
     end
     dspy --> ports
@@ -91,7 +91,8 @@ graph LR
 | `Optimizer` | Fits an evaluator to people's verdicts | `Gepa`, `ThresholdCalibration`, `BestOf` |
 | `DatasetStore` | Saves a dataset and returns its revision; loads one by name and revision | In memory, JSON Lines files, Langfuse, the Hugging Face Hub |
 | `FeedbackSource` | Yields examples from people's typed feedback | In memory; reflexr's `LogFeedbackSource` |
-| `ScoreSink` | Records verdicts as scores, idempotently | In memory, Langfuse, OpenTelemetry events |
+| `ScoreSink` | Records verdicts and feedback as scores, idempotently | In memory, Langfuse, OpenTelemetry events; the libraries' Langfuse adapters |
+| `ScoreConfigStore` | Keeps score configs, so a backend knows how to read each score | In memory; the libraries' Langfuse adapters |
 | `ExperimentTracker` | Runs a task over a dataset and judges each output | In memory, Langfuse |
 | `Formatter` | Renders an input as text within a token budget | `InputFormatter` |
 

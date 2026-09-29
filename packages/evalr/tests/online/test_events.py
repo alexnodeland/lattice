@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Any
 
 from opentelemetry import trace
@@ -118,8 +119,9 @@ def as_score(attributes: dict[str, Any], trace_id: int) -> Score:
         value=value,
         data_type=data_type,
         trace_id=f"{trace_id:032x}" if trace_id else None,
-        evaluator=attributes["evalr.evaluator.name"],
-        version=attributes["evalr.evaluator.version"],
+        session_id=attributes.get("session.id"),
+        evaluator=attributes.get("evalr.evaluator.name"),
+        version=attributes.get("evalr.evaluator.version"),
     )
 
 
@@ -136,3 +138,23 @@ async def test_the_sink_meets_the_contract_for_a_reader_keyed_by_score_id() -> N
             return list(latest.values())
 
         await check_score_sink(OtelEventSink(kept.provider), recorded)
+
+
+async def test_feedback_is_an_event_on_its_session_when_it_was_given() -> None:
+    feedback = Score(
+        id="feedback-1",
+        name="helpfulness.rating",
+        value=2.0,
+        data_type="NUMERIC",
+        session_id="thread-1",
+        timestamp=datetime(2026, 9, 29, 12, 30, 0, 250_001, tzinfo=UTC),
+        source={"actor": "alice"},
+    )
+    with logs() as kept:
+        await OtelEventSink(kept.provider).record([feedback])
+        [event] = kept.records()
+    attributes = dict(event.log_record.attributes or {})
+    assert attributes["session.id"] == "thread-1"
+    assert attributes["gen_ai.evaluation.score.value"] == 2.0
+    assert not {"evalr.evaluator.name", "evalr.evaluator.version"} & set(attributes)
+    assert event.log_record.timestamp == 1_790_685_000_250_001_000

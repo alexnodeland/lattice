@@ -6,6 +6,13 @@ evaluation code without a network.
 """
 
 from evalr.memory.datasets import InMemoryDatasetStore
+from evalr.memory.experiments import InMemoryExperimentTracker
 from evalr.memory.feedback import InMemoryFeedbackSource
+from evalr.memory.scores import InMemoryScoreSink
 
-__all__ = ["InMemoryDatasetStore", "InMemoryFeedbackSource"]
+__all__ = [
+    "InMemoryDatasetStore",
+    "InMemoryExperimentTracker",
+    "InMemoryFeedbackSource",
+    "InMemoryScoreSink",
+]

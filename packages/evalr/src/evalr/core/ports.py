@@ -8,15 +8,17 @@ contract suite in ``evalr.contracts`` that every adapter passes.
 Ports that do I/O are async. Adapters over synchronous SDKs run them in a worker thread.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import Protocol
 
 from pydantic import BaseModel
 
 from evalr.core.datasets import Dataset, Example
+from evalr.core.experiments import ExperimentResult, Task
+from evalr.core.scores import Score
 from evalr.core.verdicts import Verdict
 
-__all__ = ["DatasetStore", "Evaluator", "FeedbackSource"]
+__all__ = ["DatasetStore", "Evaluator", "ExperimentTracker", "FeedbackSource", "ScoreSink"]
 
 
 class Evaluator[InputT: BaseModel, VerdictT: BaseModel](Protocol):
@@ -112,4 +114,51 @@ class FeedbackSource[InputT: BaseModel, VerdictT: BaseModel](Protocol):
 
     def examples(self) -> AsyncIterator[Example[InputT, VerdictT]]:
         """Yield the examples."""
+        ...
+
+
+class ScoreSink(Protocol):
+    """Records scores: verdicts as named values next to the traces they judge.
+
+    Recording is idempotent by score id: recording a score again replaces it.
+    """
+
+    async def record(self, scores: Sequence[Score], /) -> None:
+        """Record the scores."""
+        ...
+
+
+class ExperimentTracker(Protocol):
+    """Runs a task over a dataset, judges every output, and keeps the results.
+
+    A failing task or evaluator fails only its own item, which records the error; the run goes
+    on. Each example runs in its own trace, which the verdicts record.
+    """
+
+    async def run_experiment[InputT: BaseModel, VerdictT: BaseModel, OutputT: BaseModel](
+        self,
+        name: str,
+        /,
+        *,
+        dataset: Dataset[InputT, VerdictT],
+        task: Task[InputT, VerdictT, OutputT],
+        evaluators: Sequence[Evaluator[OutputT, BaseModel]],
+        run_name: str | None = None,
+        max_concurrency: int = 4,
+        metadata: Mapping[str, str] | None = None,
+    ) -> ExperimentResult[OutputT]:
+        """Run the task on every example, and judge each output with every evaluator.
+
+        Args:
+            name: The experiment's name, shared by its runs.
+            dataset: The examples to run.
+            task: The system being evaluated.
+            evaluators: What judges each output.
+            run_name: This run's name; the tracker chooses one by default.
+            max_concurrency: How many examples run at once.
+            metadata: Anything to keep with the run, such as the model or prompt under test.
+
+        Returns:
+            One item per example, in the dataset's order.
+        """
         ...

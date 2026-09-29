@@ -4,8 +4,8 @@
 
 | Package | Status |
 |---|---|
-| `evalr.core` | Verdicts, field kinds, the evaluator protocol, function evaluators, datasets, splits and formatters implemented; the other ports and the metrics planned (phase 1) |
-| `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Dataset stores and feedback sources implemented; the other ports planned (phase 1) |
+| `evalr.core` | Verdicts, field kinds, the evaluator, dataset store, feedback source, score sink and experiment tracker ports, function evaluators, datasets, splits, formatters and scores implemented; the optimizer port, `Fallback` and the metrics planned (phase 1) |
+| `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Dataset stores, feedback sources, score sinks and experiment trackers implemented; the optimizer port planned (phase 1) |
 | `evalr.dspy` | Planned (phase 2) |
 | `evalr.decision` | Planned (phase 3) |
 | `evalr.langfuse`, `evalr.hf` | Planned (phase 4) |
@@ -81,7 +81,7 @@ graph LR
 | `evalr.langfuse` | `[langfuse]` | core, langfuse |
 | `evalr.hf` | `[hf]` | core, datasets, huggingface_hub |
 
-A test enforces the table: what each package imports, that no adapter package imports another, and that nothing imports artifactr or reflexr. The `[all]` extra installs every integration.
+Every package may also use the core's own dependencies, pydantic and the OpenTelemetry API. A test enforces the table: what each package imports, that no adapter package imports another, and that nothing imports artifactr or reflexr. The `[all]` extra installs every integration.
 
 ## Verdicts
 
@@ -165,6 +165,46 @@ A `FeedbackSource[InputT, VerdictT]` yields examples from people's feedback: eve
 
 - `check_dataset_store(store)`: an unknown name is not found; a saved dataset loads back exactly (name, examples, description); saving again changes nothing; a changed dataset makes a new revision and the earlier one still loads; an unknown revision is not found; loading as a type the examples do not satisfy fails validation.
 - `check_feedback_source(source)`: ids are unique, inputs and verdicts are of the source's types, every example has a verdict, and iterating again yields the same examples.
+- `check_score_sink(sink, recorded)`: recording a score again replaces it, every score recorded is kept, and the latest value wins. A sink has no reads, so the caller says how to see what it holds.
+- `check_experiment_tracker(tracker)`: one item per example in the dataset's order; a failed task leaves no output and records its error; a failed evaluator records its error while the others still judge; verdicts record the item's trace; names and the dataset version are kept.
+
+## Scores
+
+`scores(verdict)` turns a verdict into one `Score` per field that has a value, named `{type}.{field}`, the convention artifactr and reflexr share for feedback. The type name is the verdict type's class name in snake case (`TaskCompletion` is `task_completion`) unless one is given, such as a library's registered feedback name.
+
+| Field kind | Score type | Value |
+|---|---|---|
+| binary | `BOOLEAN` | `bool` |
+| ordinal, numeric | `NUMERIC` | `float` |
+| categorical | `CATEGORICAL` | the choice as a string (an `Enum`'s value) |
+| text | `TEXT` | the text |
+
+- A score's id is a UUID derived from its subject (a given key, else the verdict's trace, else a hash of the verdict), the evaluator, its version and the score's name. So recording a verdict again replaces its scores, and a new evaluator version adds new ones rather than overwriting.
+- The evaluator, its version and the field's confidence travel as the score's metadata.
+- A `ScoreSink` records scores, idempotently by id. `InMemoryScoreSink` keeps them by id; Langfuse is phase 4, and OpenTelemetry evaluation events phase 5.
+
+## Experiments
+
+An experiment runs a **task** (the system being evaluated) on every example of a dataset and judges each output with every evaluator:
+
+```python
+async def reply(example: Example[Thread, Helpfulness]) -> Thread:
+    return await agent_under_test.continue_thread(example.input)
+
+
+result = await tracker.run_experiment(
+    "prompt-v2",
+    dataset=dataset,
+    task=reply,
+    evaluators=[judge, decider],
+    metadata={"prompt": "v2"},
+)
+result.verdicts("helpfulness-judge")  # by example id
+```
+
+- The task receives the whole example (input, people's verdict, reference) and returns what the evaluators judge. A task that returns the example's input unchanged measures the evaluators themselves against people's verdicts.
+- The result has one `ItemResult` per example in the dataset's order: the output, one verdict per evaluator that succeeded, the errors, and the item's trace. A failing task or evaluator fails only its own item.
+- `InMemoryExperimentTracker` runs in the process, at most `max_concurrency` examples at once, each in a span named `evalr.experiment.item {name}`, so verdicts record the item's trace. Runs are named `{name} #{n}` unless named, and kept in `runs`. Langfuse's experiments are phase 4.
 
 ## Formatters
 

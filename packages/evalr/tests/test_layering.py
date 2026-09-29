@@ -16,7 +16,7 @@ SRC = Path(__file__).parent.parent / "src" / "evalr"
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # package: (evalr packages it may import, third-party packages it may import)
     "core": ({"evalr.core"}, {"pydantic", "annotated_types", "opentelemetry"}),
-    "memory": ({"evalr.core", "evalr.memory"}, {"pydantic"}),
+    "memory": ({"evalr.core", "evalr.memory"}, {"pydantic", "opentelemetry"}),
     "contracts": ({"evalr.core", "evalr.contracts"}, {"pydantic"}),
     "jsonl": ({"evalr.core", "evalr.jsonl"}, {"pydantic"}),
 }

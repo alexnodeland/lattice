@@ -159,6 +159,7 @@ Every command and every fact about an agent run appends events to the workspace'
 | `id`, `ts` | A unique id and the time it was stored |
 | `workspace_id`, `thread_id`, `run_id` | Where it belongs; `thread_id` and `run_id` are set when there is one |
 | `actor` | Who did it |
+| `traceparent` | The W3C trace context of the span it was committed in, or `None` when nothing was traced; the same field as on reflexr's envelopes |
 | `event` | The event itself, one of the types in `artifactr.core` |
 
 `read(after_seq=0, before_seq=None, threads=None, limit=None, last=None)` returns a page of the log ([below](#reading-a-window-or-the-tail)). `subscribe(after_seq=0, threads=None)` yields the stored envelopes after `after_seq` and then each new one as it commits, on one iterator, so nothing falls between catching up and following along:

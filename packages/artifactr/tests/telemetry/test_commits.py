@@ -3,6 +3,7 @@
 from typing import Any
 
 import pytest
+from opentelemetry.sdk.trace import ReadableSpan
 
 from artifactr.core import (
     AgentActor,
@@ -98,6 +99,27 @@ async def test_an_untraced_commit_links_no_trace() -> None:
     await ws.create(Note(text="Ship Friday"), artifact_id="n1")
     [revision] = await ws.revisions("n1")
     assert revision.trace_id is None
+    [envelope] = await ws.read()
+    assert envelope.traceparent is None
+
+
+async def test_an_envelope_records_the_trace_context_it_was_committed_in(
+    ws: Workspace, recorder: Recorder
+) -> None:
+    def traceparent(span: ReadableSpan) -> str:
+        context = span.context
+        assert context is not None
+        return f"00-{trace_id(span)}-{context.span_id:016x}-{context.trace_flags:02x}"
+
+    thread = await ws.create_thread("Launch")
+    agent = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_1"))
+    with recorder.tracer_provider.get_tracer("test").start_as_current_span("turn"):
+        await agent.record(RunStarted(run_id="run_1", thread_id=thread.id))
+        await agent.post_message(thread.id, "Done.")
+    created, started, posted = await ws.read()
+    assert created.traceparent == traceparent(recorder.span("artifactr.commit create_thread"))
+    assert started.traceparent == traceparent(recorder.span("turn")), "a fact: the current span"
+    assert posted.traceparent == traceparent(recorder.span("artifactr.commit post_message"))
 
 
 async def test_commit_spans_describe_patches_threads_and_proposals(

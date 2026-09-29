@@ -103,10 +103,10 @@ async with storage.transaction(scope) as transaction:
     while missing := needs(command, actor=actor, state=state):
         state = merge(state, await transaction.load(missing))
     result = commit(command, state, actor=actor)
-    await transaction.save(result, actor=actor)  # assigns seq, appends events
+    await transaction.save(result, actor=actor, traceparent=current_traceparent())
 ```
 
-**`seq` is gap-free and assigned at save.** `Transaction.save` stores the result's entities and revisions and appends its events, returning the envelopes with their sequence numbers. The log is a total order per workspace.
+**`seq` is gap-free and assigned at save.** `Transaction.save` stores the result's entities and revisions and appends its events, returning the envelopes with their sequence numbers. The log is a total order per workspace. Each envelope keeps the `traceparent` it was saved with, or `None`.
 
 **`read(scope, after_seq=, before_seq=, threads=, limit=, last=)` reads a window of the log,** the envelopes with `after_seq < seq < before_seq`, oldest first. `threads` keeps what a subscriber following those threads receives, by `artifactr.core.delivered_to`'s rule. `limit` keeps the first so many that match, and `last` the last so many, still oldest first. Filter in the store rather than after reading, so that a tail read of a long log reads only its tail. `Workspace.read` checks the arguments first, so a storage never gets both `limit` and `last`, or a negative number.
 

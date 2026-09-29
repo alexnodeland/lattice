@@ -18,6 +18,16 @@
 - **A revision carries the trace it was committed in** (`Revision.trace_id`), stamped by the workspace from the current span when it saves the revision, as it stamps an outcome's `seq`. Feedback on a version then finds its trace directly, whichever attempt, surface or person wrote it.
 - **No migration.** Both fields live in the stored JSON and default to empty for rows written before them. No read filters on them, so they get no columns; a migration would change nothing. If a lookup from a trace to its run is needed later, it gets a table and a migration then.
 
+### Amendment (2026-09-29): envelopes carry the trace context
+
+[stackr RFC-0002](https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md) bridges artifactr's events into reflexr, and a run a bridged event starts should link back to the turn or request that caused it ([#60](https://github.com/alexnodeland/artifactr/issues/60)). reflexr's envelopes carry `traceparent` for this; artifactr's did not.
+
+- **`Envelope.traceparent`** is the W3C trace context of the span that committed the event, or `None`. It has the name, format and meaning of reflexr's field, and `current_traceparent()` is reflexr's function. A trace id alone would not do: a link needs the span.
+- **The workspace sets it** from the current span as it saves: a command's `artifactr.commit` span, or whatever span is current for a recorded fact. `Transaction.save` takes it beside the actor, as reflexr's `Entry` does, so a `Storage` implemented elsewhere must store it too.
+- **No migration.** It is stored in the envelope's JSON, and nothing filters on it. The protocol stays `artifactr.v1`, with one new optional field.
+
+The table below turned down a trace id on every envelope because finding a version's trace would mean scanning the log. That still holds for feedback. A follower of the log reads every envelope anyway.
+
 ## Options considered
 
 | Option | Precise for resumed runs | Schema change |
@@ -36,4 +46,5 @@
 ## Action items
 
 1. [x] `run_started.trace_id` and `Run.trace_ids`, with conformance cases.
-2. [ ] The agent layer sets the trace id, and the workspace stamps revisions (RFC-0002 phase A1).
+2. [x] The agent layer sets the trace id, and the workspace stamps revisions (RFC-0002 phase A1).
+3. [x] Envelopes carry `traceparent` (2026-09-29 amendment).

@@ -16,6 +16,7 @@ from artifactr.telemetry import (
     annotate,
     attribution,
     current_trace_id,
+    current_traceparent,
     kept_attributes,
 )
 from artifactr.telemetry.attributes import (
@@ -115,6 +116,17 @@ def test_the_current_trace_id_and_annotations(recorder: Recorder) -> None:
         annotate({THREAD_ID: "thr_1", RUN_ID: None})
     assert trace_id == trace.format_trace_id(span.get_span_context().trace_id)
     assert attributes(recorder.span("work")) == {THREAD_ID: "thr_1"}
+
+
+def test_the_current_traceparent_is_the_w3c_trace_context(recorder: Recorder) -> None:
+    tracer = recorder.tracer_provider.get_tracer("test")
+    assert current_traceparent() is None
+    with tracer.start_as_current_span("work") as span:
+        traceparent = current_traceparent()
+    context = span.get_span_context()
+    assert traceparent == (
+        f"00-{context.trace_id:032x}-{context.span_id:016x}-{context.trace_flags:02x}"
+    )
 
 
 def test_attribution_names_the_session_the_user_and_the_ids() -> None:

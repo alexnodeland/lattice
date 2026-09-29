@@ -81,6 +81,8 @@ artifactr's spans carry ids, kinds, versions and counts, never content. Prompts,
 
 Each run records the trace of each attempt in `Run.trace_ids`, and each revision the trace it was committed in, so feedback can be attached to the trace it is about.
 
+Each envelope records the W3C trace context of the span that committed it, as `traceparent`: a command's `artifactr.commit` span, or the current span for a fact the agent records. reflexr's envelopes carry the same field, so code that follows the log, such as a bridge into reflexr, can link its spans to the request or turn that wrote an event. `current_traceparent()` returns the current span's context.
+
 ## Metrics
 
 artifactr's metrics are declared in a registry, `artifactr.telemetry.METRICS`, with the attributes each may carry. The [architecture](../architecture.md#metrics) lists them: commands and commit latency, turns and turn latency, runs by status, tool calls by tool and status, tokens, messages, artifact changes, proposals, and WebSocket connections.

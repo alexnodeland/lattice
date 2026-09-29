@@ -64,8 +64,15 @@ class Transaction(Protocol):
         """Load the requested entities. Ids that do not exist map to ``None``."""
         ...
 
-    async def save(self, result: CommitResult, *, actor: Actor) -> list[Envelope]:
+    async def save(
+        self, result: CommitResult, *, actor: Actor, traceparent: str | None = None
+    ) -> list[Envelope]:
         """Persist a result's entities and revisions, and append its events to the log.
+
+        Args:
+            result: What core decided.
+            actor: Who the envelopes are attributed to.
+            traceparent: The W3C trace context the envelopes record.
 
         Returns:
             The appended envelopes, with their ``seq`` numbers assigned.

@@ -64,6 +64,7 @@ Every durable event arrives in the same envelope. The stored envelope and the wi
   "thread_id": "thr_9",
   "run_id": "run_42",
   "actor": {"kind": "agent", "thread_id": "thr_9", "run_id": "run_42", "name": "assistant"},
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
   "event": {
     "type": "artifact_changed",
     "artifact_id": "plan_1",
@@ -79,6 +80,8 @@ Every durable event arrives in the same envelope. The stored envelope and the wi
 ```
 
 `actor.kind` is one of `user` (`id`, `name?`), `agent` (`thread_id`, `run_id?`, `name`), `external_agent` (`client_id`, `name?`), `system` (`name`) or `evaluator` (`name`, `version`). Every event of one thread's agent is the same participant, whatever its run.
+
+`traceparent` is the W3C trace context of the span that committed the event, or `null` when it was not traced. For a command, that is its `artifactr.commit` span. It has the name, format and meaning of reflexr's `traceparent`, so a client reads both the same way, and what an event causes elsewhere can link back to it ([ADR-0033](adr/0033-trace-links-on-runs-and-revisions.md)).
 
 | `event.type` | Scope | Fields |
 |---|---|---|

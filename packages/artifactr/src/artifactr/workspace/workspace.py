@@ -3,7 +3,9 @@
 Every read and write goes through a :class:`Workspace`, and every write goes through
 :meth:`Workspace.commit` or :meth:`Workspace.record`, which run core's rules inside one storage
 transaction (ADR-0002, ADR-0018). Each commit is traced as an ``artifactr.commit {type}``
-span, and what commits and facts do is counted in artifactr's metrics.
+span, and what commits and facts do is counted in artifactr's metrics. Every envelope records
+the W3C trace context of the span it was committed in, and every revision that span's trace
+(ADR-0033).
 """
 
 import asyncio
@@ -75,6 +77,7 @@ from artifactr.telemetry import (
     Telemetry,
     command_attributes,
     current_trace_id,
+    current_traceparent,
     outcome_attributes,
     record_events,
 )
@@ -306,7 +309,9 @@ class Workspace:
             while missing := needs(item, actor=self._actor, state=state):
                 state = _merge(state, await transaction.load(missing))
             result = _traced(decide(state))
-            envelopes = await transaction.save(result, actor=self._actor)
+            envelopes = await transaction.save(
+                result, actor=self._actor, traceparent=current_traceparent()
+            )
             if history is not None:
                 await transaction.append_history(*history)
         record_events(self._telemetry, result.events, actor=self._actor, scope=self._tenancy)

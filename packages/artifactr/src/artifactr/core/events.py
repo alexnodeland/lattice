@@ -6,7 +6,7 @@ and pyright checks it. Applications record their own facts through the one open 
 validate as :class:`UnknownEvent` instead of failing, so old clients keep working.
 
 Each stored event travels in an :class:`Envelope` that adds its sequence number, id,
-timestamp, scope and actor. The envelope's shape is also the wire shape.
+timestamp, scope, actor and trace context. The envelope's shape is also the wire shape.
 """
 
 from collections.abc import Collection
@@ -353,6 +353,10 @@ class Envelope(BaseModel):
     thread_id: ThreadId | None = None
     run_id: RunId | None = None
     actor: Actor
+    traceparent: str | None = None
+    """The W3C trace context of the span that committed the event, so what it causes can link
+    back to it."""
+
     event: Event
 
 

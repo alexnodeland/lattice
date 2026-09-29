@@ -94,7 +94,9 @@ class _Transaction:
         found = {row.id: convert(row) for row in rows}
         return {i: found.get(i) for i in ids}
 
-    async def save(self, result: CommitResult, *, actor: Actor) -> list[Envelope]:
+    async def save(
+        self, result: CommitResult, *, actor: Actor, traceparent: str | None = None
+    ) -> list[Envelope]:
         head = self._workspace.head_seq
         now = self._clock()
         envelopes: list[Envelope] = []
@@ -109,6 +111,7 @@ class _Transaction:
                     thread_id=thread_id,
                     run_id=run_id,
                     actor=actor,
+                    traceparent=traceparent,
                     event=event,
                 )
             )

@@ -11,6 +11,7 @@ from typing import Final
 from opentelemetry import metrics, trace
 from opentelemetry.metrics import Counter, Histogram, MeterProvider, UpDownCounter
 from opentelemetry.trace import Span, TracerProvider
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 from opentelemetry.util.types import AttributeValue
 
 from artifactr.core import (
@@ -58,6 +59,8 @@ VERSION: Final = version("artifactr-ai")
 """The version recorded with artifactr's instrumentation scope."""
 
 type Attributes = Mapping[str, AttributeValue | None]
+
+_W3C = TraceContextTextMapPropagator()
 
 
 class Telemetry:
@@ -124,6 +127,13 @@ def current_trace_id() -> TraceId | None:
     """Return the id of the current trace, or None when nothing is being traced."""
     context = trace.get_current_span().get_span_context()
     return trace.format_trace_id(context.trace_id) if context.is_valid else None
+
+
+def current_traceparent() -> str | None:
+    """Return the W3C trace context of the current span, if there is one."""
+    carrier: dict[str, str] = {}
+    _W3C.inject(carrier)
+    return carrier.get("traceparent")
 
 
 def annotate(attributes: Attributes, span: Span | None = None) -> None:

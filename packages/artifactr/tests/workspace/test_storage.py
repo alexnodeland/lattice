@@ -113,6 +113,19 @@ async def test_envelopes_are_stamped_and_scoped(storage: Storage) -> None:
         ALICE,
     )
     assert envelope.ts.tzinfo is not None
+    assert envelope.traceparent is None, "saved without a trace context"
+
+
+async def test_envelopes_keep_the_trace_context_they_were_saved_with(storage: Storage) -> None:
+    traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+    command = CreateThread(thread_id="t1")
+    async with storage.transaction(SCOPE) as tx:
+        state = await tx.load(needs(command, actor=ALICE))
+        [saved] = await tx.save(
+            commit(command, state, actor=ALICE), actor=ALICE, traceparent=traceparent
+        )
+    assert saved.traceparent == traceparent
+    assert await storage.read(SCOPE) == [saved]
 
 
 async def test_leases_belong_to_their_holder(storage: Storage) -> None:

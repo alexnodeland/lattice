@@ -1070,6 +1070,18 @@
           ],
           "default": null
         },
+        "traceparent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Traceparent"
+        },
         "ts": {
           "format": "date-time",
           "title": "Ts",

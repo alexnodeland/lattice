@@ -49,7 +49,7 @@ The library provides the machinery; applications provide the artifact types. A r
 | **Workspace** | A tenant-scoped handle over artifacts, threads and the event log. The only way to read or write. |
 | **Session** | The pydantic-ai dependencies for one agent run: a workspace handle bound to the agent's actor, the thread, the artifacts in focus, and the application's own deps. |
 
-Supporting types: `Envelope` (an event plus its `seq`, actor, timestamp and scope), `Proposal` (a suggested change awaiting a decision), `Thread` (a chat), and `Feedback` (a typed judgement of an artifact version, a thread, a turn or a message).
+Supporting types: `Envelope` (an event plus its `seq`, actor, timestamp, scope and trace context), `Proposal` (a suggested change awaiting a decision), `Thread` (a chat), and `Feedback` (a typed judgement of an artifact version, a thread, a turn or a message).
 
 ## Layers
 
@@ -194,7 +194,7 @@ erDiagram
 - **One event log per workspace**, with a single gap-free `seq`. Events carry an optional `thread_id` and `run_id`, and subscribers filter on them.
 - **Proposals** are durable objects that wrap the command they would execute (create, edit or archive), with its base version, the proposer and a rationale.
 - **Model history** (pydantic-ai `ModelMessage`s, serialized with `ModelMessagesTypeAdapter`) is stored per thread next to the log, not reconstructed from it.
-- **Trace links.** A run records the OpenTelemetry trace id of each attempt (`Run.trace_ids`, from the `trace_id` of each `run_started`), since a run that pauses and resumes runs once per attempt. A revision records the trace it was committed in (`Revision.trace_id`), stamped by the workspace. They let feedback on a turn or an artifact version find the trace it is about. Both are stored in the entities' JSON, so they need no schema change ([ADR-0033](adr/0033-trace-links-on-runs-and-revisions.md)).
+- **Trace links.** A run records the OpenTelemetry trace id of each attempt (`Run.trace_ids`, from the `trace_id` of each `run_started`), since a run that pauses and resumes runs once per attempt. A revision records the trace it was committed in (`Revision.trace_id`), stamped by the workspace, and an envelope the W3C trace context of the span it was committed in (`traceparent`, as on reflexr's envelopes). They let feedback on a turn or an artifact version find the trace it is about, and what an event causes elsewhere link back to it. All are stored in JSON, so they need no schema change ([ADR-0033](adr/0033-trace-links-on-runs-and-revisions.md)).
 
 ## The write path
 
@@ -389,7 +389,7 @@ One protocol, `Storage`, covers everything a workspace persists ([ADR-0019](adr/
 class Transaction(Protocol):
     async def load(self, needs: Needs) -> State: ...
     async def save(
-        self, result: CommitResult, *, actor: Actor
+        self, result: CommitResult, *, actor: Actor, traceparent: str | None = None
     ) -> list[Envelope]: ...  # assigns seq
     async def append_history(self, thread_id: ThreadId, messages: bytes) -> None: ...
 
@@ -457,7 +457,7 @@ artifactr is traced and measured through the OpenTelemetry API only, under the i
 
 Every span artifactr owns or wraps is attributed: `artifactr.tenant.id`, `artifactr.workspace.id` and `artifactr.actor.kind`; with a thread, `session.id`, `gen_ai.conversation.id` and `artifactr.thread.id` set to the thread id, which is the session; with a run, `artifactr.run.id`; and for a person, `user.id`. The `Runner` passes the thread as pydantic-ai's `conversation_id`, and never passes artifactr's run id as pydantic-ai's `run_id`: an artifactr run spans pauses, and each attempt is a separate pydantic-ai run. artifactr's own spans carry ids, kinds, versions and counts, never content; prompts and messages are on pydantic-ai's spans when its `include_content` is on.
 
-Each attempt's trace id is recorded with `run_started`, and each revision records the trace it was committed in ([ADR-0033](adr/0033-trace-links-on-runs-and-revisions.md)).
+Each attempt's trace id is recorded with `run_started`, each revision records the trace it was committed in, and each envelope the W3C trace context (`traceparent`) of the span that committed it, from `current_traceparent()` ([ADR-0033](adr/0033-trace-links-on-runs-and-revisions.md)).
 
 ### Metrics
 

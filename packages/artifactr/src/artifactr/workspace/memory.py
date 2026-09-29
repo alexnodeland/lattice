@@ -88,7 +88,9 @@ class _Transaction:
             runs={i: _latest(pending.runs, self._data.runs, i) for i in needs.runs},
         )
 
-    async def save(self, result: CommitResult, *, actor: Actor) -> list[Envelope]:
+    async def save(
+        self, result: CommitResult, *, actor: Actor, traceparent: str | None = None
+    ) -> list[Envelope]:
         head = len(self._data.log) + len(self._envelopes)
         now = self._clock()
         envelopes: list[Envelope] = []
@@ -103,6 +105,7 @@ class _Transaction:
                     thread_id=thread_id,
                     run_id=run_id,
                     actor=actor,
+                    traceparent=traceparent,
                     event=event,
                 )
             )

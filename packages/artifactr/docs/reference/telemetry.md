@@ -43,6 +43,8 @@ These are what artifactr's components record with. Applications rarely need them
 
 ::: artifactr.telemetry.current_trace_id
 
+::: artifactr.telemetry.current_traceparent
+
 ::: artifactr.telemetry.record_events
 
 ::: artifactr.telemetry.command_attributes

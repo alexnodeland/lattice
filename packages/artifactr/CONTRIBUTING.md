@@ -89,7 +89,7 @@ fix(workspace): release the run lease when a run is cancelled
 docs(adr): record the documentation tooling decision
 ```
 
-Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Scopes are package or area names: `core`, `telemetry`, `workspace`, `agent`, `scores`, `sql`, `fastapi`, `mcp`, `otel`, `langfuse`, `litellm`, `examples`, `deploy`, `docs`, `adr`, `rfc`. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The changelog is generated from these messages.
+Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Scopes are package or area names: `core`, `telemetry`, `workspace`, `agent`, `scores`, `sql`, `fastapi`, `mcp`, `otel`, `langfuse`, `litellm`, `examples`, `deploy`, `docs`, `adr`, `rfc`. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The changelog is generated from these messages. Don't edit `CHANGELOG.md` by hand: the documentation site regenerates it from `main`'s history on every build, and `make changelog` regenerates the file before a release.
 
 ## Dependencies
 

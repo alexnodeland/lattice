@@ -5,6 +5,41 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Features
+
+- **evals**: The [evals] extra over evalr ([#39](https://github.com/alexnodeland/artifactr/pull/39))
+- **examples**: Docplan observed, rated and routed when configured ([#35](https://github.com/alexnodeland/artifactr/pull/35))
+- **litellm**: Route agents through a LiteLLM proxy, with typed guardrail blocks ([#34](https://github.com/alexnodeland/artifactr/pull/34))
+- **agent**: Typed run failures, recorded with a reason ([#33](https://github.com/alexnodeland/artifactr/pull/33))
+- **deploy**: Grafana dashboards, tested against the metric registry ([#32](https://github.com/alexnodeland/artifactr/pull/32))
+- **langfuse**: The Langfuse adapter for traces and feedback scores ([#30](https://github.com/alexnodeland/artifactr/pull/30))
+- **scores**: Feedback as scores, a log mirror, and their ports ([#29](https://github.com/alexnodeland/artifactr/pull/29))
+- **core**: Typed feedback, evaluator actors and the give_feedback command ([#28](https://github.com/alexnodeland/artifactr/pull/28))
+- **otel**: Configure_telemetry, an OpenTelemetry SDK adapter ([#27](https://github.com/alexnodeland/artifactr/pull/27))
+- **telemetry**: Trace turns, commits and tool calls, with a metric registry ([#26](https://github.com/alexnodeland/artifactr/pull/26))
+- **core**: Record each run attempt's trace id ([#25](https://github.com/alexnodeland/artifactr/pull/25))
+
+### Bug fixes
+
+- **otel**: Instrument httpx2 when httpx is not installed ([#37](https://github.com/alexnodeland/artifactr/pull/37))
+
+### Documentation
+
+- Render lists on the site as GitHub does, and check them in the build ([#43](https://github.com/alexnodeland/artifactr/pull/43))
+- Wrap up RFC-0002: status, open questions and ADR action items ([#36](https://github.com/alexnodeland/artifactr/pull/36))
+- **rfc**: RFC-0002 observability, feedback, evaluation and the LLM gateway ([#21](https://github.com/alexnodeland/artifactr/pull/21))
+
+### Testing
+
+- No inline suppressions anywhere, as in reflexr ([#40](https://github.com/alexnodeland/artifactr/pull/40))
+
+### Miscellaneous
+
+- Hold the docs script to the library's gates, and mark RFC-0002 Implemented ([#41](https://github.com/alexnodeland/artifactr/pull/41))
+- A contributor Compose stack and a Compose-based dev container ([#31](https://github.com/alexnodeland/artifactr/pull/31))
+
 ## [0.1.0] - 2026-09-28
 
 ### Features
@@ -37,4 +72,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **deps**: Update only the lockfile, keeping supported version ranges ([#5](https://github.com/alexnodeland/artifactr/pull/5))
 - Lay the foundation for the v0.1 library ([#2](https://github.com/alexnodeland/artifactr/pull/2))
 
+[unreleased]: https://github.com/alexnodeland/artifactr/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0
+

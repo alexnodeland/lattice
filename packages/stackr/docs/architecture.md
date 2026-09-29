@@ -9,7 +9,7 @@
 | `langfuse` profile: Langfuse web and worker, ClickHouse, Valkey, MinIO | Implemented |
 | Local Supabase, through its CLI: the default database adapter | Implemented |
 | `postgres` profile: plain PostgreSQL, the alternative database adapter | Implemented |
-| `gateway` profile: the LiteLLM proxy | Planned (phase 4) |
+| `gateway` profile: the LiteLLM proxy, with a team per tenant | Implemented |
 | The application template (Copier) and the `app` profile | Planned (phase 5) |
 | Documentation site | Planned (phase 6) |
 
@@ -30,13 +30,13 @@ Applications talk only to **ports**: a stable protocol at a stable address, conf
 |---|---|---|---|---|
 | Telemetry | OTLP to the Collector: gRPC 4317, HTTP 4318 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | The Collector, exporting to Tempo, Prometheus, Loki and Langfuse | Implemented |
 | Profiles | Pyroscope's push API | `PYROSCOPE_SERVER_ADDRESS` | Pyroscope | Implemented |
-| LLM gateway | OpenAI-compatible HTTP API, with models named by alias or group | `LITELLM_BASE_URL`, `LITELLM_API_KEY`; `OPENAI_BASE_URL`, `OPENAI_API_KEY` for OpenAI SDKs | The LiteLLM proxy | Planned (phase 4) |
+| LLM gateway | OpenAI-compatible HTTP API, with models named by alias or group | `LITELLM_BASE_URL`, `LITELLM_API_KEY`; `OPENAI_BASE_URL`, `OPENAI_API_KEY` for OpenAI SDKs | The LiteLLM proxy | Implemented |
 | Database | A PostgreSQL connection string | `DATABASE_URL` | Local Supabase's PostgreSQL; plain PostgreSQL as the alternative | Implemented |
 | Object storage | The S3 API | `S3_ENDPOINT_URL`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | MinIO | Implemented |
 | Identity | JWTs, verified against the issuer's key set | `AUTH_ISSUER`, `AUTH_JWKS_URL`, `AUTH_AUDIENCE` | Supabase Auth | Planned (phase 5) |
 | Evaluation data | Langfuse's public API, for scores and datasets | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | Self-hosted Langfuse | Implemented |
 
-The settings are a contract with the libraries' extras and the application template, which generates applications wired to these ports only. The stack's own services use the same ports: Langfuse reaches PostgreSQL, S3 and the Redis protocol through settings in `.env`, so their adapters can change as well. Profiles and evaluation data are the two narrow ports: profiles go to Pyroscope directly until OTLP profiles are stable in the Collector, and Langfuse's API carries scores and datasets, never traces.
+The settings are a contract with the libraries' extras and the application template, which generates applications wired to these ports only. The stack's own services use the same ports: Langfuse and the gateway reach PostgreSQL, S3 and the Redis protocol through settings in `.env`, and the gateway sends its telemetry to the Collector, so their adapters can change as well. Profiles and evaluation data are the two narrow ports: profiles go to Pyroscope directly until OTLP profiles are stable in the Collector, and Langfuse's API carries scores and datasets, never traces.
 
 ## Layout
 
@@ -82,6 +82,8 @@ graph LR
     collector -- "OTLP HTTP /api/v1/otlp" --> prometheus["prometheus"]
     collector -- "OTLP HTTP /otlp" --> loki["loki"]
     collector -- "OTLP HTTP /api/public/otel<br/>+ x-langfuse-ingestion-version: 4" --> langfuse["langfuse-web"]
+    app -- "OpenAI API + traceparent" --> litellm["litellm"]
+    litellm -- "OTLP HTTP" --> collector
     tempo -- "span metrics, service graphs<br/>(remote write)" --> prometheus
     app -- "profiles" --> pyroscope["pyroscope"]
     grafana["grafana"] --> tempo & prometheus & loki & pyroscope
@@ -102,6 +104,7 @@ Prometheus translates OTLP metrics with its default strategy. The libraries' das
 - `service.name` becomes the `job` label. `deployment.environment.name` and `service.version` are copied from the resource onto every series (as `deployment_environment_name` and `service_version`); other resource attributes are on `target_info`.
 - Data point attributes become labels with dots turned into underscores: `artifactr.command.type` becomes `artifactr_command_type`.
 - Tempo's metrics generator adds `traces_spanmetrics_calls_total`, `traces_spanmetrics_latency_bucket` and `traces_service_graph_request_total`, labelled by `service`, `span_name`, `span_kind` and `status_code`.
+- The gateway adds `gen_ai_client_token_usage`, `gen_ai_usage_cost_USD` and `gen_ai_client_operation_duration_seconds` (histograms, with `job="litellm"`), labelled by model, provider and the tenant's team (`metadata_user_api_key_team_id`).
 
 ### Grafana
 
@@ -138,6 +141,33 @@ Self-hosted Langfuse 4, for LLM traces, sessions, scores and datasets ([ADR-0008
 - **Traces arrive through the Collector,** never directly: its `otlp_http/langfuse` exporter sends them to `/api/public/otel` with Basic credentials derived from the project's keys (`LANGFUSE_OTLP_AUTH`) and the `x-langfuse-ingestion-version: 4` header. Applications use Langfuse's API only for scores and datasets, the evaluation data port.
 - **Langfuse 4 reads trace-level attributes from every span:** `session.id`, `user.id`, `langfuse.trace.name` and tags must be on each span the libraries own, not only the root.
 
+## The gateway profile
+
+The LiteLLM proxy is the LLM gateway port: an OpenAI-compatible API at <http://localhost:4400> (`litellm:4000` on the network) in front of the providers and local model servers ([ADR-0010](adr/0010-the-llm-gateway.md)). Its configuration is `deploy/litellm/config.yaml`.
+
+| Model name | Routes to | Falls back to |
+|---|---|---|
+| `default` | Claude Sonnet | `gpt-4o`, then `gemini-2.5-pro` |
+| `fast` | Claude Haiku | `gpt-4o-mini`, then `gemini-2.5-flash` |
+| `claude-sonnet`, `claude-opus`, `claude-haiku` | Anthropic | |
+| `gpt-4o`, `gpt-4o-mini` | OpenAI | |
+| `gemini-2.5-pro`, `gemini-2.5-flash` | Gemini | |
+| `openrouter/<vendor>/<model>` | Any OpenRouter model | |
+| `lmstudio`, `omlx/<model>` | LM Studio and oMLX on this machine, through `host.docker.internal` (`LM_STUDIO_API_BASE`, `OMLX_API_BASE`) | |
+
+- **Provider keys** (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`) go in `.env`. A missing one fails only the requests that need it, and the router falls back.
+- **Tenants:** each tenant is a team, `tenant-<name>`, with a budget per period (calendar-aligned: `30d` resets on the 1st) and optional rate limits and model list. `make tenant NAME=acme` (or `scripts/create-tenant acme --max-budget 20 --rpm-limit 60`) creates the team and a key, and prints the settings an application reads: `LITELLM_BASE_URL` and `LITELLM_API_KEY`. Running it again keeps the team and creates a key only for a new `--key-alias`. The master key (`LITELLM_MASTER_KEY`) only administers the proxy; the admin UI is at <http://localhost:4400/ui>, as `admin` with the master key.
+- **Guardrails,** chosen per request with `"guardrails": ["pii-mask"]` in the request body:
+
+  | Name | What it does |
+  |---|---|
+  | `pii-mask` | Masks email addresses, US phone and social security numbers, card numbers, and AWS and GitHub credentials before the request reaches the model |
+  | `prompt-injection` | Blocks jailbreak, system-prompt and data-exfiltration attempts, with HTTP 400 naming the guardrail |
+
+  The response header `x-litellm-applied-guardrails` lists the guardrails that ran. Attaching guardrails to a team or key needs an Enterprise licence, so the libraries choose them per request, from each workspace's or rule's policy.
+- **Telemetry:** the proxy continues the caller's trace from its `traceparent` header, so one trace runs from the application through the proxy to the model call, in Tempo and Langfuse. Prompts and responses are not put on spans. Its metrics carry the tenant's team, not per-key ids. Both are on when the `observability` profile runs.
+- **State:** its database `litellm` on the database adapter, created by `db-init`; routing state and a 10-minute response cache in database 1 of the shared Valkey.
+
 ## The database
 
 The stack's services keep their data in PostgreSQL through the database port. One setting in `.env`, `STACKR_DATABASE`, chooses the adapter, and `make` derives the rest ([ADR-0009](adr/0009-local-supabase-as-the-database-adapter.md)):
@@ -147,8 +177,8 @@ The stack's services keep their data in PostgreSQL through the database port. On
 | `supabase` (default) | Local Supabase's PostgreSQL | `make up`, through the Supabase CLI | `supabase_db_stackr-supabase` | `postgres`, with Supabase's fixed local password `postgres` | 54322 |
 | `postgres` | Plain PostgreSQL, the `postgres` profile | `make up`, through Compose | `postgres` | `postgres`, with `POSTGRES_ADMIN_PASSWORD` from `.env` | 55432 |
 
-- **Supabase starts with the profiles that need it:** `make up` runs `supabase start` when a profile that keeps data in PostgreSQL (`langfuse`, and the gateway in phase 4) is chosen. `make up PROFILES=observability` leaves it off.
-- **`db-init`** runs `deploy/postgres/init.sql` with `psql` on every start, before the services that need it. For each service (Langfuse now; the gateway in phase 4) it creates a login role with the password from `.env`, resets the password so the two stay in step, and creates the service's database, owned by its role and in UTC. On Supabase, whose `postgres` role is not a superuser, it first grants itself the role, which PostgreSQL 16 and later require for creating a database owned by it.
+- **Supabase starts with the profiles that need it:** `make up` runs `supabase start` when a profile that keeps data in PostgreSQL (`langfuse`, `gateway`) is chosen. `make up PROFILES=observability` leaves it off.
+- **`db-init`** runs `deploy/postgres/init.sql` with `psql` on every start, before the services that need it. For each service (Langfuse and the gateway) it creates a login role with the password from `.env`, resets the password so the two stay in step, and creates the service's database, owned by its role and in UTC. On Supabase, whose `postgres` role is not a superuser, it first grants itself the role, which PostgreSQL 16 and later require for creating a database owned by it.
 - **After `supabase db reset` or `supabase stop --no-backup`,** which delete Supabase's database volume, the next `make up` recreates the stack's databases, empty.
 
 ## Local Supabase
@@ -175,6 +205,7 @@ The `supabase/` directory is a Supabase CLI project, close to what `supabase ini
 | `make up` | Start the stack, or the profiles named in `PROFILES` (`make up PROFILES=observability`), with local Supabase or the `postgres` profile when they need a database |
 | `make down` / `make reset` | Stop the stack and local Supabase, keeping or deleting their data volumes |
 | `make dashboards` | Download the libraries' dashboards at the releases pinned in `versions.env` |
+| `make tenant NAME=acme` | Create a tenant's team and key on the gateway |
 | `make validate` | Check every configuration without starting containers |
 | `make smoke` | Send test telemetry through the running stack and check it arrives |
 
@@ -189,9 +220,10 @@ CI checks the stack two ways on every pull request, with the same scripts as `ma
 - each service's configuration with that service's own validator, run from the image `compose.yaml` pins: `otelcol-contrib validate` for the Collector, `promtool check config` for Prometheus, `-config.verify` for Tempo and `-verify-config` for Loki
 - the Grafana dashboards: valid JSON, unique uids, and only the provisioned data sources
 - the Supabase project: its id differs from the Compose project's, and `compose.yaml` and the Makefile use the names it gives
+- the gateway's configuration, which has no validator of its own: fallbacks name existing model groups, guardrails use open-source integrations and valid modes, every `os.environ/` reference is set in `compose.yaml`, and no key is in the file
 - the scripts, with shellcheck and ruff
 
-**With containers,** the smoke job starts each profile and runs `scripts/smoke`: `observability` alone, and `observability langfuse` on each database adapter. For `observability`, it sends a trace, a metric and a log through the Collector with `telemetrygen`, and finds:
+**With containers,** the smoke job starts each profile and runs `scripts/smoke`: `observability` alone, and everything on each database adapter. For `observability`, it sends a trace, a metric and a log through the Collector with `telemetrygen`, and finds:
 
 - the trace in Tempo, by a TraceQL search on the run's id
 - the metric in Prometheus as `stackr_smoke_total`, which also checks the name translation above
@@ -200,3 +232,5 @@ CI checks the stack two ways on every pull request, with the same scripts as `ma
 - Grafana's four data sources healthy, and the Collector dashboard provisioned
 
 For the database adapter, it queries over `db-init`'s own connection that Langfuse's database exists, and with local Supabase that its API answers. For `langfuse` (with `observability`), it sends a trace with a known id to the Collector's HTTP port and finds it in Langfuse through the public API (`/api/public/v2/observations`) and in Tempo, which checks the Collector's route and credentials and Langfuse's ingestion end to end.
+
+For `gateway`, it checks that the proxy loaded both guardrails and both model groups, then creates a key on the `stackr-smoke` team (the only one allowed mocked responses) and sends a mocked request with a `traceparent`: it must be routed to `default`, masked by `pii-mask` and priced, the key's spend must be recorded, `prompt-injection` must block an injection, and the proxy's spans must continue the caller's trace in Tempo and Langfuse. No provider key is needed.

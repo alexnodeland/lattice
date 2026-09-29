@@ -36,11 +36,11 @@ jobs:
           - name: observability
             profiles: observability
             database: supabase
-          - name: langfuse on local Supabase
-            profiles: observability langfuse
+          - name: everything on local Supabase
+            profiles: observability langfuse gateway
             database: supabase
-          - name: langfuse on PostgreSQL
-            profiles: observability langfuse
+          - name: everything on PostgreSQL
+            profiles: observability langfuse gateway
             database: postgres
     env:
       PROFILES: ${{ matrix.profiles }}
@@ -57,7 +57,7 @@ jobs:
       - name: Read versions.env
         run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
       - uses: supabase/setup-cli@v3
-        if: matrix.database == 'supabase' && contains(matrix.profiles, 'langfuse')
+        if: matrix.database == 'supabase' && matrix.profiles != 'observability'
         with:
           version: ${{ env.SUPABASE_CLI_VERSION }}
       - run: make env

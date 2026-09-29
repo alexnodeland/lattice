@@ -17,7 +17,7 @@ unexport DOCKER_DEFAULT_PLATFORM
 
 # The profiles `make up` starts: all of them unless you choose, for example
 #   make up PROFILES=observability
-ALL_PROFILES := observability langfuse
+ALL_PROFILES := observability langfuse gateway
 PROFILES ?= $(ALL_PROFILES)
 
 # --- the database adapter (ADR-0009) -----------------------------------------
@@ -53,12 +53,14 @@ endif
 
 PROFILE_FLAGS = $(foreach profile,$(PROFILES) $(DATABASE_PROFILES),--profile $(profile))
 
-# The Collector sends traces to Langfuse only when the langfuse profile runs.
+# The Collector sends traces to Langfuse only when the langfuse profile runs,
+# and the gateway sends telemetry only when the Collector runs.
 comma := ,
 TRACES_EXPORTERS = [otlp_grpc/tempo$(if $(filter langfuse,$(PROFILES)),$(comma) otlp_http/langfuse)]
-COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' $(DATABASE_ENV)
+GATEWAY_TELEMETRY = $(if $(filter observability,$(PROFILES)),true,false)
+COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEMETRY=$(GATEWAY_TELEMETRY) $(DATABASE_ENV)
 
-.PHONY: help install env up down reset ps logs dashboards validate smoke changelog clean
+.PHONY: help install env up down reset ps logs dashboards tenant validate smoke changelog clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -97,6 +99,10 @@ logs: ## Follow the logs of the running services
 
 dashboards: ## Download the libraries' Grafana dashboards pinned in versions.env
 	$(UV) run scripts/fetch-dashboards
+
+tenant: ## Create a tenant's team and key on the gateway: make tenant NAME=acme [TENANT_FLAGS="--max-budget 20"]
+	@if [ -z "$(NAME)" ]; then echo "usage: make tenant NAME=<tenant> [TENANT_FLAGS=...]"; exit 2; fi
+	$(UV) run scripts/create-tenant $(NAME) $(TENANT_FLAGS)
 
 validate: .env ## Validate every configuration without starting containers, as CI does
 	scripts/validate

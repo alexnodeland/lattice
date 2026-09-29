@@ -6,6 +6,7 @@
 #                  Tempo, Prometheus, Loki, Pyroscope and Grafana behind it
 #   langfuse       Langfuse, behind the Collector for traces, with ClickHouse,
 #                  MinIO (the S3 port) and Valkey (the Redis protocol)
+#   gateway        the LiteLLM proxy (the LLM gateway port), with Valkey
 #   postgres       plain PostgreSQL, the alternative database adapter
 #   smoke          telemetrygen, for scripts/smoke
 # The database adapter is local Supabase by default, run beside this project
@@ -213,7 +214,7 @@ services:
   # every start (deploy/postgres/init.sql), then exits.
   db-init:
     image: postgres:17.11-alpine
-    profiles: [langfuse]
+    profiles: [langfuse, gateway]
     restart: "no"
     command: ["psql", "--no-psqlrc", "--quiet", "--file=/init.sql"]
     # The adapter's host and admin password default to local Supabase's
@@ -227,6 +228,7 @@ services:
       PGPASSWORD: ${STACKR_DB_ADMIN_PASSWORD:-postgres}
       PGCONNECT_TIMEOUT: "10"
       LANGFUSE_DB_PASSWORD: ${LANGFUSE_DB_PASSWORD:?run make env}
+      LITELLM_DB_PASSWORD: ${LITELLM_DB_PASSWORD:?run make env}
     volumes:
       - ./deploy/postgres/init.sql:/init.sql:ro
     networks: [default, supabase]
@@ -236,10 +238,12 @@ services:
         required: false
 
   # The Redis protocol, with Valkey as its adapter: Langfuse's queues and
-  # cache. `noeviction`, because queued jobs must not be dropped.
+  # cache (database 0) and the gateway's routing state and cache (database 1).
+  # `noeviction`, because queued jobs must not be dropped; the gateway's
+  # entries expire by their TTLs.
   redis:
     image: valkey/valkey:9.0.6-alpine
-    profiles: [langfuse]
+    profiles: [langfuse, gateway]
     restart: unless-stopped
     # The password goes into a config file, never onto the command line.
     entrypoint:
@@ -357,6 +361,65 @@ services:
       retries: 30
       start_period: 120s
     depends_on: *langfuse-depends-on
+
+  # The LLM gateway port: an OpenAI-compatible API in front of the providers
+  # and local model servers in deploy/litellm/config.yaml (ADR-0010).
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.103.0
+    profiles: [gateway]
+    restart: unless-stopped
+    command: ["--config", "/etc/litellm/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?run make env}
+      # Encrypts credentials stored in the database; must never change.
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?run make env}
+      # yamllint disable-line rule:line-length
+      DATABASE_URL: postgresql://litellm:${LITELLM_DB_PASSWORD:?run make env}@${STACKR_DB_HOST:-supabase_db_stackr-supabase}:5432/litellm
+      REDIS_URL: redis://:${REDIS_PASSWORD:?run make env}@redis:6379/1
+      # Provider keys: empty ones fail only the requests that need them.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      LM_STUDIO_API_BASE: ${LM_STUDIO_API_BASE:-http://host.docker.internal:1234/v1}
+      OMLX_API_BASE: ${OMLX_API_BASE:-http://host.docker.internal:4243/v1}
+      # Traces to the Collector, continuing the caller's `traceparent`, with
+      # prompts and responses left out. `make up` turns it off when the
+      # observability profile isn't running.
+      LITELLM_OTEL_V2: ${STACKR_GATEWAY_TELEMETRY:-true}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_SERVICE_NAME: litellm
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=${STACKR_ENVIRONMENT:-local}
+      LITELLM_OTEL_INTEGRATION_ENABLE_METRICS: ${STACKR_GATEWAY_TELEMETRY:-true}
+      # Use the bundled model prices, and read no .env of its own.
+      LITELLM_LOCAL_MODEL_COST_MAP: "True"
+      LITELLM_MODE: PRODUCTION
+    volumes:
+      - ./deploy/litellm/config.yaml:/etc/litellm/config.yaml:ro
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${LITELLM_PORT:-4400}:4000
+    # Local model servers run on the host.
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    networks: [default, supabase]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import sys, urllib.request;
+          sys.exit(urllib.request.urlopen('http://127.0.0.1:4000/health/readiness', timeout=3).status != 200)
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
   # Sends test telemetry for scripts/smoke; not a service.
   telemetrygen:

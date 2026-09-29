@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Static checks that no service's own validator covers. Run by scripts/validate.
 
-Usage: scripts/check-config {dashboards,supabase}
+Usage: scripts/check-config {dashboards,supabase,litellm}
 
 dashboards: every dashboard under deploy/grafana/dashboards is valid JSON, has
 a unique uid and a title, and refers only to the data sources Grafana is
@@ -10,6 +10,12 @@ provisioned with (by uid), or to a dashboard variable.
 supabase: supabase/config.toml's project_id differs from the Compose project's
 name (the CLI labels its containers as a Compose project too), and compose.yaml
 and the Makefile name the network and database host that project_id gives.
+
+litellm: the gateway's config has no validator of its own, and the proxy
+starts without a guardrail it can't load. Every model group a fallback names
+exists, guardrails use integrations that need no licence and valid modes,
+every `os.environ/` reference is set on the litellm service in compose.yaml,
+and no key is written into the file.
 """
 
 from __future__ import annotations
@@ -103,8 +109,78 @@ def check_supabase() -> list[str]:
     return problems
 
 
+# Guardrail integrations that run in the open-source proxy (ADR-0010).
+OPEN_GUARDRAILS = {
+    "litellm_content_filter",
+    "presidio",
+    "openai_moderation",
+    "lakera_v2",
+    "bedrock",
+    "generic_guardrail_api",
+}
+GUARDRAIL_MODES = {"pre_call", "post_call", "during_call", "logging_only"}
+ENV_REF = re.compile(r"^os\.environ/(\w+)$")
+
+
+def check_litellm() -> list[str]:
+    """Check the gateway's config against itself and compose.yaml."""
+    config = yaml.safe_load((ROOT / "deploy" / "litellm" / "config.yaml").read_text())
+    compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
+    environment = set(compose["services"]["litellm"].get("environment") or {})
+    problems: list[str] = []
+
+    models = {entry["model_name"] for entry in config.get("model_list", [])}
+    for entry in config.get("model_list", []):
+        params = entry.get("litellm_params") or {}
+        if "model" not in params:
+            problems.append(f"model {entry['model_name']!r} has no litellm_params.model")
+        key = str(params.get("api_key", ""))
+        if key and not ENV_REF.match(key) and (key.startswith("sk-") or len(key) > 20):
+            problems.append(f"model {entry['model_name']!r} has a key in the file; use os.environ/")
+
+    for fallback in (config.get("router_settings") or {}).get("fallbacks", []):
+        for group, targets in fallback.items():
+            for name in [group, *targets]:
+                if name not in models:
+                    problems.append(f"fallback names {name!r}, which isn't a model_name")
+
+    names: set[str] = set()
+    for guardrail in config.get("guardrails", []):
+        name, params = guardrail.get("guardrail_name"), guardrail.get("litellm_params") or {}
+        if name in names:
+            problems.append(f"guardrail {name!r} is defined twice")
+        names.add(name)
+        if params.get("guardrail") not in OPEN_GUARDRAILS:
+            problems.append(
+                f"guardrail {name!r} uses {params.get('guardrail')!r}, not an open integration"
+            )
+        modes = params.get("mode")
+        modes = modes if isinstance(modes, list) else [modes]
+        if not set(modes) <= GUARDRAIL_MODES:
+            problems.append(f"guardrail {name!r} has mode {params.get('mode')!r}")
+
+    def references(node: Any) -> Iterator[str]:
+        if isinstance(node, str) and (match := ENV_REF.match(node)):
+            yield match[1]
+        elif isinstance(node, dict):
+            for value in node.values():
+                yield from references(value)
+        elif isinstance(node, list):
+            for item in node:
+                yield from references(item)
+
+    for name in sorted(set(references(config)) - environment):
+        problems.append(f"os.environ/{name} isn't set on the litellm service in compose.yaml")
+    if not ENV_REF.match(str((config.get("general_settings") or {}).get("master_key", ""))):
+        problems.append("general_settings.master_key must come from os.environ/")
+
+    if not problems:
+        print(f"ok: {len(models)} model names, {len(names)} guardrails, every reference set")
+    return problems
+
+
 def main() -> int:
-    checks = {"dashboards": check_dashboards, "supabase": check_supabase}
+    checks = {"dashboards": check_dashboards, "supabase": check_supabase, "litellm": check_litellm}
     if len(sys.argv) != 2 or sys.argv[1] not in checks:
         print(f"usage: scripts/check-config {{{','.join(checks)}}}", file=sys.stderr)
         return 2

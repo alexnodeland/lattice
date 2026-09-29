@@ -26,6 +26,9 @@ Applications send OTLP to `localhost:4317` (gRPC) or `localhost:4318` (HTTP), or
 | Grafana | <http://localhost:3000> | `admin`, `GRAFANA_ADMIN_PASSWORD` |
 | Langfuse | <http://localhost:3300> | `LANGFUSE_ADMIN_EMAIL`, `LANGFUSE_ADMIN_PASSWORD` |
 | Supabase Studio | <http://localhost:54323> | |
+| LiteLLM admin UI | <http://localhost:4400/ui> | `admin`, `LITELLM_MASTER_KEY` |
+
+Applications reach models through the gateway at `http://localhost:4400` with a tenant's key: `make tenant NAME=acme` creates one. Provider keys go in `.env`.
 
 Run `make` to list every command. [CONTRIBUTING](CONTRIBUTING.md) covers the workflow.
 

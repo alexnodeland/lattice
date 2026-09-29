@@ -24,6 +24,7 @@ Run `make` on its own to list every command:
 | `make reset` | Stop the stack and local Supabase, and delete their data volumes |
 | `make ps` / `make logs` | Show the stack's containers, or follow their logs |
 | `make dashboards` | Download the libraries' Grafana dashboards at the releases pinned in `versions.env` |
+| `make tenant NAME=acme` | Create a tenant's team and key on the gateway |
 | `make validate` | Validate every configuration without starting containers, as CI does |
 | `make smoke` | Send test telemetry through the running stack and check it arrives, as CI does |
 | `make changelog` | Regenerate `CHANGELOG.md` from commit history |
@@ -79,6 +80,7 @@ CI runs the same scripts as `make validate` and `make smoke`.
 - **Compose configuration** for each profile on its own and all together, failing on warnings such as a variable missing from `.env`.
 - **Each service's configuration with its own validator**, from the image `compose.yaml` pins: the Collector, Prometheus, Tempo and Loki.
 - **The Supabase project's names** agree across `supabase/config.toml`, `compose.yaml` and the Makefile.
+- **The gateway's configuration:** fallbacks, guardrails and environment references, since LiteLLM has no validator and starts without a guardrail it can't load.
 - **Grafana dashboards:** valid JSON, unique uids, and only the provisioned data sources.
 - **shellcheck** for the shell scripts, and **ruff** for the Python ones.
 

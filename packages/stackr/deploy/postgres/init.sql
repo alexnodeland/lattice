@@ -25,3 +25,19 @@ GRANT langfuse TO CURRENT_USER;
 SELECT 'CREATE DATABASE langfuse OWNER langfuse'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'langfuse') \gexec
 ALTER DATABASE langfuse SET timezone TO 'UTC';
+
+-- LiteLLM
+\getenv litellm_password LITELLM_DB_PASSWORD
+SELECT 'CREATE ROLE litellm LOGIN'
+WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'litellm') \gexec
+ALTER ROLE litellm WITH LOGIN PASSWORD :'litellm_password';
+SELECT CASE
+  WHEN current_setting('server_version_num')::int >= 160000
+    THEN NOT pg_has_role(current_user, 'litellm', 'SET')
+  ELSE NOT pg_has_role(current_user, 'litellm', 'MEMBER')
+END AS needs_grant \gset
+\if :needs_grant
+GRANT litellm TO CURRENT_USER;
+\endif
+SELECT 'CREATE DATABASE litellm OWNER litellm'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'litellm') \gexec

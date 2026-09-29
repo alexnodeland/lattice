@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""Create a tenant's team and a virtual key on the LLM gateway (the LiteLLM proxy).
+
+Usage: scripts/create-tenant TENANT [options]
+
+Each tenant is a LiteLLM team, `tenant-<TENANT>`, with its own budget and rate
+limits; applications call the gateway with one of the team's keys, never the
+master key (ADR-0010). Running this again is safe: an existing team is kept as
+it is, and a new key is created only when the key alias is new, since a key's
+secret can't be read back.
+
+Options:
+  --max-budget USD        the team's budget per period (default 10)
+  --budget-duration D     the period the budget resets on, like 30d or 7d (default 30d)
+  --rpm-limit N           requests per minute for the team (default: none)
+  --tpm-limit N           tokens per minute for the team (default: none)
+  --models A,B            model names the team may use (default: all)
+  --key-alias NAME        the key's alias, unique on the proxy (default: <TENANT>-default)
+  --allow-mock-responses  let the team's keys send `mock_response` (smoke tests only)
+  --quiet                 print only the new key
+
+The master key and the gateway's port come from .env. The key is printed once,
+with the settings an application reads to use the gateway.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parent.parent
+LINE = re.compile(r"^(?P<key>[A-Za-z_][A-Za-z0-9_]*)=(?P<value>.*)$")
+TENANT = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
+
+
+def settings() -> dict[str, str]:
+    """Read .env."""
+    values: dict[str, str] = {}
+    path = ROOT / ".env"
+    if not path.exists():
+        raise SystemExit("create-tenant: .env is missing; run `make env` and `make up` first")
+    for line in path.read_text().splitlines():
+        match = LINE.match(line.strip())
+        if match:
+            values[match["key"]] = match["value"]
+    return values
+
+
+class Gateway:
+    """The proxy's admin API, called with the master key."""
+
+    def __init__(self, base_url: str, master_key: str) -> None:
+        self.base_url = base_url
+        self.master_key = master_key
+
+    def call(self, method: str, path: str, body: dict[str, Any] | None = None) -> Any:
+        """Send one request; return the decoded JSON, or raise HTTPError."""
+        request = urllib.request.Request(
+            self.base_url + path,
+            method=method,
+            data=json.dumps(body).encode() if body is not None else None,
+            headers={
+                "Authorization": f"Bearer {self.master_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.loads(response.read() or b"null")
+
+
+def error_message(error: urllib.error.HTTPError) -> str:
+    """The proxy's error message, for an HTTP error."""
+    try:
+        return str(json.loads(error.read())["error"]["message"])
+    except (ValueError, KeyError, TypeError):
+        return f"HTTP {error.code}"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description=__doc__.splitlines()[0], usage="scripts/create-tenant TENANT [options]"
+    )
+    parser.add_argument("tenant")
+    parser.add_argument("--max-budget", type=float, default=10.0)
+    parser.add_argument("--budget-duration", default="30d")
+    parser.add_argument("--rpm-limit", type=int)
+    parser.add_argument("--tpm-limit", type=int)
+    parser.add_argument("--models", default="")
+    parser.add_argument("--key-alias")
+    parser.add_argument("--allow-mock-responses", action="store_true")
+    parser.add_argument("--quiet", action="store_true")
+    args = parser.parse_args()
+
+    if not TENANT.match(args.tenant):
+        parser.error("TENANT must be lowercase letters, digits and dashes")
+    env = settings()
+    base_url = f"http://127.0.0.1:{env.get('LITELLM_PORT', '4400')}"
+    gateway = Gateway(base_url, env.get("LITELLM_MASTER_KEY", ""))
+    team_id = f"tenant-{args.tenant}"
+    key_alias = args.key_alias or f"{args.tenant}-default"
+    metadata: dict[str, Any] = {"tenant": args.tenant}
+    if args.allow_mock_responses:
+        metadata["allow_client_mock_response"] = True
+
+    def say(message: str) -> None:
+        if not args.quiet:
+            print(message, file=sys.stderr)
+
+    team: dict[str, Any] = {
+        "team_id": team_id,
+        "team_alias": args.tenant,
+        "max_budget": args.max_budget,
+        "budget_duration": args.budget_duration,
+        "models": [model for model in args.models.split(",") if model],
+        "metadata": metadata,
+    }
+    if args.rpm_limit is not None:
+        team["rpm_limit"] = args.rpm_limit
+    if args.tpm_limit is not None:
+        team["tpm_limit"] = args.tpm_limit
+
+    try:
+        gateway.call("GET", f"/team/info?team_id={team_id}")
+        say(f"create-tenant: team {team_id} exists; kept as it is")
+    except urllib.error.HTTPError as error:
+        if error.code != 404:
+            raise SystemExit(
+                f"create-tenant: reading team {team_id}: {error_message(error)}"
+            ) from error
+        try:
+            gateway.call("POST", "/team/new", team)
+        except urllib.error.HTTPError as creating:
+            message = error_message(creating)
+            raise SystemExit(f"create-tenant: creating team {team_id}: {message}") from creating
+        say(f"create-tenant: created team {team_id}")
+    except urllib.error.URLError as error:
+        raise SystemExit(f"create-tenant: the gateway at {base_url}: {error.reason}") from error
+
+    try:
+        created = gateway.call(
+            "POST",
+            "/key/generate",
+            {"team_id": team_id, "key_alias": key_alias, "metadata": {"tenant": args.tenant}},
+        )
+    except urllib.error.HTTPError as error:
+        message = error_message(error)
+        if "already exists" in message:
+            say(f"create-tenant: key {key_alias} exists; use --key-alias for another key")
+            return 0
+        raise SystemExit(f"create-tenant: creating key {key_alias}: {message}") from error
+
+    if args.quiet:
+        print(created["key"])
+    else:
+        print(f"create-tenant: created key {key_alias}; it is shown only once", file=sys.stderr)
+        print(f"LITELLM_BASE_URL={base_url}")
+        print(f"LITELLM_API_KEY={created['key']}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

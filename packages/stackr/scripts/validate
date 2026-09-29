@@ -46,6 +46,9 @@ uv run scripts/check-config dashboards || fail "dashboards"
 step "The Supabase project"
 uv run scripts/check-config supabase || fail "supabase"
 
+step "The gateway's configuration"
+uv run scripts/check-config litellm || fail "litellm"
+
 step "Service configurations, with each service's own validator"
 # Each runs the image compose.yaml pins, offline, with the config mounted as
 # the service would see it.

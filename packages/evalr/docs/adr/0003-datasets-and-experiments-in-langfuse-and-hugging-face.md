@@ -29,4 +29,4 @@ Datasets seeded by people's feedback must be versioned, shareable and visible ne
 
 ## Action items
 
-1. [ ] Implement RFC-0001 phase 4.
+1. [x] Implement RFC-0001 phase 4.

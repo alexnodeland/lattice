@@ -9,7 +9,7 @@
 | `evalr.dspy` | Implemented |
 | `evalr.decision` | Implemented |
 | `evalr.langfuse` | Implemented |
-| `evalr.hf` | Planned (phase 4) |
+| `evalr.hf` | Implemented |
 | End-to-end measures and online helpers | Planned (phase 5) |
 
 ## What evalr is
@@ -232,7 +232,15 @@ A `DatasetStore` saves a dataset under its name and returns the revision it made
 | `InMemoryDatasetStore` (`evalr.memory`) | The content hash | JSON records in memory, validated again on load |
 | `JsonlDatasetStore(root)` (`evalr.jsonl`) | The content hash | A directory per dataset: `dataset.json` names the latest revision and holds the description; each revision is `{hash}.jsonl`, one example to a line, written whole. Names are `/`-separated segments of letters, digits, `.`, `_` and `-`, so they stay under the root. |
 | `LangfuseDatasetStore(client)` (`evalr.langfuse`) | The time of the save's latest change, as Langfuse recorded it | A Langfuse dataset of the same name, an item per example. Item ids are UUID 5s of the dataset's name and the example's id (Langfuse's ids are unique across a project), so syncing again updates items, and only changed items are written. An item holds the input, `{"verdict": ..., "reference": ...}` as its expected output, the metadata with the example's id under `evalr`, and the source trace. Removed examples are archived. Langfuse versions items by time, so loading a revision reads the items as they were then. Items made in Langfuse itself load with their expected output as the verdict. |
-| Hugging Face (phase 4) | | |
+| `HfDatasetStore(api=HfApi(), private=True)` (`evalr.hf`) | The commit's hash | A dataset repository of the same name on the Hugging Face Hub. Each save is one commit of the examples as JSON Lines (`data/train.jsonl`) and a dataset card (`README.md`), so a revision names the data exactly, forever. Loading takes a commit hash, a branch or a tag. |
+
+### The Hugging Face Hub
+
+The Hub holds published and pinned datasets ([ADR-0003](adr/0003-datasets-and-experiments-in-langfuse-and-hugging-face.md)):
+
+- **Export:** `HfDatasetStore.save` creates the repository if needed (private by default) and commits the examples and a dataset card together. The card's front matter points the Hub's viewer and `datasets.load_dataset` at the examples, and records under `evalr` the types, the description and the content hash; its body describes the dataset, its size and its verdict fields. The front matter is written as JSON, which is YAML.
+- **Import at a pinned revision:** only a full commit hash names the same data every time. `resolve_revision(repo_id, "v1")` pins a branch or tag to its commit, and `import_dataset(path, revision=commit, input_type=, verdict_type=, to_example=)` loads any dataset on the Hub (or a local directory) with `datasets`, as evalr's records or through a function from a row to an example; it refuses anything but a commit hash.
+- The store reaches the Hub through a narrow protocol, `HubApi`, which `huggingface_hub.HfApi` satisfies; the tests use a fake of it. `datasets` ships no type information, so `typings/datasets/` holds minimal stubs.
 
 A `FeedbackSource[InputT, VerdictT]` yields examples from people's feedback: every example has a verdict, ids are stable, and iterating again yields the same examples. artifactr's and reflexr's `[evals]` extras implement it over their logs; `InMemoryFeedbackSource` holds a fixed list. `collect(name, source)` gathers one into a dataset.
 

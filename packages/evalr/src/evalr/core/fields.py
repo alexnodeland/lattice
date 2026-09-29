@@ -17,13 +17,13 @@ import types
 from dataclasses import dataclass
 from enum import Enum, StrEnum
 from functools import cache
-from typing import Annotated, Literal, Union, get_args, get_origin
+from typing import Annotated, Literal, Union, cast, get_args, get_origin
 
 import annotated_types
-from pydantic import BaseModel
+from pydantic import BaseModel, JsonValue
 from pydantic.fields import FieldInfo
 
-__all__ = ["FieldKind", "UnsupportedField", "VerdictField", "verdict_fields"]
+__all__ = ["FieldKind", "UnsupportedField", "VerdictField", "canonical_fields", "verdict_fields"]
 
 
 class FieldKind(StrEnum):
@@ -91,6 +91,26 @@ def verdict_fields(verdict_type: type[BaseModel]) -> tuple[VerdictField, ...]:
         UnsupportedField: A field's type cannot be judged, such as a list or a nested model.
     """
     return _verdict_fields(verdict_type)
+
+
+def canonical_fields(verdict_type: type[BaseModel]) -> list[JsonValue]:
+    """How each field of a verdict type is judged, as JSON no Python or pydantic upgrade changes.
+
+    Each field is its name, kind, choices (an ``Enum``'s values), bounds and whether it may be
+    empty. Evaluators hash it into their versions, so a change to how a field is judged changes
+    them.
+    """
+    return [
+        {
+            "name": f.name,
+            "kind": f.kind.value,
+            "choices": [cast(JsonValue, c.value if isinstance(c, Enum) else c) for c in f.choices],
+            "lower": f.lower,
+            "upper": f.upper,
+            "optional": f.optional,
+        }
+        for f in verdict_fields(verdict_type)
+    ]
 
 
 @cache

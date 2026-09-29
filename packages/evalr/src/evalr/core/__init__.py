@@ -15,7 +15,13 @@ from evalr.core.datasets import (
 from evalr.core.evaluators import Fallback, FunctionEvaluator, HandOff
 from evalr.core.experiments import ExperimentResult, ItemResult, Task
 from evalr.core.feedback import collect
-from evalr.core.fields import FieldKind, UnsupportedField, VerdictField, verdict_fields
+from evalr.core.fields import (
+    FieldKind,
+    UnsupportedField,
+    VerdictField,
+    canonical_fields,
+    verdict_fields,
+)
 from evalr.core.formatting import Formatter, InputFormatter, TokenCounter, estimate_tokens
 from evalr.core.measuring import Measurement, measure
 from evalr.core.metrics import (
@@ -89,6 +95,7 @@ __all__ = [
     "agreement_score",
     "brier_score",
     "calibration",
+    "canonical_fields",
     "cohen_kappa",
     "collect",
     "current_trace_id",

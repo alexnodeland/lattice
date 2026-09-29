@@ -7,7 +7,7 @@
 | `evalr.core` | Implemented |
 | `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Implemented |
 | `evalr.dspy` | Implemented |
-| `evalr.decision` | Planned (phase 3) |
+| `evalr.decision` | `DecisionEvaluator` implemented; threshold calibration planned (phase 3) |
 | `evalr.langfuse`, `evalr.hf` | Planned (phase 4) |
 | End-to-end measures and online helpers | Planned (phase 5) |
 
@@ -128,7 +128,7 @@ An evaluator returns a `Verdict[V]`, an immutable Pydantic model:
 |---|---|---|
 | `FunctionEvaluator` | A sync or async function of the input: a deterministic measure | Given; bump it when the function changes |
 | `DspyJudge` | A DSPy program whose signature comes from the input and verdict types | A hash of the program and the types |
-| `DecisionEvaluator` (phase 3) | A pydantic-ai agent on a decision model | The decision model's id and its thresholds |
+| `DecisionEvaluator` | A pydantic-ai agent on a decision model, answering the verdict's decision-only view | A hash of the model's name, the types, the instructions and the thresholds |
 | `Fallback(primary, fallback, min_confidence=)` | A composition: the primary judges, and hands off to the fallback | A hash of both evaluators' names and versions, and the threshold |
 
 An evaluator that declines an input raises `HandOff`. `Fallback` hands off when the primary raises it, or, with `min_confidence`, when any field of the primary's verdict is less confident than that. So a decision model backed by a language-model judge is `Fallback(DecisionEvaluator(...), DspyJudge(...), min_confidence=0.7)`: two adapters of one port, neither aware of the other. Each verdict records the evaluator that actually gave it, so the two are measured apart; the composition's span, `evalr.fallback {name}`, records whether and why it handed off. Any other failure propagates.
@@ -146,6 +146,18 @@ An evaluator that declines an input raises `HandOff`. `Fallback` hands off when 
 - **Cost:** DSPy reports no per-call cost, so a DSPy verdict's `cost` is unknown.
 
 DSPy ships no type information, so `typings/dspy/` holds minimal stubs for the parts evalr uses; pyright reads them in place of the package.
+
+### Decision evaluators
+
+`DecisionEvaluator(verdict_type, inputs=...)` (`evalr.decision`, the `[jev]` extra) is a pydantic-ai `Agent` on a decision model, TypeSafe's Jev (`typesafe:jev-latest`) by default ([ADR-0008](adr/0008-decision-only-views-and-hand-off-by-composition.md)). A decision model answers typed questions quickly and cheaply, with probabilities, but no free text.
+
+- **The view.** The agent's output type is `decision_view(verdict_type)`: the fields a decision model can fill, each a question with the field's description as its text and the verdict type's docstring as its goal. A required `bool` is a yes-or-no question; a `Literal` or `Enum` of 2 to 255 strings or whole numbers is a choice; an ordinal rating becomes a `Literal` of every value, a choice; a required `float` from 0 to an upper bound is a scaled yes-or-no. Anything else, text included, is left out and keeps its default in the verdict; a required field that would be left out is refused when the evaluator is built.
+- **The state** is the input rendered by a formatter, within 30,000 estimated tokens by default, under Jev's 32K limit.
+- **Confidence** is the probability that each value is right: a choice's probability, and for a yes-or-no field the probability of the answer given, recovered from pydantic-ai's threshold-relative report. `decide(input)` also returns each yes-or-no field's raw probability of yes.
+- **Thresholds.** `boolean_threshold` is pydantic-ai's `decision_boolean_threshold` (0.5 by default): a yes-or-no field is yes at or above it. `min_confidence` makes the evaluator hand off.
+- **Hand-off.** It raises `HandOff` when pydantic-ai hands off (`DecisionHandOff`, with routes or tools), and when any field's confidence is below `min_confidence`; the evaluation span records the reason, as an attribute rather than an error. Service failures propagate. The language-model fallback is a separate evaluator: `Fallback(DecisionEvaluator(...), DspyJudge(...))`, which fills the whole verdict, text included.
+- **Cost** is pydantic-ai's, from the model's price. The model that answered (`jev-1.13.0`) is the span's `gen_ai.response.model`; since `jev-latest` can change under a fixed version, calibrated evaluators should name a pinned model.
+- Credentials are needed only when it first runs, so evaluators can be built at import time.
 
 ### Measuring and optimizing
 

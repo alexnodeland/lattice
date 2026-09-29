@@ -6,7 +6,6 @@ import json
 import os
 from collections.abc import Mapping
 from contextlib import AbstractContextManager, nullcontext
-from enum import Enum
 from importlib.metadata import version as _distribution_version
 from pathlib import Path
 from typing import Any, Self, cast
@@ -21,6 +20,7 @@ from evalr.core import (
     InputFormatter,
     Training,
     Verdict,
+    canonical_fields,
     get_tracer,
     judging,
     score_type_name,
@@ -347,22 +347,11 @@ def program_version(
     field of the types is judged, described in terms that are the same on every Python and
     pydantic version.
     """
-    fields: list[dict[str, object]] = [
-        {
-            "name": f.name,
-            "kind": f.kind.value,
-            "choices": [c.value if isinstance(c, Enum) else c for c in f.choices],
-            "lower": f.lower,
-            "upper": f.upper,
-            "optional": f.optional,
-        }
-        for f in verdict_fields(verdict_type)
-    ]
     canonical = json.dumps(
         {
             "program": program.dump_state(),
             "inputs": list(input_type.model_fields),
-            "verdict": fields,
+            "verdict": canonical_fields(verdict_type),
         },
         sort_keys=True,
         separators=(",", ":"),

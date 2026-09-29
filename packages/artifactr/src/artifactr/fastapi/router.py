@@ -6,6 +6,8 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket
 from fastapi.responses import JSONResponse
+from opentelemetry.metrics import MeterProvider
+from opentelemetry.trace import TracerProvider
 from starlette.requests import HTTPConnection
 
 from artifactr.agent import Runner
@@ -24,6 +26,7 @@ from artifactr.core import (
     WorkspaceId,
 )
 from artifactr.fastapi.stream import Stream
+from artifactr.telemetry import Telemetry, annotate, attribution
 from artifactr.workspace import Workspace, Workspaces
 
 ResolveActor = Callable[[HTTPConnection], Awaitable[tuple[TenantId, Actor]]]
@@ -57,6 +60,8 @@ def artifactr_router(
     hello_timeout: float = 10.0,
     outbox_size: int = 1000,
     remembered_commands: int = 10_000,
+    tracer_provider: TracerProvider | None = None,
+    meter_provider: MeterProvider | None = None,
 ) -> APIRouter:
     """Build the router for the thread protocol, REST commands and reads.
 
@@ -68,15 +73,22 @@ def artifactr_router(
         hello_timeout: Seconds a new connection has to send ``hello``.
         outbox_size: Frames buffered for a slow connection before it is closed (4429).
         remembered_commands: Command ids remembered for deduplication, per process.
+        tracer_provider: Where ``artifactr.stream`` spans go. Defaults to the global one.
+        meter_provider: Where connection metrics go. Defaults to the global one.
+
+    Each REST request's span (FastAPI's own, when it is instrumented) and each connection's
+    ``artifactr.stream`` span are attributed to the tenant, workspace and actor.
     """
     router = APIRouter()
     results = _Results(remembered_commands)
+    telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
 
     async def open_workspace(connection: HTTPConnection, workspace_id: WorkspaceId) -> Workspace:
         try:
             tenant_id, actor = await resolve_actor(connection)
         except Unauthorized as error:
             raise HTTPException(status_code=401, detail=str(error) or "unauthorized") from error
+        annotate(attribution(tenant_id=tenant_id, workspace_id=workspace_id, actor=actor))
         if authorize is not None and not await authorize(tenant_id, workspace_id, actor):
             raise HTTPException(status_code=403, detail="this workspace is not yours to use")
         return await workspaces.open(tenant_id, workspace_id, actor=actor)
@@ -190,6 +202,7 @@ def artifactr_router(
             execute=execute,
             hello_timeout=hello_timeout,
             outbox_size=outbox_size,
+            telemetry=telemetry,
         ).serve()
 
     return router

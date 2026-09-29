@@ -4,6 +4,10 @@ Add it to an agent whose ``deps_type`` is :class:`~artifactr.agent.Session`. It 
 the generic artifact tools and instructions, and its hooks make every run a participant in the
 workspace: runs and tool calls are recorded, what others did is told to the agent, and messages
 sent during a run steer it.
+
+Its hooks run inside pydantic-ai's spans when the agent is instrumented: ``wrap_run`` inside
+``invoke_agent`` and ``wrap_tool_execute`` inside ``execute_tool``. They add artifactr's
+attribution to those spans, and record each attempt's trace id with ``run_started``.
 """
 
 import asyncio
@@ -51,6 +55,8 @@ from artifactr.core import (
     render_notes,
     same_participant,
 )
+from artifactr.telemetry import annotate, attribution, current_trace_id
+from artifactr.telemetry.attributes import ARTIFACT_ID
 
 type Context = RunContext[Session[Any]]
 
@@ -131,8 +137,14 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         """Record the run, brief the agent, and watch the workspace while it runs."""
         session = ctx.deps
         workspace = session.workspace
+        annotate(_attribution(session))
         started = await workspace.record(
-            RunStarted(run_id=session.run_id, thread_id=session.thread_id, trigger=session.trigger)
+            RunStarted(
+                run_id=session.run_id,
+                thread_id=session.thread_id,
+                trigger=session.trigger,
+                trace_id=current_trace_id(),
+            )
         )
         watch_after = started.seq if session.watch_after is None else session.watch_after
         thread = await workspace.thread(session.thread_id)
@@ -235,6 +247,10 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         handler: WrapToolExecuteHandler,
     ) -> Any:
         """Record a tool's own ``ModelRetry`` or ``ToolFailed``, which skip the error hook."""
+        attributes = _attribution(ctx.deps)
+        if isinstance(artifact_id := args.get("artifact_id"), str):
+            attributes[ARTIFACT_ID] = artifact_id
+        annotate(attributes)
         try:
             return await handler(args)
         except (ToolRetryError, ToolFailedError) as error:
@@ -302,6 +318,18 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             status=status,
             summary=summary,
         )
+
+
+def _attribution(session: Session[Any]) -> dict[str, Any]:
+    workspace = session.workspace
+    return attribution(
+        tenant_id=workspace.tenant_id,
+        workspace_id=workspace.workspace_id,
+        thread_id=session.thread_id,
+        run_id=session.run_id,
+        actor=workspace.actor,
+        user=session.requested_by,
+    )
 
 
 def _requests(calls: list[ToolCallPart], kind: Any) -> list[DeferredRequest]:

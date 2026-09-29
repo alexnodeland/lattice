@@ -133,10 +133,12 @@ nav:
       - Serving over WebSocket and REST: guides/serving.md
       - External agents over MCP: guides/mcp.md
       - Multi-tenancy and security: guides/security.md
+      - Observability: guides/observability.md
       - Testing your application: guides/testing.md
   - Reference:
       - reference/index.md
       - artifactr.core: reference/core.md
+      - artifactr.telemetry: reference/telemetry.md
       - artifactr.workspace: reference/workspace.md
       - artifactr.agent: reference/agent.md
       - artifactr.sql: reference/sql.md
@@ -181,6 +183,8 @@ nav:
           - adr/0031-litellm-proxy-first.md
           - adr/0032-libraries-and-the-stackr-template.md
           - adr/0033-trace-links-on-runs-and-revisions.md
+          - adr/0034-ports-and-adapters-for-integrations.md
+          - adr/0035-a-turn-is-its-own-trace.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

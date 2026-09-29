@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable, Collection, Coroutine
 from typing import Any
 
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
+from opentelemetry.trace import SpanKind
 from pydantic import BaseModel, ValidationError
 from starlette.requests import HTTPConnection
 
@@ -31,6 +32,9 @@ from artifactr.core import (
     delivered_to,
     resume,
 )
+from artifactr.telemetry import Telemetry
+from artifactr.telemetry.attributes import CLOSE_CODE, TENANT_ID, WORKSPACE_ID
+from artifactr.telemetry.metrics import STREAM_CONNECTIONS, STREAM_DISCONNECTS
 from artifactr.workspace import Workspace
 
 logger = logging.getLogger("artifactr.fastapi")
@@ -45,6 +49,10 @@ class Stream:
     One task reads frames; commands run as their own tasks, so a slow command never delays a
     ``stop_run``. Every outgoing frame goes through one bounded outbox and one writer; a client
     too slow to keep up is disconnected (4429) rather than holding events back.
+
+    The connection is traced as an ``artifactr.stream`` span, and counted in
+    ``artifactr.stream.connections`` while it is open and ``artifactr.stream.disconnects``, by
+    close code, when it ends.
     """
 
     def __init__(
@@ -57,6 +65,7 @@ class Stream:
         execute: Execute,
         hello_timeout: float,
         outbox_size: int,
+        telemetry: Telemetry,
     ) -> None:
         self._ws = websocket
         self._workspace_id = workspace_id
@@ -68,27 +77,46 @@ class Stream:
         self._overflowed = False
         self._tasks: set[asyncio.Task[None]] = set()
         self._watched: set[RunId] = set()
+        self._telemetry = telemetry
+        self._tenancy: dict[str, str] = {WORKSPACE_ID: workspace_id}
+        self._close_code: int | None = None
+        self._connected = False
 
     async def serve(self) -> None:
         """Run the connection until the client leaves."""
-        offered = self._ws.scope.get("subprotocols", [])
-        await self._ws.accept(subprotocol=PROTOCOL if PROTOCOL in offered else None)
-        try:
-            await self._session()
-        except WebSocketDisconnect:
-            pass
-        finally:
-            for task in self._tasks:
-                task.cancel()
-            await asyncio.gather(*self._tasks, return_exceptions=True)
+        with self._telemetry.tracer.start_as_current_span(
+            "artifactr.stream", kind=SpanKind.SERVER, attributes=self._tenancy
+        ) as span:
+            offered = self._ws.scope.get("subprotocols", [])
+            await self._ws.accept(subprotocol=PROTOCOL if PROTOCOL in offered else None)
+            try:
+                await self._session()
+            except WebSocketDisconnect as disconnect:
+                self._close_code = self._close_code or disconnect.code
+            finally:
+                # Recorded before anything is awaited, in case the server cancels this task.
+                if self._connected:
+                    self._telemetry.add(STREAM_CONNECTIONS, -1, self._tenancy)
+                # 1011: the server ended the connection with an error it did not handle.
+                code = str(self._close_code or 1011)
+                span.set_attribute(CLOSE_CODE, code)
+                self._telemetry.add(STREAM_DISCONNECTS, 1, {**self._tenancy, CLOSE_CODE: code})
+                for task in self._tasks:
+                    task.cancel()
+                await asyncio.gather(*self._tasks, return_exceptions=True)
+
+    async def _close(self, code: int, reason: str) -> None:
+        self._close_code = self._close_code or code
+        await self._ws.close(code=code, reason=reason)
 
     async def _session(self) -> None:
         try:
             workspace = await self._open_workspace(self._ws, self._workspace_id)
         except HTTPException as refused:
             code = 4401 if refused.status_code == 401 else 4403
-            await self._ws.close(code=code, reason=str(refused.detail))
+            await self._close(code, str(refused.detail))
             return
+        self._tenancy[TENANT_ID] = workspace.tenant_id
         hello = await self._hello()
         if hello is None:
             return
@@ -96,7 +124,7 @@ class Stream:
         try:
             plan = resume(hello, head_seq=head)
         except UnsupportedProtocol as unsupported:
-            await self._ws.close(code=4400, reason=unsupported.message)
+            await self._close(4400, unsupported.message)
             return
         running = await workspace.runs(status="running")
         self._put(
@@ -107,6 +135,8 @@ class Stream:
                 active_runs=tuple(ActiveRun(run_id=r.id, thread_id=r.thread_id) for r in running),
             )
         )
+        self._connected = True
+        self._telemetry.add(STREAM_CONNECTIONS, 1, self._tenancy)
         self._spawn(self._write())
         self._spawn(self._follow(workspace, plan.replay_after, head, hello.threads))
         # Runs that started up to head_seq are watched from this list; later ones as they start.
@@ -119,12 +149,12 @@ class Stream:
         try:
             raw = await asyncio.wait_for(self._ws.receive_text(), self._hello_timeout)
         except TimeoutError:
-            await self._ws.close(code=4408, reason="hello was not received in time")
+            await self._close(4408, "hello was not received in time")
             return None
         try:
             return Hello.model_validate_json(raw)
         except ValidationError:
-            await self._ws.close(code=4400, reason="the first frame must be hello")
+            await self._close(4400, "the first frame must be hello")
             return None
 
     async def _follow(
@@ -193,7 +223,7 @@ class Stream:
         while True:
             text = await self._outbox.get()
             if self._overflowed:
-                await self._ws.close(code=4429, reason="the client is not keeping up")
+                await self._close(4429, "the client is not keeping up")
                 return
             await self._ws.send_text(text)
 

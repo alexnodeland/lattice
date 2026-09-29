@@ -9,6 +9,7 @@ The packages are layers. Each depends only on the ones below it, so each is usab
 | Package | What it holds | Install |
 |---|---|---|
 | [`artifactr.core`](core.md) | Every rule, as pure functions over immutable values: artifact types, actors, commands, events, patches, rejections, change notes and the protocol's frames | core |
+| [`artifactr.telemetry`](telemetry.md) | Tracing and metrics through the OpenTelemetry API: span attribution and the metric registry | core |
 | [`artifactr.workspace`](workspace.md) | Tenant-scoped workspace handles, the storage protocol and in-memory storage | core |
 | [`artifactr.agent`](agent.md) | The pydantic-ai capability, the session, the runner and live output | core |
 | [`artifactr.sql`](sql.md) | SQL storage on PostgreSQL and SQLite, and its migrations | `sql`, `postgres` or `sqlite` extra |

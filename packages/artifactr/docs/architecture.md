@@ -5,6 +5,7 @@
 | Package | Status |
 |---|---|
 | `artifactr.core` | Implemented |
+| `artifactr.telemetry` | Implemented: spans, attribution and the metric registry ([RFC-0002](rfcs/0002-observability-feedback-and-evaluation.md)) |
 | `artifactr.workspace` | Implemented, with in-memory storage |
 | `artifactr.agent` | Implemented |
 | `artifactr.sql` | Implemented, on PostgreSQL and SQLite |
@@ -59,19 +60,23 @@ graph TD
     mcp --> workspace
     agent --> workspace["artifactr.workspace<br/>scoped handles, storage protocols"]
     sql["artifactr.sql<br/>SQLAlchemy storage"] --> workspace
-    workspace --> core["artifactr.core<br/>pure, synchronous rules"]
+    workspace --> telemetry["artifactr.telemetry<br/>OpenTelemetry API"]
+    telemetry --> core["artifactr.core<br/>pure, synchronous rules"]
 ```
 
 Dependencies point one way. Each layer is usable without the ones above it.
 
-| Package | Depends on | Responsibility |
-|---|---|---|
-| `artifactr.core` | pydantic, jsonpatch | Every rule. Pure, synchronous, no I/O, no pydantic-ai. |
-| `artifactr.workspace` | core | `Workspaces`, `Workspace`, storage protocols, in-memory storage. |
-| `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | Durable storage on PostgreSQL and SQLite, and its migrations. |
-| `artifactr.agent` | workspace, pydantic-ai | The `ArtifactWorkspace` capability, `Session`, live-output helpers. |
-| `artifactr.fastapi` (extra) | agent, FastAPI | The thread protocol over WebSocket, and REST commands. |
-| `artifactr.mcp` (extra) | workspace, mcp | Artifacts as MCP resources, commands as MCP tools. |
+The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and adapters ([ADR-0034](adr/0034-ports-and-adapters-for-integrations.md)). A **port** is a small interface an inner layer owns: a `typing.Protocol` such as `Storage`, or an API that already plays the role, such as the OpenTelemetry API. An **adapter** implements a port in an extra's package, which imports its own libraries and the inner layers, never the other way round. The surfaces are driving adapters. `tests/test_layering.py` enforces all of it.
+
+| Package | Depends on | Role | Responsibility |
+|---|---|---|---|
+| `artifactr.core` | pydantic, jsonpatch | Inner | Every rule. Pure, synchronous, no I/O, no pydantic-ai, no OpenTelemetry. |
+| `artifactr.telemetry` | core, the OpenTelemetry API | Inner; its port is the OpenTelemetry API | Span attribution, the metric registry, and recording through the API. |
+| `artifactr.workspace` | core, telemetry | Inner; owns the `Storage` port | `Workspaces`, `Workspace`, storage protocols, in-memory storage. |
+| `artifactr.agent` | workspace, telemetry, pydantic-ai | Inner | The `ArtifactWorkspace` capability, `Session`, `Runner`, live-output helpers. |
+| `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | Adapter for `Storage` | Durable storage on PostgreSQL and SQLite, and its migrations. |
+| `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
+| `artifactr.mcp` (extra) | agent, mcp | Driving adapter | Artifacts as MCP resources, commands as MCP tools. |
 
 ### `artifactr.core`: sans-IO
 
@@ -176,7 +181,7 @@ erDiagram
 - **One event log per workspace**, with a single gap-free `seq`. Events carry an optional `thread_id` and `run_id`, and subscribers filter on them.
 - **Proposals** are durable objects that wrap the command they would execute (create, edit or archive), with its base version, the proposer and a rationale.
 - **Model history** (pydantic-ai `ModelMessage`s, serialized with `ModelMessagesTypeAdapter`) is stored per thread next to the log, not reconstructed from it.
-- **Trace links.** A run records the OpenTelemetry trace id of each attempt (`Run.trace_ids`, from the `trace_id` of each `run_started`), since a run that pauses and resumes runs once per attempt. They let feedback on a turn find the trace it is about. Runs are stored as JSON, so the field needs no schema change.
+- **Trace links.** A run records the OpenTelemetry trace id of each attempt (`Run.trace_ids`, from the `trace_id` of each `run_started`), since a run that pauses and resumes runs once per attempt. A revision records the trace it was committed in (`Revision.trace_id`), stamped by the workspace. They let feedback on a turn or an artifact version find the trace it is about. Both are stored in the entities' JSON, so they need no schema change ([ADR-0033](adr/0033-trace-links-on-runs-and-revisions.md)).
 
 ## The write path
 
@@ -372,6 +377,48 @@ workspaces = Workspaces(SqlStorage(engine))
 
 The workspace behaviour suite in `tests/workspace/` runs against every implementation: in memory, on SQLite, and on PostgreSQL.
 
+## Observability
+
+artifactr is traced and measured through the OpenTelemetry API only, under the instrumentation scope `artifactr` at the package version ([ADR-0027](adr/0027-opentelemetry-observability-with-langfuse.md)). It never configures the SDK, never calls `Agent.instrument_all()`, and never creates a backend client; with no SDK configured, recording is a no-op. `Workspaces`, `Runner` and `artifactr_router` take an optional `tracer_provider` and `meter_provider`, defaulting to the global ones. The [observability guide](guides/observability.md) shows how an application turns it on.
+
+### Spans
+
+| Span | Name | Key attributes |
+|---|---|---|
+| A turn: the `Runner` handling a message, or answers that resume a run | `invoke_workflow turn`, a new trace linked to the span that started it ([ADR-0035](adr/0035-a-turn-is-its-own-trace.md)) | `gen_ai.operation.name=invoke_workflow`, `gen_ai.workflow.name=turn`, `artifactr.turn.trigger`, `artifactr.turn.outcome`, `langfuse.observation.type=chain` |
+| A command committed through `Workspace.commit` | `artifactr.commit {type}` | `artifactr.command.type`, `artifactr.outcome`, `artifactr.rejection`, and what the command is about: `artifactr.artifact.id`, `artifactr.artifact.version`, `artifactr.proposal.id`, `artifactr.patch.kind`, `artifactr.patch.size` |
+| The agent run inside a turn | pydantic-ai's `invoke_agent` | artifactr's attribution, added by the capability's `wrap_run` |
+| A tool call | pydantic-ai's `execute_tool` | artifactr's attribution, and `artifactr.artifact.id` when the tool is about one artifact |
+| A WebSocket connection | `artifactr.stream` | `artifactr.stream.close_code` |
+| A REST request | FastAPI's own, when the application instruments FastAPI | artifactr's attribution |
+| An MCP request | The MCP SDK's own | artifactr's attribution |
+
+Every span artifactr owns or wraps is attributed: `artifactr.tenant.id`, `artifactr.workspace.id` and `artifactr.actor.kind`; with a thread, `session.id`, `gen_ai.conversation.id` and `artifactr.thread.id` set to the thread id, which is the session; with a run, `artifactr.run.id`; and for a person, `user.id`. The `Runner` passes the thread as pydantic-ai's `conversation_id`, and never passes artifactr's run id as pydantic-ai's `run_id`: an artifactr run spans pauses, and each attempt is a separate pydantic-ai run. artifactr's own spans carry ids, kinds, versions and counts, never content; prompts and messages are on pydantic-ai's spans when its `include_content` is on.
+
+Each attempt's trace id is recorded with `run_started`, and each revision records the trace it was committed in ([ADR-0033](adr/0033-trace-links-on-runs-and-revisions.md)).
+
+### Metrics
+
+The metric registry, `artifactr.telemetry.metrics`, declares every metric with its instrument, unit, description and allowed attributes. artifactr records only declared attributes. Commands are counted by `Workspace.commit`, turns by the `Runner`, connections by the stream, and everything else from the events each commit or fact appends, so every surface is counted the same way.
+
+| Metric | Instrument | Attributes, besides tenant and workspace |
+|---|---|---|
+| `artifactr.commands` | counter | `artifactr.command.type`, `artifactr.outcome`, `artifactr.rejection`, `artifactr.actor.kind` |
+| `artifactr.commit.duration` | histogram, s | `artifactr.command.type`, `artifactr.outcome` |
+| `artifactr.turns`, `artifactr.turn.duration` | counter; histogram, s | `artifactr.turn.trigger`, `artifactr.turn.outcome` |
+| `artifactr.runs` | counter | `artifactr.run.status`, for each segment that ends or pauses |
+| `artifactr.tool_calls` | counter | `gen_ai.tool.name`, `artifactr.tool.status` |
+| `artifactr.tokens` | counter | `gen_ai.token.type` |
+| `artifactr.messages` | counter | `artifactr.actor.kind` |
+| `artifactr.artifact.changes` | counter | `artifactr.artifact.kind`, `artifactr.change`, `artifactr.actor.kind` |
+| `artifactr.proposals` | counter | `artifactr.proposal.action`, `artifactr.actor.kind` |
+| `artifactr.stream.connections` | up-down counter | |
+| `artifactr.stream.disconnects` | counter | `artifactr.stream.close_code` |
+
+pydantic-ai adds `gen_ai.client.token.usage` and `operation.cost` per model request, by model; the registry lists them, and the instrumentations' HTTP and database metrics, as external metrics the dashboards may read.
+
+**Cardinality.** Thread, turn, run, artifact and message ids are never metric attributes; those granularities come from traces. Tenant and workspace are attributes by default.
+
 ## Dependencies
 
 | Dependency | Used for | Current major (2026-09) |
@@ -384,10 +431,9 @@ The workspace behaviour suite in `tests/workspace/` runs against every implement
 | asyncpg, aiosqlite | PostgreSQL and SQLite drivers (extras; the library imports neither) | 0.31, 0.22 |
 | FastAPI | WebSocket and REST adapter | 0.141 |
 | mcp | MCP server (`MCPServer`, subscriptions) | 2.2 |
+| opentelemetry-api | Spans and metrics, through the API only | 1.45 |
 
 Python 3.12+. Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical with mkdocstrings for the documentation site ([ADR-0023](adr/0023-documentation-site.md)).
-
-Observability uses pydantic-ai's built-in OpenTelemetry instrumentation. The capability adds tenant, workspace, thread and run as span attributes.
 
 ## Testing
 
@@ -396,6 +442,7 @@ Observability uses pydantic-ai's built-in OpenTelemetry instrumentation. The cap
 - **SQL:** concurrent transactions, lease races and cross-process subscriptions on both databases, and a check that the migrations build exactly the models' schema.
 - **Agent:** scripted runs with pydantic-ai's `TestModel` and `FunctionModel`, so no test calls a model API. Assertions are on the events written, including conflicts, steering and deferred pauses.
 - **Adapters:** WebSocket contract tests with FastAPI's `TestClient`, and an MCP client round-trip.
+- **Telemetry:** spans and metrics are asserted through the OpenTelemetry SDK's `InMemorySpanExporter` and `InMemoryMetricReader`, and the registry's cardinality policy is checked for every metric.
 - **Protocol:** the JSON Schema in `schemas/` is generated from the models and checked in. CI fails if it drifts.
 
 ## Build plan
@@ -447,6 +494,8 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0031](adr/0031-litellm-proxy-first.md) | LiteLLM, proxy first, for routing and guardrails |
 | [0032](adr/0032-libraries-and-the-stackr-template.md) | Libraries, and stackr as the infrastructure template |
 | [0033](adr/0033-trace-links-on-runs-and-revisions.md) | Trace links on runs and revisions |
+| [0034](adr/0034-ports-and-adapters-for-integrations.md) | Ports and adapters for integrations |
+| [0035](adr/0035-a-turn-is-its-own-trace.md) | A turn is its own trace |
 
 ## Open questions
 

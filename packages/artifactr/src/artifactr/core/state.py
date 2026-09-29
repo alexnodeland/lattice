@@ -98,6 +98,9 @@ class Revision(BaseModel):
     actor: Actor
     proposal_id: ProposalId | None = None
     archived: bool = False
+    trace_id: TraceId | None = None
+    """The OpenTelemetry trace the change was committed in, if it was traced; set by the
+    workspace (ADR-0033)."""
 
 
 # ─── outcomes ─────────────────────────────────────────────────────────────────

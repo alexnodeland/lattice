@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic_ai import ModelMessage, ModelMessagesTypeAdapter
 
-from artifactr.core import AgentActor, RunId, ThreadId, new_run_id
+from artifactr.core import Actor, AgentActor, RunId, ThreadId, new_run_id
 from artifactr.workspace import Workspace
 
 Trigger = Literal["message", "resume", "api"]
@@ -32,6 +32,10 @@ class Session[AppDepsT]:
     watch_after: int | None = None
     """Watch the log for others' changes after this ``seq``; None means from the run's start."""
 
+    requested_by: Actor | None = None
+    """Whose message or answer started this run segment, if anyone's. Spans record a person
+    here as the user."""
+
     @classmethod
     def start(
         cls,
@@ -43,6 +47,7 @@ class Session[AppDepsT]:
         agent_name: str = "assistant",
         trigger: Trigger = "api",
         watch_after: int | None = None,
+        requested_by: Actor | None = None,
     ) -> "Session[AppDepsT]":
         """Return a session for a new (or resuming) run of the thread's agent.
 
@@ -54,6 +59,7 @@ class Session[AppDepsT]:
             agent_name: How the agent is named in change notes and messages.
             trigger: What started the run.
             watch_after: The ``seq`` after which others' changes are delivered into the run.
+            requested_by: Whose message or answer started the run segment.
         """
         run_id = run_id or new_run_id()
         actor = AgentActor(thread_id=thread_id, run_id=run_id, name=agent_name)
@@ -64,6 +70,7 @@ class Session[AppDepsT]:
             app=app,
             trigger=trigger,
             watch_after=watch_after,
+            requested_by=requested_by,
         )
 
 

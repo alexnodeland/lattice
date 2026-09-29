@@ -37,5 +37,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0031](0031-litellm-proxy-first.md) | LiteLLM, proxy first, for routing and guardrails | Accepted |
 | [0032](0032-libraries-and-the-stackr-template.md) | Libraries, and stackr as the infrastructure template | Accepted |
 | [0033](0033-trace-links-on-runs-and-revisions.md) | Trace links on runs and revisions | Accepted |
+| [0034](0034-ports-and-adapters-for-integrations.md) | Ports and adapters for integrations | Accepted |
+| [0035](0035-a-turn-is-its-own-trace.md) | A turn is its own trace | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

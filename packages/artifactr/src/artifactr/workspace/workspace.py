@@ -2,14 +2,20 @@
 
 Every read and write goes through a :class:`Workspace`, and every write goes through
 :meth:`Workspace.commit` or :meth:`Workspace.record`, which run core's rules inside one storage
-transaction (ADR-0002, ADR-0018).
+transaction (ADR-0002, ADR-0018). Each commit is traced as an ``artifactr.commit {type}``
+span, and what commits and facts do is counted in artifactr's metrics.
 """
 
 import asyncio
 import contextlib
+import dataclasses
+import time
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Collection, Iterable, Sequence
 from datetime import timedelta
 from typing import Literal, cast, overload
+
+from opentelemetry.metrics import MeterProvider
+from opentelemetry.trace import StatusCode, TracerProvider
 
 from artifactr.core import (
     Actor,
@@ -34,6 +40,7 @@ from artifactr.core import (
     ProposeChange,
     Proposed,
     Recorded,
+    Rejection,
     Resolved,
     RespondToProposal,
     Revision,
@@ -54,6 +61,23 @@ from artifactr.core import (
     record,
 )
 from artifactr.core.commands import AnswerDeferred, SetFocus, SetThreadMode
+from artifactr.telemetry import (
+    Telemetry,
+    command_attributes,
+    current_trace_id,
+    outcome_attributes,
+    record_events,
+)
+from artifactr.telemetry.attributes import (
+    ACTOR_KIND,
+    COMMAND_TYPE,
+    ERROR_TYPE,
+    OUTCOME,
+    REJECTION,
+    TENANT_ID,
+    WORKSPACE_ID,
+)
+from artifactr.telemetry.metrics import COMMANDS, COMMIT_DURATION
 from artifactr.workspace.storage import HistoryChunk, Scope, Storage
 
 
@@ -69,11 +93,21 @@ class Workspaces:
         types: The artifact types this application accepts. Others are rejected even if they
             are registered, so clients cannot create arbitrary types. ``None`` accepts every
             registered type.
+        tracer_provider: Where commit spans go. Defaults to the global tracer provider.
+        meter_provider: Where artifactr's metrics go. Defaults to the global meter provider.
     """
 
-    def __init__(self, storage: Storage, *, types: Iterable[type[Artifact]] | None = None) -> None:
+    def __init__(
+        self,
+        storage: Storage,
+        *,
+        types: Iterable[type[Artifact]] | None = None,
+        tracer_provider: TracerProvider | None = None,
+        meter_provider: MeterProvider | None = None,
+    ) -> None:
         self._storage = storage
         self._kinds = None if types is None else frozenset(t.kind for t in types)
+        self._telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
 
     async def open(
         self, tenant_id: TenantId, workspace_id: WorkspaceId, *, actor: Actor
@@ -83,7 +117,8 @@ class Workspaces:
         This is the only place a tenant id enters; nothing on the handle can reach another
         tenant.
         """
-        return Workspace(self._storage, Scope(tenant_id, workspace_id), actor, self._kinds)
+        scope = Scope(tenant_id, workspace_id)
+        return Workspace(self._storage, scope, actor, self._kinds, self._telemetry)
 
 
 class Workspace:
@@ -94,12 +129,24 @@ class Workspace:
     """
 
     def __init__(
-        self, storage: Storage, scope: Scope, actor: Actor, kinds: frozenset[str] | None
+        self,
+        storage: Storage,
+        scope: Scope,
+        actor: Actor,
+        kinds: frozenset[str] | None,
+        telemetry: Telemetry | None = None,
     ) -> None:
         self._storage = storage
         self._scope = scope
         self._actor = actor
         self._kinds = kinds
+        self._telemetry = telemetry or Telemetry()
+        self._tenancy = {TENANT_ID: scope.tenant_id, WORKSPACE_ID: scope.workspace_id}
+
+    @property
+    def tenant_id(self) -> TenantId:
+        """The id of the tenant the workspace belongs to."""
+        return self._scope.tenant_id
 
     @property
     def workspace_id(self) -> WorkspaceId:
@@ -113,7 +160,7 @@ class Workspace:
 
     def as_actor(self, actor: Actor) -> "Workspace":
         """Return a handle on the same workspace that acts as ``actor``."""
-        return Workspace(self._storage, self._scope, actor, self._kinds)
+        return Workspace(self._storage, self._scope, actor, self._kinds, self._telemetry)
 
     # ─── writes ───────────────────────────────────────────────────────────────
 
@@ -142,8 +189,50 @@ class Workspace:
         Raises:
             Rejection: If the command cannot be applied.
         """
-        self._check_kind(command)
-        return await self._execute(command, lambda state: commit(command, state, actor=self._actor))
+        attributes = command_attributes(
+            command,
+            tenant_id=self._scope.tenant_id,
+            workspace_id=self._scope.workspace_id,
+            actor=self._actor,
+        )
+        started = time.perf_counter()
+        with self._telemetry.tracer.start_as_current_span(
+            f"artifactr.commit {command.type}",
+            attributes=attributes,
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
+            try:
+                self._check_kind(command)
+                outcome = await self._execute(
+                    command, lambda state: commit(command, state, actor=self._actor)
+                )
+            except Rejection as rejection:
+                span.set_attributes({OUTCOME: "rejected", REJECTION: rejection.code})
+                self._count(command, started, outcome="rejected", rejection=rejection.code)
+                raise
+            except Exception as error:
+                span.record_exception(error)
+                span.set_status(StatusCode.ERROR, str(error))
+                span.set_attributes({OUTCOME: "error", ERROR_TYPE: type(error).__qualname__})
+                self._count(command, started, outcome="error")
+                raise
+            span.set_attributes(outcome_attributes(outcome))
+            self._count(command, started, outcome=outcome.type)
+            return outcome
+
+    def _count(
+        self, command: Command, started: float, *, outcome: str, rejection: str | None = None
+    ) -> None:
+        attributes = {
+            **self._tenancy,
+            COMMAND_TYPE: command.type,
+            OUTCOME: outcome,
+            REJECTION: rejection,
+            ACTOR_KIND: self._actor.kind,
+        }
+        self._telemetry.add(COMMANDS, 1, attributes)
+        self._telemetry.record(COMMIT_DURATION, time.perf_counter() - started, attributes)
 
     async def record(self, fact: Fact, *, history: bytes | None = None) -> Recorded:
         """Record a fact about an agent run, or an application event.
@@ -193,10 +282,11 @@ class Workspace:
             state = State()
             while missing := needs(item, actor=self._actor, state=state):
                 state = _merge(state, await transaction.load(missing))
-            result = decide(state)
+            result = _traced(decide(state))
             envelopes = await transaction.save(result, actor=self._actor)
             if history is not None:
                 await transaction.append_history(*history)
+        record_events(self._telemetry, result.events, actor=self._actor, scope=self._tenancy)
         if not envelopes:
             return result.outcome
         return result.outcome.model_copy(update={"seq": envelopes[-1].seq})
@@ -382,6 +472,15 @@ class Workspace:
         while True:
             await asyncio.sleep(ttl.total_seconds() / 3)
             await self._storage.acquire_lease(self._scope, key, holder, ttl)
+
+
+def _traced(result: CommitResult) -> CommitResult:
+    """Stamp the current trace on the revisions a result appends (ADR-0033)."""
+    trace_id = current_trace_id()
+    if trace_id is None or not result.revisions:
+        return result
+    revisions = tuple(r.model_copy(update={"trace_id": trace_id}) for r in result.revisions)
+    return dataclasses.replace(result, revisions=revisions)
 
 
 def _merge(state: State, loaded: State) -> State:

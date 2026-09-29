@@ -1,8 +1,12 @@
 """The package layering in docs/architecture.md, enforced.
 
 Each layer may import the standard library, the artifactr layers below it, and an explicit list
-of third-party packages. Dependencies point one way, so each layer is usable without the ones
+of third-party modules. Dependencies point one way, so each layer is usable without the ones
 above it.
+
+Ports and adapters (ADR-0034): the inner layers reach OpenTelemetry through its API only, the
+port; the SDK, exporters and instrumentations are adapters, and only the ``otel`` extra may
+import them. Each extra imports its own third-party libraries plus the inner layers.
 """
 
 import ast
@@ -15,34 +19,45 @@ ROOT = Path(__file__).parent.parent
 SRC = ROOT / "src" / "artifactr"
 EXAMPLE = ROOT / "examples" / "docplan" / "src" / "docplan"
 
+OTEL_API = {
+    "opentelemetry.baggage",
+    "opentelemetry.context",
+    "opentelemetry.metrics",
+    "opentelemetry.trace",
+    "opentelemetry.util.types",
+}
+"""The OpenTelemetry API: the port every layer may record through."""
+
+INNER = {"artifactr.core", "artifactr.telemetry", "artifactr.workspace", "artifactr.agent"}
+
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
-    # layer: (artifactr packages it may import, third-party packages it may import)
+    # layer: (artifactr packages it may import, third-party modules it may import)
     "core": ({"artifactr.core"}, {"pydantic", "jsonpatch", "jsonpointer"}),
-    "workspace": ({"artifactr.core", "artifactr.workspace"}, set()),
-    "agent": (
-        {"artifactr.core", "artifactr.workspace", "artifactr.agent"},
-        {"pydantic", "pydantic_ai"},
-    ),
+    "telemetry": ({"artifactr.core", "artifactr.telemetry"}, OTEL_API),
+    "workspace": ({"artifactr.core", "artifactr.telemetry", "artifactr.workspace"}, OTEL_API),
+    "agent": (INNER, {"pydantic", "pydantic_ai", *OTEL_API}),
     "sql": ({"artifactr.core", "artifactr.workspace", "artifactr.sql"}, {"sqlalchemy", "alembic"}),
     "fastapi": (
-        {"artifactr.core", "artifactr.workspace", "artifactr.agent", "artifactr.fastapi"},
-        {"fastapi", "starlette", "pydantic"},
+        {*INNER, "artifactr.fastapi"},
+        {"fastapi", "starlette", "pydantic", *OTEL_API},
     ),
-    "mcp": (
-        {"artifactr.core", "artifactr.workspace", "artifactr.agent", "artifactr.mcp"},
-        {"mcp", "starlette", "pydantic"},
-    ),
+    "mcp": ({*INNER, "artifactr.mcp"}, {"mcp", "starlette", "pydantic", *OTEL_API}),
 }
 
 
 def _imports(path: Path) -> set[str]:
+    """Every module a file imports, with ``from m import n`` counted as ``m.n``."""
     names: set[str] = set()
     for node in ast.walk(ast.parse(path.read_text())):
         if isinstance(node, ast.Import):
             names.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
-            names.add(node.module)
+            names.update(f"{node.module}.{alias.name}" for alias in node.names)
     return names
+
+
+def _within(name: str, prefixes: set[str]) -> bool:
+    return any(name == p or name.startswith(f"{p}.") for p in prefixes)
 
 
 @pytest.mark.parametrize("layer", sorted(LAYERS))
@@ -57,12 +72,17 @@ def test_layer_imports_only_what_it_may(layer: str) -> None:
             if root in sys.stdlib_module_names:
                 continue
             if root == "artifactr":
-                assert any(name == p or name.startswith(f"{p}.") for p in own), f"{where}: above"
+                assert _within(name, own), f"{where}: above"
             else:
-                assert root in third_party, f"{where}: not a dependency of this layer"
+                assert _within(name, third_party), f"{where}: not a dependency of this layer"
 
 
-PUBLIC = {"artifactr", *(f"artifactr.{package}" for package in (*LAYERS, "sql"))}
+def test_every_package_is_a_layer() -> None:
+    packages = {path.name for path in SRC.iterdir() if (path / "__init__.py").exists()}
+    assert packages == set(LAYERS)
+
+
+PUBLIC = {"artifactr", *(f"artifactr.{package}" for package in LAYERS)}
 
 
 def test_the_reference_implementation_uses_only_the_public_api() -> None:
@@ -71,4 +91,6 @@ def test_the_reference_implementation_uses_only_the_public_api() -> None:
     for path in modules:
         for name in _imports(path):
             if name.split(".")[0] == "artifactr":
-                assert name in PUBLIC, f"{path.relative_to(ROOT)} imports {name}, not a package"
+                where = f"{path.relative_to(ROOT)} imports {name}, not a package's public name"
+                assert _within(name, PUBLIC), where
+                assert name.count(".") <= 2, where

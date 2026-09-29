@@ -30,6 +30,7 @@ from artifactr.core import (
     TenantId,
     WorkspaceId,
 )
+from artifactr.telemetry import annotate, attribution
 from artifactr.workspace import Workspace, Workspaces
 
 ResolveClient = Callable[[Context], Awaitable[tuple[TenantId, ExternalAgentActor]]]
@@ -54,6 +55,9 @@ class ArtifactrMcp:
     Mount :meth:`http_app` in the application, and run :meth:`lifespan` in the application's
     lifespan. Every tool call goes through the same workspace and runner as the other surfaces,
     attributed to the client's :class:`~artifactr.core.ExternalAgentActor`.
+
+    The MCP SDK traces each request itself, through the global tracer provider. The server adds
+    the tenant, workspace and actor to those spans, and has no spans or metrics of its own.
 
     Args:
         workspaces: Opens tenant-scoped workspaces.
@@ -102,6 +106,7 @@ class ArtifactrMcp:
 
     async def _open(self, ctx: Context, workspace_id: WorkspaceId) -> Workspace:
         tenant_id, actor = await self._resolve(ctx)
+        annotate(attribution(tenant_id=tenant_id, workspace_id=workspace_id, actor=actor))
         workspace = await self._workspaces.open(tenant_id, workspace_id, actor=actor)
         key = (tenant_id, workspace_id)
         if key not in self._watchers:

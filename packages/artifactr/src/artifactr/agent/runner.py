@@ -10,16 +10,26 @@ comes from:
 
 Runs are asyncio tasks in this process. Their live frames go to :attr:`Runner.live`, where any
 connection can :meth:`Runner.watch` them.
+
+Each turn (a run started by a message, or resumed by answers) is traced as its own trace, an
+``invoke_workflow turn`` span linked to the span that started it (ADR-0035). The thread is the
+session: it is the turn's ``session.id`` and pydantic-ai's ``conversation_id``, and it is placed
+in OpenTelemetry baggage for the turn's duration.
 """
 
 import asyncio
 import contextlib
+import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
-from pydantic_ai import Agent, AgentRunResult, DeferredToolResults, ToolDenied
+from opentelemetry import baggage, trace
+from opentelemetry import context as otel_context
+from opentelemetry.metrics import MeterProvider
+from opentelemetry.trace import Link, SpanContext, StatusCode, TracerProvider
+from pydantic_ai import Agent, AgentRunResult, DeferredToolRequests, DeferredToolResults, ToolDenied
 
 from artifactr.agent.live import FanoutChannel, forward_live
 from artifactr.agent.session import Session, Trigger, load_history
@@ -39,6 +49,19 @@ from artifactr.core import (
     new_message_id,
     new_run_id,
 )
+from artifactr.telemetry import Telemetry, attribution
+from artifactr.telemetry.attributes import (
+    ERROR_TYPE,
+    GEN_AI_OPERATION_NAME,
+    GEN_AI_WORKFLOW_NAME,
+    LANGFUSE_OBSERVATION_TYPE,
+    SESSION_ID,
+    TENANT_ID,
+    TURN_OUTCOME,
+    TURN_TRIGGER,
+    WORKSPACE_ID,
+)
+from artifactr.telemetry.metrics import TURN_DURATION, TURNS
 from artifactr.workspace import ThreadBusy, Workspace
 
 
@@ -76,6 +99,8 @@ class Runner[AppDepsT]:
         live: Where runs' live frames go. Defaults to an in-process fan-out.
         agent_name: How the agent is named in the workspace.
         claim_ttl: How long a thread claim lasts without renewal, should this process die.
+        tracer_provider: Where turn spans go. Defaults to the global tracer provider.
+        meter_provider: Where turn metrics go. Defaults to the global meter provider.
     """
 
     def __init__(
@@ -86,6 +111,8 @@ class Runner[AppDepsT]:
         live: FanoutChannel | None = None,
         agent_name: str = "assistant",
         claim_ttl: timedelta = timedelta(seconds=30),
+        tracer_provider: TracerProvider | None = None,
+        meter_provider: MeterProvider | None = None,
     ) -> None:
         self._agent = agent
         self._app = app
@@ -93,6 +120,7 @@ class Runner[AppDepsT]:
         self._agent_name = agent_name
         self._claim_ttl = claim_ttl
         self._runs: dict[RunId, RunHandle] = {}
+        self._telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
 
     async def execute(self, workspace: Workspace, command: Command | StopRun) -> Outcome:
         """Carry out any command the way every surface should.
@@ -238,8 +266,10 @@ class Runner[AppDepsT]:
             agent_name=self._agent_name,
             trigger=trigger,
             watch_after=watch_after,
+            requested_by=workspace.actor,
         )
-        task = asyncio.create_task(self._run(claim, session, prompt, deferred))
+        caller = trace.get_current_span().get_span_context()
+        task = asyncio.create_task(self._run(claim, session, prompt, deferred, caller))
         handle = RunHandle(run_id=run_id, thread_id=thread_id, task=task)
         self._runs[run_id] = handle
         task.add_done_callback(lambda done: self._finished(run_id, done))
@@ -251,18 +281,75 @@ class Runner[AppDepsT]:
         session: Session[AppDepsT],
         prompt: str | None,
         deferred: DeferredToolResults | None,
+        caller: SpanContext,
     ) -> AgentRunResult[Any]:
         async with claim:
             try:
-                return await self._agent.run(
-                    prompt,
-                    deps=session,
-                    message_history=await load_history(session.workspace, session.thread_id),
-                    deferred_tool_results=deferred,
-                    event_stream_handler=forward_live(self.live),
-                )
+                return await self._turn(session, prompt, deferred, caller)
             finally:
                 self.live.close(session.run_id)
+
+    async def _turn(
+        self,
+        session: Session[AppDepsT],
+        prompt: str | None,
+        deferred: DeferredToolResults | None,
+        caller: SpanContext,
+    ) -> AgentRunResult[Any]:
+        """Run the agent once, as a turn: its own trace, linked to what started it."""
+        workspace = session.workspace
+        tenancy = {TENANT_ID: workspace.tenant_id, WORKSPACE_ID: workspace.workspace_id}
+        attributes = {
+            GEN_AI_OPERATION_NAME: "invoke_workflow",
+            GEN_AI_WORKFLOW_NAME: "turn",
+            LANGFUSE_OBSERVATION_TYPE: "chain",
+            TURN_TRIGGER: session.trigger,
+            **attribution(
+                tenant_id=workspace.tenant_id,
+                workspace_id=workspace.workspace_id,
+                thread_id=session.thread_id,
+                run_id=session.run_id,
+                actor=session.requested_by,
+            ),
+        }
+        started = time.perf_counter()
+        outcome = "failed"
+        with self._telemetry.tracer.start_as_current_span(
+            "invoke_workflow turn",
+            context=otel_context.Context(),
+            links=[Link(caller)] if caller.is_valid else None,
+            attributes=attributes,
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
+            token = otel_context.attach(baggage.set_baggage(SESSION_ID, session.thread_id))
+            try:
+                result = await self._agent.run(
+                    prompt,
+                    deps=session,
+                    message_history=await load_history(workspace, session.thread_id),
+                    deferred_tool_results=deferred,
+                    event_stream_handler=forward_live(self.live),
+                    conversation_id=session.thread_id,
+                )
+            except asyncio.CancelledError:
+                outcome = "stopped"
+                raise
+            except Exception as error:
+                span.record_exception(error)
+                span.set_status(StatusCode.ERROR, str(error))
+                span.set_attribute(ERROR_TYPE, type(error).__qualname__)
+                raise
+            else:
+                paused = isinstance(result.output, DeferredToolRequests)
+                outcome = "paused" if paused else "completed"
+                return result
+            finally:
+                otel_context.detach(token)
+                span.set_attribute(TURN_OUTCOME, outcome)
+                counted = {**tenancy, TURN_TRIGGER: session.trigger, TURN_OUTCOME: outcome}
+                self._telemetry.add(TURNS, 1, counted)
+                self._telemetry.record(TURN_DURATION, time.perf_counter() - started, counted)
 
     def _finished(self, run_id: RunId, task: "asyncio.Task[AgentRunResult[Any]]") -> None:
         self._runs.pop(run_id, None)

@@ -225,7 +225,7 @@ REST mirrors the commands and exposes reads; `artifactr.fastapi.artifactr_router
 | `POST /v1/workspaces/{workspace_id}/commands` | Submit one command frame; the response body is its `command_result`. |
 | `GET /v1/workspaces/{workspace_id}/artifacts?kind=&include_archived=` | List artifacts. |
 | `GET /v1/workspaces/{workspace_id}/artifacts/{artifact_id}` | The current `Versioned` artifact: `id`, `kind`, `version`, `data`, `updated_by`, `archived`. |
-| `GET /v1/workspaces/{workspace_id}/artifacts/{artifact_id}/revisions` | Revision history. |
+| `GET /v1/workspaces/{workspace_id}/artifacts/{artifact_id}/revisions` | Revision history. Each revision has the `trace_id` it was committed in, when it was traced. |
 | `GET /v1/workspaces/{workspace_id}/events?after_seq=&thread_id=&limit=` | A page of the log, as envelopes. `thread_id` may repeat. |
 | `GET /v1/workspaces/{workspace_id}/threads` | Every thread. |
 | `GET /v1/workspaces/{workspace_id}/threads/{thread_id}` | A thread's mode and focus. |

@@ -27,6 +27,8 @@ from artifactr.core import (
     SetFocus,
     Versioned,
 )
+from artifactr.telemetry import annotate
+from artifactr.telemetry.attributes import ARTIFACT_ID
 from artifactr.workspace import Workspace
 
 # Tools annotate their context as RunContext[...] literally: pydantic-ai detects context-taking
@@ -78,6 +80,7 @@ def artifact_tools(
         ctx: RunContext[Session[Any]], kind: str, data: dict[str, Any]
     ) -> str:
         command = CreateArtifact(kind=kind, data=data, thread_id=ctx.deps.thread_id)
+        annotate({ARTIFACT_ID: command.artifact_id})  # the tool's span; it has no artifact_id
         outcome = await ctx.deps.workspace.commit(command)
         if isinstance(outcome, Applied):
             await _follow(ctx, outcome.artifact_id)

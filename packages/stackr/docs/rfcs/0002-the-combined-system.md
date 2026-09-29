@@ -108,18 +108,18 @@ The bridge has two ports of its own. The **ledger** is storage: an in-memory ada
 
 - **One follower per workspace.** It holds a lease in the ledger, so only one process follows each workspace. It reads envelopes in `seq` order and publishes the selected ones into the reflexr workspace with the same tenant and id. Only then does it advance its cursor.
 - **Ids come from the artifactr envelope id,** so publishing an event twice appends nothing (reflexr's `publish` is idempotent by id).
-- **Names come from reflexr's namespaces.** reflexr's registry is process-global with flat names, and its own facts `run_started` and `feedback_given` would collide with artifactr's. [reflexr #45][r-45] decides how event types are namespaced before phase 1 starts (**D6**), and the bridged types use its scheme. This RFC writes them as `artifactr.message_posted` and so on, as placeholders.
+- **Names come from reflexr's namespaces.** reflexr's registry is process-global with flat names, and its own facts `run_started` and `feedback_given` would collide with artifactr's. [reflexr #45][r-45] decides how event types are namespaced before phase 1 starts (**D6**), and the bridged types use its scheme. #45 was decided on 2026-09-29 ([reflexr ADR-0039][r-adr-0039]): every event type is qualified as `namespace:name`, reflexr's own facts become `reflexr:*`, and the bridged types are `artifactr:<type>`, such as `artifactr:message_posted`.
 - **The actor** on each bridged envelope is `SourceActor("artifactr")`, since the bridge published it. The artifactr actor goes in an `author` field, so rules can filter on who did it.
 
 The default set:
 
 | artifactr event | Bridged as | Notes |
 |---|---|---|
-| `message_posted` | `artifactr.message_posted` | thread, message id, content, author |
-| `artifact_created`, `artifact_changed`, `artifact_archived` | the same names, prefixed | kind, id, version, summary, and the data or patch |
-| `proposal_created`, `proposal_resolved` | the same names, prefixed | with `proposed_by`, used for loop control and evaluation |
-| `run_ended` | `artifactr.turn_ended` | so that "run" means one thing inside reflexr |
-| `feedback_given` | `artifactr.feedback_given` | |
+| `message_posted` | `artifactr:message_posted` | thread, message id, content, author |
+| `artifact_created`, `artifact_changed`, `artifact_archived` | the same names, in the `artifactr` namespace | kind, id, version, summary, and the data or patch |
+| `proposal_created`, `proposal_resolved` | the same names, in the `artifactr` namespace | with `proposed_by`, used for loop control and evaluation |
+| `run_ended` | `artifactr:turn_ended` | so that "run" means one thing inside reflexr |
+| `feedback_given` | `artifactr:feedback_given` | |
 | the application's `app_event`s and artifact kinds | projections the application registers | a mapping function per type |
 
 - **Not bridged:** tool calls and returns, run starts and pauses, deferred answers, and focus and mode changes. They are noisy, and tool arguments can hold data that rules have no need to see. Live frames never reach the log anyway.
@@ -211,7 +211,7 @@ This part depends on [reflexr #21][r-21]. Today, rules and schedules are the app
 1. **Draft.** The chat agent writes a `rule` artifact: a reflexr `Rule` as JSON, with write policy `propose`. The artifact type validates the draft with `Rule.check(events=..., actions=...)`, against the application's registered event types and an allowlist of actions that chat rules may use. `InvalidRule` lists every problem, and the agent can fix them.
 2. **Preview.** The bridge replays the reflexr workspace's recent log through reflexr's pure `core.evaluate`, which runs no actions. The agent puts the result ("would have fired N times in the last 7 days") in the proposal's rationale.
 3. **Accept.** A person accepts the proposal, possibly with edits.
-4. **Check.** The bridge's own rule, `install-rule`, fires on `artifactr.proposal_resolved`. It never trusts the bridged event, and re-reads artifactr to confirm that:
+4. **Check.** The bridge's own rule, `install-rule`, fires on `artifactr:proposal_resolved`. It never trusts the bridged event, and re-reads artifactr to confirm that:
    - the proposal was accepted
    - the artifact is at that version
    - the approver is a user allowed to install rules
@@ -235,7 +235,7 @@ Changing the rule means another proposal on the artifact, which installs a new v
 
 | Measure | From | Lands in |
 |---|---|---|
-| Proposal outcome per run: accepted, edited or rejected | `artifactr.proposal_resolved` for a bridge proposal. An evaluator of the log gives feedback on the run that proposed, as an `EvaluatorActor` | reflexr feedback, then a Langfuse score on the run |
+| Proposal outcome per run: accepted, edited or rejected | `artifactr:proposal_resolved` for a bridge proposal. An evaluator of the log gives feedback on the run that proposed, as an `EvaluatorActor` | reflexr feedback, then a Langfuse score on the run |
 | Acceptance and edit rates per rule | the proposal outcomes | Langfuse and Grafana |
 | Chat-to-rule conversion, and rule survival | rule artifacts proposed, accepted, still enabled after 30 days | the combined experiment |
 | Bridge lag and end-to-end latency | from the artifactr commit to the reflexr publish, and from the first event to its effect in the thread | bridge metrics in Prometheus |
@@ -250,7 +250,7 @@ One gap has no home yet. evalr's `Session` is "a conversation or a causal chain"
 ### Security
 
 - **Forged bridged events.**
-  - The risk: bridged types are registered in reflexr like any other type, so any client allowed to publish could send a fake `artifactr.proposal_resolved`. `Workspaces(emitted=[...])` reserves types to runs, but nothing reserves a type to one source (a prerequisite).
+  - The risk: bridged types are registered in reflexr like any other type, so any client allowed to publish could send a fake `artifactr:proposal_resolved`. `Workspaces(emitted=[...])` reserves types to runs, but nothing reserves a type to one source (a prerequisite).
   - Until that exists, bridge rules check that the envelope's actor is `SourceActor("artifactr")`, and the application must never resolve a client to that source.
   - Either way, anything that matters re-reads artifactr before acting. The install rule never acts on a bridged event alone.
 - **Actor permissions.**
@@ -350,7 +350,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 
 | Prerequisite | Library | Issue | Needed by | Until then |
 |---|---|---|---|---|
-| Namespaced event types | reflexr | [#45][r-45] | phase 1 (D6) | phase 1 waits |
+| Namespaced event types | reflexr | [#45][r-45], decided in [ADR-0039][r-adr-0039] | phase 1 (D6) | phase 1 waits for the implementation |
 | Runtime rule management: per-tenant, versioned, installed through the API, not listed to other tenants | reflexr | [#21][r-21] | phase 5 | no rules from chat |
 | Telemetry setup that composes across both libraries, polling without a trace per poll, and mirror cursors | reflexr, artifactr | [reflexr #62][r-62], [artifactr #50][a-50] | phase 4 | links and tags, without the combined setup |
 | `traceparent` on artifactr envelopes | artifactr | [#60][a-60] | phase 4, for links in the artifactr-to-reflexr direction | tags only, in that direction |
@@ -367,7 +367,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 | 2. Outbound adapter and loop control | The capability and helpers, allowlists, derived ids, keyed patches, read-back, and chain continuation | Under forced retries, a rule's proposal and notice each appear once. Two rules that answer each other stop at the depth limit |
 | 3. Template option, example and smoke test | The `bridge` question, the incident timeline example, and `make smoke-app` extended | A generated application passes its CI, and the smoke test sees an event cross each way |
 | 4. Telemetry links and tags | Span links, `thread:` and `chain:` tags, and the Langfuse user (after reflexr #62 and artifactr #50) | In Tempo, a turn started by a run links to the run's span. In Langfuse, each session carries the other's tag |
-| 5. Rules from chat | The `rule` artifact type, validation, preview, the install rule, and provenance (after reflexr #21) | A rule drafted in a thread goes live only after a person accepts it, and a forged `artifactr.proposal_resolved` installs nothing |
+| 5. Rules from chat | The `rule` artifact type, validation, preview, the install rule, and provenance (after reflexr #21) | A rule drafted in a thread goes live only after a person accepts it, and a forged `artifactr:proposal_resolved` installs nothing |
 | 6. Evaluation | Proposal-outcome feedback, the measures, and a combined experiment in the template's `evals/` | The example's experiment reports acceptance, rewrite rate and time to resolution |
 | 7. Docs, ADRs and the product repository | An ADR for each decision, stackr's docs, and the product repository generated from the template | The product repository passes its CI on the stack |
 
@@ -400,7 +400,8 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 ## Tracking
 
 - [x] Sign-off on D1 to D7 (2026-09-29)
-- [ ] Decide reflexr #45's namespaces
+- [x] Decide reflexr #45's namespaces ([ADR-0039][r-adr-0039], 2026-09-29)
+- [ ] Implement reflexr #45
 - [x] File the prerequisite issues: artifactr [#60][a-60], [#61][a-61], [#62][a-62] and [#63][a-63], and reflexr [#72][r-72]
 - [ ] Phase 1: inbound adapter
 - [ ] Phase 2: outbound adapter and loop control
@@ -425,6 +426,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 [r-adr-0016]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0016-tenants-and-workspaces-like-artifactr.md
 [r-adr-0018]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0018-opentelemetry-observability-with-langfuse.md
 [r-adr-0024]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0024-causal-chains-and-operator-actions.md
+[r-adr-0039]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0039-namespaced-event-types.md
 [r-adr-0027]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0027-executing-runs.md
 [r-21]: https://github.com/alexnodeland/reflexr/issues/21
 [r-45]: https://github.com/alexnodeland/reflexr/issues/45

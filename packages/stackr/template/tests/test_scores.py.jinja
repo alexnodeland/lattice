@@ -5,7 +5,6 @@ import json
 import logging
 import uuid
 from collections.abc import Iterator
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -16,9 +15,8 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.otel import TelemetryHandle, configure_telemetry
 
-from conftest import Script, app, bearer, say, settings, wait_for
+from conftest import Script, app, bearer, say, wait_for
 from {{ package_name }}.scores import Mirrors, sync_configs
-from {{ package_name }}.settings import Settings
 
 
 class FakeLangfuse:
@@ -71,17 +69,15 @@ def telemetry(langfuse: FakeLangfuse) -> Iterator[TelemetryHandle]:
 
 
 def test_feedback_becomes_scores_on_the_traces_it_is_about(
-    script: Script, langfuse: FakeLangfuse, telemetry: TelemetryHandle, tmp_path: Path
+    script: Script, langfuse: FakeLangfuse, telemetry: TelemetryHandle
 ) -> None:
-    database = f"sqlite+aiosqlite:///{tmp_path / 'app.db'}"
-    config = Settings(database_url=database, auth=settings().auth)
 
     def scored(count: int) -> bool:
         assert telemetry.langfuse is not None
         telemetry.langfuse.flush()
         return len(langfuse.scores) >= count
 
-    with TestClient(app(script, config, telemetry=telemetry), headers=bearer()) as client:
+    with TestClient(app(script, telemetry=telemetry), headers=bearer()) as client:
         expected: list[str] = []
 {%- if use_artifactr %}
         base = "/artifactr/v1/workspaces/main"

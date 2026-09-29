@@ -6,9 +6,10 @@ reactor evaluates the rules and runs their actions while the application is up.
 
 import asyncio
 import contextlib
+import logging
 from collections.abc import AsyncGenerator
 from datetime import timedelta
-from typing import Any, Never, cast
+from typing import Any, cast
 
 from fastapi import FastAPI
 from mcp.server.mcpserver import Context
@@ -41,6 +42,8 @@ from {{ package_name }}.tickets import (
 )
 
 PREFIX = "/reflexr"
+
+log = logging.getLogger(__name__)
 
 
 class Automation:
@@ -151,8 +154,16 @@ class Automation:
         )
 
 
-async def _stop(work: asyncio.Task[Never]) -> None:
-    """Stop the reactor; a run it was executing is attempted again later."""
+async def _stop(work: asyncio.Task[Any]) -> None:
+    """Stop the reactor; a run it was executing is attempted again when its lease lapses.
+
+    A reactor stopped in the middle of a transaction can fail as it stops, such as with
+    SQLite's "database is locked"; that is logged, and the application stops anyway.
+    """
     work.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
+    try:
         await work
+    except asyncio.CancelledError:
+        pass
+    except Exception as error:
+        log.warning("the reactor stopped with an error: %r", error)

@@ -37,6 +37,8 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "workspace": ({"artifactr.core", "artifactr.telemetry", "artifactr.workspace"}, OTEL_API),
     "agent": (INNER, {"pydantic", "pydantic_ai", *OTEL_API}),
     "sql": ({"artifactr.core", "artifactr.workspace", "artifactr.sql"}, {"sqlalchemy", "alembic"}),
+    # Feedback as scores, and the ports scores leave through.
+    "scores": ({"artifactr.core", "artifactr.workspace", "artifactr.scores"}, {"pydantic"}),
     "fastapi": (
         {*INNER, "artifactr.fastapi"},
         {"fastapi", "starlette", "pydantic", *OTEL_API},

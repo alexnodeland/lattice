@@ -21,7 +21,7 @@ from artifactr.agent.live import (
     forward_live,
     to_live,
 )
-from artifactr.agent.runner import RunHandle, Runner, Sent
+from artifactr.agent.runner import RunHandle, Runner, Sent, TurnContext
 from artifactr.agent.session import Session, Trigger, last_seen, load_history
 from artifactr.agent.tools import (
     artifact_text,
@@ -42,6 +42,7 @@ __all__ = [
     "Sent",
     "Session",
     "Trigger",
+    "TurnContext",
     "artifact_text",
     "artifact_tools",
     "describe_outcome",

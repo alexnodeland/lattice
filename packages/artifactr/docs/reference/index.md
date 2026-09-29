@@ -12,6 +12,7 @@ The packages are layers. Each depends only on the ones below it, so each is usab
 | [`artifactr.telemetry`](telemetry.md) | Tracing and metrics through the OpenTelemetry API: span attribution and the metric registry | core |
 | [`artifactr.workspace`](workspace.md) | Tenant-scoped workspace handles, the storage protocol and in-memory storage | core |
 | [`artifactr.agent`](agent.md) | The pydantic-ai capability, the session, the runner and live output | core |
+| [`artifactr.scores`](scores.md) | Feedback as scores: the mapping, the mirror that follows the log, and the ports scores leave through | core |
 | [`artifactr.sql`](sql.md) | SQL storage on PostgreSQL and SQLite, and its migrations | `sql`, `postgres` or `sqlite` extra |
 | [`artifactr.fastapi`](fastapi.md) | The thread protocol over WebSocket, and REST, as a FastAPI router | `fastapi` extra |
 | [`artifactr.otel`](otel.md) | `configure_telemetry`: the OpenTelemetry SDK, exporters and instrumentations, and metric views | `otel` extra |

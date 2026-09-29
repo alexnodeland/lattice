@@ -63,7 +63,7 @@ fix(workspace): release the run lease when a run is cancelled
 docs(adr): record the documentation tooling decision
 ```
 
-Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Scopes are package or area names: `core`, `telemetry`, `workspace`, `agent`, `sql`, `fastapi`, `mcp`, `otel`, `examples`, `docs`, `adr`, `rfc`. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The changelog is generated from these messages.
+Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Scopes are package or area names: `core`, `telemetry`, `workspace`, `agent`, `scores`, `sql`, `fastapi`, `mcp`, `otel`, `langfuse`, `litellm`, `examples`, `docs`, `adr`, `rfc`. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The changelog is generated from these messages.
 
 ## Dependencies
 

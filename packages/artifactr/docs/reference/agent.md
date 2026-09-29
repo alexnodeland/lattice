@@ -30,6 +30,8 @@ See [Running the agent](../guides/agent.md#running-the-agent).
 
 ::: artifactr.agent.Sent
 
+::: artifactr.agent.TurnContext
+
 ## Live output
 
 See [Live output](../guides/live-output.md).

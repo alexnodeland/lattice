@@ -20,7 +20,8 @@ in OpenTelemetry baggage for the turn's duration.
 import asyncio
 import contextlib
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -64,6 +65,13 @@ from artifactr.telemetry.attributes import (
 from artifactr.telemetry.metrics import TURN_DURATION, TURNS
 from artifactr.workspace import ThreadBusy, Workspace
 
+type TurnContext = Callable[[Session[Any]], AbstractAsyncContextManager[object]]
+"""A context entered around each turn, inside the turn's span, given the run's session.
+
+It is a port (ADR-0034): a backend that attributes a turn in its own way, such as Langfuse's
+propagated trace attributes, implements it, and the Runner stays free of the backend.
+"""
+
 
 @dataclass(frozen=True)
 class RunHandle:
@@ -101,6 +109,7 @@ class Runner[AppDepsT]:
         claim_ttl: How long a thread claim lasts without renewal, should this process die.
         tracer_provider: Where turn spans go. Defaults to the global tracer provider.
         meter_provider: Where turn metrics go. Defaults to the global meter provider.
+        turn_context: Entered around each turn, inside its span.
     """
 
     def __init__(
@@ -113,8 +122,10 @@ class Runner[AppDepsT]:
         claim_ttl: timedelta = timedelta(seconds=30),
         tracer_provider: TracerProvider | None = None,
         meter_provider: MeterProvider | None = None,
+        turn_context: TurnContext | None = None,
     ) -> None:
         self._agent = agent
+        self._turn_context = turn_context
         self._app = app
         self.live = live or FanoutChannel()
         self._agent_name = agent_name
@@ -324,14 +335,17 @@ class Runner[AppDepsT]:
         ) as span:
             token = otel_context.attach(baggage.set_baggage(SESSION_ID, session.thread_id))
             try:
-                result = await self._agent.run(
-                    prompt,
-                    deps=session,
-                    message_history=await load_history(workspace, session.thread_id),
-                    deferred_tool_results=deferred,
-                    event_stream_handler=forward_live(self.live),
-                    conversation_id=session.thread_id,
-                )
+                async with contextlib.AsyncExitStack() as scope:
+                    if self._turn_context is not None:
+                        await scope.enter_async_context(self._turn_context(session))
+                    result = await self._agent.run(
+                        prompt,
+                        deps=session,
+                        message_history=await load_history(workspace, session.thread_id),
+                        deferred_tool_results=deferred,
+                        event_stream_handler=forward_live(self.live),
+                        conversation_id=session.thread_id,
+                    )
             except asyncio.CancelledError:
                 outcome = "stopped"
                 raise

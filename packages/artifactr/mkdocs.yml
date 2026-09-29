@@ -142,6 +142,7 @@ nav:
       - artifactr.telemetry: reference/telemetry.md
       - artifactr.workspace: reference/workspace.md
       - artifactr.agent: reference/agent.md
+      - artifactr.scores: reference/scores.md
       - artifactr.sql: reference/sql.md
       - artifactr.fastapi: reference/fastapi.md
       - artifactr.mcp: reference/mcp.md
@@ -189,6 +190,7 @@ nav:
           - adr/0035-a-turn-is-its-own-trace.md
           - adr/0036-metric-cardinality-through-sdk-views.md
           - adr/0037-feedback-targets-and-evaluators.md
+          - adr/0038-feedback-as-scores.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

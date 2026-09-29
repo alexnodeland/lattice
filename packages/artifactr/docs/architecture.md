@@ -60,6 +60,7 @@ graph TD
     mcp --> workspace
     agent --> workspace["artifactr.workspace<br/>scoped handles, storage protocols"]
     sql["artifactr.sql<br/>SQLAlchemy storage"] --> workspace
+    scores["artifactr.scores<br/>feedback as scores"] --> workspace
     otel["artifactr.otel<br/>OpenTelemetry SDK"] --> telemetry
     workspace --> telemetry["artifactr.telemetry<br/>OpenTelemetry API"]
     telemetry --> core["artifactr.core<br/>pure, synchronous rules"]
@@ -74,7 +75,8 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.core` | pydantic, jsonpatch | Inner | Every rule. Pure, synchronous, no I/O, no pydantic-ai, no OpenTelemetry. |
 | `artifactr.telemetry` | core, the OpenTelemetry API | Inner; its port is the OpenTelemetry API | Span attribution, the metric registry, and recording through the API. |
 | `artifactr.workspace` | core, telemetry | Inner; owns the `Storage` port | `Workspaces`, `Workspace`, storage protocols, in-memory storage. |
-| `artifactr.agent` | workspace, telemetry, pydantic-ai | Inner | The `ArtifactWorkspace` capability, `Session`, `Runner`, live-output helpers. |
+| `artifactr.agent` | workspace, telemetry, pydantic-ai | Inner; owns the `TurnContext` port | The `ArtifactWorkspace` capability, `Session`, `Runner`, live-output helpers. |
+| `artifactr.scores` | workspace | Inner; owns the `ScoreSink` and `ScoreConfigStore` ports | Feedback as scores, and the mirror that sends a workspace's feedback to a sink. |
 | `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | Adapter for `Storage` | Durable storage on PostgreSQL and SQLite, and its migrations. |
 | `artifactr.otel` (extra) | telemetry, the OpenTelemetry SDK, exporters and instrumentations | Adapter for the OpenTelemetry API | `configure_telemetry`: providers, OTLP export, instrumentations and metric views, for applications. |
 | `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
@@ -296,6 +298,17 @@ class Helpfulness(Feedback, name="helpfulness", targets={"turn", "thread"}):
 
 Feedback is the `give_feedback` command, so it goes through the one write path and every surface has it. Core checks the type is registered and declares the target's kind, validates the value, and checks the target exists, then records `feedback_given` with the validated value. An evaluator's verdict is an instance of the same types, given by an `EvaluatorActor(name, version)`, which may give feedback and nothing else; people's and evaluators' judgements can then be compared directly. Feedback is counted in `artifactr.feedback` by type, target and kind of actor.
 
+**Scores.** Evaluation backends see feedback as scores, one per field, named `{type}.{field}` and typed by the field: bounded numbers are numeric, `bool` boolean, `Literal` and `Enum` categorical, `str` text ([ADR-0038](adr/0038-feedback-as-scores.md)). `artifactr.scores.FeedbackMirror` follows a workspace's log and sends each `feedback_given`'s scores to a `ScoreSink`, attached to a trace or else a session:
+
+| Target | Scored on |
+|---|---|
+| A turn | The trace of the run's latest attempt |
+| A message | The latest trace of the run that posted it, when the target names it; else the thread's session |
+| An artifact version | The trace the version was committed in; else the session of the agent that wrote it |
+| A thread | The thread's session |
+
+Score ids are derived from the envelope's id, so mirroring the log again replaces scores rather than adding more. `sync_score_configs` creates each type's score configs in a `ScoreConfigStore`. `ScoreSink` and `ScoreConfigStore` are ports: `artifactr.langfuse` adapts Langfuse to them.
+
 ## Live output
 
 The event log carries durable domain events only. Token-level output belongs to whoever drives the run ([ADR-0007](adr/0007-caller-owned-live-output.md)). pydantic-ai hands the run's event stream to its caller through `event_stream_handler`, and `forward_live(channel)` sends it to a `LiveChannel` as protocol live frames:
@@ -445,6 +458,8 @@ pydantic-ai adds `gen_ai.client.token.usage` and `operation.cost` per model requ
 
 The `[otel]` extra's `configure_telemetry(...)` is for applications and the reference implementation; no part of the library requires it. It sets up the tracer, meter and logger providers with the service's resource, OTLP over HTTP, the metric views, a `BaggageSpanProcessor` that copies a turn's `session.id` onto every span in it (database and HTTP spans included), the open instrumentations for FastAPI, SQLAlchemy, asyncpg, httpx and httpx2, and pydantic-ai's `InstrumentationSettings`. It returns a handle that instruments FastAPI apps and SQLAlchemy engines created later, gives agents pydantic-ai's `Instrumentation` capability, and shuts everything down.
 
+The `Runner` takes a `turn_context`: an async context entered around each turn, inside its span, given the run's session. It is a port for backends that attribute a turn in their own way, such as Langfuse's propagated trace attributes.
+
 ## Dependencies
 
 | Dependency | Used for | Current major (2026-09) |
@@ -524,6 +539,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0035](adr/0035-a-turn-is-its-own-trace.md) | A turn is its own trace |
 | [0036](adr/0036-metric-cardinality-through-sdk-views.md) | Metric cardinality through SDK views |
 | [0037](adr/0037-feedback-targets-and-evaluators.md) | Feedback targets and evaluators |
+| [0038](adr/0038-feedback-as-scores.md) | Feedback as scores, through ports |
 
 ## Open questions
 

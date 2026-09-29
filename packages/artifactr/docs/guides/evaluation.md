@@ -86,9 +86,37 @@ ratings = [
 
 It is also counted in the `artifactr.feedback` metric, by type, target and kind of actor, and each commit is traced ([Observability](observability.md)).
 
+## Scores
+
+Evaluation backends see feedback as scores: one per field, named `{type}.{field}`, typed by the field ([ADR-0038](../adr/0038-feedback-as-scores.md)). `Helpfulness` above becomes `helpfulness.rating`, a numeric score from 1 to 5, and `helpfulness.reason`, a text score. Booleans are 1 or 0, `Literal` and `Enum` fields are categories, and fields left empty are not scored.
+
+`artifactr.scores.FeedbackMirror` follows a workspace's log and sends each piece of feedback's scores to a `ScoreSink`, attached to the trace the feedback is about when there is one, and to the session (the thread) otherwise:
+
+```python
+import asyncio
+
+from artifactr.scores import FeedbackMirror
+
+mirror = FeedbackMirror(workspace, sink)
+task = asyncio.create_task(mirror.follow())  # until cancelled
+```
+
+A turn's feedback lands on the trace of the run's latest attempt, a message's on the trace of the run that posted it, and an artifact version's on the trace it was committed in. Score ids are derived from the feedback's envelope, so a mirror can start over from the beginning of the log without duplicating anything. `sync_score_configs(store)` creates the score configs of every registered feedback type that a `ScoreConfigStore` lacks.
+
+The sink and the store are small protocols, so any backend can implement them:
+
+```python
+from artifactr.scores import Score
+
+
+class PrintingSink:
+    async def send(self, score: Score) -> None:
+        print(score.name, score.value, score.trace_id or score.session_id)
+```
+
 ## What comes next
 
 RFC-0002 plans two more pieces on top of feedback:
 
-- the `[langfuse]` extra mirrors feedback to Langfuse as scores on the traces it judges
+- the `[langfuse]` extra adapts Langfuse to the score ports, so feedback appears as Langfuse scores beside the traces it judges
 - the `[evals]` extra connects artifactr to evalr, the shared eval kit, for datasets from the log, experiments, online evaluators and end-to-end measures such as rewrite rate and drop-off

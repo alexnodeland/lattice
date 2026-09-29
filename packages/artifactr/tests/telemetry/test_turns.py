@@ -1,11 +1,12 @@
 """Turns are traces: the Runner's span, pydantic-ai's spans inside it, and artifactr's ids."""
 
 import asyncio
-from collections.abc import Sequence
+import contextlib
+from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
 import pytest
-from opentelemetry import baggage
+from opentelemetry import baggage, trace
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.trace import StatusCode
 from pydantic_ai import Agent, DeferredToolRequests, FunctionToolset, RunContext
@@ -230,3 +231,22 @@ async def test_a_stopped_turn_and_a_failed_turn(
     assert failed.status.status_code == StatusCode.ERROR
     assert recorder.total("artifactr.turns", {TURN_OUTCOME: "stopped"}) == 1
     assert recorder.total("artifactr.turns", {TURN_OUTCOME: "failed"}) == 1
+
+
+async def test_a_turn_context_is_entered_inside_the_turns_span(
+    ws: Workspace, thread: Thread, recorder: Recorder, gate: Gate
+) -> None:
+    entered: list[tuple[str, str]] = []
+
+    @contextlib.asynccontextmanager
+    async def attribute(session: Session[Any]) -> AsyncIterator[None]:
+        span = trace.get_current_span()
+        entered.append((getattr(span, "name", ""), session.thread_id))
+        yield
+
+    script = Script(say("Hello."))
+    runner = Runner(
+        traced(script, recorder), app=gate, turn_context=attribute, **recorder.providers
+    )
+    await started(await runner.send(ws, thread.id, "Hi")).wait()
+    assert entered == [("invoke_workflow turn", thread.id)]

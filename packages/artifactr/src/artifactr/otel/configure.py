@@ -43,6 +43,14 @@ Instrumented = Literal["fastapi", "sqlalchemy", "asyncpg", "httpx"]
 INSTRUMENTED: tuple[Instrumented, ...] = ("fastapi", "sqlalchemy", "asyncpg", "httpx")
 """Every library ``configure_telemetry`` can instrument."""
 
+_MODULES: dict[Instrumented, tuple[str, ...]] = {
+    "fastapi": ("fastapi",),
+    "sqlalchemy": ("sqlalchemy",),
+    "asyncpg": ("asyncpg",),
+    # pydantic-ai's model providers use httpx2, and need httpx only for an optional extra.
+    "httpx": ("httpx", "httpx2"),
+}
+
 BAGGAGE_KEYS: frozenset[str] = frozenset({SESSION_ID})
 """The baggage entries copied onto every span: the session, which a turn places in baggage."""
 
@@ -71,8 +79,15 @@ def metric_views(detail: MetricsDetail = "workspace") -> list[View]:
 
 
 def installed() -> set[Instrumented]:
-    """Return the instrumentable libraries that are installed."""
-    return {name for name in INSTRUMENTED if importlib.util.find_spec(name) is not None}
+    """Return the instrumentable libraries that are installed.
+
+    ``httpx`` counts when either httpx or httpx2 is: one instruments the other's clients too.
+    """
+    return {name for name in INSTRUMENTED if any(map(_found, _MODULES[name]))}
+
+
+def _found(module: str) -> bool:
+    return importlib.util.find_spec(module) is not None
 
 
 class TelemetryHandle:
@@ -117,6 +132,7 @@ class TelemetryHandle:
         if langfuse is not None:
             self._cleanups.append(langfuse.shutdown)
         self._engines: list[Engine] = []
+        self._shut_down = False
         if log_handler is not None:
             logging.getLogger().addHandler(log_handler)
             self._cleanups.append(lambda: _remove(log_handler))
@@ -199,12 +215,19 @@ class TelemetryHandle:
                 HTTPXClientInstrumentor,
             )
 
-            for client in (HTTPXClientInstrumentor(), HTTPX2ClientInstrumentor()):
-                client.instrument(tracer_provider=tracer_provider, meter_provider=meter_provider)
-                self._cleanups.append(client.uninstrument)
+            clients = (("httpx", HTTPXClientInstrumentor()), ("httpx2", HTTPX2ClientInstrumentor()))
+            for module, client in clients:
+                if _found(module):
+                    client.instrument(
+                        tracer_provider=tracer_provider, meter_provider=meter_provider
+                    )
+                    self._cleanups.append(client.uninstrument)
 
     def shutdown(self) -> None:
         """Remove the instrumentation, and flush and shut down the providers. Idempotent."""
+        if self._shut_down:
+            return
+        self._shut_down = True
         cleanups, self._cleanups = self._cleanups, []
         # Each cleanup runs once, even when an engine re-instrumented SQLAlchemy.
         for cleanup in dict.fromkeys(reversed(cleanups)):

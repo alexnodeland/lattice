@@ -4,7 +4,27 @@ A Python library for **typed evaluation of agent systems**. An evaluator judges 
 
 Two kinds of evaluator are equals: [DSPy](https://dspy.ai) judges optimized with GEPA, and TypeSafe's Jev decision models through [pydantic-ai](https://ai.pydantic.dev), with a language-model fallback. Datasets and experiments live in [Langfuse](https://langfuse.com) and on the [Hugging Face Hub](https://huggingface.co/datasets).
 
-> **Status:** pre-release. evalr is being built in the phases tracked by [RFC-0001](docs/rfcs/0001-v0.1-implementation-plan.md).
+> **Status:** pre-release. v0.1 is built, as planned in [RFC-0001](docs/rfcs/0001-v0.1-implementation-plan.md); its documentation site is next.
+
+```python
+class Helpfulness(BaseModel):
+    rating: Annotated[int, Field(ge=1, le=5, description="How much the reply helped")]
+    resolved: bool = Field(description="The request was fully addressed")
+    reason: str | None = None
+
+
+judge = DspyJudge(Helpfulness, inputs=Thread, lm=dspy.LM("openai/gpt-5-mini"))
+trained = await optimize(judge, train=train, validate=validate, optimizer=Gepa(reflection_lm=lm))
+trained.save("judges/helpfulness.json")
+
+decider = DecisionEvaluator(Helpfulness, inputs=Thread, min_confidence=0.7)  # Jev, then the judge
+evaluator = Fallback(decider, trained)
+verdict = await evaluator.evaluate(thread)  # Verdict[Helpfulness], with confidence and trace id
+
+measurement = await measure(evaluator, validate)  # agreement with people, calibration, cost
+```
+
+evalr is built as ports and adapters ([ADR-0006](docs/adr/0006-ports-and-adapters.md)): a pure core of verdicts, datasets and metrics, with DSPy, decision models, Langfuse, the Hugging Face Hub and in-memory fakes as adapters of its small protocols.
 
 Part of a family with [artifactr](https://github.com/alexnodeland/artifactr) and [reflexr](https://github.com/alexnodeland/reflexr), which depend on evalr through their `[evals]` extras. evalr imports neither.
 

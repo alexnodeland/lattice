@@ -370,6 +370,8 @@ evalr uses the OpenTelemetry API only, under the `evalr` scope, and never config
 - Every evaluation runs in a span named `evalr.evaluate {evaluator}`, with the attributes `evalr.evaluator.name`, `evalr.evaluator.version` and `evalr.verdict.type`. The span is current while the evaluator works, so the spans of the language models or agents it calls nest under it. A failure is recorded on the span.
 - The verdict's `trace_id` is that span's trace, so a verdict made inside an experiment item's trace, or on the trace of the run it judges, links back to it. With no SDK configured, and no enclosing trace, it is `None`.
 - `judging(tracer, evaluator=, version=, verdict_type=)` is the context manager every evaluator kind uses; application evaluators can use it too.
+- evalr instruments nothing else. pydantic-ai traces decision evaluators' agent runs itself, once the application turns its instrumentation on. DSPy is traced by OpenInference's `DSPyInstrumentor` (`openinference-instrumentation-dspy`), which the application installs and enables; GEPA runs DSPy single-threaded so the trace context survives. DSPy's default `engine="auto"` may use its bundled `lm15` engine, which bypasses HTTP and LiteLLM hooks, so applications that route through a LiteLLM gateway should choose its engine.
+- Online evaluations can also be emitted as `gen_ai.evaluation.result` events on the spans they judge (`OtelEventSink`, above).
 
 ## Quality
 

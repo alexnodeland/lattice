@@ -1,0 +1,186 @@
+"""The application's assembly: its surfaces, the database, telemetry, the gateway and ``main``."""
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
+
+import pytest
+import uvicorn
+from fastapi.testclient import TestClient
+from pydantic_ai.capabilities import Instrumentation
+from pydantic_ai.models.instrumented import InstrumentationSettings
+from pydantic_ai.models.openai import OpenAIChatModel
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+import {{ package_name }}.app
+import {{ package_name }}.telemetry
+from conftest import Script, app, bearer, settings
+from {{ package_name }}.database import create_schema, open_database
+from {{ package_name }}.gateway import Guardrails, TenantKeys, gateway_model, model_settings
+from {{ package_name }}.settings import GatewaySettings, Settings
+from {{ package_name }}.telemetry import configure, through_the_collector
+
+
+def test_the_root_describes_the_surfaces(client: TestClient) -> None:
+    about = client.get("/").json()
+{%- if use_artifactr %}
+    assert (about["artifactr"], about["artifactr_mcp"]) == ("/artifactr/v1", "/artifactr/mcp/")
+{%- endif %}
+{%- if use_reflexr %}
+    assert (about["reflexr"], about["reflexr_mcp"]) == ("/reflexr/v1", "/reflexr/mcp/")
+{%- endif %}
+
+
+def test_health_needs_no_token(script: Script) -> None:
+    with TestClient(app(script)) as client:
+        assert client.get("/healthz").json() == {"status": "ok"}
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+{%- if use_artifactr %}
+        "/artifactr/v1/workspaces/main/artifacts",
+        "/artifactr/mcp/",
+{%- endif %}
+{%- if use_reflexr %}
+        "/reflexr/v1/workspaces/main/events",
+        "/reflexr/v1/rules",
+        "/reflexr/mcp/",
+{%- endif %}
+    ],
+)
+@pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer not-a-token"}])
+def test_every_surface_needs_a_valid_token(
+    script: Script, path: str, headers: dict[str, str]
+) -> None:
+    with TestClient(app(script)) as client:
+        assert client.get(path, headers=headers).status_code == 401
+
+
+def test_workspaces_can_live_in_a_database(script: Script, tmp_path: Path) -> None:
+    config = Settings(
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'app.db'}",
+        auth=settings().auth,
+    )
+    for restart in range(2):
+        with TestClient(app(script, config), headers=bearer()) as client:
+{%- if use_artifactr %}
+            base = "/artifactr/v1/workspaces/main"
+            if restart == 0:
+                thread = {"type": "create_thread"}
+                frame = {"type": "command", "command_id": "c1", "command": thread}
+                assert client.post(f"{base}/commands", json=frame).json()["ok"]
+            assert len(client.get(f"{base}/threads").json()) == 1, "a restarted app finds it"
+{%- endif %}
+{%- if use_reflexr %}
+            base = "/reflexr/v1/workspaces/main"
+            if restart == 0:
+                event = {"type": "ticket.triaged", "priority": "low", "summary": "kept"}
+                assert client.post(f"{base}/events", json={"event": event}).status_code == 200
+            [kept] = client.get(f"{base}/events", params={"type": "ticket.triaged"}).json()
+            assert kept["event"]["summary"] == "kept", "a restarted app finds it"
+{%- endif %}
+
+
+def test_postgresql_gets_the_schema_as_its_search_path() -> None:
+    engine = open_database("postgresql+asyncpg://postgres:postgres@db/postgres", schema="app")
+    assert engine.dialect.name == "postgresql"
+
+
+async def test_the_schema_is_created_on_postgresql() -> None:
+    executed: list[str] = []
+
+    class Connection:
+        async def execute(self, statement: object) -> None:
+            executed.append(str(statement))
+
+    class Engine:
+        dialect = SimpleNamespace(name="postgresql")
+
+        @asynccontextmanager
+        async def begin(self) -> AsyncIterator[Connection]:
+            yield Connection()
+
+    await create_schema(cast(AsyncEngine, Engine()), "app")
+    assert executed == ['CREATE SCHEMA IF NOT EXISTS "app"']
+
+
+def test_the_gateway_model_is_the_configured_group() -> None:
+    model = gateway_model(GatewaySettings(base_url="http://litellm:4000", model="fast"))
+    assert isinstance(model, OpenAIChatModel)
+    assert (model.model_name, model.system) == ("fast", "litellm")
+
+
+def test_a_mocked_reply_is_asked_for_only_when_set() -> None:
+    assert model_settings(GatewaySettings()) == {}
+    assert model_settings(GatewaySettings(mock_response="ok")) == {
+        "extra_body": {"mock_response": "ok"}
+    }
+
+
+async def test_tenants_use_their_keys_and_the_same_guardrails() -> None:
+    keys = TenantKeys({"acme": "sk-acme"})
+    assert (await keys("acme"), await keys("initech")) == ("sk-acme", None)
+    guardrails = Guardrails(("pii-mask",))
+{%- if use_artifactr %}
+    assert await guardrails.for_workspace("acme", "main") == ("pii-mask",)
+{%- endif %}
+{%- if use_reflexr %}
+    assert await guardrails.for_rule("acme", "main", "triage") == ("pii-mask",)
+{%- endif %}
+
+
+def test_telemetry_is_configured_only_with_an_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    configured: list[dict[str, Any]] = []
+
+    def configure_telemetry(**options: Any) -> None:
+        configured.append(options)
+
+    monkeypatch.setattr({{ package_name }}.telemetry, "configure_telemetry", configure_telemetry)
+    assert configure(Settings()) is None
+    configure(Settings(telemetry=True, langfuse=True, environment="staging"))
+    [options] = configured
+    assert (options["service_name"], options["environment"]) == ("{{ project_slug }}", "staging")
+    assert options["langfuse"] is True
+    assert options["instrument"] == ("fastapi", "httpx")
+    assert options["langfuse_options"] == {"should_export_span": through_the_collector}
+    assert through_the_collector(cast(Any, None)) is False
+
+
+def test_main_serves_with_telemetry(monkeypatch: pytest.MonkeyPatch) -> None:
+    served: dict[str, Any] = {}
+    shut_down: list[bool] = []
+
+    class Handle:
+        tracer_provider = meter_provider = langfuse = None
+
+        def capability(self) -> Instrumentation:
+            return Instrumentation(settings=InstrumentationSettings())
+
+        def instrument_app(self, app: object) -> None:
+            served["instrumented"] = True
+
+        def shutdown(self) -> None:
+            shut_down.append(True)
+
+    monkeypatch.setattr({{ package_name }}.app, "configure", lambda settings: Handle())
+    monkeypatch.setattr(uvicorn, "run", lambda app, **options: served.update(options))
+    monkeypatch.setenv("AUTH_JWT_SECRET", "secret")
+    monkeypatch.setenv("APP_HOST", "127.0.0.1")
+    monkeypatch.setenv("APP_PORT", "9000")
+    {{ package_name }}.app.main()
+    assert served == {"instrumented": True, "host": "127.0.0.1", "port": 9000}
+    assert shut_down == [True]
+
+
+def test_main_serves_without_telemetry(monkeypatch: pytest.MonkeyPatch) -> None:
+    served: dict[str, Any] = {}
+    monkeypatch.setattr(uvicorn, "run", lambda app, **options: served.update(options))
+    monkeypatch.setenv("AUTH_JWT_SECRET", "secret")
+    for unset in ("APP_HOST", "APP_PORT", "OTEL_EXPORTER_OTLP_ENDPOINT"):
+        monkeypatch.delenv(unset, raising=False)
+    {{ package_name }}.app.main()
+    assert served == {"host": "127.0.0.1", "port": {{ app_port }}}

@@ -1,0 +1,108 @@
+# The application template (RFC-0001 phase 5, ADR-0011): a new application on artifactr,
+# reflexr or both, wired to the stack's ports.
+#
+#   uvx copier copy gh:alexnodeland/stackr my-app     # from GitHub, at the latest release
+#   uvx copier copy path/to/stackr my-app             # from a clone
+#   uvx copier update                                 # later, in the application
+#
+# The template's files are in template/. Copier takes a repository, not a directory of one,
+# so these questions live at the repository's root and point it there.
+
+_subdirectory: template
+_min_copier_version: "9.4"
+_answers_file: .copier-answers.yml
+
+project_name:
+  type: str
+  help: The application's name, as people read it
+  default: My App
+  validator: >-
+    {% if not project_name.strip() %}The name can't be empty{% endif %}
+
+project_slug:
+  type: str
+  help: >-
+    Its slug: the Python distribution, the OpenTelemetry service and the Compose project
+  default: >-
+    {{ project_name.strip().lower() | regex_replace('[^a-z0-9]+', '-') | trim('-') }}
+  validator: >-
+    {% if not (project_slug | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$')) %}
+    Lowercase letters, digits and single dashes, starting with a letter
+    {% elif project_slug | length > 30 %}
+    At most 30 characters
+    {% endif %}
+
+description:
+  type: str
+  help: One line about what it does
+  default: An application on stackr.
+
+libraries:
+  type: str
+  help: The libraries it uses
+  choices:
+    artifactr (people and agents edit shared artifacts): artifactr
+    reflexr (rules over event streams run agents): reflexr
+    both, mounted side by side on one database: both
+  default: both
+
+evals:
+  type: bool
+  help: Include evaluation with evalr (an evals/ directory and a starter experiment)?
+  default: true
+
+python_version:
+  type: str
+  help: The Python version it runs on
+  choices: ["3.12", "3.13", "3.14"]
+  default: "3.12"
+
+app_port:
+  type: int
+  help: The port it is published on, on this machine
+  default: 8800
+  validator: >-
+    {% if app_port < 1024 or app_port > 65535 %}Choose a port from 1024 to 65535{% endif %}
+
+# The libraries are not on PyPI: each is pinned to a git revision of its repository, the
+# current `main` when the template was last updated. `copier update` keeps the revisions you
+# chose; change them here, or in pyproject.toml's [tool.uv.sources].
+artifactr_rev:
+  type: str
+  help: The artifactr revision to pin (a commit SHA)
+  default: e890aca037c0160f49812778a7d6fbbd0c257889
+  when: "{{ libraries in ['artifactr', 'both'] }}"
+  validator: >-
+    {% if not (artifactr_rev | regex_search('^[0-9a-f]{40}$')) %}A full 40-character commit SHA{% endif %}
+
+reflexr_rev:
+  type: str
+  help: The reflexr revision to pin (a commit SHA)
+  default: 5c1fb77c7b7793a9741e97c0ee825b638ea8ca39
+  when: "{{ libraries in ['reflexr', 'both'] }}"
+  validator: >-
+    {% if not (reflexr_rev | regex_search('^[0-9a-f]{40}$')) %}A full 40-character commit SHA{% endif %}
+
+evalr_rev:
+  type: str
+  help: The evalr revision to pin (a commit SHA)
+  default: 62582e2a677947bbb540e367e28bb6ad7d33b7f9
+  when: "{{ evals }}"
+  validator: >-
+    {% if not (evalr_rev | regex_search('^[0-9a-f]{40}$')) %}A full 40-character commit SHA{% endif %}
+
+# Derived, never asked, and not recorded in the answers.
+package_name:
+  type: str
+  default: "{{ project_slug | replace('-', '_') }}"
+  when: false
+
+use_artifactr:
+  type: bool
+  default: "{{ libraries in ['artifactr', 'both'] }}"
+  when: false
+
+use_reflexr:
+  type: bool
+  default: "{{ libraries in ['reflexr', 'both'] }}"
+  when: false

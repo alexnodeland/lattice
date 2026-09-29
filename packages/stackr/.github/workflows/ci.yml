@@ -25,6 +25,41 @@ jobs:
       # Generates a throwaway .env first, which also tests scripts/setup-env.
       - run: make validate
 
+  # Each variant of the application template, generated and checked as its own CI would:
+  # lint, strict types, and the tests with 100% coverage. `make validate` checks the template's
+  # rendering and lint in every variant; this installs and runs what it generates.
+  template:
+    name: Template (${{ matrix.libraries }}${{ matrix.evals && ', evals' || '' }}, Python ${{ matrix.python }})
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        libraries: [artifactr, reflexr, both]
+        evals: [true, false]
+        python: ["3.12"]
+        include:
+          - libraries: both
+            evals: true
+            python: "3.14"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Generate the application
+        run: >-
+          uv run copier copy --defaults --vcs-ref HEAD
+          --data libraries=${{ matrix.libraries }} --data evals=${{ matrix.evals }}
+          --data python_version=${{ matrix.python }}
+          . "$RUNNER_TEMP/app"
+      - name: Its checks
+        working-directory: ${{ runner.temp }}/app
+        run: |
+          uv sync --all-groups
+          make check
+
   smoke:
     name: Smoke (${{ matrix.name }})
     needs: validate

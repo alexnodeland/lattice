@@ -1,0 +1,27 @@
+# Settings and secrets: .env.example is the template, .env is yours.
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+*.egg-info/
+
+# Tools
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.cache/
+
+# The dev container's override, written by initialize.sh
+.devcontainer/stackr.generated.yaml
+
+# Editors and systems
+.DS_Store
+.idea/
+.vscode/

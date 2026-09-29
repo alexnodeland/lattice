@@ -32,6 +32,20 @@ Applications reach models through the gateway at `http://localhost:4400` with a 
 
 Run `make` to list every command. [CONTRIBUTING](CONTRIBUTING.md) covers the workflow.
 
+## Start an application
+
+stackr's [Copier](https://copier.readthedocs.io) template generates an application on artifactr, reflexr or both, already wired to the stack: Supabase sign-in and PostgreSQL, agents on the gateway, OpenTelemetry, feedback as Langfuse scores, evalr experiments, and the family's quality gates.
+
+```bash
+uvx copier copy gh:alexnodeland/stackr my-app
+cd my-app
+make install        # writes uv.lock: commit it
+make env && make check
+make up             # runs it beside the stack
+```
+
+`uvx copier update` brings in the template's later improvements. [The architecture](docs/architecture.md#the-application-template) describes what it generates.
+
 ## License
 
 [MIT](LICENSE)

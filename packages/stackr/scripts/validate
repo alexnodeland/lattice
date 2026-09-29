@@ -49,6 +49,9 @@ uv run scripts/check-config supabase || fail "supabase"
 step "The gateway's configuration"
 uv run scripts/check-config litellm || fail "litellm"
 
+step "The application template, rendered in every variant"
+uv run scripts/check-template || fail "template"
+
 step "Service configurations, with each service's own validator"
 # Each runs the image compose.yaml pins, offline, with the config mounted as
 # the service would see it.
@@ -99,7 +102,7 @@ check_service "Loki" \
 step "Shell scripts"
 shell_scripts=()
 while IFS= read -r file; do shell_scripts+=("$file"); done \
-  < <(grep -rlE '^#!/usr/bin/env (bash|sh)' scripts .devcontainer | sort)
+  < <(grep -rlE '^#!/usr/bin/env (bash|sh)' scripts .devcontainer template | sort)
 if uv run shellcheck "${shell_scripts[@]}"; then
   echo "ok: ${shell_scripts[*]}"
 else

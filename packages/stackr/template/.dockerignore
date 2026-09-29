@@ -1,0 +1,14 @@
+# What `docker build` leaves out: the image needs pyproject.toml, uv.lock, README.md and src/.
+.git
+.env
+.venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+.coverage
+coverage.xml
+htmlcov
+.cache
+dist
+tests
+evals

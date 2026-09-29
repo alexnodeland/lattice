@@ -1,0 +1,151 @@
+"""Test helpers: tokens signed here, a scripted model, and the application in memory.
+
+No test needs the stack or the network. Tokens are signed in the test with a secret (or a key)
+the verifier is given; the agents' model is a :class:`Script` that answers each request with its
+next step; workspaces live in memory, or in SQLite.
+"""
+
+import asyncio
+import json
+import socket
+import time
+from collections.abc import AsyncIterator, Callable, Iterator
+{%- if use_reflexr %}
+from datetime import timedelta
+{%- endif %}
+from typing import Any
+
+import jwt
+import pytest
+import uvicorn
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from pydantic_ai import ModelMessage, ModelResponse, TextPart, ToolCallPart
+from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
+
+from {{ package_name }}.app import create_app
+from {{ package_name }}.settings import AuthSettings, GatewaySettings, Settings
+
+SECRET = "a-secret-for-the-tests-at-least-32-characters-long"
+TENANT = "acme"
+TENANT_KEY = "sk-acme-key"
+
+
+def token(
+    user: str = "alice",
+    *,
+    tenant: str | None = TENANT,
+    audience: str = "authenticated",
+    expires_in: int = 3600,
+    secret: str = SECRET,
+    **claims: Any,
+) -> str:
+    """An HS256 access token, like one Supabase Auth issues on its legacy JWT secret."""
+    payload: dict[str, Any] = {
+        "sub": user,
+        "aud": audience,
+        "exp": int(time.time()) + expires_in,
+        "email": f"{user}@example.com",
+        **claims,
+    }
+    if tenant is not None:
+        payload["app_metadata"] = {"provider": "email", "tenant_id": tenant}
+    return jwt.encode(payload, secret, algorithm="HS256")
+
+
+def bearer(user: str = "alice", *, tenant: str = TENANT) -> dict[str, str]:
+    """The Authorization header of a user of a tenant."""
+    return {"Authorization": f"Bearer {token(user, tenant=tenant)}"}
+
+
+def say(text: str) -> ModelResponse:
+    """A step that replies with text."""
+    return ModelResponse(parts=[TextPart(text)])
+
+
+def call(tool: str, **args: Any) -> ModelResponse:
+    """A step that calls one tool."""
+    return ModelResponse(parts=[ToolCallPart(tool_name=tool, args=args)])
+
+
+class Script:
+    """A model that answers each request with the next step, and records the requests' settings.
+
+    Tests append steps as they go. The agents stream, so the script streams too.
+    """
+
+    def __init__(self, *steps: ModelResponse) -> None:
+        self.steps = list(steps)
+        self.settings: list[dict[str, Any]] = []
+
+    @property
+    def model(self) -> FunctionModel:
+        return FunctionModel(self._respond, stream_function=self._stream)
+
+    def _next(self, info: AgentInfo) -> ModelResponse:
+        self.settings.append(dict(info.model_settings or {}))
+        return self.steps.pop(0)
+
+    async def _respond(self, messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        return self._next(info)
+
+    async def _stream(self, messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[Any]:
+        for index, part in enumerate(self._next(info).parts):
+            if isinstance(part, TextPart):
+                yield part.content
+            else:
+                assert isinstance(part, ToolCallPart)
+                yield {index: DeltaToolCall(name=part.tool_name, json_args=json.dumps(part.args))}
+
+
+def settings(**gateway: Any) -> Settings:
+    """Settings for the tests: HS256 tokens, the tenant's gateway key, no database."""
+    return Settings(
+        auth=AuthSettings(jwt_secret=SECRET),
+        gateway=GatewaySettings(tenant_keys={TENANT: TENANT_KEY}, **gateway),
+    )
+
+
+def app(script: Script, config: Settings | None = None, **options: Any) -> FastAPI:
+    """The application over a scripted model."""
+{%- if use_reflexr %}
+    options.setdefault("poll_interval", timedelta(milliseconds=10))
+{%- endif %}
+    return create_app(config or settings(), model=script.model, **options)
+
+
+def wait_for(condition: Callable[[], object], timeout: float = 30.0) -> None:
+    """Wait, polling, until ``condition()`` is truthy; generously, for slow machines."""
+    deadline = time.monotonic() + timeout
+    while not condition():
+        assert time.monotonic() < deadline, "timed out"
+        time.sleep(0.01)
+
+
+@pytest.fixture
+def script() -> Script:
+    return Script()
+
+
+@pytest.fixture
+def client(script: Script) -> Iterator[TestClient]:
+    """The application in process, as alice of acme."""
+    with TestClient(app(script), headers=bearer()) as client:
+        yield client
+
+
+@pytest.fixture
+async def server(script: Script) -> AsyncIterator[str]:
+    """Serve the application on a free port in this event loop, and return its URL."""
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    config = uvicorn.Config(app(script), ws="websockets-sansio", log_level="warning")
+    served = uvicorn.Server(config)
+    serving = asyncio.create_task(served.serve(sockets=[listener]))
+    for _ in range(3000):  # thirty seconds at most
+        if served.started:
+            break
+        await asyncio.sleep(0.01)
+    yield f"http://127.0.0.1:{listener.getsockname()[1]}"
+    served.should_exit = True
+    await serving

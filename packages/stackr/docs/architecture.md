@@ -10,7 +10,7 @@
 | Local Supabase, through its CLI: the default database adapter | Implemented |
 | `postgres` profile: plain PostgreSQL, the alternative database adapter | Implemented |
 | `gateway` profile: the LiteLLM proxy, with a team per tenant | Implemented |
-| The application template (Copier) and the `app` profile | Planned (phase 5) |
+| The application template (Copier) and the `app` profile | Implemented |
 | Documentation site | Planned (phase 6) |
 
 ## What stackr is
@@ -33,7 +33,7 @@ Applications talk only to **ports**: a stable protocol at a stable address, conf
 | LLM gateway | OpenAI-compatible HTTP API, with models named by alias or group | `LITELLM_BASE_URL`, `LITELLM_API_KEY`; `OPENAI_BASE_URL`, `OPENAI_API_KEY` for OpenAI SDKs | The LiteLLM proxy | Implemented |
 | Database | A PostgreSQL connection string | `DATABASE_URL` | Local Supabase's PostgreSQL; plain PostgreSQL as the alternative | Implemented |
 | Object storage | The S3 API | `S3_ENDPOINT_URL`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | MinIO | Implemented |
-| Identity | JWTs, verified against the issuer's key set | `AUTH_ISSUER`, `AUTH_JWKS_URL`, `AUTH_AUDIENCE` | Supabase Auth | Planned (phase 5) |
+| Identity | JWTs, verified against the issuer's key set (or a shared secret, for HS256) | `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`; `AUTH_JWT_SECRET`, `AUTH_TENANT_CLAIM` | Supabase Auth | Implemented |
 | Evaluation data | Langfuse's public API, for scores and datasets | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | Self-hosted Langfuse | Implemented |
 
 The settings are a contract with the libraries' extras and the application template, which generates applications wired to these ports only. The stack's own services use the same ports: Langfuse and the gateway reach PostgreSQL, S3 and the Redis protocol through settings in `.env`, and the gateway sends its telemetry to the Collector, so their adapters can change as well. Profiles and evaluation data are the two narrow ports: profiles go to Pyroscope directly until OTLP profiles are stable in the Collector, and Langfuse's API carries scores and datasets, never traces.
@@ -42,12 +42,14 @@ The settings are a contract with the libraries' extras and the application templ
 
 ```
 compose.yaml        the stack: one Compose project, with profiles
+copier.yml          the application template's questions; its files are in template/
+template/           the application template (Copier): an application on artifactr, reflexr or both
 .env.example        settings and placeholders; `make env` turns it into .env
 versions.env        versions pinned outside compose.yaml: the Supabase CLI, the libraries' dashboards
 deploy/<service>/   each service's configuration, mounted read-only
 deploy/postgres/    init.sql: each service's role and database, created by db-init
 supabase/           the Supabase CLI project: config.toml (project id stackr-supabase) and seed.sql
-scripts/            setup-env, validate, smoke, fetch-dashboards and check-config, run by make and CI
+scripts/            setup-env, validate, smoke, fetch-dashboards, check-config and check-template, run by make and CI
 docs/               this document, ADRs and RFCs
 ```
 
@@ -197,6 +199,41 @@ The `supabase/` directory is a Supabase CLI project, close to what `supabase ini
 - **Keys and URLs:** `supabase status` prints the API URL, the local publishable and secret keys, and the rest. They are Supabase's well-known local development values.
 - **Skipping services:** `make up SUPABASE_START_FLAGS="-x studio,imgproxy"` passes flags to `supabase start`; CI uses this to start only what the smoke test needs.
 
+## The application template
+
+A Copier template generates an application on artifactr, reflexr or both, wired to the stack's ports only ([ADR-0004](adr/0004-the-application-template.md), [ADR-0011](adr/0011-the-application-template-in-detail.md)). Its questions are in `copier.yml` at the repository's root, and its files in `template/`:
+
+```bash
+uvx copier copy gh:alexnodeland/stackr my-app    # or a path to a clone of stackr
+cd my-app && make install && make env && make check
+uvx copier update                                # later: the template's improvements
+```
+
+| Question | Default | What it decides |
+|---|---|---|
+| `project_name`, `project_slug`, `description` | My App, `my-app` | The distribution, the package (`my_app`), the OpenTelemetry service and the Compose project |
+| `libraries` | `both` | `artifactr`, `reflexr`, or both side by side on one database and one telemetry setup |
+| `evals` | yes | An `evals/` directory with starter evalr experiments |
+| `python_version` | 3.12 | 3.12, 3.13 or 3.14 |
+| `app_port` | 8800 | The port the application is published on |
+| `artifactr_rev`, `reflexr_rev`, `evalr_rev` | Each library's `main` when the template was last updated | The git revision `[tool.uv.sources]` pins, since the libraries aren't on PyPI |
+
+A generated application:
+
+| Part | Where | What |
+|---|---|---|
+| Surfaces | `app.py`, `collaboration.py`, `automation.py` | FastAPI with each library's REST and WebSocket routes and MCP server under its name: `/artifactr/v1`, `/artifactr/mcp/`, `/reflexr/v1`, `/reflexr/mcp/`; the reactor runs while the application is up |
+| Examples | `notes.py`, `tickets.py` | A `note` artifact type, its agent and a `rating` of turns; `ticket.opened` and `ticket.triaged` events, a `triage` rule, its agent, and a `triage-review` of runs |
+| Identity | `auth.py` | Supabase's access tokens, verified against its published keys (`AUTH_JWKS_URL`), or with a legacy HS256 secret (`AUTH_JWT_SECRET`); the user is `sub`, the tenant `app_metadata.tenant_id`; anything else is 401, the MCP servers included |
+| Database | `database.py` | The libraries' SQL storage on `DATABASE_URL`, migrated at startup, in a schema of the application's own (`DATABASE_SCHEMA`), since Supabase's Data API serves `public` |
+| Telemetry | `telemetry.py` | `configure_telemetry`, when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; Langfuse's client, when `LANGFUSE_PUBLIC_KEY` is set, for trace attributes and scores, while traces reach Langfuse through the Collector |
+| Gateway | `gateway.py` | Agents on `litellm_model("default")` with `LiteLLMGateway`: each request with its tenant's key and the `pii-mask` and `prompt-injection` guardrails |
+| Feedback | `scores.py` | A `FeedbackMirror` to Langfuse scores for each workspace the application uses, and the score configs, created at startup |
+| Evals | `evals/` | The agents on a few examples, judged by evaluators of the feedback types: offline with a scripted model (`make evals`), or in Langfuse with the gateway's model (`make evals-langfuse`) |
+| Quality gates | `pyproject.toml`, `Makefile`, `.github/workflows/ci.yml`, `.pre-commit-config.yaml` | uv, ruff, pyright in strict mode, pytest with warnings as errors and 100% branch coverage, Conventional Commits; tests need no network or stack |
+| The `app` profile | `compose.yaml`, `Dockerfile`, `.env.example` | The application beside the stack (`make up`), on the `stackr` network and local Supabase's, where it reaches the stack's services by name |
+| Dev container | `.devcontainer/` | Joins the stack's networks when the stack is running |
+
 ## Commands
 
 | Command | What it does |
@@ -221,7 +258,10 @@ CI checks the stack two ways on every pull request, with the same scripts as `ma
 - the Grafana dashboards: valid JSON, unique uids, and only the provisioned data sources
 - the Supabase project: its id differs from the Compose project's, and `compose.yaml` and the Makefile use the names it gives
 - the gateway's configuration, which has no validator of its own: fallbacks name existing model groups, guardrails use open-source integrations and valid modes, every `os.environ/` reference is set in `compose.yaml`, and no key is in the file
+- the application template, rendered in every variant (`scripts/check-template`): nothing is left unrendered, and the generated Python, YAML, shell scripts and Compose file pass ruff (with the generated project's settings), yamllint, shellcheck and `docker compose config`
 - the scripts, with shellcheck and ruff
+
+CI's **template** job generates each of the six variants (three choices of libraries, with and without evals), and the largest again on Python 3.14, and runs its `make check`: lint, strict types, and its tests with 100% coverage.
 
 **With containers,** the smoke job starts each profile and runs `scripts/smoke`: `observability` alone, and everything on each database adapter. For `observability`, it sends a trace, a metric and a log through the Collector with `telemetrygen`, and finds:
 

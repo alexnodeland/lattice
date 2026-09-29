@@ -1,0 +1,50 @@
+# {{ project_name }} beside stackr's stack, in the `app` profile: `make up`, or
+#
+#   docker compose --profile app up --detach --build --wait
+#
+# Start the stack first (`make up` in stackr): it creates the two networks the application
+# joins, `stackr` and local Supabase's, where it reaches the stack's services by name. The
+# settings come from .env, except the stack's addresses, which on its networks are fixed here.
+
+name: {{ project_slug }}
+
+services:
+  app:
+    profiles: [app]
+    build: .
+    image: {{ project_slug }}:local
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_HOST: 0.0.0.0
+      APP_PORT: "8000"
+      # The ports, at the stack's addresses on its networks.
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      LITELLM_BASE_URL: http://litellm:4000
+      LANGFUSE_BASE_URL: http://langfuse-web:3000
+      AUTH_JWKS_URL: http://supabase_kong_stackr-supabase:8000/auth/v1/.well-known/jwks.json
+      # Local Supabase's PostgreSQL, unless STACK_DATABASE_URL names another database.
+      # yamllint disable-line rule:line-length
+      DATABASE_URL: ${STACK_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@supabase_db_stackr-supabase:5432/postgres}
+    ports:
+      - ${APP_BIND:-127.0.0.1}:${APP_PORT:-{{ app_port }}}:8000
+    networks: [stackr, supabase]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+networks:
+  stackr:
+    external: true
+  supabase:
+    name: supabase_network_stackr-supabase
+    external: true

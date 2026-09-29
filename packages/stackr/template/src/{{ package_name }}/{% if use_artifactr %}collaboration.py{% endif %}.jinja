@@ -1,0 +1,147 @@
+"""artifactr's surfaces: REST and the WebSocket at ``/artifactr/v1``, MCP at ``/artifactr/mcp/``.
+
+People sign in with Supabase; each request's tenant and user come from its access token. MCP
+clients are external agents acting for the user whose token they carry.
+"""
+
+import contextlib
+from collections.abc import AsyncGenerator
+from typing import Any, cast
+
+from fastapi import FastAPI
+from mcp.server.mcpserver import Context
+from pydantic_ai.capabilities import AbstractCapability
+from pydantic_ai.models import Model
+from sqlalchemy.ext.asyncio import AsyncEngine
+from starlette.requests import HTTPConnection, Request
+
+from artifactr import InMemoryStorage, Runner, Session, SystemActor, UserActor, Workspaces
+from artifactr.core import Actor, ExternalAgentActor, TenantId
+from artifactr.fastapi import Unauthorized, artifactr_router
+from artifactr.langfuse import LangfuseScoreConfigs, LangfuseScores, langfuse_turn
+from artifactr.litellm import LiteLLMGateway
+from artifactr.mcp import ArtifactrMcp
+from artifactr.scores import FeedbackMirror, sync_score_configs
+from artifactr.sql import SqlStorage, migrate
+
+from {{ package_name }}.auth import RequireToken, TokenVerifier, Unauthenticated
+from {{ package_name }}.gateway import Guardrails, TenantKeys, model_settings
+from {{ package_name }}.notes import Note, Rating, build_note_agent
+from {{ package_name }}.scores import Mirrors, sync_configs
+from {{ package_name }}.settings import GatewaySettings
+from {{ package_name }}.telemetry import Telemetry
+
+PREFIX = "/artifactr"
+
+
+class Collaboration:
+    """artifactr in the application: workspaces of notes, the agent, and their surfaces.
+
+    Args:
+        name: The application's name, as MCP clients and the gateway's tags see it.
+        verifier: Verifies access tokens.
+        model: The agent's model.
+        gateway: The gateway's settings: tenant keys, guardrails, a mocked reply.
+        engine: The database; without one, workspaces live in memory.
+        telemetry: OpenTelemetry, and Langfuse when it has a client.
+    """
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        verifier: TokenVerifier,
+        model: Model,
+        gateway: GatewaySettings,
+        engine: AsyncEngine | None = None,
+        telemetry: Telemetry | None = None,
+    ) -> None:
+        self._verifier = verifier
+        tracer_provider = telemetry.tracer_provider if telemetry else None
+        meter_provider = telemetry.meter_provider if telemetry else None
+        self.workspaces = Workspaces(
+            SqlStorage(engine) if engine else InMemoryStorage(),
+            types=[Note],
+            tracer_provider=tracer_provider,
+            meter_provider=meter_provider,
+        )
+        capabilities: list[AbstractCapability[Session[None]]] = [
+            LiteLLMGateway(
+                tenant_key=TenantKeys(gateway.tenant_keys),
+                guardrails=Guardrails(gateway.guardrails).for_workspace,
+                tags=[name],
+            )
+        ]
+        if telemetry is not None:
+            capabilities.append(telemetry.capability())
+        langfuse = telemetry.langfuse if telemetry else None
+        self._langfuse = langfuse
+        self.runner = Runner[None](
+            build_note_agent(
+                model, capabilities=capabilities, model_settings=model_settings(gateway)
+            ),
+            app=None,
+            agent_name="assistant",
+            turn_context=langfuse_turn if langfuse else None,
+            tracer_provider=tracer_provider,
+            meter_provider=meter_provider,
+        )
+        self.mcp = ArtifactrMcp(
+            self.workspaces, self.runner, resolve=self._resolve_client, name=name
+        )
+        self._mirrors: Mirrors | None = None
+        if langfuse is not None:
+            scores = LangfuseScores(langfuse)
+
+            async def follow(tenant_id: str, workspace_id: str) -> None:
+                workspace = await self.workspaces.open(tenant_id, workspace_id, actor=SystemActor())
+                await FeedbackMirror(workspace, scores).follow()
+
+            self._mirrors = Mirrors(follow)
+        self._tracer_provider = tracer_provider
+        self._meter_provider = meter_provider
+
+    async def migrate(self, engine: AsyncEngine) -> None:
+        """Upgrade the database to artifactr's schema."""
+        await migrate(engine)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(self) -> AsyncGenerator[None]:
+        """Run the MCP server; with Langfuse, create the score configs and mirror feedback."""
+        async with self.mcp.lifespan():
+            if self._langfuse is not None:
+                configs = LangfuseScoreConfigs(self._langfuse)
+                await sync_configs(sync_score_configs(configs, [Rating]))
+            try:
+                yield
+            finally:
+                if self._mirrors is not None:
+                    await self._mirrors.aclose()
+
+    def mount(self, app: FastAPI) -> None:
+        """Add the REST and WebSocket routes and the MCP server to the application."""
+        router = artifactr_router(
+            self.workspaces,
+            self.runner,
+            resolve_actor=self._resolve_actor,
+            authorize=self._mirrors.authorize if self._mirrors else None,
+            tracer_provider=self._tracer_provider,
+            meter_provider=self._meter_provider,
+        )
+        app.include_router(router, prefix=f"{PREFIX}/v1")
+        mcp = self.mcp.http_app(streamable_http_path="/")
+        app.mount(f"{PREFIX}/mcp", RequireToken(mcp, self._verifier))
+
+    async def _resolve_actor(self, connection: HTTPConnection) -> tuple[TenantId, Actor]:
+        try:
+            principal = await self._verifier.authenticate(connection)
+        except Unauthenticated as error:
+            raise Unauthorized(str(error)) from error
+        return principal.tenant_id, UserActor(id=principal.user_id, name=principal.name)
+
+    async def _resolve_client(self, ctx: Context[Any, Any]) -> tuple[TenantId, ExternalAgentActor]:
+        # The server is mounted over HTTP, behind RequireToken: every call has its request.
+        principal = await self._verifier.authenticate(cast(Request, ctx.request_context.request))
+        return principal.tenant_id, ExternalAgentActor(
+            client_id=principal.user_id, name=f"{principal.name} (MCP)"
+        )

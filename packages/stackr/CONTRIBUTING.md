@@ -82,7 +82,15 @@ CI runs the same scripts as `make validate` and `make smoke`.
 - **The Supabase project's names** agree across `supabase/config.toml`, `compose.yaml` and the Makefile.
 - **The gateway's configuration:** fallbacks, guardrails and environment references, since LiteLLM has no validator and starts without a guardrail it can't load.
 - **Grafana dashboards:** valid JSON, unique uids, and only the provisioned data sources.
+- **The application template,** rendered in every variant: nothing left unrendered, and the generated Python, YAML, shell scripts and Compose file pass their linters.
 - **shellcheck** for the shell scripts, and **ruff** for the Python ones.
+
+CI also generates each variant of the template and runs its own `make check`. To do the same locally, render one and check it:
+
+```bash
+uv run copier copy --defaults --vcs-ref HEAD --data libraries=both . /tmp/my-app
+cd /tmp/my-app && make install && make check
+```
 
 `make smoke` runs against a started stack (`make up`): it sends test telemetry through each profile and checks that it lands where it should. CI starts each profile and runs it.
 

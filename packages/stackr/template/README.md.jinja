@@ -1,0 +1,115 @@
+# {{ project_name }}
+
+{{ description }}
+
+Built from [stackr](https://github.com/alexnodeland/stackr)'s application template on {% if libraries == 'both' %}[artifactr](https://github.com/alexnodeland/artifactr) and [reflexr](https://github.com/alexnodeland/reflexr){% elif use_artifactr %}[artifactr](https://github.com/alexnodeland/artifactr){% else %}[reflexr](https://github.com/alexnodeland/reflexr){% endif %}{% if evals %}, with [evalr](https://github.com/alexnodeland/evalr) for evaluation{% endif %}, and wired to stackr's stack: Supabase for the database and sign-in, the LiteLLM gateway for models, and OpenTelemetry, Grafana and Langfuse for telemetry and feedback.
+
+## Quick start
+
+You need [uv](https://docs.astral.sh/uv/), `make`, and Docker with Compose v2. Start stackr's stack first (`make env && make up` in a clone of stackr).
+
+```bash
+make install        # the dependencies (this writes uv.lock: commit it) and the git hooks
+make env            # .env from .env.example; fill in the keys it asks for
+make check          # lint, types and tests, as CI runs them
+make up             # build the image and run it beside the stack, at http://localhost:{{ app_port }}
+```
+
+`make serve` runs it on this machine instead, with the settings in `.env`. Run `make` to list every command.
+
+## What it serves
+
+Every surface needs a Supabase access token: in the `Authorization: Bearer` header, or, for a WebSocket, in the `access_token` query parameter. The token's `sub` is the user, and its `app_metadata.tenant_id` is the tenant, whose workspaces the user can use. Anything else is 401.
+
+| Path | What |
+|---|---|
+{%- if use_artifactr %}
+| `/artifactr/v1` | artifactr's REST commands and reads, and its WebSocket stream (`/workspaces/{id}/stream`) |
+| `/artifactr/mcp/` | artifactr's MCP server: external agents edit artifacts and talk to the agent |
+{%- endif %}
+{%- if use_reflexr %}
+| `/reflexr/v1` | reflexr's REST publishing, reads and administration, and its WebSocket stream |
+| `/reflexr/mcp/` | reflexr's MCP server: external agents publish events and operate runs |
+{%- endif %}
+| `/healthz` | Whether it is up, without a token |
+
+The examples to replace with your own:
+{% if use_artifactr %}
+- **Notes** ([`notes.py`](src/{{ package_name }}/notes.py)): an artifact type, `note`, that people and the agent write together; the agent, with artifactr's tools; and a `rating` people give the agent's turns.
+{%- endif %}
+{%- if use_reflexr %}
+- **Tickets** ([`tickets.py`](src/{{ package_name }}/tickets.py)): the events `ticket.opened` and `ticket.triaged`; a rule, `triage`, that runs the triage agent when a ticket is opened; and a `triage-review` people give its runs.
+{%- endif %}
+
+### Sign in and try it
+
+Local Supabase issues the tokens. Create a user with a tenant through its admin API, with the secret key `supabase status` prints in stackr, then sign in with the publishable key:
+
+```bash
+eval "$(supabase status -o env | grep -E '^(SECRET_KEY|PUBLISHABLE_KEY)=')"   # in stackr
+curl -X POST http://127.0.0.1:54321/auth/v1/admin/users \
+  -H "apikey: $SECRET_KEY" -H "Authorization: Bearer $SECRET_KEY" -H 'Content-Type: application/json' \
+  -d '{"email": "ada@example.com", "password": "a-local-password", "email_confirm": true,
+       "app_metadata": {"tenant_id": "acme"}}'
+TOKEN=$(curl -s 'http://127.0.0.1:54321/auth/v1/token?grant_type=password' \
+  -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Type: application/json' \
+  -d '{"email": "ada@example.com", "password": "a-local-password"}' | jq -r .access_token)
+```
+
+The agents call the gateway with the tenant's key: `make tenant NAME=acme` in stackr prints one, for `LITELLM_API_KEY` (or `LITELLM_TENANT_KEYS`) in `.env`. Then:
+{% if use_artifactr %}
+```bash
+app=http://localhost:{{ app_port }}/artifactr/v1/workspaces/main
+curl -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' $app/commands \
+  -d '{"type": "command", "command_id": "c1", "command": {"type": "create_thread", "thread_id": "t1"}}'
+curl -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' $app/commands \
+  -d '{"type": "command", "command_id": "c2", "command": {"type": "post_message", "thread_id": "t1",
+       "content": "Start a note about our launch."}}'
+curl -H "Authorization: Bearer $TOKEN" $app/artifacts
+```
+{% endif %}
+{%- if use_reflexr %}
+```bash
+app=http://localhost:{{ app_port }}/reflexr/v1/workspaces/main
+curl -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' $app/events \
+  -d '{"event": {"type": "ticket.opened", "subject": "Checkout fails", "body": "Every payment errors."}}'
+curl -H "Authorization: Bearer $TOKEN" $app/runs
+```
+{% endif %}
+The agent's trace, through the gateway to the model, is in Grafana (Tempo) and Langfuse; the application's metrics are in Prometheus, with `job="{{ project_slug }}"`.
+
+## How it is wired
+
+It talks to stackr's ports only, through the settings in `.env` ([`settings.py`](src/{{ package_name }}/settings.py)). Pointing them at other services (hosted Supabase, another OTLP backend, another OpenAI-compatible gateway) changes settings, never code.
+
+| Port | Settings | In the code |
+|---|---|---|
+| Telemetry | `OTEL_EXPORTER_OTLP_ENDPOINT` (OTLP over HTTP), `OTEL_SERVICE_NAME` | [`telemetry.py`](src/{{ package_name }}/telemetry.py): the libraries' `configure_telemetry`, on when the endpoint is set. Traces reach Langfuse through stackr's Collector |
+| Database | `DATABASE_URL`, `DATABASE_SCHEMA` | [`database.py`](src/{{ package_name }}/database.py): the libraries' SQL storage, migrated at startup, in a schema of its own outside the `public` schema Supabase's API serves |
+| Identity | `AUTH_JWKS_URL`, `AUTH_JWT_SECRET`, `AUTH_AUDIENCE`, `AUTH_ISSUER`, `AUTH_TENANT_CLAIM` | [`auth.py`](src/{{ package_name }}/auth.py): Supabase's ES256 tokens against its published keys, or HS256 tokens with a legacy secret |
+| LLM gateway | `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `LITELLM_TENANT_KEYS`, `LITELLM_MODEL`, `LITELLM_GUARDRAILS` | [`gateway.py`](src/{{ package_name }}/gateway.py): agents on the `default` model group, each request with its tenant's key and the `pii-mask` and `prompt-injection` guardrails |
+| Evaluation data | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | [`scores.py`](src/{{ package_name }}/scores.py): each workspace's feedback mirrored to Langfuse scores, on the traces it is about |
+
+The app profile ([`compose.yaml`](compose.yaml)) joins the stack's networks and reaches its services by name; `STACK_DATABASE_URL` points it at another database there.
+{%- if evals %}
+
+## Evaluation
+
+[`evals/`](evals/experiments.py) holds starter experiments with evalr: the agents on a few examples, judged by evaluators whose verdicts are the application's own feedback types, so they can be measured against people's feedback and replaced by trained judges.
+
+```bash
+make evals            # offline: a scripted model, results in memory
+make evals-langfuse   # in Langfuse, with the gateway's model, as .env configures them
+```
+{%- endif %}
+
+## Development
+
+- **Quality gates**, as CI runs them: `ruff` for formatting and lint, `pyright` in strict mode with no inline suppressions, and `pytest` with warnings as errors and 100% branch coverage. `make install` adds them as git hooks, with Conventional Commits.
+- **Tests** need no network and no stack: tokens are signed in the test, the agents' model is scripted, and workspaces live in memory or SQLite.
+- **A dev container** (`.devcontainer/`) joins the stack's networks when the stack is running.
+
+## Updating
+
+- **The template:** `uvx copier update` pulls in stackr's improvements, keeping your answers and your changes.
+- **The libraries:** they are pinned to git revisions in `pyproject.toml`'s `[tool.uv.sources]`. Change a `rev`, then `uv lock` and `make check`.

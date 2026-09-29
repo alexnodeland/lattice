@@ -1,0 +1,270 @@
+"""Starter experiments: the agents on a few examples, judged by evaluators of the feedback types.
+
+Run them offline, with a scripted model and the results in memory::
+
+    make evals              # python -m evals
+
+or in Langfuse, with the gateway's model, where each run shows beside its traces::
+
+    make evals-langfuse     # python -m evals --langfuse
+
+Each evaluator's verdict is a feedback type people give too, so the evaluator can be measured
+against people's feedback (evalr's ``measure``), and replaced by a DSPy judge trained on it
+(``evalr[dspy]``'s ``DspyJudge``) once there is enough. Add examples as the application grows,
+from its own traffic and feedback.
+{%- if use_reflexr %} reflexr's ``LogFeedbackSource`` turns a workspace's feedback into
+examples.
+{%- endif %}
+"""
+
+import argparse
+import asyncio
+from collections.abc import {% if use_artifactr %}AsyncIterator, {% endif %}Awaitable, Callable, Sequence
+from typing import Any
+
+from langfuse import Langfuse
+from pydantic import BaseModel
+from pydantic_ai import ModelMessage{% if use_reflexr %}, ModelResponse, TextPart{% endif %}
+from pydantic_ai.models import Model
+from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.settings import ModelSettings
+
+{% if use_artifactr -%}
+from artifactr import InMemoryStorage, Runner, UserActor, Workspaces
+from artifactr.core import CreateThread
+{% endif -%}
+from evalr import Dataset, Example, ExperimentResult, ExperimentTracker, FunctionEvaluator
+from evalr.core import Task
+from evalr.langfuse import LangfuseExperimentTracker
+from evalr.memory import InMemoryExperimentTracker
+{%- if use_reflexr %}
+from reflexr.core import Event
+from reflexr.evals import Replay, replay_task
+{%- endif %}
+
+from {{ package_name }}.gateway import gateway_model, model_settings
+{%- if use_artifactr %}
+from {{ package_name }}.notes import Note, Rating, build_note_agent
+{%- endif %}
+from {{ package_name }}.settings import Settings
+{%- if use_reflexr %}
+from {{ package_name }}.tickets import (
+    EVENTS,
+    TicketOpened,
+    TriageReview,
+    build_triage_agent,
+    triage_action,
+    triage_rule,
+)
+{%- endif %}
+
+type Experiment = Callable[
+    [ExperimentTracker, Model, ModelSettings], Awaitable[ExperimentResult[Any]]
+]
+"""Runs one experiment with a tracker, and a model with its settings. Each has its own output
+type, and a result is invariant in it on Python 3.13 and later."""
+{%- if use_artifactr %}
+
+
+# ─── artifactr: the notes agent's replies, rated as people rate turns ─────────
+
+
+class Request(BaseModel):
+    """A message to the notes agent."""
+
+    message: str
+
+
+class Reply(BaseModel):
+    """What the agent answered."""
+
+    message: str
+    reply: str
+
+
+REQUESTS = Dataset(
+    "notes-replies",
+    [
+        Example(id="launch", input=Request(message="Start a note about Friday's launch.")),
+        Example(id="summary", input=Request(message="What is in our notes, in a sentence?")),
+    ],
+    input_type=Request,
+    verdict_type=Rating,
+    description="Messages to the notes agent.",
+)
+
+
+def replying(model: Model, settings: ModelSettings) -> Task[Request, Rating, Reply]:
+    """The task: the agent answers an example's message in a fresh workspace, in memory."""
+
+    async def reply(example: Example[Request, Rating]) -> Reply:
+        workspaces = Workspaces(InMemoryStorage(), types=[Note])
+        person = UserActor(id="evals", name="evals")
+        workspace = await workspaces.open("evals", example.id, actor=person)
+        await workspace.commit(CreateThread(thread_id="thread"))
+        runner = Runner[None](build_note_agent(model, model_settings=settings), app=None)
+        sent = await runner.send(workspace, "thread", example.input.message)
+        assert sent.run is not None, "a message in an idle thread starts a run"
+        result = await sent.run.wait()
+        return Reply(message=example.input.message, reply=str(result.output))
+
+    return reply
+
+
+def rate_reply(reply: Reply) -> Rating:
+    """A starter measure: the agent is told to answer in a sentence or two."""
+    words = len(reply.reply.split())
+    return Rating(stars=5 if 0 < words <= 60 else 2, comment=f"{words} words")
+
+
+async def notes_replies(
+    tracker: ExperimentTracker, model: Model, settings: ModelSettings
+) -> ExperimentResult[Reply]:
+    """How the notes agent replies."""
+    return await tracker.run_experiment(
+        "notes-replies",
+        dataset=REQUESTS,
+        task=replying(model, settings),
+        evaluators=[FunctionEvaluator(rate_reply, verdict_type=Rating)],
+    )
+{%- endif %}
+{%- if use_reflexr %}
+
+
+# ─── reflexr: the triage rule, replayed against the triage agent ──────────────
+
+
+class Ticket(BaseModel):
+    """A ticket as a customer opens it."""
+
+    subject: str
+    body: str
+
+
+class Triage(BaseModel):
+    """How the triage run ended."""
+
+    status: str
+    summary: str
+
+
+TICKETS = Dataset(
+    "ticket-triage",
+    [
+        Example(id="outage", input=Ticket(subject="Checkout fails", body="Every payment errors.")),
+        Example(id="question", input=Ticket(subject="Invoices", body="Where are my invoices?")),
+    ],
+    input_type=Ticket,
+    verdict_type=TriageReview,
+    description="Tickets for the triage agent.",
+)
+
+
+def opened(example: Example[Ticket, TriageReview]) -> Sequence[Event]:
+    """The events an example replays: its ticket, opened."""
+    return [TicketOpened(subject=example.input.subject, body=example.input.body)]
+
+
+def triaged(replay: Replay) -> Triage:
+    """What the replay's triage run did."""
+    [run] = replay.runs
+    return Triage(status=run.status, summary=str(run.output or ""))
+
+
+def review_triage(triage: Triage) -> TriageReview:
+    """A starter measure: the run succeeded with a summary."""
+    correct = triage.status == "succeeded" and bool(triage.summary)
+    return TriageReview(correct=correct, comment=triage.summary or None)
+
+
+async def ticket_triage(
+    tracker: ExperimentTracker, model: Model, settings: ModelSettings
+) -> ExperimentResult[Triage]:
+    """How the triage agent triages tickets, each replayed in a workspace of its own."""
+    task: Task[Ticket, TriageReview, Triage] = replay_task(
+        rule=triage_rule,
+        action=triage_action(build_triage_agent(model, model_settings=settings)),
+        deps=None,
+        events=opened,
+        output=triaged,
+        event_types=EVENTS,
+    )
+    return await tracker.run_experiment(
+        "ticket-triage",
+        dataset=TICKETS,
+        task=task,
+        evaluators=[FunctionEvaluator(review_triage, verdict_type=TriageReview)],
+    )
+{%- endif %}
+
+
+# ─── running them ─────────────────────────────────────────────────────────────
+
+EXPERIMENTS: list[Experiment] = [
+{%- if use_artifactr %}
+    notes_replies,
+{%- endif %}
+{%- if use_reflexr %}
+    ticket_triage,
+{%- endif %}
+]
+
+
+def scripted() -> Model:
+    """A model that answers every request with the same sentence: for running offline."""
+{%- if use_reflexr %}
+
+    def answer(_messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        return ModelResponse(parts=[TextPart("Done: a short, scripted answer.")])
+{%- endif %}
+{%- if use_artifactr %}
+
+    # artifactr's runner streams the agent's answers.
+    async def stream(_messages: list[ModelMessage], _info: AgentInfo) -> AsyncIterator[str]:
+        yield "Done: a short, scripted answer."
+{%- endif %}
+
+    return FunctionModel(
+{%- if use_reflexr %}answer{% endif %}
+{%- if libraries == 'both' %}, {% endif %}
+{%- if use_artifactr %}stream_function=stream{% endif %})
+
+
+async def run(
+    tracker: ExperimentTracker, model: Model, settings: ModelSettings | None = None
+) -> list[ExperimentResult[Any]]:
+    """Run every experiment, one after another."""
+    chosen = settings or ModelSettings()
+    return [await experiment(tracker, model, chosen) for experiment in EXPERIMENTS]
+
+
+def summary(result: ExperimentResult[Any]) -> str:
+    """One run's results, a line per example."""
+    lines = [f"{result.run_name}: {len(result.items)} examples of {result.dataset}"]
+    for item in result.items:
+        verdicts = [f"{v.evaluator} {v.value.model_dump_json()}" for v in item.verdicts]
+        lines.append(f"  {item.example_id}: {'; '.join(verdicts + list(item.errors))}")
+    return "\n".join(lines + ([f"  {result.url}"] if result.url else []))
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run the experiments and print their results; exit 1 if any example failed."""
+    parser = argparse.ArgumentParser(prog="python -m evals", description="Run the experiments.")
+    parser.add_argument(
+        "--langfuse",
+        action="store_true",
+        help="run in Langfuse, with the gateway's model, as the environment configures them",
+    )
+    if parser.parse_args(argv).langfuse:
+        client = Langfuse()
+        try:
+            gateway = Settings.from_environ().gateway
+            tracker = LangfuseExperimentTracker(client)
+            results = asyncio.run(run(tracker, gateway_model(gateway), model_settings(gateway)))
+        finally:
+            client.flush()
+    else:
+        results = asyncio.run(run(InMemoryExperimentTracker(), scripted()))
+    for result in results:
+        print(summary(result))
+    return 1 if any(item.errors for result in results for item in result.items) else 0

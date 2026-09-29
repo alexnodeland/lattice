@@ -1,0 +1,93 @@
+"""The example events, rule, agent action and feedback: an agent triages support tickets.
+
+Replace them with the application's own. Producers publish events into a workspace; when a
+rule's condition holds, the reactor runs its action, here a pydantic-ai agent that reads the
+log and publishes what it decides.
+"""
+
+from collections.abc import Sequence
+from typing import Literal
+
+from pydantic import Field
+from pydantic_ai import Agent
+from pydantic_ai.capabilities import AbstractCapability
+from pydantic_ai.models import Model
+from pydantic_ai.settings import ModelSettings
+from pydantic_ai.usage import UsageLimits
+
+from reflexr import Event, Feedback, Rule, on, run
+from reflexr.agent import AgentAction, EventContext
+from reflexr.workspace import Reaction
+
+Priority = Literal["low", "normal", "urgent"]
+
+INSTRUCTIONS = """\
+You triage support tickets. A ticket was just opened.
+
+- Decide its priority: urgent if customers can't work, normal if they can, low otherwise.
+- Publish your decision with emit_event, as a ticket.triaged event with a one-line summary.
+- Answer with the summary.
+"""
+
+
+class TicketOpened(Event, name="ticket.opened"):
+    """A customer opened a support ticket."""
+
+    subject: str
+    body: str = ""
+
+
+class TicketTriaged(Event, name="ticket.triaged"):
+    """The triage agent decided a ticket's priority."""
+
+    priority: Priority
+    summary: str
+
+
+EVENTS: list[type[Event]] = [TicketOpened, TicketTriaged]
+"""The event types the workspaces accept."""
+
+triage_rule = Rule(
+    name="triage",
+    description="A ticket was opened. Decide its priority and summarize it.",
+    when=on(TicketOpened),
+    then=run("triage"),
+)
+
+RULES = [triage_rule]
+
+
+class TriageReview(Feedback, name="triage-review", targets={"run"}):
+    """A person's review of a triage run. Each field becomes a Langfuse score."""
+
+    correct: bool = Field(description="The priority and summary were right")
+    comment: str | None = None
+
+
+def build_triage_agent(
+    model: Model,
+    *,
+    capabilities: Sequence[AbstractCapability[Reaction[None]]] = (),
+    model_settings: ModelSettings | None = None,
+) -> Agent[Reaction[None], str]:
+    """Build the triage agent.
+
+    Args:
+        model: The model: the gateway's model group, or a scripted one in tests.
+        capabilities: More capabilities: the gateway's and telemetry's.
+        model_settings: Settings for every model request.
+    """
+    return Agent[Reaction[None], str](
+        model,
+        name="triage",
+        deps_type=Reaction[None],
+        output_type=str,
+        instructions=INSTRUCTIONS,
+        capabilities=[EventContext(emit=[TicketTriaged]), *capabilities],
+        model_settings=model_settings,
+    )
+
+
+def triage_action(agent: Agent[Reaction[None], str]) -> AgentAction[None, str]:
+    """The triage agent as the rule's action, with a bound on its model requests."""
+    return AgentAction(agent, usage_limits=UsageLimits(request_limit=10))

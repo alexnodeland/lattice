@@ -1,0 +1,197 @@
+"""Access tokens: Supabase's, verified with its public keys or its legacy secret."""
+
+import time
+from typing import Any
+
+import jwt
+import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
+from fastapi import FastAPI, WebSocket
+from fastapi.testclient import TestClient
+from jwt.algorithms import ECAlgorithm
+from starlette.requests import HTTPConnection
+
+from conftest import SECRET, TENANT, token
+from {{ package_name }}.auth import (
+    JwksKeys,
+    Principal,
+    RequireToken,
+    TokenVerifier,
+    Unauthenticated,
+    bearer_token,
+)
+from {{ package_name }}.settings import AuthSettings
+
+KID = "test-key"
+
+
+@pytest.fixture(scope="module")
+def signing_key() -> ec.EllipticCurvePrivateKey:
+    """An ES256 key, as local Supabase signs access tokens with."""
+    return ec.generate_private_key(ec.SECP256R1())
+
+
+@pytest.fixture(scope="module")
+def jwks(signing_key: ec.EllipticCurvePrivateKey) -> dict[str, Any]:
+    """The key set the issuer publishes."""
+    public = ECAlgorithm.to_jwk(signing_key.public_key(), as_dict=True)
+    return {"keys": [{**public, "kid": KID, "alg": "ES256", "use": "sig"}]}
+
+
+def es256(signing_key: ec.EllipticCurvePrivateKey, **claims: Any) -> str:
+    payload = {
+        "sub": "bob",
+        "aud": "authenticated",
+        "exp": int(time.time()) + 60,
+        "app_metadata": {"tenant_id": TENANT},
+        **claims,
+    }
+    return jwt.encode(payload, signing_key, algorithm="ES256", headers={"kid": KID})
+
+
+def verifier(
+    *, issuer: str | None = None, tenant_claim: str = "app_metadata.tenant_id"
+) -> TokenVerifier:
+    return TokenVerifier(
+        audience="authenticated", secret=SECRET, issuer=issuer, tenant_claim=tenant_claim
+    )
+
+
+async def test_a_valid_token_names_its_tenant_and_user() -> None:
+    principal = await verifier().verify(token("alice"))
+    assert principal == Principal(tenant_id=TENANT, user_id="alice", name="alice@example.com")
+
+
+async def test_the_user_is_named_by_its_id_without_an_email() -> None:
+    principal = await verifier().verify(token("alice", email=""))
+    assert principal.name == "alice"
+
+
+@pytest.mark.parametrize(
+    ("signed", "reason"),
+    [
+        pytest.param(token(expires_in=-60), "expired", id="expired"),
+        pytest.param(token(audience="someone-else"), "Audience", id="audience"),
+        pytest.param(token(secret=f"another-{SECRET}"), "Signature", id="key"),
+        pytest.param(token(tenant=None), "no tenant", id="no-tenant"),
+        pytest.param(token(tenant=None, app_metadata="acme"), "no tenant", id="metadata"),
+        pytest.param(jwt.encode({"sub": "a", "aud": "authenticated"}, SECRET), "exp", id="exp"),
+        pytest.param("not-a-token", "malformed", id="malformed"),
+    ],
+)
+async def test_invalid_tokens_are_refused(signed: str, reason: str) -> None:
+    with pytest.raises(Unauthenticated, match=reason):
+        await verifier().verify(signed)
+
+
+async def test_the_issuer_is_checked_when_it_is_set() -> None:
+    checked = verifier(issuer="http://127.0.0.1:54321/auth/v1")
+    assert await checked.verify(token(iss="http://127.0.0.1:54321/auth/v1"))
+    with pytest.raises(Unauthenticated, match="issuer"):
+        await checked.verify(token(iss="http://elsewhere"))
+
+
+async def test_the_tenant_claim_can_be_elsewhere() -> None:
+    principal = await verifier(tenant_claim="org").verify(token(tenant=None, org="initech"))
+    assert principal.tenant_id == "initech"
+
+
+async def test_es256_tokens_are_verified_with_the_issuers_keys(
+    signing_key: ec.EllipticCurvePrivateKey, jwks: dict[str, Any]
+) -> None:
+    keys = jwt.PyJWKSet.from_dict(jwks)
+
+    async def published(signed: str) -> jwt.PyJWK:
+        return keys[jwt.get_unverified_header(signed)["kid"]]
+
+    only_keys = TokenVerifier(audience="authenticated", keys=published)
+    assert (await only_keys.verify(es256(signing_key))).user_id == "bob"
+    with pytest.raises(Unauthenticated, match="HS256"):
+        await only_keys.verify(token())
+    with pytest.raises(Unauthenticated, match="ES256"):
+        await verifier().verify(es256(signing_key))
+
+
+async def test_keys_are_fetched_from_the_jwks_url(
+    signing_key: ec.EllipticCurvePrivateKey,
+    jwks: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fetched: list[str] = []
+
+    def fetch(client: jwt.PyJWKClient) -> dict[str, Any]:
+        fetched.append(client.uri)
+        return jwks
+
+    monkeypatch.setattr(jwt.PyJWKClient, "fetch_data", fetch)
+    url = "http://supabase/auth/v1/.well-known/jwks.json"
+    from_settings = TokenVerifier.from_settings(AuthSettings(jwks_url=url))
+    assert (await from_settings.verify(es256(signing_key))).tenant_id == TENANT
+    assert fetched == [url]
+
+
+async def test_a_key_that_cannot_be_fetched_refuses_the_token(
+    signing_key: ec.EllipticCurvePrivateKey, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def unreachable(client: jwt.PyJWKClient) -> dict[str, Any]:
+        raise jwt.PyJWKClientConnectionError("connection refused")
+
+    monkeypatch.setattr(jwt.PyJWKClient, "fetch_data", unreachable)
+    with pytest.raises(Unauthenticated, match="no key"):
+        await JwksKeys("http://supabase/jwks.json")(es256(signing_key))
+
+
+def test_a_verifier_needs_a_secret_or_keys() -> None:
+    with pytest.raises(ValueError, match="AUTH_JWKS_URL or AUTH_JWT_SECRET"):
+        TokenVerifier.from_settings(AuthSettings())
+
+
+def connection(
+    kind: str = "http", *, headers: dict[str, str] | None = None, query: str = ""
+) -> HTTPConnection:
+    raw = [(k.lower().encode(), v.encode()) for k, v in (headers or {}).items()]
+    return HTTPConnection({"type": kind, "headers": raw, "query_string": query.encode()})
+
+
+def test_the_token_is_the_bearer_header() -> None:
+    assert bearer_token(connection(headers={"Authorization": "Bearer abc "})) == "abc"
+
+
+@pytest.mark.parametrize(
+    "request_without",
+    [
+        connection(),
+        connection(headers={"Authorization": "Basic abc"}),
+        connection(headers={"Authorization": "Bearer "}),
+        connection(query="access_token=abc"),
+    ],
+)
+def test_a_request_without_a_bearer_token_has_none(request_without: HTTPConnection) -> None:
+    with pytest.raises(Unauthenticated, match="required"):
+        bearer_token(request_without)
+
+
+def test_a_websocket_may_carry_its_token_in_the_query() -> None:
+    assert bearer_token(connection("websocket", query="access_token=abc")) == "abc"
+
+
+def test_require_token_refuses_requests_without_one() -> None:
+    guarded = FastAPI()
+
+    @guarded.get("/")
+    async def hello() -> str:
+        return "hello"
+
+    @guarded.websocket("/ws")
+    async def stream(websocket: WebSocket) -> None:
+        await websocket.accept()
+        await websocket.send_text("hello")
+        await websocket.close()
+
+    with TestClient(RequireToken(guarded, verifier())) as client:
+        refused = client.get("/")
+        assert (refused.status_code, refused.headers["www-authenticate"]) == (401, "Bearer")
+        assert refused.json() == {"detail": "an access token is required"}
+        assert client.get("/", headers={"Authorization": f"Bearer {token()}"}).json() == "hello"
+        with client.websocket_connect(f"/ws?access_token={token()}") as websocket:
+            assert websocket.receive_text() == "hello"

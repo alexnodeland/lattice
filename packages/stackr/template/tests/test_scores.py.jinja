@@ -1,0 +1,188 @@
+"""Feedback reaches Langfuse as scores, through a mirror per workspace."""
+
+import asyncio
+import json
+import logging
+import uuid
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
+
+import httpx
+import pytest
+from fastapi.testclient import TestClient
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.otel import TelemetryHandle, configure_telemetry
+
+from conftest import Script, app, bearer, say, settings, wait_for
+from {{ package_name }}.scores import Mirrors, sync_configs
+from {{ package_name }}.settings import Settings
+
+
+class FakeLangfuse:
+    """Langfuse's score-config and ingestion endpoints, in memory."""
+
+    def __init__(self) -> None:
+        self.configs: list[str] = []
+        self.scores: list[dict[str, Any]] = []
+
+    def handle(self, request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/public/score-configs" and request.method == "GET":
+            meta = {"page": 1, "limit": 100, "totalItems": 0, "totalPages": 0}
+            return httpx.Response(200, json={"data": [], "meta": meta})
+        body = json.loads(request.content)
+        if request.url.path == "/api/public/score-configs":
+            self.configs.append(body["name"])
+            created = {"id": body["name"], "createdAt": "2026-09-28T00:00:00Z"}
+            created |= {"updatedAt": "2026-09-28T00:00:00Z", "projectId": "p", "isArchived": False}
+            return httpx.Response(200, json=body | created)
+        self.scores += [e["body"] for e in body["batch"] if e["type"] == "score-create"]
+        return httpx.Response(207, json={"successes": [], "errors": []})
+
+
+@pytest.fixture
+def langfuse() -> FakeLangfuse:
+    return FakeLangfuse()
+
+
+@pytest.fixture
+def telemetry(langfuse: FakeLangfuse) -> Iterator[TelemetryHandle]:
+    """Telemetry with Langfuse, kept in memory: nothing leaves the process."""
+    handle = configure_telemetry(
+        service_name="{{ project_slug }}",
+        instrument=(),
+        logs=False,
+        set_global=False,
+        span_exporter=InMemorySpanExporter(),
+        metric_reader=InMemoryMetricReader(),
+        langfuse=True,
+        langfuse_options={
+            "public_key": f"pk-lf-{uuid.uuid4()}",
+            "secret_key": "sk-lf-test",
+            "base_url": "http://langfuse.test",
+            "httpx_client": httpx.Client(transport=httpx.MockTransport(langfuse.handle)),
+            "span_exporter": InMemorySpanExporter(),
+        },
+    )
+    yield handle
+    handle.shutdown()
+
+
+def test_feedback_becomes_scores_on_the_traces_it_is_about(
+    script: Script, langfuse: FakeLangfuse, telemetry: TelemetryHandle, tmp_path: Path
+) -> None:
+    database = f"sqlite+aiosqlite:///{tmp_path / 'app.db'}"
+    config = Settings(database_url=database, auth=settings().auth)
+
+    def scored(count: int) -> bool:
+        assert telemetry.langfuse is not None
+        telemetry.langfuse.flush()
+        return len(langfuse.scores) >= count
+
+    with TestClient(app(script, config, telemetry=telemetry), headers=bearer()) as client:
+        expected: list[str] = []
+{%- if use_artifactr %}
+        base = "/artifactr/v1/workspaces/main"
+
+        def command(**body: Any) -> dict[str, Any]:
+            frame = {"type": "command", "command_id": str(uuid.uuid4()), "command": body}
+            return client.post(f"{base}/commands", json=frame).json()
+
+        def ended() -> list[dict[str, Any]]:
+            log = client.get(f"{base}/events").json()
+            return [e["event"] for e in log if e["event"]["type"] == "run_ended"]
+
+        script.steps += [say("Hello.")]
+        command(type="create_thread", thread_id="t1")
+        command(type="post_message", thread_id="t1", content="Hello")
+        wait_for(ended)
+        [run] = ended()
+        target = {"kind": "turn", "run_id": run["run_id"]}
+        rating = {"feedback_type": "rating", "target": target, "value": {"stars": 4}}
+        rated = command(type="give_feedback", **rating)
+        assert rated["ok"], rated
+        expected.append("rating.stars")
+        wait_for(lambda: scored(len(expected)))
+{%- endif %}
+{%- if use_reflexr %}
+        events = "/reflexr/v1/workspaces/main"
+        script.steps += [say("Low: a question about invoices.")]
+        opened = {"type": "ticket.opened", "subject": "Invoices", "body": "Where are they?"}
+        client.post(f"{events}/events", json={"event": opened})
+        wait_for(lambda: [r["status"] for r in client.get(f"{events}/runs").json()] != [])
+        wait_for(lambda: client.get(f"{events}/runs").json()[0]["status"] == "succeeded")
+        [triage] = client.get(f"{events}/runs").json()
+        review = {
+            "type": "give_feedback",
+            "feedback_type": "triage-review",
+            "target": {"kind": "run", "run_id": triage["id"]},
+            "value": {"correct": True},
+        }
+        frame = {"type": "command", "command_id": str(uuid.uuid4()), "command": review}
+        assert client.post(f"{events}/commands", json=frame).json()["ok"]
+        expected.append("triage-review.correct")
+        wait_for(lambda: scored(len(expected)))
+{%- endif %}
+
+    configs = {
+{%- if use_artifactr %}
+        "rating.stars",
+        "rating.comment",
+{%- endif %}
+{%- if use_reflexr %}
+        "triage-review.correct",
+        "triage-review.comment",
+{%- endif %}
+    }
+    assert set(langfuse.configs) == configs
+    assert sorted(score["name"] for score in langfuse.scores) == sorted(expected)
+    assert all(score["traceId"] for score in langfuse.scores), "each is on its trace"
+
+
+async def test_a_workspace_is_mirrored_once() -> None:
+    started: list[tuple[str, str]] = []
+
+    async def follow(tenant_id: str, workspace_id: str) -> None:
+        started.append((tenant_id, workspace_id))
+        await asyncio.Event().wait()
+
+    mirrors = Mirrors(follow)
+    assert await mirrors.authorize("acme", "main", object())
+    mirrors.watch("acme", "main")
+    await asyncio.sleep(0.01)
+    assert started == [("acme", "main")]
+    await mirrors.aclose()
+
+
+async def test_a_mirror_that_stops_starts_again_when_used(caplog: pytest.LogCaptureFixture) -> None:
+    outcomes: list[Exception | None] = [RuntimeError("Langfuse is down"), None]
+
+    async def follow(tenant_id: str, workspace_id: str) -> None:
+        if (outcome := outcomes.pop(0)) is not None:
+            raise outcome
+
+    mirrors = Mirrors(follow)
+    for _ in range(2):
+        mirrors.watch("acme", "main")
+        await asyncio.sleep(0.01)
+    assert outcomes == []
+    assert "Langfuse is down" in caplog.text
+    await mirrors.aclose()
+
+
+async def test_score_configs_that_cannot_be_created_do_not_stop_the_app(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def unreachable() -> list[str]:
+        raise httpx.ConnectError("connection refused")
+
+    async def created() -> list[str]:
+        return ["rating.stars"]
+
+    with caplog.at_level(logging.INFO):
+        await sync_configs(unreachable())
+        await sync_configs(created())
+    assert "could not create" in caplog.text
+    assert "rating.stars" in caplog.text

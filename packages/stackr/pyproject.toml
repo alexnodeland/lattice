@@ -1,6 +1,7 @@
 # stackr is not a Python package. This file pins the tools that develop and
-# validate it (linters, pre-commit, git-cliff), so `make` and CI run the same
-# versions from uv.lock, as in the rest of the family.
+# validate it (linters, pre-commit, git-cliff, and Copier for the application
+# template), so `make` and CI run the same versions from uv.lock, as in the rest
+# of the family.
 [project]
 name = "stackr"
 version = "0.0.0"
@@ -12,6 +13,7 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+  "copier>=9.18",
   "git-cliff>=2.14.2",
   "pre-commit>=4.6.2",
   "pyyaml>=6.0.3",
@@ -27,7 +29,13 @@ package = false
 line-length = 100
 target-version = "py312"
 # The scripts are Python without a `.py` suffix, so they read as commands.
-extend-include = ["scripts/setup-env", "scripts/fetch-dashboards", "scripts/check-config", "scripts/create-tenant"]
+extend-include = [
+  "scripts/setup-env",
+  "scripts/fetch-dashboards",
+  "scripts/check-config",
+  "scripts/create-tenant",
+  "scripts/check-template",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]

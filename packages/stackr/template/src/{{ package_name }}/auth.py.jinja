@@ -1,0 +1,208 @@
+"""Identity: verifying the access tokens Supabase Auth issues, and who they name.
+
+A request carries a JWT: in the ``Authorization: Bearer`` header, or, for a WebSocket (which
+browsers open without headers), in the ``access_token`` query parameter. The token must be
+signed by the issuer, unexpired, and for this audience. Its ``sub`` is the user, and a claim
+(``app_metadata.tenant_id`` by default, which only the service role can set) is the tenant.
+Anything else is 401.
+
+Local Supabase signs tokens with an asymmetric key (ES256) published at its JWKS URL; projects
+still on Supabase's legacy JWT secret sign them with HS256. Either or both can be configured.
+"""
+
+import asyncio
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass
+from typing import Any, Self, cast
+
+import jwt
+from starlette.requests import HTTPConnection
+from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+from {{ package_name }}.settings import AuthSettings
+
+type KeySource = Callable[[str], Awaitable[jwt.PyJWK]]
+"""Finds the public key that verifies a token, from its ``kid``."""
+
+ASYMMETRIC = frozenset(
+    {"ES256", "ES384", "ES512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "EdDSA"}
+)
+"""The algorithms verified with the issuer's published keys."""
+
+
+class Unauthenticated(Exception):
+    """A request without a valid access token: HTTP 401."""
+
+
+@dataclass(frozen=True)
+class Principal:
+    """Who a valid token names.
+
+    Attributes:
+        tenant_id: The tenant, from the token's tenant claim.
+        user_id: The user, the token's ``sub``.
+        name: How to show the user: the token's ``email``, or its ``sub``.
+    """
+
+    tenant_id: str
+    user_id: str
+    name: str
+
+
+class JwksKeys:
+    """The issuer's public keys, fetched from its JWKS URL and cached.
+
+    Args:
+        url: The JSON Web Key Set, such as Supabase's
+            ``/auth/v1/.well-known/jwks.json``.
+    """
+
+    def __init__(self, url: str) -> None:
+        self._client = jwt.PyJWKClient(url, cache_keys=True, lifespan=300)
+
+    async def __call__(self, token: str) -> jwt.PyJWK:
+        """Return the key that signed ``token``; fetching it runs in a thread."""
+        try:
+            return await asyncio.to_thread(self._client.get_signing_key_from_jwt, token)
+        except jwt.PyJWKClientError as error:
+            raise Unauthenticated(f"no key to verify the token: {error}") from error
+
+
+class TokenVerifier:
+    """Verifies access tokens and reads the principal from their claims.
+
+    Args:
+        audience: The ``aud`` every token must carry.
+        issuer: The ``iss`` every token must carry, when given.
+        secret: The shared secret of HS256 tokens, when they are accepted.
+        keys: Where the public keys of asymmetrically signed tokens come from, when they are
+            accepted.
+        tenant_claim: The dotted path of the tenant in the claims.
+
+    Raises:
+        ValueError: If neither a secret nor keys are given, so no token could be verified.
+    """
+
+    def __init__(
+        self,
+        *,
+        audience: str,
+        issuer: str | None = None,
+        secret: str | None = None,
+        keys: KeySource | None = None,
+        tenant_claim: str = "app_metadata.tenant_id",
+    ) -> None:
+        if secret is None and keys is None:
+            raise ValueError("set AUTH_JWKS_URL or AUTH_JWT_SECRET, to verify access tokens")
+        self._audience = audience
+        self._issuer = issuer
+        self._secret = secret
+        self._keys = keys
+        self._tenant_claim = tenant_claim.split(".")
+
+    @classmethod
+    def from_settings(cls, settings: AuthSettings) -> Self:
+        """Build the verifier the settings describe."""
+        return cls(
+            audience=settings.audience,
+            issuer=settings.issuer,
+            secret=settings.jwt_secret,
+            keys=JwksKeys(settings.jwks_url) if settings.jwks_url else None,
+            tenant_claim=settings.tenant_claim,
+        )
+
+    async def verify(self, token: str) -> Principal:
+        """Verify a token and return who it names.
+
+        Raises:
+            Unauthenticated: If the token is malformed, signed by an unknown key or with an
+                algorithm not accepted, expired, for another audience or issuer, or names no
+                tenant.
+        """
+        try:
+            algorithm = jwt.get_unverified_header(token).get("alg")
+        except jwt.InvalidTokenError as error:
+            raise Unauthenticated("the access token is malformed") from error
+        key: Any
+        if algorithm == "HS256" and self._secret is not None:
+            key, algorithms = self._secret, ["HS256"]
+        elif algorithm in ASYMMETRIC and self._keys is not None:
+            signing = await self._keys(token)
+            key, algorithms = signing.key, [signing.algorithm_name]
+        else:
+            raise Unauthenticated(f"tokens signed with {algorithm} are not accepted")
+        try:
+            claims = jwt.decode(
+                token,
+                key,
+                algorithms=algorithms,
+                audience=self._audience,
+                issuer=self._issuer,
+                options={"require": ["exp", "sub", "aud"]},
+            )
+        except jwt.InvalidTokenError as error:
+            raise Unauthenticated(f"the access token is not valid: {error}") from error
+        tenant = _claim(claims, self._tenant_claim)
+        if not isinstance(tenant, str) or not tenant:
+            raise Unauthenticated("the access token names no tenant")
+        user = str(claims["sub"])
+        return Principal(tenant_id=tenant, user_id=user, name=str(claims.get("email") or user))
+
+    async def authenticate(self, connection: HTTPConnection) -> Principal:
+        """Verify the token a request or WebSocket carries."""
+        return await self.verify(bearer_token(connection))
+
+
+def bearer_token(connection: HTTPConnection) -> str:
+    """Return the access token a request carries.
+
+    Raises:
+        Unauthenticated: If there is none.
+    """
+    scheme, _, token = connection.headers.get("authorization", "").partition(" ")
+    if scheme.lower() == "bearer" and token.strip():
+        return token.strip()
+    # Browsers can't send headers when they open a WebSocket. Tokens stay out of other URLs,
+    # which end up in logs.
+    websocket = connection.scope["type"] == "websocket"
+    if websocket and (token := connection.query_params.get("access_token")):
+        return token
+    raise Unauthenticated("an access token is required")
+
+
+class RequireToken:
+    """An ASGI app that answers 401 unless a request carries a valid access token.
+
+    It guards apps that authenticate each call themselves, such as an MCP server, so a request
+    without a token is refused before it reaches them.
+
+    Args:
+        app: The app to guard.
+        verifier: Verifies the tokens.
+    """
+
+    def __init__(self, app: ASGIApp, verifier: TokenVerifier) -> None:
+        self._app = app
+        self._verifier = verifier
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Refuse the request, or pass it on; lifespan events pass on."""
+        if scope["type"] in ("http", "websocket"):
+            try:
+                await self._verifier.authenticate(HTTPConnection(scope))
+            except Unauthenticated as error:
+                refusal = JSONResponse(
+                    {"detail": str(error)}, status_code=401, headers={"WWW-Authenticate": "Bearer"}
+                )
+                await refusal(scope, receive, send)
+                return
+        await self._app(scope, receive, send)
+
+
+def _claim(claims: Mapping[str, Any], path: list[str]) -> object:
+    """The value at a dotted path in the claims, or None."""
+    value: object = claims
+    for key in path:
+        value = cast(Mapping[str, object], value).get(key) if isinstance(value, Mapping) else None
+    return value

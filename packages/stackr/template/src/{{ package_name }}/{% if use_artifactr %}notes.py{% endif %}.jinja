@@ -1,0 +1,64 @@
+"""The example artifact type, its feedback and its agent: people and an agent write notes together.
+
+Replace them with the application's own. An artifact type is a Pydantic model; the agent edits
+it with artifactr's tools, and people with the same commands, over REST, the WebSocket or MCP.
+"""
+
+from collections.abc import Sequence
+from typing import Annotated
+
+from pydantic import Field
+from pydantic_ai import Agent, DeferredToolRequests
+from pydantic_ai.capabilities import AbstractCapability
+from pydantic_ai.models import Model
+from pydantic_ai.settings import ModelSettings
+
+from artifactr import ArtifactWorkspace, Feedback, MarkdownArtifact, Session
+
+INSTRUCTIONS = """\
+You help a team keep notes: short Markdown documents they write with you.
+
+- Create a note when asked, and edit notes in small, precise steps.
+- Ask when something important is unclear; do not guess.
+- Answer in a sentence or two, and let the notes hold the detail.
+"""
+
+
+class Note(MarkdownArtifact):
+    """A Markdown note, with a title. People and the agent edit it directly."""
+
+    title: str = ""
+
+    def render_for_agent(self) -> str:
+        """Show the title as a heading above the text."""
+        return f"# {self.title}\n\n{self.text}" if self.title else self.text
+
+
+class Rating(Feedback, name="rating", targets={"turn"}):
+    """How a person rated one of the agent's turns. Each field becomes a Langfuse score."""
+
+    stars: Annotated[int, Field(ge=1, le=5, description="From 1 (useless) to 5 (just right)")]
+    comment: str | None = None
+
+
+def build_note_agent(
+    model: Model,
+    *,
+    capabilities: Sequence[AbstractCapability[Session[None]]] = (),
+    model_settings: ModelSettings | None = None,
+) -> Agent[Session[None], str | DeferredToolRequests]:
+    """Build the notes agent.
+
+    Args:
+        model: The model: the gateway's model group, or a scripted one in tests.
+        capabilities: More capabilities: the gateway's and telemetry's.
+        model_settings: Settings for every model request.
+    """
+    return Agent[Session[None], str | DeferredToolRequests](
+        model,
+        deps_type=Session[None],
+        instructions=INSTRUCTIONS,
+        output_type=[str, DeferredToolRequests],
+        capabilities=[ArtifactWorkspace(types=[Note], ask=True), *capabilities],
+        model_settings=model_settings,
+    )

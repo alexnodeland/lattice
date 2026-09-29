@@ -14,5 +14,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0008](0008-langfuse-and-its-services.md) | Langfuse and its services | Accepted |
 | [0009](0009-local-supabase-as-the-database-adapter.md) | Local Supabase as the database adapter | Accepted |
 | [0010](0010-the-llm-gateway.md) | The LLM gateway | Accepted |
+| [0011](0011-the-application-template-in-detail.md) | The application template, in detail | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

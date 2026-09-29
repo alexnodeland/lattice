@@ -1,0 +1,40 @@
+{
+  "name": "{{ project_name }}",
+  // Built on compose.yaml beside this file. When stackr's stack is running, the dev container
+  // joins its networks and reaches its services by name (initialize.sh).
+  "dockerComposeFile": ["compose.yaml", "stackr.generated.yaml"],
+  "service": "dev",
+  "workspaceFolder": "/workspaces/{{ project_slug }}",
+  "initializeCommand": "bash .devcontainer/initialize.sh",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "features": {
+    "github-cli": "latest",
+    "ghcr.io/va-h/devcontainers-features/uv:1": {},
+    // `make up` builds and runs the app profile on the host's Docker.
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  "forwardPorts": [{{ app_port }}],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        },
+        "python.defaultInterpreterPath": ".venv/bin/python"
+      },
+      "extensions": [
+        "charliermarsh.ruff",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "tamasfe.even-better-toml",
+        "redhat.vscode-yaml",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  },
+  "remoteUser": "vscode"
+}

@@ -1,0 +1,77 @@
+"""Feedback as Langfuse scores: a mirror per workspace, from the first time it is used.
+
+People (and evaluators) give typed feedback in a workspace; the libraries' ``FeedbackMirror``
+follows a workspace's log and records each piece as scores on the trace it is about. A library
+mirrors one workspace at a time, so the application starts a mirror for each workspace it
+opens, until it stops.
+"""
+
+import asyncio
+import logging
+from collections.abc import Callable, Coroutine
+from typing import Any
+
+log = logging.getLogger(__name__)
+
+type Follow = Callable[[str, str], Coroutine[Any, Any, None]]
+"""Mirrors one workspace's feedback, given its tenant and id, until cancelled."""
+
+
+class Mirrors:
+    """Mirrors the feedback of each workspace the application uses.
+
+    Each mirror reads its workspace's log from the start, so a restarted application catches
+    up; score ids are derived from the feedback, so Langfuse replaces scores it already has.
+
+    Args:
+        follow: Mirrors one workspace: a library's ``FeedbackMirror(...).follow()``.
+    """
+
+    def __init__(self, follow: Follow) -> None:
+        self._follow = follow
+        self._tasks: dict[tuple[str, str], asyncio.Task[None]] = {}
+
+    def watch(self, tenant_id: str, workspace_id: str) -> None:
+        """Mirror a workspace, unless it is mirrored already."""
+        key = (tenant_id, workspace_id)
+        if key in self._tasks:
+            return
+        task = asyncio.create_task(self._follow(tenant_id, workspace_id))
+        self._tasks[key] = task
+        task.add_done_callback(lambda done: self._ended(key, done))
+
+    async def authorize(self, tenant_id: str, workspace_id: str, actor: object) -> bool:
+        """The libraries' ``authorize`` hook: mirror each workspace a request uses.
+
+        It allows every request: every user of a tenant may use the tenant's workspaces.
+        """
+        del actor
+        self.watch(tenant_id, workspace_id)
+        return True
+
+    def _ended(self, key: tuple[str, str], task: asyncio.Task[None]) -> None:
+        # A mirror that stopped starts again the next time its workspace is used.
+        self._tasks.pop(key, None)
+        if not task.cancelled() and (error := task.exception()) is not None:
+            log.warning("mirroring the feedback of %s/%s stopped: %r", *key, error)
+
+    async def aclose(self) -> None:
+        """Stop every mirror."""
+        tasks = list(self._tasks.values())
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def sync_configs(sync: Coroutine[Any, Any, list[str]]) -> None:
+    """Create the feedback types' score configs in Langfuse, or log why that failed.
+
+    The application starts without them when Langfuse is unreachable; scores still arrive, and
+    the configs are created on the next start.
+    """
+    try:
+        created = await sync
+    except Exception as error:
+        log.warning("could not create Langfuse's score configs: %r", error)
+    else:
+        log.info("Langfuse's score configs are in place; created %s", created or "none")

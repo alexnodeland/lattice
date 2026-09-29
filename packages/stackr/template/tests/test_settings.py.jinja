@@ -1,0 +1,86 @@
+"""Settings come from the environment: the stack's ports, with local defaults."""
+
+import pytest
+
+from {{ package_name }}.settings import AuthSettings, GatewaySettings, Settings
+
+
+def test_an_empty_environment_gives_the_defaults() -> None:
+    settings = Settings.from_environ({})
+    assert settings == Settings()
+    assert (settings.database_url, settings.telemetry, settings.langfuse) == (None, False, False)
+    assert settings.gateway.guardrails == ("pii-mask", "prompt-injection")
+    assert settings.auth.tenant_claim == "app_metadata.tenant_id"
+
+
+def test_every_setting_comes_from_its_variable() -> None:
+    settings = Settings.from_environ(
+        {
+            "OTEL_SERVICE_NAME": "renamed",
+            "OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel-collector:4318",
+            "APP_ENVIRONMENT": "staging",
+            "APP_HOST": "0.0.0.0",
+            "APP_PORT": "9000",
+            "DATABASE_URL": "postgresql+asyncpg://postgres:postgres@db:5432/postgres",
+            "DATABASE_SCHEMA": "renamed_schema",
+            "AUTH_JWKS_URL": "http://auth/jwks.json",
+            "AUTH_JWT_SECRET": "secret",
+            "AUTH_AUDIENCE": "api",
+            "AUTH_ISSUER": "http://auth",
+            "AUTH_TENANT_CLAIM": "tenant",
+            "LITELLM_BASE_URL": "http://litellm:4000",
+            "LITELLM_API_KEY": "sk-default",
+            "LITELLM_MODEL": "fast",
+            "LITELLM_TENANT_KEYS": '{"acme": "sk-acme"}',
+            "LITELLM_GUARDRAILS": "pii-mask, ",
+            "LITELLM_MOCK_RESPONSE": "ok",
+            "LANGFUSE_PUBLIC_KEY": "pk-lf-1",
+        }
+    )
+    assert settings == Settings(
+        service_name="renamed",
+        environment="staging",
+        host="0.0.0.0",
+        port=9000,
+        database_url="postgresql+asyncpg://postgres:postgres@db:5432/postgres",
+        database_schema="renamed_schema",
+        auth=AuthSettings(
+            jwks_url="http://auth/jwks.json",
+            jwt_secret="secret",
+            audience="api",
+            issuer="http://auth",
+            tenant_claim="tenant",
+        ),
+        gateway=GatewaySettings(
+            base_url="http://litellm:4000",
+            api_key="sk-default",
+            model="fast",
+            tenant_keys={"acme": "sk-acme"},
+            guardrails=("pii-mask",),
+            mock_response="ok",
+        ),
+        telemetry=True,
+        langfuse=True,
+    )
+
+
+def test_empty_variables_count_as_unset() -> None:
+    settings = Settings.from_environ({"DATABASE_URL": "", "LITELLM_GUARDRAILS": ""})
+    assert settings.database_url is None
+    assert settings.gateway.guardrails == ("pii-mask", "prompt-injection")
+
+
+def test_guardrails_can_be_turned_off() -> None:
+    assert Settings.from_environ({"LITELLM_GUARDRAILS": "none"}).gateway.guardrails == ()
+
+
+@pytest.mark.parametrize("keys", ["not json", '["sk-acme"]'])
+def test_tenant_keys_must_be_a_json_object(keys: str) -> None:
+    with pytest.raises(ValueError, match="LITELLM_TENANT_KEYS"):
+        Settings.from_environ({"LITELLM_TENANT_KEYS": keys})
+
+
+@pytest.mark.parametrize("schema", ["Public", "has space", 'quote"d', ""])
+def test_the_schema_must_be_a_plain_identifier(schema: str) -> None:
+    with pytest.raises(ValueError, match="DATABASE_SCHEMA"):
+        Settings(database_schema=schema)

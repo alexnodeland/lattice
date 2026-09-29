@@ -1,0 +1,79 @@
+"""reflexr's surfaces: an opened ticket fires the triage rule, and the agent triages it."""
+
+from typing import Any
+
+import httpx
+import httpx2
+from fastapi.testclient import TestClient
+from mcp import Client
+from mcp.client.streamable_http import streamable_http_client
+
+from conftest import TENANT, TENANT_KEY, Script, bearer, call, say, wait_for
+
+BASE = "/reflexr/v1/workspaces/main"
+
+
+def publish(client: TestClient, **event: Any) -> dict[str, Any]:
+    response = client.post(f"{BASE}/events", json={"event": event})
+    assert response.status_code == 200, response.text
+    [outcome] = response.json()
+    return outcome
+
+
+def runs(client: TestClient) -> list[dict[str, Any]]:
+    return client.get(f"{BASE}/runs").json()
+
+
+def test_an_opened_ticket_is_triaged(client: TestClient, script: Script) -> None:
+    triaged = {"priority": "urgent", "summary": "Checkout is down for every customer"}
+    script.steps += [
+        call("emit_event", type="ticket.triaged", fields=triaged),
+        say("Urgent: checkout is down."),
+    ]
+    publish(client, type="ticket.opened", subject="Checkout fails", body="Every payment errors.")
+    wait_for(lambda: [run["status"] for run in runs(client)] == ["succeeded"])
+    [run] = runs(client)
+    assert (run["rule"], run["output"]) == ("triage", "Urgent: checkout is down.")
+    [envelope] = client.get(f"{BASE}/events", params={"type": "ticket.triaged"}).json()
+    assert envelope["event"] == {"type": "ticket.triaged", **triaged}
+    assert (envelope["actor"]["kind"], envelope["actor"]["rule"]) == ("agent", "triage")
+
+    first = script.settings[0]
+    assert first["extra_headers"]["Authorization"] == f"Bearer {TENANT_KEY}"
+    assert first["extra_body"]["guardrails"] == ["pii-mask", "prompt-injection"]
+    metadata = first["extra_body"]["metadata"]
+    assert (metadata["tenant_id"], metadata["rule"]) == (TENANT, "triage")
+
+
+def test_publishers_are_the_users_of_their_tokens(client: TestClient) -> None:
+    publish(client, type="ticket.triaged", priority="low", summary="A question")
+    [envelope] = client.get(f"{BASE}/events").json()
+    assert envelope["actor"] == {"kind": "user", "id": "alice", "name": "alice@example.com"}
+
+
+def test_only_the_applications_events_are_accepted(client: TestClient) -> None:
+    response = client.post(f"{BASE}/events", json={"event": {"type": "deploy.completed"}})
+    assert response.status_code == 404
+
+
+def test_the_rules_are_described(client: TestClient) -> None:
+    [rule] = client.get("/reflexr/v1/rules").json()
+    assert (rule["name"], rule["then"]["action"]) == ("triage", "triage")
+
+
+async def test_mcp_clients_publish_for_the_user_of_their_token(server: str) -> None:
+    headers = bearer("bob")
+    async with (
+        httpx2.AsyncClient(headers=headers) as http,
+        Client(streamable_http_client(f"{server}/reflexr/mcp/", http_client=http)) as mcp,
+    ):
+        event = {"type": "ticket.triaged", "priority": "normal", "summary": "From MCP"}
+        published = await mcp.call_tool("publish_event", {"workspace_id": "main", "event": event})
+        assert not published.is_error
+    async with httpx.AsyncClient(base_url=server, headers=headers) as client:
+        [envelope] = (await client.get(f"{BASE}/events")).json()
+    assert envelope["actor"] == {
+        "kind": "external_agent",
+        "client_id": "bob",
+        "name": "bob@example.com (MCP)",
+    }

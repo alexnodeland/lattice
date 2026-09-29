@@ -1,0 +1,166 @@
+"""The application: {% if libraries == 'both' %}artifactr and reflexr side by side{% else %}{{ libraries }}'s surfaces{% endif %}, on one database and telemetry setup.
+
+Run it with ``{{ project_slug }}`` (``make serve``), or beside the stack in its ``app`` profile
+(``make up``). Every surface needs a Supabase access token.
+{%- if use_artifactr %}
+
+- ``/artifactr/v1``: artifactr's REST commands and reads, and its WebSocket stream
+- ``/artifactr/mcp/``: artifactr's MCP server
+{%- endif %}
+{%- if use_reflexr %}
+
+- ``/reflexr/v1``: reflexr's REST publishing, reads and administration, and its WebSocket stream
+- ``/reflexr/mcp/``: reflexr's MCP server
+{%- endif %}
+"""
+
+import contextlib
+from collections.abc import AsyncGenerator
+from contextlib import AbstractAsyncContextManager
+{%- if use_reflexr %}
+from datetime import timedelta
+{%- endif %}
+from importlib.metadata import metadata
+from typing import Protocol
+
+import uvicorn
+from fastapi import FastAPI
+from pydantic_ai.models import Model
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+from {{ package_name }}.auth import TokenVerifier
+{%- if use_reflexr %}
+from {{ package_name }}.automation import Automation
+{%- endif %}
+{%- if use_artifactr %}
+from {{ package_name }}.collaboration import Collaboration
+{%- endif %}
+from {{ package_name }}.database import create_schema, open_database
+from {{ package_name }}.gateway import gateway_model
+from {{ package_name }}.settings import Settings
+from {{ package_name }}.telemetry import Telemetry, configure
+
+TITLE = {{ project_name | tojson }}
+DISTRIBUTION = "{{ project_slug }}"
+
+
+class Part(Protocol):
+    """One library's surfaces, mounted under a prefix of its own."""
+
+    async def migrate(self, engine: AsyncEngine) -> None:
+        """Upgrade the database to the library's schema."""
+        ...
+
+    def lifespan(self) -> AbstractAsyncContextManager[None]:
+        """Run what the library needs while the application is up."""
+        ...
+
+    def mount(self, app: FastAPI) -> None:
+        """Add the library's routes to the application."""
+        ...
+
+
+def create_app(
+    settings: Settings | None = None,
+    *,
+    model: Model | None = None,
+    telemetry: Telemetry | None = None,
+{%- if use_reflexr %}
+    poll_interval: timedelta = timedelta(seconds=1),
+{%- endif %}
+) -> FastAPI:
+    """Build the application.
+
+    Args:
+        settings: The settings; read from the environment by default.
+        model: The agents' model; the gateway's model group by default. Tests pass a scripted
+            one.
+        telemetry: OpenTelemetry and Langfuse, as ``telemetry.configure`` sets them up.
+{%- if use_reflexr %}
+        poll_interval: How often the reactor looks for work.
+{%- endif %}
+    """
+    settings = settings or Settings.from_environ()
+    verifier = TokenVerifier.from_settings(settings.auth)
+    model = model or gateway_model(settings.gateway)
+    engine = (
+        open_database(settings.database_url, schema=settings.database_schema)
+        if settings.database_url
+        else None
+    )
+    parts: list[Part] = [
+{%- if use_artifactr %}
+        Collaboration(
+            name=settings.service_name,
+            verifier=verifier,
+            model=model,
+            gateway=settings.gateway,
+            engine=engine,
+            telemetry=telemetry,
+        ),
+{%- endif %}
+{%- if use_reflexr %}
+        Automation(
+            name=settings.service_name,
+            verifier=verifier,
+            model=model,
+            gateway=settings.gateway,
+            engine=engine,
+            telemetry=telemetry,
+            poll_interval=poll_interval,
+        ),
+{%- endif %}
+    ]
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
+        async with contextlib.AsyncExitStack() as stack:
+            if engine is not None:
+                stack.push_async_callback(engine.dispose)
+                await create_schema(engine, settings.database_schema)
+                for part in parts:
+                    await part.migrate(engine)
+            for part in parts:
+                await stack.enter_async_context(part.lifespan())
+            yield
+
+    app = FastAPI(title=TITLE, description=metadata(DISTRIBUTION)["Summary"], lifespan=lifespan)
+    for part in parts:
+        part.mount(app)
+
+    @app.get("/")
+    async def about() -> dict[str, str]:
+        """Where the surfaces are."""
+        return {
+            "name": TITLE,
+{%- if use_artifactr %}
+            "artifactr": "/artifactr/v1",
+            "artifactr_mcp": "/artifactr/mcp/",
+{%- endif %}
+{%- if use_reflexr %}
+            "reflexr": "/reflexr/v1",
+            "reflexr_mcp": "/reflexr/mcp/",
+{%- endif %}
+        }
+
+    @app.get("/healthz")
+    async def health() -> dict[str, str]:
+        """Whether the application is up; for health checks, and untraced."""
+        return {"status": "ok"}
+
+    if telemetry is not None:
+        telemetry.instrument_app(app)
+    return app
+
+
+def main() -> None:
+    """Serve the application on ``APP_HOST``:``APP_PORT``, as the environment configures it."""
+    settings = Settings.from_environ()
+    telemetry = configure(settings)
+    try:
+        uvicorn.run(
+            create_app(settings, telemetry=telemetry), host=settings.host, port=settings.port
+        )
+    finally:
+        if telemetry is not None:
+            telemetry.shutdown()

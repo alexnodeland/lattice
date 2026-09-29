@@ -34,4 +34,4 @@ pydantic-ai 2.51 supports decision models natively. `Agent('typesafe:jev-latest'
 
 ## Action items
 
-1. [ ] Implement RFC-0001 phases 2 and 3.
+1. [x] Implement RFC-0001 phases 2 and 3.

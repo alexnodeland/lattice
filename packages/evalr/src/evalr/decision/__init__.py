@@ -5,6 +5,7 @@ verdict's fields as typed questions, with calibrated confidence, and hands off w
 of (ADR-0002, ADR-0006, ADR-0008).
 """
 
+from evalr.decision.calibration import DEFAULT_GRID, ThresholdCalibration
 from evalr.decision.evaluators import (
     DEFAULT_BOOLEAN_THRESHOLD,
     DEFAULT_MODEL,
@@ -15,10 +16,12 @@ from evalr.decision.views import MAX_CHOICES, DecisionView, decision_view
 
 __all__ = [
     "DEFAULT_BOOLEAN_THRESHOLD",
+    "DEFAULT_GRID",
     "DEFAULT_MODEL",
     "MAX_CHOICES",
     "Decision",
     "DecisionEvaluator",
     "DecisionView",
+    "ThresholdCalibration",
     "decision_view",
 ]

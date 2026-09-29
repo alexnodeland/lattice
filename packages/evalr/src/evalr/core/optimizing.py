@@ -2,7 +2,7 @@
 
 from typing import Self
 
-from pydantic import BaseModel, JsonValue
+from pydantic import BaseModel, Field, JsonValue
 
 from evalr.core.datasets import Dataset
 from evalr.core.ports import Optimizer
@@ -34,6 +34,7 @@ class Training(BaseModel, frozen=True):
         validation: The data it was checked on.
         score_before: Agreement with people on the validation data before fitting, from 0 to 1.
         score_after: Agreement after fitting.
+        results: What the optimizer found, as JSON, such as calibrated thresholds.
     """
 
     optimizer: str
@@ -43,6 +44,7 @@ class Training(BaseModel, frozen=True):
     validation: DatasetRef
     score_before: float | None
     score_after: float | None
+    results: dict[str, JsonValue] = Field(default_factory=dict[str, JsonValue])
 
 
 async def optimize[InputT: BaseModel, VerdictT: BaseModel, EvaluatorT](

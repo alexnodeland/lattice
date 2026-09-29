@@ -7,7 +7,7 @@
 | `evalr.core` | Implemented |
 | `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Implemented |
 | `evalr.dspy` | Implemented |
-| `evalr.decision` | `DecisionEvaluator` implemented; threshold calibration planned (phase 3) |
+| `evalr.decision` | Implemented |
 | `evalr.langfuse`, `evalr.hf` | Planned (phase 4) |
 | End-to-end measures and online helpers | Planned (phase 5) |
 
@@ -169,9 +169,9 @@ An `Optimizer[InputT, VerdictT, EvaluatorT]` fits an evaluator to people's verdi
 |---|---|---|
 | `BestOf(candidates)` | Any evaluator: picks, from it and the candidates, the one that agrees best with people on `train`, and measures the choice on `validate`. A tie keeps the evaluator given. | `evalr.memory` |
 | `Gepa(reflection_lm=, auto=)` | A DSPy judge's instructions, from people's verdicts and their reasons | `evalr.dspy` |
-| Threshold calibration (phase 3) | A decision evaluator's thresholds | `evalr.decision` |
+| `ThresholdCalibration(target_agreement=)` | A decision evaluator's boolean and hand-off thresholds | `evalr.decision` |
 
-A fitted evaluator carries a `Training` record (core), so its version can be explained: the optimizer and its settings, the version it started from, the training and validation data (`DatasetRef`: name, content hash, size), and its agreement with people on the validation data before and after.
+A fitted evaluator carries a `Training` record (core), so its version can be explained: the optimizer and its settings, the version it started from, the training and validation data (`DatasetRef`: name, content hash, size), its agreement with people on the validation data before and after, and what the optimizer found (`results`), such as calibrated thresholds.
 
 ### Training judges with GEPA
 
@@ -182,6 +182,15 @@ A fitted evaluator carries a `Training` record (core), so its version can be exp
 - **Budget:** one of `auto` (`"light"` by default), `max_metric_calls` or `max_full_evals`. `reflection_minibatch_size`, `use_merge` and `seed` pass through.
 - **Threads:** DSPy runs single-threaded (`num_threads=1`), so evaluation spans keep their trace context and a seed reproduces a run. The compile runs in a worker thread, off the event loop.
 - **The result** is a new judge (the one given is unchanged) with the trained program, a new version, and a `Training` record whose scores are GEPA's validation scores for the starting program and the chosen one.
+
+### Calibrating decision evaluators
+
+A decision model is not trained; its thresholds are. `ThresholdCalibration` adapts that to the `Optimizer` port. pydantic-ai applies the thresholds on the client, after the one request, so calibration asks the model once per example and re-reads the answers under every candidate threshold (0.05 to 0.95 by default):
+
+1. **The boolean threshold** (`decision_boolean_threshold`) is the one at which the yes-or-no fields agree best with people on the training examples; ties go to the one nearest the current threshold. A verdict with no yes-or-no fields keeps its threshold.
+2. **The hand-off threshold** (`min_confidence`) is the lowest at which the evaluator agrees with people on at least `target_agreement` (0.9 by default) of the training examples it keeps, handing off the rest; with no threshold at all first. If none reaches the target, the one that agrees best.
+
+Examples pydantic-ai hands off whatever the thresholds are left out. The calibrated evaluator is a copy with the new thresholds and version, and a `Training` record. Its scores are the agreement on the validation examples each keeps, before and after, so their denominators differ: `results` records the thresholds and the share of validation examples kept before and after (`coverage_before`, `coverage_after`). The fallback judges what the evaluator hands off.
 
 ### Saved judges
 

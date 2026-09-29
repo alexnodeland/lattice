@@ -63,4 +63,4 @@ And ADR-0006 made evaluators adapters of one port, composed rather than special-
 ## Action items
 
 1. [x] Implement `decision_view` and `DecisionEvaluator` (RFC-0001 phase 3).
-2. [ ] Implement threshold calibration (phase 3).
+2. [x] Implement threshold calibration (phase 3).

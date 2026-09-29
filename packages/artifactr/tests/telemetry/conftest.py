@@ -66,8 +66,8 @@ class Recorder:
         )
 
 
-@pytest.fixture
-def recorder() -> Iterator[Recorder]:
+def recording() -> Iterator[Recorder]:
+    """Providers that record in memory, shut down afterwards: a fixture's body."""
     exporter = InMemorySpanExporter()
     tracer_provider = TracerProvider()
     tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
@@ -87,3 +87,8 @@ def trace_id(span: ReadableSpan) -> str:
     """A span's trace id, as 32 hexadecimal digits."""
     assert span.context is not None
     return f"{span.context.trace_id:032x}"
+
+
+@pytest.fixture
+def recorder() -> Iterator[Recorder]:
+    yield from recording()

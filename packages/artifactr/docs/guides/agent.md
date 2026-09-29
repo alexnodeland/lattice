@@ -164,7 +164,7 @@ run_ended        status: completed (with token usage), stopped or failed (with t
                  and a reason when a RunFailure said why)
 ```
 
-A run that pauses ends its segment with `run_paused` instead, listing the requests it waits on, with the usage so far. A tool or capability that fails the run for a known reason raises `RunFailure(message, reason="...")`: the run is recorded as failed with that `reason`, which clients and dashboards can count on ([ADR-0042](../adr/0042-typed-run-failures.md)). The run's new model messages are stored in the same transaction as `run_ended` or `run_paused`, so the history and the log never disagree.
+A run that pauses ends its segment with `run_paused` instead, listing the requests it waits on, with the usage so far. A tool or capability that fails the run for a known reason raises `RunFailure(message, reason="...")`: the run is recorded as failed with that `reason`, which clients and dashboards can count on ([ADR-0042](../adr/0042-typed-run-failures.md)). The [LLM gateway](gateway.md) uses it for guardrail blocks. The run's new model messages are stored in the same transaction as `run_ended` or `run_paused`, so the history and the log never disagree.
 
 ## Proposals
 

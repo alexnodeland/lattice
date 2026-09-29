@@ -199,6 +199,6 @@ LiteLLM runs as a proxy in stackr and owns routing (model groups, fallbacks, loa
 - [x] A2: typed feedback: `Feedback`, targets, `give_feedback`, `feedback_given`, `EvaluatorActor`, surfaces
 - [x] A3: `[langfuse]` extra: span filter, context helper, feedback mirror, score configs
 - [x] A4: dev environment: contributor Compose, dev container, Grafana dashboards with a dashboard-to-registry test, and dashboards published as release assets
-- [ ] A7: `[litellm]` extra: `litellm_model`, per-request metadata, guardrail policies, typed guardrail outcomes, tenant key resolution
+- [x] A7: `[litellm]` extra: `litellm_model`, per-request metadata, guardrail policies, typed guardrail outcomes, tenant key resolution
 - [ ] A5: `[evals]` extra over evalr: datasets from the log, experiment tasks, online evaluators, end-to-end measures
 - [ ] A6: docs: an observability guide, an evaluation guide, and the architecture updated

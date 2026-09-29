@@ -17,6 +17,7 @@ The packages are layers. Each depends only on the ones below it, so each is usab
 | [`artifactr.fastapi`](fastapi.md) | The thread protocol over WebSocket, and REST, as a FastAPI router | `fastapi` extra |
 | [`artifactr.otel`](otel.md) | `configure_telemetry`: the OpenTelemetry SDK, exporters and instrumentations, and metric views | `otel` extra |
 | [`artifactr.langfuse`](langfuse.md) | Langfuse behind the score ports, a span filter for whole traces, and a turn's trace attributes | `langfuse` extra |
+| [`artifactr.litellm`](litellm.md) | A model over a LiteLLM proxy, and a capability for each request's metadata, key and guardrails | `litellm` extra |
 | [`artifactr.mcp`](mcp.md) | An MCP server for external agents | `mcp` extra |
 
 The wire formats have their own pages: the [thread protocol](../protocol.md) and its [JSON Schema](schema.md).

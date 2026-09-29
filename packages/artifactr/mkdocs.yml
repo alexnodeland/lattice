@@ -135,6 +135,7 @@ nav:
       - Multi-tenancy and security: guides/security.md
       - Observability: guides/observability.md
       - Evaluation: guides/evaluation.md
+      - The LLM gateway: guides/gateway.md
       - Testing your application: guides/testing.md
   - Reference:
       - reference/index.md
@@ -148,6 +149,7 @@ nav:
       - artifactr.mcp: reference/mcp.md
       - artifactr.otel: reference/otel.md
       - artifactr.langfuse: reference/langfuse.md
+      - artifactr.litellm: reference/litellm.md
       - Thread protocol: protocol.md
       - Protocol JSON Schema: reference/schema.md
   - Design:
@@ -196,6 +198,7 @@ nav:
           - adr/0040-joining-stackrs-network.md
           - adr/0041-dashboards-generated-tested-and-released.md
           - adr/0042-typed-run-failures.md
+          - adr/0043-the-litellm-adapter.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

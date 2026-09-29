@@ -47,6 +47,9 @@ otel = [
 langfuse = [
     "langfuse>=4.15,<5",
 ]
+litellm = [
+    "pydantic-ai-slim[openai]>=2.51",
+]
 
 [project.urls]
 Homepage = "https://artifactr.alexnodeland.com"

@@ -102,6 +102,9 @@ fastapi = [
 langfuse = [
     { name = "langfuse" },
 ]
+litellm = [
+    { name = "pydantic-ai-slim", extra = ["openai"] },
+]
 mcp = [
     { name = "mcp" },
 ]
@@ -190,9 +193,10 @@ requires-dist = [
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.45" },
     { name = "pydantic", specifier = ">=2.13" },
     { name = "pydantic-ai-slim", specifier = ">=2.51" },
+    { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'litellm'", specifier = ">=2.51" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
 ]
-provides-extras = ["sql", "sqlite", "postgres", "fastapi", "mcp", "otel", "langfuse"]
+provides-extras = ["sql", "sqlite", "postgres", "fastapi", "mcp", "otel", "langfuse", "litellm"]
 
 [package.metadata.requires-dev]
 dev = [

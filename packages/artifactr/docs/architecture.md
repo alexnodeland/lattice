@@ -63,6 +63,7 @@ graph TD
     scores["artifactr.scores<br/>feedback as scores"] --> workspace
     otel["artifactr.otel<br/>OpenTelemetry SDK"] --> telemetry
     langfuse["artifactr.langfuse<br/>Langfuse"] --> scores
+    litellm["artifactr.litellm<br/>LiteLLM"] --> agent
     workspace --> telemetry["artifactr.telemetry<br/>OpenTelemetry API"]
     telemetry --> core["artifactr.core<br/>pure, synchronous rules"]
 ```
@@ -80,6 +81,7 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.scores` | workspace | Inner; owns the `ScoreSink` and `ScoreConfigStore` ports | Feedback as scores, and the mirror that sends a workspace's feedback to a sink. |
 | `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | Adapter for `Storage` | Durable storage on PostgreSQL and SQLite, and its migrations. |
 | `artifactr.otel` (extra) | telemetry, the OpenTelemetry SDK, exporters and instrumentations | Adapter for the OpenTelemetry API | `configure_telemetry`: providers, OTLP export, instrumentations and metric views, for applications. |
+| `artifactr.litellm` (extra) | agent, pydantic-ai's OpenAI support | Adapter for pydantic-ai's `Model` | `litellm_model` and the `LiteLLMGateway` capability: each request's tenancy, session, trace, key and guardrails, and guardrail blocks as typed failures ([ADR-0043](adr/0043-the-litellm-adapter.md)). |
 | `artifactr.langfuse` (extra) | scores, agent, langfuse | Adapter for `ScoreSink`, `ScoreConfigStore` and `TurnContext` | Feedback as Langfuse scores and score configs, a span filter that keeps whole traces, and each turn's trace attributes ([ADR-0039](adr/0039-the-langfuse-adapter.md)). |
 | `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
 | `artifactr.mcp` (extra) | agent, mcp | Driving adapter | Artifacts as MCP resources, commands as MCP tools. |
@@ -311,6 +313,10 @@ Feedback is the `give_feedback` command, so it goes through the one write path a
 
 Score ids are derived from the envelope's id, so mirroring the log again replaces scores rather than adding more. `sync_score_configs` creates each type's score configs in a `ScoreConfigStore`. `ScoreSink` and `ScoreConfigStore` are ports: `artifactr.langfuse` adapts Langfuse to them.
 
+## The LLM gateway
+
+Agents reach models through a LiteLLM proxy, which owns routing, budgets, rate limits and guardrails ([ADR-0031](adr/0031-litellm-proxy-first.md)). The `[litellm]` extra's `litellm_model` is a pydantic-ai model over the proxy, and its `LiteLLMGateway` capability adds to each request, in `before_model_request`, the tenant, workspace, thread and run as LiteLLM metadata and tags, the thread as the session, the person as the user, the trace id and trace context, the workspace's guardrails from an application policy, and the tenant's virtual key from an application callback ([ADR-0043](adr/0043-the-litellm-adapter.md)). A request a guardrail blocks fails the run with the reason `guardrail_blocked` and is not retried ([ADR-0042](adr/0042-typed-run-failures.md)).
+
 ## Live output
 
 The event log carries durable domain events only. Token-level output belongs to whoever drives the run ([ADR-0007](adr/0007-caller-owned-live-output.md)). pydantic-ai hands the run's event stream to its caller through `event_stream_handler`, and `forward_live(channel)` sends it to a `LiveChannel` as protocol live frames:
@@ -494,6 +500,7 @@ Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opent
 | asyncpg, aiosqlite | PostgreSQL and SQLite drivers (extras; the library imports neither) | 0.31, 0.22 |
 | FastAPI | WebSocket and REST adapter | 0.141 |
 | mcp | MCP server (`MCPServer`, subscriptions) | 2.2 |
+| langfuse (extra) | Traces, scores and score configs in Langfuse | 4.15 |
 | opentelemetry-api | Spans and metrics, through the API only | 1.45 |
 
 Python 3.12+. Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical with mkdocstrings for the documentation site ([ADR-0023](adr/0023-documentation-site.md)).
@@ -568,6 +575,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0040](adr/0040-joining-stackrs-network.md) | Joining stackr's network when it runs |
 | [0041](adr/0041-dashboards-generated-tested-and-released.md) | Dashboards generated, tested and released |
 | [0042](adr/0042-typed-run-failures.md) | Typed run failures |
+| [0043](adr/0043-the-litellm-adapter.md) | The LiteLLM adapter |
 
 ## Open questions
 

@@ -49,6 +49,11 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"artifactr.core", "artifactr.telemetry", "artifactr.otel", "artifactr.langfuse"},
         {"opentelemetry", "pydantic_ai", "fastapi", "sqlalchemy", "langfuse"},
     ),
+    # The LiteLLM adapter: a model over the proxy, and a capability for each request.
+    "litellm": (
+        {*INNER, "artifactr.litellm"},
+        {"pydantic_ai", "httpx2", "opentelemetry.propagate", *OTEL_API},
+    ),
     # The Langfuse adapter: the score ports, a TurnContext and a span filter.
     "langfuse": (
         {*INNER, "artifactr.scores", "artifactr.langfuse"},

@@ -26,6 +26,12 @@ RFC-0001 phase 4 builds `SqlStorage`, the production implementation of the stora
 - **Migrations ship in the package.** `migrate(engine)` runs the packaged Alembic scripts up to the latest revision. They record their version in their own table (`artifactr_alembic_version`), and every table name starts with `artifactr_`, so they sit beside the application's schema and migrations. `create_schema(engine)` creates the tables straight from the models, for tests and prototypes. A test runs the migrations on both databases and checks that Alembic's autogenerate finds no differences from the models.
 - **Drivers are extras.** `artifactr[sql]` installs SQLAlchemy and Alembic. `artifactr[postgres]` adds asyncpg, and `artifactr[sqlite]` adds aiosqlite. The library imports neither driver.
 
+### Amendment (2026-09-29): a SQLite engine keeps one connection
+
+Under load, SQLite transactions in one process failed with "database is locked": each held its own connection and polled for the write lock through SQLite's busy handler, which gives up after `sqlite3`'s five-second `timeout` and keeps no order. reflexr had already decided otherwise (its ADR-0030).
+
+- **`create_sqlite_engine` pools a single connection** unless given another `poolclass`. SQLite runs one transaction at a time anyway, so a process's transactions queue for the connection and take turns in the order they begin, as on in-memory storage, for up to the pool's `pool_timeout` (30 seconds). Only other processes contend for the write lock.
+
 ## Options considered
 
 ### Serializing the transactions on a workspace

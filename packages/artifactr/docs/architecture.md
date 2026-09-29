@@ -413,7 +413,7 @@ class Storage(Protocol):
 Two implementations ship:
 
 - **`InMemoryStorage`** (`artifactr.workspace`), for tests, examples and single-process prototypes. A per-workspace `asyncio.Lock` serializes transactions and an `asyncio.Condition` wakes subscribers. Its clock is injectable, so tests control lease expiry.
-- **`SqlStorage`** (`artifactr.sql`), for production: SQLAlchemy 2 async, with the same code on PostgreSQL and SQLite ([ADR-0021](adr/0021-sql-storage.md)).
+- **`SqlStorage`** (`artifactr.sql`), for production: SQLAlchemy 2 async, with the same code on PostgreSQL and SQLite ([ADR-0021](adr/0021-sql-storage.md)). A SQLite engine keeps one connection, so a process's transactions take turns in order.
 
 ```python
 engine = create_async_engine("postgresql+asyncpg://localhost/app")  # artifactr-ai[postgres]

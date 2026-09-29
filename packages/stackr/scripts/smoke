@@ -7,6 +7,9 @@
 # Tempo, Prometheus and Loki; the span metrics Tempo's metrics generator
 # derives from the trace, and the Collector's own metrics, in Prometheus; and
 # Grafana's provisioned data sources and dashboards.
+# postgres: PostgreSQL is ready, and db-init created Langfuse's database.
+# langfuse (with observability): a trace with a known id, sent to the
+# Collector, is found in Langfuse through its public API, and in Tempo.
 
 # The checks are called through `eventually`, which shellcheck can't follow.
 # shellcheck disable=SC2329
@@ -25,6 +28,8 @@ prometheus="http://$host:$(setting PROMETHEUS_PORT 9090)"
 tempo="http://$host:$(setting TEMPO_PORT 3200)"
 loki="http://$host:$(setting LOKI_PORT 3100)"
 grafana="http://$host:$(setting GRAFANA_PORT 3000)"
+collector_http="http://$host:$(setting OTLP_HTTP_PORT 4318)"
+langfuse="http://$host:$(setting LANGFUSE_PORT 3300)"
 
 run_id="smoke-$(date +%s)-$RANDOM"
 service="stackr-smoke"
@@ -105,12 +110,65 @@ smoke_observability() {
   eventually "Grafana has the Collector dashboard" grafana_has_dashboard stackr-collector
 }
 
+random_hex() { od -An -N"$1" -tx1 /dev/urandom | tr -d ' \n'; }
+
+# An OTLP/JSON trace with a known id, sent to the Collector's HTTP port.
+send_trace() {
+  local now
+  now=$(date +%s)
+  curl -fsS -o /dev/null -H 'Content-Type: application/json' --data @- "$collector_http/v1/traces" <<JSON
+{"resourceSpans": [{
+  "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "$service"}}]},
+  "scopeSpans": [{"scope": {"name": "stackr.smoke"}, "spans": [{
+    "traceId": "$trace_id", "spanId": "$(random_hex 8)", "name": "stackr smoke", "kind": 1,
+    "startTimeUnixNano": "${now}000000000", "endTimeUnixNano": "${now}500000000",
+    "attributes": [{"key": "smoke.run", "value": {"stringValue": "$run_id"}}]
+  }]}]
+}]}
+JSON
+}
+
+# Langfuse's public API with the project's keys, passed to curl on stdin.
+langfuse_get() {
+  printf 'user = "%s:%s"\n' "$(setting LANGFUSE_PUBLIC_KEY '')" "$(setting LANGFUSE_SECRET_KEY '')" |
+    curl -fsS --config - "$langfuse$1"
+}
+langfuse_has_trace() {
+  langfuse_get "/api/public/v2/observations?traceId=$trace_id&fields=core" | grep -q "$trace_id"
+}
+tempo_has_trace_id() {
+  curl -fsS -o /dev/null "$tempo/api/v2/traces/$trace_id"
+}
+langfuse_database_ok() {
+  curl -fsS -o /dev/null "$langfuse/api/public/health?failIfDatabaseUnavailable=true"
+}
+postgres_has_database() {
+  docker compose exec -T postgres psql -U "$(setting POSTGRES_ADMIN_USER postgres)" -d postgres -Atc \
+    "SELECT 1 FROM pg_database WHERE datname = '$1'" | grep -q 1
+}
+
+smoke_postgres() {
+  eventually "PostgreSQL is ready" docker compose exec -T postgres pg_isready -q
+  eventually "db-init created Langfuse's database" postgres_has_database langfuse
+}
+
+smoke_langfuse() {
+  trace_id=$(random_hex 16)
+  log "langfuse: sending trace $trace_id through the Collector"
+  eventually "Langfuse is up, with its database" langfuse_database_ok
+  send_trace
+  eventually "the trace is in Langfuse" langfuse_has_trace
+  eventually "the same trace is in Tempo" tempo_has_trace_id
+}
+
 profiles=("$@")
 ((${#profiles[@]} > 0)) || profiles=(observability)
 status=0
 for profile in "${profiles[@]}"; do
   case $profile in
     observability) smoke_observability || status=1 ;;
+    postgres) smoke_postgres || status=1 ;;
+    langfuse) smoke_langfuse || status=1 ;;
     *)
       log "smoke: no checks for profile '$profile'"
       status=1

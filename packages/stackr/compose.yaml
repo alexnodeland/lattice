@@ -4,6 +4,9 @@
 # (ADR-0005). Only what a task needs runs:
 #   observability  the OpenTelemetry Collector (the telemetry port), with
 #                  Tempo, Prometheus, Loki, Pyroscope and Grafana behind it
+#   postgres       plain PostgreSQL, as the database adapter
+#   langfuse       Langfuse, behind the Collector for traces, with ClickHouse,
+#                  MinIO (the S3 port) and Valkey (the Redis protocol)
 #   smoke          telemetrygen, for scripts/smoke
 # Local Supabase runs beside this project through its CLI. `make up` starts
 # the stack; see docs/architecture.md.
@@ -25,6 +28,43 @@ volumes:
   loki-data:
   pyroscope-data:
   grafana-data:
+  postgres-data:
+  redis-data:
+  minio-data:
+  clickhouse-data:
+  clickhouse-logs:
+
+# Langfuse's web and worker share their settings. SALT and ENCRYPTION_KEY
+# must match between them and never change.
+x-langfuse-env: &langfuse-env
+  DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD:?run make env}@${POSTGRES_HOST:-postgres}:5432/langfuse
+  SALT: ${LANGFUSE_SALT:?run make env}
+  ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?run make env}
+  NEXTAUTH_URL: http://localhost:${LANGFUSE_PORT:-3300}
+  TELEMETRY_ENABLED: "false"
+  # Listen on every interface, not only the container's own address.
+  HOSTNAME: 0.0.0.0
+  CLICKHOUSE_URL: http://clickhouse:8123
+  CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+  CLICKHOUSE_USER: langfuse
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?run make env}
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  # Database 0 of the shared Valkey; the gateway uses database 1.
+  REDIS_CONNECTION_STRING: redis://:${REDIS_PASSWORD:?run make env}@redis:6379/0
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: ${S3_REGION:-auto}
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-stackr}
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?run make env}
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: ${S3_REGION:-auto}
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-stackr}
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?run make env}
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
 
 services:
   # The telemetry port: every application, and the LiteLLM proxy, sends OTLP
@@ -36,6 +76,10 @@ services:
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     environment:
       STACKR_ENVIRONMENT: ${STACKR_ENVIRONMENT:-local}
+      # Where traces go. `make up` leaves Langfuse out when its profile isn't
+      # running (see the Makefile).
+      STACKR_TRACES_EXPORTERS: ${STACKR_TRACES_EXPORTERS:-[otlp_grpc/tempo, otlp_http/langfuse]}
+      LANGFUSE_OTLP_AUTH: ${LANGFUSE_OTLP_AUTH:?run make env}
     volumes:
       - ./deploy/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
     ports:
@@ -135,6 +179,169 @@ services:
       - tempo
       - loki
       - pyroscope
+
+  # The database port's plain PostgreSQL adapter.
+  postgres:
+    image: postgres:17.11-alpine
+    profiles: [postgres]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?run make env}
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${POSTGRES_PORT:-55432}:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # Creates each service's role and database on the database adapter, on
+  # every start (deploy/postgres/init.sql), then exits.
+  db-init:
+    image: postgres:17.11-alpine
+    profiles: [langfuse]
+    restart: "no"
+    command: ["psql", "--no-psqlrc", "--quiet", "--file=/init.sql"]
+    environment:
+      PGHOST: ${POSTGRES_HOST:-postgres}
+      PGPORT: "5432"
+      PGDATABASE: postgres
+      PGUSER: ${POSTGRES_ADMIN_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_ADMIN_PASSWORD:?run make env}
+      PGCONNECT_TIMEOUT: "10"
+      LANGFUSE_DB_PASSWORD: ${LANGFUSE_DB_PASSWORD:?run make env}
+    volumes:
+      - ./deploy/postgres/init.sql:/init.sql:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+
+  # The Redis protocol, with Valkey as its adapter: Langfuse's queues and
+  # cache. `noeviction`, because queued jobs must not be dropped.
+  redis:
+    image: valkey/valkey:9.0.6-alpine
+    profiles: [langfuse]
+    restart: unless-stopped
+    # The password goes into a config file, never onto the command line.
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        printf 'requirepass %s\n' "$$REDIS_PASSWORD" > /tmp/valkey.conf &&
+        exec valkey-server /tmp/valkey.conf --maxmemory-policy noeviction --save 60 1
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?run make env}
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?run make env}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # The S3 port, with MinIO as its adapter. Chainguard publishes only
+  # `latest` for free, so the image is pinned by digest (ADR-0008).
+  minio:
+    image: cgr.dev/chainguard/minio:latest@sha256:71674988a1c7ddd5724928633199152b11e4ddefd6c6ce2d60772ff4a8f22ca9
+    profiles: [langfuse]
+    restart: unless-stopped
+    entrypoint:
+      - sh
+      - -c
+      - mkdir -p /data/langfuse && exec minio server --address :9000 --console-address :9001 /data
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-stackr}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:?run make env}
+    volumes:
+      - minio-data:/data
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${MINIO_PORT:-9000}:9000
+      - ${STACKR_BIND:-127.0.0.1}:${MINIO_CONSOLE_PORT:-9001}:9001
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.8.14
+    profiles: [langfuse]
+    restart: unless-stopped
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?run make env}
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - clickhouse-logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8123/ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:4.46.0
+    profiles: [langfuse]
+    restart: unless-stopped
+    environment:
+      <<: *langfuse-env
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3030/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 60s
+    depends_on: &langfuse-depends-on
+      db-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
+  # Langfuse's web server runs the database migrations on start, and creates
+  # the organisation, project, API keys and admin user from .env on first
+  # start (headless initialization).
+  langfuse-web:
+    image: langfuse/langfuse:4.46.0
+    profiles: [langfuse]
+    restart: unless-stopped
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?run make env}
+      AUTH_DISABLE_SIGNUP: "true"
+      # Browsers and SDKs upload media to MinIO's published port directly.
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://localhost:${MINIO_PORT:-9000}
+      LANGFUSE_S3_MEDIA_UPLOAD_INTERNAL_ENDPOINT: http://minio:9000
+      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-stackr}
+      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_ID:-stackr}
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-stackr}
+      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_ID:-stackr}
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?run make env}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?run make env}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_ADMIN_EMAIL:-admin@stackr.local}
+      LANGFUSE_INIT_USER_NAME: admin
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_ADMIN_PASSWORD:?run make env}
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${LANGFUSE_PORT:-3300}:3000
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/public/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 120s
+    depends_on: *langfuse-depends-on
 
   # Sends test telemetry for scripts/smoke; not a service.
   telemetrygen:

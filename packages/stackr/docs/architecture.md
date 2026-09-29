@@ -6,7 +6,8 @@
 |---|---|
 | Foundation: layout, `make`, generated secrets, static validation in CI | Implemented |
 | `observability` profile: OpenTelemetry Collector, Prometheus, Tempo, Loki, Pyroscope, Grafana | Implemented |
-| `langfuse` profile: Langfuse web and worker, ClickHouse, Redis, MinIO | Planned (phase 2) |
+| `langfuse` profile: Langfuse web and worker, ClickHouse, Valkey, MinIO | Implemented |
+| `postgres` profile: plain PostgreSQL, with `db-init` creating each service's database | Implemented |
 | Local Supabase, through its CLI | Planned (phase 3) |
 | `gateway` profile: the LiteLLM proxy | Planned (phase 4) |
 | The application template (Copier) and the `app` profile | Planned (phase 5) |
@@ -27,15 +28,15 @@ Applications talk only to **ports**: a stable protocol at a stable address, conf
 
 | Port | Contract | Settings an application reads | Default adapter | Status |
 |---|---|---|---|---|
-| Telemetry | OTLP to the Collector: gRPC 4317, HTTP 4318 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | The Collector, exporting to Tempo, Prometheus, Loki and Langfuse | Implemented; Langfuse planned (phase 2) |
+| Telemetry | OTLP to the Collector: gRPC 4317, HTTP 4318 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | The Collector, exporting to Tempo, Prometheus, Loki and Langfuse | Implemented |
 | Profiles | Pyroscope's push API | `PYROSCOPE_SERVER_ADDRESS` | Pyroscope | Implemented |
 | LLM gateway | OpenAI-compatible HTTP API, with models named by alias or group | `LITELLM_BASE_URL`, `LITELLM_API_KEY`; `OPENAI_BASE_URL`, `OPENAI_API_KEY` for OpenAI SDKs | The LiteLLM proxy | Planned (phase 4) |
-| Database | A PostgreSQL connection string | `DATABASE_URL` | Local Supabase's PostgreSQL; plain PostgreSQL as the alternative | Planned (phase 3) |
-| Object storage | The S3 API | `S3_ENDPOINT_URL`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | MinIO | Planned (phase 2) |
+| Database | A PostgreSQL connection string | `DATABASE_URL` | Local Supabase's PostgreSQL; plain PostgreSQL as the alternative | Plain PostgreSQL implemented; Supabase planned (phase 3) |
+| Object storage | The S3 API | `S3_ENDPOINT_URL`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | MinIO | Implemented |
 | Identity | JWTs, verified against the issuer's key set | `AUTH_ISSUER`, `AUTH_JWKS_URL`, `AUTH_AUDIENCE` | Supabase Auth | Planned (phase 5) |
-| Evaluation data | Langfuse's public API, for scores and datasets | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | Self-hosted Langfuse | Planned (phase 2) |
+| Evaluation data | Langfuse's public API, for scores and datasets | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | Self-hosted Langfuse | Implemented |
 
-The settings are a contract with the libraries' extras and the application template, which generates applications wired to these ports only. Profiles and evaluation data are the two narrow ports: profiles go to Pyroscope directly until OTLP profiles are stable in the Collector, and Langfuse's API carries scores and datasets, never traces.
+The settings are a contract with the libraries' extras and the application template, which generates applications wired to these ports only. The stack's own services use the same ports: Langfuse reaches PostgreSQL, S3 and the Redis protocol through settings in `.env`, so their adapters can change as well. Profiles and evaluation data are the two narrow ports: profiles go to Pyroscope directly until OTLP profiles are stable in the Collector, and Langfuse's API carries scores and datasets, never traces.
 
 ## Layout
 
@@ -44,6 +45,7 @@ compose.yaml        the stack: one Compose project, with profiles
 .env.example        settings and placeholders; `make env` turns it into .env
 versions.env        versions pinned outside compose.yaml: the libraries' dashboards
 deploy/<service>/   each service's configuration, mounted read-only
+deploy/postgres/    init.sql: each service's role and database, created by db-init
 scripts/            setup-env, validate, smoke and fetch-dashboards, run by make and CI
 docs/               this document, ADRs and RFCs
 ```
@@ -79,12 +81,13 @@ graph LR
     collector -- "OTLP gRPC" --> tempo["tempo"]
     collector -- "OTLP HTTP /api/v1/otlp" --> prometheus["prometheus"]
     collector -- "OTLP HTTP /otlp" --> loki["loki"]
+    collector -- "OTLP HTTP /api/public/otel<br/>+ x-langfuse-ingestion-version: 4" --> langfuse["langfuse-web"]
     tempo -- "span metrics, service graphs<br/>(remote write)" --> prometheus
     app -- "profiles" --> pyroscope["pyroscope"]
     grafana["grafana"] --> tempo & prometheus & loki & pyroscope
 ```
 
-How each signal is routed, and why metrics use Prometheus's OTLP receiver, is in [ADR-0007](adr/0007-how-telemetry-reaches-the-backends.md). The Collector's configuration is `deploy/otel-collector/config.yaml`; replacing a backend means replacing its exporter there.
+How each signal is routed, and why metrics use Prometheus's OTLP receiver, is in [ADR-0007](adr/0007-how-telemetry-reaches-the-backends.md). The Collector's configuration is `deploy/otel-collector/config.yaml`; replacing a backend means replacing its exporter there. Traces go to Langfuse only when the `langfuse` profile runs: the traces pipeline takes its exporters from `STACKR_TRACES_EXPORTERS`, which `make up` sets from the chosen profiles.
 
 ### Metric names in Prometheus
 
@@ -118,6 +121,30 @@ https://github.com/alexnodeland/<library>/releases/download/v<version>/<library>
 
 `versions.env` pins the release for each library (`ARTIFACTR_DASHBOARDS_VERSION`, `REFLEXR_DASHBOARDS_VERSION`), with an optional sha256 of the archive. `scripts/fetch-dashboards` downloads each pinned archive, checks its sha256, and replaces the library's folder. A library with no version pinned is skipped, and a failed download is a warning (an error with `--strict`), so `make up` works offline and before a library has published. To move to a new release, change its version and sha256 in `versions.env`, then run `make dashboards` and `make smoke`.
 
+## The langfuse profile
+
+Self-hosted Langfuse 4, for LLM traces, sessions, scores and datasets ([ADR-0008](adr/0008-langfuse-and-its-services.md)).
+
+| Service | Image | Role | Published port |
+|---|---|---|---|
+| `langfuse-web` | `langfuse/langfuse` | The UI and the public API; receives traces from the Collector; runs the PostgreSQL and ClickHouse migrations on start | 3300 |
+| `langfuse-worker` | `langfuse/langfuse-worker` | Processes ingestion and evaluation jobs from the queues | none |
+| `clickhouse` | `clickhouse/clickhouse-server` | Traces, observations and scores | none |
+| `redis` | `valkey/valkey` | The Redis protocol: Langfuse's queues and cache (database 0), shared with the gateway (database 1), with `noeviction` | none |
+| `minio` | `cgr.dev/chainguard/minio`, by digest | The S3 port: Langfuse's event and media bucket, `langfuse` | 9000 (S3), 9001 (console) |
+| `db-init` | `postgres` | Creates each service's role and database on the database adapter, then exits | none |
+
+- **First start** creates an organisation and project (`stackr`), the project's API keys (`LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`) and an admin user (`LANGFUSE_ADMIN_EMAIL`, `LANGFUSE_ADMIN_PASSWORD`), all from `.env`. Sign-up is disabled. The UI is at <http://localhost:3300>.
+- **Traces arrive through the Collector,** never directly: its `otlp_http/langfuse` exporter sends them to `/api/public/otel` with Basic credentials derived from the project's keys (`LANGFUSE_OTLP_AUTH`) and the `x-langfuse-ingestion-version: 4` header. Applications use Langfuse's API only for scores and datasets, the evaluation data port.
+- **Langfuse 4 reads trace-level attributes from every span:** `session.id`, `user.id`, `langfuse.trace.name` and tags must be on each span the libraries own, not only the root.
+
+## The database
+
+The stack's services keep their data in PostgreSQL through the database port: a host, the admin credentials, and a role and password per service, all in `.env`.
+
+- **The `postgres` profile** runs plain PostgreSQL as `postgres`, published on 55432. It is the database adapter until local Supabase lands (phase 3), and the alternative to it afterwards.
+- **`db-init`** runs `deploy/postgres/init.sql` with `psql` on every start, before the services that need it. For each service (Langfuse now; the gateway in phase 4) it creates a login role with the password from `.env`, resets the password so the two stay in step, and creates the service's database, owned by its role and in UTC. It works the same on plain PostgreSQL and on Supabase, whose `postgres` role is not a superuser.
+
 ## Commands
 
 | Command | What it does |
@@ -148,3 +175,5 @@ CI checks the stack two ways on every pull request, with the same scripts as `ma
 - the log in Loki
 - Tempo's span metrics, and the Collector's own metrics, in Prometheus
 - Grafana's four data sources healthy, and the Collector dashboard provisioned
+
+For `postgres`, PostgreSQL is ready and `db-init` has created Langfuse's database. For `langfuse` (with `observability`), it sends a trace with a known id to the Collector's HTTP port and finds it in Langfuse through the public API (`/api/public/v2/observations`) and in Tempo, which checks the Collector's route and credentials and Langfuse's ingestion end to end.

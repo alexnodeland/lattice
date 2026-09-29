@@ -19,7 +19,12 @@ make smoke      # send test telemetry through it and check it arrives
 make down       # stop it, keeping its data
 ```
 
-Applications send OTLP to `localhost:4317` (gRPC) or `localhost:4318` (HTTP), or to `otel-collector` on the `stackr` Docker network. Grafana is at <http://localhost:3000>, as `admin` with `GRAFANA_ADMIN_PASSWORD` from `.env`.
+Applications send OTLP to `localhost:4317` (gRPC) or `localhost:4318` (HTTP), or to `otel-collector` on the `stackr` Docker network.
+
+| Service | Address | Sign in with (from `.env`) |
+|---|---|---|
+| Grafana | <http://localhost:3000> | `admin`, `GRAFANA_ADMIN_PASSWORD` |
+| Langfuse | <http://localhost:3300> | `LANGFUSE_ADMIN_EMAIL`, `LANGFUSE_ADMIN_PASSWORD` |
 
 Run `make` to list every command. [CONTRIBUTING](CONTRIBUTING.md) covers the workflow.
 

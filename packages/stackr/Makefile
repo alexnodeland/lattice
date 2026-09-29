@@ -9,9 +9,13 @@ COMPOSE ?= docker compose
 
 # The profiles `make up` starts: all of them unless you choose, for example
 #   make up PROFILES=observability
-ALL_PROFILES := observability
+ALL_PROFILES := observability postgres langfuse
 PROFILES ?= $(ALL_PROFILES)
 PROFILE_FLAGS = $(foreach profile,$(PROFILES),--profile $(profile))
+
+# The Collector sends traces to Langfuse only when the langfuse profile runs.
+comma := ,
+TRACES_EXPORTERS = [otlp_grpc/tempo$(if $(filter langfuse,$(PROFILES)),$(comma) otlp_http/langfuse)]
 
 .PHONY: help install env up down reset ps logs dashboards validate smoke changelog clean
 
@@ -29,7 +33,7 @@ env: ## Create or update .env, generating local secrets
 	$(UV) run scripts/setup-env
 
 up: .env dashboards ## Start the chosen PROFILES (default: all of them)
-	$(COMPOSE) $(PROFILE_FLAGS) up --detach --wait
+	STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' $(COMPOSE) $(PROFILE_FLAGS) up --detach --wait
 
 down: ## Stop the stack, keeping its data
 	$(COMPOSE) --profile '*' down

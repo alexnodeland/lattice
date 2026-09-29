@@ -1,6 +1,6 @@
 # The OpenTelemetry Collector: every application, and the LiteLLM proxy, sends
 # OTLP here, and the Collector fans it out:
-#   traces  -> Tempo
+#   traces  -> Tempo, and Langfuse when the langfuse profile runs
 #   metrics -> Prometheus, through its OTLP receiver
 #   logs    -> Loki, through its OTLP endpoint
 # See docs/architecture.md and ADR-0007.
@@ -47,6 +47,13 @@ exporters:
     endpoint: http://loki:3100/otlp
     tls:
       insecure: true
+  # Langfuse takes traces only, over OTLP HTTP. The ingestion version header
+  # makes them visible as soon as they are written.
+  otlp_http/langfuse:
+    endpoint: http://langfuse-web:3000/api/public/otel
+    headers:
+      Authorization: Basic ${env:LANGFUSE_OTLP_AUTH}
+      x-langfuse-ingestion-version: "4"
 
 service:
   extensions: [health_check]
@@ -54,7 +61,9 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, resource/environment, batch]
-      exporters: [otlp_grpc/tempo]
+      # [otlp_grpc/tempo, otlp_http/langfuse], or Tempo alone when the
+      # langfuse profile isn't running; set in compose.yaml and the Makefile.
+      exporters: ${env:STACKR_TRACES_EXPORTERS}
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, resource/environment, batch]

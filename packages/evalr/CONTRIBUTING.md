@@ -56,6 +56,8 @@ The core depends on pydantic and the OpenTelemetry API only. Everything else is 
 
 A new adapter implements a port from `evalr.core`, depends on nothing in evalr but the core, and passes the port's contract suite in `evalr.contracts`.
 
+A library without type information gets minimal stubs in `typings/` for the parts evalr uses (as for DSPy), rather than inline suppressions.
+
 ## Design: RFCs, ADRs and evergreen docs
 
 | Document | When | Where |

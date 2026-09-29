@@ -94,6 +94,8 @@ known-third-party = ["dspy", "langfuse"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D", "ARG"]
+# Stubs for untyped libraries mirror the libraries' own names (DSPy's InputField, toDict).
+"typings/**" = ["N802"]
 
 # ─── types ────────────────────────────────────────────────────────────────────
 

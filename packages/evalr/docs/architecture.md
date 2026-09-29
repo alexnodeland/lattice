@@ -6,7 +6,7 @@
 |---|---|
 | `evalr.core` | Implemented |
 | `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Implemented |
-| `evalr.dspy` | Planned (phase 2) |
+| `evalr.dspy` | `DspyJudge` implemented; GEPA and saved judges planned (phase 2) |
 | `evalr.decision` | Planned (phase 3) |
 | `evalr.langfuse`, `evalr.hf` | Planned (phase 4) |
 | End-to-end measures and online helpers | Planned (phase 5) |
@@ -127,11 +127,25 @@ An evaluator returns a `Verdict[V]`, an immutable Pydantic model:
 | Kind | How | Version |
 |---|---|---|
 | `FunctionEvaluator` | A sync or async function of the input: a deterministic measure | Given; bump it when the function changes |
-| `DspyJudge` (phase 2) | A DSPy module whose signature comes from the input and verdict types | A hash of the compiled program |
+| `DspyJudge` | A DSPy program whose signature comes from the input and verdict types | A hash of the program and the types |
 | `DecisionEvaluator` (phase 3) | A pydantic-ai agent on a decision model | The decision model's id and its thresholds |
 | `Fallback(primary, fallback, min_confidence=)` | A composition: the primary judges, and hands off to the fallback | A hash of both evaluators' names and versions, and the threshold |
 
 An evaluator that declines an input raises `HandOff`. `Fallback` hands off when the primary raises it, or, with `min_confidence`, when any field of the primary's verdict is less confident than that. So a decision model backed by a language-model judge is `Fallback(DecisionEvaluator(...), DspyJudge(...), min_confidence=0.7)`: two adapters of one port, neither aware of the other. Each verdict records the evaluator that actually gave it, so the two are measured apart; the composition's span, `evalr.fallback {name}`, records whether and why it handed off. Any other failure propagates.
+
+### DSPy judges
+
+`DspyJudge(verdict_type, inputs=...)` (`evalr.dspy`, the `[dspy]` extra) is a language-model judge: a DSPy program whose signature is derived from the two types by `judge_signature`.
+
+- **Inputs:** one text input per field of the input type, rendered by an `InputFormatter` within its token budget, described by the field's description.
+- **Outputs:** one per field of the verdict type, typed as the field is (`int`, `bool`, a `Literal` or `Enum`, `float`, `str`, optionally `None`). The field's description is its instruction, with its bounds spelled out ("a whole number from 1 to 5"), since DSPy reads only the type. Input and verdict fields need distinct names, and `reasoning` is DSPy's.
+- **Instructions:** "Read the {input} and judge it, giving a {verdict}", followed by the verdict type's docstring, unless given. GEPA rewrites them.
+- **Program:** `dspy.Predict`, or `dspy.ChainOfThought` with `reasoning=True`. It runs with the judge's `lm`, or DSPy's configured one.
+- **Validation:** the outputs are validated as the verdict type, so an out-of-range rating fails rather than passing through. An optional text field answered with "None", "null" or nothing is empty.
+- **Version:** a hash of the program's state (instructions, demonstrations, fields) and of how each field of the two types is judged, described so that it is the same on every Python and pydantic version. Training changes it.
+- **Cost:** DSPy reports no per-call cost, so a DSPy verdict's `cost` is unknown.
+
+DSPy ships no type information, so `typings/dspy/` holds minimal stubs for the parts evalr uses; pyright reads them in place of the package.
 
 ### Measuring and optimizing
 

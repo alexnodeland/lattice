@@ -22,6 +22,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "memory": ({"evalr.core", "evalr.memory"}, set()),
     "contracts": ({"evalr.core", "evalr.contracts"}, set()),
     "jsonl": ({"evalr.core", "evalr.jsonl"}, set()),
+    "dspy": ({"evalr.core", "evalr.dspy"}, {"dspy"}),
 }
 
 FORBIDDEN = {"artifactr", "reflexr"}

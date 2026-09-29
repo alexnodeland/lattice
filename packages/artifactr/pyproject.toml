@@ -44,6 +44,9 @@ otel = [
     "opentelemetry-processor-baggage>=0.66b0",
     "opentelemetry-sdk>=1.45",
 ]
+langfuse = [
+    "langfuse>=4.15,<5",
+]
 
 [project.urls]
 Homepage = "https://artifactr.alexnodeland.com"
@@ -110,9 +113,9 @@ ignore = [
 convention = "google"
 
 [tool.ruff.lint.isort]
-# artifactr.fastapi and artifactr.mcp share their names with the libraries they adapt; without
-# this, isort's same-package detection files the libraries as first-party.
-known-third-party = ["fastapi", "mcp"]
+# artifactr.fastapi, artifactr.mcp and artifactr.langfuse share their names with the libraries they
+# adapt; without this, isort's same-package detection files the libraries as first-party.
+known-third-party = ["fastapi", "mcp", "langfuse"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D", "ARG"]
@@ -138,7 +141,11 @@ testpaths = ["tests", "examples/docplan/tests"]
 addopts = ["--strict-markers", "--strict-config", "-ra"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # backoff, which Langfuse uses, calls asyncio.iscoroutinefunction, deprecated in Python 3.14.
+    "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning:backoff._decorator",
+]
 markers = [
     "postgres: needs a PostgreSQL database (set ARTIFACTR_TEST_POSTGRES_URL)",
 ]

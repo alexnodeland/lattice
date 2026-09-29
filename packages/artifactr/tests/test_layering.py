@@ -46,8 +46,13 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "mcp": ({*INNER, "artifactr.mcp"}, {"mcp", "starlette", "pydantic", *OTEL_API}),
     # The OpenTelemetry SDK adapter; it imports FastAPI and SQLAlchemy only to instrument them.
     "otel": (
-        {"artifactr.core", "artifactr.telemetry", "artifactr.otel"},
-        {"opentelemetry", "pydantic_ai", "fastapi", "sqlalchemy"},
+        {"artifactr.core", "artifactr.telemetry", "artifactr.otel", "artifactr.langfuse"},
+        {"opentelemetry", "pydantic_ai", "fastapi", "sqlalchemy", "langfuse"},
+    ),
+    # The Langfuse adapter: the score ports, a TurnContext and a span filter.
+    "langfuse": (
+        {*INNER, "artifactr.scores", "artifactr.langfuse"},
+        {"langfuse", "opentelemetry"},
     ),
 }
 

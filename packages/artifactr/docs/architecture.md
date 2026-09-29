@@ -62,6 +62,7 @@ graph TD
     sql["artifactr.sql<br/>SQLAlchemy storage"] --> workspace
     scores["artifactr.scores<br/>feedback as scores"] --> workspace
     otel["artifactr.otel<br/>OpenTelemetry SDK"] --> telemetry
+    langfuse["artifactr.langfuse<br/>Langfuse"] --> scores
     workspace --> telemetry["artifactr.telemetry<br/>OpenTelemetry API"]
     telemetry --> core["artifactr.core<br/>pure, synchronous rules"]
 ```
@@ -79,6 +80,7 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.scores` | workspace | Inner; owns the `ScoreSink` and `ScoreConfigStore` ports | Feedback as scores, and the mirror that sends a workspace's feedback to a sink. |
 | `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | Adapter for `Storage` | Durable storage on PostgreSQL and SQLite, and its migrations. |
 | `artifactr.otel` (extra) | telemetry, the OpenTelemetry SDK, exporters and instrumentations | Adapter for the OpenTelemetry API | `configure_telemetry`: providers, OTLP export, instrumentations and metric views, for applications. |
+| `artifactr.langfuse` (extra) | scores, agent, langfuse | Adapter for `ScoreSink`, `ScoreConfigStore` and `TurnContext` | Feedback as Langfuse scores and score configs, a span filter that keeps whole traces, and each turn's trace attributes ([ADR-0039](adr/0039-the-langfuse-adapter.md)). |
 | `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
 | `artifactr.mcp` (extra) | agent, mcp | Driving adapter | Artifacts as MCP resources, commands as MCP tools. |
 
@@ -460,6 +462,10 @@ The `[otel]` extra's `configure_telemetry(...)` is for applications and the refe
 
 The `Runner` takes a `turn_context`: an async context entered around each turn, inside its span, given the run's session. It is a port for backends that attribute a turn in their own way, such as Langfuse's propagated trace attributes.
 
+### Langfuse
+
+Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opentelemetry-observability-with-langfuse.md), [ADR-0039](adr/0039-the-langfuse-adapter.md)). The `[langfuse]` extra adds `should_export_span`, a filter that keeps artifactr's, pydantic-graph's, the MCP SDK's and the HTTP and database instrumentations' spans as well as Langfuse's default LLM spans, so traces stay whole; `langfuse_turn`, a `TurnContext` that propagates each turn's session, user, tags (tenant, workspace, the kinds of artifact followed), trace name and metadata; and `LangfuseScores` and `LangfuseScoreConfigs`, which put feedback in Langfuse through the score ports. `configure_telemetry(langfuse=True)` adds Langfuse to the same tracer provider. A Collector can also send plain OTLP to Langfuse's HTTP endpoint, with the `x-langfuse-ingestion-version: 4` header.
+
 ## Dependencies
 
 | Dependency | Used for | Current major (2026-09) |
@@ -540,6 +546,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0036](adr/0036-metric-cardinality-through-sdk-views.md) | Metric cardinality through SDK views |
 | [0037](adr/0037-feedback-targets-and-evaluators.md) | Feedback targets and evaluators |
 | [0038](adr/0038-feedback-as-scores.md) | Feedback as scores, through ports |
+| [0039](adr/0039-the-langfuse-adapter.md) | The Langfuse adapter |
 
 ## Open questions
 

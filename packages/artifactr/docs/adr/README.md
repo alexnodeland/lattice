@@ -42,5 +42,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0036](0036-metric-cardinality-through-sdk-views.md) | Metric cardinality through SDK views | Accepted |
 | [0037](0037-feedback-targets-and-evaluators.md) | Feedback targets and evaluators | Accepted |
 | [0038](0038-feedback-as-scores.md) | Feedback as scores, through ports | Accepted |
+| [0039](0039-the-langfuse-adapter.md) | The Langfuse adapter | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

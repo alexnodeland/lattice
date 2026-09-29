@@ -147,6 +147,7 @@ nav:
       - artifactr.fastapi: reference/fastapi.md
       - artifactr.mcp: reference/mcp.md
       - artifactr.otel: reference/otel.md
+      - artifactr.langfuse: reference/langfuse.md
       - Thread protocol: protocol.md
       - Protocol JSON Schema: reference/schema.md
   - Design:
@@ -191,6 +192,7 @@ nav:
           - adr/0036-metric-cardinality-through-sdk-views.md
           - adr/0037-feedback-targets-and-evaluators.md
           - adr/0038-feedback-as-scores.md
+          - adr/0039-the-langfuse-adapter.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

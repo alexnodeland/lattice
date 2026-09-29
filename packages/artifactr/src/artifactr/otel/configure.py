@@ -9,7 +9,7 @@ import logging
 import os
 from collections.abc import Callable, Collection, Mapping, Sequence
 from types import TracebackType
-from typing import TYPE_CHECKING, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal, Self
 
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
@@ -33,6 +33,7 @@ from artifactr.telemetry.attributes import SESSION_ID
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
+    from langfuse import Langfuse
     from sqlalchemy import Engine
     from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -87,6 +88,7 @@ class TelemetryHandle:
         instrument: The libraries to instrument now.
         engines: SQLAlchemy engines to instrument now.
         log_handler: A handler to add to the root logger until shutdown.
+        langfuse: A Langfuse client to shut down with the rest.
     """
 
     def __init__(
@@ -99,6 +101,7 @@ class TelemetryHandle:
         instrument: Collection[Instrumented] = (),
         engines: "Sequence[AsyncEngine | Engine]" = (),
         log_handler: logging.Handler | None = None,
+        langfuse: "Langfuse | None" = None,
     ) -> None:
         self.tracer_provider = tracer_provider
         """The SDK's tracer provider."""
@@ -108,7 +111,11 @@ class TelemetryHandle:
         """The SDK's logger provider, when logs are exported."""
         self.instrumentation = instrumentation
         """pydantic-ai's instrumentation settings over these providers."""
+        self.langfuse = langfuse
+        """The Langfuse client, when traces also go to Langfuse."""
         self._cleanups: list[Callable[[], object]] = []
+        if langfuse is not None:
+            self._cleanups.append(langfuse.shutdown)
         self._engines: list[Engine] = []
         if log_handler is not None:
             logging.getLogger().addHandler(log_handler)
@@ -236,6 +243,8 @@ def configure_telemetry(
     metric_reader: MetricReader | None = None,
     log_exporter: LogRecordExporter | None = None,
     span_processors: Sequence[SpanProcessor] = (),
+    langfuse: bool = False,
+    langfuse_options: Mapping[str, Any] | None = None,
     set_global: bool = True,
 ) -> TelemetryHandle:
     """Set up OpenTelemetry for an application: providers, OTLP export and instrumentation.
@@ -254,6 +263,8 @@ def configure_telemetry(
       set already)
     - pydantic-ai's instrumentation settings, which :meth:`TelemetryHandle.capability` wraps
       for an agent
+    - with ``langfuse=True``, a Langfuse client on the same tracer provider, which keeps whole
+      traces (``artifactr.langfuse``, the ``[langfuse]`` extra)
 
     Nothing in artifactr requires it: it is one way to configure the SDK, which artifactr
     only ever records to through the API.
@@ -274,6 +285,10 @@ def configure_telemetry(
         metric_reader: How metrics are read instead of a periodic OTLP export.
         log_exporter: Where log records go instead of OTLP.
         span_processors: More span processors to add, such as a backend's own.
+        langfuse: Whether to send traces to Langfuse too, with ``artifactr.langfuse``'s span
+            filter. Its keys come from the ``LANGFUSE_*`` environment variables or
+            ``langfuse_options``.
+        langfuse_options: Passed to ``Langfuse(...)``.
         set_global: Whether to make the providers the global ones, which artifactr, pydantic-ai
             and the instrumentations default to.
 
@@ -321,6 +336,11 @@ def configure_telemetry(
         metrics.set_meter_provider(meter_provider)
 
     os.environ.setdefault("OTEL_SEMCONV_STABILITY_OPT_IN", "http")
+    client = None
+    if langfuse:
+        from artifactr.langfuse import langfuse_client
+
+        client = langfuse_client(tracer_provider=tracer_provider, **dict(langfuse_options or {}))
     return TelemetryHandle(
         tracer_provider=tracer_provider,
         meter_provider=meter_provider,
@@ -334,6 +354,7 @@ def configure_telemetry(
         instrument=installed() if instrument is None else instrument,
         engines=engines,
         log_handler=log_handler,
+        langfuse=client,
     )
 
 

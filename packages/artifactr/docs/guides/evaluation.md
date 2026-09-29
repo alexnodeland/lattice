@@ -114,9 +114,23 @@ class PrintingSink:
         print(score.name, score.value, score.trace_id or score.session_id)
 ```
 
+## Scores in Langfuse
+
+With the `langfuse` extra, feedback becomes Langfuse scores beside the traces it judges. `LangfuseScores` is a `ScoreSink`, and `LangfuseScoreConfigs` a `ScoreConfigStore`:
+
+```python
+import asyncio
+
+from artifactr.langfuse import LangfuseScoreConfigs, LangfuseScores, langfuse_client
+from artifactr.scores import FeedbackMirror, sync_score_configs
+
+langfuse = langfuse_client(tracer_provider=telemetry.tracer_provider)  # or telemetry.langfuse
+await sync_score_configs(LangfuseScoreConfigs(langfuse))  # once, at startup
+mirror = asyncio.create_task(FeedbackMirror(workspace, LangfuseScores(langfuse)).follow())
+```
+
+Score configs give Langfuse each score's type, range and categories, so its UI can offer the same scales for annotation. Langfuse accepts config names of up to 35 characters; a longer `{type}.{field}` raises, and a shorter `name=` on the feedback type fixes it. Scores are queued by the Langfuse client and sent in the background; call `langfuse.flush()` before a short-lived process exits.
+
 ## What comes next
 
-RFC-0002 plans two more pieces on top of feedback:
-
-- the `[langfuse]` extra adapts Langfuse to the score ports, so feedback appears as Langfuse scores beside the traces it judges
-- the `[evals]` extra connects artifactr to evalr, the shared eval kit, for datasets from the log, experiments, online evaluators and end-to-end measures such as rewrite rate and drop-off
+RFC-0002 plans the `[evals]` extra, which connects artifactr to evalr, the shared eval kit, for datasets from the log, experiments, online evaluators and end-to-end measures such as rewrite rate and drop-off.

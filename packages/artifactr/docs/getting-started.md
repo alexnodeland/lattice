@@ -31,6 +31,7 @@ The core install covers artifact types, workspaces with in-memory storage, and t
 | `postgres` | [SQL storage](guides/storage.md#sql-storage) on PostgreSQL, with asyncpg | `"artifactr-ai[postgres] @ git+https://github.com/alexnodeland/artifactr"` |
 | `sqlite` | SQL storage on SQLite, with aiosqlite | `"artifactr-ai[sqlite] @ git+https://github.com/alexnodeland/artifactr"` |
 | `sql` | SQL storage without a driver, if you bring your own | `"artifactr-ai[sql] @ git+https://github.com/alexnodeland/artifactr"` |
+| `langfuse` | [Langfuse](guides/observability.md#langfuse): whole traces, each turn's session and user, and feedback as scores | `"artifactr-ai[langfuse] @ git+https://github.com/alexnodeland/artifactr"` |
 | `otel` | [`configure_telemetry`](guides/observability.md): the OpenTelemetry SDK, OTLP export and instrumentation in one call | `"artifactr-ai[otel] @ git+https://github.com/alexnodeland/artifactr"` |
 
 Combine extras with commas, as in `artifactr-ai[fastapi,postgres]`. You also need the pydantic-ai extra for your model provider, such as `pydantic-ai-slim[anthropic]` or `pydantic-ai-slim[openai]`, and its API key in the environment.

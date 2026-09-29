@@ -103,6 +103,59 @@ During a turn, the thread id is in OpenTelemetry baggage as `session.id`. `confi
 
 `configure_telemetry` exports the standard `logging` module's records through OTLP, with the trace and span they were logged in; pass `logs=False` to leave logging alone.
 
+## Langfuse
+
+Langfuse is the primary backend for artifactr's traces and feedback ([ADR-0039](../adr/0039-the-langfuse-adapter.md)). With the `langfuse` extra, add it beside the Collector and give the `Runner` Langfuse's turn context:
+
+```python
+from artifactr.langfuse import langfuse_turn
+from artifactr.otel import configure_telemetry
+
+telemetry = configure_telemetry(service_name="docplan", langfuse=True)  # keys: LANGFUSE_* variables
+runner = Runner(agent, app=deps, turn_context=langfuse_turn)
+```
+
+- **Whole traces.** Langfuse's default keeps only LLM spans. `should_export_span`, which `configure_telemetry(langfuse=True)` and `langfuse_client(...)` install, also keeps artifactr's spans, pydantic-graph's, the MCP SDK's and the FastAPI, SQLAlchemy, asyncpg and httpx instrumentations', so a turn in Langfuse shows its commits, queries and HTTP calls around the model calls.
+- **Sessions and users.** `langfuse_turn` propagates each turn's attributes to every span in it: the thread as the session, the person who sent the message as the user, the trace name `turn`, tags for the tenant, the workspace and the kinds of artifact the thread follows (`tenant:acme`, `workspace:launch`, `kind:plan`), and artifactr's ids as metadata. Values are made ASCII and cut to 200 characters, as Langfuse requires. They stay in the process; nothing is sent as baggage.
+- **Feedback as scores.** See [Evaluation](evaluation.md#scores-in-langfuse).
+
+Configuring the SDK yourself, create the client with `langfuse_client(tracer_provider=...)`: it adds Langfuse's span processor, with the filter, to your provider.
+
+### Through a Collector
+
+A Collector can send the same traces to Langfuse over plain OTLP instead. Langfuse accepts OTLP over HTTP only, and needs its ingestion version header:
+
+```yaml
+exporters:
+  otlphttp/langfuse:
+    endpoint: https://langfuse.example.com/api/public/otel
+    headers:
+      Authorization: Basic ${env:LANGFUSE_AUTH}  # base64 of public_key:secret_key
+      x-langfuse-ingestion-version: "4"
+```
+
+A Collector sends every span, so filter it there, or send Langfuse only the traces that contain LLM spans.
+
+### Logfire
+
+Logfire works as a second backend. Configure it first: it sets the global providers, which artifactr, pydantic-ai and Langfuse then use. Its scrubber redacts attributes whose names look sensitive, `session.id` among them, so keep the session and user:
+
+```python
+import logfire
+
+from artifactr.langfuse import langfuse_client
+
+KEPT = {("attributes", "session.id"), ("attributes", "user.id")}
+
+
+def keep_session_and_user(match: logfire.ScrubMatch) -> object:
+    return match.value if tuple(match.path) in KEPT else None
+
+
+logfire.configure(scrubbing=logfire.ScrubbingOptions(callback=keep_session_and_user))
+langfuse = langfuse_client()  # adds Langfuse to the global tracer provider
+```
+
 ## Attributing your own spans
 
 Your own tools run inside pydantic-ai's `execute_tool` span. To attribute a span you start yourself, use the same helper artifactr does:

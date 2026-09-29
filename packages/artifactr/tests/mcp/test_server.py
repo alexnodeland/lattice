@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 from collections.abc import AsyncIterator
 from typing import Any, assert_type
 
@@ -479,3 +480,16 @@ async def test_external_agents_give_feedback(mcp: ArtifactrMcp, ws: Workspace) -
     [envelope] = await ws.read(after_seq=1)
     assert envelope.actor == CLAUDE
     assert envelope.event.type == "feedback_given"
+
+
+async def test_building_the_server_leaves_logging_as_it_was(
+    workspaces: Workspaces, identity: Identity, gate: Gate, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # As in an application that has not configured logging: the SDK's server would otherwise
+    # give the root logger a rich handler and set the whole process to INFO.
+    root = logging.getLogger()
+    monkeypatch.setattr(root, "handlers", [])
+    monkeypatch.setattr(root, "level", logging.WARNING)
+    runner = Runner(make_agent(Script()), app=gate)
+    await ArtifactrMcp(workspaces, runner, resolve=identity.resolve).aclose()
+    assert (root.handlers, root.level) == ([], logging.WARNING)

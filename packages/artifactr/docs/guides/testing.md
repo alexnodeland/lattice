@@ -163,6 +163,6 @@ A `resolve_actor` that reads a test header, such as `x-user`, lets one test act 
 
 ## Tips
 
-- pydantic-ai may print an observability banner when an agent is built. artifactr's test suite sets `PYDANTIC_AI_NO_BANNER=1` in its `conftest.py` to keep test output clean.
+- pydantic-ai never prints its first-run banner under pytest or in CI, so tests need nothing to keep their output clean. [Serving](serving.md#logging-and-startup-output) says when it does print one.
 - Tests that start runs should wait for them (`await sent.run.wait()`) before the test ends, so no task outlives its event loop.
 - The [reference implementation's tests](https://github.com/alexnodeland/artifactr/tree/main/examples/docplan/tests) go one step further: they start the real server with uvicorn on a free port and drive it with the real terminal client, still with a scripted model.

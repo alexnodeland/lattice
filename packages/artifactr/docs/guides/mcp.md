@@ -34,7 +34,7 @@ app = FastAPI(lifespan=lifespan)
 app.mount("/mcp", mcp.http_app(streamable_http_path="/"))
 ```
 
-Clients then connect to `https://your-host/mcp/` with any MCP client that speaks Streamable HTTP. `mcp.server` is the underlying `MCPServer`, if you need to serve it another way.
+Clients then connect to `https://your-host/mcp/` with any MCP client that speaks Streamable HTTP. `mcp.server` is the underlying `MCPServer`, if you need to serve it another way. The SDK's server configures logging for the whole process as it is built, and `ArtifactrMcp` undoes that, so logging stays the application's ([Logging and startup output](serving.md#logging-and-startup-output)).
 
 - **`resolve(ctx)`** authenticates each request and returns the client's tenant and its `ExternalAgentActor`. `ctx.headers` holds the HTTP request's headers. They are the client's own claims, so verify a credential rather than trusting a name. `ctx` is an `McpContext`, the MCP SDK's `Context` with its request typed. Over HTTP, `ctx.request_context.request` is the Starlette `Request`, so an authenticator written for the router's `resolve_actor` can take it without a cast. Check it for `None` first: the in-process client that tests use has no HTTP request.
 

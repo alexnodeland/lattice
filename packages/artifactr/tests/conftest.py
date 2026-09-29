@@ -1,12 +1,8 @@
 import importlib
-import os
 
 import pytest
 
 from tests.databases import POSTGRES_URL
-
-# pydantic-ai prints an observability banner when an agent is built; tests have no terminal.
-os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
 
 
 def pytest_configure(config: pytest.Config) -> None:

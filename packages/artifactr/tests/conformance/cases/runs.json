@@ -496,6 +496,216 @@
       }
     },
     {
+      "name": "a traced run records its trace",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "record": {
+        "type": "run_started",
+        "run_id": "run_1",
+        "thread_id": "thr_1",
+        "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "run_started",
+            "run_id": "run_1",
+            "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_1",
+            "status": "running",
+            "trace_ids": [
+              "4bf92f3577b34da6a3ce929d0e0e4736"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "a resumed run keeps the traces of its earlier attempts",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_p"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "question": "Which day?"
+                }
+              }
+            ],
+            "answers": {
+              "call_q": {
+                "answer": "Monday"
+              }
+            },
+            "trace_ids": [
+              "4bf92f3577b34da6a3ce929d0e0e4736"
+            ]
+          }
+        ]
+      },
+      "record": {
+        "type": "run_started",
+        "run_id": "run_p",
+        "thread_id": "thr_1",
+        "trigger": "resume",
+        "trace_id": "0af7651916cd43dd8448eb211c80319c"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "runs": [
+          {
+            "id": "run_p",
+            "status": "running",
+            "trace_ids": [
+              "4bf92f3577b34da6a3ce929d0e0e4736",
+              "0af7651916cd43dd8448eb211c80319c"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "an untraced attempt adds no trace",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_p"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_p",
+            "thread_id": "thr_1",
+            "status": "paused",
+            "pending": [
+              {
+                "tool_call_id": "call_q",
+                "tool_name": "ask_user",
+                "kind": "question",
+                "args": {
+                  "question": "Which day?"
+                }
+              }
+            ],
+            "answers": {
+              "call_q": {
+                "answer": "Monday"
+              }
+            },
+            "trace_ids": [
+              "4bf92f3577b34da6a3ce929d0e0e4736"
+            ]
+          }
+        ]
+      },
+      "record": {
+        "type": "run_started",
+        "run_id": "run_p",
+        "thread_id": "thr_1",
+        "trigger": "resume"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "runs": [
+          {
+            "id": "run_p",
+            "status": "running",
+            "trace_ids": [
+              "4bf92f3577b34da6a3ce929d0e0e4736"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "an ended run keeps its traces",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "running",
+            "trace_ids": [
+              "4bf92f3577b34da6a3ce929d0e0e4736"
+            ]
+          }
+        ]
+      },
+      "record": {
+        "type": "run_ended",
+        "run_id": "run_1",
+        "thread_id": "thr_1",
+        "status": "completed"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "runs": [
+          {
+            "id": "run_1",
+            "status": "completed",
+            "trace_ids": [
+              "4bf92f3577b34da6a3ce929d0e0e4736"
+            ]
+          }
+        ]
+      }
+    },
+    {
       "name": "a running run cannot start again",
       "actor": {
         "kind": "agent",

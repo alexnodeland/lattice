@@ -1892,6 +1892,17 @@
           "default": "run_paused",
           "title": "Type",
           "type": "string"
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunUsage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -1910,6 +1921,17 @@
         },
         "thread_id": {
           "$ref": "#/$defs/ThreadId"
+        },
+        "trace_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraceId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "trigger": {
           "default": "message",
@@ -2295,6 +2317,11 @@
           "title": "Tool Call Id",
           "type": "string"
         },
+        "tool_name": {
+          "default": "",
+          "title": "Tool Name",
+          "type": "string"
+        },
         "type": {
           "const": "tool_returned",
           "default": "tool_returned",
@@ -2310,6 +2337,10 @@
       ],
       "title": "ToolReturned",
       "type": "object"
+    },
+    "TraceId": {
+      "pattern": "^[0-9a-f]{32}$",
+      "type": "string"
     },
     "UnknownEvent": {
       "additionalProperties": true,

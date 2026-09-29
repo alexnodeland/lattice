@@ -90,10 +90,10 @@ Every durable event arrives in the same envelope. The stored envelope and the wi
 | `artifact_archived` | workspace | `artifact_id`, `kind`, `version`, `proposal_id?` |
 | `proposal_created` | workspace | `proposal_id`, `change` (the proposed `create_artifact`, `edit_artifact` or `archive_artifact` command; a proposed edit always carries a `summary`, generated when the proposer gave none), `rationale?` |
 | `proposal_resolved` | workspace | `proposal_id`, `decision` (`accept`, `reject`), `proposed_by`, `artifact_id`, `changes?`, `reason?`, `version?` |
-| `run_started` | run | `run_id`, `thread_id`, `trigger` (`message`, `resume`, `api`) |
+| `run_started` | run | `run_id`, `thread_id`, `trigger` (`message`, `resume`, `api`), `trace_id?`: the OpenTelemetry trace of this attempt, when it is traced |
 | `tool_called` | run | `run_id`, `thread_id`, `tool_call_id`, `tool_name`, `args_summary` |
-| `tool_returned` | run | `run_id`, `thread_id`, `tool_call_id`, `status` (`ok`, `error`, `retry`), `summary` |
-| `run_paused` | run | `run_id`, `thread_id`, `requests`: list of `{tool_call_id, tool_name, kind: question \| approval, args}` |
+| `tool_returned` | run | `run_id`, `thread_id`, `tool_call_id`, `tool_name`, `status` (`ok`, `error`, `retry`), `summary` |
+| `run_paused` | run | `run_id`, `thread_id`, `requests`: list of `{tool_call_id, tool_name, kind: question \| approval, args}`, `usage?` |
 | `deferred_answered` | run | `run_id`, `thread_id`, `tool_call_id`, `answer?`, `approved?` |
 | `run_ended` | run | `run_id`, `thread_id`, `status` (`completed`, `stopped`, `failed`), `usage?`, `error?` |
 | `app_event` | any | `name`, `data`, `thread_id?`, `run_id?` |

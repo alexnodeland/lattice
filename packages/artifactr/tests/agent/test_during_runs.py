@@ -108,10 +108,10 @@ async def test_a_tool_that_asks_for_a_retry_or_fails_is_recorded(
     returned = [
         event_as(e, ToolReturned) for e in await ws.read() if e.event.type == "tool_returned"
     ]
-    assert [(r.status, r.summary) for r in returned] == [
-        ("retry", "there is no task t9"),
-        ("error", "the service is down"),
-        ("ok", "picked"),
+    assert [(r.tool_name, r.status, r.summary) for r in returned] == [
+        ("pick", "retry", "there is no task t9"),
+        ("pick", "error", "the service is down"),
+        ("pick", "ok", "picked"),
     ]
     assert types(await ws.read()).count("tool_called") == 3, "every call has one result"
 

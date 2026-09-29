@@ -175,23 +175,26 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         workspace = session.workspace
         history = result.new_messages_json()
         output = result.output
+        usage = RunUsage(
+            requests=result.usage.requests,
+            input_tokens=result.usage.input_tokens,
+            output_tokens=result.usage.output_tokens,
+        )
         if isinstance(output, DeferredToolRequests):
             requests = (
                 *_requests(output.calls, "question"),
                 *_requests(output.approvals, "approval"),
             )
             paused = RunPaused(
-                run_id=session.run_id, thread_id=session.thread_id, requests=requests
+                run_id=session.run_id,
+                thread_id=session.thread_id,
+                requests=requests,
+                usage=usage,
             )
             await workspace.record(paused, history=history)
             return
         if isinstance(output, str) and output.strip():
             await workspace.post_message(session.thread_id, output)
-        usage = RunUsage(
-            requests=result.usage.requests,
-            input_tokens=result.usage.input_tokens,
-            output_tokens=result.usage.output_tokens,
-        )
         await workspace.record(self._ended(session, "completed", usage=usage), history=history)
 
     @staticmethod
@@ -295,6 +298,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             run_id=ctx.deps.run_id,
             thread_id=ctx.deps.thread_id,
             tool_call_id=call.tool_call_id,
+            tool_name=call.tool_name,
             status=status,
             summary=summary,
         )

@@ -180,6 +180,7 @@ nav:
           - adr/0030-compose-and-dev-containers.md
           - adr/0031-litellm-proxy-first.md
           - adr/0032-libraries-and-the-stackr-template.md
+          - adr/0033-trace-links-on-runs-and-revisions.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

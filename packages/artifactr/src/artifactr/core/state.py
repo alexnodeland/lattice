@@ -16,7 +16,7 @@ from artifactr.core.actors import Actor
 from artifactr.core.artifacts import Artifact, Versioned
 from artifactr.core.commands import ProposedChange, ThreadMode
 from artifactr.core.events import DeferredRequest, KnownEvent
-from artifactr.core.ids import ArtifactId, ProposalId, RunId, ThreadId
+from artifactr.core.ids import ArtifactId, ProposalId, RunId, ThreadId, TraceId
 from artifactr.core.patches import Patch
 
 # ─── entities ─────────────────────────────────────────────────────────────────
@@ -55,6 +55,9 @@ class Run(BaseModel):
     status: RunStatus = "running"
     pending: tuple[DeferredRequest, ...] = ()
     answers: dict[str, DeferredAnswer] = {}
+    trace_ids: tuple[TraceId, ...] = ()
+    """The OpenTelemetry trace of each traced attempt, oldest first: a run that pauses and
+    resumes runs once per attempt, each in its own trace."""
 
     @property
     def all_answered(self) -> bool:

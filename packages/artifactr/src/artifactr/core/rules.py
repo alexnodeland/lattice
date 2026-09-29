@@ -55,7 +55,7 @@ from artifactr.core.events import (
     ToolCalled,
     ToolReturned,
 )
-from artifactr.core.ids import ArtifactId, ProposalId, RunId, ThreadId
+from artifactr.core.ids import ArtifactId, ProposalId, RunId, ThreadId, TraceId
 from artifactr.core.patches import Patch, apply_patch, describe_patch, diff
 from artifactr.core.state import (
     Applied,
@@ -625,12 +625,16 @@ def _check_recorder(actor: Actor, thread_id: ThreadId) -> None:
 def _run_started(fact: RunStarted, state: State) -> CommitResult:
     _thread(state, fact.thread_id)
     existing = _loaded(state.runs, fact.run_id, "run")
+    traces: tuple[TraceId, ...] = ()
     if existing is not None:
         if existing.thread_id != fact.thread_id:
             raise InvalidState(f"run {existing.id} belongs to thread {existing.thread_id}")
         if existing.status != "paused":
             raise InvalidState(f"run {existing.id} is {existing.status} and cannot start again")
-    run = Run(id=fact.run_id, thread_id=fact.thread_id)
+        traces = existing.trace_ids
+    if fact.trace_id is not None:
+        traces = (*traces, fact.trace_id)
+    run = Run(id=fact.run_id, thread_id=fact.thread_id, trace_ids=traces)
     return CommitResult(outcome=Recorded(), events=(fact,), runs=(run,))
 
 

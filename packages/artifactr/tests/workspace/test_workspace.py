@@ -159,8 +159,10 @@ async def test_a_command_without_events_has_no_seq(ws: Workspace) -> None:
 async def test_runs_and_history_are_recorded_together(ws: Workspace) -> None:
     thread = await ws.create_thread()
     agent = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_1"))
-    await agent.record(RunStarted(run_id="run_1", thread_id=thread.id))
-    assert (await ws.run("run_1")).status == "running"
+    trace_id = "4bf92f3577b34da6a3ce929d0e0e4736"
+    await agent.record(RunStarted(run_id="run_1", thread_id=thread.id, trace_id=trace_id))
+    run = await ws.run("run_1")
+    assert (run.status, run.trace_ids) == ("running", (trace_id,))
     ended = RunEnded(run_id="run_1", thread_id=thread.id, status="completed")
     await agent.record(ended, history=b'[{"kind":"request"}]')
     assert (await ws.run("run_1")).status == "completed"

@@ -29,6 +29,7 @@ from artifactr.core import (
     PartEnded,
     PartStarted,
     RunEnded,
+    RunPaused,
     StopRun,
     TextDelta,
     ThinkingDelta,
@@ -63,6 +64,9 @@ async def test_a_question_pauses_the_run_until_answered(
     assert isinstance(paused.output, DeferredToolRequests)
     run = await ws.run(handle.run_id)
     assert (run.status, [r.tool_call_id for r in run.pending]) == ("paused", ["q1"])
+    [pause] = [e.event for e in await ws.read() if isinstance(e.event, RunPaused)]
+    assert pause.usage is not None
+    assert pause.usage.requests == 1, "what the run used before it paused"
     resumed = (
         await runner.answer(ws, AnswerDeferred(run_id=run.id, tool_call_id="q1", answer="Monday"))
     ).run

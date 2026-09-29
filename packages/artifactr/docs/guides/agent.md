@@ -154,15 +154,16 @@ The run is recorded the same way (with trigger `api`) and its history is saved. 
 A run's record is on the log, attributed to the agent:
 
 ```text
-run_started      trigger: message, resume or api
+run_started      trigger: message, resume or api; the trace id when the run is traced
 tool_called      for every tool call, the application's included
 artifact_changed (or proposal_created, artifact_created, ...) for each change a tool commits
-tool_returned    status: ok, retry (a rejection or the tool's own ModelRetry) or error
+tool_returned    the tool's name, and status: ok, retry (a rejection or the tool's own
+                 ModelRetry) or error
 message_posted   the agent's reply
 run_ended        status: completed (with token usage), stopped or failed (with the error)
 ```
 
-A run that pauses ends its segment with `run_paused` instead, listing the requests it waits on. The run's new model messages are stored in the same transaction as `run_ended` or `run_paused`, so the history and the log never disagree.
+A run that pauses ends its segment with `run_paused` instead, listing the requests it waits on, with the usage so far. The run's new model messages are stored in the same transaction as `run_ended` or `run_paused`, so the history and the log never disagree.
 
 ## Proposals
 

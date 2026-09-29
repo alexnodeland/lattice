@@ -36,5 +36,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0030](0030-compose-and-dev-containers.md) | Contributor Compose and dev containers here, infrastructure in stackr | Accepted |
 | [0031](0031-litellm-proxy-first.md) | LiteLLM, proxy first, for routing and guardrails | Accepted |
 | [0032](0032-libraries-and-the-stackr-template.md) | Libraries, and stackr as the infrastructure template | Accepted |
+| [0033](0033-trace-links-on-runs-and-revisions.md) | Trace links on runs and revisions | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

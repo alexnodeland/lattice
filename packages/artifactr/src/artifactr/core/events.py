@@ -17,7 +17,15 @@ from pydantic import BaseModel, ConfigDict, Discriminator, Field, JsonValue, Tag
 
 from artifactr.core.actors import Actor
 from artifactr.core.commands import ProposedChange, ThreadMode
-from artifactr.core.ids import ArtifactId, MessageId, ProposalId, RunId, ThreadId, WorkspaceId
+from artifactr.core.ids import (
+    ArtifactId,
+    MessageId,
+    ProposalId,
+    RunId,
+    ThreadId,
+    TraceId,
+    WorkspaceId,
+)
 from artifactr.core.patches import Patch
 
 
@@ -144,6 +152,16 @@ class DeferredRequest(BaseModel):
     args: dict[str, JsonValue] = {}
 
 
+class RunUsage(BaseModel):
+    """Token and request counts for a run."""
+
+    model_config = ConfigDict(frozen=True)
+
+    requests: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+
 class RunStarted(_Event):
     """An agent run started, or resumed after a pause."""
 
@@ -151,6 +169,8 @@ class RunStarted(_Event):
     run_id: RunId
     thread_id: ThreadId
     trigger: Literal["message", "resume", "api"] = "message"
+    trace_id: TraceId | None = None
+    """The OpenTelemetry trace this attempt runs in, when it is traced."""
 
 
 class ToolCalled(_Event):
@@ -173,6 +193,8 @@ class ToolReturned(_Event):
     tool_call_id: str
     status: Literal["ok", "error", "retry"]
     summary: str = ""
+    tool_name: str = ""
+    """The tool's name, as in its ``tool_called``; empty in events from earlier versions."""
 
 
 class RunPaused(_Event):
@@ -182,6 +204,8 @@ class RunPaused(_Event):
     run_id: RunId
     thread_id: ThreadId
     requests: tuple[DeferredRequest, ...] = Field(min_length=1)
+    usage: RunUsage | None = None
+    """What the run used up to the pause."""
 
 
 class DeferredAnswered(_Event):
@@ -193,16 +217,6 @@ class DeferredAnswered(_Event):
     tool_call_id: str
     answer: JsonValue = None
     approved: bool | None = None
-
-
-class RunUsage(BaseModel):
-    """Token and request counts for a run."""
-
-    model_config = ConfigDict(frozen=True)
-
-    requests: int = 0
-    input_tokens: int = 0
-    output_tokens: int = 0
 
 
 class RunEnded(_Event):

@@ -176,6 +176,7 @@ erDiagram
 - **One event log per workspace**, with a single gap-free `seq`. Events carry an optional `thread_id` and `run_id`, and subscribers filter on them.
 - **Proposals** are durable objects that wrap the command they would execute (create, edit or archive), with its base version, the proposer and a rationale.
 - **Model history** (pydantic-ai `ModelMessage`s, serialized with `ModelMessagesTypeAdapter`) is stored per thread next to the log, not reconstructed from it.
+- **Trace links.** A run records the OpenTelemetry trace id of each attempt (`Run.trace_ids`, from the `trace_id` of each `run_started`), since a run that pauses and resumes runs once per attempt. They let feedback on a turn find the trace it is about. Runs are stored as JSON, so the field needs no schema change.
 
 ## The write path
 
@@ -445,6 +446,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0030](adr/0030-compose-and-dev-containers.md) | Contributor Compose and dev containers here, infrastructure in stackr |
 | [0031](adr/0031-litellm-proxy-first.md) | LiteLLM, proxy first, for routing and guardrails |
 | [0032](adr/0032-libraries-and-the-stackr-template.md) | Libraries, and stackr as the infrastructure template |
+| [0033](adr/0033-trace-links-on-runs-and-revisions.md) | Trace links on runs and revisions |
 
 ## Open questions
 

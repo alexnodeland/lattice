@@ -10,6 +10,9 @@ same result.
 """
 
 import secrets
+from typing import Annotated
+
+from pydantic import StringConstraints
 
 type TenantId = str
 """Identifies a tenant: the top-level isolation boundary."""
@@ -31,6 +34,9 @@ type ProposalId = str
 
 type MessageId = str
 """Identifies a message in a thread."""
+
+type TraceId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{32}$")]
+"""An OpenTelemetry trace id, as 32 lowercase hexadecimal digits."""
 
 
 def new_id(prefix: str) -> str:

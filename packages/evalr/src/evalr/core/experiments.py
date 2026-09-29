@@ -21,7 +21,7 @@ evaluator against people's verdicts) returns the input.
 """
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ItemResult[OutputT: BaseModel]:
     """What happened to one example in an experiment.
 
@@ -40,7 +40,7 @@ class ItemResult[OutputT: BaseModel]:
     trace_id: str | None = None
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ExperimentResult[OutputT: BaseModel]:
     """An experiment's results: one item per example of the dataset, in the dataset's order.
 

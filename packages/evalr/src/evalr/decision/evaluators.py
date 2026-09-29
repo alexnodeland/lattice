@@ -34,7 +34,7 @@ DEFAULT_BOOLEAN_THRESHOLD = 0.5
 """pydantic-ai's threshold for a yes, when none is set."""
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class Decision[VerdictT: BaseModel]:
     """What a decision model answered for one input, before any hand-off.
 

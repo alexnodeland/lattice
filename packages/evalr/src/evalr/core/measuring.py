@@ -20,7 +20,7 @@ from evalr.core.verdicts import Verdict
 __all__ = ["Measurement", "measure"]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class Measurement[VerdictT: BaseModel]:
     """How an evaluator did on a dataset's labelled examples.
 

@@ -27,7 +27,7 @@ DEFAULT_GRID = tuple(round(i / 20, 2) for i in range(1, 20))
 """Candidate thresholds: 0.05 to 0.95 in steps of 0.05."""
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class _Observed[VerdictT: BaseModel]:
     expected: VerdictT
     decision: Decision[VerdictT]

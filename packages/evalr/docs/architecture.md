@@ -4,7 +4,8 @@
 
 | Package | Status |
 |---|---|
-| `evalr.core` | Verdicts, field kinds, the evaluator protocol, function evaluators, datasets, splits and formatters implemented; metrics planned (phase 1) |
+| `evalr.core` | Verdicts, field kinds, the evaluator protocol, function evaluators, datasets, splits and formatters implemented; the other ports and the metrics planned (phase 1) |
+| `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Planned (phase 1) |
 | `evalr.dspy` | Planned (phase 2) |
 | `evalr.decision` | Planned (phase 3) |
 | `evalr.langfuse`, `evalr.hf` | Planned (phase 4) |
@@ -22,38 +23,65 @@ It serves [artifactr](https://github.com/alexnodeland/artifactr) and [reflexr](h
 - Two kinds of evaluator are equals ([ADR-0002](adr/0002-dspy-judges-and-decision-models-as-equals.md)): DSPy judges optimized with GEPA, and decision models (TypeSafe's Jev) with a language-model fallback. Both implement one protocol and are measured with the same metrics.
 - Evaluators are versioned, and the version is recorded on every verdict, so scores from different evaluators never mix.
 - Datasets and experiments are reproducible: deterministic splits, deterministic dataset item ids, pinned revisions ([ADR-0003](adr/0003-datasets-and-experiments-in-langfuse-and-hugging-face.md)).
-- The core is small and pure, with every integration behind an extra.
+- The core is small and pure. Every integration is an adapter behind one of its ports, and behind an extra.
 
 ### Non-goals (for now)
 
 - A hosted evaluation service or a UI. Langfuse shows experiments and scores; Hugging Face hosts published datasets.
 - Evaluators for every modality. Inputs are Pydantic models turned into text.
 
-## Layers
+## Ports and adapters
+
+evalr is built as ports and adapters ([ADR-0006](adr/0006-ports-and-adapters.md)). `evalr.core` is the hexagon: the values (verdicts, examples, datasets, scores, experiment results), the pure functions over them, and the **ports**, small protocols for what the core needs from outside. **Adapters** implement the ports, each in its own package, and depend inward only.
 
 ```mermaid
-graph TD
-    app["Your application, or a library's [evals] extra"] --> dspy["evalr.dspy<br/>DSPy judges, GEPA"]
-    app --> decision["evalr.decision<br/>Jev decision evaluators"]
-    app --> langfuse["evalr.langfuse<br/>dataset sync, experiments, scores"]
-    app --> hf["evalr.hf<br/>Hugging Face import and export"]
-    dspy --> core["evalr.core<br/>verdicts, evaluators, datasets, metrics"]
-    decision --> core
-    langfuse --> core
-    hf --> core
+graph LR
+    subgraph adapters["Adapters"]
+        dspy["evalr.dspy<br/>DspyJudge, GEPA"]
+        decision["evalr.decision<br/>DecisionEvaluator, calibration"]
+        langfuse["evalr.langfuse<br/>datasets, scores, experiments"]
+        hf["evalr.hf<br/>Hugging Face datasets"]
+        jsonl["evalr.jsonl<br/>JSON Lines datasets"]
+        memory["evalr.memory<br/>in-memory, every port"]
+        libs["artifactr, reflexr<br/>[evals] extras"]
+    end
+    subgraph core["evalr.core"]
+        ports["Evaluator, Optimizer, DatasetStore,<br/>ScoreSink, ExperimentTracker,<br/>FeedbackSource, Formatter"]
+        values["verdicts, datasets, splits,<br/>formatters, metrics"]
+    end
+    dspy --> ports
+    decision --> ports
+    langfuse --> ports
+    hf --> ports
+    jsonl --> ports
+    memory --> ports
+    libs --> ports
 ```
 
-Dependencies point one way. Each package is usable without the others, and a test enforces the imports.
-
-| Package | Depends on | Responsibility |
+| Port | What it does | Adapters |
 |---|---|---|
-| `evalr.core` | pydantic, opentelemetry-api | Verdicts, the evaluator protocol, datasets and splits, formatters, agreement and calibration metrics, function evaluators. Pure. |
-| `evalr.dspy` (`[dspy]`) | core, dspy | `DspyJudge`, signature derivation, `optimize` with GEPA, versioned judges |
-| `evalr.decision` (`[jev]`) | core, pydantic-ai-slim with the typesafe extra | `DecisionEvaluator`, the language-model fallback, threshold calibration |
-| `evalr.langfuse` (`[langfuse]`) | core, langfuse | Dataset sync, experiments, scores |
-| `evalr.hf` (`[hf]`) | core, datasets | Hugging Face import and export |
+| `Evaluator[InputT, VerdictT]` | Judges an input and returns a typed verdict | `FunctionEvaluator` (core), `DspyJudge` (`evalr.dspy`), `DecisionEvaluator` (`evalr.decision`); compositions: `Fallback` (core), sampling and budgets (phase 5) |
+| `Optimizer[InputT, VerdictT, EvaluatorT]` | Fits an evaluator to people's verdicts | GEPA (`evalr.dspy`), threshold calibration (`evalr.decision`), in-memory (`evalr.memory`) |
+| `DatasetStore` | Saves a dataset and returns its revision; loads one by name and revision | `evalr.memory`, `evalr.jsonl`, `evalr.langfuse`, `evalr.hf` |
+| `ScoreSink` | Records verdicts as scores, idempotently | `evalr.memory`, `evalr.langfuse`, OpenTelemetry evaluation events (phase 5) |
+| `ExperimentTracker` | Runs a task over a dataset and judges each output | `evalr.memory`, `evalr.langfuse` |
+| `FeedbackSource[InputT, VerdictT]` | Yields examples from people's typed feedback | `evalr.memory`; artifactr's and reflexr's `[evals]` extras |
+| `Formatter[InputT]` | Renders an input as text within a token budget | `InputFormatter` (core) |
 
-The `[all]` extra installs every integration.
+- **Compositions, not special cases.** A decision evaluator that hands unsure inputs to a language-model judge is `Fallback(DecisionEvaluator(...), DspyJudge(...))`.
+- **I/O ports are async.** Adapters over synchronous SDKs run them in a worker thread.
+- **Every port has an in-memory adapter** in `evalr.memory`, and a contract suite in `evalr.contracts` that the in-memory adapter and every other adapter pass. The libraries run the `FeedbackSource` suite against their own adapters.
+
+| Package | Extra | May import |
+|---|---|---|
+| `evalr.core` | | pydantic, opentelemetry-api |
+| `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | | core |
+| `evalr.dspy` | `[dspy]` | core, dspy |
+| `evalr.decision` | `[jev]` | core, pydantic-ai-slim with the typesafe extra |
+| `evalr.langfuse` | `[langfuse]` | core, langfuse |
+| `evalr.hf` | `[hf]` | core, datasets, huggingface_hub |
+
+A test enforces the table: what each package imports, that no adapter package imports another, and that nothing imports artifactr or reflexr. The `[all]` extra installs every integration.
 
 ## Verdicts
 

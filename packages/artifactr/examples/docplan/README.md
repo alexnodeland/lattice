@@ -78,12 +78,33 @@ DOCPLAN_DATABASE_URL=postgresql+asyncpg://user:password@localhost/docplan uv run
 | `/accept ID` | Accepts a proposal |
 | `/reject ID [REASON]` | Rejects a proposal, with an optional reason the agent will see |
 | `/mode edit` or `/mode suggest` | In `suggest` mode every agent change becomes a proposal |
+| `/rate 1-5 [COMMENT]` | Rates the agent's last turn, as typed feedback (a `rating`) |
 | `/stop` | Stops the agent's current run |
 | `/help` and `/quit` | Help, and leave |
 
 Other flags: `--url` (default `http://127.0.0.1:8000`), `--workspace` (default `main`), `--thread`
 to rejoin a thread, and `--send MESSAGE` (repeatable) to post messages, print what happens until
 each run finishes, and exit.
+
+### Observe it
+
+docplan reports to OpenTelemetry when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, through
+`artifactr.otel.configure_telemetry`: its turns, commits, model and tool calls, database queries and
+HTTP requests as traces, artifactr's metrics, and its logs. With `LANGFUSE_PUBLIC_KEY` and
+`LANGFUSE_SECRET_KEY` (and `LANGFUSE_BASE_URL`) set too, it files each turn in Langfuse under its
+thread and user, creates the score configs of its `rating` feedback, and mirrors the `main`
+workspace's ratings to Langfuse scores on the rated turn's trace.
+
+With a LiteLLM proxy at `DOCPLAN_LITELLM_URL`, the agent calls its model group
+`DOCPLAN_LITELLM_MODEL` (`claude-sonnet` by default) with the key `DOCPLAN_LITELLM_KEY`, and every
+request carries docplan's tenant, thread and trace.
+
+[stackr](https://github.com/alexnodeland/stackr) runs the Collector, Grafana, Langfuse and LiteLLM.
+With its stack running, start docplan on stackr's network from the repository root:
+
+```sh
+docker compose -f compose.yaml -f compose.stackr.yaml --profile app up -d --build
+```
 
 ### Other surfaces
 

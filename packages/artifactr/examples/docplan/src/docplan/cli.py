@@ -46,6 +46,7 @@ Type a message to talk to the agent. Commands:
   /accept ID            accept a proposal
   /reject ID [REASON]   reject a proposal
   /mode edit|suggest    let the agent edit, or make every change a proposal
+  /rate 1-5 [COMMENT]   rate the agent's last turn
   /stop                 stop the agent
   /quit                 leave"""
 
@@ -71,6 +72,8 @@ class State:
 
     thread_id: str
     active_run: str | None = None
+    last_run: str | None = None
+    """The agent's latest run in the thread, which ``/rate`` rates."""
 
 
 def parse_line(line: str, state: State) -> Frame | Local | None:
@@ -95,6 +98,16 @@ def parse_line(line: str, state: State) -> Frame | Local | None:
             )
         case "mode" if rest in ("edit", "suggest"):
             return command_frame(type="set_thread_mode", thread_id=state.thread_id, mode=rest)
+        case "rate" if state.last_run and rest[:1] in ("1", "2", "3", "4", "5"):
+            stars, _, comment = rest.partition(" ")
+            return command_frame(
+                type="give_feedback",
+                feedback_type="rating",
+                target={"kind": "turn", "run_id": state.last_run},
+                value={"stars": int(stars), "comment": comment.strip() or None},
+            )
+        case "rate" if state.last_run is None:
+            return Local("note", "There is no turn to rate yet.")
         case "stop" if state.active_run:
             return command_frame(type="stop_run", run_id=state.active_run)
         case "stop":
@@ -168,7 +181,7 @@ class Renderer:
                 verdict = "accepted" if event["decision"] == "accept" else "rejected"
                 self._line(f"[yellow]{who} {verdict} {event['proposal_id']}[/]")
             case "run_started":
-                self._state.active_run = event["run_id"]
+                self._state.active_run = self._state.last_run = event["run_id"]
                 self._agents[event["run_id"]] = who
                 self._line(f"[dim]{who} is working…[/]")
             case "tool_called":
@@ -183,6 +196,9 @@ class Renderer:
                         self._line(f"[magenta]{who} asks: {question}\n  (reply to answer)[/]")
                     else:
                         self._line(f"[magenta]{who} wants to call {request['tool_name']}[/]")
+            case "feedback_given" if event["feedback_type"] == "rating":
+                stars = event["value"]["stars"]
+                self._line(f"[dim]{who} rated the turn {'★' * stars}{'☆' * (5 - stars)}[/]")
             case "run_ended":
                 self._state.active_run = None
                 if event["status"] != "completed":

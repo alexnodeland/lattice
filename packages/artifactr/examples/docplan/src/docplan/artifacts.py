@@ -1,10 +1,10 @@
-"""The two artifact types: a Markdown document, and a plan of tasks."""
+"""The two artifact types, a Markdown document and a plan of tasks, and a rating of turns."""
 
-from typing import ClassVar, Literal, Self
+from typing import Annotated, ClassVar, Literal, Self
 
 from pydantic import BaseModel, Field
 
-from artifactr import Artifact, MarkdownArtifact, WritePolicy, new_id
+from artifactr import Artifact, Feedback, MarkdownArtifact, WritePolicy, new_id
 
 Status = Literal["todo", "doing", "done"]
 
@@ -75,3 +75,10 @@ class Plan(Artifact):
         if self.goal != before.goal:
             changes.append(f"goal: {self.goal!r}")
         return "; ".join(changes) or None
+
+
+class Rating(Feedback, name="rating", targets={"turn"}):
+    """How a person rated one of the agent's turns, with ``/rate`` in the terminal client."""
+
+    stars: Annotated[int, Field(ge=1, le=5, description="From 1 (useless) to 5 (just right)")]
+    comment: str | None = None

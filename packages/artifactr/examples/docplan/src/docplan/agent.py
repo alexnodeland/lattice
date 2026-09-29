@@ -1,13 +1,16 @@
 """The agent: artifactr's capability, plus tools for working with plans."""
 
 import os
+from collections.abc import Sequence
 from typing import Any
 
 from pydantic_ai import Agent, DeferredToolRequests, FunctionToolset, ModelRetry, RunContext
+from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.models import Model
 
 from artifactr import ArtifactWorkspace, Session
 from artifactr.agent import describe_outcome
+from artifactr.litellm import LiteLLMGateway, litellm_model
 from docplan.artifacts import Doc, Plan, Status
 
 DEFAULT_MODEL = "anthropic:claude-sonnet-5-5"
@@ -58,19 +61,34 @@ async def set_task_status(
     return describe_outcome(await ctx.deps.workspace.commit(edit))
 
 
-def build_agent(model: Model | str | None = None) -> Agent[Session[None], Any]:
+def build_agent(
+    model: Model | str | None = None,
+    *,
+    capabilities: Sequence[AbstractCapability[Session[None]]] = (),
+) -> Agent[Session[None], Any]:
     """Build the docplan agent.
 
+    With ``DOCPLAN_LITELLM_URL`` set, the agent calls that LiteLLM proxy's model group
+    ``DOCPLAN_LITELLM_MODEL`` (``claude-sonnet`` by default) with the key
+    ``DOCPLAN_LITELLM_KEY``, and every request carries docplan's tenant, thread and trace.
+
     Args:
-        model: A pydantic-ai model or model name. Defaults to the ``DOCPLAN_MODEL`` environment
-            variable, then to a current Claude model.
+        model: A pydantic-ai model or model name. Defaults to the LiteLLM proxy, when one is
+            configured; otherwise to the ``DOCPLAN_MODEL`` environment variable, then to a
+            current Claude model.
+        capabilities: More capabilities, such as pydantic-ai's instrumentation.
     """
+    extra: list[AbstractCapability[Session[None]]] = list(capabilities)
+    if model is None and (proxy := os.environ.get("DOCPLAN_LITELLM_URL")):
+        group = os.environ.get("DOCPLAN_LITELLM_MODEL", "claude-sonnet")
+        model = litellm_model(group, api_base=proxy, api_key=os.environ.get("DOCPLAN_LITELLM_KEY"))
+        extra.append(LiteLLMGateway(tags=["docplan"]))
     return Agent(
         model or os.environ.get("DOCPLAN_MODEL", DEFAULT_MODEL),
         deps_type=Session[None],
         instructions=INSTRUCTIONS,
         output_type=[str, DeferredToolRequests],
         toolsets=[plan_tools],
-        capabilities=[ArtifactWorkspace(types=[Doc, Plan], ask=True)],
+        capabilities=[ArtifactWorkspace(types=[Doc, Plan], ask=True), *extra],
         defer_model_check=True,
     )

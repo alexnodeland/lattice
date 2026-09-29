@@ -9,7 +9,8 @@
 | Artifact types | [`artifacts.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/artifacts.py) | A Markdown `Doc` the agent edits directly, and a `Plan` with `write_policy = "propose"`, its own methods, `render_for_agent` and `describe_change` |
 | Agent | [`agent.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/agent.py) | A pydantic-ai agent with the `ArtifactWorkspace` capability and `ask_user`, plus the plan's own tools, `add_task` and `set_task_status` |
 | Server | [`app.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/app.py) | A FastAPI app with the thread protocol and REST at `/v1`, MCP at `/mcp`, and in-memory or SQL storage |
-| Terminal client | [`cli.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/cli.py) | A chat client that speaks the thread protocol as plain JSON frames, a template for a client in any language |
+| Terminal client | [`cli.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/cli.py) | A chat client that speaks the thread protocol as plain JSON frames, a template for a client in any language; `/rate` gives typed feedback on a turn |
+| Observability | [`app.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/app.py) | `configure_telemetry` when an OTLP endpoint is set; Langfuse's turn context, score configs and a feedback mirror when its keys are set; a LiteLLM proxy when one is configured |
 | Tests | [`tests/`](https://github.com/alexnodeland/artifactr/tree/main/examples/docplan/tests) | The real server and client over a real WebSocket, with a scripted model |
 
 ## Run it

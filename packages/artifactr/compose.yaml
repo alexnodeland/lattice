@@ -35,6 +35,9 @@ services:
       DOCPLAN_MODEL:
       ANTHROPIC_API_KEY:
       OPENAI_API_KEY:
+      DOCPLAN_LITELLM_URL:
+      DOCPLAN_LITELLM_MODEL:
+      DOCPLAN_LITELLM_KEY:
     ports:
       - "127.0.0.1:${DOCPLAN_PORT:-8000}:8000"
     healthcheck:

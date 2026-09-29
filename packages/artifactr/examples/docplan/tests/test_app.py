@@ -8,6 +8,8 @@ import pytest
 import uvicorn
 from fastapi.testclient import TestClient
 from mcp import Client
+from pydantic_ai.capabilities import Instrumentation
+from pydantic_ai.models.instrumented import InstrumentationSettings
 
 import docplan.app
 from artifactr import new_id
@@ -132,3 +134,37 @@ def test_main_serves_on_the_configured_address(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("DOCPLAN_PORT", "9000")
     docplan.app.main()
     assert served == {"host": "127.0.0.1", "port": 9000}
+
+
+def test_main_sets_up_telemetry_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    configured: list[dict[str, Any]] = []
+    shut_down: list[bool] = []
+
+    class Handle:
+        langfuse = None
+        tracer_provider = None  # the global ones
+        meter_provider = None
+
+        def capability(self) -> Instrumentation:
+            return Instrumentation(settings=InstrumentationSettings())
+
+        def instrument_app(self, app: object) -> None:
+            pass
+
+        def shutdown(self) -> None:
+            shut_down.append(True)
+
+    def configure(**options: Any) -> Handle:
+        configured.append(options)
+        return Handle()
+
+    monkeypatch.setattr(docplan.app, "configure_telemetry", configure)
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: None)
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+    assert docplan.app.telemetry_from_environment() is None
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318")
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-1")
+    docplan.app.main()
+    [options] = configured
+    assert (options["service_name"], options["langfuse"]) == ("docplan", True)
+    assert shut_down == [True]

@@ -62,10 +62,28 @@ def terminal() -> tuple[Console, io.StringIO]:
         ),
         ("/mode suggest", {"type": "set_thread_mode", "thread_id": "thr_1", "mode": "suggest"}),
         ("/stop", {"type": "stop_run", "run_id": "run_1"}),
+        (
+            "/rate 4 good plan",
+            {
+                "type": "give_feedback",
+                "feedback_type": "rating",
+                "target": {"kind": "turn", "run_id": "run_0"},
+                "value": {"stars": 4, "comment": "good plan"},
+            },
+        ),
+        (
+            "/rate 2",
+            {
+                "type": "give_feedback",
+                "feedback_type": "rating",
+                "target": {"kind": "turn", "run_id": "run_0"},
+                "value": {"stars": 2, "comment": None},
+            },
+        ),
     ],
 )
 def test_lines_become_command_frames(line: str, command: dict[str, Any]) -> None:
-    frame = parse_line(line, State("thr_1", active_run="run_1"))
+    frame = parse_line(line, State("thr_1", active_run="run_1", last_run="run_0"))
     assert isinstance(frame, dict)
     assert (frame["type"], frame["command"]) == ("command", command)
     assert frame["command_id"].startswith("cmd_")
@@ -83,10 +101,15 @@ def test_lines_become_command_frames(line: str, command: dict[str, Any]) -> None
         ("/accept", Local("help")),
         ("/mode fast", Local("help")),
         ("/dance", Local("help")),
+        ("/rate 4", Local("note", "There is no turn to rate yet.")),
     ],
 )
 def test_other_lines_are_handled_by_the_client(line: str, action: Local | None) -> None:
     assert parse_line(line, State("thr_1")) == action
+
+
+def test_a_rating_needs_stars() -> None:
+    assert parse_line("/rate great", State("thr_1", last_run="run_1")) == Local("help")
 
 
 # ─── rendering ────────────────────────────────────────────────────────────────
@@ -170,6 +193,8 @@ FRAMES: list[dict[str, Any]] = [
     event(AGENT, "run_2", type="run_ended", status="completed"),
     event(AGENT, "run_3", type="run_ended", status="stopped"),
     event(AGENT, "run_4", type="run_ended", status="failed", error="model timed out"),
+    event(ALICE, type="feedback_given", feedback_type="rating", value={"stars": 4}),
+    event(ALICE, type="feedback_given", feedback_type="other", value={}),
     {"type": "command_result", "command_id": "cmd_1", "ok": True},
     {
         "type": "command_result",
@@ -213,10 +238,11 @@ def test_frames_render_as_a_transcript() -> None:
         "docplan: Done.",
         "docplan's run stopped",
         "docplan's run failed: model timed out",
+        "alice rated the turn ★★★★☆",
         "✗ nope",
         "✗ not a command frame",
     ]
-    assert state.active_run is None
+    assert (state.active_run, state.last_run) == (None, "run_1")
 
 
 # ─── sessions against a running server ────────────────────────────────────────

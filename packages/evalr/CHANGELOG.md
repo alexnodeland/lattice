@@ -26,8 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **core**: Add examples, datasets, deterministic splits and formatters ([#5](https://github.com/alexnodeland/evalr/pull/5))
 - **core**: Add verdicts, field kinds, the evaluator protocol and function evaluators ([#4](https://github.com/alexnodeland/evalr/pull/4))
 
+### Bug fixes
+
+- **core**: Never shorten a list that windowing alone can fit ([#25](https://github.com/alexnodeland/evalr/pull/25))
+
 ### Documentation
 
+- Render lists on the site as GitHub does, and gate scripts/ like the library ([#27](https://github.com/alexnodeland/evalr/pull/27))
+- Publish the site at evalr.alexnodeland.com from main ([#24](https://github.com/alexnodeland/evalr/pull/24))
+- Add the documentation site and brand ([#23](https://github.com/alexnodeland/evalr/pull/23))
+- Describe v0.1 in the README and refresh the changelog ([#22](https://github.com/alexnodeland/evalr/pull/22))
 - **adr**: Build evalr as ports and adapters ([#6](https://github.com/alexnodeland/evalr/pull/6))
 - Add the evalr design: RFC-0001 and ADRs ([#1](https://github.com/alexnodeland/evalr/pull/1))
 
@@ -35,3 +43,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Lay the foundation for the evalr library ([#3](https://github.com/alexnodeland/evalr/pull/3))
 - Initial commit
+
+

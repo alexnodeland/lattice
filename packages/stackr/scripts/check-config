@@ -8,8 +8,10 @@ a unique uid and a title, and refers only to the data sources Grafana is
 provisioned with (by uid), or to a dashboard variable.
 
 supabase: supabase/config.toml's project_id differs from the Compose project's
-name (the CLI labels its containers as a Compose project too), and compose.yaml
-and the Makefile name the network and database host that project_id gives.
+name (the CLI labels its containers as a Compose project too), compose.yaml
+and the Makefile name the network and database host that project_id gives, and
+every postgres image in compose.yaml has the major version local Supabase runs,
+so both database adapters are the same PostgreSQL.
 
 litellm: the gateway's config has no validator of its own, and the proxy
 starts without a guardrail it can't load. Every model group a fallback names
@@ -89,7 +91,8 @@ def check_dashboards() -> list[str]:
 
 def check_supabase() -> list[str]:
     """Check that the Supabase project id and its names agree everywhere."""
-    project = tomllib.loads((ROOT / "supabase" / "config.toml").read_text())["project_id"]
+    config = tomllib.loads((ROOT / "supabase" / "config.toml").read_text())
+    project, major = config["project_id"], str(config["db"]["major_version"])
     compose_text = (ROOT / "compose.yaml").read_text()
     compose = yaml.safe_load(compose_text)
     makefile = (ROOT / "Makefile").read_text()
@@ -104,8 +107,18 @@ def check_supabase() -> list[str]:
         problems.append(f"compose.yaml should refer to {host} and {network}, not {sorted(stale)}")
     if f"SUPABASE_PROJECT := {project}" not in makefile:
         problems.append(f"the Makefile's SUPABASE_PROJECT isn't {project}")
+    images = {
+        service["image"]
+        for service in compose["services"].values()
+        if service.get("image", "").startswith("postgres:")
+    }
+    problems.extend(
+        f"compose.yaml's {image} isn't PostgreSQL {major}, the major version local Supabase runs"
+        for image in sorted(images)
+        if image.removeprefix("postgres:").split(".")[0].split("-")[0] != major
+    )
     if not problems:
-        print(f"ok: project {project}, network {network}, database host {host}")
+        print(f"ok: project {project}, network {network}, database host {host}, PostgreSQL {major}")
     return problems
 
 

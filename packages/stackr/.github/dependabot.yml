@@ -8,6 +8,12 @@ updates:
       interval: weekly
     commit-message:
       prefix: "chore(deps)"
+    ignore:
+      # The plain PostgreSQL adapter runs the major version local Supabase
+      # runs (supabase/config.toml's db.major_version); both move together,
+      # by hand (ADR-0009).
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

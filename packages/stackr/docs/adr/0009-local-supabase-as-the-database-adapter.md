@@ -56,3 +56,10 @@
 
 1. [x] The `supabase/` project, the network, the adapter switch and CI for both adapters (RFC-0001 phase 3).
 2. [ ] The gateway's database on the same adapter (phase 4).
+
+## Amendment (2026-09-29): one PostgreSQL major version
+
+The plain PostgreSQL adapter runs the major version local Supabase runs (`supabase/config.toml`'s `db.major_version`, 17), so an application sees the same PostgreSQL on either adapter. Dependabot proposed PostgreSQL 18 for the adapter alone, which would have split them; 18's image also keeps its data under `/var/lib/postgresql` rather than `/var/lib/postgresql/data`, so the volume mount has to change, and an existing volume needs `pg_upgrade` or a dump and restore. So:
+
+- `scripts/check-config supabase` fails when a `postgres` image in `compose.yaml` has another major version than Supabase's.
+- Dependabot keeps proposing minor updates of the image, but not major ones. A major upgrade is done by hand, for both adapters at once, with the new mount and upgrade notes.

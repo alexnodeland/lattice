@@ -116,6 +116,7 @@ def needs(item: Command | Fact, *, actor: Actor, state: State | None = None) -> 
         proposals=frozenset(i for i in wanted.proposals if i not in state.proposals),
         threads=frozenset(i for i in wanted.threads if i not in state.threads),
         runs=frozenset(i for i in wanted.runs if i not in state.runs),
+        messages=frozenset(i for i in wanted.messages if i not in state.messages),
     )
 
 
@@ -140,7 +141,9 @@ def _wanted(item: Command | Fact, actor: Actor, state: State) -> Needs:
                 proposals=frozenset({item.proposal_id}),
                 artifacts=frozenset({proposal.artifact_id}) if proposal else frozenset(),
             )
-        case CreateThread() | PostMessage() | SetThreadMode():
+        case PostMessage():
+            return Needs(threads=frozenset({item.thread_id}), messages=frozenset({item.message_id}))
+        case CreateThread() | SetThreadMode():
             return Needs(threads=frozenset({item.thread_id}))
         case SetFocus():
             return Needs(
@@ -544,6 +547,8 @@ def _create_thread(command: CreateThread, state: State) -> CommitResult:
 
 def _post_message(command: PostMessage, state: State, actor: Actor) -> CommitResult:
     _thread(state, command.thread_id)
+    if _loaded(state.messages, command.message_id, "message"):
+        raise InvalidState(f"message {command.message_id} already exists")
     return CommitResult(
         outcome=Recorded(),
         events=(
@@ -554,6 +559,7 @@ def _post_message(command: PostMessage, state: State, actor: Actor) -> CommitRes
                 run_id=_run_id(actor),
             ),
         ),
+        messages=(command.message_id,),
     )
 
 

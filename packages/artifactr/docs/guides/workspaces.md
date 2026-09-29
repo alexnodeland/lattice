@@ -69,6 +69,17 @@ await ws.commit(plan.archive())  # ArchiveArtifact
 
     `ws.post_message` only records a message. To post a message that starts, steers or answers the thread's agent, send it through the `Runner` with `runner.send(ws, thread_id, content)`; see [The agent](agent.md#running-the-agent).
 
+A message id is used once in a workspace, like a thread, artifact or proposal id ([ADR-0045](../adr/0045-a-message-id-is-used-once.md)). Code that retries derives its ids from what it is doing, and treats `InvalidState` as "already done":
+
+```python
+import contextlib
+
+from artifactr.core import InvalidState
+
+with contextlib.suppress(InvalidState):  # an earlier attempt posted it
+    await ws.post_message(thread.id, "The deploy failed.", message_id=f"deploy-{deploy_id}")
+```
+
 ## Reading
 
 | Method | Returns |

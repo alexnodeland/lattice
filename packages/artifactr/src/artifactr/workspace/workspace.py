@@ -42,6 +42,7 @@ from artifactr.core import (
     Fact,
     GiveFeedback,
     InvalidState,
+    MessageId,
     Note,
     NotFound,
     Outcome,
@@ -70,6 +71,7 @@ from artifactr.core import (
     create_artifact,
     delivered_to,
     needs,
+    new_message_id,
     record,
 )
 from artifactr.core.commands import AnswerDeferred, SetFocus, SetThreadMode
@@ -293,9 +295,21 @@ class Workspace:
         await self.commit(command)
         return await self.thread(command.thread_id)
 
-    async def post_message(self, thread_id: ThreadId, content: str) -> Recorded:
-        """Post a message in a thread as this handle's actor."""
-        return await self.commit(PostMessage(thread_id=thread_id, content=content))
+    async def post_message(
+        self, thread_id: ThreadId, content: str, *, message_id: MessageId | None = None
+    ) -> Recorded:
+        """Post a message in a thread as this handle's actor.
+
+        Args:
+            thread_id: The thread to post in.
+            content: What the message says.
+            message_id: The message's id; a new one when omitted. An id already used in the
+                workspace is refused with :class:`~artifactr.core.InvalidState`.
+        """
+        message = PostMessage(
+            thread_id=thread_id, content=content, message_id=message_id or new_message_id()
+        )
+        return await self.commit(message)
 
     async def _execute(
         self,
@@ -544,4 +558,5 @@ def _merge(state: State, loaded: State) -> State:
         proposals={**state.proposals, **loaded.proposals},
         threads={**state.threads, **loaded.threads},
         runs={**state.runs, **loaded.runs},
+        messages={**state.messages, **loaded.messages},
     )

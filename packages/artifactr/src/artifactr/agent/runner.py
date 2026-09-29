@@ -255,7 +255,11 @@ class Runner[AppDepsT]:
         *,
         message_id: MessageId | None = None,
     ) -> Sent:
-        """Post a message as the workspace handle's actor, and act on it."""
+        """Post a message as the workspace handle's actor, and act on it.
+
+        Raises:
+            InvalidState: If ``message_id`` is already used in the workspace; nothing is done.
+        """
         message = PostMessage(
             thread_id=thread_id, content=content, message_id=message_id or new_message_id()
         )

@@ -103,7 +103,7 @@ result = core.commit(command, state, actor=actor)  # CommitResult, or raises a R
 save(result)  # entities and events, in one transaction
 ```
 
-- `needs` returns the ids of the artifacts, proposals, threads and runs a command depends on. Some commands only know their full needs once their first entities are loaded (accepting a proposal needs the proposal before it knows which artifact), so hosts loop until nothing is missing.
+- `needs` returns the ids of the artifacts, proposals, threads, runs and messages a command depends on. Some commands only know their full needs once their first entities are loaded (accepting a proposal needs the proposal before it knows which artifact), so hosts loop until nothing is missing.
 - `commit` decides a command. For artifact changes it applies the type's write policy, checks the base version, applies the patch, and validates the result against the type. It returns a `CommitResult`: the outcome (`Applied`, `Proposed`, `Resolved` or `Recorded`), the entities to save, the revisions to append, and the events to log. Accepting or rejecting a proposal is the `RespondToProposal` command; an accepted change is rebased onto the artifact's current version, with the person's own changes layered on top.
 - `record` decides a fact about an agent run (`RunStarted`, `ToolCalled`, `ToolReturned`, `RunPaused`, `RunEnded`) or an application `AppEvent`. Only the thread's own agent, or the system, may record facts about its runs.
 - `change_notes` turns a slice of the log into short, attributed notes for a viewer. It keeps changes by other participants to the artifacts the viewer follows (and artifacts created in the viewer's thread), proposals others made on them, and decisions on the viewer's own proposals; several changes to one artifact become one note.
@@ -193,6 +193,7 @@ erDiagram
 - **Revisions are append-only.** Every committed change writes a revision with its version, patch, resulting data and actor. Reverting writes a new revision; versions never go backwards.
 - **One event log per workspace**, with a single gap-free `seq`. Events carry an optional `thread_id` and `run_id`, and subscribers filter on them.
 - **Proposals** are durable objects that wrap the command they would execute (create, edit or archive), with its base version, the proposer and a rationale.
+- **Messages are events, not entities** ([ADR-0037](adr/0037-feedback-targets-and-evaluators.md)). Each workspace also records the message ids it has used, so core can refuse a message id that is already used without reading the log ([ADR-0045](adr/0045-a-message-id-is-used-once.md)).
 - **Model history** (pydantic-ai `ModelMessage`s, serialized with `ModelMessagesTypeAdapter`) is stored per thread next to the log, not reconstructed from it.
 - **Trace links.** A run records the OpenTelemetry trace id of each attempt (`Run.trace_ids`, from the `trace_id` of each `run_started`), since a run that pauses and resumes runs once per attempt. A revision records the trace it was committed in (`Revision.trace_id`), stamped by the workspace, and an envelope the W3C trace context of the span it was committed in (`traceparent`, as on reflexr's envelopes). They let feedback on a turn or an artifact version find the trace it is about, and what an event causes elsewhere link back to it. All are stored in JSON, so they need no schema change ([ADR-0033](adr/0033-trace-links-on-runs-and-revisions.md)).
 
@@ -375,7 +376,7 @@ app.mount(
 )  # run mcp.lifespan() in the app's lifespan
 ```
 
-The WebSocket session reads with a single task and runs each command as its own task, so a `stop_run` is never stuck behind a slow command. All outgoing frames pass through one bounded outbox and one writer; a client too slow to keep up is disconnected (close code 4429) rather than holding events back, and resumes by `seq` when it reconnects. `Runner.execute_once` remembers each command's result in a `CommandResults` port, keyed by tenant, workspace, sender and `command_id`, so a retried command returns its original result on every surface. The default adapter, `InMemoryCommandResults`, keeps the 10,000 most recent per process.
+The WebSocket session reads with a single task and runs each command as its own task, so a `stop_run` is never stuck behind a slow command. All outgoing frames pass through one bounded outbox and one writer; a client too slow to keep up is disconnected (close code 4429) rather than holding events back, and resumes by `seq` when it reconnects. `Runner.execute_once` remembers each command's result in a `CommandResults` port, keyed by tenant, workspace, sender and `command_id`, so a retried command returns its original result on every surface. The default adapter, `InMemoryCommandResults`, keeps the 10,000 most recent per process. Beyond that memory, core refuses a create or message whose id is already used, as `invalid_state` ([ADR-0045](adr/0045-a-message-id-is-used-once.md)).
 
 The protocol's frames are Pydantic models in `artifactr.core.protocol`. `schemas/artifactr.v1.json` is generated from them (`make schema`) for clients to generate types from, and a test fails if it drifts.
 
@@ -413,6 +414,7 @@ class Storage(Protocol):
 ```
 
 - **Transactions serialize per workspace from the moment they begin**, so what a transaction loads cannot change before it saves. Writes are staged and applied atomically when the block exits normally; an exception rolls back entities, log and history together.
+- **Message ids are looked up by key.** `load` says whether each message id in `needs` is used, and `save` records a result's `messages` as used.
 - **`read` takes a window of the log** (`after_seq < seq < before_seq`), for some threads by `delivered_to`'s rule, and its first `limit` or last `last` envelopes, oldest first. Storage filters, so a tail read of a long log reads only its tail; `Workspace.read` refuses both `limit` and `last`.
 - **`subscribe(after_seq)` replays, then follows live**, on one iterator. Because a subscription starts from a `seq`, there is no gap to manage between history and live events. It is the only read path for replay, live fan-out, hooks, MCP notifications and change notes.
 - **Leases** back `Workspace.claim_thread`: a time-limited, renewed claim that holds across processes and lapses if its holder dies.
@@ -432,7 +434,7 @@ workspaces = Workspaces(SqlStorage(engine))
 `SqlStorage` works like this:
 
 - **Locking.** A transaction creates its workspace's row if the workspace is new, then locks it (`SELECT ... FOR UPDATE`) before it loads anything. `save` assigns `seq` from the row's `head_seq`. PostgreSQL runs at its default `READ COMMITTED` isolation. SQLite has no row locks, so engines from `create_sqlite_engine` begin every transaction with `BEGIN IMMEDIATE`, which takes the database's write lock instead.
-- **Tables.** Every primary key starts with the tenant and the workspace, and every table name with `artifactr_`. Entities are stored as the JSON of their Pydantic models, beside the columns that reads filter on (kind, archived, status, thread, and each event's type and thread). Lists come back oldest first, by a creation position counted on the workspace row.
+- **Tables.** Every primary key starts with the tenant and the workspace, and every table name with `artifactr_`. Entities are stored as the JSON of their Pydantic models, beside the columns that reads filter on (kind, archived, status, thread, and each event's type and thread). Lists come back oldest first, by a creation position counted on the workspace row. `artifactr_messages` holds the message ids used in each workspace, so checking an id is one key lookup.
 - **Subscriptions** read the log a page at a time. Once caught up, they wait for a commit through the same `SqlStorage`, which wakes them at once, or poll every `poll_interval` (0.5 s by default) for commits from other processes.
 - **Leases** are rows, taken with a conditional update or an insert, so two processes racing for a lease cannot both win.
 - **Migrations** ship in the package and record their version in `artifactr_alembic_version`, apart from the application's own. `migrate(engine)` upgrades a database; `create_schema(engine)` creates the tables without migrations, for tests and prototypes. A test checks that the migrations build exactly the models' schema.
@@ -599,16 +601,17 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0042](adr/0042-typed-run-failures.md) | Typed run failures |
 | [0043](adr/0043-the-litellm-adapter.md) | The LiteLLM adapter |
 | [0044](adr/0044-the-evalr-adapter.md) | The evalr adapter |
+| [0045](adr/0045-a-message-id-is-used-once.md) | A message id is used once in a workspace |
 
 ## Open questions
 
 - **Log retention.** When old envelopes are compacted, `resume` falls back to a snapshot. The snapshot format is not yet specified.
 - **Very hot workspaces.** Assigning `seq` serializes commits per workspace. If that becomes a bottleneck, the log could be sharded by artifact group behind the same per-workspace cursor.
 - **Change-note volume.** With many concurrent chats, notes may need coalescing beyond focus filtering.
-- **Crash recovery for runs.** A run interrupted by a process crash is recorded as failed when its lease expires. pydantic-ai's durable execution integrations (Temporal, DBOS, Prefect) could make such runs resumable.
+- **Crash recovery for runs.** A run interrupted by a process crash stays `running`: its thread claim lapses, so the thread takes new runs, but nothing records the old one as ended ([#68](https://github.com/alexnodeland/artifactr/issues/68)). A message whose process died after posting it and before starting its turn has no turn, and a retry with the same `message_id` is refused ([ADR-0045](adr/0045-a-message-id-is-used-once.md)). pydantic-ai's durable execution integrations (Temporal, DBOS, Prefect) could make such runs resumable.
 - **Pushing log updates across processes.** `SqlStorage` subscriptions learn about commits from other processes by polling. PostgreSQL's `LISTEN/NOTIFY` could wake them at once: an optimisation behind the same `subscribe`, with polling kept for SQLite and as a fallback ([ADR-0021](adr/0021-sql-storage.md)).
 - **Cross-process runs.** Runs are tasks in the process that started them, so `Runner.stop` and `Runner.watch` reach only local runs. A pub/sub channel would make both work across replicas.
-- **Cross-process deduplication.** `InMemoryCommandResults` remembers results in one process, and a retry that arrives while the first attempt is still being carried out runs again. A `CommandResults` over shared storage, with a claim on a command while it runs, would close both gaps ([ADR-0022](adr/0022-surfaces-over-one-command-handler.md)).
+- **Cross-process deduplication.** `InMemoryCommandResults` remembers results in one process, and a retry that arrives while the first attempt is still being carried out runs again. A `CommandResults` over shared storage, with a claim on a command while it runs, would close both gaps ([ADR-0022](adr/0022-surfaces-over-one-command-handler.md)). Core already refuses a repeated create or message by its id, whichever process it reaches ([ADR-0045](adr/0045-a-message-id-is-used-once.md)), so the gaps matter only for commands whose ids the client leaves out, and for `give_feedback`, which has none.
 - **`jsonpatch` maintenance.** It is stable but rarely updated; its surface is small enough to vendor if needed.
 - **The session on database and HTTP spans in a real deployment.** A `BaggageSpanProcessor` carries a turn's `session.id` onto every span in it, as a test shows in process ([ADR-0035](adr/0035-a-turn-is-its-own-trace.md)). Whether a deployed Collector and Langfuse keep it end to end is left for stackr's integration tests.
 - **Guardrail error shapes.** A guardrail block is recognised as an HTTP 400 whose error mentions a guardrail ([ADR-0043](adr/0043-the-litellm-adapter.md)). If LiteLLM adds a typed error code for blocks, the gateway should use it.

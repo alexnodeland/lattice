@@ -14,13 +14,15 @@ from artifactr.core import (
     ArtifactCreated,
     Envelope,
     Event,
+    MessagePosted,
+    Needs,
     ThreadCreated,
     UnknownEvent,
     UserActor,
 )
 from artifactr.sql import SqlStorage, create_schema, migrate
 from artifactr.sql.schema import _alembic_config
-from artifactr.sql.tables import VERSION_TABLE, EventRow, metadata
+from artifactr.sql.tables import VERSION_TABLE, EventRow, MessageRow, metadata
 from artifactr.workspace import Scope
 
 
@@ -115,3 +117,56 @@ async def test_upgrading_fills_the_new_columns_from_the_stored_envelopes(
         assert await connection.scalar(select(func.count()).select_from(events)) == 4, (
             "the rows outlive the columns"
         )
+
+
+async def test_upgrading_keeps_the_ids_of_the_messages_already_posted(
+    engine: AsyncEngine,
+) -> None:
+    events = table(
+        "artifactr_events",
+        column("tenant_id"),
+        column("workspace_id"),
+        column("seq"),
+        column("event_type"),
+        column("thread_id"),
+        column("envelope", JSON()),
+    )
+
+    def posted(seq: int, message_id: str, thread_id: str, workspace_id: str) -> dict[str, Any]:
+        event = MessagePosted(thread_id=thread_id, message_id=message_id, content="hi")
+        row = _stored(seq, event, thread_id)
+        return {
+            **row,
+            "workspace_id": workspace_id,
+            "event_type": event.type,
+            "thread_id": thread_id,
+        }
+
+    thread = ThreadCreated(thread_id="t2", title="two")
+    stored = [
+        posted(1, "m1", "t1", "ws_1"),
+        {**_stored(2, thread, "t2"), "event_type": thread.type, "thread_id": "t2"},
+        posted(3, "m2", "t2", "ws_1"),
+        posted(4, "m1", "t2", "ws_1"),  # the same id again, which nothing refused before
+        posted(1, "m1", "t9", "ws_2"),
+    ]
+    async with engine.begin() as connection:
+        await connection.run_sync(lambda c: command.upgrade(_alembic_config(c), "0002"))
+        await connection.execute(insert(events), stored)
+    await migrate(engine)
+    async with engine.connect() as connection:
+        query = select(MessageRow.workspace_id, MessageRow.id).order_by(
+            MessageRow.workspace_id, MessageRow.id
+        )
+        assert (await connection.execute(query)).all() == [
+            ("ws_1", "m1"),
+            ("ws_1", "m2"),
+            ("ws_2", "m1"),
+        ], "each id once in its workspace"
+    async with SqlStorage(engine).transaction(Scope("tenant_a", "ws_1")) as transaction:
+        loaded = await transaction.load(Needs(messages=frozenset({"m1", "m3"})))
+    assert loaded.messages == {"m1": True, "m3": False}
+    async with engine.begin() as connection:
+        await connection.run_sync(lambda c: command.downgrade(_alembic_config(c), "0002"))
+        assert "artifactr_messages" not in await connection.run_sync(_tables)
+        assert await connection.scalar(select(func.count()).select_from(events)) == 5

@@ -65,6 +65,8 @@ def test_conformance(case: dict[str, Any]) -> None:
     for key in ("artifacts", "revisions", "proposals", "threads", "runs"):
         if key in expect:
             assert_subset([_dump(entity) for entity in getattr(result, key)], expect[key])
+    if "messages" in expect:
+        assert list(result.messages) == expect["messages"]
 
 
 def _load(item: Any, actor: Actor, given: dict[str, Any]) -> State:
@@ -83,6 +85,7 @@ def _load(item: Any, actor: Actor, given: dict[str, Any]) -> State:
     proposals = {p["id"]: Proposal.model_validate(p) for p in given.get("proposals", [])}
     threads = {t["id"]: Thread.model_validate(t) for t in given.get("threads", [])}
     runs = {r["id"]: Run.model_validate(r) for r in given.get("runs", [])}
+    messages = set[str](given.get("messages", []))
     state = State()
     while missing := needs(item, actor=actor, state=state):
         state = State(
@@ -90,6 +93,7 @@ def _load(item: Any, actor: Actor, given: dict[str, Any]) -> State:
             proposals={**state.proposals, **{i: proposals.get(i) for i in missing.proposals}},
             threads={**state.threads, **{i: threads.get(i) for i in missing.threads}},
             runs={**state.runs, **{i: runs.get(i) for i in missing.runs}},
+            messages={**state.messages, **{i: i in messages for i in missing.messages}},
         )
     return state
 

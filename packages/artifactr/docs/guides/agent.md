@@ -129,9 +129,11 @@ if sent.run is not None:  # None when the message steered a running run
 
 A message in an idle thread, such as one just created, starts a run unless another starts one first. Code that owns its thread, such as a test or an evaluation, can assert that `sent.run` is set.
 
+`send` takes a `message_id`. Sending a used one again raises `InvalidState` before anything else happens, so a retry never starts or steers a second turn ([ADR-0045](../adr/0045-a-message-id-is-used-once.md)).
+
 | Runner method | What it does |
 |---|---|
-| `send(workspace, thread_id, content)` | Posts a message and starts, steers or resumes a run |
+| `send(workspace, thread_id, content, message_id=None)` | Posts a message and starts, steers or resumes a run |
 | `answer(workspace, AnswerDeferred(...))` | Answers one request of a paused run, resuming it once all are answered |
 | `resume(workspace, run_id)` | Resumes a paused run whose requests are all answered |
 | `stop(run_id)` | Cancels a run in this process; it ends with status `stopped` |

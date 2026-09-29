@@ -16,7 +16,7 @@ from artifactr.core.actors import Actor
 from artifactr.core.artifacts import Artifact, Versioned
 from artifactr.core.commands import ProposedChange, ThreadMode
 from artifactr.core.events import DeferredRequest, KnownEvent
-from artifactr.core.ids import ArtifactId, ProposalId, RunId, ThreadId, TraceId
+from artifactr.core.ids import ArtifactId, MessageId, ProposalId, RunId, ThreadId, TraceId
 from artifactr.core.patches import Patch
 
 # ─── entities ─────────────────────────────────────────────────────────────────
@@ -168,6 +168,8 @@ class State:
     proposals: Mapping[ProposalId, Proposal | None] = field(default=_EMPTY)
     threads: Mapping[ThreadId, Thread | None] = field(default=_EMPTY)
     runs: Mapping[RunId, Run | None] = field(default=_EMPTY)
+    messages: Mapping[MessageId, bool] = field(default=_EMPTY)
+    """Whether each message id is already used in the workspace (ADR-0045)."""
 
 
 @dataclass(frozen=True)
@@ -178,9 +180,10 @@ class Needs:
     proposals: frozenset[ProposalId] = frozenset()
     threads: frozenset[ThreadId] = frozenset()
     runs: frozenset[RunId] = frozenset()
+    messages: frozenset[MessageId] = frozenset()
 
     def __bool__(self) -> bool:
-        return bool(self.artifacts or self.proposals or self.threads or self.runs)
+        return bool(self.artifacts or self.proposals or self.threads or self.runs or self.messages)
 
 
 @dataclass(frozen=True)
@@ -188,7 +191,8 @@ class CommitResult:
     """Everything a host persists after a command, in one transaction.
 
     ``artifacts``, ``proposals``, ``threads`` and ``runs`` are entities to insert or replace;
-    ``revisions`` are appended; ``events`` are appended to the log in order.
+    ``revisions`` are appended; ``messages`` are message ids to record as used; ``events`` are
+    appended to the log in order.
     """
 
     outcome: Applied | Proposed | Resolved | Recorded
@@ -198,3 +202,4 @@ class CommitResult:
     proposals: tuple[Proposal, ...] = ()
     threads: tuple[Thread, ...] = ()
     runs: tuple[Run, ...] = ()
+    messages: tuple[MessageId, ...] = ()

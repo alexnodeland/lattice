@@ -157,6 +157,30 @@ def test_only_recent_command_ids_are_remembered() -> None:
         assert repeated.status_code == 409, "c1 was forgotten, so it ran again and was rejected"
 
 
+def test_a_message_is_posted_once_per_id_after_its_command_is_forgotten() -> None:
+    app, _ = build(Script(say("On it.")), results=InMemoryCommandResults(capacity=1))
+    with TestClient(app) as client:
+        client.post(f"{BASE}/commands", json=command("c1", type="create_thread", thread_id="t1"))
+        message = command(
+            "c2", type="post_message", thread_id="t1", message_id="m1", content="Plan it"
+        )
+        assert client.post(f"{BASE}/commands", json=message).json()["ok"]
+
+        def events() -> list[dict[str, Any]]:
+            return [e["event"] for e in client.get(f"{BASE}/events").json()]
+
+        wait_for(lambda: "run_ended" in [e["type"] for e in events()])
+        client.post(f"{BASE}/commands", json=command("c3", type="create_thread", thread_id="t2"))
+        repeated = client.post(f"{BASE}/commands", json=message)
+        assert repeated.status_code == 409, "c2 was forgotten, but m1 is in the log"
+        assert repeated.json()["rejection"] == {
+            "type": "invalid_state",
+            "message": "message m1 already exists",
+        }
+        posted = [e["content"] for e in events() if e["type"] == "message_posted"]
+        assert posted == ["Plan it", "On it."], "posted once, and answered once"
+
+
 def test_feedback_is_a_command_like_any_other(client: TestClient) -> None:
     client.post(f"{BASE}/commands", json=command("c1", type="create_thread", thread_id="t1"))
     feedback = command(

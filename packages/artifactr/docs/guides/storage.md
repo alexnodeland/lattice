@@ -85,6 +85,7 @@ If your application runs Alembic's autogenerate on the same database, exclude th
 
 - **One writer per workspace at a time.** A transaction creates its workspace's row if the workspace is new, then locks it (`SELECT ... FOR UPDATE`) before loading anything, and `seq` is assigned from that row. On SQLite, the engine's `BEGIN IMMEDIATE` takes the database's write lock instead. Different workspaces commit independently on PostgreSQL.
 - **Subscriptions poll.** A subscription reads the log a page at a time. Once it has caught up, a commit made through the same `SqlStorage` wakes it at once, and commits from other processes are seen within `poll_interval` (half a second by default; `SqlStorage(engine, poll_interval=timedelta(seconds=0.2))` to change it).
+- **Message ids have a table.** `artifactr_messages` has a row per message id used in a workspace, so checking an id is one key lookup. Migration 0003 fills it from the messages already in the log.
 - **Entities are JSON.** Each artifact, proposal, thread and run is stored as its Pydantic model's JSON, beside the columns that reads filter on. Adding a field with a default to your artifact type needs no migration; changing data in ways your model no longer validates does, and that migration is yours.
 - **Reads of the log filter in the database.** Each envelope's event type and thread have columns of their own, so a read for some threads selects only what those threads' subscribers receive, and a read of the last so many reads the log backwards from the end.
 - **Leases are rows**, taken with a conditional update or an insert, so two processes racing for a thread claim cannot both win.
@@ -115,6 +116,8 @@ async with storage.transaction(scope) as transaction:
 **Leases are exclusive and expire.** `acquire_lease(scope, key, holder, ttl)` takes or renews a lease and returns whether the holder has it; `release_lease` gives it up. `Workspace.claim_thread` uses them to allow one active run per thread, across processes: the claim is renewed while held and lapses by itself if its holder dies.
 
 **History is opaque bytes.** A thread's model history (pydantic-ai messages, serialized by the agent layer) is appended with `Transaction.append_history`, in the same transaction as the run fact that ends a run segment. Each chunk records the log's head when it was saved, which is how the agent knows what it has already been told.
+
+**Message ids are looked up by key.** `needs` asks for message ids as well as entities; `load` says whether each is used, and `save` records `result.messages` as used ([ADR-0045](../adr/0045-a-message-id-is-used-once.md)).
 
 ## Writing your own
 

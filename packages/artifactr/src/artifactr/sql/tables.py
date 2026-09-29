@@ -116,6 +116,14 @@ class RunRow(EntityRow):
     body: Mapped[dict[str, Any]] = mapped_column(JSON)
 
 
+class MessageRow(ScopedRow):
+    """A message id used in a workspace. What the message says is only in the log."""
+
+    __tablename__ = "artifactr_messages"
+
+    id: Mapped[str] = mapped_column(primary_key=True)
+
+
 class EventRow(ScopedRow):
     """One envelope in a workspace's log, with the columns reads of some threads filter on."""
 

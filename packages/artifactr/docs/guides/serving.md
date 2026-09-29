@@ -97,6 +97,8 @@ from artifactr.agent import InMemoryCommandResults
 runner = Runner(agent, app=None, results=InMemoryCommandResults(capacity=50_000))
 ```
 
+A retry that reaches another process, or arrives after its result was forgotten, is carried out again. To cover that, choose the ids of what a command creates, such as `message_id`, and repeat them on a retry: an id already used is refused with 409 `invalid_state`, which then means an earlier attempt succeeded. For `post_message` it means the message was posted, not that its turn ran: a process that died between the two leaves the message without a turn ([Deduplication](../protocol.md#deduplication)).
+
 ## The WebSocket
 
 A client connects to `/v1/workspaces/{workspace_id}/stream` with the subprotocol `artifactr.v1`, and sends `hello` with the last `seq` it has seen (0 the first time) and, optionally, the threads it follows:

@@ -18,6 +18,7 @@ from artifactr.core import (
     ArtifactId,
     CommitResult,
     Envelope,
+    MessageId,
     Needs,
     Proposal,
     ProposalId,
@@ -54,6 +55,7 @@ class _Data:
     proposals: dict[ProposalId, Proposal] = field(default_factory=dict[ProposalId, Proposal])
     threads: dict[ThreadId, Thread] = field(default_factory=dict[ThreadId, Thread])
     runs: dict[RunId, Run] = field(default_factory=dict[RunId, Run])
+    messages: set[MessageId] = field(default_factory=set[MessageId])
     log: list[Envelope] = field(default_factory=list[Envelope])
     history: dict[ThreadId, list[HistoryChunk]] = field(
         default_factory=dict[ThreadId, list[HistoryChunk]]
@@ -86,6 +88,7 @@ class _Transaction:
             },
             threads={i: _latest(pending.threads, self._data.threads, i) for i in needs.threads},
             runs={i: _latest(pending.runs, self._data.runs, i) for i in needs.runs},
+            messages={i: i in pending.messages or i in self._data.messages for i in needs.messages},
         )
 
     async def save(
@@ -141,6 +144,7 @@ def _apply(data: _Data, result: CommitResult) -> None:
         data.threads[thread.id] = thread
     for run in result.runs:
         data.runs[run.id] = run
+    data.messages.update(result.messages)
 
 
 class InMemoryStorage:

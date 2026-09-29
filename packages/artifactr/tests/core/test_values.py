@@ -139,6 +139,7 @@ class TestState:
     def test_needs_is_falsy_when_empty(self) -> None:
         assert not Needs()
         assert Needs(runs=frozenset({"r1"}))
+        assert Needs(messages=frozenset({"m1"}))
 
     def test_a_paused_run_is_ready_once_every_request_is_answered(self) -> None:
         requests = (

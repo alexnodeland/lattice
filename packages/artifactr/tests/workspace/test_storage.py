@@ -13,6 +13,7 @@ from artifactr.core import (
     Envelope,
     MessagePosted,
     Needs,
+    PostMessage,
     State,
     UserActor,
     commit,
@@ -46,14 +47,25 @@ async def test_later_loads_in_a_transaction_see_earlier_saves(storage: Storage) 
             actor=ALICE,
         )
         assert [e.seq for e in envelopes] == [2], "seq continues within the transaction"
+        post = PostMessage(thread_id="t1", message_id="m1", content="hi")
+        await tx.save(
+            commit(post, await tx.load(needs(post, actor=ALICE)), actor=ALICE), actor=ALICE
+        )
+        messages = (await tx.load(Needs(messages=frozenset({"m1", "m2"})))).messages
+        assert messages == {"m1": True, "m2": False}
 
 
 async def test_a_transaction_that_raises_rolls_back(storage: Storage) -> None:
+    post = PostMessage(thread_id="t1", message_id="m1", content="hi")
+
     async def save_then_fail() -> None:
         async with storage.transaction(SCOPE) as tx:
             await tx.save(
                 commit(CreateThread(thread_id="t1"), State(threads={"t1": None}), actor=ALICE),
                 actor=ALICE,
+            )
+            await tx.save(
+                commit(post, await tx.load(needs(post, actor=ALICE)), actor=ALICE), actor=ALICE
             )
             await tx.append_history("t1", b"[]")
             raise RuntimeError("the host failed after saving")
@@ -63,6 +75,8 @@ async def test_a_transaction_that_raises_rolls_back(storage: Storage) -> None:
     assert await storage.head_seq(SCOPE) == 0
     assert await storage.thread(SCOPE, "t1") is None
     assert await storage.history(SCOPE, "t1") == []
+    async with storage.transaction(SCOPE) as tx:
+        assert (await tx.load(Needs(messages=frozenset({"m1"})))).messages == {"m1": False}
 
 
 async def test_reads_filter_and_page(storage: Storage) -> None:

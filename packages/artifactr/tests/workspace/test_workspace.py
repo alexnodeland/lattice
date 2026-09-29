@@ -17,6 +17,7 @@ from artifactr.core import (
     EvaluatorActor,
     FeedbackGiven,
     GiveFeedback,
+    InvalidState,
     MarkdownArtifact,
     NotFound,
     ProposeChange,
@@ -157,6 +158,27 @@ async def test_threads_and_messages(ws: Workspace) -> None:
     assert posted.seq == 2
     with pytest.raises(NotFound):
         await ws.thread("thr_nope")
+
+
+async def test_a_message_id_is_used_once_in_a_workspace(
+    workspaces: Workspaces, ws: Workspace
+) -> None:
+    one = await ws.create_thread("one")
+    two = await ws.create_thread("two")
+    await ws.post_message(one.id, "Ship Monday", message_id="m1")
+    head = await ws.head_seq()
+    for thread in (one, two):
+        with pytest.raises(InvalidState, match="message m1 already exists"):
+            await ws.post_message(thread.id, "Ship Monday", message_id="m1")
+    agent = ws.as_actor(AgentActor(thread_id=one.id, run_id="run_1"))
+    with pytest.raises(InvalidState):
+        await agent.post_message(one.id, "Done.", message_id="m1")
+    assert await ws.head_seq() == head, "a refused message appends nothing"
+    for tenant_id, workspace_id in (("tenant_a", "ws_2"), ("tenant_b", "ws_1")):
+        elsewhere = await workspaces.open(tenant_id, workspace_id, actor=ALICE)
+        thread = await elsewhere.create_thread("one")
+        posted = await elsewhere.post_message(thread.id, "Ship Monday", message_id="m1")
+        assert posted.seq == 2, "message ids are per workspace"
 
 
 async def test_a_command_without_events_has_no_seq(ws: Workspace) -> None:

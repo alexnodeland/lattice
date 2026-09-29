@@ -61,13 +61,16 @@ class Transaction(Protocol):
     """
 
     async def load(self, needs: Needs) -> State:
-        """Load the requested entities. Ids that do not exist map to ``None``."""
+        """Load the requested entities, and whether the requested message ids are used.
+
+        Entity ids that do not exist map to ``None``.
+        """
         ...
 
     async def save(
         self, result: CommitResult, *, actor: Actor, traceparent: str | None = None
     ) -> list[Envelope]:
-        """Persist a result's entities and revisions, and append its events to the log.
+        """Persist a result's entities, revisions and used message ids, and log its events.
 
         Args:
             result: What core decided.

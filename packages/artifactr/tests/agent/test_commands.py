@@ -1,5 +1,7 @@
 """Commands through the runner: carried out once per id, and described to models."""
 
+import pytest
+
 from artifactr.agent import (
     CommandKey,
     InMemoryCommandResults,
@@ -10,6 +12,9 @@ from artifactr.core import (
     Applied,
     CommandResult,
     CreateThread,
+    InvalidState,
+    MessagePosted,
+    PostMessage,
     Proposed,
     Recorded,
     Resolved,
@@ -54,6 +59,28 @@ async def test_the_same_id_elsewhere_or_from_someone_else_is_another_command(
     repeated = await runner.execute_once(alice_again, CreateThread(thread_id="t3"), command_id="c1")
     assert repeated.outcome == Recorded(seq=1), "the same participant, whatever its name"
     assert [t.id for t in await ws.threads()] == ["t1", "t2"]
+
+
+async def test_a_message_is_posted_once_per_id_whichever_process_it_reaches(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    first, second = (make_runner(make_agent(Script(say("On it."))), gate) for _ in range(2))
+    post = PostMessage(thread_id=thread.id, message_id="m1", content="Plan it")
+    sent = await first.execute_once(ws, post, command_id="c1")
+    assert isinstance(sent.outcome, Recorded)
+    handle = first.running(thread.id)
+    assert handle is not None
+    await handle.wait()
+    retried = await second.execute_once(ws, post, command_id="c1")
+    assert retried.rejection is not None, "another process does not remember c1"
+    assert retried.rejection["type"] == "invalid_state"
+    with pytest.raises(InvalidState):
+        await first.send(ws, thread.id, "Plan it", message_id="m1")
+    assert second.running(thread.id) is None
+    assert first.running(thread.id) is None, "no second turn started"
+    assert [run.id for run in await ws.runs(thread_id=thread.id)] == [sent.outcome.run_id]
+    posted = [e.event for e in await ws.read() if isinstance(e.event, MessagePosted)]
+    assert [m.content for m in posted] == ["Plan it", "On it."], "and one reply"
 
 
 async def test_only_the_most_recent_results_are_remembered() -> None:

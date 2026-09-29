@@ -182,7 +182,7 @@ The command is one of the `Command` models in `artifactr.core`, or `stop_run` or
 | `type` | Fields | Effect |
 |---|---|---|
 | `create_thread` | `thread_id?`, `title?` | `thread_created` |
-| `post_message` | `thread_id`, `content`, `message_id?` | `message_posted`. Starts a run if the thread is idle, steers the running run if there is one, and answers a paused run's pending requests (declining approvals, with the message as the reason) before resuming it. |
+| `post_message` | `thread_id`, `content`, `message_id?` | `message_posted`. Starts a run if the thread is idle, steers the running run if there is one, and answers a paused run's pending requests (declining approvals, with the message as the reason) before resuming it. A `message_id` already used in the workspace is `invalid_state`. |
 | `set_focus` | `thread_id`, `artifact_ids` | `focus_changed` |
 | `set_thread_mode` | `thread_id`, `mode` (`edit`, `suggest`) | `thread_mode_changed` |
 | `create_artifact` | `kind`, `data`, `artifact_id?`, `thread_id?`, `proposal_id?` | `artifact_created`, or `proposal_created` under the type's write policy |
@@ -213,6 +213,8 @@ Every command is carried out by `artifactr.agent.Runner.execute`, whichever tran
 ### Deduplication
 
 Every surface hands a command with its id to `Runner.execute_once`, which carries it out the first time the id is seen and remembers the result in the runner's `CommandResults`. A command is known by the tenant and workspace it was sent to, the sender (its actor's participant, so a changed display name does not matter) and its `command_id`; a repeated id returns the first result whatever command it comes with. By default the runner remembers the 10,000 most recent results in its process (`InMemoryCommandResults`), so a retry that reaches another process, or arrives after the result was forgotten, runs again, and so does one that arrives while the first is still being carried out.
+
+Beyond the memory, core refuses a command that creates something with an id already used, as `invalid_state`, whichever process it reaches: `create_thread`, `create_artifact`, `propose_change` and `post_message` ([ADR-0045](adr/0045-a-message-id-is-used-once.md)). A client that chooses those ids and repeats them on a retry gets each command carried out once; `invalid_state` then means an earlier attempt succeeded. For `post_message` it means the message was posted, but not that its turn ran: if the process that posted it died before starting the turn, the turn never runs. An id the client omits is generated anew each time.
 
 ## Close codes
 

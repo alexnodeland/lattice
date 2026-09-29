@@ -94,6 +94,9 @@
             "content": "Let's ship Monday",
             "run_id": null
           }
+        ],
+        "messages": [
+          "msg_1"
         ]
       }
     },
@@ -128,6 +131,74 @@
             "run_id": "run_1"
           }
         ]
+      }
+    },
+    {
+      "name": "a message id must be new in the workspace",
+      "actor": {
+        "kind": "user",
+        "id": "alice",
+        "name": "Alice"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          },
+          {
+            "id": "thr_2",
+            "title": "Beta",
+            "mode": "edit"
+          }
+        ],
+        "messages": [
+          "msg_1"
+        ]
+      },
+      "command": {
+        "type": "post_message",
+        "thread_id": "thr_2",
+        "message_id": "msg_1",
+        "content": "Let's ship Monday"
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state",
+          "message": "message msg_1 already exists"
+        }
+      }
+    },
+    {
+      "name": "a retried message from the agent is refused too",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ],
+        "messages": [
+          "msg_2"
+        ]
+      },
+      "command": {
+        "type": "post_message",
+        "thread_id": "thr_1",
+        "message_id": "msg_2",
+        "content": "Done."
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state"
+        }
       }
     },
     {

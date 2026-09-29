@@ -60,7 +60,7 @@ print(support.version)
 180e6a296f478c0f
 ```
 
-- **`version`** is a hash of the examples' content, independent of their order. Any change to any example changes it, so a trained judge records exactly the data it was trained on.
+- **`version`** is a hash of the examples' content, independent of their order. Any change to any example changes it, so a trained judge records exactly the data it was trained on. Numbers are hashed by value, as JSON reads them: `1.0` and `1` are the same number.
 - **Ids are unique**: two examples with one id raise `DuplicateExample`. A verdict type evalr cannot judge raises `UnsupportedField`.
 - **`labelled()`** keeps the examples with a verdict from people, and **`filter(predicate)`** any others you choose. Both return a dataset of the same name and types.
 - **`records()`** turns the examples into JSON records, and **`Dataset.from_records(name, records, input_type=, verdict_type=)`** back. The stores build on them.
@@ -108,7 +108,7 @@ Every store keeps the same promises, which the [contract suite](testing.md#your-
 |---|---|---|---|
 | `InMemoryDatasetStore` | `evalr.memory` | The content hash | Tests and prototypes |
 | `JsonlDatasetStore(root)` | `evalr.jsonl` | The content hash | Files in a repository or on a disk |
-| `LangfuseDatasetStore(client)` | `evalr.langfuse` | The time of the save's latest change | Working datasets, beside the traces they came from |
+| `LangfuseDatasetStore(client)` | `evalr.langfuse` | A time at which Langfuse held it as saved | Working datasets, beside the traces they came from |
 | `HfDatasetStore(api)` | `evalr.hf` | The commit's hash | Published and pinned datasets |
 
 ### JSON Lines files
@@ -159,8 +159,10 @@ as_saved = await datasets.load(
 | source trace | The example's `trace_id`, linking the item to the trace it came from |
 
 - **Only changed items are written.** Examples no longer in the dataset are archived, not deleted.
-- **A revision is a time.** Langfuse versions a dataset's items by time, so `save` returns the time of the latest change it made, in ISO 8601, and loading that revision reads the items as they were then.
+- **A revision is a time.** Langfuse versions a dataset's items by time, so `save` returns a time at which Langfuse held the dataset as saved, in ISO 8601, and loading that revision reads the items as they were then. Saving the same content again returns the same revision.
+- **An example that loses its trace** has its item deleted and written anew, because Langfuse keeps an item's source trace when it is written without one. Earlier revisions still load with the trace.
 - **Items made in Langfuse load too**, with their input as the input and their expected output as the verdict, so a dataset people curated in Langfuse's UI can train a judge.
+- **Langfuse keeps JSON as JavaScript does**, so a whole-number float in a reference or metadata loads as an integer (`1.0` as `1`), with the same `version`. Examples load in the order their items were last written.
 - The client's calls are synchronous, so they run in a worker thread. The store makes no connection of its own.
 
 ### The Hugging Face Hub

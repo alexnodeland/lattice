@@ -60,7 +60,7 @@ def contract_example(i: int) -> Example[ContractInput, ContractVerdict]:
         ),
         reference={"answer": f"answer {i}", "steps": [i, i + 1]} if i % 2 else None,
         trace_id=f"{i:032x}",
-        metadata={"source": "contract", "index": i},
+        metadata={"source": "contract", "index": i, "weight": float(i % 3)},
     )
 
 

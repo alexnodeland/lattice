@@ -11,9 +11,11 @@ than adding more; Langfuse's item ids are unique across a project, hence the dat
 | ``metadata`` | The example's metadata, with its id under ``evalr`` |
 | ``sourceTraceId`` | The trace the example came from |
 
-Langfuse versions a dataset's items by time, so a revision is the time of the latest change
-the save made, as Langfuse recorded it, and loading a revision reads the items as they were
-then. Examples no longer in the dataset are archived, not deleted.
+Langfuse versions a dataset's items by time, so a revision is a time at which Langfuse held the
+dataset as saved, and loading a revision reads the items as they were then. Saving the same
+content again returns the same revision. Examples no longer in the dataset are archived, not
+deleted. An item written without a source trace keeps the one it had, so when an example loses
+its trace, its item is deleted and written anew; earlier revisions keep the trace.
 """
 
 import asyncio
@@ -63,7 +65,8 @@ class LangfuseDatasetStore:
         Only items whose content changed are written.
 
         Returns:
-            The time of the latest change, in ISO 8601, which ``load`` accepts.
+            A time at which Langfuse held the dataset as saved, in ISO 8601, which ``load``
+            accepts: the same time for the same content.
         """
         return await asyncio.to_thread(self._save, dataset)
 
@@ -123,36 +126,59 @@ class LangfuseDatasetStore:
             },
         )
         _, current = self._items(dataset.name, None)
-        existing = {item.id: item for item in current}
-        changes: list[datetime] = []
+        existing = {item.id: item for item in current if item.status == DatasetStatus.ACTIVE}
+        kept: list[datetime] = []
+        archived: list[datetime] = []
+        wrote = False
         for example in dataset:
             fields = _fields(example)
             known = existing.pop(item_id(dataset.name, example.id), None)
             if known is not None and _same(known, fields):
-                changes.append(known.updated_at)
+                kept.append(known.updated_at)
                 continue
+            if known is not None and known.source_trace_id and example.trace_id is None:
+                # Writing no source trace keeps the item's, so the item is made anew.
+                self.client.api.dataset_items.delete(id=known.id)
             written = self.client.create_dataset_item(
                 dataset_name=dataset.name,
                 id=item_id(dataset.name, example.id),
                 status=DatasetStatus.ACTIVE,
                 **fields,
             )
-            changes.append(written.updated_at)
+            kept.append(written.updated_at)
+            wrote = True
         for item in existing.values():
-            if item.status == DatasetStatus.ACTIVE:
-                archived = self.client.create_dataset_item(
-                    dataset_name=dataset.name,
-                    id=item.id,
-                    input=item.input,
-                    expected_output=item.expected_output,
-                    metadata=item.metadata,
-                    source_trace_id=item.source_trace_id,
-                    status=DatasetStatus.ARCHIVED,
-                )
-                changes.append(archived.updated_at)
-            else:
-                changes.append(item.updated_at)
-        return max(changes, default=created.updated_at).isoformat()
+            gone = self.client.create_dataset_item(
+                dataset_name=dataset.name,
+                id=item.id,
+                input=item.input,
+                expected_output=item.expected_output,
+                metadata=item.metadata,
+                source_trace_id=item.source_trace_id,
+                status=DatasetStatus.ARCHIVED,
+            )
+            archived.append(gone.updated_at)
+        if wrote or not kept:
+            return max([*kept, *archived], default=created.updated_at).isoformat()
+        ids = {item_id(dataset.name, example.id) for example in dataset}
+        return self._settled(dataset.name, ids, max(kept), created.updated_at).isoformat()
+
+    def _settled(self, name: str, ids: set[str], latest: datetime, now: datetime) -> datetime:
+        """The revision of a dataset this save wrote no example of.
+
+        That is the time its examples were last written, unless an item the dataset held then
+        has been archived since: Langfuse lists no archived item at any time after its archive,
+        but still has the archive's time. An item deleted since has no time left, so the
+        revision is ``now``.
+        """
+        _, then = self._items(name, latest)
+        changes = [latest]
+        for gone in {item.id for item in then if item.status == DatasetStatus.ACTIVE} - ids:
+            try:
+                changes.append(self.client.api.dataset_items.get(id=gone).updated_at)
+            except NotFoundError:
+                changes.append(now)
+        return max(changes)
 
 
 def _fields[InputT: BaseModel, VerdictT: BaseModel](
@@ -168,16 +194,12 @@ def _fields[InputT: BaseModel, VerdictT: BaseModel](
 
 
 def _same(item: DatasetItem, fields: dict[str, Any]) -> bool:
-    return (
-        item.status == DatasetStatus.ACTIVE
-        and {
-            "input": item.input,
-            "expected_output": item.expected_output,
-            "metadata": item.metadata,
-            "source_trace_id": item.source_trace_id,
-        }
-        == fields
-    )
+    return {
+        "input": item.input,
+        "expected_output": item.expected_output,
+        "metadata": item.metadata,
+        "source_trace_id": item.source_trace_id,
+    } == fields
 
 
 def _record(item: DatasetItem) -> dict[str, JsonValue]:

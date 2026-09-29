@@ -5,7 +5,7 @@ from langfuse import Langfuse
 
 from evalr.contracts import ContractInput, ContractVerdict, check_dataset_store
 from evalr.contracts.support import contract_dataset
-from evalr.core import DatasetNotFound
+from evalr.core import Dataset, DatasetNotFound
 from evalr.langfuse import LangfuseDatasetStore, item_id
 
 from .server import FakeLangfuse, connected
@@ -33,11 +33,12 @@ async def test_items_are_keyed_by_dataset_and_example(
     dataset = contract_dataset("team/helpfulness", count=2)
     await store.save(dataset)
     assert set(server.history) == {item_id("team/helpfulness", e.id) for e in dataset}
-    item = server.history[item_id("team/helpfulness", "example-1")][-1][1]
+    item = server.item(item_id("team/helpfulness", "example-1"))
     assert item["expectedOutput"]["verdict"]["rating"] == 2
     assert item["metadata"] == {
         "source": "contract",
         "index": 1,
+        "weight": 1.0,
         "evalr": {"example_id": "example-1"},
     }
     assert item["sourceTraceId"] == f"{1:032x}"
@@ -85,13 +86,57 @@ async def test_unknown_datasets_are_not_found(client: Langfuse) -> None:
         )
 
 
-async def test_removed_examples_stay_archived(client: Langfuse, server: FakeLangfuse) -> None:
+async def load_ids(store: LangfuseDatasetStore, revision: str | None = None) -> set[str]:
+    loaded = await store.load(
+        "d", input_type=ContractInput, verdict_type=ContractVerdict, revision=revision
+    )
+    return {e.id for e in loaded}
+
+
+@pytest.mark.parametrize("removed", ["example-0", "example-2"])
+async def test_removed_examples_stay_archived(
+    client: Langfuse, server: FakeLangfuse, removed: str
+) -> None:
     store = LangfuseDatasetStore(client)
     full = contract_dataset("d", count=3)
-    fewer = full.filter(lambda e: e.id != "example-2")
+    fewer = full.filter(lambda e: e.id != removed)
     await store.save(full)
     revision = await store.save(fewer)
-    assert server.history[item_id("d", "example-2")][-1][1]["status"] == "ARCHIVED"
+    assert server.item(item_id("d", removed))["status"] == "ARCHIVED"
     assert await store.save(fewer) == revision
+    assert await load_ids(store) == await load_ids(store, revision) == {e.id for e in fewer}
+
+
+async def test_an_item_deleted_in_langfuse_stays_deleted(client: Langfuse) -> None:
+    store = LangfuseDatasetStore(client)
+    full = contract_dataset("d", count=3)
+    await store.save(full)
+    client.api.dataset_items.delete(id=item_id("d", "example-0"))
+    revision = await store.save(full.filter(lambda e: e.id != "example-0"))
+    assert await load_ids(store, revision) == {"example-1", "example-2"}
+
+
+async def test_an_example_that_loses_its_trace_loses_it_in_langfuse(
+    client: Langfuse, server: FakeLangfuse
+) -> None:
+    store = LangfuseDatasetStore(client)
+    traced = contract_dataset("d", count=2)
+    first = await store.save(traced)
+    untraced = Dataset(
+        "d",
+        [traced["example-0"], traced["example-1"].model_copy(update={"trace_id": None})],
+        input_type=ContractInput,
+        verdict_type=ContractVerdict,
+        description=traced.description,
+    )
+    second = await store.save(untraced)
+    writes = len(server.writes)
+    assert await store.save(untraced) == second
+    assert len(server.writes) == writes
     loaded = await store.load("d", input_type=ContractInput, verdict_type=ContractVerdict)
-    assert {e.id for e in loaded} == {"example-0", "example-1"}
+    assert loaded["example-1"].trace_id is None
+    assert loaded.version == untraced.version
+    pinned = await store.load(
+        "d", input_type=ContractInput, verdict_type=ContractVerdict, revision=first
+    )
+    assert pinned["example-1"].trace_id == traced["example-1"].trace_id

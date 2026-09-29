@@ -95,7 +95,7 @@ await langfuse_scores.flush()  # before a short-lived process exits
 ```
 
 - Each score keeps its id as Langfuse's `score_id`, so recording a verdict again replaces its scores in Langfuse too.
-- The evaluator, its version and the confidence go in the score's metadata.
+- The evaluator, its version and the confidence go in the score's metadata. Langfuse reads back a metadata value that parses as JSON as that JSON, so a version such as `"1"` (a `FunctionEvaluator`'s default) reads back as the number `1`.
 - Langfuse attaches scores to traces, so a score without a trace is refused with `ValueError`.
 - The client queues scores and sends them in the background; `flush()` waits until they are sent.
 

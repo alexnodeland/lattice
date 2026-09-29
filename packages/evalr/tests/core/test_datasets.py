@@ -1,7 +1,7 @@
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, JsonValue, ValidationError
 
 from evalr import Dataset, Example, UnsupportedField
 from evalr.core import DuplicateExample, split_bucket
@@ -102,6 +102,22 @@ def test_the_version_is_a_hash_of_the_content_not_the_order() -> None:
         verdict_type=Helpfulness,
     )
     assert changed.version != data.version
+
+
+def test_the_version_takes_whole_floats_for_the_integers_they_equal() -> None:
+    def with_numbers(reference: JsonValue, weight: float) -> Dataset[Thread, Helpfulness]:
+        rich = Ex(
+            id="rich",
+            input=Thread(messages=["a"]),
+            reference=reference,
+            metadata={"weight": weight, "nested": {"scores": [weight, 0.5]}},
+        )
+        return Dataset("d", [rich], input_type=Thread, verdict_type=Helpfulness)
+
+    as_floats = with_numbers({"score": 1.0, "steps": [2.0, 3.0]}, 2.0)
+    as_integers = with_numbers({"score": 1, "steps": [2, 3]}, 2)
+    assert as_floats.version == as_integers.version
+    assert with_numbers({"score": 1.5, "steps": [2, 3]}, 2).version != as_integers.version
 
 
 def test_labelled_keeps_the_examples_with_a_verdict() -> None:

@@ -141,9 +141,11 @@ class Dataset[InputT: BaseModel, VerdictT: BaseModel]:
         """A hash of the examples' content, independent of their order: 16 hex digits.
 
         Any change to any example changes it, so a trained judge records the exact data it
-        was trained on.
+        was trained on. Numbers are hashed by value, as JSON reads them (``1.0`` and ``1`` are
+        one number), so a dataset keeps its version through stores that write whole numbers
+        without a decimal point, as Langfuse does.
         """
-        records = sorted(self.records(), key=lambda r: str(r["id"]))
+        records = [_whole(r) for r in sorted(self.records(), key=lambda r: str(r["id"]))]
         canonical = json.dumps(records, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
@@ -206,3 +208,14 @@ class Dataset[InputT: BaseModel, VerdictT: BaseModel]:
             self.filter(lambda e: e.id not in held_out),
             self.filter(lambda e: e.id in held_out),
         )
+
+
+def _whole(value: JsonValue) -> JsonValue:
+    """JSON with every whole-number float as the integer it equals."""
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, list):
+        return [_whole(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _whole(item) for key, item in value.items()}
+    return value

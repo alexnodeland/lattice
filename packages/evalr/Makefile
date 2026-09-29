@@ -5,7 +5,7 @@
 .DEFAULT_GOAL := help
 UV ?= uv
 
-.PHONY: help install fmt lint typecheck test check changelog clean
+.PHONY: help install fmt lint typecheck test check docs docs-serve changelog clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -29,6 +29,12 @@ test: ## Run the tests with the 100% branch-coverage gate
 	$(UV) run pytest --cov --cov-report=term-missing
 
 check: lint typecheck test ## Run everything CI runs
+
+docs: ## Build the documentation site in strict mode, as CI does
+	$(UV) run zensical build --strict --clean
+
+docs-serve: ## Serve the documentation site with live reload at http://localhost:8000
+	$(UV) run zensical serve
 
 changelog: ## Regenerate CHANGELOG.md from conventional commits
 	$(UV) run git-cliff --output CHANGELOG.md

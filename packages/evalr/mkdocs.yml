@@ -1,0 +1,179 @@
+# The documentation site, built with Zensical (ADR-0010). `make docs` builds it in strict mode;
+# `make docs-serve` serves it with live reload.
+
+site_name: evalr
+site_description: >-
+  Typed evaluation of agent systems: judges that give typed verdicts, trained on people's
+  feedback and measured against it.
+site_author: Alex Nodeland
+site_url: https://evalr.alexnodeland.com/
+repo_url: https://github.com/alexnodeland/evalr
+repo_name: alexnodeland/evalr
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 Alex Nodeland. Released under the MIT License.
+docs_dir: docs
+
+theme:
+  name: material
+  variant: modern
+  language: en
+  logo: assets/brand/mark-light.svg
+  favicon: assets/brand/favicon.svg
+  font:
+    text: Schibsted Grotesk
+    code: Fragment Mono
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: lucide/sun-moon
+        name: Use the light scheme
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: lucide/sun
+        name: Use the dark scheme
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: lucide/moon
+        name: Follow the system scheme
+  features:
+    - content.action.edit
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - navigation.footer
+    - navigation.indexes
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - toc.follow
+
+extra_css:
+  - assets/stylesheets/brand.css
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      # Pages under docs/project/ include the repository's root files (CONTRIBUTING.md and
+      # others) instead of copying them.
+      base_path: [.]
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          inventories:
+            - https://docs.python.org/3/objects.inv
+            - https://docs.pydantic.dev/latest/objects.inv
+            - https://ai.pydantic.dev/objects.inv
+            - https://opentelemetry-python.readthedocs.io/en/latest/objects.inv
+          options:
+            docstring_style: google
+            extensions:
+              - griffe_pydantic:
+                  schema: false
+              - scripts/griffe_sphinx_roles.py:SphinxRoles
+            filters: ["!^_", "!^model_config$"]
+            heading_level: 3
+            members_order: source
+            merge_init_into_class: true
+            separate_signature: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_signature_annotations: true
+            show_source: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            signature_crossrefs: true
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Concepts: concepts.md
+  - Guides:
+      - Typed verdicts and field kinds: guides/verdicts.md
+      - Function evaluators: guides/function-evaluators.md
+      - DSPy judges and GEPA: guides/dspy-judges.md
+      - Decision evaluators: guides/decision-evaluators.md
+      - Calibration: guides/calibration.md
+      - Datasets, splits and stores: guides/datasets.md
+      - Feedback sources: guides/feedback-sources.md
+      - Scores and score sinks: guides/scores.md
+      - Experiments: guides/experiments.md
+      - Agreement and calibration metrics: guides/metrics.md
+      - Workflow measures: guides/measures.md
+      - Online evaluation: guides/online.md
+      - Testing with the contracts: guides/testing.md
+  - Reference:
+      - reference/index.md
+      - evalr.core: reference/core.md
+      - evalr.memory: reference/memory.md
+      - evalr.contracts: reference/contracts.md
+      - evalr.jsonl: reference/jsonl.md
+      - evalr.dspy: reference/dspy.md
+      - evalr.decision: reference/decision.md
+      - evalr.langfuse: reference/langfuse.md
+      - evalr.hf: reference/hf.md
+      - evalr.measures: reference/measures.md
+      - evalr.online: reference/online.md
+  - Design:
+      - Architecture: architecture.md
+      - Decisions:
+          - adr/README.md
+          - adr/0001-typed-verdicts-over-any-pydantic-model.md
+          - adr/0002-dspy-judges-and-decision-models-as-equals.md
+          - adr/0003-datasets-and-experiments-in-langfuse-and-hugging-face.md
+          - adr/0004-trunk-based-development-with-rfcs-and-adrs.md
+          - adr/0005-quality-gates-and-license.md
+          - adr/0006-ports-and-adapters.md
+          - adr/0007-trained-judges-saved-as-json-files.md
+          - adr/0008-decision-only-views-and-hand-off-by-composition.md
+          - adr/0009-online-evaluation.md
+          - adr/0010-documentation-site.md
+          - adr/template.md
+      - RFCs:
+          - rfcs/README.md
+          - rfcs/0001-v0.1-implementation-plan.md
+          - rfcs/template.md
+  - Project:
+      - Contributing: project/contributing.md
+      - Changelog: project/changelog.md
+      - Code of conduct: project/code-of-conduct.md
+      - Security: project/security.md
+      - License: project/license.md
+      - Brand: assets/brand/README.md

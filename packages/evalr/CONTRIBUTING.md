@@ -22,6 +22,8 @@ Run `make` on its own to list every command:
 | `make typecheck` | Type-check with pyright (strict for `src/`) |
 | `make test` | Run the tests with the 100% branch-coverage gate |
 | `make check` | Everything CI runs |
+| `make docs` | Build the documentation site in strict mode, as CI does |
+| `make docs-serve` | Serve the documentation site with live reload at <http://localhost:8000> |
 | `make changelog` | Regenerate `CHANGELOG.md` from commit history |
 
 ## How work flows: trunk-based development

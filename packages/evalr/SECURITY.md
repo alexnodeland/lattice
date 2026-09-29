@@ -10,7 +10,7 @@ Please do not open a public issue. Report vulnerabilities privately through GitH
 
 Include what you can of:
 
-- the affected package (`core`, `memory`, `contracts`, `jsonl`, `dspy`, `decision`, `langfuse`, `hf`) and version or commit
+- the affected package (`core`, `memory`, `contracts`, `jsonl`, `dspy`, `decision`, `langfuse`, `hf`, `measures`, `online`) and version or commit
 - a description of the issue and its impact
 - steps to reproduce, or a proof of concept
 

@@ -15,6 +15,10 @@ Working on artifactr needs PostgreSQL and the reference app. Evaluating and oper
 - **Dashboards stay here,** next to the metric registry they are tested against, and are published with each release for stackr to provision by version.
 - CI validates the Compose file and dashboard JSON without starting containers.
 
+### Amendment (2026-09-29): CI builds and starts docplan
+
+Validating the Compose files without starting containers missed that docplan's image had stopped building: evalr comes from a git source, and the slim `uv` image had no `git` (#52). CI's Compose job now builds docplan's image and starts it on the Compose PostgreSQL, waits for its health check, and requests its root page. It still starts nothing else.
+
 ## Options considered
 
 | Option | Copies of the infrastructure | Setup for a contributor |

@@ -89,6 +89,13 @@ jobs:
           docker compose $files config -q
       - name: The dashboards' JSON
         run: for file in deploy/grafana/dashboards/*.json; do jq empty "$file"; done
+      # Validating the files cannot tell whether docplan's image still builds and starts.
+      - name: docplan's image, built and started on the Compose PostgreSQL
+        run: |
+          docker compose --profile app up -d --build --wait docplan \
+            || { docker compose --profile app logs docplan; exit 1; }
+          curl -fsS http://127.0.0.1:8000/ > /dev/null
+          docker compose --profile app down
 
   docs:
     name: Docs

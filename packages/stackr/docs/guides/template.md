@@ -110,11 +110,31 @@ uvx copier update --defaults --data artifactr_rev=<commit SHA>   # through Copie
 uv lock && make check
 ```
 
-A revision is a full 40-character commit SHA. When an application uses reflexr's `[evals]` extra, it declares evalr's source itself, because a dependency's own `[tool.uv.sources]` doesn't apply to its dependents.
+A revision is a full 40-character commit SHA. When an application uses reflexr's `[evals]` extra, it declares evalr's source itself, since reflexr's `[tool.uv.sources]` doesn't apply to the application's own requirements. It pins the commit reflexr's sources pin, since uv resolves reflexr's own requirement on evalr with them and refuses two URLs for one package, so move evalr with reflexr.
 
 ### In stackr: bumping the template's defaults
 
-When a library's `main` moves, stackr's template follows by changing the `*_rev` defaults in `copier.yml`. Then run `make docs-reference`, since the reference pages show them, and `make validate`. CI's template job generates every variant and runs its checks against the new revisions.
+The libraries install from GitHub rather than PyPI for now ([artifactr#23](https://github.com/alexnodeland/artifactr/issues/23)), so the template's `*_rev` defaults in `copier.yml` follow each library's `main` by hand. `make bump-libraries` does it:
+
+```bash
+make bump-libraries                                  # every library, to the commit its main points to
+make bump-libraries BUMP_FLAGS=--check               # change nothing; fail if a pin is behind main
+make bump-libraries BUMP_FLAGS="artifactr=v0.1.0"    # artifactr only, to a tag, a branch or a commit SHA
+```
+
+It runs `scripts/bump-libraries`, which resolves each library's `main` with `git ls-remote`, rewrites the defaults in `copier.yml`, regenerates the reference pages that show them (`make docs-reference`), and prints each pin it moved, with a link to what changed:
+
+```text
+artifactr e890aca037c0 → 9c92a7f7685d  https://github.com/alexnodeland/artifactr/compare/e890aca037c0...9c92a7f7685d
+```
+
+Naming libraries moves only those; a commit SHA must be a full 40 characters, and is checked against the library's repository.
+
+**evalr follows reflexr.** The template installs reflexr's `[evals]` extra, and uv resolves reflexr's requirement on evalr with reflexr's own `[tool.uv.sources]`, which pins evalr to a commit. An application whose own evalr pin names another commit has two URLs for one package, and uv refuses to lock it. So the script pins evalr to the commit the new reflexr pins, not to evalr's `main`, and says so when the two differ; evalr moves when reflexr moves its pin. Asking for another evalr commit is an error.
+
+Then run `make validate`, and open a pull request with the output in its description: CI's template job generates every variant on the new revisions and runs its checks, and the smoke job runs an application on them beside the stack. When a library's `main` breaks the template, either fix the template in the same pull request, or pin that library to its last good commit.
+
+Nothing runs this on a schedule, and CI doesn't run `--check`, which would fail every pull request as soon as a library merged something. Applications already generated keep their revisions until they move them, as above.
 
 ## How the template is checked
 

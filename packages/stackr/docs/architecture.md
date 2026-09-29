@@ -49,8 +49,8 @@ versions.env        versions pinned outside compose.yaml: the Supabase CLI, the 
 deploy/<service>/   each service's configuration, mounted read-only
 deploy/postgres/    init.sql: each service's role and database, created by db-init
 supabase/           the Supabase CLI project: config.toml (project id stackr-supabase) and seed.sql
-scripts/            setup-env, validate, smoke, fetch-dashboards, create-tenant, check-config, check-template,
-                    docs-reference and check_site.py, run by make and CI
+scripts/            setup-env, validate, smoke, fetch-dashboards, create-tenant, bump-libraries, check-config,
+                    check-template, docs-reference and check_site.py, run by make and CI
 docs/               this document, ADRs and RFCs, and the documentation site's other pages
 mkdocs.yml          the documentation site's configuration, built with Zensical
 ```
@@ -219,7 +219,7 @@ uvx copier update                                # later: the template's improve
 | `evals` | yes | An `evals/` directory with starter evalr experiments |
 | `python_version` | 3.12 | 3.12, 3.13 or 3.14 |
 | `app_port` | 8800 | The port the application is published on |
-| `artifactr_rev`, `reflexr_rev`, `evalr_rev` | Each library's `main` when the template was last updated | The git revision `[tool.uv.sources]` pins, since the libraries aren't on PyPI |
+| `artifactr_rev`, `reflexr_rev`, `evalr_rev` | Each library's `main` when the template was last updated, by `make bump-libraries` | The git revision `[tool.uv.sources]` pins, since the libraries aren't on PyPI |
 
 A generated application:
 
@@ -246,6 +246,7 @@ A generated application:
 | `make down` / `make reset` | Stop the stack and local Supabase, keeping or deleting their data volumes |
 | `make dashboards` | Download the libraries' dashboards at the releases pinned in `versions.env` |
 | `make tenant NAME=acme` | Create a tenant's team and key on the gateway |
+| `make bump-libraries` | Pin the template's libraries to each one's current `main`, and regenerate the reference pages that show them |
 | `make validate` | Check every configuration without starting containers |
 | `make smoke` | Send test telemetry through the running stack and check it arrives |
 | `make smoke-app` | Run an application from the template beside the running stack, and trace its agents through it |

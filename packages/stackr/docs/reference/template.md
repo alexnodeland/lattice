@@ -15,8 +15,8 @@ The application template's questions are in `copier.yml` at the repository's roo
 | `evals` | bool | yes |  | always | Include evaluation with evalr (an evals/ directory and a starter experiment)? |
 | `python_version` | str | `3.12` | `3.12`, `3.13`, `3.14` | always | The Python version it runs on |
 | `app_port` | int | `8800` |  | always | The port it is published on, on this machine |
-| `artifactr_rev` | str | `e890aca037c0160f49812778a7d6fbbd0c257889` |  | `libraries in ['artifactr', 'both']` | The artifactr revision to pin (a commit SHA) |
-| `reflexr_rev` | str | `5c1fb77c7b7793a9741e97c0ee825b638ea8ca39` |  | `libraries in ['reflexr', 'both']` | The reflexr revision to pin (a commit SHA) |
+| `artifactr_rev` | str | `9c92a7f7685df14861dd1077539b595cb6c1ede4` |  | `libraries in ['artifactr', 'both']` | The artifactr revision to pin (a commit SHA) |
+| `reflexr_rev` | str | `f91a89409e6d42c8d7ac0bca945856e39229476f` |  | `libraries in ['reflexr', 'both']` | The reflexr revision to pin (a commit SHA) |
 | `evalr_rev` | str | `62582e2a677947bbb540e367e28bb6ad7d33b7f9` |  | `evals` | The evalr revision to pin (a commit SHA) |
 
 <!-- end generated -->

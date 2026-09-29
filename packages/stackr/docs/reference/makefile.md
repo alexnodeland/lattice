@@ -18,6 +18,7 @@ Every command is a `make` target; `make` on its own lists them. The tools run th
 | `make logs` | Follow the logs of the running services |
 | `make dashboards` | Download the libraries' Grafana dashboards pinned in versions.env |
 | `make tenant` | Create a tenant's team and key on the gateway: make tenant NAME=acme [TENANT_FLAGS="--max-budget 20"] |
+| `make bump-libraries` | Pin the template's libraries to their main commits: make bump-libraries [BUMP_FLAGS="--check" or "artifactr=REV"] |
 | `make validate` | Validate every configuration without starting containers, as CI does |
 | `make smoke` | Send test telemetry through the running stack and find it (PROFILES as for up) |
 | `make smoke-app` | Run an application from the template beside the running stack, and trace its agents |
@@ -46,7 +47,7 @@ Set a variable on the command line (`make up PROFILES=observability`) or in the 
 
 <!-- end generated -->
 
-`make tenant` also reads `NAME`, the tenant, and `TENANT_FLAGS`, the options `scripts/create-tenant` takes ([The LLM gateway](../guides/gateway.md#tenants)). `make smoke-app` reads `SMOKE_APP_PORT`, and both smoke targets `SMOKE_TIMEOUT` ([The smoke tests](../guides/smoke-tests.md)).
+`make tenant` also reads `NAME`, the tenant, and `TENANT_FLAGS`, the options `scripts/create-tenant` takes ([The LLM gateway](../guides/gateway.md#tenants)). `make bump-libraries` reads `BUMP_FLAGS`, the option and `LIBRARY=REV` pins `scripts/bump-libraries` takes ([The application template](../guides/template.md#in-stackr-bumping-the-templates-defaults)). `make smoke-app` reads `SMOKE_APP_PORT`, and both smoke targets `SMOKE_TIMEOUT` ([The smoke tests](../guides/smoke-tests.md)).
 
 ## The file
 

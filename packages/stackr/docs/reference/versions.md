@@ -6,7 +6,7 @@ stackr pins every version it depends on, in the file that uses it:
 |---|---|---|
 | Every service's image | `compose.yaml`, by tag, and by digest where a registry publishes only `latest` | Weekly by Dependabot, merged when CI's smoke tests pass |
 | The Supabase CLI, which pins Supabase's own images, and the libraries' Grafana dashboards | `versions.env` | By hand |
-| The libraries the application template pins by default | `copier.yml` | By hand |
+| The libraries the application template pins by default | `copier.yml` | By `make bump-libraries`, run by hand |
 | The development tools: linters, pre-commit, git-cliff, Copier, Zensical | `uv.lock` | Weekly by Dependabot |
 | The GitHub Actions | `.github/workflows/` | Weekly by Dependabot |
 
@@ -31,14 +31,14 @@ Dependabot doesn't read this file. To bump a pin, change it here, then run `make
 
 ## The template's library revisions
 
-The libraries aren't on PyPI yet, so the application template pins each to a commit of its repository: each library's `main` when the template was last updated. An application keeps the revisions it was generated with, and moves them itself ([The application template](../guides/template.md#the-libraries-revisions)).
+The libraries aren't on PyPI yet, so the application template pins each to a commit of its repository: each library's `main` when the template was last updated. `make bump-libraries` moves them to each library's current `main` (evalr's to the commit reflexr pins) and regenerates this table, and `make bump-libraries BUMP_FLAGS=--check` fails when one is behind ([bumping the template's defaults](../guides/template.md#in-stackr-bumping-the-templates-defaults)). An application keeps the revisions it was generated with, and moves them itself ([The application template](../guides/template.md#the-libraries-revisions)).
 
 <!-- generated: template-revisions -->
 
 | Library | Commit the template pins by default |
 |---|---|
-| artifactr | `e890aca037c0160f49812778a7d6fbbd0c257889` |
-| reflexr | `5c1fb77c7b7793a9741e97c0ee825b638ea8ca39` |
+| artifactr | `9c92a7f7685df14861dd1077539b595cb6c1ede4` |
+| reflexr | `f91a89409e6d42c8d7ac0bca945856e39229476f` |
 | evalr | `62582e2a677947bbb540e367e28bb6ad7d33b7f9` |
 
 <!-- end generated -->

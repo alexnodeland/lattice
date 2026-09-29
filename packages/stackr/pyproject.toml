@@ -40,6 +40,7 @@ extend-include = [
   "scripts/fetch-dashboards",
   "scripts/check-config",
   "scripts/create-tenant",
+  "scripts/bump-libraries",
   "scripts/check-template",
   "scripts/docs-reference",
 ]

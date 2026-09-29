@@ -50,7 +50,7 @@ The template and smoke jobs wait for Validate. Every job installs the tools from
 
 ## Dependencies
 
-Every image is pinned to a version, and where a registry publishes only `latest`, by digest as well. Dependabot proposes updates weekly for the images in `compose.yaml`, the GitHub Actions, and the tools in `uv.lock`; an update merges when CI passes, the smoke tests included. `versions.env` and the template's library revisions are bumped by hand ([Pinned versions](../reference/versions.md)).
+Every image is pinned to a version, and where a registry publishes only `latest`, by digest as well. Dependabot proposes updates weekly for the images in `compose.yaml`, the GitHub Actions, and the tools in `uv.lock`; an update merges when CI passes, the smoke tests included. `versions.env` is bumped by hand, and the template's library revisions by `make bump-libraries` ([Pinned versions](../reference/versions.md)).
 
 ## Git hooks
 

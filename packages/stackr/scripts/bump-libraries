@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""Pin the application template's libraries to the latest commit on each one's main.
+
+Usage: scripts/bump-libraries [--check] [LIBRARY=REV ...]
+
+The libraries (artifactr, reflexr and evalr) install from GitHub, not PyPI, so the template pins
+each to a commit of its repository: the `<library>_rev` defaults in copier.yml, which a generated
+application writes into its `[tool.uv.sources]` (ADR-0011). For each library, this script
+resolves the commit its `main` points to with `git ls-remote`, rewrites that default in
+copier.yml, and regenerates the reference pages that show the pins (scripts/docs-reference). It
+prints each pin it moves as old → new, with a URL comparing the two commits.
+
+    scripts/bump-libraries                        every library, to its main
+    scripts/bump-libraries --check                change nothing; fail if a pin is behind
+    scripts/bump-libraries artifactr=v0.1.0       artifactr only, to a tag
+    scripts/bump-libraries reflexr=<commit SHA>   reflexr only, to a commit
+
+A REV is a branch, a tag or a full 40-character commit SHA; a SHA is checked by fetching that
+commit alone from the library's repository. Naming libraries moves only those. With `--check`
+nothing is written, and the script exits 1 when a pin is not at its target.
+
+evalr follows reflexr. The template installs reflexr's `[evals]` extra, and uv resolves it with
+reflexr's own `[tool.uv.sources]`, which pins evalr to a commit; an application that pins evalr
+anywhere else has two URLs for one package, and uv refuses it. So evalr's target is the commit
+the pinned reflexr's pyproject.toml names, not evalr's main, for as long as reflexr pins one.
+
+Applications already generated keep the revisions they were generated with; the template's
+guide says how they move theirs.
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import subprocess
+import sys
+import tempfile
+import tomllib
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+LIBRARIES = ("artifactr", "reflexr", "evalr")
+REPOSITORY = "https://github.com/alexnodeland/{library}"
+PYPROJECT = "https://raw.githubusercontent.com/alexnodeland/{library}/{sha}/pyproject.toml"
+# A library the template installs through another's extra, and so pins where that one does.
+FOLLOWS = {"evalr": "reflexr"}
+ROOT = Path(__file__).resolve().parent.parent
+COPIER = ROOT / "copier.yml"
+SHA = re.compile(r"[0-9a-f]{40}")
+SHORT = 12
+
+
+def pin_line(library: str) -> re.Pattern[str]:
+    """The `default:` line of the library's `<library>_rev` question in copier.yml."""
+    return re.compile(
+        rf"^(?P<prefix>{library}_rev:\n(?:[ \t]+.*\n)*?[ \t]+default:[ \t]+)(?P<rev>\S+)$", re.M
+    )
+
+
+def current_pin(text: str, library: str) -> str:
+    """The commit copier.yml pins the library to."""
+    matches = list(pin_line(library).finditer(text))
+    if len(matches) != 1:
+        raise SystemExit(f"bump-libraries: copier.yml: can't find the default of {library}_rev")
+    return matches[0]["rev"]
+
+
+def git(*args: str) -> str:
+    """Run git; return its output, or raise CalledProcessError with its error."""
+    return subprocess.run(
+        ["git", *args], check=True, capture_output=True, text=True, timeout=120
+    ).stdout
+
+
+def remote_refs(library: str) -> dict[str, str]:
+    """The repository's branches and tags, each with the commit it points to."""
+    url = REPOSITORY.format(library=library)
+    try:
+        output = git("ls-remote", url)
+    except subprocess.CalledProcessError as error:
+        raise SystemExit(f"bump-libraries: {library}: {url}: {error.stderr.strip()}") from error
+    refs: dict[str, str] = {}
+    for line in output.splitlines():
+        sha, _, name = line.partition("\t")
+        refs[name] = sha
+    return refs
+
+
+def check_commit(library: str, sha: str) -> None:
+    """Fail unless the repository has the commit: fetch it alone, without its files."""
+    url = REPOSITORY.format(library=library)
+    with tempfile.TemporaryDirectory() as directory:
+        git("init", "--quiet", "--bare", directory)
+        try:
+            git("-C", directory, "fetch", "--quiet", "--depth=1", "--filter=tree:0", url, sha)
+        except subprocess.CalledProcessError as error:
+            raise SystemExit(f"bump-libraries: {library}: no commit {sha} in {url}") from error
+
+
+def resolve(library: str, rev: str) -> str:
+    """The commit a branch, tag or commit SHA of the library names."""
+    if SHA.fullmatch(rev):
+        check_commit(library, rev)
+        return rev
+    refs = remote_refs(library)
+    # As git resolves a name: a tag (the commit an annotated tag points to), then a branch.
+    for name in (f"refs/tags/{rev}^{{}}", f"refs/tags/{rev}", f"refs/heads/{rev}"):
+        if name in refs:
+            return refs[name]
+    raise SystemExit(
+        f"bump-libraries: {library}: no branch or tag {rev!r}; give a branch, a tag or a full "
+        "40-character commit SHA"
+    )
+
+
+def pinned_by(leader: str, sha: str, library: str) -> str | None:
+    """The commit of `library` that `leader`'s pyproject.toml at `sha` pins, if it pins one."""
+    url = PYPROJECT.format(library=leader, sha=sha)
+    try:
+        with urllib.request.urlopen(url, timeout=60) as response:
+            project: dict[str, Any] = tomllib.loads(response.read().decode())
+    except (urllib.error.URLError, tomllib.TOMLDecodeError) as error:
+        raise SystemExit(f"bump-libraries: {leader}: {url}: {error}") from error
+    source = project.get("tool", {}).get("uv", {}).get("sources", {}).get(library)
+    if not isinstance(source, dict) or not isinstance(rev := source.get("rev"), str):
+        return None
+    return resolve(library, rev)
+
+
+def compare_url(library: str, old: str, new: str) -> str:
+    return f"{REPOSITORY.format(library=library)}/compare/{old[:SHORT]}...{new[:SHORT]}"
+
+
+def say(message: str) -> None:
+    print(f"bump-libraries: {message}", file=sys.stderr)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description=__doc__.splitlines()[0],
+        usage="scripts/bump-libraries [--check] [LIBRARY=REV ...]",
+    )
+    parser.add_argument(
+        "--check", action="store_true", help="change nothing; fail if a pin is not at its target"
+    )
+    parser.add_argument(
+        "pins", nargs="*", metavar="LIBRARY=REV", help="move only these libraries, to these revs"
+    )
+    args = parser.parse_args()
+
+    named: dict[str, str] = {}
+    for pin in args.pins:
+        library, _, rev = pin.partition("=")
+        if library not in LIBRARIES or not rev:
+            parser.error(f"{pin!r}: expected LIBRARY=REV, where LIBRARY is {', '.join(LIBRARIES)}")
+        named[library] = rev
+    targets = named or dict.fromkeys(LIBRARIES, "main")
+
+    text = COPIER.read_text()
+    old = {library: current_pin(text, library) for library in LIBRARIES}
+    new = dict(old)
+    # In LIBRARIES' order, so a library another follows is resolved first.
+    for library in LIBRARIES:
+        leader = FOLLOWS.get(library)
+        required = None
+        if leader is not None and (leader in targets or library in targets):
+            required = pinned_by(leader, new[leader], library)
+        if required is None:
+            if library in targets:
+                new[library] = resolve(library, targets[library])
+            continue
+        if library in targets and (wanted := resolve(library, targets[library])) != required:
+            at = f"{required[:SHORT]}, the commit {leader} {new[leader][:SHORT]} pins"
+            if library in named:
+                raise SystemExit(
+                    f"bump-libraries: {library}={named[library]}: the template installs "
+                    f"{leader}'s extra, so {library} must be at {at}; move {leader} to a commit "
+                    f"that pins {library} where you want it, and {library} follows"
+                )
+            say(f"{library} follows {leader}: {at} ({targets[library]} is {wanted[:SHORT]})")
+        new[library] = required
+
+    moved = [library for library in LIBRARIES if new[library] != old[library]]
+    for library in LIBRARIES:
+        if library in moved:
+            url = compare_url(library, old[library], new[library])
+            line = f"{library:<9} {old[library][:SHORT]} → {new[library][:SHORT]}  {url}"
+            print(line, flush=True)
+        elif library in targets:
+            say(f"{library} is at {new[library][:SHORT]}")
+
+    if not moved:
+        return 0
+    if args.check:
+        say(
+            f"not at their targets: {', '.join(moved)}; run this again without --check to move them"
+        )
+        return 1
+    for library in moved:
+        text = pin_line(library).sub(rf"\g<prefix>{new[library]}", text)
+    COPIER.write_text(text)
+    # The reference pages show the pins; their output goes to stderr, beside this script's own.
+    subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "docs-reference")], check=True, stdout=sys.stderr
+    )
+    say(
+        "copier.yml and the reference pages updated; run `make validate`, and let a pull "
+        "request's Template and Smoke jobs generate applications on the new pins"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

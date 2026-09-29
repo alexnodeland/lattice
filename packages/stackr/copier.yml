@@ -66,11 +66,13 @@ app_port:
 
 # The libraries are not on PyPI: each is pinned to a git revision of its repository, the
 # current `main` when the template was last updated. `copier update` keeps the revisions you
-# chose; change them here, or in pyproject.toml's [tool.uv.sources].
+# chose; change them here, or in pyproject.toml's [tool.uv.sources]. In stackr, `make
+# bump-libraries` moves these defaults: each library's to its `main`, and evalr's to the commit
+# reflexr pins, since reflexr's [evals] extra resolves evalr there.
 artifactr_rev:
   type: str
   help: The artifactr revision to pin (a commit SHA)
-  default: e890aca037c0160f49812778a7d6fbbd0c257889
+  default: 9c92a7f7685df14861dd1077539b595cb6c1ede4
   when: "{{ libraries in ['artifactr', 'both'] }}"
   validator: >-
     {% if not (artifactr_rev | regex_search('^[0-9a-f]{40}$')) %}A full 40-character commit SHA{% endif %}
@@ -78,7 +80,7 @@ artifactr_rev:
 reflexr_rev:
   type: str
   help: The reflexr revision to pin (a commit SHA)
-  default: 5c1fb77c7b7793a9741e97c0ee825b638ea8ca39
+  default: f91a89409e6d42c8d7ac0bca945856e39229476f
   when: "{{ libraries in ['reflexr', 'both'] }}"
   validator: >-
     {% if not (reflexr_rev | regex_search('^[0-9a-f]{40}$')) %}A full 40-character commit SHA{% endif %}

@@ -60,7 +60,7 @@ TRACES_EXPORTERS = [otlp_grpc/tempo$(if $(filter langfuse,$(PROFILES)),$(comma) 
 GATEWAY_TELEMETRY = $(if $(filter observability,$(PROFILES)),true,false)
 COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEMETRY=$(GATEWAY_TELEMETRY) $(DATABASE_ENV)
 
-.PHONY: help install env up down reset ps logs dashboards tenant validate smoke smoke-app docs docs-serve docs-reference changelog clean
+.PHONY: help install env up down reset ps logs dashboards tenant bump-libraries validate smoke smoke-app docs docs-serve docs-reference changelog clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -103,6 +103,9 @@ dashboards: ## Download the libraries' Grafana dashboards pinned in versions.env
 tenant: ## Create a tenant's team and key on the gateway: make tenant NAME=acme [TENANT_FLAGS="--max-budget 20"]
 	@if [ -z "$(NAME)" ]; then echo "usage: make tenant NAME=<tenant> [TENANT_FLAGS=...]"; exit 2; fi
 	$(UV) run scripts/create-tenant $(NAME) $(TENANT_FLAGS)
+
+bump-libraries: ## Pin the template's libraries to their main commits: make bump-libraries [BUMP_FLAGS="--check" or "artifactr=REV"]
+	$(UV) run scripts/bump-libraries $(BUMP_FLAGS)
 
 validate: .env ## Validate every configuration without starting containers, as CI does
 	scripts/validate

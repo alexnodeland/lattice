@@ -27,6 +27,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "langfuse": ({"evalr.core", "evalr.langfuse"}, {"langfuse"}),
     "hf": ({"evalr.core", "evalr.hf"}, {"datasets", "huggingface_hub"}),
     "measures": ({"evalr.core", "evalr.measures"}, set()),
+    "online": ({"evalr.core", "evalr.online"}, set()),
 }
 
 FORBIDDEN = {"artifactr", "reflexr"}

@@ -1,6 +1,6 @@
 # Architecture
 
-> **Status:** accepted design, being built in the phases tracked by [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). This document is evergreen: it is updated in the same pull request as the code that changes it, and the table below shows what exists today. Decisions are recorded in [`adr/`](adr/README.md), and proposals in [`rfcs/`](rfcs/README.md).
+> **Status:** v0.1 is built, as planned in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), except its documentation site (phase 6). This document is evergreen: it is updated in the same pull request as the code that changes it, and the table below shows what exists today. Decisions are recorded in [`adr/`](adr/README.md), and proposals in [`rfcs/`](rfcs/README.md).
 
 | Package | Status |
 |---|---|
@@ -11,7 +11,7 @@
 | `evalr.langfuse` | Implemented |
 | `evalr.hf` | Implemented |
 | `evalr.measures` | Implemented |
-| `evalr.online` | Planned (phase 5) |
+| `evalr.online` | Implemented |
 
 ## What evalr is
 
@@ -62,10 +62,10 @@ graph LR
 
 | Port | What it does | Adapters |
 |---|---|---|
-| `Evaluator[InputT, VerdictT]` | Judges an input and returns a typed verdict | `FunctionEvaluator` (core), `DspyJudge` (`evalr.dspy`), `DecisionEvaluator` (`evalr.decision`); compositions: `Fallback` (core), sampling and budgets (phase 5) |
+| `Evaluator[InputT, VerdictT]` | Judges an input and returns a typed verdict | `FunctionEvaluator` (core), `DspyJudge` (`evalr.dspy`), `DecisionEvaluator` (`evalr.decision`); composed by `Fallback` (core) and run online by `OnlineEvaluation` (`evalr.online`) |
 | `Optimizer[InputT, VerdictT, EvaluatorT]` | Fits an evaluator to people's verdicts | GEPA (`evalr.dspy`), threshold calibration (`evalr.decision`), in-memory (`evalr.memory`) |
 | `DatasetStore` | Saves a dataset and returns its revision; loads one by name and revision | `evalr.memory`, `evalr.jsonl`, `evalr.langfuse`, `evalr.hf` |
-| `ScoreSink` | Records verdicts as scores, idempotently | `evalr.memory`, `evalr.langfuse`, OpenTelemetry evaluation events (phase 5) |
+| `ScoreSink` | Records verdicts as scores, idempotently | `evalr.memory`, `evalr.langfuse`, OpenTelemetry evaluation events (`evalr.online`) |
 | `ExperimentTracker` | Runs a task over a dataset and judges each output | `evalr.memory`, `evalr.langfuse` |
 | `FeedbackSource[InputT, VerdictT]` | Yields examples from people's typed feedback | `evalr.memory`; artifactr's and reflexr's `[evals]` extras |
 | `Formatter[InputT]` | Renders an input as text within a token budget | `InputFormatter` (core) |
@@ -82,7 +82,7 @@ graph LR
 | `evalr.decision` | `[jev]` | core, pydantic-ai-slim with the typesafe extra |
 | `evalr.langfuse` | `[langfuse]` | core, langfuse |
 | `evalr.hf` | `[hf]` | core, datasets, huggingface_hub |
-| `evalr.measures` | | core |
+| `evalr.measures`, `evalr.online` | | core |
 
 Every package may also use the core's own dependencies, pydantic and the OpenTelemetry API. A test enforces the table: what each package imports, that no adapter package imports another, and that nothing imports artifactr or reflexr. The `[all]` extra installs every integration.
 
@@ -270,7 +270,7 @@ A `FeedbackSource[InputT, VerdictT]` yields examples from people's feedback: eve
 
 - A score's id is a UUID derived from its subject (a given key, else the verdict's trace, else a hash of the verdict), the evaluator, its version and the score's name. So recording a verdict again replaces its scores, and a new evaluator version adds new ones rather than overwriting.
 - The evaluator, its version and the field's confidence travel as the score's metadata.
-- A `ScoreSink` records scores, idempotently by id. `InMemoryScoreSink` keeps them by id. OpenTelemetry evaluation events are phase 5.
+- A `ScoreSink` records scores, idempotently by id. `InMemoryScoreSink` keeps them by id. A score may also name the span it judges (`span_id`).
 - `LangfuseScoreSink(client)` (`evalr.langfuse`) records them with `create_score`, keeping each score's id as Langfuse's `score_id`, so recording a verdict again replaces its scores; the metadata carries the evaluator, version and confidence. Langfuse attaches scores to traces, so a score without one is refused. Langfuse sends in the background; `flush()` waits.
 
 ## Experiments
@@ -339,6 +339,29 @@ Agreement compares an evaluator's verdicts with people's, field by field, with t
 | `evaluator_stats(verdicts)` | Per evaluator version: count, mean, median and 95th-percentile latency (nearest rank), and total and mean cost over the verdicts that report one. |
 
 The measures over pairs are property-tested against scikit-learn and SciPy, and calibration error against a NumPy computation.
+
+## Online evaluation
+
+`evalr.online` runs evaluators on live traffic ([ADR-0009](adr/0009-online-evaluation.md)):
+
+```python
+online = OnlineEvaluation(
+    [Fallback(decider, judge)],
+    sample_rate=0.1,
+    budget=Budget(max_cost=5.0),
+    sinks=[LangfuseScoreSink(langfuse), OtelEventSink()],
+)
+online.submit(transcript, key=turn_id)  # in the background, on the current span
+await online.drain()  # at shutdown
+```
+
+- **Sampling by key.** An input is judged when `split_bucket(key, salt)` is below `sample_rate`, so a given turn or run is judged in every process and replay, or never.
+- **Budgets.** `Budget(max_evaluations=, max_cost=, period=timedelta(days=1))` is checked before each evaluation and spent after it, so it is a soft limit; hand-offs and failures count as evaluations.
+- **The judged span.** `judge(input, key=, span=)` evaluates in the trace of the span it judges: the current span, or one given, even one that has ended. Evaluation spans nest under it, and scores record its trace and span. `submit` takes the current span when called, and judges in the background, at most `max_concurrency` at once.
+- **Sinks** receive every verdict's scores, keyed by the input's key, named by `type_names` where a library registers its feedback under another name.
+- **Nothing is raised.** An `OnlineResult` records the verdicts, the evaluators skipped for budget, those that handed off, and every evaluator or sink failure.
+
+`OtelEventSink(logger_provider=None)` is a `ScoreSink` that emits each score as a `gen_ai.evaluation.result` event through the OpenTelemetry logs API, with the judged trace and span as its context, so it can emit after that span has ended. It sets `gen_ai.evaluation.name` (`{type}.{field}`), `gen_ai.evaluation.score.value` (a number, or 1 or 0 for a yes or no) or `gen_ai.evaluation.score.label` (a choice, or `true` or `false`), and `gen_ai.evaluation.explanation` (the verdict's text fields; a text field's own event has its text alone), with the evaluator, its version, the score's id and the confidence. Events are append-only; a reader keyed by the score's id keeps the latest.
 
 ## Observability
 

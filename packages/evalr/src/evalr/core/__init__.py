@@ -51,10 +51,11 @@ from evalr.core.ports import (
     ScoreSink,
 )
 from evalr.core.scores import SCORE_NAMESPACE, Score, ScoreType, score_type_name, scores
-from evalr.core.tracing import Judging, current_trace_id, get_tracer, judging
+from evalr.core.tracing import SCOPE, Judging, current_trace_id, get_tracer, judging
 from evalr.core.verdicts import Confidence, Verdict
 
 __all__ = [
+    "SCOPE",
     "SCORE_NAMESPACE",
     "Agreement",
     "Confidence",

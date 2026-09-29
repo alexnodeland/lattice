@@ -17,9 +17,9 @@ import hashlib
 import re
 import uuid
 from enum import Enum
-from typing import Literal, cast
+from typing import Annotated, Literal, cast
 
-from pydantic import BaseModel, JsonValue
+from pydantic import BaseModel, Field, JsonValue
 
 from evalr.core.fields import FieldKind, verdict_fields
 from evalr.core.verdicts import Verdict
@@ -52,6 +52,7 @@ class Score(BaseModel, frozen=True):
             and ``TEXT``.
         data_type: How the value is to be read.
         trace_id: The trace the score is attached to, when there is one.
+        span_id: The span within that trace the score judges, as 16 hex digits, when known.
         evaluator: The evaluator that gave the verdict.
         version: The evaluator's version.
         confidence: The evaluator's confidence in the field's value, when it has one.
@@ -62,6 +63,7 @@ class Score(BaseModel, frozen=True):
     value: bool | float | str
     data_type: ScoreType
     trace_id: str | None = None
+    span_id: Annotated[str, Field(pattern=r"^[0-9a-f]{16}$")] | None = None
     evaluator: str
     version: str
     confidence: float | None = None
@@ -92,6 +94,7 @@ def scores(
     type_name: str | None = None,
     subject: str | None = None,
     trace_id: str | None = None,
+    span_id: str | None = None,
 ) -> list[Score]:
     """Turn a verdict into one score per field that has a value.
 
@@ -102,6 +105,7 @@ def scores(
         subject: What the verdict is about, such as a run or an example id. It keys the scores'
             ids, so pass it whenever the verdict has no trace.
         trace_id: The trace to attach the scores to; the verdict's own by default.
+        span_id: The span the verdict judges, within that trace, when known.
 
     Returns:
         The scores, in the order of the verdict type's fields.
@@ -127,6 +131,7 @@ def scores(
                 value=_value(field.kind, raw),
                 data_type=_DATA_TYPES[field.kind],
                 trace_id=trace,
+                span_id=span_id,
                 evaluator=verdict.evaluator,
                 version=verdict.version,
                 confidence=verdict.confidence.get(field.name),

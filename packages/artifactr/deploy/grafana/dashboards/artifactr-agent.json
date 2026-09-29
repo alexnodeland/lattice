@@ -289,6 +289,49 @@
     },
     {
       "type": "timeseries",
+      "title": "Failed runs by reason",
+      "description": "Runs that failed for a typed reason, such as a gateway's guardrail block.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (artifactr_run_reason) (rate(artifactr_runs_total{job=~\"$job\", artifactr_tenant_id=~\"$tenant\", artifactr_run_status=\"failed\", artifactr_run_reason!=\"\"}[$__rate_interval]))",
+          "legendFormat": "{{artifactr_run_reason}}",
+          "exemplar": false,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
       "title": "Run segments by status",
       "description": "Run segments that completed, paused, were stopped or failed.",
       "datasource": {
@@ -325,7 +368,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 18,
+        "y": 26,
         "w": 12,
         "h": 8
       }
@@ -378,7 +421,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 18,
+        "y": 26,
         "w": 12,
         "h": 8
       }
@@ -421,7 +464,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 26,
+        "y": 34,
         "w": 12,
         "h": 8
       }
@@ -464,7 +507,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 26,
+        "y": 34,
         "w": 12,
         "h": 8
       }

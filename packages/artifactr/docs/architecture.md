@@ -243,7 +243,7 @@ handle = await runner.send(workspace, thread_id, "Draft a launch plan")
 |---|---|
 | `get_toolset` | The generic tools: `list_artifacts`, `read_artifact`, `create_artifact`, `edit_text` (which can also propose), `archive_artifact`, and optionally `ask_user`. Their definitions never change, so the prompt cache stays warm. Application toolsets are registered on the agent itself ([ADR-0017](adr/0017-application-toolsets-and-capability-events.md)). |
 | `get_instructions` | Renders, fresh from storage for every model request, the artifacts the thread follows, the kinds of artifact the agent can create, the thread's mode, and the agent's proposals awaiting review. |
-| `wrap_run` | Records `run_started`, then briefs the agent: change notes since the thread's last-seen `seq` are enqueued before the first request. Watches the log for the run's duration (see below). When the run ends, records the agent's reply as `message_posted`, then `run_paused` with the deferred requests or `run_ended` with usage, storing the run's new `ModelMessage`s in the same transaction. A cancelled run is recorded as `stopped`, and one that raised as `failed`. |
+| `wrap_run` | Records `run_started`, then briefs the agent: change notes since the thread's last-seen `seq` are enqueued before the first request. Watches the log for the run's duration (see below). When the run ends, records the agent's reply as `message_posted`, then `run_paused` with the deferred requests or `run_ended` with usage, storing the run's new `ModelMessage`s in the same transaction. A cancelled run is recorded as `stopped`, and one that raised as `failed`, with the `reason` of a `RunFailure` ([ADR-0042](adr/0042-typed-run-failures.md)). |
 | `before_tool_execute`, `wrap_tool_execute`, `after_tool_execute` | Record every tool call and its result, the application's tools included, as `tool_called` and `tool_returned`: `ok`, `retry` (a rejection, or the tool's own `ModelRetry`) or `error` (`ToolFailed`, or an exception that fails the run). |
 | `on_tool_execute_error` | Turns any `Rejection` into `ModelRetry` with the rejection's message (for a `VersionConflict`, adding "read the artifact again"), so tools never catch rejections themselves. Other exceptions are recorded and fail the run. |
 
@@ -442,7 +442,7 @@ The metric registry, `artifactr.telemetry.metrics`, declares every metric with i
 | `artifactr.commands` | counter | `artifactr.command.type`, `artifactr.outcome`, `artifactr.rejection`, `artifactr.actor.kind` |
 | `artifactr.commit.duration` | histogram, s | `artifactr.command.type`, `artifactr.outcome` |
 | `artifactr.turns`, `artifactr.turn.duration` | counter; histogram, s | `artifactr.turn.trigger`, `artifactr.turn.outcome` |
-| `artifactr.runs` | counter | `artifactr.run.status`, for each segment that ends or pauses |
+| `artifactr.runs` | counter | `artifactr.run.status` and `artifactr.run.reason`, for each segment that ends or pauses |
 | `artifactr.tool_calls` | counter | `gen_ai.tool.name`, `artifactr.tool.status` |
 | `artifactr.tokens` | counter | `gen_ai.token.type` |
 | `artifactr.messages` | counter | `artifactr.actor.kind` |
@@ -567,6 +567,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0039](adr/0039-the-langfuse-adapter.md) | The Langfuse adapter |
 | [0040](adr/0040-joining-stackrs-network.md) | Joining stackr's network when it runs |
 | [0041](adr/0041-dashboards-generated-tested-and-released.md) | Dashboards generated, tested and released |
+| [0042](adr/0042-typed-run-failures.md) | Typed run failures |
 
 ## Open questions
 

@@ -233,7 +233,9 @@ async def test_what_events_do_is_counted(ws: Workspace, recorder: Recorder) -> N
         )
     )
     await agent.record(RunStarted(run_id="run_2", thread_id=thread.id))
-    await agent.record(RunEnded(run_id="run_2", thread_id=thread.id, status="failed"))
+    await agent.record(
+        RunEnded(run_id="run_2", thread_id=thread.id, status="failed", reason="guardrail_blocked")
+    )
 
     assert recorder.total("artifactr.messages", {ACTOR_KIND: "user"}) == 1
     assert recorder.total("artifactr.messages", {ACTOR_KIND: "agent"}) == 1
@@ -246,6 +248,8 @@ async def test_what_events_do_is_counted(ws: Workspace, recorder: Recorder) -> N
     assert recorder.total("artifactr.tool_calls", where) == 1
     for status in ("paused", "completed", "failed"):
         assert recorder.total("artifactr.runs", {RUN_STATUS: status}) == 1
+    where = {RUN_STATUS: "failed", "artifactr.run.reason": "guardrail_blocked"}
+    assert recorder.total("artifactr.runs", where) == 1
     assert recorder.total("artifactr.tokens", {GEN_AI_TOKEN_TYPE: "input"}) == 15
     assert recorder.total("artifactr.tokens", {GEN_AI_TOKEN_TYPE: "output"}) == 7
 

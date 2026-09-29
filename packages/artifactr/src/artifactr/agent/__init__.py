@@ -12,7 +12,7 @@ it in threads with a :class:`Runner`::
     await runner.send(workspace, thread_id, "Draft a launch plan")
 """
 
-from artifactr.agent.capability import ArtifactWorkspace
+from artifactr.agent.capability import ArtifactWorkspace, RunFailure
 from artifactr.agent.live import (
     ArtifactDraft,
     FanoutChannel,
@@ -37,6 +37,7 @@ __all__ = [
     "FanoutChannel",
     "LiveChannel",
     "NullChannel",
+    "RunFailure",
     "RunHandle",
     "Runner",
     "Sent",

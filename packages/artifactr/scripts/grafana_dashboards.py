@@ -534,6 +534,24 @@ def agent() -> dict[str, Any]:
     layout.row("Runs and tools")
     series(
         layout,
+        "Failed runs by reason",
+        [
+            (
+                rate(
+                    "artifactr_runs_total",
+                    TENANT,
+                    by="artifactr_run_reason",
+                    extra='artifactr_run_status="failed", artifactr_run_reason!=""',
+                ),
+                "{{artifactr_run_reason}}",
+            )
+        ],
+        unit="reqps",
+        description="Runs that failed for a typed reason, such as a gateway's guardrail block.",
+        width=24,
+    )
+    series(
+        layout,
         "Run segments by status",
         [
             (

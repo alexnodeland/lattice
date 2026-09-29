@@ -14,6 +14,8 @@ See [The agent](../guides/agent.md).
 
 ::: artifactr.agent.Session
 
+::: artifactr.agent.RunFailure
+
 ::: artifactr.agent.Trigger
 
 ::: artifactr.agent.load_history

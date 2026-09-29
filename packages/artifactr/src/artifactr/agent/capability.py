@@ -60,6 +60,23 @@ from artifactr.telemetry.attributes import ARTIFACT_ID
 
 type Context = RunContext[Session[Any]]
 
+
+class RunFailure(Exception):
+    """An exception that fails a run for a known reason, recorded in its ``run_ended``.
+
+    Raise a subclass from a tool or a capability to give a failure a typed reason instead of an
+    opaque error: the run ends as ``failed``, with ``reason`` and the exception's message.
+
+    Args:
+        message: What happened, for people.
+        reason: A short, stable code, such as ``guardrail_blocked``.
+    """
+
+    def __init__(self, message: str, *, reason: str) -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
 INTRO = (
     "You collaborate with the people in this thread through shared artifacts. People and "
     "other agents can change them at any time: you are told what changed as it happens, "
@@ -160,7 +177,9 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             await workspace.record(self._ended(session, "stopped"))
             raise
         except Exception as error:
-            await workspace.record(self._ended(session, "failed", error=str(error)))
+            reason = error.reason if isinstance(error, RunFailure) else None
+            failed = self._ended(session, "failed", error=str(error), reason=reason)
+            await workspace.record(failed)
             raise
         finally:
             watcher.cancel()
@@ -216,6 +235,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         *,
         usage: RunUsage | None = None,
         error: str | None = None,
+        reason: str | None = None,
     ) -> RunEnded:
         return RunEnded(
             run_id=session.run_id,
@@ -223,6 +243,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             status=status,
             usage=usage,
             error=error,
+            reason=reason,
         )
 
     # ─── tool calls ───────────────────────────────────────────────────────────

@@ -195,6 +195,7 @@ nav:
           - adr/0039-the-langfuse-adapter.md
           - adr/0040-joining-stackrs-network.md
           - adr/0041-dashboards-generated-tested-and-released.md
+          - adr/0042-typed-run-failures.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

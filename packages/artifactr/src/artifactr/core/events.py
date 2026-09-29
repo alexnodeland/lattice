@@ -229,6 +229,8 @@ class RunEnded(_Event):
     status: Literal["completed", "stopped", "failed"]
     usage: RunUsage | None = None
     error: str | None = None
+    reason: str | None = None
+    """Why a failed run failed, when a capability said, such as ``guardrail_blocked``."""
 
 
 # ─── feedback ─────────────────────────────────────────────────────────────────

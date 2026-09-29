@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from pydantic_ai import FunctionToolset, ModelRequest, ModelRetry, RunContext, ToolFailed
 
-from artifactr.agent import Session
+from artifactr.agent import RunFailure, Session
 from artifactr.core import (
     EditArtifact,
     RunEnded,
@@ -239,3 +239,22 @@ async def test_creating_a_proposal_policy_type_proposes(
     [proposal] = await ws.proposals()
     assert proposal.change.type == "create_artifact"
     assert (await ws.thread(thread.id)).focus == (), "nothing to follow until it exists"
+
+
+async def test_a_typed_failure_records_its_reason(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    tools = FunctionToolset[Session[Gate]]()
+
+    @tools.tool
+    async def publish(ctx: RunContext[Session[Gate]]) -> str:
+        raise RunFailure("publishing is switched off", reason="publishing_disabled")
+
+    script = Script(call("publish"))
+    with pytest.raises(RunFailure, match="switched off"):
+        await make_agent(script, tools=[tools]).run(
+            "go", deps=Session.start(ws, thread.id, app=gate)
+        )
+    ended = event_as((await ws.read())[-1], RunEnded)
+    assert (ended.status, ended.reason) == ("failed", "publishing_disabled")
+    assert ended.error == "publishing is switched off"

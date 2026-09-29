@@ -706,6 +706,49 @@
       }
     },
     {
+      "name": "a failed run records its reason",
+      "actor": {
+        "kind": "agent",
+        "thread_id": "thr_1",
+        "run_id": "run_1"
+      },
+      "given": {
+        "runs": [
+          {
+            "id": "run_1",
+            "thread_id": "thr_1",
+            "status": "running"
+          }
+        ]
+      },
+      "record": {
+        "type": "run_ended",
+        "run_id": "run_1",
+        "thread_id": "thr_1",
+        "status": "failed",
+        "error": "blocked by guardrail pii",
+        "reason": "guardrail_blocked"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "run_ended",
+            "status": "failed",
+            "reason": "guardrail_blocked"
+          }
+        ],
+        "runs": [
+          {
+            "id": "run_1",
+            "status": "failed"
+          }
+        ]
+      }
+    },
+    {
       "name": "a running run cannot start again",
       "actor": {
         "kind": "agent",

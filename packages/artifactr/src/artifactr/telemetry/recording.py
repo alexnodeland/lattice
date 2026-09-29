@@ -38,6 +38,7 @@ from artifactr.telemetry.attributes import (
     GEN_AI_TOKEN_TYPE,
     GEN_AI_TOOL_NAME,
     PROPOSAL_ACTION,
+    RUN_REASON,
     RUN_STATUS,
     TOOL_STATUS,
 )
@@ -164,7 +165,8 @@ def record_events(
                 telemetry.add(RUNS, 1, {**scope, RUN_STATUS: "paused"})
                 _tokens(telemetry, event.usage, scope)
             case RunEnded():
-                telemetry.add(RUNS, 1, {**scope, RUN_STATUS: event.status})
+                ended = {**scope, RUN_STATUS: event.status, RUN_REASON: event.reason}
+                telemetry.add(RUNS, 1, ended)
                 _tokens(telemetry, event.usage, scope)
             case FeedbackGiven():
                 attributes = {

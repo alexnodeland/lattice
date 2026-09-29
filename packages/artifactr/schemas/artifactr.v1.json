@@ -2039,6 +2039,18 @@
           "default": null,
           "title": "Error"
         },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
         "run_id": {
           "$ref": "#/$defs/RunId"
         },

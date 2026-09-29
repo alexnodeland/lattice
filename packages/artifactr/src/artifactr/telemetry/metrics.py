@@ -32,6 +32,7 @@ from artifactr.telemetry.attributes import (
     OUTCOME,
     PROPOSAL_ACTION,
     REJECTION,
+    RUN_REASON,
     RUN_STATUS,
     TENANT_ID,
     TOOL_STATUS,
@@ -153,8 +154,9 @@ RUNS = _artifactr(
     "artifactr.runs",
     "counter",
     "{run}",
-    "Run segments recorded as ended or paused, by status.",
+    "Run segments recorded as ended or paused, by status, and a failure's reason.",
     RUN_STATUS,
+    RUN_REASON,
 )
 TOOL_CALLS = _artifactr(
     "artifactr.tool_calls",

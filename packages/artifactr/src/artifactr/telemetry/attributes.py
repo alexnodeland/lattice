@@ -91,6 +91,9 @@ TURN_OUTCOME: Final = "artifactr.turn.outcome"
 RUN_STATUS: Final = "artifactr.run.status"
 """How a run segment ended: ``completed``, ``paused``, ``stopped`` or ``failed``."""
 
+RUN_REASON: Final = "artifactr.run.reason"
+"""Why a run segment failed, when it has a typed reason, such as ``guardrail_blocked``."""
+
 TOOL_STATUS: Final = "artifactr.tool.status"
 """How a tool call ended: ``ok``, ``retry`` or ``error``."""
 

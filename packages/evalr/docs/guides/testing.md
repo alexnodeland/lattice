@@ -127,7 +127,7 @@ evalr's own [fake of Jev](https://github.com/alexnodeland/evalr/blob/main/tests/
 | `check_optimizer(optimizer, evaluator, train=, validate=)` | The evaluator given is left alone, and the fitted one gives the same verdict type and passes `check_evaluator` |
 | `check_dataset_store(store)` | An unknown name is not found; a saved dataset loads back exactly; saving again changes nothing; a changed dataset makes a new revision and the earlier one still loads; an unknown revision is not found; loading as a type the examples do not satisfy fails validation |
 | `check_feedback_source(source)` | Ids are unique, inputs and verdicts are of the source's types, every example has a verdict, and iterating again yields the same examples |
-| `check_score_sink(sink, recorded)` | Recording a score again replaces it, every score recorded is kept, and the latest value wins, on its trace or its session |
+| `check_score_sink(sink, recorded)` | Recording a score again replaces it, every score recorded is kept, and the latest value wins, with its type, trace, span, session, time and metadata; a score without a time may be given the time it was recorded |
 | `check_score_config_store(store)` | A new store lists no configs, and every config created is listed by its name |
 | `check_experiment_tracker(tracker)` | One item per example, in the dataset's order; a failed task leaves no output and records its error; a failed evaluator records its error while the others still judge; verdicts record the item's trace; names and the dataset's version are kept |
 
@@ -199,7 +199,7 @@ async def test_the_evaluator_meets_the_contract() -> None:
     await check_evaluator(evaluator, [Thread(request="Hi", reply="Hello")])
 ```
 
-`check_dataset_store` needs a store that does not yet hold a dataset named `evalr-contract` (pass `name=` to use another), `check_score_sink` a sink that holds no scores yet, and `check_score_config_store` a store that holds no configs yet. The libraries' Langfuse score sinks and config stores can run the same two suites against a fake of Langfuse's API.
+`check_dataset_store` needs a store that does not yet hold a dataset named `evalr-contract` (pass `name=` to use another), `check_score_sink` a sink that holds no scores yet, and `check_score_config_store` a store that holds no configs yet. evalr's Langfuse sink and config store pass the same two suites against a fake of Langfuse's API.
 
 ## Tips
 

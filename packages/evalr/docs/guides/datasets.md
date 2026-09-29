@@ -152,7 +152,7 @@ as_saved = await datasets.load(
 
 | Item | Holds |
 |---|---|
-| id | A UUID 5 of the dataset's name and the example's id (`item_id`), so saving again updates items rather than adding more |
+| id | A UUID 5 of the dataset's name and the example's id, so saving again updates items rather than adding more |
 | input | The example's input |
 | expected output | `{"verdict": ..., "reference": ...}` |
 | metadata | The example's metadata, with its id under `evalr` |

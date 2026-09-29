@@ -20,16 +20,15 @@ from evalr.core import (
     Dataset,
     Evaluator,
     ExperimentResult,
-    FieldKind,
     ItemResult,
     Task,
     Verdict,
     current_trace_id,
     scores,
-    verdict_fields,
 )
+from evalr.core._explanation import explanation
 
-__all__ = ["LangfuseExperimentTracker", "evaluations"]
+__all__ = ["LangfuseExperimentTracker"]
 
 _EVALR = "evalr"
 
@@ -42,13 +41,19 @@ class LangfuseExperimentTracker:
     cannot hold, become the comment of the verdict's other scores.
     """
 
-    def __init__(self, client: Langfuse) -> None:
+    def __init__(
+        self, client: Langfuse, *, type_names: Mapping[type[BaseModel], str] | None = None
+    ) -> None:
         """Use a Langfuse client.
 
         Args:
             client: The application's client.
+            type_names: Score names for verdict types, where a library registers its feedback
+                under a name other than the class name in snake case, so that evaluators' scores
+                and people's line up.
         """
         self.client = client
+        self.type_names = dict(type_names or {})
 
     async def run_experiment[InputT: BaseModel, VerdictT: BaseModel, OutputT: BaseModel](
         self,
@@ -95,7 +100,7 @@ class LangfuseExperimentTracker:
                     errors[example_id].append(_describe(evaluator.name, error))
                     raise
                 verdicts[example_id][index] = verdict
-                return evaluations(verdict)
+                return evaluations(verdict, type_name=self.type_names.get(type(verdict.value)))
 
             evaluate.__name__ = evaluator.name
             return evaluate
@@ -140,25 +145,27 @@ class LangfuseExperimentTracker:
         )
 
 
-def evaluations(verdict: Verdict[BaseModel]) -> list[Evaluation]:
+def evaluations(verdict: Verdict[BaseModel], *, type_name: str | None = None) -> list[Evaluation]:
     """A verdict as Langfuse evaluations: one per field that is not text, named ``{type}.{field}``.
 
     Langfuse's evaluations hold numbers, booleans and categories only, so the verdict's text
     fields (people's or the judge's reasons) become each evaluation's comment.
+
+    Args:
+        verdict: The verdict.
+        type_name: The ``{type}`` in the evaluations' names, as ``scores`` takes it.
     """
-    texts = [f.name for f in verdict_fields(type(verdict.value)) if f.kind is FieldKind.TEXT]
-    comment = "\n".join(
-        f"{name}: {value}" for name in texts if (value := getattr(verdict.value, name)) is not None
-    )
+    judged = scores(verdict, type_name=type_name)
+    comment = explanation(judged) or None
     return [
         Evaluation(
             name=score.name,
             value=score.value,
-            comment=comment or None,
+            comment=comment,
             metadata=score.metadata,
             data_type=score.data_type,
         )
-        for score in scores(verdict)
+        for score in judged
         if score.data_type != "TEXT"
     ]
 

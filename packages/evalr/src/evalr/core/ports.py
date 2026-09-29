@@ -1,10 +1,10 @@
 """The ports: what the core needs from the outside, as small protocols.
 
 Adapters implement them in their own packages (ADR-0006): DSPy judges and decision models are
-evaluators, Langfuse, Hugging Face and JSON Lines files are dataset stores, and artifactr and
-reflexr supply feedback sources, score sinks and score config stores (ADR-0011). Every port has an
-in-memory adapter in ``evalr.memory`` and a contract suite in ``evalr.contracts`` that every
-adapter passes.
+evaluators, Langfuse, Hugging Face and JSON Lines files are dataset stores, Langfuse keeps scores
+and score configs for evalr and the libraries alike (ADR-0012), and artifactr and reflexr supply
+feedback sources. Every port has an in-memory adapter in ``evalr.memory`` and a contract suite in
+``evalr.contracts`` that every adapter passes.
 
 Ports that do I/O are async. Adapters over synchronous SDKs run them in a worker thread.
 """

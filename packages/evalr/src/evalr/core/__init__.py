@@ -18,7 +18,7 @@ from evalr.core.feedback import collect
 from evalr.core.fields import (
     FieldKind,
     ScoreConfig,
-    ScoreType,
+    ScoreDataType,
     UnsupportedField,
     VerdictField,
     canonical_fields,
@@ -92,8 +92,8 @@ __all__ = [
     "Score",
     "ScoreConfig",
     "ScoreConfigStore",
+    "ScoreDataType",
     "ScoreSink",
-    "ScoreType",
     "Task",
     "TokenCounter",
     "Training",

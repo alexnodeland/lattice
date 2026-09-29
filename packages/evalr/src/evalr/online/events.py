@@ -16,6 +16,7 @@ from opentelemetry.context import Context
 from opentelemetry.util.types import AttributeValue
 
 from evalr.core import SCOPE, Score
+from evalr.core._explanation import explanation
 
 __all__ = ["EVALUATION_RESULT", "OtelEventSink"]
 
@@ -43,6 +44,9 @@ class OtelEventSink:
     - ``evalr.evaluator.name``, ``evalr.evaluator.version``, ``evalr.score.id`` and
       ``evalr.confidence``: the rest, where the score has them (people's feedback has no
       evaluator)
+    - ``evalr.source.{key}``: each entry of the score's source, such as who gave the feedback.
+      Entries are emitted verbatim and may identify people or tenants, so put nothing in a
+      score's source that the log pipeline must not hold.
 
     An event's time is the score's timestamp, when it has one. Events are append-only; each
     carries its score's id, so a reader that keys by it keeps the latest.
@@ -58,20 +62,19 @@ class OtelEventSink:
 
     async def record(self, scores: Sequence[Score], /) -> None:
         """Emit an event for each score."""
-        explanations: dict[_Verdict, list[str]] = defaultdict(list)
+        verdicts: dict[_Verdict, list[Score]] = defaultdict(list)
+        for score in scores:
+            verdicts[_verdict(score)].append(score)
         for score in scores:
             if score.data_type == "TEXT":
-                explanations[_verdict(score)].append(f"{score.name.split('.')[-1]}: {score.value}")
-        for score in scores:
-            if score.data_type == "TEXT":
-                explanation = str(score.value)
+                explained = str(score.value)
             else:
-                explanation = "\n".join(explanations[_verdict(score)])
+                explained = explanation(verdicts[_verdict(score)])
             self._logger.emit(
                 timestamp=_nanoseconds(score.timestamp) if score.timestamp else None,
                 event_name=EVALUATION_RESULT,
                 context=_judged(score),
-                attributes=_attributes(score, explanation),
+                attributes=_attributes(score, explained),
             )
 
 
@@ -96,7 +99,7 @@ def _judged(score: Score) -> Context | None:
     return trace.set_span_in_context(trace.NonRecordingSpan(span))
 
 
-def _attributes(score: Score, explanation: str) -> dict[str, AttributeValue]:
+def _attributes(score: Score, explained: str) -> dict[str, AttributeValue]:
     attributes: dict[str, AttributeValue] = {
         "gen_ai.evaluation.name": score.name,
         "evalr.score.id": score.id,
@@ -107,18 +110,19 @@ def _attributes(score: Score, explanation: str) -> dict[str, AttributeValue]:
         attributes["evalr.evaluator.name"] = score.evaluator
     if score.version is not None:
         attributes["evalr.evaluator.version"] = score.version
-    value = score.value
-    if isinstance(value, bool):
-        attributes["gen_ai.evaluation.score.value"] = 1.0 if value else 0.0
-        attributes["gen_ai.evaluation.score.label"] = "true" if value else "false"
+    if score.data_type == "BOOLEAN":
+        attributes["gen_ai.evaluation.score.value"] = 1.0 if score.value else 0.0
+        attributes["gen_ai.evaluation.score.label"] = "true" if score.value else "false"
+    elif score.data_type == "NUMERIC":
+        attributes["gen_ai.evaluation.score.value"] = float(score.value)
     elif score.data_type == "CATEGORICAL":
-        attributes["gen_ai.evaluation.score.label"] = str(value)
-    elif not isinstance(value, str):
-        attributes["gen_ai.evaluation.score.value"] = float(value)
-    if explanation:
-        attributes["gen_ai.evaluation.explanation"] = explanation
+        attributes["gen_ai.evaluation.score.label"] = str(score.value)
+    if explained:
+        attributes["gen_ai.evaluation.explanation"] = explained
     if score.confidence is not None:
         attributes["evalr.confidence"] = score.confidence
+    for key, value in score.source.items():
+        attributes[f"evalr.source.{key}"] = value
     return attributes
 
 

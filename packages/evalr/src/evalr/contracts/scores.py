@@ -2,6 +2,7 @@
 
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
+from datetime import UTC, datetime
 
 from evalr.contracts.support import ContractVerdict, require
 from evalr.core import (
@@ -35,6 +36,7 @@ def _feedback() -> Score:
         value=4.0,
         data_type="NUMERIC",
         session_id="evalr-contract-session",
+        timestamp=datetime(2026, 9, 29, 12, 30, tzinfo=UTC),
         source={"actor": "evalr-contract-person"},
     )
 
@@ -42,10 +44,12 @@ def _feedback() -> Score:
 async def check_score_sink(
     sink: ScoreSink, recorded: Callable[[], Awaitable[Sequence[Score]]]
 ) -> None:
-    """Check that a score sink keeps one score per id, the latest recorded, on its trace or session.
+    """Check that a score sink keeps one score per id: the latest recorded, whole.
 
     A score sink has no reads, so the caller says how to see what it recorded: the in-memory
-    sink's scores, or what a backend's fake received.
+    sink's scores, or what a backend's fake received. A score must be kept with everything it
+    holds (its value and type, trace, span, session, time and metadata), except that a score
+    without a time may be given the time it was recorded.
 
     Args:
         sink: The sink to check, holding no scores yet.
@@ -55,7 +59,7 @@ async def check_score_sink(
         ContractViolation: The sink behaves differently from the ``ScoreSink`` contract.
     """
     first = scores(_verdict(1))
-    second = scores(_verdict(2), subject="contract-subject")
+    second = scores(_verdict(2), subject="contract-subject", span_id="00f067aa0ba902b7")
     feedback = _feedback()
     await sink.record(first)
     await sink.record(first)
@@ -74,11 +78,12 @@ async def check_score_sink(
     require(set(by_id) == set(expected), "every score recorded, and only those, must be kept")
     for score_id, score in expected.items():
         kept = by_id[score_id]
+        if score.timestamp is None:
+            kept = kept.model_copy(update={"timestamp": None})
         require(
-            (kept.name, kept.value, kept.data_type, kept.trace_id, kept.session_id)
-            == (score.name, score.value, score.data_type, score.trace_id, score.session_id),
-            f"{score.name}: the latest value recorded must be kept, with its type, trace and "
-            "session",
+            kept == score,
+            f"{score.name}: the latest value recorded must be kept, with its type, trace, span, "
+            "session, time and metadata",
         )
 
 

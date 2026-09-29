@@ -217,7 +217,7 @@ def opinionated(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
     return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"tone": "warm"})])
 
 
-async def test_verdicts_with_nothing_scored_leave_the_scores_unknown() -> None:
+async def test_verdicts_with_nothing_compared_leave_the_scores_unknown() -> None:
     def data(name: str) -> Dataset[Case, Opinion]:
         example = Example[Case, Opinion](id=f"{name}-0", input=Case(text="x"), verdict=Opinion())
         return Dataset(name, [example], input_type=Case, verdict_type=Opinion)

@@ -42,6 +42,8 @@ class FakeLangfuse:
         self.scores: dict[str, dict[str, Any]] = {}
         self.score_times: dict[str, str] = {}
         """When each score was given, by id: its ingestion event's timestamp."""
+        self.configs: list[dict[str, Any]] = []
+        """Every score config created, in order."""
         self.writes: list[str] = []
 
     def now(self) -> datetime:
@@ -68,6 +70,10 @@ class FakeLangfuse:
             return self.delete_item(path.removeprefix("/api/public/dataset-items/"))
         if path == "/api/public/ingestion" and method == "POST":
             return self.ingest(body)
+        if path == "/api/public/score-configs" and method == "POST":
+            return self.create_config(body)
+        if path == "/api/public/score-configs" and method == "GET":
+            return paged(self.configs, dict(request.url.params))
         if path == "/api/public/projects" and method == "GET":
             return httpx.Response(200, json={"data": [{"id": "project", "name": "evalr"}]})
         return httpx.Response(404, json={"message": f"{method} {path} is not faked"})
@@ -144,20 +150,7 @@ class FakeLangfuse:
             latest = states[-1] if states else None
             if latest and latest["datasetName"] == name and latest["status"] == "ACTIVE":
                 items.append(latest)
-        page, limit = int(params.get("page", 1)), int(params.get("limit", 50))
-        pages = max(1, -(-len(items) // limit))
-        return httpx.Response(
-            200,
-            json={
-                "data": items[(page - 1) * limit : page * limit],
-                "meta": {
-                    "page": page,
-                    "limit": limit,
-                    "totalItems": len(items),
-                    "totalPages": pages,
-                },
-            },
-        )
+        return paged(items, params)
 
     def ingest(self, body: dict[str, Any]) -> httpx.Response:
         successes = []
@@ -167,6 +160,32 @@ class FakeLangfuse:
                 self.score_times[event["body"]["id"]] = event["timestamp"]
             successes.append({"id": event["id"], "status": 201})
         return httpx.Response(207, json={"successes": successes, "errors": []})
+
+    def create_config(self, body: dict[str, Any]) -> httpx.Response:
+        moment = stamp(self.now())
+        config = {
+            **body,
+            "id": str(uuid.uuid4()),
+            "projectId": "project",
+            "isArchived": False,
+            "createdAt": moment,
+            "updatedAt": moment,
+        }
+        self.configs.append(config)
+        return httpx.Response(200, json=config)
+
+
+def paged(data: list[dict[str, Any]], params: dict[str, str]) -> httpx.Response:
+    """One page of a list, as Langfuse's list endpoints return it."""
+    page, limit = int(params.get("page", 1)), int(params.get("limit", 50))
+    pages = max(1, -(-len(data) // limit))
+    return httpx.Response(
+        200,
+        json={
+            "data": data[(page - 1) * limit : page * limit],
+            "meta": {"page": page, "limit": limit, "totalItems": len(data), "totalPages": pages},
+        },
+    )
 
 
 def as_javascript(value: Any) -> Any:

@@ -3,12 +3,14 @@
 Each dataset is a directory under the store's root, named by the dataset (``org/helpfulness``
 becomes ``org/helpfulness/``). Every revision is a file of JSON records, one example to a line,
 named by the dataset's content hash, so saving the same examples again rewrites nothing.
-``dataset.json`` names the latest revision and holds the description::
+``dataset.json`` names the latest revision and holds the description:
 
-    root/
-      helpfulness/
-        dataset.json            {"description": "...", "latest": "3f2a9c0d1e4b5a67"}
-        3f2a9c0d1e4b5a67.jsonl  one example per line
+```text
+root/
+  helpfulness/
+    dataset.json            {"description": "...", "latest": "3f2a9c0d1e4b5a67"}
+    3f2a9c0d1e4b5a67.jsonl  one example per line
+```
 """
 
 import asyncio

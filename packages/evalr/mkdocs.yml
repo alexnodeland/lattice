@@ -112,7 +112,6 @@ plugins:
             extensions:
               - griffe_pydantic:
                   schema: false
-              - scripts/griffe_sphinx_roles.py:SphinxRoles
             filters: ["!^_", "!^model_config$"]
             heading_level: 3
             members_order: source
@@ -171,6 +170,8 @@ nav:
           - adr/0009-online-evaluation.md
           - adr/0010-documentation-site.md
           - adr/0011-scores-shared-with-the-libraries.md
+          - adr/0012-langfuse-score-adapters-in-evalr.md
+          - adr/0013-docstrings-in-markdown-and-one-docs-build.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

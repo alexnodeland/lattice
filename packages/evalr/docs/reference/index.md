@@ -30,7 +30,7 @@ evalr is built as ports and adapters ([Concepts](../concepts.md#ports-and-adapte
 | `Evaluator`, `FunctionEvaluator`, `Fallback`, `HandOff` | [`evalr.core`: Evaluators](core.md#evaluators) |
 | `Example`, `Dataset`, `DatasetStore`, `DatasetNotFound`, `DuplicateExample`, `FeedbackSource`, `collect` | [`evalr.core`: Examples and datasets](core.md#examples-and-datasets) |
 | `Formatter`, `InputFormatter`, `TokenCounter` | [`evalr.core`: Formatters](core.md#formatters) |
-| `Score`, `ScoreType`, `ScoreSink`, `scores` | [`evalr.core`: Scores](core.md#scores) |
+| `Score`, `ScoreDataType`, `ScoreSink`, `scores` | [`evalr.core`: Scores](core.md#scores) |
 | `ScoreConfig`, `ScoreConfigStore`, `score_configs`, `sync_score_configs` | [`evalr.core`: Score configs](core.md#score-configs) |
 | `ExperimentTracker`, `Task`, `ExperimentResult`, `ItemResult` | [`evalr.core`: Experiments](core.md#experiments) |
 | `measure`, `Measurement`, `Optimizer`, `optimize`, `Training`, `DatasetRef` | [`evalr.core`: Measuring and optimizing](core.md#measuring-and-optimizing) |

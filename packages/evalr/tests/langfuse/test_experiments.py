@@ -7,7 +7,8 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from evalr.contracts import ContractInput, ContractVerdict, check_experiment_tracker
 from evalr.contracts.support import contract_dataset
 from evalr.core import Example, FunctionEvaluator, Verdict
-from evalr.langfuse import LangfuseExperimentTracker, evaluations
+from evalr.langfuse import LangfuseExperimentTracker
+from evalr.langfuse.experiments import evaluations
 
 from ..conftest import Spans, context_of
 from ..decision.models import Helpfulness
@@ -48,7 +49,8 @@ async def test_items_run_in_their_own_traces_and_verdicts_become_scores(
     def judge(reply: Reply) -> ContractVerdict:
         return ContractVerdict(rating=4, resolved=True, reason="it said done")
 
-    result = await LangfuseExperimentTracker(client).run_experiment(
+    tracker = LangfuseExperimentTracker(client, type_names={ContractVerdict: "contract-review"})
+    result = await tracker.run_experiment(
         "prompt-v2",
         dataset=dataset,
         task=answer,
@@ -69,13 +71,16 @@ async def test_items_run_in_their_own_traces_and_verdicts_become_scores(
     assert {langfuse_spans[s.parent.span_id] for s in evaluate if s.parent} == {"judge"}
     assert {"experiment-item-run", "experiment-item-task"} <= set(langfuse_spans.values())
     comments = {body["name"]: body.get("comment") for body in server.scores.values()}
-    assert comments["contract_verdict.rating"] == "reason: it said done"
-    assert "contract_verdict.reason" not in comments
+    assert comments["contract-review.rating"] == "reason: it said done"
+    assert "contract-review.reason" not in comments
 
 
-def test_evaluations_leave_text_to_comments() -> None:
+def test_evaluations_leave_out_text_and_an_empty_one_explains_nothing() -> None:
     verdict = Verdict(
-        value=Helpfulness(rating=4, resolved=True), evaluator="e", version="1", trace_id="f" * 32
+        value=Helpfulness(rating=4, resolved=True, reason=""),
+        evaluator="e",
+        version="1",
+        trace_id="f" * 32,
     )
     result = evaluations(verdict)
     assert [(e.name, e.value, e.data_type, e.comment) for e in result] == [

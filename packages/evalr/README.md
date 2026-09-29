@@ -103,7 +103,7 @@ It needs `OPENAI_API_KEY` (or another provider's, with the models renamed) and `
 The documentation site is at **<https://evalr.alexnodeland.com>**. It is built from [`docs/`](docs/index.md) and published from `main` on every push; run `make docs-serve` to read it locally at <http://localhost:8000>.
 
 - [Getting started](docs/getting-started.md), [concepts](docs/concepts.md) and the [guides](docs/guides/verdicts.md): verdicts, evaluators, DSPy judges, decision evaluators, calibration, datasets, feedback sources, scores, experiments, metrics, workflow measures, online evaluation and testing.
-- [Architecture](docs/architecture.md): concepts, packages and what exists today.
+- [Architecture](docs/architecture.md): concepts, packages and how each part works.
 - [Architecture decision records](docs/adr/README.md): why each part is the way it is.
 - [RFCs](docs/rfcs/README.md): proposals and the v0.1 build plan.
 - [Brand](docs/assets/brand/README.md): the mark, colours and type.

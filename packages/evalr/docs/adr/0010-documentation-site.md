@@ -1,6 +1,6 @@
 # ADR-0010: The documentation site, and publishing it from main
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0013](0013-docstrings-in-markdown-and-one-docs-build.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 

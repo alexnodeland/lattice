@@ -117,7 +117,7 @@ print(result.run_name, result.url)
 ```
 
 - **Each example is an item with a trace of its own.** The item holds the example's input, `{"verdict": ..., "reference": ...}` as its expected output, and the example's id in its metadata. The task runs in the item's task span, and each evaluator in a span named after it, so everything they call nests under the item.
-- **Every verdict becomes the item's scores**, named `{type}.{field}` like [any score](scores.md#names-and-ids), with the evaluator, its version and the confidence as metadata. Langfuse's evaluations hold no text, so a verdict's text fields (its reason) become the comment of its other scores.
+- **Every verdict becomes the item's scores**, named `{type}.{field}` like [any score](scores.md#names-and-ids), with the evaluator, its version and the confidence as metadata. `type_names={Helpfulness: "reply_helpfulness"}` names a verdict type's scores the way a library registered its feedback, so an evaluator's scores and people's line up. Langfuse's evaluations hold no text, so a verdict's text fields (its reason) become the comment of its other scores, one `field: text` line each.
 - **Runs are named by Langfuse** (`{name} - {time}`) unless you pass `run_name=`. The examples go to Langfuse as local items rather than a Langfuse dataset's, so a run is one of the project's experiments, listed under its run name, not a dataset run, and `result.url` is `None`.
 - The Langfuse client runs an experiment on an event loop of its own, in a worker thread. evalr runs your task and evaluators back on your event loop, where their clients live, carrying the trace context across, so they behave as they do anywhere else.
 

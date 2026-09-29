@@ -157,7 +157,7 @@ def feedback_metric[InputT: BaseModel, VerdictT: BaseModel](
 ) -> FeedbackMetric:
     """GEPA's metric for a judge: per-field agreement with people, with textual feedback.
 
-    The score is the mean of ``field_agreement`` (1 when people gave no scored field). The
+    The score is the mean of ``field_agreement`` (1 when people gave no compared field). The
     feedback names each field the judge got wrong, with both answers, and quotes people's text
     fields (their reasons), so the reflection model learns why people judged as they did. An
     answer that is not a valid verdict scores 0, and the feedback says why.

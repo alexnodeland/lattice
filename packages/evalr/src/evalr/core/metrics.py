@@ -162,7 +162,7 @@ def _ranks(values: Sequence[float]) -> list[float]:
 
 
 def field_agreement[V: BaseModel](expected: V, predicted: V | None) -> dict[str, float]:
-    """How far a predicted verdict agrees with the expected one, per scored field, from 0 to 1.
+    """How far a predicted verdict agrees with the expected one, per compared field, from 0 to 1.
 
     Only fields with an expected value count. Binary and categorical fields agree fully or not
     at all. Ordinal and bounded numeric fields lose agreement in proportion to the distance
@@ -172,7 +172,7 @@ def field_agreement[V: BaseModel](expected: V, predicted: V | None) -> dict[str,
     result: dict[str, float] = {}
     for field in verdict_fields(type(expected)):
         value: object = getattr(expected, field.name)
-        if field.scored and value is not None:
+        if field.compared and value is not None:
             other: object = None if predicted is None else getattr(predicted, field.name)
             result[field.name] = _agreement(field, value, other)
     return result
@@ -181,7 +181,7 @@ def field_agreement[V: BaseModel](expected: V, predicted: V | None) -> dict[str,
 def agreement_score[V: BaseModel](expected: V, predicted: V | None) -> float | None:
     """The mean of ``field_agreement``: one number from 0 to 1 per pair of verdicts.
 
-    ``None`` when the expected verdict has no scored field with a value.
+    ``None`` when the expected verdict has no compared field with a value.
     """
     values = field_agreement(expected, predicted).values()
     return sum(values) / len(values) if values else None
@@ -234,7 +234,7 @@ class Agreement(BaseModel, frozen=True):
     Attributes:
         n: The pairs compared.
         score: The mean ``agreement_score`` over pairs that have one, from 0 to 1.
-        fields: Per scored field, in the verdict type's order.
+        fields: Per compared field, in the verdict type's order.
     """
 
     n: int
@@ -259,7 +259,7 @@ def agreement[V: BaseModel](
     _paired(expected, predicted)
     fields: dict[str, FieldAgreement] = {}
     for field in verdict_fields(verdict_type):
-        if field.scored:
+        if field.compared:
             fields[field.name] = _field_agreement(field, expected, predicted)
     per_pair = [agreement_score(e, p) for e, p in zip(expected, predicted, strict=True)]
     scored = [s for s in per_pair if s is not None]

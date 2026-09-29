@@ -93,7 +93,7 @@ print(await sync_score_configs(store, score_configs(Helpfulness)))  # nothing ne
 []
 ```
 
-artifactr and reflexr implement the port over Langfuse's score configs, in their `[langfuse]` extras, and sync every feedback type they register.
+`LangfuseScoreConfigStore` keeps them as Langfuse's score configs ([Scores in Langfuse](#scores-in-langfuse)), and artifactr and reflexr sync every feedback type they register into it.
 
 ## Feedback as scores
 
@@ -135,7 +135,7 @@ print(score.metadata)
 {'workspace_id': 'support', 'actor': 'alice'}
 ```
 
-A score's `metadata` is its `source`, then the evaluator, its version and the confidence, where it has them.
+A score's `metadata` is its `source`, then the evaluator, its version and the confidence, where it has them. A `Score` refuses what does not fit together: a value not of its data type (a `bool` for `BOOLEAN`, a `float` for `NUMERIC`, a string for `CATEGORICAL` and `TEXT`), a `source` key that would clash with the rest of its metadata (`evaluator`, `version` or `confidence`), and a span without a trace (`span_id` without `trace_id`).
 
 ## Score sinks
 
@@ -176,9 +176,23 @@ await langfuse_scores.record(scores(verdict))
 await langfuse_scores.flush()  # before a short-lived process exits
 ```
 
-- Each score keeps its id as Langfuse's `score_id`, so recording a verdict again replaces its scores in Langfuse too, and its `timestamp`, where it has one.
+- It records evaluators' scores and the libraries' mirrors of people's feedback alike.
+- Each score keeps its id as Langfuse's `score_id`, so recording a verdict again replaces its scores in Langfuse too, and its span (as Langfuse's observation) and `timestamp`, where it has them. A yes or no is sent as 1 or 0.
+- Evalr's online scores attach to the judged span as a Langfuse observation; if the Langfuse exporter filters that span out (v4's default keeps only LLM spans), the score names an observation Langfuse lacks.
 - The score's `metadata` (its source, the evaluator, its version and the confidence) goes in Langfuse's metadata. Langfuse reads back a metadata value that parses as JSON as that JSON, so a version such as `"1"` (a `FunctionEvaluator`'s default) reads back as the number `1`.
-- Langfuse attaches scores to traces or sessions, so a score with neither is refused with `ValueError`.
+- Langfuse attaches scores to traces or sessions, so if any score has neither, `record` raises `ValueError` and queues none of them.
 - The client queues scores and sends them in the background; `flush()` waits until they are sent.
+
+`LangfuseScoreConfigStore` keeps score configs as Langfuse's own, so Langfuse knows each score's type, range and choices:
+
+```python
+from evalr.langfuse import LangfuseScoreConfigStore
+
+await sync_score_configs(LangfuseScoreConfigStore(Langfuse()), score_configs(Helpfulness))
+```
+
+- A config keeps its bounds, its description, and a categorical field's choices as Langfuse's categories, valued by their order.
+- Langfuse takes a config name of at most 35 letters, digits, spaces and `_.()-`. Any other name is refused with `ValueError` before anything is sent: shorten the type's name (`type_name=`) or the field's.
+- Its calls run in a worker thread, and `names()` reads every page of Langfuse's configs, archived ones included.
 
 Scores from [experiments in Langfuse](experiments.md#experiments-in-langfuse) are recorded by Langfuse's experiment API instead, as each item's evaluations.

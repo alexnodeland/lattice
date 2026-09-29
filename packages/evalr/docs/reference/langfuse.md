@@ -12,16 +12,12 @@ See [Langfuse datasets](../guides/datasets.md#langfuse-datasets), [Scores in Lan
 
 ::: evalr.langfuse.LangfuseDatasetStore
 
-::: evalr.langfuse.item_id
-
-::: evalr.langfuse.ITEM_NAMESPACE
-
 ## Scores
 
 ::: evalr.langfuse.LangfuseScoreSink
 
+::: evalr.langfuse.LangfuseScoreConfigStore
+
 ## Experiments
 
 ::: evalr.langfuse.LangfuseExperimentTracker
-
-::: evalr.langfuse.evaluations

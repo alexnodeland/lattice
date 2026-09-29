@@ -22,7 +22,7 @@ Run `make` on its own to list every command:
 | `make typecheck` | Type-check with pyright (strict for `src/`) |
 | `make test` | Run the tests with the 100% branch-coverage gate |
 | `make check` | Everything CI runs |
-| `make docs` | Build the documentation site in strict mode and check that its lists rendered, as CI does |
+| `make docs` | Build the documentation site, changelog included, in strict mode and check that its lists rendered, as the Docs workflow does |
 | `make docs-serve` | Serve the documentation site with live reload at <http://localhost:8000> |
 | `make changelog` | Regenerate `CHANGELOG.md` from commit history |
 
@@ -48,7 +48,7 @@ fix(dspy): keep field descriptions in derived signatures
 docs(adr): record where trained judges are stored
 ```
 
-Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Scopes are package or area names: `core`, `memory`, `contracts`, `jsonl`, `dspy`, `decision`, `langfuse`, `hf`, `measures`, `online`, `docs`, `adr`, `rfc`. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The changelog is generated from these messages. Don't edit `CHANGELOG.md` by hand: the documentation site regenerates it from `main`'s history on every build, and `make changelog` regenerates the file before a release.
+Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Scopes are package or area names: `core`, `memory`, `contracts`, `jsonl`, `dspy`, `decision`, `langfuse`, `hf`, `measures`, `online`, `docs`, `adr`, `rfc`. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The changelog is generated from these messages. Don't edit `CHANGELOG.md` by hand: `make docs` regenerates it from the history for the documentation site, as every build of the site does, and `make changelog` regenerates the file to commit before a release.
 
 ## Dependencies
 

@@ -66,11 +66,11 @@ graph LR
     subgraph adapters["Adapters"]
         dspy["evalr.dspy<br/>DspyJudge, GEPA"]
         decision["evalr.decision<br/>DecisionEvaluator, calibration"]
-        langfuse["evalr.langfuse<br/>datasets, scores, experiments"]
+        langfuse["evalr.langfuse<br/>datasets, scores, score configs,<br/>experiments"]
         hf["evalr.hf<br/>Hugging Face datasets"]
         jsonl["evalr.jsonl<br/>JSON Lines datasets"]
         memory["evalr.memory<br/>in-memory, every port"]
-        libs["artifactr, reflexr<br/>[evals] and [langfuse] extras"]
+        libs["artifactr, reflexr<br/>[evals] extras"]
     end
     subgraph core["evalr.core"]
         ports["Evaluator, Optimizer, DatasetStore,<br/>ScoreSink, ScoreConfigStore,<br/>ExperimentTracker, FeedbackSource,<br/>Formatter"]
@@ -91,8 +91,8 @@ graph LR
 | `Optimizer` | Fits an evaluator to people's verdicts | `Gepa`, `ThresholdCalibration`, `BestOf` |
 | `DatasetStore` | Saves a dataset and returns its revision; loads one by name and revision | In memory, JSON Lines files, Langfuse, the Hugging Face Hub |
 | `FeedbackSource` | Yields examples from people's typed feedback | In memory; reflexr's `LogFeedbackSource` |
-| `ScoreSink` | Records verdicts and feedback as scores, idempotently | In memory, Langfuse, OpenTelemetry events; the libraries' Langfuse adapters |
-| `ScoreConfigStore` | Keeps score configs, so a backend knows how to read each score | In memory; the libraries' Langfuse adapters |
+| `ScoreSink` | Records verdicts and feedback as scores, idempotently | In memory, Langfuse, OpenTelemetry events |
+| `ScoreConfigStore` | Keeps score configs, so a backend knows how to read each score | In memory, Langfuse |
 | `ExperimentTracker` | Runs a task over a dataset and judges each output | In memory, Langfuse |
 | `Formatter` | Renders an input as text within a token budget | `InputFormatter` |
 

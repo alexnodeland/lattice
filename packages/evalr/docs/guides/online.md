@@ -91,9 +91,10 @@ Online evaluation must not break the application it watches, so an evaluator's f
 | `gen_ai.evaluation.name` | The score's name, `{type}.{field}` |
 | `gen_ai.evaluation.score.value` | A number, or 1 or 0 for a yes or no |
 | `gen_ai.evaluation.score.label` | A choice, or `true` or `false` |
-| `gen_ai.evaluation.explanation` | The verdict's text fields, such as its reason; a text field's own event has its text alone |
+| `gen_ai.evaluation.explanation` | The verdict's text fields, such as its reason, one `field: text` line each; a text field's own event has its text alone |
 | `evalr.evaluator.name`, `evalr.evaluator.version` | Who judged, where an evaluator did |
 | `evalr.score.id`, `evalr.confidence` | The score's id, and the evaluator's confidence where it has one |
 | `session.id` | The session the score is attached to, where it has one |
+| `evalr.source.{key}` | Each entry of the score's source, such as who gave a piece of feedback |
 
 An event's time is the score's `timestamp` where it has one, and otherwise when it was emitted. Events go to the global logger provider, which does nothing until the application configures the OpenTelemetry SDK's logs, or to the one you pass: `OtelEventSink(logger_provider)`. Events are append-only, so a reader that keys by `evalr.score.id` keeps the latest of each score.

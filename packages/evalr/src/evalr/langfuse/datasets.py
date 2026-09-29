@@ -29,7 +29,7 @@ from pydantic import BaseModel, JsonValue
 
 from evalr.core import Dataset, DatasetNotFound, Example
 
-__all__ = ["ITEM_NAMESPACE", "LangfuseDatasetStore", "item_id"]
+__all__ = ["LangfuseDatasetStore"]
 
 ITEM_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "https://github.com/alexnodeland/evalr/items")
 """The namespace of dataset item ids."""

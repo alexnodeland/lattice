@@ -110,9 +110,11 @@ class Fallback[InputT: BaseModel, VerdictT: BaseModel]:
 
     The primary hands off by raising ``HandOff``, or, when ``min_confidence`` is set, by giving a
     verdict with any field's confidence below it. The usual pairing is a fast, cheap decision
-    model first and a language-model judge behind it::
+    model first and a language-model judge behind it:
 
-        evaluator = Fallback(DecisionEvaluator(...), DspyJudge(...), min_confidence=0.7)
+    ```python
+    evaluator = Fallback(DecisionEvaluator(...), DspyJudge(...), min_confidence=0.7)
+    ```
 
     Each verdict records the evaluator that actually gave it, so the two are measured apart.
     The composition runs in a span named ``evalr.fallback {name}``, which records whether and

@@ -31,7 +31,7 @@ from pydantic.fields import FieldInfo
 __all__ = [
     "FieldKind",
     "ScoreConfig",
-    "ScoreType",
+    "ScoreDataType",
     "UnsupportedField",
     "VerdictField",
     "canonical_fields",
@@ -40,7 +40,7 @@ __all__ = [
     "verdict_fields",
 ]
 
-type ScoreType = Literal["NUMERIC", "BOOLEAN", "CATEGORICAL", "TEXT"]
+type ScoreDataType = Literal["NUMERIC", "BOOLEAN", "CATEGORICAL", "TEXT"]
 """A score's data type, as Langfuse and the OpenTelemetry conventions name them."""
 
 
@@ -56,7 +56,8 @@ class FieldKind(StrEnum):
     NUMERIC = "numeric"
     """Any other ``int`` or ``float``."""
     TEXT = "text"
-    """A ``str``: free text, which only language-model judges fill, and which is not scored."""
+    """A ``str``: free text, which only language-model judges fill. It is scored as ``TEXT``, but
+    the agreement metrics do not compare it."""
 
 
 class UnsupportedField(TypeError):
@@ -91,8 +92,8 @@ class VerdictField:
     required: bool = True
 
     @property
-    def scored(self) -> bool:
-        """Whether agreement metrics score the field: every kind but text."""
+    def compared(self) -> bool:
+        """Whether the agreement metrics compare the field: every kind but text."""
         return self.kind is not FieldKind.TEXT
 
 
@@ -131,7 +132,7 @@ def canonical_fields(verdict_type: type[BaseModel]) -> list[JsonValue]:
     ]
 
 
-_DATA_TYPES: dict[FieldKind, ScoreType] = {
+_DATA_TYPES: dict[FieldKind, ScoreDataType] = {
     FieldKind.BINARY: "BOOLEAN",
     FieldKind.CATEGORICAL: "CATEGORICAL",
     FieldKind.ORDINAL: "NUMERIC",
@@ -145,7 +146,7 @@ class ScoreConfig:
     """How one field of a verdict or feedback type is scored, for a backend to read its scores by.
 
     A backend that knows a score's config can check its values and offer its choices to people
-    scoring by hand. The libraries create them in Langfuse through a ``ScoreConfigStore``.
+    scoring by hand. ``sync_score_configs`` creates them in a ``ScoreConfigStore``.
 
     Attributes:
         name: The score's name, ``{type}.{field}``.
@@ -164,7 +165,7 @@ class ScoreConfig:
     name: str
     type_name: str
     field: str
-    data_type: ScoreType
+    data_type: ScoreDataType
     description: str | None = None
     minimum: float | None = None
     maximum: float | None = None

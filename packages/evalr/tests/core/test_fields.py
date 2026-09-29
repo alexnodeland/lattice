@@ -49,9 +49,9 @@ def test_fields_are_described_in_declaration_order() -> None:
     )
 
 
-def test_text_fields_are_not_scored() -> None:
-    scored = [f.name for f in verdict_fields(Helpfulness) if f.scored]
-    assert scored == ["rating", "resolved", "category", "tone", "confidence", "count"]
+def test_text_fields_are_not_compared() -> None:
+    compared = [f.name for f in verdict_fields(Helpfulness) if f.compared]
+    assert compared == ["rating", "resolved", "category", "tone", "confidence", "count"]
 
 
 def test_constraints_inside_an_optional_are_found() -> None:

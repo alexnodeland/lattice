@@ -37,9 +37,13 @@ class Lossy(InMemoryScoreSink):
         await super().record(scores[1:])
 
 
-class Sessionless(InMemoryScoreSink):
+class Forgetful(InMemoryScoreSink):
+    def __init__(self, **forgotten: object) -> None:
+        super().__init__()
+        self.forgotten = forgotten
+
     async def record(self, scores: Sequence[Score], /) -> None:
-        await super().record([s.model_copy(update={"session_id": None}) for s in scores])
+        await super().record([s.model_copy(update=self.forgotten) for s in scores])
 
 
 @pytest.mark.parametrize(
@@ -48,9 +52,12 @@ class Sessionless(InMemoryScoreSink):
         (Appending(), "replace it, not add another"),
         (Stubborn(), "latest value recorded must be kept"),
         (Lossy(), "every score recorded, and only those"),
-        (Sessionless(), "with its type, trace and session"),
+        (Forgetful(session_id=None), "session, time and metadata"),
+        (Forgetful(span_id=None), "session, time and metadata"),
+        (Forgetful(timestamp=None), "session, time and metadata"),
+        (Forgetful(source={}), "session, time and metadata"),
     ],
-    ids=["appending", "stubborn", "lossy", "sessionless"],
+    ids=["appending", "stubborn", "lossy", "sessionless", "spanless", "timeless", "sourceless"],
 )
 async def test_a_broken_sink_fails_the_contract(
     broken: Appending | InMemoryScoreSink, message: str

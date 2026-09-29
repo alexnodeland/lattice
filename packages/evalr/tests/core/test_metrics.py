@@ -210,7 +210,7 @@ def test_a_missing_verdict_agrees_not_at_all() -> None:
     assert agreement_score(review(3, True), None) == 0.0
 
 
-def test_a_verdict_with_nothing_scored_has_no_score() -> None:
+def test_a_verdict_with_nothing_compared_has_no_score() -> None:
     class Note(BaseModel):
         text: str | None = None
 

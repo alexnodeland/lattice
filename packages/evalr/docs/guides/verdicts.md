@@ -40,7 +40,7 @@ The type of each field decides how it is judged and how it is scored. evalr call
 | `Literal`, `Enum` | categorical | any evaluator | accuracy, Cohen's kappa | `CATEGORICAL` |
 | `int` bounded on both sides | ordinal | any evaluator | mean absolute error, Spearman | `NUMERIC` |
 | any other `int` or `float` | numeric | any evaluator | mean absolute error, Spearman | `NUMERIC` |
-| `str` | text | language-model judges only | not scored | `TEXT` |
+| `str` | text | language-model judges only | not compared | `TEXT` |
 
 A few rules complete the table:
 

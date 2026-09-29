@@ -1,17 +1,6 @@
 # Architecture
 
-> **Status:** v0.1 is built, as planned in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and documented at [evalr.alexnodeland.com](https://evalr.alexnodeland.com). This document is evergreen: it is updated in the same pull request as the code that changes it, and the table below shows what exists today. Decisions are recorded in [`adr/`](adr/README.md), and proposals in [`rfcs/`](rfcs/README.md).
-
-| Package | Status |
-|---|---|
-| `evalr.core` | Implemented |
-| `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Implemented |
-| `evalr.dspy` | Implemented |
-| `evalr.decision` | Implemented |
-| `evalr.langfuse` | Implemented |
-| `evalr.hf` | Implemented |
-| `evalr.measures` | Implemented |
-| `evalr.online` | Implemented |
+Decisions are recorded in [`adr/`](adr/README.md), and proposals in [`rfcs/`](rfcs/README.md).
 
 ## What evalr is
 
@@ -41,11 +30,11 @@ graph LR
     subgraph adapters["Adapters"]
         dspy["evalr.dspy<br/>DspyJudge, GEPA"]
         decision["evalr.decision<br/>DecisionEvaluator, calibration"]
-        langfuse["evalr.langfuse<br/>datasets, scores, experiments"]
+        langfuse["evalr.langfuse<br/>datasets, scores, score configs,<br/>experiments"]
         hf["evalr.hf<br/>Hugging Face datasets"]
         jsonl["evalr.jsonl<br/>JSON Lines datasets"]
         memory["evalr.memory<br/>in-memory, every port"]
-        libs["artifactr, reflexr<br/>[evals] and [langfuse] extras"]
+        libs["artifactr, reflexr<br/>[evals] extras"]
     end
     subgraph core["evalr.core"]
         ports["Evaluator, Optimizer, DatasetStore,<br/>ScoreSink, ScoreConfigStore,<br/>ExperimentTracker, FeedbackSource,<br/>Formatter"]
@@ -65,8 +54,8 @@ graph LR
 | `Evaluator[InputT, VerdictT]` | Judges an input and returns a typed verdict | `FunctionEvaluator` (core), `DspyJudge` (`evalr.dspy`), `DecisionEvaluator` (`evalr.decision`); composed by `Fallback` (core) and run online by `OnlineEvaluation` (`evalr.online`) |
 | `Optimizer[InputT, VerdictT, EvaluatorT]` | Fits an evaluator to people's verdicts | GEPA (`evalr.dspy`), threshold calibration (`evalr.decision`), in-memory (`evalr.memory`) |
 | `DatasetStore` | Saves a dataset and returns its revision; loads one by name and revision | `evalr.memory`, `evalr.jsonl`, `evalr.langfuse`, `evalr.hf` |
-| `ScoreSink` | Records verdicts and feedback as scores, idempotently | `evalr.memory`, `evalr.langfuse`, OpenTelemetry evaluation events (`evalr.online`); artifactr's and reflexr's `[langfuse]` extras |
-| `ScoreConfigStore` | Keeps score configs by name, so a backend knows each score's type, range and choices | `evalr.memory`; artifactr's and reflexr's `[langfuse]` extras |
+| `ScoreSink` | Records verdicts and feedback as scores, idempotently | `evalr.memory`, `evalr.langfuse`, OpenTelemetry evaluation events (`evalr.online`) |
+| `ScoreConfigStore` | Keeps score configs by name, so a backend knows each score's type, range and choices | `evalr.memory`, `evalr.langfuse` |
 | `ExperimentTracker` | Runs a task over a dataset and judges each output | `evalr.memory`, `evalr.langfuse` |
 | `FeedbackSource[InputT, VerdictT]` | Yields examples from people's typed feedback | `evalr.memory`; artifactr's and reflexr's `[evals]` extras |
 | `Formatter[InputT]` | Renders an input as text within a token budget | `InputFormatter` (core) |
@@ -74,7 +63,7 @@ graph LR
 - **Compositions, not special cases.** A decision evaluator that hands unsure inputs to a language-model judge is `Fallback(DecisionEvaluator(...), DspyJudge(...))`.
 - **I/O ports are async.** Adapters over synchronous SDKs run them in a worker thread.
 - **Every port has an in-memory adapter** in `evalr.memory`, and a contract suite in `evalr.contracts` that the in-memory adapter and every other adapter pass. The libraries run the `FeedbackSource` suite against their own adapters.
-- **The libraries share the score ports and mapping** ([ADR-0011](adr/0011-scores-shared-with-the-libraries.md)). artifactr and reflexr mirror people's feedback to a `ScoreSink` with evalr's mapping, and keep their mirrors, which know their logs, and their Langfuse adapters, in their own `[langfuse]` extras. Their cores never import evalr.
+- **The libraries share the score ports, mapping and adapters** ([ADR-0011](adr/0011-scores-shared-with-the-libraries.md), [ADR-0012](adr/0012-langfuse-score-adapters-in-evalr.md)). artifactr and reflexr mirror people's feedback to a `ScoreSink` with evalr's mapping, and record it in Langfuse with evalr's adapters; their mirrors, which know their logs, stay in their own `[langfuse]` extras. Their cores never import evalr.
 
 | Package | Extra | May import |
 |---|---|---|
@@ -110,7 +99,7 @@ class Helpfulness(BaseModel):
 | `Literal`, `Enum` | categorical | any evaluator | accuracy, Cohen's kappa |
 | `int` bounded on both sides | ordinal | any evaluator | mean absolute error, Spearman |
 | any other `int` or `float` | numeric | any evaluator | mean absolute error, Spearman |
-| `str` | text | language-model judges only | not scored |
+| `str` | text | language-model judges only | not compared |
 
 - `X | None` is judged as `X` and may be left empty. Bounds are read from `Field(ge=, le=, gt=, lt=)` and `annotated_types` constraints at any level of `Annotated`, including inside an optional. An integer's exclusive bounds become inclusive (`gt=0` is 1).
 - A field's description is the instruction judges read for it.
@@ -256,7 +245,7 @@ A `FeedbackSource[InputT, VerdictT]` yields examples from people's feedback: eve
 
 - `check_dataset_store(store)`: an unknown name is not found; a saved dataset loads back exactly (name, examples, description); saving again changes nothing; a changed dataset makes a new revision and the earlier one still loads; an unknown revision is not found; loading as a type the examples do not satisfy fails validation.
 - `check_feedback_source(source)`: ids are unique, inputs and verdicts are of the source's types, every example has a verdict, and iterating again yields the same examples.
-- `check_score_sink(sink, recorded)`: recording a score again replaces it, every score recorded is kept, and the latest value wins, on its trace or its session. A sink has no reads, so the caller says how to see what it holds.
+- `check_score_sink(sink, recorded)`: recording a score again replaces it, every score recorded is kept, and the latest value wins, with everything the score holds: its type, trace, span, session, time and metadata (a score without a time may be given the time it was recorded). A sink has no reads, so the caller says how to see what it holds.
 - `check_score_config_store(store)`: a new store lists no configs, and every config created is listed by its name.
 - `check_evaluator(evaluator, inputs)`: each verdict is of the verdict type, names the evaluator that gave it and its version, and records the trace it was judged in (the check judges inside a trace of its own, through the OpenTelemetry API); an evaluator may hand off some inputs but must judge one; judging does not change its name or version.
 - `check_optimizer(optimizer, evaluator, train=, validate=)`: the evaluator given is left alone, and the fitted one gives the same verdict type and passes `check_evaluator`.
@@ -277,10 +266,11 @@ Every field of a verdict, or of a piece of people's feedback, becomes one score 
 - `score_values(type, value, type_name=)` pairs each field of a validated value (a model's fields, or its JSON as the libraries keep feedback) with its config and score value. `None`, `""` and missing fields give no score; a choice or text is cut at `MAX_TEXT`, 500 characters.
 - `scores(verdict)` builds a `Score` from each pair. A score's id is a UUID derived from its subject (a given key, else the verdict's trace, else a hash of the verdict), the evaluator, its version and the score's name. So recording a verdict again replaces its scores, and a new evaluator version adds new ones rather than overwriting.
 - A `Score` is attached to a trace (and may name the span it judges, `span_id`) or to a session (`session_id`), and may carry the time it was given (`timestamp`). A verdict's score names its evaluator, version and confidence; a library's feedback score has none, and says where it came from in `source`. Its `metadata` is the source, then the evaluator, version and confidence.
+- A `Score` holds together: its value is of its data type (a `bool` for `BOOLEAN`, a `float` that is not a `bool` for `NUMERIC`, a `str` for `CATEGORICAL` and `TEXT`), its source has no `evaluator`, `version` or `confidence` key for its metadata to clash with, and a span comes with a trace. Sinks rely on it rather than checking values themselves.
 - A `ScoreSink` records scores, idempotently by id. `InMemoryScoreSink` keeps them by id.
-- `LangfuseScoreSink(client)` (`evalr.langfuse`) records them with `create_score`, keeping each score's id as Langfuse's `score_id`, so recording a verdict again replaces its scores, with the score's session, timestamp and metadata. Langfuse attaches scores to traces or sessions, so a score with neither is refused. Langfuse sends in the background; `flush()` waits.
-- A `ScoreConfigStore` keeps score configs by name (`names()`, `create(config)`). `sync_score_configs(store, configs)` creates the ones whose names a store lacks and never changes one it has, since scores in a backend link to their config by name. `InMemoryScoreConfigStore` keeps them by name. evalr ships no Langfuse config store: the libraries' `[langfuse]` extras adapt Langfuse's score configs for their feedback types.
-- A fixture of the configs and values the libraries' own copies gave (`tests/core/score_configs.json`) pins the mapping, so the configs they create in Langfuse do not change.
+- `LangfuseScoreSink(client)` (`evalr.langfuse`) records them with `create_score`, in a worker thread as every synchronous SDK is called, for evaluators' scores and the libraries' feedback mirrors alike. It keeps each score's id as Langfuse's `score_id`, so recording a verdict again replaces its scores, with the score's span (as Langfuse's observation), session, timestamp and metadata; a yes or no is 1 or 0. Langfuse attaches scores to traces or sessions, so a batch with a score that has neither is refused whole. Langfuse sends in the background; `flush()` waits. Evalr's online scores attach to the judged span as a Langfuse observation; if the Langfuse exporter filters that span out (v4's default keeps only LLM spans), the score names an observation Langfuse lacks. Both Langfuse adapters pass the contract suites against a fake of Langfuse's API.
+- A `ScoreConfigStore` keeps score configs by name (`names()`, `create(config)`). `sync_score_configs(store, configs)` creates the ones whose names a store lacks and never changes one it has, since scores in a backend link to their config by name. `InMemoryScoreConfigStore` keeps them by name. `LangfuseScoreConfigStore(client)` (`evalr.langfuse`) keeps them as Langfuse's score configs, with their bounds, categories and description, reading every page of them in a worker thread; it refuses a name Langfuse would, one longer than 35 characters or with other characters than letters, digits, spaces and `_.()-`.
+- A fixture (`tests/core/score_configs.json`) pins the mapping to the configs and values the libraries have always created, so the configs in their users' Langfuse projects do not change.
 
 ## Experiments
 
@@ -305,7 +295,7 @@ result.verdicts("helpfulness-judge", verdict_type=Helpfulness)  # by example id
 - The result has one `ItemResult` per example in the dataset's order: the output, one verdict per evaluator that succeeded, the errors, and the item's trace. A failing task or evaluator fails only its own item.
 - `result.verdicts(evaluator)` gives one evaluator's verdicts by example id, typed as `BaseModel`, since an experiment's evaluators can give different verdict types. With `verdict_type=`, they are typed as that type, and a verdict of another type raises `TypeError`.
 - `InMemoryExperimentTracker` runs in the process, at most `max_concurrency` examples at once, each in a span named `evalr.experiment.item {name}`, so verdicts record the item's trace. Runs are named `{name} #{n}` unless named, and kept in `runs`.
-- `LangfuseExperimentTracker(client)` (`evalr.langfuse`) runs through Langfuse's experiment API, so results show beside each item's trace. Each example is a local item (its input, `{"verdict", "reference"}` as the expected output, and its id in the metadata) with a trace of its own; the task runs in the item's task span, and each evaluator in a span named after it, so everything they call nests under the item, and the verdicts record its trace. Every verdict becomes the item's scores, named `{type}.{field}`; Langfuse's evaluations hold no text, so the verdict's text fields become the comment of its other scores. The SDK runs an experiment on an event loop of its own, in a worker thread; evalr runs the task and evaluators back on the caller's loop, where their clients live, carrying the trace context across. Runs are named by Langfuse (`{name} - {time}`) unless named.
+- `LangfuseExperimentTracker(client, type_names=)` (`evalr.langfuse`) runs through Langfuse's experiment API, so results show beside each item's trace. Each example is a local item (its input, `{"verdict", "reference"}` as the expected output, and its id in the metadata) with a trace of its own; the task runs in the item's task span, and each evaluator in a span named after it, so everything they call nests under the item, and the verdicts record its trace. Every verdict becomes the item's scores, named `{type}.{field}`, with `type_names` naming a verdict type as a library registers its feedback, as online evaluation does. Langfuse's evaluations hold no text, so the verdict's text scores become the comment of its other scores, one `field: text` line each, as they become an OpenTelemetry event's explanation. The SDK runs an experiment on an event loop of its own, in a worker thread; evalr runs the task and evaluators back on the caller's loop, where their clients live, carrying the trace context across. Runs are named by Langfuse (`{name} - {time}`) unless named.
 
 ## Formatters
 
@@ -332,7 +322,7 @@ A formatter renders an input as the text a judge reads. A decision model's state
 | Drop-off | `DropOff`: `outcome` (`continued`, `dropped`, `pending`) and `cause` (`no_reply`, `unresolved_proposal`) | Computed by `measure_drop_off(session, window=, now=)`: dropped when the agent acted last and no person acted within the window, or a proposal stayed unresolved longer than it; pending until the window has passed. `drop_off_rate` counts decided sessions only. |
 | Rewrites | `Rewrites`: `agent_revisions`, `rewritten`, `rate` | Computed by `measure_rewrites(history, window=, threshold=0.2)`: an agent's revision is rewritten when a person's revision within the window, before the agent writes again, changes at least the threshold's share of its text, by `share_changed` (the last such revision counts). `rewrite_rate` pools revisions across artifacts. |
 
-- **Rates read verdicts or values.** `completion_rate`, `drop_off_rate` and `rewrite_rate` take, one per session or artifact, an evaluator's `Verdict` or the verdict type's value itself, such as people's feedback or a measure computed directly. A made-up `people()` evaluator was not added: it would pass people's feedback off as an evaluator's. A library's feedback type that subclasses the measure's type, such as artifactr's `TaskCompletion`, counts as one.
+- **Rates read verdicts or values.** `completion_rate`, `drop_off_rate` and `rewrite_rate` take, one per session or artifact, an evaluator's `Verdict` or the verdict type's value itself, such as people's feedback or a measure computed directly. There is no `people()` evaluator: it would pass people's feedback off as an evaluator's. A library's feedback type that subclasses the measure's type, such as artifactr's `TaskCompletion`, counts as one.
 - **`share_changed(before, after)`** is the share of a text an edit changed. It aligns lines, then compares characters within the lines that changed, with `difflib`'s autojunk heuristic off.
 - `drop_off_evaluator(window=, now=)` and `rewrite_evaluator(window=, threshold=)` wrap the computed measures as function evaluators, versioned by their settings (`drop-off` at `1:3600s`, `rewrites` at `2:3600s:0.2`), so they run in experiments and online like any evaluator. The leading number is the measure's own version, bumped when its computation changes.
 - The tests compute all three on logs recorded in artifactr's and reflexr's shapes, read without importing either library.
@@ -374,7 +364,7 @@ await online.drain()  # at shutdown
 - **Sinks** receive every verdict's scores, keyed by the input's key, named by `type_names` where a library registers its feedback under another name.
 - **Nothing is raised.** An `OnlineResult` records the verdicts, the evaluators skipped for budget, those that handed off, and every evaluator or sink failure.
 
-`OtelEventSink(logger_provider=None)` is a `ScoreSink` that emits each score as a `gen_ai.evaluation.result` event through the OpenTelemetry logs API, with the judged trace and span as its context, so it can emit after that span has ended. It sets `gen_ai.evaluation.name` (`{type}.{field}`), `gen_ai.evaluation.score.value` (a number, or 1 or 0 for a yes or no) or `gen_ai.evaluation.score.label` (a choice, or `true` or `false`), and `gen_ai.evaluation.explanation` (the verdict's text fields; a text field's own event has its text alone), with the evaluator, its version, the score's id, the confidence and `session.id`, where the score has them. An event's time is the score's timestamp, when it has one. Events are append-only; a reader keyed by the score's id keeps the latest.
+`OtelEventSink(logger_provider=None)` is a `ScoreSink` that emits each score as a `gen_ai.evaluation.result` event through the OpenTelemetry logs API, with the judged trace and span as its context, so it can emit after that span has ended. It sets `gen_ai.evaluation.name` (`{type}.{field}`), `gen_ai.evaluation.score.value` (a number, or 1 or 0 for a yes or no) or `gen_ai.evaluation.score.label` (a choice, or `true` or `false`), and `gen_ai.evaluation.explanation` (the verdict's text scores, one `field: text` line each; a text field's own event has its text alone), with the evaluator, its version, the score's id, the confidence, `session.id` and each entry of the source as `evalr.source.{key}`, where the score has them. An event's time is the score's timestamp, when it has one. Events are append-only; a reader keyed by the score's id keeps the latest.
 
 ## Observability
 
@@ -392,4 +382,4 @@ The gates are those of artifactr and reflexr ([ADR-0005](adr/0005-quality-gates-
 
 ## Documentation
 
-The documentation site is built from `docs/` with Zensical, in strict mode in CI, and published from `main` on every push at <https://evalr.alexnodeland.com> ([ADR-0010](adr/0010-documentation-site.md)). The API reference is generated from the docstrings of each package's `__all__`, and the guides' examples are run offline, against the in-memory adapters and fakes, before they are published.
+The documentation site is built from `docs/` with Zensical by `make docs`, in strict mode and with the changelog regenerated, on every pull request, and published from `main` on every push at <https://evalr.alexnodeland.com> ([ADR-0010](adr/0010-documentation-site.md), [ADR-0013](adr/0013-docstrings-in-markdown-and-one-docs-build.md)). The API reference is generated from the docstrings of each package's `__all__`, which are Markdown, and the guides' examples are run offline, against the in-memory adapters and fakes, before they are published.

@@ -1,8 +1,9 @@
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from opentelemetry import trace
+from opentelemetry.sdk._logs import ReadableLogRecord
 
 from evalr.contracts import check_score_sink
 from evalr.core import Score, Verdict, scores
@@ -13,6 +14,7 @@ from .logs import logs
 
 TRACE = "0af7651916cd43dd8448eb211c80319c"
 SPAN = "b7ad6b7169203331"
+EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
 def verdict() -> Verdict[Helpfulness]:
@@ -100,8 +102,10 @@ async def test_without_a_trace_of_its_own_a_score_takes_the_current_span() -> No
     }
 
 
-def as_score(attributes: dict[str, Any], trace_id: int) -> Score:
+def as_score(event: ReadableLogRecord) -> Score:
     """An event read back as a score, as a reader of the events would."""
+    record = event.log_record
+    attributes: dict[str, Any] = dict(record.attributes or {})
     label = attributes.get("gen_ai.evaluation.score.label")
     number = attributes.get("gen_ai.evaluation.score.value")
     value: bool | float | str
@@ -113,15 +117,24 @@ def as_score(attributes: dict[str, Any], trace_id: int) -> Score:
         value, data_type = number, "NUMERIC"
     else:
         value, data_type = attributes["gen_ai.evaluation.explanation"], "TEXT"
+    when = EPOCH + timedelta(microseconds=record.timestamp // 1000) if record.timestamp else None
     return Score(
         id=attributes["evalr.score.id"],
         name=attributes["gen_ai.evaluation.name"],
         value=value,
         data_type=data_type,
-        trace_id=f"{trace_id:032x}" if trace_id else None,
+        trace_id=f"{record.trace_id:032x}" if record.trace_id else None,
+        span_id=f"{record.span_id:016x}" if record.span_id else None,
         session_id=attributes.get("session.id"),
+        timestamp=when,
         evaluator=attributes.get("evalr.evaluator.name"),
         version=attributes.get("evalr.evaluator.version"),
+        confidence=attributes.get("evalr.confidence"),
+        source={
+            key.removeprefix("evalr.source."): entry
+            for key, entry in attributes.items()
+            if key.startswith("evalr.source.")
+        },
     )
 
 
@@ -129,12 +142,7 @@ async def test_the_sink_meets_the_contract_for_a_reader_keyed_by_score_id() -> N
     with logs() as kept:
 
         async def recorded() -> Sequence[Score]:
-            latest = {}
-            for event in kept.records():
-                score = as_score(
-                    dict(event.log_record.attributes or {}), event.log_record.trace_id or 0
-                )
-                latest[score.id] = score
+            latest = {score.id: score for score in map(as_score, kept.records())}
             return list(latest.values())
 
         await check_score_sink(OtelEventSink(kept.provider), recorded)

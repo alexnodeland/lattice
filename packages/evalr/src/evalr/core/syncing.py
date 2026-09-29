@@ -12,9 +12,11 @@ async def sync_score_configs(store: ScoreConfigStore, configs: Iterable[ScoreCon
     """Create the configs whose names a store does not have yet.
 
     A config the store has by name is left as it is, even if its definition differs, so a
-    backend's links from scores to configs never break::
+    backend's links from scores to configs never break:
 
-        await sync_score_configs(store, score_configs(Helpfulness))
+    ```python
+    await sync_score_configs(store, score_configs(Helpfulness))
+    ```
 
     Args:
         store: Where the configs live.

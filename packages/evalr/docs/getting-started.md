@@ -57,7 +57,7 @@ class Helpfulness(BaseModel):
     reason: str | None = Field(default=None, description="Why, in a sentence")
 ```
 
-Each field's type decides how it is judged and measured: `rating` is an ordinal scale, `resolved` a yes or no, and `reason` free text, which only language-model judges write and which is not scored. Each description is the instruction evaluators read for the field. [Typed verdicts and field kinds](guides/verdicts.md) covers the rest.
+Each field's type decides how it is judged and measured: `rating` is an ordinal scale, `resolved` a yes or no, and `reason` free text, which only language-model judges write and which agreement with people does not compare. Each description is the instruction evaluators read for the field. [Typed verdicts and field kinds](guides/verdicts.md) covers the rest.
 
 ## 2. Gather people's verdicts
 

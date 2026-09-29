@@ -47,13 +47,13 @@ A `Measurement` holds:
 
 ## Agreement
 
-`agreement(expected, predicted, verdict_type=)` compares two sequences of verdicts pair by pair: people's, and an evaluator's for the same inputs, `None` where it gave none. `measure` calls it for you. The result has `n` (the pairs compared), `score` (the mean per-pair agreement, from 0 to 1), and one `FieldAgreement` per scored field, with the measures that suit its kind:
+`agreement(expected, predicted, verdict_type=)` compares two sequences of verdicts pair by pair: people's, and an evaluator's for the same inputs, `None` where it gave none. `measure` calls it for you. The result has `n` (the pairs compared), `score` (the mean per-pair agreement, from 0 to 1), and one `FieldAgreement` per compared field, with the measures that suit its kind:
 
 | Kind | Measures | On a missing prediction |
 |---|---|---|
 | binary, categorical | `accuracy`, and Cohen's `kappa`: agreement beyond what the two sides' label frequencies give by chance (1 is perfect, 0 is chance) | Counts as a wrong label |
 | ordinal, numeric | `mean_absolute_error`, and `spearman`, the rank correlation with tied values given their average rank | Left out, and counted in `missing` |
-| text | Not scored | |
+| text | Not compared | |
 
 Every field also has `n` (the pairs where people gave the field a value), `missing`, and `score`, its mean per-pair agreement. Fields people left empty do not count, so an optional field is measured only where people filled it.
 

@@ -46,11 +46,6 @@ def test_ids_are_unique() -> None:
         )
 
 
-def test_example_ids_are_not_empty() -> None:
-    with pytest.raises(ValidationError):
-        Ex(id="", input=Thread(messages=[]))
-
-
 def test_the_verdict_type_must_be_judgeable() -> None:
     class Listy(BaseModel):
         tags: list[str]

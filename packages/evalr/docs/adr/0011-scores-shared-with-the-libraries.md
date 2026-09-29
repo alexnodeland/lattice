@@ -1,6 +1,6 @@
 # ADR-0011: Scores shared with the libraries
 
-**Status:** Accepted
+**Status:** Accepted, partly superseded by [ADR-0012](0012-langfuse-score-adapters-in-evalr.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 

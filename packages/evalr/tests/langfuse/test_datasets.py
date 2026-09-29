@@ -6,7 +6,8 @@ from langfuse import Langfuse
 from evalr.contracts import ContractInput, ContractVerdict, check_dataset_store
 from evalr.contracts.support import contract_dataset
 from evalr.core import Dataset, DatasetNotFound
-from evalr.langfuse import LangfuseDatasetStore, item_id
+from evalr.langfuse import LangfuseDatasetStore
+from evalr.langfuse.datasets import item_id
 
 from .server import FakeLangfuse, connected
 

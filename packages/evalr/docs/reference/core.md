@@ -78,7 +78,7 @@ Verdicts and people's feedback as named values, how each field is scored, and th
 
 ::: evalr.core.Score
 
-::: evalr.core.ScoreType
+::: evalr.core.ScoreDataType
 
 ::: evalr.core.ScoreSink
 

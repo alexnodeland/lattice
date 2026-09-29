@@ -3,10 +3,12 @@
 Each check takes an adapter, exercises it through its port, and raises ``ContractViolation``
 where it behaves differently from the port's contract. evalr runs them against every adapter it
 ships; the libraries run them against theirs, such as ``check_feedback_source`` against their
-feedback sources and ``check_score_sink`` against their score sinks::
+feedback sources:
 
-    async def test_the_feedback_source_meets_the_contract() -> None:
-        await check_feedback_source(HelpfulnessFeedback(workspace))
+```python
+async def test_the_feedback_source_meets_the_contract() -> None:
+    await check_feedback_source(HelpfulnessFeedback(workspace))
+```
 
 The checks need no test framework.
 """

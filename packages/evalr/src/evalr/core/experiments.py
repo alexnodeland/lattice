@@ -75,10 +75,12 @@ class ExperimentResult[OutputT: BaseModel]:
         """One evaluator's verdicts, by example id.
 
         An experiment can have evaluators of several verdict types, so verdicts are typed as
-        ``BaseModel`` unless the evaluator's type is given::
+        ``BaseModel`` unless the evaluator's type is given:
 
-            verdicts = result.verdicts("helpfulness-judge", verdict_type=Helpfulness)
-            ratings = [verdict.value.rating for verdict in verdicts.values()]
+        ```python
+        verdicts = result.verdicts("helpfulness-judge", verdict_type=Helpfulness)
+        ratings = [verdict.value.rating for verdict in verdicts.values()]
+        ```
 
         Args:
             evaluator: The evaluator's name, as its verdicts record it.

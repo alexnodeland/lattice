@@ -114,7 +114,7 @@ def test_an_invalid_answer_scores_zero_and_says_why() -> None:
     assert feedback.endswith("People's reason: slow refund")
 
 
-def test_nothing_scored_is_full_agreement() -> None:
+def test_nothing_compared_is_full_agreement() -> None:
     class Remark(BaseModel):
         tone: Literal["warm", "cold"] | None = None
         note: str | None = None

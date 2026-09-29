@@ -19,28 +19,27 @@ import hashlib
 import uuid
 from collections.abc import Mapping
 from enum import Enum
-from typing import Annotated, cast
+from typing import Annotated, Self, cast
 
-from pydantic import AwareDatetime, BaseModel, Field, JsonValue
+from pydantic import AwareDatetime, BaseModel, Field, JsonValue, model_validator
 
-from evalr.core.fields import ScoreConfig, ScoreType, score_configs, score_type_name
+from evalr.core.fields import ScoreConfig, ScoreDataType, score_configs
 from evalr.core.verdicts import Verdict
 
-__all__ = [
-    "MAX_TEXT",
-    "SCORE_NAMESPACE",
-    "Score",
-    "ScoreType",
-    "score_type_name",
-    "score_values",
-    "scores",
-]
+__all__ = ["MAX_TEXT", "SCORE_NAMESPACE", "Score", "score_values", "scores"]
 
 SCORE_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "https://github.com/alexnodeland/evalr/scores")
 """The namespace of the ids ``scores`` gives."""
 
 MAX_TEXT = 500
 """The longest category or text a score holds, in characters; longer ones are cut."""
+
+_VALUE_TYPES: dict[ScoreDataType, type[object]] = {
+    "BOOLEAN": bool,
+    "NUMERIC": float,  # bool subclasses int, not float, so a bool is never a NUMERIC value
+    "CATEGORICAL": str,
+    "TEXT": str,
+}
 
 
 class Score(BaseModel, frozen=True):
@@ -55,10 +54,11 @@ class Score(BaseModel, frozen=True):
             one score per field however often it is recorded.
         name: ``{type}.{field}``.
         value: A bool for ``BOOLEAN``, a float for ``NUMERIC``, and a string for ``CATEGORICAL``
-            and ``TEXT``.
+            and ``TEXT``; a value of another type is refused.
         data_type: How the value is to be read.
         trace_id: The trace the score is attached to, when there is one.
-        span_id: The span within that trace the score judges, as 16 hex digits, when known.
+        span_id: The span within that trace the score judges, as 16 hex digits, when known;
+            only with a trace.
         session_id: The session the score is attached to, such as a thread or a causal chain,
             when it is about the session rather than one trace.
         timestamp: When the score was given, with its time zone; when it is recorded, if
@@ -67,13 +67,14 @@ class Score(BaseModel, frozen=True):
         version: The evaluator's version.
         confidence: The evaluator's confidence in the field's value, when it has one.
         source: Where the score came from, beyond an evaluator: the tenant, workspace and person
-            that gave a piece of feedback, for example.
+            that gave a piece of feedback, for example. Its keys cannot be ``evaluator``,
+            ``version`` or ``confidence``, which ``metadata`` adds.
     """
 
     id: str
     name: str
     value: bool | float | str
-    data_type: ScoreType
+    data_type: ScoreDataType
     trace_id: str | None = None
     span_id: Annotated[str, Field(pattern=r"^[0-9a-f]{16}$")] | None = None
     session_id: str | None = None
@@ -82,6 +83,20 @@ class Score(BaseModel, frozen=True):
     version: str | None = None
     confidence: float | None = None
     source: Mapping[str, str] = Field(default_factory=dict[str, str])
+
+    @model_validator(mode="after")
+    def _fields_agree(self) -> Self:
+        value_type = _VALUE_TYPES[self.data_type]
+        if not isinstance(self.value, value_type):
+            raise ValueError(
+                f"a {self.data_type} score's value is a {value_type.__name__}, not {self.value!r}"
+            )
+        clashing = sorted(self.source.keys() & {"evaluator", "version", "confidence"})
+        if clashing:
+            raise ValueError(f"source keys that clash with the score's metadata: {clashing}")
+        if self.span_id is not None and self.trace_id is None:
+            raise ValueError("a score's span is within its trace, so it needs a trace")
+        return self
 
     @property
     def metadata(self) -> dict[str, JsonValue]:
@@ -173,7 +188,7 @@ def scores(
     ]
 
 
-def _value(data_type: ScoreType, raw: object) -> bool | float | str:
+def _value(data_type: ScoreDataType, raw: object) -> bool | float | str:
     match data_type:
         case "BOOLEAN":
             return bool(raw)

@@ -8,7 +8,8 @@
 | `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | Implemented |
 | `evalr.dspy` | Implemented |
 | `evalr.decision` | Implemented |
-| `evalr.langfuse`, `evalr.hf` | Planned (phase 4) |
+| `evalr.langfuse` | Dataset store implemented; score sink and experiment tracker planned (phase 4) |
+| `evalr.hf` | Planned (phase 4) |
 | End-to-end measures and online helpers | Planned (phase 5) |
 
 ## What evalr is
@@ -230,7 +231,8 @@ A `DatasetStore` saves a dataset under its name and returns the revision it made
 |---|---|---|
 | `InMemoryDatasetStore` (`evalr.memory`) | The content hash | JSON records in memory, validated again on load |
 | `JsonlDatasetStore(root)` (`evalr.jsonl`) | The content hash | A directory per dataset: `dataset.json` names the latest revision and holds the description; each revision is `{hash}.jsonl`, one example to a line, written whole. Names are `/`-separated segments of letters, digits, `.`, `_` and `-`, so they stay under the root. |
-| Langfuse, Hugging Face (phase 4) | | |
+| `LangfuseDatasetStore(client)` (`evalr.langfuse`) | The time of the save's latest change, as Langfuse recorded it | A Langfuse dataset of the same name, an item per example. Item ids are UUID 5s of the dataset's name and the example's id (Langfuse's ids are unique across a project), so syncing again updates items, and only changed items are written. An item holds the input, `{"verdict": ..., "reference": ...}` as its expected output, the metadata with the example's id under `evalr`, and the source trace. Removed examples are archived. Langfuse versions items by time, so loading a revision reads the items as they were then. Items made in Langfuse itself load with their expected output as the verdict. |
+| Hugging Face (phase 4) | | |
 
 A `FeedbackSource[InputT, VerdictT]` yields examples from people's feedback: every example has a verdict, ids are stable, and iterating again yields the same examples. artifactr's and reflexr's `[evals]` extras implement it over their logs; `InMemoryFeedbackSource` holds a fixed list. `collect(name, source)` gathers one into a dataset.
 

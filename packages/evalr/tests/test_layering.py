@@ -24,6 +24,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "jsonl": ({"evalr.core", "evalr.jsonl"}, set()),
     "dspy": ({"evalr.core", "evalr.dspy"}, {"dspy"}),
     "decision": ({"evalr.core", "evalr.decision"}, {"pydantic_ai"}),
+    "langfuse": ({"evalr.core", "evalr.langfuse"}, {"langfuse"}),
 }
 
 FORBIDDEN = {"artifactr", "reflexr"}

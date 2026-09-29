@@ -95,6 +95,10 @@ telemetry = configure_telemetry(service_name="docplan", metrics_detail="tenant")
 
 pydantic-ai records `gen_ai.client.token.usage` and `operation.cost` per model request, by model. artifactr's `artifactr.tokens` counts the same tokens by tenant and workspace, from each run's recorded usage.
 
+### Dashboards
+
+Seven Grafana dashboards ship in [`deploy/grafana/dashboards/`](https://github.com/alexnodeland/artifactr/tree/main/deploy/grafana/dashboards): an overview of every tenant, one tenant, one workspace, the agent and its models, collaboration, the surfaces, and storage. They expect Prometheus with the data source uid `prometheus`, fed over OTLP (Prometheus's own OTLP receiver, or a Collector), which names the series as the registry predicts: `artifactr.commands` becomes `artifactr_commands_total`, `artifactr.commit.duration` becomes `artifactr_commit_duration_seconds`. [stackr](https://github.com/alexnodeland/stackr) provisions them; elsewhere, import the JSON files, or download them from a release's assets. Latency panels show exemplars, which link to the trace of a slow turn or commit.
+
 ## The session on every span
 
 During a turn, the thread id is in OpenTelemetry baggage as `session.id`. `configure_telemetry` adds a `BaggageSpanProcessor` that copies it onto every span started in the turn, so the database and HTTP spans of a turn carry the session too, not only artifactr's and pydantic-ai's. Baggage also travels on outgoing HTTP requests (to model providers, for example), so it holds only the thread id: no tenant, user or content.

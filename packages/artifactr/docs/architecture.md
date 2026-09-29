@@ -439,6 +439,12 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0024](adr/0024-reference-implementation-as-a-workspace-member.md) | The reference implementation as a workspace member |
 | [0025](adr/0025-distribution-name.md) | Distributed as artifactr-ai, imported as artifactr |
 | [0026](adr/0026-publishing-the-documentation-site.md) | Publishing the documentation site from main |
+| [0027](adr/0027-opentelemetry-observability-with-langfuse.md) | OpenTelemetry-native observability, with Langfuse primary |
+| [0028](adr/0028-typed-feedback-as-events.md) | Typed feedback as events, mirrored to Langfuse |
+| [0029](adr/0029-evalr-shared-eval-kit.md) | evalr, a shared eval kit |
+| [0030](adr/0030-compose-and-dev-containers.md) | Contributor Compose and dev containers here, infrastructure in stackr |
+| [0031](adr/0031-litellm-proxy-first.md) | LiteLLM, proxy first, for routing and guardrails |
+| [0032](adr/0032-libraries-and-the-stackr-template.md) | Libraries, and stackr as the infrastructure template |
 
 ## Open questions
 

@@ -30,5 +30,11 @@ Each record captures one decision: the context that forced it, the options consi
 | [0024](0024-reference-implementation-as-a-workspace-member.md) | The reference implementation as a workspace member | Accepted |
 | [0025](0025-distribution-name.md) | Distributed as artifactr-ai, imported as artifactr | Accepted |
 | [0026](0026-publishing-the-documentation-site.md) | Publishing the documentation site from main | Accepted |
+| [0027](0027-opentelemetry-observability-with-langfuse.md) | OpenTelemetry-native observability, with Langfuse primary | Accepted |
+| [0028](0028-typed-feedback-as-events.md) | Typed feedback as events, mirrored to Langfuse | Accepted |
+| [0029](0029-evalr-shared-eval-kit.md) | evalr, a shared eval kit | Accepted |
+| [0030](0030-compose-and-dev-containers.md) | Contributor Compose and dev containers here, infrastructure in stackr | Accepted |
+| [0031](0031-litellm-proxy-first.md) | LiteLLM, proxy first, for routing and guardrails | Accepted |
+| [0032](0032-libraries-and-the-stackr-template.md) | Libraries, and stackr as the infrastructure template | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

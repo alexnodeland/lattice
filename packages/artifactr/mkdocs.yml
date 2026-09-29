@@ -174,10 +174,17 @@ nav:
           - adr/0024-reference-implementation-as-a-workspace-member.md
           - adr/0025-distribution-name.md
           - adr/0026-publishing-the-documentation-site.md
+          - adr/0027-opentelemetry-observability-with-langfuse.md
+          - adr/0028-typed-feedback-as-events.md
+          - adr/0029-evalr-shared-eval-kit.md
+          - adr/0030-compose-and-dev-containers.md
+          - adr/0031-litellm-proxy-first.md
+          - adr/0032-libraries-and-the-stackr-template.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md
           - rfcs/0001-v0.1-implementation-plan.md
+          - rfcs/0002-observability-feedback-and-evaluation.md
           - rfcs/template.md
   - Project:
       - Contributing: project/contributing.md

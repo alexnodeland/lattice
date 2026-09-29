@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# Check a running stack end to end: send telemetry and find it where it should land.
+#
+# Usage: scripts/smoke [PROFILE...]   (default: observability)
+#
+# observability: a trace, a metric and a log through the Collector, found in
+# Tempo, Prometheus and Loki; the span metrics Tempo's metrics generator
+# derives from the trace, and the Collector's own metrics, in Prometheus; and
+# Grafana's provisioned data sources and dashboards.
+
+# The checks are called through `eventually`, which shellcheck can't follow.
+# shellcheck disable=SC2329
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+# The published ports: from .env, or the defaults in .env.example.
+setting() {
+  local value
+  value=$(sed -n "s/^$1=//p" .env 2>/dev/null | tail -n 1)
+  printf '%s' "${value:-$2}"
+}
+host=$(setting STACKR_BIND 127.0.0.1)
+[[ $host == 0.0.0.0 ]] && host=127.0.0.1
+prometheus="http://$host:$(setting PROMETHEUS_PORT 9090)"
+tempo="http://$host:$(setting TEMPO_PORT 3200)"
+loki="http://$host:$(setting LOKI_PORT 3100)"
+grafana="http://$host:$(setting GRAFANA_PORT 3000)"
+
+run_id="smoke-$(date +%s)-$RANDOM"
+service="stackr-smoke"
+timeout=${SMOKE_TIMEOUT:-120}
+
+log() { printf '%s\n' "$*" >&2; }
+
+# Retry a check until it succeeds or the timeout passes.
+eventually() {
+  local description=$1 deadline=$((SECONDS + timeout))
+  shift
+  until "$@"; do
+    if ((SECONDS >= deadline)); then
+      log "FAIL: $description (after ${timeout}s)"
+      return 1
+    fi
+    sleep 3
+  done
+  log "ok: $description"
+}
+
+telemetrygen() {
+  docker compose --profile smoke run --rm --no-deps telemetrygen "$@" \
+    --otlp-endpoint otel-collector:4317 --otlp-insecure \
+    --service "$service" --telemetry-attributes "smoke.run=\"$run_id\"" >/dev/null 2>&1
+}
+
+# A query's JSON result has at least one element.
+prometheus_has() {
+  curl -fsS --get "$prometheus/api/v1/query" --data-urlencode "query=$1" |
+    grep -q '"result":\[{'
+}
+tempo_has_trace() {
+  curl -fsS --get "$tempo/api/search" \
+    --data-urlencode "q={ resource.service.name = \"$service\" && span.smoke.run = \"$run_id\" }" \
+    --data-urlencode "start=$(($(date +%s) - 3600))" --data-urlencode "end=$(($(date +%s) + 60))" |
+    grep -q '"traceID"'
+}
+loki_has_log() {
+  curl -fsS --get "$loki/loki/api/v1/query_range" \
+    --data-urlencode "query={service_name=\"$service\"} | smoke_run=\"$run_id\"" \
+    --data-urlencode "since=1h" |
+    grep -q '"values":\[\['
+}
+
+# Grafana's API as admin. The password goes to curl on stdin, never in its
+# arguments, where other processes could read it.
+grafana_get() {
+  printf 'user = "admin:%s"\n' "$(setting GRAFANA_ADMIN_PASSWORD '')" |
+    curl -fsS --config - "$grafana$1"
+}
+grafana_datasource_ok() {
+  grafana_get "/api/datasources/uid/$1/health" | grep -q '"status":"OK"'
+}
+grafana_has_dashboard() {
+  grafana_get "/api/dashboards/uid/$1" >/dev/null
+}
+
+smoke_observability() {
+  log "observability: sending a trace, a metric and a log as $service ($run_id)"
+  telemetrygen traces --traces 1
+  telemetrygen metrics --metrics 1 --metric-type Sum --aggregation-temporality cumulative \
+    --otlp-metric-name stackr.smoke
+  telemetrygen logs --logs 1 --body "stackr smoke test $run_id"
+
+  eventually "the trace is in Tempo" tempo_has_trace
+  eventually "the metric is in Prometheus as stackr_smoke_total" \
+    prometheus_has "stackr_smoke_total{job=\"$service\", smoke_run=\"$run_id\"}"
+  eventually "the log is in Loki" loki_has_log
+  eventually "Tempo's span metrics are in Prometheus" \
+    prometheus_has "traces_spanmetrics_calls_total{service=\"$service\"}"
+  eventually "the Collector's own metrics are in Prometheus" \
+    prometheus_has 'otelcol_exporter_sent_spans{exporter="otlp_grpc/tempo"}'
+  local source
+  for source in prometheus tempo loki pyroscope; do
+    eventually "Grafana's $source data source is healthy" grafana_datasource_ok "$source"
+  done
+  eventually "Grafana has the Collector dashboard" grafana_has_dashboard stackr-collector
+}
+
+profiles=("$@")
+((${#profiles[@]} > 0)) || profiles=(observability)
+status=0
+for profile in "${profiles[@]}"; do
+  case $profile in
+    observability) smoke_observability || status=1 ;;
+    *)
+      log "smoke: no checks for profile '$profile'"
+      status=1
+      ;;
+  esac
+done
+exit $status

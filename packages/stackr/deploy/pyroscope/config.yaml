@@ -1,0 +1,20 @@
+# Pyroscope 2, as a single process with its data on a local volume.
+# Applications push profiles to it on 4040.
+target: all
+architecture_storage: v2
+
+server:
+  http_listen_port: 4040
+
+storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/v2/shared
+
+metastore:
+  data_dir: /data/v2/metastore/data
+  raft:
+    dir: /data/v2/metastore/raft
+
+analytics:
+  reporting_enabled: false

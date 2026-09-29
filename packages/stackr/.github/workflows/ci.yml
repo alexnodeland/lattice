@@ -24,3 +24,27 @@ jobs:
       - run: uv sync --locked
       # Generates a throwaway .env first, which also tests scripts/setup-env.
       - run: make validate
+
+  smoke:
+    name: Smoke (${{ matrix.profiles }})
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        profiles: [observability]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: make env
+      - run: make up PROFILES="${{ matrix.profiles }}"
+      - run: make smoke PROFILES="${{ matrix.profiles }}"
+      - name: Logs
+        if: failure()
+        run: docker compose --profile '*' logs --no-color --tail=200
+      - name: Stop the stack
+        if: always()
+        run: make reset

@@ -190,3 +190,7 @@ cython_debug/
 
 # Browser-automation logs from local tooling
 .playwright-mcp/
+
+# stackr: the libraries' dashboards, downloaded by scripts/fetch-dashboards
+/deploy/grafana/dashboards/*
+!/deploy/grafana/dashboards/stackr/

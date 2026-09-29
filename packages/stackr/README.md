@@ -14,8 +14,12 @@ You need Docker with Compose v2, [uv](https://docs.astral.sh/uv/) and `make`.
 git clone https://github.com/alexnodeland/stackr.git
 cd stackr
 make env        # .env, with local secrets generated
-make validate   # check every configuration without starting containers
+make up         # start the stack
+make smoke      # send test telemetry through it and check it arrives
+make down       # stop it, keeping its data
 ```
+
+Applications send OTLP to `localhost:4317` (gRPC) or `localhost:4318` (HTTP), or to `otel-collector` on the `stackr` Docker network. Grafana is at <http://localhost:3000>, as `admin` with `GRAFANA_ADMIN_PASSWORD` from `.env`.
 
 Run `make` to list every command. [CONTRIBUTING](CONTRIBUTING.md) covers the workflow.
 

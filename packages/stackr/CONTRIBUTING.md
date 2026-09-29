@@ -23,7 +23,9 @@ Run `make` on its own to list every command:
 | `make down` | Stop the stack, keeping its data |
 | `make reset` | Stop the stack and delete its data volumes |
 | `make ps` / `make logs` | Show the stack's containers, or follow their logs |
+| `make dashboards` | Download the libraries' Grafana dashboards at the releases pinned in `versions.env` |
 | `make validate` | Validate every configuration without starting containers, as CI does |
+| `make smoke` | Send test telemetry through the running stack and check it arrives, as CI does |
 | `make changelog` | Regenerate `CHANGELOG.md` from commit history |
 
 ## How work flows: trunk-based development
@@ -69,16 +71,21 @@ An RFC proposes; ADRs record what was decided; the architecture docs describe wh
 
 ## Quality gates
 
-`make validate` runs, and CI runs the same script:
+CI runs the same scripts as `make validate` and `make smoke`.
+
+`make validate` checks without starting the stack:
 
 - **yamllint** in strict mode over every YAML file.
 - **Compose configuration** for each profile on its own and all together, failing on warnings such as a variable missing from `.env`.
-- **Grafana dashboards** parse as JSON.
+- **Each service's configuration with its own validator**, from the image `compose.yaml` pins: the Collector, Prometheus, Tempo and Loki.
+- **Grafana dashboards:** valid JSON, unique uids, and only the provisioned data sources.
 - **shellcheck** for the shell scripts, and **ruff** for the Python ones.
+
+`make smoke` runs against a started stack (`make up`): it sends test telemetry through each profile and checks that it lands where it should. CI starts each profile and runs it.
 
 ## Definition of done
 
-- [ ] `make validate` passes locally.
+- [ ] `make validate` passes locally, and `make smoke` for the profiles the change touches.
 - [ ] Images are pinned, and new settings are in `.env.example`.
 - [ ] The architecture docs reflect the change.
 - [ ] New decisions have an ADR; substantial proposals had an RFC.

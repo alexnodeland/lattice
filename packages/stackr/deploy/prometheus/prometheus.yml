@@ -1,0 +1,41 @@
+# Prometheus receives metrics two ways:
+# - OTLP from the Collector, at /api/v1/otlp (--web.enable-otlp-receiver)
+# - remote write from Tempo's metrics generator (--web.enable-remote-write-receiver)
+# and scrapes the stack's own services for their health.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+otlp:
+  # Resource attributes that become labels on every series, beyond `job` and
+  # `instance` (from service.name, service.namespace and service.instance.id).
+  promote_resource_attributes:
+    - deployment.environment.name
+    - service.version
+  # Keep OTel's resource attributes queryable through target_info.
+  keep_identifying_resource_attributes: true
+
+storage:
+  tsdb:
+    # Out-of-order samples happen when the Collector retries a batch.
+    out_of_order_time_window: 30m
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+  - job_name: otel-collector
+    static_configs:
+      - targets: ["otel-collector:8888"]
+  - job_name: tempo
+    static_configs:
+      - targets: ["tempo:3200"]
+  - job_name: loki
+    static_configs:
+      - targets: ["loki:3100"]
+  - job_name: pyroscope
+    static_configs:
+      - targets: ["pyroscope:4040"]
+  - job_name: grafana
+    static_configs:
+      - targets: ["grafana:3000"]

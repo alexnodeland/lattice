@@ -41,21 +41,37 @@ done
 check_compose "all profiles" --profile '*'
 
 step "Grafana dashboards"
-dashboards=()
-if [[ -d deploy/grafana/dashboards ]]; then
-  while IFS= read -r file; do dashboards+=("$file"); done \
-    < <(find deploy/grafana/dashboards -name '*.json' | sort)
-fi
-if ((${#dashboards[@]} == 0)); then
-  echo "none yet"
-fi
-for file in "${dashboards[@]+"${dashboards[@]}"}"; do
-  if uv run python -m json.tool "$file" >/dev/null; then
-    echo "ok: $file"
+uv run scripts/check-config dashboards || fail "dashboards"
+
+step "Service configurations, with each service's own validator"
+# Each runs the image compose.yaml pins, offline, with the config mounted as
+# the service would see it and .env as its environment.
+compose_json=$(docker compose --profile '*' config --format json)
+image_of() {
+  uv run python -c 'import json, sys; print(json.loads(sys.argv[1])["services"][sys.argv[2]]["image"])' \
+    "$compose_json" "$1"
+}
+check_service() {
+  local label=$1 output
+  shift
+  if output=$(docker run --rm --network none --env-file .env "$@" 2>&1); then
+    echo "ok: $label"
   else
-    fail "invalid JSON: $file"
+    fail "$label: $output"
   fi
-done
+}
+check_service "OpenTelemetry Collector" \
+  -v "$PWD/deploy/otel-collector:/etc/otelcol-contrib:ro" \
+  "$(image_of otel-collector)" validate --config=/etc/otelcol-contrib/config.yaml
+check_service "Prometheus" \
+  -v "$PWD/deploy/prometheus:/etc/prometheus:ro" --entrypoint promtool \
+  "$(image_of prometheus)" check config --syntax-only /etc/prometheus/prometheus.yml
+check_service "Tempo" \
+  -v "$PWD/deploy/tempo:/etc/tempo:ro" \
+  "$(image_of tempo)" -config.file=/etc/tempo/tempo.yaml -config.verify=true
+check_service "Loki" \
+  -v "$PWD/deploy/loki:/etc/loki:ro" \
+  "$(image_of loki)" -config.file=/etc/loki/loki.yaml -verify-config=true
 
 step "Shell scripts"
 shell_scripts=()

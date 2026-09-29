@@ -1,0 +1,52 @@
+# Tempo 3, as a single process (monolithic mode, which needs no Kafka) with
+# its data on a local volume. It receives traces from the Collector over OTLP,
+# and its metrics generator derives span metrics and service graphs,
+# remote-written to Prometheus with exemplars.
+stream_over_http_enabled: true
+
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9095
+  log_level: warn
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+# For local use, a trace is searchable as soon as it arrives, rather than
+# after the default 30-second cutoff.
+query_frontend:
+  query_end_cutoff: 0s
+live_store:
+  fail_on_high_lag: false
+
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
+
+usage_report:
+  reporting_enabled: false

@@ -9,11 +9,11 @@ COMPOSE ?= docker compose
 
 # The profiles `make up` starts: all of them unless you choose, for example
 #   make up PROFILES=observability
-ALL_PROFILES :=
+ALL_PROFILES := observability
 PROFILES ?= $(ALL_PROFILES)
 PROFILE_FLAGS = $(foreach profile,$(PROFILES),--profile $(profile))
 
-.PHONY: help install env up down reset ps logs validate changelog clean
+.PHONY: help install env up down reset ps logs dashboards validate smoke changelog clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -28,8 +28,7 @@ env: ## Create or update .env, generating local secrets
 .env: .env.example
 	$(UV) run scripts/setup-env
 
-up: .env ## Start the chosen PROFILES (default: all of them)
-	@if [ -z "$(strip $(PROFILES))" ]; then echo "up: no profiles to start yet"; exit 1; fi
+up: .env dashboards ## Start the chosen PROFILES (default: all of them)
 	$(COMPOSE) $(PROFILE_FLAGS) up --detach --wait
 
 down: ## Stop the stack, keeping its data
@@ -44,8 +43,14 @@ ps: ## Show the stack's containers
 logs: ## Follow the logs of the running services
 	$(COMPOSE) --profile '*' logs --follow --tail=100
 
+dashboards: ## Download the libraries' Grafana dashboards pinned in versions.env
+	$(UV) run scripts/fetch-dashboards
+
 validate: .env ## Validate every configuration without starting containers, as CI does
 	scripts/validate
+
+smoke: ## Send test telemetry through the running stack and find it (PROFILES as for up)
+	scripts/smoke $(PROFILES)
 
 changelog: ## Regenerate CHANGELOG.md from conventional commits
 	$(UV) run git-cliff --output CHANGELOG.md

@@ -1,8 +1,15 @@
 # stackr: the services applications on artifactr, reflexr and evalr run on.
 #
-# Services are grouped in profiles (observability, langfuse, gateway), so only
-# what a task needs runs. Local Supabase runs beside this project through its
-# CLI. `make up` starts both; see docs/architecture.md.
+# Services are grouped in profiles, which are adapter sets behind stable ports
+# (ADR-0005). Only what a task needs runs:
+#   observability  the OpenTelemetry Collector (the telemetry port), with
+#                  Tempo, Prometheus, Loki, Pyroscope and Grafana behind it
+#   smoke          telemetrygen, for scripts/smoke
+# Local Supabase runs beside this project through its CLI. `make up` starts
+# the stack; see docs/architecture.md.
+#
+# Published ports bind to STACKR_BIND (127.0.0.1 by default), and each is a
+# setting in .env (ADR-0006).
 
 name: stackr
 
@@ -12,4 +19,124 @@ networks:
   default:
     name: stackr
 
-services: {}
+volumes:
+  prometheus-data:
+  tempo-data:
+  loki-data:
+  pyroscope-data:
+  grafana-data:
+
+services:
+  # The telemetry port: every application, and the LiteLLM proxy, sends OTLP
+  # here. Swapping a backend changes the Collector's exporters only.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.161.0
+    profiles: [observability]
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      STACKR_ENVIRONMENT: ${STACKR_ENVIRONMENT:-local}
+    volumes:
+      - ./deploy/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${OTLP_GRPC_PORT:-4317}:4317
+      - ${STACKR_BIND:-127.0.0.1}:${OTLP_HTTP_PORT:-4318}:4318
+    depends_on:
+      - tempo
+      - prometheus
+      - loki
+
+  tempo:
+    image: grafana/tempo:3.0.3
+    profiles: [observability]
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./deploy/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${TEMPO_PORT:-3200}:3200
+    depends_on:
+      - prometheus
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    profiles: [observability]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      # Metrics arrive as OTLP from the Collector, and by remote write from
+      # Tempo's metrics generator (ADR-0007).
+      - --web.enable-otlp-receiver
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${PROMETHEUS_PORT:-9090}:9090
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  loki:
+    image: grafana/loki:3.7.8
+    profiles: [observability]
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - ./deploy/loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki-data:/loki
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${LOKI_PORT:-3100}:3100
+
+  # The profiles port: applications push profiles here directly, until OTLP
+  # profiles are stable in the Collector (ADR-0005).
+  pyroscope:
+    image: grafana/pyroscope:2.3.1
+    profiles: [observability]
+    restart: unless-stopped
+    command: ["-config.file=/etc/pyroscope/config.yaml"]
+    volumes:
+      - ./deploy/pyroscope/config.yaml:/etc/pyroscope/config.yaml:ro
+      - pyroscope-data:/data
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${PYROSCOPE_PORT:-4040}:4040
+
+  grafana:
+    image: grafana/grafana:13.2.2
+    profiles: [observability]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?run make env}
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      - ./deploy/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./deploy/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+      - pyroscope
+
+  # Sends test telemetry for scripts/smoke; not a service.
+  telemetrygen:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.161.0
+    profiles: [smoke]

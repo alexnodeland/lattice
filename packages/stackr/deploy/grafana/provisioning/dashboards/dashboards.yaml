@@ -1,0 +1,14 @@
+# Dashboards from files: each directory under deploy/grafana/dashboards is a
+# folder. `stackr/` is committed; the libraries' folders are downloaded by
+# scripts/fetch-dashboards at the versions pinned in versions.env.
+apiVersion: 1
+
+providers:
+  - name: stackr
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true

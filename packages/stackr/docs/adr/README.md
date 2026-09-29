@@ -9,5 +9,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0003](0003-observability-and-gateway-services.md) | The observability and gateway services | Accepted |
 | [0004](0004-the-application-template.md) | The application template | Accepted |
 | [0005](0005-ports-and-adapters-for-the-stack.md) | Ports and adapters for the stack | Accepted |
+| [0006](0006-networks-and-published-ports.md) | Networks and published ports | Accepted |
+| [0007](0007-how-telemetry-reaches-the-backends.md) | How telemetry reaches the backends | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

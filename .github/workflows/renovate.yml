@@ -1,0 +1,48 @@
+# Dependency updates (stackr's RFC-0003, CI and tooling). Renovate's open-source CLI runs here, in
+# lattice's own Actions, rather than as Mend's hosted app, so no service outside GitHub holds
+# access to the repository. renovate.json is its configuration.
+#
+# Renovate acts as lattice's GitHub App, as release.yml does, with a token minted for each run and
+# narrowed to what Renovate needs, so that its pull requests' CI and Title checks run. It commits
+# through GitHub's API, so its commits are signed.
+
+name: Renovate
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    name: Renovate
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.LATTICE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.LATTICE_APP_PRIVATE_KEY }}
+          permission-administration: read
+          permission-checks: write
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+          permission-statuses: write
+          permission-vulnerability-alerts: read
+          permission-workflows: write
+      - uses: renovatebot/github-action@6d26fcf0275dc65624cbc3d51fe78bc773f98321 # v46.3.6
+        with:
+          token: ${{ steps.app.outputs.token }}
+        env:
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          RENOVATE_ONBOARDING: "false"
+          RENOVATE_REQUIRE_CONFIG: required
+          RENOVATE_PLATFORM_COMMIT: enabled

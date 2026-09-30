@@ -5,10 +5,10 @@
 # attached to its release with a build-provenance attestation. Publishing to PyPI is a later job
 # here.
 #
-# release-please acts as the release GitHub App, with a token minted for each run, so that its
-# pull request's CI and Title checks run, which they never do for the workflow's own token. The
-# App's client ID and private key are the RELEASE_APP_CLIENT_ID and RELEASE_APP_PRIVATE_KEY
-# secrets.
+# release-please acts as lattice's GitHub App, with a token minted for each run and narrowed to
+# what it needs, so that its pull request's CI and Title checks run, which they never do for the
+# workflow's own token. The App's client ID and private key are the LATTICE_APP_CLIENT_ID and
+# LATTICE_APP_PRIVATE_KEY secrets; renovate.yml acts as the same App.
 
 name: Release
 
@@ -34,8 +34,8 @@ jobs:
       - id: app
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          client-id: ${{ secrets.LATTICE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.LATTICE_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
       - id: release

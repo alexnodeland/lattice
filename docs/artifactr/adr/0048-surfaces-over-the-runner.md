@@ -1,6 +1,6 @@
 # ADR-0048: Surfaces over the runner
 
-**Status:** Accepted
+**Status:** Accepted; the run a recorded message names amended by [ADR-0055](0055-turns-from-the-log.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 

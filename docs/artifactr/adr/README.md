@@ -11,7 +11,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0005](0005-one-event-log-per-workspace.md) | One durable event log per workspace | Accepted, amended by 0021 |
 | [0006](0006-agent-integration-as-pydantic-ai-capability.md) | Agent integration as a pydantic-ai capability | Accepted, amended by 0017 |
 | [0007](0007-caller-owned-live-output.md) | Live output is owned by the caller, not the log | Accepted |
-| [0008](0008-agent-perception-and-steering.md) | Agent perception: change notes, fresh rendering, steering | Accepted |
+| [0008](0008-agent-perception-and-steering.md) | Agent perception: change notes, fresh rendering, steering | Accepted; its steering amended by 0055 |
 | [0009](0009-write-policies-and-non-blocking-proposals.md) | Write policies and non-blocking proposals | Accepted |
 | [0010](0010-pausing-with-deferred-tools.md) | Pausing with pydantic-ai deferred tools | Accepted |
 | [0011](0011-workspace-scoped-artifacts-and-tenant-handles.md) | Workspace-scoped artifacts and tenant-scoped handles | Accepted |
@@ -23,7 +23,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0017](0017-application-toolsets-and-capability-events.md) | Application toolsets register on the agent; the capability emits capability events | Accepted |
 | [0018](0018-core-host-contract.md) | Core's host contract: needs, commit and record | Accepted |
 | [0019](0019-storage-protocol-and-workspace-handles.md) | One storage protocol behind workspace handles | Accepted |
-| [0020](0020-running-agents-in-threads.md) | Running agents in threads | Accepted |
+| [0020](0020-running-agents-in-threads.md) | Running agents in threads | Accepted; what a message does, and its thread claims, amended by 0055 |
 | [0021](0021-sql-storage.md) | SQL storage with one dialect-neutral implementation | Accepted |
 | [0022](0022-surfaces-over-one-command-handler.md) | Surfaces over one command handler | Superseded by 0048 |
 | [0023](0023-documentation-site.md) | The documentation site | Accepted, amended by 0026, 0050 and 0053 |
@@ -51,12 +51,13 @@ Each record captures one decision: the context that forced it, the options consi
 | [0045](0045-a-message-id-is-used-once.md) | A message id is used once in a workspace | Accepted |
 | [0046](0046-telemetry-that-composes-across-libraries.md) | Telemetry that composes across libraries, untraced polling and mirror cursors | Accepted |
 | [0047](0047-cancel-safe-storage.md) | Cancel-safe storage | Accepted |
-| [0048](0048-surfaces-over-the-runner.md) | Surfaces over the runner | Accepted |
+| [0048](0048-surfaces-over-the-runner.md) | Surfaces over the runner | Accepted; the run a recorded message names amended by 0055 |
 | [0049](0049-scores-on-evalr.md) | Scores on evalr | Accepted |
 | [0050](0050-one-docs-build.md) | One docs build | Accepted, amended by 0053 |
-| [0051](0051-notices.md) | Notices: messages that start no turn | Accepted |
+| [0051](0051-notices.md) | Notices: messages that start no turn | Accepted; what becomes of a message committed directly amended by 0055 |
 | [0052](0052-artifactr-in-lattice.md) | artifactr in lattice | Accepted |
 | [0053](0053-one-site-for-the-family.md) | One site for the family | Accepted |
 | [0054](0054-dashboards-from-the-checkout.md) | Dashboards from the checkout | Accepted |
+| [0055](0055-turns-from-the-log.md) | Turns from the log | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

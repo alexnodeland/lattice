@@ -6,7 +6,7 @@ Decisions are recorded in [`adr/`](adr/README.md), and proposals in [`rfcs/`](rf
 
 evalr is a Python library for **typed evaluation of agent systems**. An evaluator judges an input (a chat thread, a workflow run, an artifact version) and returns a verdict: an instance of a Pydantic type, typically one of the feedback types people also give. Because people and evaluators produce the same types, evaluators can be trained on people's feedback and measured against it.
 
-It serves [artifactr](https://github.com/alexnodeland/artifactr) and [reflexr](https://github.com/alexnodeland/reflexr), which record typed feedback from people and depend on evalr through their `[evals]` extras. evalr imports neither ([ADR-0001](adr/0001-typed-verdicts-over-any-pydantic-model.md)).
+It serves [artifactr](../artifactr/index.md) and [reflexr](../reflexr/index.md), which record typed feedback from people and depend on evalr through their `[evals]` extras. evalr imports neither ([ADR-0001](adr/0001-typed-verdicts-over-any-pydantic-model.md)).
 
 ### Goals
 
@@ -382,4 +382,4 @@ The gates are those of artifactr and reflexr ([ADR-0005](adr/0005-quality-gates-
 
 ## Documentation
 
-The documentation site is built from `docs/` with Zensical by `make docs`, in strict mode and with the changelog regenerated, on every pull request, and published from `main` on every push at <https://evalr.alexnodeland.com> ([ADR-0010](adr/0010-documentation-site.md), [ADR-0013](adr/0013-docstrings-in-markdown-and-one-docs-build.md)). The API reference is generated from the docstrings of each package's `__all__`, which are Markdown, and the guides' examples are run offline, against the in-memory adapters and fakes, before they are published.
+The documentation is evalr's section of lattice's site, built from `docs/evalr/` with Zensical by `moon run lattice:docs`, in strict mode, by CI whenever a pull request changes it, and published from `main` on every push at <https://lattice.alexnodeland.com/evalr/> ([ADR-0010](adr/0010-documentation-site.md), [ADR-0013](adr/0013-docstrings-in-markdown-and-one-docs-build.md)). The API reference is generated from the docstrings of each package's `__all__`, which are Markdown, and the guides' examples are run offline, against the in-memory adapters and fakes, before they are published.

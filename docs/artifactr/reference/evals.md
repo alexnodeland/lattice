@@ -1,6 +1,6 @@
 # artifactr.evals
 
-The `evals` extra: artifactr over [evalr](https://github.com/alexnodeland/evalr), the shared eval kit. See [Evaluation](../guides/evaluation.md#datasets-from-the-log) and [ADR-0044](../adr/0044-the-evalr-adapter.md).
+The `evals` extra: artifactr over [evalr](../../evalr/index.md), the shared eval kit. See [Evaluation](../guides/evaluation.md#datasets-from-the-log) and [ADR-0044](../adr/0044-the-evalr-adapter.md).
 
 ::: artifactr.evals
     options:

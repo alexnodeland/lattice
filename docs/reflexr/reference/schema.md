@@ -1,13 +1,13 @@
 # JSON Schemas
 
-reflexr publishes two JSON Schemas, generated from its Pydantic models, which are the source of truth, and checked in under [`schemas/`](https://github.com/alexnodeland/reflexr/tree/main/schemas):
+reflexr publishes two JSON Schemas, generated from its Pydantic models, which are the source of truth, and checked in under [`schemas/`](https://github.com/alexnodeland/lattice/tree/main/packages/reflexr/schemas):
 
 | Schema | What it describes | Use it to |
 |---|---|---|
-| [`reflexr.rules.v1.json`](https://github.com/alexnodeland/reflexr/blob/main/schemas/reflexr.rules.v1.json) | A [rule](../guides/rules.md): its condition, scope, action and policies | Validate rules written as JSON, by people or by agents |
-| [`reflexr.v1.json`](https://github.com/alexnodeland/reflexr/blob/main/schemas/reflexr.v1.json) | Every frame of the [stream protocol](../protocol.md): `client` is any frame a client sends, and `server` any frame a server sends; `$defs` holds every frame, command, outcome and envelope they refer to | Generate a client's types |
+| [`reflexr.rules.v1.json`](https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/schemas/reflexr.rules.v1.json) | A [rule](../guides/rules.md): its condition, scope, action and policies | Validate rules written as JSON, by people or by agents |
+| [`reflexr.v1.json`](https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/schemas/reflexr.v1.json) | Every frame of the [stream protocol](../protocol.md): `client` is any frame a client sends, and `server` any frame a server sends; `$defs` holds every frame, command, outcome and envelope they refer to | Generate a client's types |
 
-A test fails if either checked-in file drifts from the models. Regenerate both with `make schema`, which runs:
+A test fails if either checked-in file drifts from the models. Regenerate both with `moon run reflexr:schema`, which runs, in `packages/reflexr/`:
 
 ```bash
 uv run python -m reflexr.core.schema rules > schemas/reflexr.rules.v1.json

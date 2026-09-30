@@ -22,7 +22,7 @@ The infrastructure template for applications built on artifactr, reflexr and eva
 
 ## Why: one stack the family's applications share
 
-Every application on [artifactr](https://github.com/alexnodeland/artifactr), [reflexr](https://github.com/alexnodeland/reflexr) or [evalr](https://github.com/alexnodeland/evalr) needs the same infrastructure: a database with sign-in, a gateway in front of the models with budgets and guardrails, traces, metrics, logs and profiles, and a place for LLM traces, scores and datasets. The libraries emit OpenTelemetry, reach models through a LiteLLM proxy and ship their own Grafana dashboards, but those only pay off when something is set up to receive them.
+Every application on [artifactr](../artifactr/index.md), [reflexr](../reflexr/index.md) or [evalr](../evalr/index.md) needs the same infrastructure: a database with sign-in, a gateway in front of the models with budgets and guardrails, traces, metrics, logs and profiles, and a place for LLM traces, scores and datasets. The libraries emit OpenTelemetry, reach models through a LiteLLM proxy and ship their own Grafana dashboards, but those only pay off when something is set up to receive them.
 
 stackr is that setup, in two parts:
 
@@ -34,8 +34,8 @@ Applications talk to **ports**, never to vendors: OTLP to the Collector, the Ope
 ## A short example
 
 ```bash
-git clone https://github.com/alexnodeland/stackr.git
-cd stackr
+git clone https://github.com/alexnodeland/lattice.git
+cd lattice/packages/stackr
 make env        # .env, with local secrets generated
 make up         # the default profiles, with local Supabase
 make smoke      # send test telemetry through the stack and find it where it lands
@@ -44,7 +44,7 @@ make smoke      # send test telemetry through the stack and find it where it lan
 Then generate an application beside it:
 
 ```bash
-uvx copier copy gh:alexnodeland/stackr my-app
+uvx copier copy gh:alexnodeland/lattice my-app
 cd my-app && git init
 make install && make env && make check
 make up         # the application in its app profile, at http://localhost:8800

@@ -21,6 +21,8 @@ Every file is a hand-authored SVG with no embedded images or fonts. Text is outl
 | [`banner-dark.svg`](banner-dark.svg) | The README banner, 1280 × 400 | Dark backgrounds |
 | [`favicon.svg`](favicon.svg) | The mark, switching to the dark colours when the system prefers a dark scheme | Browser tabs |
 
+lattice's site takes lattice's palette in every section ([lattice ADR-0001](../../../adr/0001-lattices-brand.md)), and opens artifactr's section with artifactr's lockup. Where the table below names a role on the site, it is the role artifactr's own palette gives that colour.
+
 ## Colours
 
 | Name | Light | Dark | Role |
@@ -49,4 +51,4 @@ Both are open-source (SIL Open Font License) and served by Google Fonts. The wor
 - The mark stays legible down to 16 pixels. Below 24 pixels, use it without the wordmark.
 - Magenta and cyan stand for the two participants, so don't use them as decoration. Outside the mark, magenta only marks interaction on the site (a hovered link, the current page), and the overprint indigo is the working colour for everything else.
 - Don't stretch, rotate, outline or add effects to the mark, and don't set the wordmark in another typeface.
-- In a README, switch between the light and dark banners with a `<picture>` element, as the repository's README does.
+- In a README, switch between the light and dark banners with a `<picture>` element, as [artifactr's README](https://github.com/alexnodeland/lattice/blob/main/packages/artifactr/README.md) does.

@@ -1,6 +1,6 @@
 # Reference
 
-One page for each area of stackr's configuration. The tables on these pages are generated from the files they describe by `scripts/docs-reference`, and `make validate`, `make docs` and CI fail when a page no longer matches its file, so what you read here is what the files say. Each page also includes its file in full.
+One page for each area of stackr's configuration. The tables on these pages are generated from the files they describe by `scripts/docs-reference`, and `moon run stackr:reference`, which CI runs, fails when a page no longer matches its file, so what you read here is what the files say. Each page also includes its file in full.
 
 | Page | Describes | Generated from |
 |---|---|---|
@@ -13,4 +13,4 @@ One page for each area of stackr's configuration. The tables on these pages are 
 | [Makefile targets](makefile.md) | Every `make` command, and the variables they read | `Makefile` |
 | [Pinned versions](versions.md) | What stackr pins outside `compose.yaml`, and where each pin lives | `versions.env`, `copier.yml` |
 
-Images are named without their versions: `compose.yaml` pins them, and Dependabot changes them every week. To regenerate the pages after changing one of these files, run `make docs-reference`.
+Images are named without their versions: `compose.yaml` pins them, and Renovate proposes their updates. To regenerate the pages after changing one of these files, run `make docs-reference`.

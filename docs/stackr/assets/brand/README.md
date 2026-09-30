@@ -1,6 +1,6 @@
 # Brand
 
-stackr is one of a family of four projects: [artifactr](https://github.com/alexnodeland/artifactr), [reflexr](https://github.com/alexnodeland/reflexr), [evalr](https://github.com/alexnodeland/evalr) and stackr. Their marks are drawn on one 64-unit grid, with one stroke and one diagonal, their wordmarks are set in one typeface, and each has a colour of its own. The family's identity comes from print proofing: each library is drawn in two of the three process inks, cyan, magenta and yellow, and where both land on the same spot they overprint into a third colour, its working colour. reflexr's [brand page](https://github.com/alexnodeland/reflexr/blob/main/docs/assets/brand/README.md) states the system in full.
+stackr is one of the five packages in [lattice](https://github.com/alexnodeland/lattice), which is drawn in their brand system too: [artifactr](../../../artifactr/index.md), [reflexr](../../../reflexr/index.md), [evalr](../../../evalr/index.md), [relayr](../../../relayr/adr/README.md) and stackr. Their marks are drawn on one 64-unit grid with one stroke, their wordmarks are set in one typeface, and each has a colour of its own. The family's identity comes from print proofing: artifactr, reflexr and evalr are each drawn in two of the three process inks, cyan, magenta and yellow, and where both land on the same spot they overprint into a third colour, the library's working colour; relayr and lattice each print on one plate, magenta and cyan, and overprint where it prints twice. [lattice's brand page](../../../assets/brand/README.md#the-family) states the system in full, with the inks it reserves for portalr and grantr.
 
 stackr prints in **key**, the fourth plate: the black that the colour plates are printed in register to, and the quiet layer they sit on. Its mark is **three slabs**, stacked along the family's diagonal, with their ends cut at its angle: the layers the libraries run on. The slabs are one tint of key, and where two layers overlap they print in full key, the family's overprint drawn without a hue.
 
@@ -24,7 +24,7 @@ Every file is a hand-authored SVG with no embedded images or fonts. Text is outl
 | [`favicon.svg`](favicon.svg) | The mark, switching to the dark colours when the system prefers a dark scheme | Browser tabs |
 | [`tokens.json`](tokens.json) | The colours below, and the site's, as data | Tools and new material |
 
-lattice's site applies one palette to every section, from its `docs/assets/stylesheets/lattice.css`, until lattice's brand ADR.
+lattice's site takes lattice's palette in every section ([lattice ADR-0001](../../../adr/0001-lattices-brand.md)), and opens stackr's section with stackr's lockup. Where the table below names a role on the site, it is the role stackr's own palette gives that colour.
 
 The banners place the mark three grid units (21.6) left of the family's banner origin, at (824, 0.8) rather than (845.6, 0.8). At the family's placement, the top slab's right end ran past the panel's edge and its cut was lost; now all three slabs are whole, with the same room on either side of them. Nothing else about the banner differs from the family's layout.
 
@@ -56,7 +56,11 @@ Both are open-source (SIL Open Font License) and served by Google Fonts. The wor
 - stackr has no hue, so its colour can't tell a link from the text around it: links on the site are underlined, and should be wherever stackr's colours set text.
 - Keep stackr in key beside its siblings. Its colour is the absence of one: don't borrow a library's ink to make it stand out.
 - Don't stretch, rotate, outline or add effects to the mark, and don't set the wordmark in another typeface.
-- In a README, switch between the light and dark banners with a `<picture>` element, as the repository's README does.
+- In a README, switch between the light and dark banners with a `<picture>` element, as [stackr's README](https://github.com/alexnodeland/lattice/blob/main/packages/stackr/README.md) does.
+
+## The alternative set aside
+
+stackr's alternative mark, drawn and set aside, stacks the three process inks instead: cyan, magenta and yellow slabs, overprinting into artifactr's indigo and reflexr's red where they meet. It says "the family's stack" more literally and gives stackr colour, but it reads as a flag, and it borrows its siblings' overprints instead of having one of its own. The key version is preferred: infrastructure should be the quiet plate under the colour.
 
 ## Known weaknesses
 

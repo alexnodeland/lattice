@@ -1,6 +1,6 @@
 # Brand
 
-reflexr's identity is a sibling of [artifactr's](https://github.com/alexnodeland/artifactr/blob/main/docs/assets/brand/README.md), and comes from the same place: print proofing. Two inks, yellow and magenta, are the two halves of a reflex: the event that arrives and the response that leaves. Where both inks land on the same spot they overprint into a third colour, a deep red, which stands for the moment between them: the rule firing. The mark is artifactr's caret turned a quarter, a chevron. An event comes in along the upper stroke and the response goes back out along the lower one, and at the point, where the two meet, the rule fires. It also reads as "then", the second half of every rule.
+reflexr's identity is a sibling of [artifactr's](../../../artifactr/assets/brand/README.md), and comes from the same place: print proofing. Two inks, yellow and magenta, are the two halves of a reflex: the event that arrives and the response that leaves. Where both inks land on the same spot they overprint into a third colour, a deep red, which stands for the moment between them: the rule firing. The mark is artifactr's caret turned a quarter, a chevron. An event comes in along the upper stroke and the response goes back out along the lower one, and at the point, where the two meet, the rule fires. It also reads as "then", the second half of every rule.
 
 <p>
   <img src="mark-light.svg#gh-light-mode-only" width="96" alt="The reflexr mark">
@@ -20,8 +20,10 @@ Every file is a hand-authored SVG with no embedded images or fonts. Text is outl
 | [`banner-light.svg`](banner-light.svg) | The README banner, 1280 × 400 | Light backgrounds |
 | [`banner-dark.svg`](banner-dark.svg) | The README banner, 1280 × 400 | Dark backgrounds |
 | [`favicon.svg`](favicon.svg) | The mark, switching to the dark colours when the system prefers a dark scheme | Browser tabs |
-| [`family-light.svg`](family-light.svg) | The four marks of the family, over their names | Light backgrounds |
-| [`family-dark.svg`](family-dark.svg) | The four marks of the family, over their names | Dark backgrounds |
+| [`family-light.svg`](family-light.svg) | The family's first four marks, over their names; [lattice's sheet](../../../assets/brand/README.md#the-family) has all six | Light backgrounds |
+| [`family-dark.svg`](family-dark.svg) | The family's first four marks, over their names; [lattice's sheet](../../../assets/brand/README.md#the-family) has all six | Dark backgrounds |
+
+lattice's site takes lattice's palette in every section ([lattice ADR-0001](../../../adr/0001-lattices-brand.md)), and opens reflexr's section with reflexr's lockup. Where the table below names a role on the site, it is the role reflexr's own palette gives that colour.
 
 ## Colours
 
@@ -52,42 +54,14 @@ Both are open-source (SIL Open Font License) and served by Google Fonts. The wor
 - Yellow and magenta stand for the event and the response, so don't use them as decoration. Outside the mark, magenta only marks interaction on the site (a hovered link, the current page), yellow only highlights code, and the overprint red is the working colour for everything else.
 - Never set text in yellow: it is too light on paper.
 - Don't stretch, rotate, outline or add effects to the mark, and don't set the wordmark in another typeface.
-- In a README, switch between the light and dark banners with a `<picture>` element, as the repository's README does.
+- In a README, switch between the light and dark banners with a `<picture>` element, as [reflexr's README](https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/README.md) does.
 
 ## The family
 
-artifactr, reflexr, evalr and stackr share one brand system, so that they read as a family wherever they appear together: a README that links its siblings, a stack that runs them all, a system built from them.
-
-<p>
-  <img src="family-light.svg#gh-light-mode-only" width="704" alt="The marks of artifactr, reflexr, evalr and stackr, over their names">
-  <img src="family-dark.svg#gh-dark-mode-only" width="704" alt="The marks of artifactr, reflexr, evalr and stackr, over their names">
-</p>
-
-### The system
-
-- **The inks are a printer's**: cyan, magenta, yellow and key. Each coloured library prints with two of the three process inks and names its own meaning for each, and where they overlap they overprint into a third colour: the library's working colour. Any two of the coloured libraries share one ink, as neighbouring jobs on a press share a plate. stackr prints in key.
-- **One grid.** Every mark is drawn on a 64-unit square and sits in the same place on it in every file, so one mark can replace another without re-spacing a layout.
-- **One stroke.** A stroke is a band 14 units wide, measured horizontally, on artifactr's diagonal of 27 across for every 52 down (about 62.6°). Strokes end in flat cuts along the grid, and meet in points where one stroke's edge cuts the other.
-- **One overprint.** A mark's overlaps, and only those, are filled with its overprint colour. On paper the overprint is darker than both inks, and on screen lighter.
-- **One typographic layout.** The wordmark is Schibsted Grotesk Bold, lowercase, outlined and tracked 1.2% tight. In a lockup it is set at 64 units, with the mark's grid scaled so that 52 grid units (from line 6 to line 58, the height of artifactr's caret) are 0.8 of the type size, line 58 on the baseline, 0.16 of the type size between the mark and the word, and 8 units of padding. A banner is 1280 × 400 with 24-unit corners: the wordmark at 136 units (baseline 196, from x = 104), a two-line tagline in the same face at weight 420 and 32 units (baselines 272 and 316, from x = 108) in the graphite, and the mark at 7.2 times its grid from (845.6, 0.8), running off the panel.
-- **One site palette rule.** The overprint is the working colour (headings, links, the primary colour), the darker ink marks interaction, and the lighter ink highlights code. The dark scheme's background is a near-black of the overprint's hue.
-
-### The siblings
-
-| Library | Mark | Inks | Overprint | What the mark says |
-|---|---|---|---|---|
-| **artifactr** | A caret, `^` | Magenta and cyan: a person and an agent | Indigo `#2D2A8C`: the artifact they share | The proofreader's sign for "insert here", and the letter A |
-| **reflexr** | A chevron, `>`: the caret turned a quarter | Yellow and magenta: an event and a response | Red `#B3122E`: the rule firing | A reflex, a signal in and bent back out; and "then" |
-| **evalr** | A tick: the caret turned over, one arm cut short at two thirds of its height | Yellow and cyan: a person's judgement and an evaluator's | Green `#00704F`: the verdict where they agree | A verdict; its arms meet in a point, as the caret's do |
-| **stackr** | Three slabs, stacked along the family's diagonal, their ends cut at its angle | Key: one tint for every layer | Key `#1C1D26`, where two layers overlap | The layers the other libraries run on, and the key plate the others are printed in register to |
-
-evalr's and stackr's files are drawn to these rules and join their own repositories with their sites.
-
-stackr's alternative, drawn and set aside, stacks the three process inks instead: cyan, magenta and yellow slabs, overprinting into artifactr's indigo and reflexr's red where they meet. It says "the family's stack" more literally and gives stackr colour, but it reads as a flag, and it borrows its siblings' overprints instead of having one of its own. The key version is preferred: infrastructure should be the quiet plate under the colour.
+artifactr, reflexr, evalr, relayr and stackr share one brand system with lattice, which holds them. [lattice's brand page](../../../assets/brand/README.md#the-family) states it in full: the inks, the grid, the stroke, the overprint and the layout every mark follows, each member's mark and inks, the inks reserved for portalr and grantr, and a family sheet with all six marks.
 
 ### Known weaknesses
 
 - **The chevron reads as "play" or "next"** to some eyes, and in front of the wordmark it looks like a shell prompt. The family accepts this, as artifactr's caret also reads as "up", and for a library whose rules end in "then run this" the connotation is not wrong.
 - **Yellow is the weakest ink on paper.** It holds at the size of the mark, and on dark backgrounds it is the strongest, but it must never carry text or thin lines.
-- **Magenta is shared with artifactr.** Side by side, the shapes and overprints tell the two apart, but in a browser's tab strip at 16 pixels they are the closest pair in the family.
-- **stackr is the least distinctive.** Three horizontal bars can read as a menu icon, and without a hue its links need underlines to be told apart from body text.
+- **Magenta is shared with artifactr, and with relayr, which prints in it alone.** Side by side, the shapes and overprints tell them apart, but in a browser's tab strip at 16 pixels reflexr and artifactr are the closest pair in the family, and relayr's deep magenta is the working colour nearest to reflexr's red.

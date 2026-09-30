@@ -1,6 +1,6 @@
 # The smoke tests
 
-`make validate` checks every configuration without starting anything ([Validation and CI](validation.md)). The smoke tests are the other half: they run against a started stack, send telemetry, a gateway request and an application's requests through it, and find each where it should land. CI runs them on every pull request, and you run them after changing a service, an image or a version.
+`make validate` checks every configuration without starting anything ([Validation and CI](validation.md)). The smoke tests are the other half: they run against a started stack, send telemetry, a gateway request and an application's requests through it, and find each where it should land. CI runs them on every pull request that changes stackr, and you run them after changing a service, an image or a version.
 
 Both are `scripts/smoke`, and need no provider key: the gateway's model replies are mocked.
 

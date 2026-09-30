@@ -114,7 +114,7 @@ verdicts = [
 
 ## Scores
 
-Evaluation backends see feedback as **scores**: one per field, named `{type}.{field}`, typed by the field. The mapping and the ports are [evalr](https://github.com/alexnodeland/evalr)'s, shared with artifactr and with evalr's own evaluators, so an evaluator's `triage_quality.correct` and a person's are the same score ([evalr's scores guide](https://evalr.alexnodeland.com/guides/scores/)). `reflexr.scores` needs evalr, which the `langfuse` and `evals` extras install. The types above become:
+Evaluation backends see feedback as **scores**: one per field, named `{type}.{field}`, typed by the field. The mapping and the ports are [evalr](../../evalr/index.md)'s, shared with artifactr and with evalr's own evaluators, so an evaluator's `triage_quality.correct` and a person's are the same score ([evalr's scores guide](../../evalr/guides/scores.md)). `reflexr.scores` needs evalr, which the `langfuse` and `evals` extras install. The types above become:
 
 | Score | Data type | Value |
 |---|---|---|
@@ -185,12 +185,20 @@ Score configs give Langfuse each score's type, range and categories, so its UI o
 
 ## Evaluators and datasets with evalr
 
-[evalr](https://github.com/alexnodeland/evalr) is the family's evaluation library: evaluators that return typed verdicts (DSPy judges, decision models, plain functions), datasets, experiments and agreement metrics ([ADR-0020](../adr/0020-evalr-shared-eval-kit.md)). The `evals` extra connects reflexr to it. evalr is not on PyPI yet, so reflexr pins it to a GitHub revision, and an application installs it from GitHub alongside reflexr:
+[evalr](../../evalr/index.md) is the family's evaluation library: evaluators that return typed verdicts (DSPy judges, decision models, plain functions), datasets, experiments and agreement metrics ([ADR-0020](../adr/0020-evalr-shared-eval-kit.md)). The `evals` extra connects reflexr to it. evalr is not on PyPI yet, so an application installs both from lattice: uv brings evalr from the same commit as reflexr, and pip, which reads only the version ranges, needs evalr named as well:
 
-```bash
-uv add "reflexr[evals] @ git+https://github.com/alexnodeland/reflexr" \
-  "evalr @ git+https://github.com/alexnodeland/evalr"
-```
+=== "uv"
+
+    ```bash
+    uv add "reflexr[evals] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"
+    ```
+
+=== "pip"
+
+    ```bash
+    pip install "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" \
+      "reflexr[evals] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"
+    ```
 
 ### Evaluators as rules
 

@@ -90,7 +90,7 @@ It is also counted in the `artifactr.feedback` metric, by type, target and kind 
 
 Evaluation backends see feedback as scores: one per field, named `{type}.{field}`, typed by the field ([ADR-0049](../adr/0049-scores-on-evalr.md)). `Helpfulness` above becomes `helpfulness.rating`, a numeric score from 1 to 5, and `helpfulness.reason`, a text score. Booleans are yes or no (1 or 0 in Langfuse), `Literal` and `Enum` fields are categories, text is cut at 500 characters, and fields left empty are not scored.
 
-The mapping and the ports are [evalr](https://github.com/alexnodeland/evalr)'s, shared with reflexr and with evalr's own evaluators, so an evaluator's `helpfulness.rating` and a person's are the same score ([evalr's scores guide](https://evalr.alexnodeland.com/guides/scores/)). `artifactr.scores` needs evalr, which the `langfuse` and `evals` extras install; it names each type's scores as the type is registered. `Score`, `ScoreConfig`, `ScoreSink` and `ScoreConfigStore` are imported from `evalr.core`.
+The mapping and the ports are [evalr](../../evalr/index.md)'s, shared with reflexr and with evalr's own evaluators, so an evaluator's `helpfulness.rating` and a person's are the same score ([evalr's scores guide](../../evalr/guides/scores.md)). `artifactr.scores` needs evalr, which the `langfuse` and `evals` extras install; it names each type's scores as the type is registered. `Score`, `ScoreConfig`, `ScoreSink` and `ScoreConfigStore` are imported from `evalr.core`.
 
 `artifactr.scores.FeedbackMirror` follows a workspace's log and records each piece of feedback's scores in a `ScoreSink`, attached to the trace the feedback is about when there is one, and to the session (the thread) otherwise:
 
@@ -146,7 +146,7 @@ Score configs give Langfuse each score's type, range and categories, so its UI c
 
 ## Evaluating with evalr
 
-The `evals` extra connects artifactr to [evalr](https://github.com/alexnodeland/evalr), the eval kit artifactr and reflexr share ([ADR-0029](../adr/0029-evalr-shared-eval-kit.md), [ADR-0044](../adr/0044-the-evalr-adapter.md)). evalr owns the evaluators (DSPy judges optimized with GEPA, TypeSafe Jev decision models, plain functions), datasets, experiments and online evaluation; `artifactr.evals` feeds them from the log and records what they decide back into it:
+The `evals` extra connects artifactr to [evalr](../../evalr/index.md), the eval kit artifactr and reflexr share ([ADR-0029](../adr/0029-evalr-shared-eval-kit.md), [ADR-0044](../adr/0044-the-evalr-adapter.md)). evalr owns the evaluators (DSPy judges optimized with GEPA, TypeSafe Jev decision models, plain functions), datasets, experiments and online evaluation; `artifactr.evals` feeds them from the log and records what they decide back into it:
 
 | You want | Use |
 |---|---|
@@ -155,9 +155,22 @@ The `evals` extra connects artifactr to [evalr](https://github.com/alexnodeland/
 | To judge live turns as they end | `OnlineEvaluator`, in `Runner(evaluators=[...])` |
 | Drop-off, the rewrite rate and task completion | `thread_sessions`, `artifact_histories`, `TaskCompletion` |
 
-evalr is not on PyPI yet. artifactr's own development environment pins it by revision; an application installs it from GitHub alongside the extra, for example with `uv add "evalr @ git+https://github.com/alexnodeland/evalr"`.
+evalr is not on PyPI yet. In lattice, artifactr's development environment takes it from the workspace. An application installs both from lattice: uv brings evalr from the same commit as artifactr, and pip, which reads only the version ranges, needs evalr named as well:
 
-[docplan](../reference-implementation.md#evaluate-it), the reference implementation, runs the whole loop on one feedback type, in [`evals.py`](https://github.com/alexnodeland/artifactr/blob/main/examples/docplan/src/docplan/evals.py): people's feedback becomes a dataset, a function judge is calibrated against it, the server judges its turns online, an experiment replays them, and the measures come from the log. Its tests run the loop offline, with scripted models.
+=== "uv"
+
+    ```bash
+    uv add "artifactr-ai[evals] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"
+    ```
+
+=== "pip"
+
+    ```bash
+    pip install "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" \
+      "artifactr-ai[evals] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"
+    ```
+
+[docplan](../reference-implementation.md#evaluate-it), the reference implementation, runs the whole loop on one feedback type, in [`evals.py`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/src/docplan/evals.py): people's feedback becomes a dataset, a function judge is calibrated against it, the server judges its turns online, an experiment replays them, and the measures come from the log. Its tests run the loop offline, with scripted models.
 
 ### Datasets from the log
 

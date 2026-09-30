@@ -134,7 +134,7 @@ def test_three_severe_errors_within_a_minute_fire_once() -> None:
 
 `needs` says which scopes the batch touches; with no stored state they are all new, so `evaluate` gets an empty mapping. The `Evaluation` it returns holds the firings, the evaluation errors, the facts to append, the changed scope states and the new progress ([ADR-0017](../adr/0017-the-cores-evaluation-contract.md)).
 
-reflexr's own rules are specified this way, as language-neutral JSON: each case in [`tests/conformance/cases/`](https://github.com/alexnodeland/reflexr/tree/main/tests/conformance/cases) gives a rule, envelopes with times, and the firings or errors expected. [`test_conformance.py`](https://github.com/alexnodeland/reflexr/blob/main/tests/core/test_conformance.py) evaluates each case in one batch and again one envelope at a time, with the state saved as JSON in between, as a storage host would, and checks that both decide the same. The same approach suits an application with many rules: a table of logs and the firings they should cause.
+reflexr's own rules are specified this way, as language-neutral JSON: each case in [`tests/conformance/cases/`](https://github.com/alexnodeland/lattice/tree/main/packages/reflexr/tests/conformance/cases) gives a rule, envelopes with times, and the firings or errors expected. [`test_conformance.py`](https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/tests/core/test_conformance.py) evaluates each case in one batch and again one envelope at a time, with the state saved as JSON in between, as a storage host would, and checks that both decide the same. The same approach suits an application with many rules: a table of logs and the firings they should cause.
 
 ## Settling the reactor
 

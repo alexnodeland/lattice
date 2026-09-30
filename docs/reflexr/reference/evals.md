@@ -1,6 +1,6 @@
 # reflexr.evals
 
-The `evals` extra, over [evalr](https://github.com/alexnodeland/evalr). See [Feedback and evaluation](../guides/evaluation.md#evaluators-and-datasets-with-evalr).
+The `evals` extra, over [evalr](../../evalr/index.md). See [Feedback and evaluation](../guides/evaluation.md#evaluators-and-datasets-with-evalr).
 
 ::: reflexr.evals
     options:

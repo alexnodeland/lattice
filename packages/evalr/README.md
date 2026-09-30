@@ -4,8 +4,8 @@
 </picture>
 
 <p>
-  <a href="https://evalr.alexnodeland.com"><img alt="Docs" src="https://img.shields.io/badge/docs-evalr.alexnodeland.com-00704F"></a>
-  <a href="https://github.com/alexnodeland/evalr/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/alexnodeland/evalr/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://lattice.alexnodeland.com/evalr/"><img alt="Docs" src="https://img.shields.io/badge/docs-lattice.alexnodeland.com%2Fevalr-00704F"></a>
+  <a href="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml"><img alt="Nightly" src="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml/badge.svg?branch=main"></a>
   <img alt="Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-00704F">
   <img alt="Coverage: 100%" src="https://img.shields.io/badge/coverage-100%25-00704F">
   <img alt="Typed: pyright strict" src="https://img.shields.io/badge/typed-pyright%20strict-00704F">
@@ -22,10 +22,10 @@ People judge an agent's work in feedback, but only a fraction of it, and only af
 
 ## Install
 
-Python 3.12 or newer. Until evalr is on PyPI, install it from this repository:
+Python 3.12 or newer. Until evalr is on PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the family's repository:
 
 ```bash
-uv add "evalr[all] @ git+https://github.com/alexnodeland/evalr"
+uv add "evalr[all] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr"
 ```
 
 The core needs only pydantic and the OpenTelemetry API. Extras: `dspy` (DSPy judges and GEPA), `jev` (decision evaluators on TypeSafe's Jev, through pydantic-ai), `langfuse` (datasets, scores and experiments in Langfuse), `hf` (Hugging Face datasets), and `all`.
@@ -100,7 +100,7 @@ It needs `OPENAI_API_KEY` (or another provider's, with the models renamed) and `
 
 ## Documentation
 
-The documentation site is at **<https://evalr.alexnodeland.com>**. It is built from [`docs/`](https://lattice.alexnodeland.com/evalr/) and published from `main` on every push; run `make docs-serve` to read it locally at <http://localhost:8000>.
+The documentation is evalr's section of lattice's site, at **<https://lattice.alexnodeland.com/evalr/>**. It is built from [`docs/evalr/`](https://github.com/alexnodeland/lattice/tree/main/docs/evalr) and published from `main` on every push; run `moon run lattice:docs-serve` to read it locally at <http://localhost:8000>.
 
 - [Getting started](https://lattice.alexnodeland.com/evalr/getting-started/), [concepts](https://lattice.alexnodeland.com/evalr/concepts/) and the [guides](https://lattice.alexnodeland.com/evalr/guides/verdicts/): verdicts, evaluators, DSPy judges, decision evaluators, calibration, datasets, feedback sources, scores, experiments, metrics, workflow measures, online evaluation and testing.
 - [Architecture](https://lattice.alexnodeland.com/evalr/architecture/): concepts, packages and how each part works.
@@ -110,7 +110,7 @@ The documentation site is at **<https://evalr.alexnodeland.com>**. It is built f
 
 ## The family
 
-evalr is part of a family with [artifactr](https://github.com/alexnodeland/artifactr) and [reflexr](https://github.com/alexnodeland/reflexr), which record typed feedback from people and depend on evalr through their `[evals]` extras, and [stackr](https://github.com/alexnodeland/stackr), the infrastructure they run on. evalr imports neither library.
+evalr is part of a family of packages in [lattice](https://github.com/alexnodeland/lattice): [artifactr](https://lattice.alexnodeland.com/artifactr/) and [reflexr](https://lattice.alexnodeland.com/reflexr/), which record typed feedback from people and depend on evalr through their `[evals]` extras; [relayr](https://lattice.alexnodeland.com/relayr/adr/), the bridge planned between them; and [stackr](https://lattice.alexnodeland.com/stackr/), the infrastructure they run on. evalr imports none of them.
 
 ## Contributing
 

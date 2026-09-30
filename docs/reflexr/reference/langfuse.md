@@ -26,4 +26,4 @@ The `langfuse` extra. See [Langfuse](../guides/observability.md#langfuse) and [S
 
 ## Scores
 
-Feedback reaches Langfuse through evalr's adapters, [`evalr.langfuse.LangfuseScoreSink`](https://evalr.alexnodeland.com/reference/langfuse/#evalr.langfuse.LangfuseScoreSink) and [`evalr.langfuse.LangfuseScoreConfigStore`](https://evalr.alexnodeland.com/reference/langfuse/#evalr.langfuse.LangfuseScoreConfigStore), which a [`FeedbackMirror`](scores.md#reflexr.scores.FeedbackMirror) and [`sync_score_configs`](scores.md#reflexr.scores.sync_score_configs) take ([ADR-0045](../adr/0045-scores-on-evalr.md)).
+Feedback reaches Langfuse through evalr's adapters, [`evalr.langfuse.LangfuseScoreSink`](../../evalr/reference/langfuse.md#evalr.langfuse.LangfuseScoreSink) and [`evalr.langfuse.LangfuseScoreConfigStore`](../../evalr/reference/langfuse.md#evalr.langfuse.LangfuseScoreConfigStore), which a [`FeedbackMirror`](scores.md#reflexr.scores.FeedbackMirror) and [`sync_score_configs`](scores.md#reflexr.scores.sync_score_configs) take ([ADR-0045](../adr/0045-scores-on-evalr.md)).

@@ -4,8 +4,8 @@
 </picture>
 
 <p>
-  <a href="https://reflexr.alexnodeland.com"><img alt="Docs" src="https://img.shields.io/badge/docs-reflexr.alexnodeland.com-B3122E"></a>
-  <a href="https://github.com/alexnodeland/reflexr/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/alexnodeland/reflexr/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://lattice.alexnodeland.com/reflexr/"><img alt="Docs" src="https://img.shields.io/badge/docs-lattice.alexnodeland.com%2Freflexr-B3122E"></a>
+  <a href="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml"><img alt="Nightly" src="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml/badge.svg?branch=main"></a>
   <img alt="Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-B3122E">
   <img alt="Coverage: 100%" src="https://img.shields.io/badge/coverage-100%25-B3122E">
   <img alt="Typed: pyright strict" src="https://img.shields.io/badge/typed-pyright%20strict-B3122E">
@@ -14,9 +14,9 @@
 
 **reflexr** is a Python library for **reactive agent workflows**: rules watch the event log of each workspace, and when a rule's condition holds (three errors from one service within a minute, a deploy followed by a spike, a heartbeat that stops), it runs a workflow: a [pydantic-ai](https://ai.pydantic.dev) agent, a pydantic-graph graph, or a plain async function.
 
-It is the sibling of [artifactr](https://github.com/alexnodeland/artifactr): artifactr is for live chats in which people and agents edit shared artifacts, and reflexr is for workflows that events start. The two share their conventions (tenants and workspaces, envelopes, actors, storage, the protocol's shape), and neither imports the other.
+It is the sibling of [artifactr](https://lattice.alexnodeland.com/artifactr/): artifactr is for live chats in which people and agents edit shared artifacts, and reflexr is for workflows that events start. The two share their conventions (tenants and workspaces, envelopes, actors, storage, the protocol's shape), and neither imports the other.
 
-> **Status:** pre-release. v0.1 is built, as planned in [RFC-0001](https://lattice.alexnodeland.com/reflexr/rfcs/0001-v0.1-implementation-plan/), and not yet released; the API may change before the first release. Work from before the rebuild is on the `archive/pre-rebuild` branch.
+> **Status:** pre-release. v0.1 is built, as planned in [RFC-0001](https://lattice.alexnodeland.com/reflexr/rfcs/0001-v0.1-implementation-plan/), and not yet released; the API may change before the first release. Work from before the rebuild is on the [`archive/pre-rebuild`](https://github.com/alexnodeland/reflexr/tree/archive/pre-rebuild) branch of reflexr's old repository.
 
 ## Why
 
@@ -24,13 +24,13 @@ Most LLM applications start with a person typing. Many useful workflows start wi
 
 ## Install
 
-Python 3.12 or newer. Until reflexr is on PyPI, install it from this repository:
+Python 3.12 or newer. Until reflexr is on PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the family's repository:
 
 ```bash
-uv add "reflexr[fastapi] @ git+https://github.com/alexnodeland/reflexr"
+uv add "reflexr[fastapi] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"
 ```
 
-Extras: `fastapi` (publishing, REST and the WebSocket stream), `mcp` (external agents), `postgres` or `sqlite` (SQL storage with a driver), `sql` (SQL storage without one), `otel` (OpenTelemetry in one call), `langfuse` (traces and scores in Langfuse), `litellm` (the LLM gateway) and `evals` (evaluation with [evalr](https://github.com/alexnodeland/evalr), which you also install from GitHub for now).
+Extras: `fastapi` (publishing, REST and the WebSocket stream), `mcp` (external agents), `postgres` or `sqlite` (SQL storage with a driver), `sql` (SQL storage without one), `otel` (OpenTelemetry in one call), `langfuse` (traces and scores in Langfuse), `litellm` (the LLM gateway) and `evals` (evaluation with [evalr](https://lattice.alexnodeland.com/evalr/)). The `evals` and `langfuse` extras need evalr, which is not on PyPI either: uv takes it from the same commit of lattice, and with pip you install it from lattice too.
 
 ## Example
 
@@ -82,7 +82,7 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-The log it prints shows the four errors, the rule firing on the three severe ones, and the run of its action, in order and attributed. Swap `page` for an `AgentAction` and the same rule runs a pydantic-ai agent that is told what fired, can read the log, and can publish the events you allow ([Getting started](https://reflexr.alexnodeland.com/getting-started/)).
+The log it prints shows the four errors, the rule firing on the three severe ones, and the run of its action, in order and attributed. Swap `page` for an `AgentAction` and the same rule runs a pydantic-ai agent that is told what fired, can read the log, and can publish the events you allow ([Getting started](https://lattice.alexnodeland.com/reflexr/getting-started/)).
 
 ## What you get
 
@@ -99,7 +99,7 @@ The log it prints shows the four errors, the rule firing on the three severe one
 
 ## Try it
 
-[`examples/oncall`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/README.md) is a complete application built on the library, for incident response: severe alerts run a triage agent that opens an incident, the incident runs a runbook graph that rolls back a recent deploy or pages a person, and a service that stops sending heartbeats is paged. It serves REST, the WebSocket stream and MCP, with a terminal client that watches the log live.
+[`examples/oncall`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/README.md) is a complete application built on the library, for incident response: severe alerts run a triage agent that opens an incident, the incident runs a runbook graph that rolls back a recent deploy or pages a person, and a service that stops sending heartbeats is paged. It serves REST, the WebSocket stream and MCP, with a terminal client that watches the log live. From the root of a clone of lattice:
 
 ```sh
 make install
@@ -113,14 +113,14 @@ Set `ONCALL_DATABASE_URL` (for example `sqlite+aiosqlite:///oncall.db`) to keep 
 
 ## Documentation
 
-The documentation site is at **<https://reflexr.alexnodeland.com>**. It is built from [`docs/`](https://lattice.alexnodeland.com/reflexr/) and published from `main` on every push; run `make docs-serve` to read it locally at <http://localhost:8000>.
+The documentation is reflexr's section of lattice's site, at **<https://lattice.alexnodeland.com/reflexr/>**. It is built from [`docs/reflexr/`](https://github.com/alexnodeland/lattice/tree/main/docs/reflexr) and published from `main` on every push; run `moon run lattice:docs-serve` to read it locally at <http://localhost:8000>.
 
 - [Getting started](https://lattice.alexnodeland.com/reflexr/getting-started/) and the [guides](https://lattice.alexnodeland.com/reflexr/guides/events/): events, rules, workspaces, the reactor, actions, schedules, storage, serving, MCP, security, observability, the LLM gateway, evaluation, safety and testing.
 - [Architecture](https://lattice.alexnodeland.com/reflexr/architecture/): concepts, layers, rules, deciding and acting, actions, safety, tenancy and storage.
 - [Stream protocol v1](https://lattice.alexnodeland.com/reflexr/protocol/): the REST, WebSocket and MCP contracts, with generated JSON Schemas for [the protocol](https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/schemas/reflexr.v1.json) and [rules](https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/schemas/reflexr.rules.v1.json).
 - [Architecture decision records](https://lattice.alexnodeland.com/reflexr/adr/): why each part is the way it is.
 - [RFCs](https://lattice.alexnodeland.com/reflexr/rfcs/): proposals and the v0.1 build plan.
-- [Brand](https://lattice.alexnodeland.com/reflexr/assets/brand/): the mark, colours and type, and the family system reflexr shares with artifactr, evalr and stackr.
+- [Brand](https://lattice.alexnodeland.com/reflexr/assets/brand/): the mark, colours and type, and how reflexr sits in the family's brand system.
 
 ## Built on
 

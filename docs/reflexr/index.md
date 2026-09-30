@@ -117,5 +117,5 @@ The workspace's log tells the whole story, in order: the three severe errors and
 | Look up a class or function | The [API reference](reference/index.md) |
 | Publish from another service, or write a frontend | The [stream protocol](protocol.md) and its [JSON Schemas](reference/schema.md) |
 | Understand why it is built this way | The [architecture](architecture.md) and the [decision records](adr/README.md) |
-| Use it beside artifactr | [artifactr](https://artifactr.alexnodeland.com), its sibling for chats in which people and agents edit shared artifacts |
+| Use it beside artifactr | [artifactr](../artifactr/index.md), its sibling for chats in which people and agents edit shared artifacts |
 | Contribute | [Contributing](../project/contributing.md) |

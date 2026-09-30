@@ -4,18 +4,18 @@ This page builds a small incident-response application: a monitoring system publ
 
 ## Install
 
-reflexr needs Python 3.12 or newer. Until it is published to PyPI, install it from GitHub:
+reflexr needs Python 3.12 or newer. Until it is published to PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the family's repository:
 
 === "uv"
 
     ```bash
-    uv add "reflexr @ git+https://github.com/alexnodeland/reflexr"
+    uv add "reflexr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"
     ```
 
 === "pip"
 
     ```bash
-    pip install "reflexr @ git+https://github.com/alexnodeland/reflexr"
+    pip install "reflexr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"
     ```
 
 The core install covers event types, rules, workspaces with in-memory storage, the reactor, schedules, and agent and graph actions. The adapters are optional extras:
@@ -32,11 +32,11 @@ The core install covers event types, rules, workspaces with in-memory storage, t
 | `litellm` | Models over a LiteLLM proxy, with tenants' keys and guardrails ([The LLM gateway](guides/gateway.md)) |
 | `evals` | evalr: feedback as datasets, evaluators as rules, replay experiments ([Feedback and evaluation](guides/evaluation.md)) |
 
-Combine extras with commas, as in `"reflexr[fastapi,postgres] @ git+https://github.com/alexnodeland/reflexr"`. You also need the pydantic-ai extra for your model provider, such as `pydantic-ai-slim[anthropic]`, and its API key in the environment.
+Combine extras with commas, as in `"reflexr[fastapi,postgres] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"`. You also need the pydantic-ai extra for your model provider, such as `pydantic-ai-slim[anthropic]`, and its API key in the environment.
 
-!!! note "evalr comes from GitHub too"
+!!! note "evalr comes from lattice too"
 
-    The `evals` extra depends on [evalr](https://github.com/alexnodeland/evalr), which is not on PyPI yet either. reflexr's own repository pins it to a GitHub revision, but that pin does not travel with the package, so add evalr from GitHub yourself: `uv add "evalr @ git+https://github.com/alexnodeland/evalr"`.
+    The `evals` and `langfuse` extras depend on [evalr](../evalr/index.md), which is not on PyPI yet either. uv installs it from the same commit of lattice as reflexr. pip reads only the version ranges, so with pip, install evalr from lattice as well: `pip install "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" "reflexr[evals] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"`.
 
 ## 1. Define event types
 

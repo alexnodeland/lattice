@@ -157,7 +157,7 @@ pydantic-ai's instrumentation records metrics of its own too, such as `gen_ai.cl
 
 ### Dashboards
 
-Eight Grafana dashboards ship in [`deploy/grafana/dashboards/`](https://github.com/alexnodeland/reflexr/tree/main/deploy/grafana/dashboards):
+Eight Grafana dashboards ship in [`deploy/grafana/dashboards/`](https://github.com/alexnodeland/lattice/tree/main/packages/reflexr/deploy/grafana/dashboards):
 
 | Dashboard | What it shows |
 |---|---|
@@ -172,7 +172,7 @@ Eight Grafana dashboards ship in [`deploy/grafana/dashboards/`](https://github.c
 
 They expect Prometheus with the data source uid `prometheus`, fed over OTLP (Prometheus's own OTLP receiver, or a Collector), which names the series as the registry predicts: `reflexr.firings` becomes `reflexr_firings_total`, `reflexr.run.duration` becomes `reflexr_run_duration_seconds`, and `service.name` becomes the `job` label. Every dashboard filters by service and environment (`deployment_environment_name`), and most by tenant and workspace. Latency panels show exemplars, which link to the trace of a slow attempt or evaluation. Rates assume the SDK's default export interval of a minute.
 
-[stackr](https://github.com/alexnodeland/stackr) provisions them at the release it pins: each release attaches them as `reflexr-dashboards-<version>.tar.gz`. Elsewhere, import the JSON files, or download them from a release's assets. A test checks every query against the registry ([ADR-0038](../adr/0038-dashboards-generated-tested-and-released.md)), so a renamed metric or attribute cannot leave a dashboard behind.
+[stackr](../../stackr/index.md) provisions them from its checkout of lattice, so its Grafana has the dashboards of the same commit. Elsewhere, import the JSON files. A test checks every query against the registry ([ADR-0038](../adr/0038-dashboards-generated-tested-and-released.md)), so a renamed metric or attribute cannot leave a dashboard behind.
 
 ## Sessions and causal chains
 

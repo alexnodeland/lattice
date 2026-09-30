@@ -59,7 +59,7 @@ async def test_the_judge_reads_the_rating() -> None:
     assert verdict.value == Helpfulness(rating=4, resolved=True, reason="It refunded the charge")
 ```
 
-To test training, give GEPA a scripted reflection model too (`DummyLM([{"new_instruction": "..."}] * 20)`), and a small budget such as `Gepa(reflection_lm=..., max_metric_calls=12)`. evalr's [GEPA tests](https://github.com/alexnodeland/evalr/blob/main/tests/dspy/scripted.py) script a judge whose answers depend on its instructions, so a test can show training makes it agree with people.
+To test training, give GEPA a scripted reflection model too (`DummyLM([{"new_instruction": "..."}] * 20)`), and a small budget such as `Gepa(reflection_lm=..., max_metric_calls=12)`. evalr's [GEPA tests](https://github.com/alexnodeland/lattice/blob/main/packages/evalr/tests/dspy/scripted.py) script a judge whose answers depend on its instructions, so a test can show training makes it agree with people.
 
 ## Decision evaluators without TypeSafe's API
 
@@ -115,7 +115,7 @@ async def test_the_decision_model_is_confident() -> None:
     assert (verdict.value.rating, verdict.value.resolved) == (5, True)
 ```
 
-evalr's own [fake of Jev](https://github.com/alexnodeland/evalr/blob/main/tests/decision/jev.py) scripts answers by the text of the input, and fails requests on demand, to test hand-offs and service failures.
+evalr's own [fake of Jev](https://github.com/alexnodeland/lattice/blob/main/packages/evalr/tests/decision/jev.py) scripts answers by the text of the input, and fails requests on demand, to test hand-offs and service failures.
 
 ## The contract suites
 
@@ -203,7 +203,7 @@ async def test_the_evaluator_meets_the_contract() -> None:
 
 ## Tips
 
-- **Traces.** To assert on spans and trace ids, give evaluators an OpenTelemetry SDK `TracerProvider` with an `InMemorySpanExporter` as `tracer_provider=`, as evalr's own [test fixtures](https://github.com/alexnodeland/evalr/blob/main/tests/conftest.py) do.
-- **Langfuse.** The Langfuse client takes an `httpx_client`, so a test can put a fake of Langfuse's API behind the real client, as evalr's [Langfuse tests](https://github.com/alexnodeland/evalr/blob/main/tests/langfuse/server.py) do.
+- **Traces.** To assert on spans and trace ids, give evaluators an OpenTelemetry SDK `TracerProvider` with an `InMemorySpanExporter` as `tracer_provider=`, as evalr's own [test fixtures](https://github.com/alexnodeland/lattice/blob/main/packages/evalr/tests/conftest.py) do.
+- **Langfuse.** The Langfuse client takes an `httpx_client`, so a test can put a fake of Langfuse's API behind the real client, as evalr's [Langfuse tests](https://github.com/alexnodeland/lattice/blob/main/packages/evalr/tests/langfuse/server.py) do.
 - **The Hugging Face Hub.** `HfDatasetStore` and `resolve_revision` take a `HubApi`, a narrow protocol a fake can implement; set `HF_HUB_OFFLINE=1` and `HF_DATASETS_OFFLINE=1` so nothing reaches the Hub. `import_dataset` reads a local directory of data files, at any full commit hash.
 - **pydantic-ai's banner.** pydantic-ai may print an observability banner when a decision evaluator's agent is built; `PYDANTIC_AI_NO_BANNER=1` keeps test output clean.

@@ -90,7 +90,6 @@ nav:
     - adr/0052-artifactr-in-lattice.md
     - adr/0053-one-site-for-the-family.md
     - adr/0054-dashboards-from-the-checkout.md
-    - adr/template.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

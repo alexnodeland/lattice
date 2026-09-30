@@ -13,7 +13,7 @@ nav:
       - adr/0007-a-timeout-on-every-test-and-every-job.md
       - adr/0008-one-resolution-litellm-held-at-1-83-0.md
       - adr/0009-one-dev-container-at-the-root.md
-      - adr/template.md
+      - Template: adr/template.md
   - Brand: assets/brand/README.md
   - artifactr: artifactr
   - reflexr: reflexr

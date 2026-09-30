@@ -17,7 +17,6 @@ nav:
   - adr/0012-the-libraries-pinned-by-git-revision.md
   - adr/0013-relayr-in-lattice.md
   - adr/0014-one-site-for-the-family.md
-  - adr/template.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

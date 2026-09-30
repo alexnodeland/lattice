@@ -22,4 +22,4 @@ Each record captures one decision: the context that forced it, the options consi
 | [0016](0016-stackr-in-lattice.md) | stackr in lattice | Accepted |
 | [0017](0017-one-site-for-the-family.md) | One site for the family | Accepted |
 
-To add a record, copy [`template.md`](template.md) to the next number and add a row above.
+To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

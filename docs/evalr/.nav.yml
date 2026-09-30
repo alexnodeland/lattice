@@ -48,7 +48,6 @@ nav:
     - adr/0013-docstrings-in-markdown-and-one-docs-build.md
     - adr/0014-evalr-in-lattice.md
     - adr/0015-one-site-for-the-family.md
-    - adr/template.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

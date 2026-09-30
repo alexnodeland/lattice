@@ -34,6 +34,8 @@ package = false
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# The scripts import scripts/_env.py as a first-party module.
+src = [".", "scripts"]
 # The scripts are Python without a `.py` suffix, so they read as commands.
 extend-include = [
   "scripts/setup-env",

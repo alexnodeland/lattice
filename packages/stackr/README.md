@@ -22,7 +22,7 @@ Every application on the libraries needs the same infrastructure: a database wit
 
 ## Quick start
 
-You need Docker with Compose v2, [uv](https://docs.astral.sh/uv/), `make`, and the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) (or Node, to run it through `npx`).
+You need Docker with Compose v2, [uv](https://docs.astral.sh/uv/), `make`, `jq`, and the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) (or Node, to run it through `npx`).
 
 ```bash
 git clone https://github.com/alexnodeland/stackr.git

@@ -52,31 +52,19 @@ uv run scripts/check-config litellm || fail "litellm"
 step "The application template, rendered in every variant"
 uv run scripts/check-template || fail "template"
 
-step "The documentation's reference pages, against the files they describe"
-uv run scripts/docs-reference --check || fail "docs-reference"
-
 step "Service configurations, with each service's own validator"
 # Each runs the image compose.yaml pins, offline, with the config mounted as
 # the service would see it.
 compose_json=$(docker compose --profile '*' config --format json)
-service_field() {
-  uv run python -c '
-import json, sys
-service = json.loads(sys.argv[1])["services"][sys.argv[2]]
-if sys.argv[3] == "image":
-    print(service["image"])
-else:
-    for key, value in (service.get("environment") or {}).items():
-        print(f"{key}={value}")
-' "$compose_json" "$1" "$2"
-}
-image_of() { service_field "$1" image; }
+image_of() { jq -r --arg name "$1" '.services[$name].image' <<<"$compose_json"; }
 # The environment compose.yaml gives a service, in a private file rather than
 # on docker's command line.
 env_dir=$(mktemp -d)
 trap 'rm -rf "$env_dir"' EXIT
 env_file_of() {
-  (umask 077 && service_field "$1" environment >"$env_dir/$1.env")
+  (umask 077 && jq -r --arg name "$1" \
+    '.services[$name].environment // {} | to_entries[] | "\(.key)=\(.value)"' \
+    <<<"$compose_json" >"$env_dir/$1.env")
   printf '%s' "$env_dir/$1.env"
 }
 check_service() {

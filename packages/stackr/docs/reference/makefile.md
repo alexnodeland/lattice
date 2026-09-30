@@ -22,7 +22,7 @@ Every command is a `make` target; `make` on its own lists them. The tools run th
 | `make validate` | Validate every configuration without starting containers, as CI does |
 | `make smoke` | Send test telemetry through the running stack and find it (PROFILES as for up) |
 | `make smoke-app` | Run an application from the template beside the running stack, and trace its agents |
-| `make docs` | Build the documentation site strictly, and check its reference pages and lists, as CI does |
+| `make docs` | Build the documentation site strictly, changelog included, and check its reference pages and lists, as CI does |
 | `make docs-serve` | Serve the documentation site with live reload at http://localhost:8000 |
 | `make docs-reference` | Regenerate the reference pages from the files they describe |
 | `make changelog` | Regenerate CHANGELOG.md from conventional commits |

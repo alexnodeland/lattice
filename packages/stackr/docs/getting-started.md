@@ -10,7 +10,7 @@ This page starts the stack on your machine, finds each service's interface, chec
 | [uv](https://docs.astral.sh/uv/) | Runs stackr's scripts and tools at the versions in `uv.lock`, and Copier through `uvx`. |
 | `make` and `git` | Every command is a `make` target. |
 | The [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) (`brew install supabase/tap/supabase`), or Node | Runs local Supabase. Without an installed `supabase`, `make` runs the version pinned in `versions.env` through `npx`. |
-| `curl` and `jq` | Only for the examples on this page. |
+| `curl` and `jq` | `make validate`, the smoke tests, and the examples on this page. |
 
 The first start pulls several gigabytes of images.
 

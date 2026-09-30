@@ -11,12 +11,7 @@ if docker network inspect stackr >/dev/null 2>&1 &&
 # Written by initialize.sh: stackr's stack is running.
 services:
   dev:
-    environment:
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      LITELLM_BASE_URL: http://litellm:4000
-      LANGFUSE_BASE_URL: http://langfuse-web:3000
-      AUTH_JWKS_URL: http://supabase_kong_stackr-supabase:8000/auth/v1/.well-known/jwks.json
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@supabase_db_stackr-supabase:5432/postgres
+    env_file: ../stackr.env
     networks: [default, stackr, supabase]
 networks:
   stackr:

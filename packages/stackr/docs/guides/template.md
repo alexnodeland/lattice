@@ -79,21 +79,13 @@ Fill in two things after `make env`: `LITELLM_API_KEY`, a tenant's key from `mak
 | `make up` | In the `app` profile: builds its image and runs it beside the stack, at <http://localhost:8800> (`app_port`) |
 | `make down`, `make logs` | Stops the app profile, or follows its logs |
 
-The **app profile** is the application's own `compose.yaml`, not a service in stackr's. Its service joins the `stackr` network and local Supabase's, and its compose file replaces the stack's addresses in `.env` with their names on those networks:
-
-| Setting | In the app profile |
-|---|---|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://otel-collector:4318` |
-| `LITELLM_BASE_URL` | `http://litellm:4000` |
-| `LANGFUSE_BASE_URL` | `http://langfuse-web:3000` |
-| `AUTH_JWKS_URL` | `http://supabase_kong_stackr-supabase:8000/auth/v1/.well-known/jwks.json` |
-| `DATABASE_URL` | Local Supabase's PostgreSQL by name, or `STACK_DATABASE_URL` from `.env` for another database |
+The **app profile** is the application's own `compose.yaml`, not a service in stackr's. Its service joins the `stackr` network and local Supabase's, and reads [`stackr.env`](https://github.com/alexnodeland/stackr/blob/main/template/stackr.env) after `.env`, which replaces the stack's addresses in `.env` with their names on those networks. Its `DATABASE_URL` is local Supabase's PostgreSQL by name, unless `STACK_DATABASE_URL` in `.env` names another database.
 
 So start the stack first, with local Supabase: stackr's default `make up`. The image is built in two stages, the first with git to fetch the libraries at their pinned commits, so building it needs the network.
 
 **Stopping:** the server lets open requests finish for `DRAIN`, then the reactor stops before the database closes, giving running actions `STOP_GRACE` to end and recording those it then cancels as abandoned attempts, which the next start retries ([reflexr's graceful stop](https://github.com/alexnodeland/reflexr/blob/main/docs/guides/reactor.md#running-the-reactor)). Together, and with the rest of the shutdown, they must end within the app profile's `stop_grace_period`.
 
-The **dev container** is built on `.devcontainer/compose.yaml`. When the stack is running, its `initialize.sh` adds the stack's networks and the same addresses, so the application inside it reaches the stack by name; otherwise the dev container runs on its own.
+The **dev container** is built on `.devcontainer/compose.yaml`. When the stack is running, its `initialize.sh` adds the stack's networks and `stackr.env`'s addresses, so the application inside it reaches the stack by name; otherwise the dev container runs on its own.
 
 ## Keeping it up to date
 

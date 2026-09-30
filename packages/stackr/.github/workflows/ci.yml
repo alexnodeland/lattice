@@ -25,24 +25,6 @@ jobs:
       # Generates a throwaway .env first, which also tests scripts/setup-env.
       - run: make validate
 
-  # The documentation site, as `make docs` builds it (ADR-0012): the reference pages against the
-  # files they describe, a strict build, and lists that rendered as lists.
-  docs:
-    name: Docs
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0  # git-cliff reads the whole history
-      - uses: astral-sh/setup-uv@v10.2.0
-        with:
-          enable-cache: true
-      - run: uv sync --locked
-      - run: uv run git-cliff --output CHANGELOG.md  # the site shows main's changelog
-      - run: uv run scripts/docs-reference --check
-      - run: uv run zensical build --strict --clean
-      - run: uv run python scripts/check_site.py site
-
   # Each variant of the application template, generated and checked as its own CI would:
   # lint, strict types, and the tests with 100% coverage. `make validate` checks the template's
   # rendering and lint in every variant; this installs and runs what it generates.

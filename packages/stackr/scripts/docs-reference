@@ -12,9 +12,8 @@ Each page under docs/reference/ is written by hand around blocks that this scrip
 It regenerates every block from the file the block describes: compose.yaml, .env.example,
 deploy/otel-collector/, deploy/grafana/, deploy/litellm/, copier.yml and template/, the Makefile
 and versions.env. With `--check` it writes nothing, and fails when a block is out of date, a page
-names a block this script doesn't know, or a block is on no page; `make docs` and
-scripts/validate run it that way, so a page can't drift from its source. `make docs-reference`
-rewrites the blocks.
+names a block this script doesn't know, or a block is on no page; `make docs` runs it that way,
+so a page can't drift from its source. `make docs-reference` rewrites the blocks.
 
 Images are named without their tags: Dependabot changes those every week, and compose.yaml pins
 them. A service in compose.yaml without a role below fails, so a new service gets described.
@@ -33,7 +32,8 @@ from typing import Any
 
 import yaml
 
-ROOT = Path(__file__).resolve().parent.parent
+from _env import LINE, ROOT, read_env
+
 PAGES = ROOT / "docs" / "reference"
 BLOCK = re.compile(
     r"(<!-- generated: (?P<name>[a-z0-9-]+) -->\n)(?P<body>.*?)(\n<!-- end generated -->)", re.S
@@ -146,15 +146,6 @@ PORT = re.compile(
 )
 
 
-def env_example() -> dict[str, str]:
-    """The settings in .env.example, by key."""
-    values: dict[str, str] = {}
-    for line in (ROOT / ".env.example").read_text().splitlines():
-        if (match := ENV_LINE.match(line)) is not None:
-            values[match["key"]] = match["value"]
-    return values
-
-
 def compose() -> dict[str, Any]:
     """compose.yaml, with every service described in ROLES."""
     document: dict[str, Any] = load_yaml("compose.yaml")
@@ -246,7 +237,7 @@ def block_compose_profiles() -> str:
 
 def block_compose_services() -> str:
     document = compose()
-    defaults = env_example()
+    defaults = read_env(ROOT / ".env.example")
     sections: list[str] = []
     for name, service in document["services"].items():
         image = str(service["image"]).split("@")[0].rsplit(":", 1)[0]
@@ -316,7 +307,6 @@ def block_compose_networks() -> str:
 
 # --- .env.example -------------------------------------------------------------------------------
 
-ENV_LINE = re.compile(r"^(?P<key>[A-Za-z_][A-Za-z0-9_]*)=(?P<value>.*)$")
 SECTION = re.compile(r"^# --- (?P<title>.+?) -+$")
 LISTED = re.compile(r"^\s{2,}(?P<term>\S+)\s{2,}(?P<text>.+)$")
 
@@ -364,7 +354,7 @@ def block_env_settings() -> str:
     output: list[str] = []
     groups = [group.splitlines() for group in (ROOT / ".env.example").read_text().split("\n\n")]
     for index, group in enumerate(groups):
-        if index == 0 and not any(ENV_LINE.match(line) for line in group):
+        if index == 0 and not any(LINE.match(line) for line in group):
             continue  # the file's header, which the page introduces by hand
         comment: list[str] = []
         rows: list[list[str]] = []
@@ -384,7 +374,7 @@ def block_env_settings() -> str:
                 flush(comment, rows)
                 title = section["title"]
                 output.append(f"### {title[0].upper()}{title[1:]}")
-            elif (setting := ENV_LINE.match(line)) is not None:
+            elif (setting := LINE.match(line)) is not None:
                 if comment and rows:
                     flush([], rows)
                 if comment:
@@ -838,11 +828,10 @@ def block_makefile_variables() -> str:
 
 
 def block_versions_env() -> str:
-    rows: list[list[str]] = []
-    for line in (ROOT / "versions.env").read_text().splitlines():
-        if (match := ENV_LINE.match(line)) is not None:
-            pinned = code(match["value"]) if match["value"] else "not pinned"
-            rows.append([code(match["key"]), pinned])
+    rows = [
+        [code(key), code(value) if value else "not pinned"]
+        for key, value in read_env(ROOT / "versions.env").items()
+    ]
     return table(["Pin", "Value"], rows)
 
 

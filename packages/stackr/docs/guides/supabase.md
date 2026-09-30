@@ -6,7 +6,7 @@ Local Supabase is the stack's default database adapter, and the identity provide
 
 The `supabase/` directory is a Supabase CLI project, close to what `supabase init` generates:
 
-- `supabase/config.toml` sets the project id, `stackr-supabase`, and the ports. The id names the containers (`supabase_db_stackr-supabase`) and the network (`supabase_network_stackr-supabase`). It differs from the Compose project's name, `stackr`, because the CLI labels its containers as a Compose project too, and Compose would otherwise treat them as its own orphans. `make validate` checks that `config.toml`, `compose.yaml` and the Makefile agree on these names.
+- `supabase/config.toml` sets the project id, `stackr-supabase`, and the ports. The id names the containers (`supabase_db_stackr-supabase`) and the network (`supabase_network_stackr-supabase`). It differs from the Compose project's name, `stackr`, because the CLI labels its containers as a Compose project too, and Compose would otherwise treat them as its own orphans. `make validate` checks that every file in the repository, the application template's included, agrees on these names.
 - `supabase/seed.sql` is loaded into the `postgres` database on the first start and after every `supabase db reset`. It is empty; add seed data there.
 
 `make` runs the CLI for you: an installed `supabase`, or the version pinned in `versions.env` (`SUPABASE_CLI_VERSION`) through `npx`. CI installs the pinned version. The CLI's version decides Supabase's own image versions, so bumping it is how Supabase is upgraded: change `versions.env`, then run `make up` and `make smoke`.

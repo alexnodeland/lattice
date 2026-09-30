@@ -4,7 +4,7 @@ Thanks for helping. This guide covers how to set up, how work flows into `main`,
 
 ## Set up
 
-You need Docker with Compose v2, [uv](https://docs.astral.sh/uv/) and `make`. The development tools are installed from `uv.lock`. Local Supabase needs the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) (`brew install supabase/tap/supabase`); without it, `make` runs the version pinned in `versions.env` through `npx`, which needs Node.
+You need Docker with Compose v2, [uv](https://docs.astral.sh/uv/), `make` and `jq`. The development tools are installed from `uv.lock`. Local Supabase needs the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) (`brew install supabase/tap/supabase`); without it, `make` runs the version pinned in `versions.env` through `npx`, which needs Node.
 
 ```bash
 git clone git@github.com:alexnodeland/stackr.git
@@ -29,7 +29,7 @@ Run `make` on its own to list every command:
 | `make validate` | Validate every configuration without starting containers, as CI does |
 | `make smoke` | Send test telemetry through the running stack and check it arrives, as CI does |
 | `make smoke-app` | Run an application from the template beside the running stack, and trace its agents through the gateway, as CI does |
-| `make docs` | Build the [documentation site][site] strictly, as CI does |
+| `make docs` | Build the [documentation site][site] strictly, changelog included, as CI does |
 | `make docs-serve` | Serve the documentation site with live reload at <http://localhost:8000> |
 | `make docs-reference` | Regenerate the site's reference pages from the files they describe |
 | `make changelog` | Regenerate `CHANGELOG.md` from commit history |
@@ -86,11 +86,10 @@ CI runs the same scripts as `make validate` and `make smoke`.
 - **yamllint** in strict mode over every YAML file.
 - **Compose configuration** for each profile on its own and all together, failing on warnings such as a variable missing from `.env`.
 - **Each service's configuration with its own validator**, from the image `compose.yaml` pins: the Collector, Prometheus, Tempo and Loki.
-- **The Supabase project's names** agree across `supabase/config.toml`, `compose.yaml` and the Makefile.
+- **The Supabase project's names:** every tracked file, the template's included, names Supabase's containers and network by the project id in `supabase/config.toml`.
 - **The gateway's configuration:** fallbacks, guardrails and environment references, since LiteLLM has no validator and starts without a guardrail it can't load.
 - **Grafana dashboards:** valid JSON, unique uids, and only the provisioned data sources.
 - **The application template,** rendered in every variant: nothing left unrendered, and the generated Python, YAML, shell scripts and Compose file pass their linters.
-- **The documentation's reference pages** match the files they describe.
 - **shellcheck** for the shell scripts, and **ruff** for the Python ones.
 
 CI also generates each variant of the template and runs its own `make check`. To do the same locally, render one and check it:
@@ -100,7 +99,7 @@ uv run copier copy --defaults --vcs-ref HEAD --data libraries=both . /tmp/my-app
 cd /tmp/my-app && git init && make install && make check
 ```
 
-`make docs` builds the documentation site as CI's Docs job does: the reference pages against their files, a strict build that fails on a broken link or anchor, and a check that every list rendered as a list. In Markdown, put a blank line before every list, and indent a nested item by its parent's text: two spaces after `-`, three after `1.`.
+`make docs` builds the documentation site as the Docs workflow does on every pull request ([ADR-0014](docs/adr/0014-one-docs-build.md)): the changelog regenerated from the history, the reference pages checked against their files, a strict build that fails on a broken link or anchor, and a check that every list rendered as a list. It leaves `CHANGELOG.md` regenerated in your working tree; don't commit that. In Markdown, put a blank line before every list, and indent a nested item by its parent's text: two spaces after `-`, three after `1.`.
 
 `make smoke` runs against a started stack (`make up`): it sends test telemetry through each profile and checks that it lands where it should. CI starts each profile and runs it. `make smoke-app`, against the whole stack on local Supabase, runs an application generated from the template in its app profile and traces its agents through the gateway.
 

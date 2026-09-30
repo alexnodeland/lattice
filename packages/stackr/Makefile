@@ -1,8 +1,8 @@
 # stackr: everyday commands. `make` lists them.
 #
 # The tools (linters, pre-commit, git-cliff, Zensical) run through uv, so their
-# versions are the ones in uv.lock. The stack itself needs Docker with Compose v2, and
-# the Supabase CLI for local Supabase.
+# versions are the ones in uv.lock. The stack itself needs Docker with Compose v2, the
+# Supabase CLI for local Supabase, and jq for `validate` and `smoke`.
 
 .DEFAULT_GOAL := help
 UV ?= uv
@@ -60,6 +60,9 @@ TRACES_EXPORTERS = [otlp_grpc/tempo$(if $(filter langfuse,$(PROFILES)),$(comma) 
 GATEWAY_TELEMETRY = $(if $(filter observability,$(PROFILES)),true,false)
 COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEMETRY=$(GATEWAY_TELEMETRY) $(DATABASE_ENV)
 
+# scripts/smoke runs Compose as `make up` does, and the Supabase CLI as make runs it.
+SMOKE = $(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) SUPABASE="$(SUPABASE)" scripts/smoke
+
 .PHONY: help install env up down reset ps logs dashboards tenant bump-libraries validate smoke smoke-app docs docs-serve docs-reference changelog clean
 
 help: ## List the available commands
@@ -111,12 +114,12 @@ validate: .env ## Validate every configuration without starting containers, as C
 	scripts/validate
 
 smoke: ## Send test telemetry through the running stack and find it (PROFILES as for up)
-	$(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) scripts/smoke $(PROFILES) $(if $(NEEDS_DATABASE),database)
+	$(SMOKE) $(PROFILES) $(if $(NEEDS_DATABASE),database)
 
 smoke-app: ## Run an application from the template beside the running stack, and trace its agents
-	$(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) SUPABASE="$(SUPABASE)" scripts/smoke app
+	$(SMOKE) app
 
-docs: ## Build the documentation site strictly, and check its reference pages and lists, as CI does
+docs: changelog ## Build the documentation site strictly, changelog included, and check its reference pages and lists, as CI does
 	$(UV) run scripts/docs-reference --check
 	$(UV) run zensical build --strict --clean
 	$(UV) run python scripts/check_site.py site

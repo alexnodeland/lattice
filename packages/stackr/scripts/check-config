@@ -8,8 +8,9 @@ a unique uid and a title, and refers only to the data sources Grafana is
 provisioned with (by uid), or to a dashboard variable.
 
 supabase: supabase/config.toml's project_id differs from the Compose project's
-name (the CLI labels its containers as a Compose project too), compose.yaml
-and the Makefile name the network and database host that project_id gives, and
+name (the CLI labels its containers as a Compose project too), the Makefile
+and compose.yaml use it, every Supabase container or network name in a tracked
+file (the template's and the documentation's included) is the one it gives, and
 every postgres image in compose.yaml has the major version local Supabase runs,
 so both database adapters are the same PostgreSQL.
 
@@ -24,6 +25,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 import tomllib
 from collections.abc import Iterator
@@ -89,6 +91,27 @@ def check_dashboards() -> list[str]:
     return problems
 
 
+def supabase_names() -> Iterator[tuple[str, str, str]]:
+    """Every Supabase container or network name in a tracked file: where, its kind and project.
+
+    CHANGELOG.md is left out: it is generated from commit messages, which can't change.
+    """
+    pattern = r"supabase_(db|kong|network)_[[:alnum:]_-]+"
+    found = subprocess.run(
+        ["git", "grep", "-I", "-n", "-o", "-E", pattern, "--", ":!CHANGELOG.md"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if found.returncode > 1:  # 1 is no match
+        raise SystemExit(f"check-config: git grep: {found.stderr.strip()}")
+    for line in found.stdout.splitlines():
+        where, _, name = line.rpartition(":")
+        _, kind, project = name.split("_", 2)
+        yield where, kind, project
+
+
 def check_supabase() -> list[str]:
     """Check that the Supabase project id and its names agree everywhere."""
     config = tomllib.loads((ROOT / "supabase" / "config.toml").read_text())
@@ -102,9 +125,13 @@ def check_supabase() -> list[str]:
         problems.append(f"project_id {project!r} is also the Compose project's name")
     if compose["networks"]["supabase"]["name"] != network:
         problems.append(f"compose.yaml's supabase network isn't {network}")
-    stale = set(re.findall(r"supabase_(?:db|network)_[\w-]+", compose_text)) - {network, host}
-    if stale or host not in compose_text:
-        problems.append(f"compose.yaml should refer to {host} and {network}, not {sorted(stale)}")
+    if host not in compose_text:
+        problems.append(f"compose.yaml doesn't refer to {host}")
+    problems.extend(
+        f"{where}: supabase_{kind}_{other} should be supabase_{kind}_{project}"
+        for where, kind, other in supabase_names()
+        if other != project
+    )
     if f"SUPABASE_PROJECT := {project}" not in makefile:
         problems.append(f"the Makefile's SUPABASE_PROJECT isn't {project}")
     images = {
@@ -118,7 +145,7 @@ def check_supabase() -> list[str]:
         if image.removeprefix("postgres:").split(".")[0].split("-")[0] != major
     )
     if not problems:
-        print(f"ok: project {project}, network {network}, database host {host}, PostgreSQL {major}")
+        print(f"ok: project {project}, in every file's Supabase names; PostgreSQL {major}")
     return problems
 
 

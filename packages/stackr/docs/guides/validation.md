@@ -11,10 +11,9 @@ stackr is configuration, and most of what can go wrong with configuration shows 
 | YAML lint | Every YAML file, with yamllint in strict mode |
 | Compose configuration | `compose.yaml` for no profile, each profile on its own and all of them together, failing on any warning, such as a variable missing from `.env` |
 | Grafana dashboards | Every dashboard is valid JSON with a title and a unique uid, and refers only to the provisioned data sources' uids |
-| The Supabase project | Its project id differs from the Compose project's name, and `compose.yaml` and the Makefile use the network and host names it gives |
+| The Supabase project | Its project id differs from the Compose project's name, the Makefile and `compose.yaml` use it, and every Supabase container or network name in a tracked file, the template's and the documentation's included, is the one it gives |
 | The gateway's configuration | Every model group a fallback names exists, guardrails use integrations that need no licence and valid modes, every `os.environ/` reference is set on the `litellm` service in `compose.yaml`, and no key is written into the file. LiteLLM has no validator of its own, and starts without a guardrail it can't load |
 | The application template | Every variant rendered, with nothing left unrendered, and its Python, YAML, shell scripts and Compose file through their linters (`scripts/check-template`) |
-| The reference pages | Every generated block in `docs/reference/` matches the file it describes (`scripts/docs-reference --check`) |
 | Service configurations | Each with its own validator, run from the image `compose.yaml` pins, offline: `otelcol-contrib validate` for the Collector, `promtool check config` for Prometheus, `-config.verify` for Tempo and `-verify-config` for Loki |
 | Shell scripts | shellcheck |
 | Python scripts | ruff's formatter and linter |
@@ -23,11 +22,12 @@ The Supabase, gateway and dashboard checks are `scripts/check-config`, which cov
 
 ## The documentation
 
-`make docs` builds this site as CI does:
+`make docs` builds this site as the Docs workflow does:
 
-1. `scripts/docs-reference --check`: the reference pages match the files they describe
-2. `zensical build --strict --clean`: a broken link or anchor fails the build
-3. `scripts/check_site.py site`: no list rendered as text, which happens when a list has no blank line before it, or a nested item isn't indented by its parent's text
+1. `make changelog`: `CHANGELOG.md` regenerated from the whole history, so the site shows `main`'s; leave the regenerated file out of your commit
+2. `scripts/docs-reference --check`: every generated block in `docs/reference/` matches the file it describes
+3. `zensical build --strict --clean`: a broken link or anchor fails the build
+4. `scripts/check_site.py site`: no list rendered as text, which happens when a list has no blank line before it, or a nested item isn't indented by its parent's text
 
 `make docs-serve` serves the site with live reload at <http://localhost:8000>. When you change a file a reference page describes (`compose.yaml`, `.env.example`, the Collector's, Grafana's or the gateway's configuration, `copier.yml`, the template's files, the Makefile or `versions.env`), run `make docs-reference` to regenerate the page, and commit both.
 
@@ -40,13 +40,12 @@ The Supabase, gateway and dashboard checks are `scripts/check-config`, which cov
 | Validate | `make validate`, after `make env` generates a throwaway `.env`, which also tests `scripts/setup-env` |
 | Template | Each of the six variants of the application template (three choices of libraries, with and without evals) on Python 3.12, and the largest on Python 3.14: generated from the pull request's commit, then its own `make check`, which is lint, strict types and the tests with 100% coverage |
 | Smoke | The stack started three ways, with `make smoke`, and `make smoke-app` beside the whole stack on local Supabase ([The smoke tests](smoke-tests.md)) |
-| Docs | The changelog regenerated from the whole history, then `make docs`'s three steps |
 
 The template and smoke jobs wait for Validate. Every job installs the tools from `uv.lock` with `uv sync --locked`, so CI runs the versions you run.
 
-## Publishing the site
+## Building and publishing the site
 
-`.github/workflows/docs.yml` builds the site as the Docs job does, and deploys it to GitHub Pages at <https://stackr.alexnodeland.com> on every push to `main`, and when run by hand. The site always shows `main` ([ADR-0012](../adr/0012-documentation-site.md)).
+`.github/workflows/docs.yml` runs `make docs` in its Docs job on every pull request, on every push to `main` and when run by hand, and deploys the site to GitHub Pages at <https://stackr.alexnodeland.com> from `main` only. Runs on `main` wait their turn, so an older commit never deploys after a newer one. The site always shows `main` ([ADR-0012](../adr/0012-documentation-site.md), [ADR-0014](../adr/0014-one-docs-build.md)).
 
 ## Dependencies
 

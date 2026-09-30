@@ -81,6 +81,7 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `src/<package>/notes.py` | `use_artifactr` | rendered |
 | `src/<package>/automation.py` | `use_reflexr` | rendered |
 | `src/<package>/tickets.py` | `use_reflexr` | rendered |
+| `stackr.env` | always | copied |
 | `tests/conftest.py` | always | rendered |
 | `tests/test_app.py` | always | rendered |
 | `tests/test_auth.py` | always | rendered |

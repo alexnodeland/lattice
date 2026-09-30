@@ -4,7 +4,7 @@
 #
 # Start the stack first (`make up` in stackr): it creates the two networks the application
 # joins, `stackr` and local Supabase's, where it reaches the stack's services by name. The
-# settings come from .env, except the stack's addresses, which on its networks are fixed here.
+# settings come from .env, except the stack's addresses on its networks, from stackr.env.
 
 name: {{ project_slug }}
 
@@ -18,20 +18,14 @@ services:
     # Docker's default, stated for DRAIN in app.py and STOP_GRACE in automation.py, which must end within it.
     stop_grace_period: 10s
 {%- endif %}
+    # A later file's value replaces an earlier one's.
     env_file:
       - path: .env
         required: false
+      - stackr.env
     environment:
       APP_HOST: 0.0.0.0
       APP_PORT: "8000"
-      # The ports, at the stack's addresses on its networks.
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      LITELLM_BASE_URL: http://litellm:4000
-      LANGFUSE_BASE_URL: http://langfuse-web:3000
-      AUTH_JWKS_URL: http://supabase_kong_stackr-supabase:8000/auth/v1/.well-known/jwks.json
-      # Local Supabase's PostgreSQL, unless STACK_DATABASE_URL names another database.
-      # yamllint disable-line rule:line-length
-      DATABASE_URL: ${STACK_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@supabase_db_stackr-supabase:5432/postgres}
     ports:
       - ${APP_BIND:-127.0.0.1}:${APP_PORT:-{{ app_port }}}:8000
     networks: [stackr, supabase]

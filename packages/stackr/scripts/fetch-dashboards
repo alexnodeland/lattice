@@ -29,7 +29,6 @@ import argparse
 import hashlib
 import io
 import os
-import re
 import shutil
 import sys
 import tarfile
@@ -37,24 +36,14 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from _env import ROOT, read_env
+
 LIBRARIES = ("artifactr", "reflexr")
 DEFAULT_URL = (
     "https://github.com/alexnodeland/{library}/releases/download/"
     "v{version}/{library}-dashboards-{version}.tar.gz"
 )
-ROOT = Path(__file__).resolve().parent.parent
 TARGET = ROOT / "deploy" / "grafana" / "dashboards"
-LINE = re.compile(r"^(?P<key>[A-Za-z_][A-Za-z0-9_]*)=(?P<value>.*)$")
-
-
-def read_versions(path: Path) -> dict[str, str]:
-    """Read KEY=VALUE lines from versions.env."""
-    values: dict[str, str] = {}
-    for line in path.read_text().splitlines():
-        match = LINE.match(line.strip())
-        if match:
-            values[match["key"]] = match["value"].strip()
-    return values
 
 
 def fetch(library: str, version: str, sha256: str) -> None:
@@ -95,7 +84,7 @@ def main() -> int:
     parser.add_argument("--strict", action="store_true", help="fail when a download fails")
     args = parser.parse_args()
 
-    versions = read_versions(ROOT / "versions.env")
+    versions = read_env(ROOT / "versions.env")
     failed = False
     for library in LIBRARIES:
         prefix = f"{library.upper()}_DASHBOARDS"

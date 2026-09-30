@@ -20,8 +20,9 @@ Options:
   --quiet                 print only the new key
 
 The master key, the gateway's port and the address it is published on
-(`STACKR_BIND`, or 127.0.0.1 when that is 0.0.0.0) come from .env. The key is
-printed once, with the settings an application reads to use the gateway.
+(`STACKR_BIND`, or 127.0.0.1 when that is 0.0.0.0) come from .env, with
+.env.example's defaults. The key is printed once, with the settings an
+application reads to use the gateway.
 """
 
 from __future__ import annotations
@@ -32,31 +33,11 @@ import re
 import sys
 import urllib.error
 import urllib.request
-from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parent.parent
-LINE = re.compile(r"^(?P<key>[A-Za-z_][A-Za-z0-9_]*)=(?P<value>.*)$")
+from _env import ROOT, published_host, settings
+
 TENANT = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
-
-
-def settings() -> dict[str, str]:
-    """Read .env."""
-    values: dict[str, str] = {}
-    path = ROOT / ".env"
-    if not path.exists():
-        raise SystemExit("create-tenant: .env is missing; run `make env` and `make up` first")
-    for line in path.read_text().splitlines():
-        match = LINE.match(line.strip())
-        if match:
-            values[match["key"]] = match["value"]
-    return values
-
-
-def gateway_host(env: dict[str, str]) -> str:
-    """Where the gateway is published: STACKR_BIND, or this machine when that is every interface."""
-    bind = env.get("STACKR_BIND") or "127.0.0.1"
-    return "127.0.0.1" if bind == "0.0.0.0" else bind
 
 
 class Gateway:
@@ -67,7 +48,10 @@ class Gateway:
         self.master_key = master_key
 
     def call(self, method: str, path: str, body: dict[str, Any] | None = None) -> Any:
-        """Send one request; return the decoded JSON, or raise HTTPError."""
+        """Send one request; return the decoded JSON, or raise HTTPError.
+
+        Exits when the gateway can't be reached, doesn't answer in time or drops the connection.
+        """
         request = urllib.request.Request(
             self.base_url + path,
             method=method,
@@ -77,8 +61,16 @@ class Gateway:
                 "Content-Type": "application/json",
             },
         )
-        with urllib.request.urlopen(request, timeout=30) as response:
-            return json.loads(response.read() or b"null")
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return json.loads(response.read() or b"null")
+        except urllib.error.HTTPError:
+            raise
+        except OSError as error:
+            # A URLError while connecting; a TimeoutError or a dropped connection while waiting
+            # for the answer.
+            reason = getattr(error, "reason", error)
+            raise SystemExit(f"create-tenant: the gateway at {self.base_url}: {reason}") from error
 
 
 def error_message(error: urllib.error.HTTPError) -> str:
@@ -106,9 +98,11 @@ def main() -> int:
 
     if not TENANT.match(args.tenant):
         parser.error("TENANT must be lowercase letters, digits and dashes")
+    if not (ROOT / ".env").exists():
+        raise SystemExit("create-tenant: .env is missing; run `make env` and `make up` first")
     env = settings()
-    base_url = f"http://{gateway_host(env)}:{env.get('LITELLM_PORT', '4400')}"
-    gateway = Gateway(base_url, env.get("LITELLM_MASTER_KEY", ""))
+    base_url = f"http://{published_host(env)}:{env['LITELLM_PORT']}"
+    gateway = Gateway(base_url, env["LITELLM_MASTER_KEY"])
     team_id = f"tenant-{args.tenant}"
     key_alias = args.key_alias or f"{args.tenant}-default"
     metadata: dict[str, Any] = {"tenant": args.tenant}
@@ -146,8 +140,6 @@ def main() -> int:
             message = error_message(creating)
             raise SystemExit(f"create-tenant: creating team {team_id}: {message}") from creating
         say(f"create-tenant: created team {team_id}")
-    except urllib.error.URLError as error:
-        raise SystemExit(f"create-tenant: the gateway at {base_url}: {error.reason}") from error
 
     try:
         created = gateway.call(

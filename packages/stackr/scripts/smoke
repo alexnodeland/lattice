@@ -31,21 +31,24 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# The published ports: from .env, or the defaults in .env.example.
+# A setting from .env, or from .env.example where .env leaves it unset or empty, as
+# scripts/_env.py reads them.
 setting() {
   local value
   value=$(sed -n "s/^$1=//p" .env 2>/dev/null | tail -n 1)
-  printf '%s' "${value:-$2}"
+  [[ -n $value ]] || value=$(sed -n "s/^$1=//p" .env.example | tail -n 1)
+  printf '%s' "$value"
 }
-host=$(setting STACKR_BIND 127.0.0.1)
+# The published ports, at STACKR_BIND, or on this machine when that is every interface.
+host=$(setting STACKR_BIND)
 [[ $host == 0.0.0.0 ]] && host=127.0.0.1
-prometheus="http://$host:$(setting PROMETHEUS_PORT 9090)"
-tempo="http://$host:$(setting TEMPO_PORT 3200)"
-loki="http://$host:$(setting LOKI_PORT 3100)"
-grafana="http://$host:$(setting GRAFANA_PORT 3000)"
-collector_http="http://$host:$(setting OTLP_HTTP_PORT 4318)"
-langfuse="http://$host:$(setting LANGFUSE_PORT 3300)"
-gateway="http://$host:$(setting LITELLM_PORT 4400)"
+prometheus="http://$host:$(setting PROMETHEUS_PORT)"
+tempo="http://$host:$(setting TEMPO_PORT)"
+loki="http://$host:$(setting LOKI_PORT)"
+grafana="http://$host:$(setting GRAFANA_PORT)"
+collector_http="http://$host:$(setting OTLP_HTTP_PORT)"
+langfuse="http://$host:$(setting LANGFUSE_PORT)"
+gateway="http://$host:$(setting LITELLM_PORT)"
 
 run_id="smoke-$(date +%s)-$RANDOM"
 service="stackr-smoke"
@@ -98,7 +101,7 @@ loki_has_log() {
 # Grafana's API as admin. The password goes to curl on stdin, never in its
 # arguments, where other processes could read it.
 grafana_get() {
-  printf 'user = "admin:%s"\n' "$(setting GRAFANA_ADMIN_PASSWORD '')" |
+  printf 'user = "admin:%s"\n' "$(setting GRAFANA_ADMIN_PASSWORD)" |
     curl -fsS --config - "$grafana$1"
 }
 grafana_datasource_ok() {
@@ -150,7 +153,7 @@ JSON
 
 # Langfuse's public API with the project's keys, passed to curl on stdin.
 langfuse_get() {
-  printf 'user = "%s:%s"\n' "$(setting LANGFUSE_PUBLIC_KEY '')" "$(setting LANGFUSE_SECRET_KEY '')" |
+  printf 'user = "%s:%s"\n' "$(setting LANGFUSE_PUBLIC_KEY)" "$(setting LANGFUSE_SECRET_KEY)" |
     curl -fsS --config - "$langfuse$1"
 }
 langfuse_has_trace() {
@@ -168,9 +171,17 @@ database_has() {
   docker compose run --rm --no-deps -T db-init psql --no-psqlrc -Atc \
     "SELECT 1 FROM pg_database WHERE datname = '$1'" 2>/dev/null | grep -q 1
 }
-# Local Supabase's API gateway: `[api] port` in supabase/config.toml.
+# Local Supabase's API URL and keys, from its CLI (SUPABASE, as make runs it).
+supabase_status() {
+  local supabase settings
+  read -ra supabase <<<"${SUPABASE:-supabase}"
+  settings=$("${supabase[@]}" status -o json) || return 1
+  supabase_api=$(jq -er .API_URL <<<"$settings") || return 1
+  supabase_secret=$(jq -er .SECRET_KEY <<<"$settings") || return 1
+  supabase_publishable=$(jq -er .PUBLISHABLE_KEY <<<"$settings")
+}
 supabase_api_ok() {
-  curl -fsS -o /dev/null "http://127.0.0.1:54321/auth/v1/health"
+  curl -fsS -o /dev/null "$supabase_api/auth/v1/health"
 }
 
 has_profile() {
@@ -187,7 +198,7 @@ gateway_call() {
   printf 'header = "Authorization: Bearer %s"\nurl = "%s"\n' "$key" "$gateway$path" |
     curl -fsS --config - "$@"
 }
-master_key() { setting LITELLM_MASTER_KEY ''; }
+master_key() { setting LITELLM_MASTER_KEY; }
 gateway_lists() {
   gateway_call "$(master_key)" "$1" | grep -q "\"$2\""
 }
@@ -253,7 +264,7 @@ smoke_gateway() {
 }
 
 smoke_database() {
-  local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE supabase)}
+  local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE)}
   if has_profile langfuse; then
     eventually "db-init created Langfuse's database on $adapter" database_has langfuse
   fi
@@ -261,6 +272,7 @@ smoke_database() {
     eventually "db-init created the gateway's database on $adapter" database_has litellm
   fi
   if [[ $adapter == supabase ]]; then
+    supabase_status || { log "FAIL: local Supabase's status"; return 1; }
     eventually "local Supabase's API answers" supabase_api_ok
   fi
 }
@@ -279,12 +291,6 @@ smoke_langfuse() {
 app_name=stackr-smoke-app
 app_port=${SMOKE_APP_PORT:-8800}
 app_url="http://127.0.0.1:$app_port"
-supabase_api="http://127.0.0.1:54321"
-
-# Values from a JSON document on stdin, by a Python expression over `data`.
-json_value() {
-  uv run --quiet python -c 'import json, sys; data = json.load(sys.stdin); print(eval(sys.argv[1]))' "$1"
-}
 
 # The application's API as the signed-in user; the token goes to curl on stdin.
 app_call() {
@@ -325,20 +331,21 @@ cleanup_app() {
 artifactr_turn_trace() {
   local ended
   ended=$(app_call "/artifactr/v1/workspaces/$run_id/events" |
-    json_value 'next((e["event"]["run_id"] + " " + e["event"]["status"] for e in data if e["event"]["type"] == "run_ended"), "")')
+    jq -r 'first(.[].event | select(.type == "run_ended") | "\(.run_id) \(.status)")')
   [[ -n $ended ]] || return 1
   if [[ ${ended#* } != completed ]]; then
     log "FAIL: the notes agent's turn ended ${ended#* }"
     status=1
   fi
   trace_id=$(app_call "/artifactr/v1/workspaces/$run_id/runs/${ended% *}" |
-    json_value '(data["trace_ids"] or ["none"])[-1]')
+    jq -r '.trace_ids[-1] // "none"')
 }
 
 reflexr_run_trace() {
   local run
   run=$(app_call "/reflexr/v1/workspaces/$run_id/runs" |
-    json_value 'next((r["status"] + " " + (r["trace_ids"] or ["none"])[-1] for r in data if r["status"] in ("succeeded", "dead")), "")')
+    jq -r 'first(.[] | select(.status == "succeeded" or .status == "dead") |
+      "\(.status) \(.trace_ids[-1] // "none")")')
   [[ -n $run ]] || return 1
   if [[ ${run% *} != succeeded ]]; then
     log "FAIL: the triage run ended ${run% *}"
@@ -351,13 +358,12 @@ reflexr_run_trace() {
 app_trace_in_tempo() { tempo_trace_has_service "$app_name" && tempo_trace_has_service litellm; }
 
 smoke_app() {
-  local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE supabase)}
+  local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE)}
   if [[ $adapter != supabase ]]; then
     log "FAIL: app: needs local Supabase, whose Auth signs its users in (STACKR_DATABASE=$adapter)"
     return 1
   fi
-  local supabase
-  read -ra supabase <<<"${SUPABASE:-supabase}"
+  supabase_status || { log "FAIL: app: local Supabase's status"; return 1; }
   unset DOCKER_DEFAULT_PLATFORM
 
   app_dir="$(mktemp -d)/$app_name"
@@ -377,8 +383,8 @@ smoke_app() {
     cat >"$app_dir/.env" <<ENV
 APP_PORT=$app_port
 OTEL_METRIC_EXPORT_INTERVAL=2000
-LANGFUSE_PUBLIC_KEY=$(setting LANGFUSE_PUBLIC_KEY '')
-LANGFUSE_SECRET_KEY=$(setting LANGFUSE_SECRET_KEY '')
+LANGFUSE_PUBLIC_KEY=$(setting LANGFUSE_PUBLIC_KEY)
+LANGFUSE_SECRET_KEY=$(setting LANGFUSE_SECRET_KEY)
 AUTH_ISSUER=$supabase_api/auth/v1
 LITELLM_API_KEY=$app_key
 LITELLM_MOCK_RESPONSE="stackr smoke ok"
@@ -400,18 +406,14 @@ ENV
     status=1
   fi
 
-  local keys
-  keys=$("${supabase[@]}" status -o env 2>/dev/null) || { log "FAIL: app: supabase status"; return 1; }
-  supabase_secret=$(sed -n 's/^SECRET_KEY="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' <<<"$keys")
-  local publishable password
-  publishable=$(sed -n 's/^PUBLISHABLE_KEY="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' <<<"$keys")
+  local password
   password=$(random_hex 16)
   local user="{\"email\": \"$run_id@stackr.local\", \"password\": \"$password\""
   local tenant='"email_confirm": true, "app_metadata": {"tenant_id": "stackr-smoke"}'
   if ! app_user=$(supabase_auth "$supabase_secret" /admin/users --data "$user, $tenant}" |
-    json_value 'data["id"]') ||
-    ! app_token=$(supabase_auth "$publishable" "/token?grant_type=password" --data "$user}" |
-      json_value 'data["access_token"]'); then
+    jq -er .id) ||
+    ! app_token=$(supabase_auth "$supabase_publishable" "/token?grant_type=password" --data "$user}" |
+      jq -er .access_token); then
     log "FAIL: app: local Supabase didn't sign a user in"
     return 1
   fi

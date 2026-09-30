@@ -26,8 +26,6 @@
 # the gateway's spans in it, is in Tempo and Langfuse, and the application's
 # metrics are in Prometheus.
 
-# The checks are called through `eventually`, which shellcheck can't follow.
-# shellcheck disable=SC2329
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

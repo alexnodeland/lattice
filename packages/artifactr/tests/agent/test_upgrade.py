@@ -127,3 +127,25 @@ async def test_a_message_posted_directly_after_the_upgrade_is_taken_by_the_next_
     started(await runner.send(before.ws, before.thread.id, "Anything new?"))
     await settled(before.thread.id, runner)
     assert script.conversation() == ["Plan the launch", "Posted after the upgrade", "Anything new?"]
+
+
+async def test_a_downgrade_and_a_second_upgrade_carry_nothing_out_again(
+    database: Database, gate: Gate, runners: MakeRunner
+) -> None:
+    engine = database.engine()
+    await migrate(engine)
+    ws = await Workspaces(SqlStorage(engine)).open("t", "w", actor=ALICE)
+    thread = await ws.create_thread("Launch")
+    script = Script(*[say("ok")] * 3)
+    runner = runners(make_agent(script))
+    await started(await runner.send(ws, thread.id, "one")).wait()
+    await settled(thread.id, runner)
+    async with engine.begin() as connection:
+        await connection.run_sync(lambda c: command.downgrade(_alembic_config(c), "0004"))
+    await ws.post_message(thread.id, "two")  # the older release carries it out, and saves
+    session = Session.start(ws, thread.id, app=gate)  # history but no position
+    await make_agent(script).run("two", deps=session)
+    await migrate(engine)  # upgraded again
+    await started(await runner.send(ws, thread.id, "three")).wait()
+    await settled(thread.id, runner)
+    assert script.conversation() == ["one", "two", "three"], "not 'two' again"

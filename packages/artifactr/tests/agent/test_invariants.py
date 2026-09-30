@@ -62,11 +62,13 @@ def hold(
     every: bool = False,
     after: bool = False,
     status: str | None = None,
+    raises: Exception | None = None,
 ) -> Gate:
     """Hold the storage's next call of ``method`` at a gate, or ``every`` call until released.
 
     With ``after``, the call is made first, and the caller held once it returns. With
-    ``status``, only a read of runs with that status is held.
+    ``status``, only a read of runs with that status is held. With ``raises``, the held call
+    raises it once released.
     """
     gate, original = Gate(), getattr(storage, method)
     armed = [True]
@@ -80,6 +82,8 @@ def hold(
             await gate.wait()
             return result
         await gate.wait()
+        if raises is not None:
+            raise raises
         return await original(*args, **kwargs)
 
     setattr(storage, method, held)
@@ -230,6 +234,7 @@ async def test_i2_a_reply_is_consumed_with_its_answer_so_it_is_never_a_prompt(
     assert script.conversation() == ["Plan the launch", "Hello?"], "the reply is not a prompt"
 
 
+@pytest.mark.parametrize("ends", ["completes", "is stopped"])
 async def test_i2_steering_is_consumed_with_the_runs_end(
     storage: Storage,
     ws: Workspace,
@@ -238,6 +243,7 @@ async def test_i2_steering_is_consumed_with_the_runs_end(
     runners: MakeRunner,
     app_tools: FunctionToolset[Session[Gate]],
     monkeypatch: pytest.MonkeyPatch,
+    ends: str,
 ) -> None:
     script = Script(call("hold"), say("Noted."), *[say("ok")] * 2)
     runner = runners(make_agent(script, tools=[app_tools]))
@@ -254,13 +260,17 @@ async def test_i2_steering_is_consumed_with_the_runs_end(
     steering = await runner.send(ws, thread.id, "The venue changed")
     assert steering.run is None
     await asyncio.wait_for(offered.wait(), timeout=5)  # the watcher delivered it
+    if ends == "is stopped":
+        assert await runner.stop(handle.run_id)
     gate.release.set()
-    await handle.wait()
+    await asyncio.gather(handle.task, return_exceptions=True)
     await settled(thread.id, runner)
-    assert await _taken(storage, thread) >= (steering.outcome.seq or 0)
+    assert await _taken(storage, thread) >= (steering.outcome.seq or 0), "with its end record"
     started(await runner.send(ws, thread.id, "Hello?"))
     await settled(thread.id, runner)
-    assert script.conversation().count("The venue changed") == 1
+    conversation = script.conversation()
+    assert conversation[-1] == "Hello?"
+    assert conversation.count("The venue changed") == (1 if ends == "completes" else 0)
 
 
 # ─── I3: a claim, a task, and a hand-over ────────────────────────────────────
@@ -274,6 +284,32 @@ async def test_i3_a_claim_is_released_when_its_run_cannot_be_set_up(
         await runner.send(ws, thread.id, "Plan the launch")
     async with ws.claim_thread(thread.id, holder="next"):
         pass
+
+
+@pytest.mark.parametrize("ends", ["is cancelled", "fails"])
+async def test_i3_a_claimant_that_never_starts_a_run_hands_over_what_it_refused(
+    storage: Storage,
+    ws: Workspace,
+    there: Workspace,
+    thread: Thread,
+    runners: MakeRunner,
+    ends: str,
+) -> None:
+    script = Script(*[say("ok")] * 4)
+    runner, other = runners(make_agent(script)), runners(make_agent(script))
+    blinks = ConnectionError("the database blinked") if ends == "fails" else None
+    planning = hold(storage, "runs", status="paused", raises=blinks)
+    sending = asyncio.create_task(runner.send(ws, thread.id, "Plan the launch"))
+    await _entered(planning)
+    bystander = await other.send(there.as_actor(BOB), thread.id, "Also book the big room")
+    assert bystander.run is None, "its holder hands the thread over"
+    if ends == "is cancelled":
+        sending.cancel()
+    planning.release.set()
+    with contextlib.suppress(asyncio.CancelledError, ConnectionError):
+        await sending
+    await settled(thread.id, runner, other)
+    assert script.conversation() == ["Plan the launch", "Also book the big room"]
 
 
 @pytest.mark.parametrize("ends", ["fails", "is stopped"])

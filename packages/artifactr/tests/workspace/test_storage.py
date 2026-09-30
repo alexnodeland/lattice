@@ -206,6 +206,19 @@ async def test_a_transaction_saves_a_cursor_as_it_commits(storage: Storage) -> N
     assert await storage.cursor(SCOPE, "consumed") == 4, "only forward"
 
 
+async def test_a_cursor_saved_in_a_transaction_and_outside_it_keeps_the_furthest(
+    storage: Storage,
+) -> None:
+    await storage.save_cursor(SCOPE, "consumed", 9)
+    async with storage.transaction(SCOPE) as tx:
+        await tx.save_cursor("consumed", 4)
+    assert await storage.cursor(SCOPE, "consumed") == 9
+    async with storage.transaction(SCOPE) as tx:
+        await tx.save_cursor("consumed", 12)
+    await storage.save_cursor(SCOPE, "consumed", 10)
+    assert await storage.cursor(SCOPE, "consumed") == 12
+
+
 async def test_cursors_only_move_forward(storage: Storage) -> None:
     assert await storage.cursor(SCOPE, "mirror") == 0
     await storage.save_cursor(SCOPE, "mirror", 5)

@@ -1,7 +1,7 @@
 """A scripted model and fixtures for agent tests: no test calls a model API."""
 
 import asyncio
-from collections.abc import AsyncGenerator, AsyncIterator, Callable, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Collection, Sequence
 from datetime import timedelta
 from typing import Any
 
@@ -131,8 +131,9 @@ class HeldStorage(InMemoryStorage):
     ``held`` holds every release of a claim until the gate is released. The others hold the
     next call of their kind, once: a claim, a read of a cursor, a read of the log's head, a
     read of a thread's paused runs (as a claimant plans), a read of a thread's history (as a
-    turn begins, before its run starts), a read of a thread (as a run has just started), and a
-    subscription (as a run's watcher starts). It counts claims, and refuses one past
+    turn begins, before its run starts), a read of a thread (as a run has just started), a
+    subscription (as a run's watcher starts), and a read of a thread's log, once it has
+    returned (as a claimant has read what it plans from). It counts claims, and refuses one past
     ``MAX_CLAIMS``, so a claimant that never stops fails its test rather than hanging it.
     """
 
@@ -148,6 +149,7 @@ class HeldStorage(InMemoryStorage):
         self.held_subscribe: Gate | None = None
         self.held_head: Gate | None = None
         self.held_thread: Gate | None = None
+        self.held_log: Gate | None = None
         self.claims = 0
 
     async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
@@ -175,6 +177,29 @@ class HeldStorage(InMemoryStorage):
             self.held_head = None
             await gate.wait()
         return await super().head_seq(scope)
+
+    async def read(
+        self,
+        scope: Scope,
+        *,
+        after_seq: int = 0,
+        before_seq: int | None = None,
+        threads: Collection[ThreadId] | None = None,
+        limit: int | None = None,
+        last: int | None = None,
+    ) -> list[Envelope]:
+        found = await super().read(
+            scope,
+            after_seq=after_seq,
+            before_seq=before_seq,
+            threads=threads,
+            limit=limit,
+            last=last,
+        )
+        if threads and (gate := self.held_log) is not None:
+            self.held_log = None
+            await gate.wait()
+        return found
 
     async def thread(self, scope: Scope, thread_id: ThreadId) -> Thread | None:
         if (gate := self.held_thread) is not None:

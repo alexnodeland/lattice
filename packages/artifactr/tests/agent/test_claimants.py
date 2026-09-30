@@ -104,18 +104,36 @@ async def test_a_partial_answer_while_another_thread_commits_ends(
 # ─── a claimant cancelled, or a runner closed, before its turn starts ────────
 
 
-@pytest.mark.parametrize("when", ["as it asks", "as it plans", "as its turn begins"])
+@pytest.mark.parametrize(
+    "when",
+    [
+        "as it asks",
+        "as it reads what the agent was last told",
+        "as it plans",
+        "as its turn begins",
+    ],
+)
 async def test_a_send_cancelled_at_any_step_has_its_message_carried_out_once(
     storage: HeldStorage, ws: Workspace, thread: Thread, runners: MakeRunner, when: str
 ) -> None:
     script = Script(*[say("ok")] * 3)
-    runner = runners(make_agent(script))
+    beginning = Gate()
+
+    @contextlib.asynccontextmanager
+    async def begins(session: Session[Any]) -> AsyncIterator[None]:
+        if when == "as its turn begins" and not beginning.release.is_set():
+            await beginning.wait()
+        yield
+
+    runner = runners(make_agent(script), turn_context=begins)
     if when == "as it asks":
         held = storage.held_read = Gate()
+    elif when == "as it reads what the agent was last told":
+        held = storage.held_history = Gate()  # a thread with no position reads its history
     elif when == "as it plans":
         held = storage.held_runs = Gate()
     else:
-        held = storage.held_history = Gate()
+        held = beginning
     sending = asyncio.create_task(runner.send(ws, thread.id, "Plan the launch"))
     await _entered(held)
     sending.cancel()
@@ -309,3 +327,60 @@ async def test_a_notice_posted_in_a_paused_thread_answers_nothing(
     await ws.as_actor(BOB).post_message(thread.id, "CI is green", kind="notice")
     assert await runner.resume(ws, paused.run_id) is None
     assert (await ws.run(paused.run_id)).status == "paused"
+
+
+# ─── the rules that keep a message from being stranded ───────────────────────
+
+
+async def test_a_claimant_that_plans_nothing_looks_again_for_what_it_refused(
+    storage: HeldStorage, ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    script = Script(say("Done."), *[say("ok")] * 3)
+    runner, other = runners(make_agent(script)), runners(make_agent(script))
+    first = started(await runner.send(ws, thread.id, "Go"))
+    await first.wait()
+    await runner.drain()
+    reading = storage.held_log = Gate()
+    resuming = asyncio.create_task(runner.resume(ws, first.run_id))  # it plans nothing
+    await _entered(reading)  # it has read the log, holding the thread
+    assert (await other.send(ws.as_actor(BOB), thread.id, "Also book the big room")).run is None
+    reading.release.set()
+    following = await resuming  # having planned nothing, it looks again and takes Bob's
+    assert following is not None
+    await settled(thread.id, runner, other)
+    assert script.conversation() == ["Go", "Also book the big room"]
+
+
+async def test_a_run_that_took_nothing_reads_what_was_asked_after_its_release(
+    storage: HeldStorage, ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    failing = [True]
+
+    @contextlib.asynccontextmanager
+    async def fails_once(session: Session[Any]) -> AsyncIterator[None]:
+        if failing.pop() if failing else False:
+            raise RuntimeError("the tracing backend blinked")
+        yield
+
+    script = Script(*[say("ok")] * 3)
+    runner = runners(make_agent(script), turn_context=fails_once)
+    other = runners(make_agent(script))
+    releasing = storage.held = Gate()
+    first = started(await runner.send(ws, thread.id, "Plan the launch"))
+    await _entered(releasing)  # it failed, took nothing, and is releasing the thread
+    assert (await other.send(ws.as_actor(BOB), thread.id, "Also book the big room")).run is None
+    releasing.release.set()
+    await asyncio.gather(first.task, return_exceptions=True)
+    await settled(thread.id, runner, other)
+    assert script.conversation() == ["Plan the launch", "Also book the big room"]
+
+
+async def test_a_run_stopped_at_once_releases_its_thread(
+    ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    runner = runners(make_agent(Script(say("ok"))))
+    handle = started(await runner.send(ws, thread.id, "Go"))
+    handle.task.cancel()  # before the loop runs anything else: its task started eagerly
+    await asyncio.gather(handle.task, return_exceptions=True)
+    async with asyncio.timeout(2), ws.claim_thread(thread.id, holder="next"):
+        pass

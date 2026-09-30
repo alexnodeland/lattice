@@ -388,15 +388,23 @@ class Runner[AppDepsT]:
 
         A claimant that starts nothing looks again once it has released the thread, since a
         command it refused meanwhile relies on it. Each round starts a turn, finds nothing
-        asked, finds the thread busy, or records what it found as taken, so it ends. The turn
-        links to ``caller``, or else to where the message or answer it carries out was
-        committed.
+        asked, finds the thread busy, or records what it found as taken, so it ends. One that
+        is cancelled or fails holding the thread hands it over as it propagates, as a run does.
+        The turn links to ``caller``, or else to where the message or answer it carries out
+        was committed.
         """
-        while not self._closed and await _asked_for(workspace, thread_id):
+        while not self._closed:
+            taken = await _taken_seq(workspace, thread_id)
+            asked = await workspace.cursor(_asked(thread_id))
+            if asked <= taken:
+                return None
             try:
                 handle = await self._start(workspace, thread_id, caller)
             except ThreadBusy:
                 return None  # its holder hands the thread over as it releases it
+            except BaseException:  # cancelled, or storage failed: the claim is released
+                self._hand_over(workspace, thread_id, taken=taken, asked=asked)
+                raise
             if handle is not None:
                 return handle
         return None
@@ -516,33 +524,40 @@ class Runner[AppDepsT]:
                     stopping.cancel()
                     await asyncio.gather(stopping, return_exceptions=True)
         finally:
-            self._hand_over(session, turn)
+            self._hand_over(
+                session.workspace, session.thread_id, taken=turn.taken, asked=turn.asked
+            )
 
-    def _hand_over(self, session: Session[AppDepsT], turn: "_Turn") -> None:
-        """Once a run has released its thread, take the turn it was asked for meanwhile.
+    def _hand_over(
+        self, workspace: Workspace, thread_id: ThreadId, *, taken: int, asked: int
+    ) -> None:
+        """Once a claimant has released its thread, take the turn it was asked for meanwhile.
 
-        It runs in the background, in a context of its own, so the run's end does not wait for
-        it and the turn it starts links to what it carries out.
+        ``taken`` and ``asked`` are what the claimant read before it held the thread. It runs in
+        the background, in a context of its own, so the claimant's end does not wait for it and
+        the turn it starts links to what it carries out.
         """
         if self._closed:
             return  # the thread's next claimant, in any process, carries it out
         handover = asyncio.create_task(
-            self._take_over(session.workspace, session.thread_id, turn),
+            self._take_over(workspace, thread_id, taken=taken, asked=asked),
             context=contextvars.Context(),
         )
         self._handovers.add(handover)
         handover.add_done_callback(self._handovers.discard)
 
-    async def _take_over(self, workspace: Workspace, thread_id: ThreadId, turn: "_Turn") -> None:
-        """Take the thread's next turn, if the run took something or was asked for more.
+    async def _take_over(
+        self, workspace: Workspace, thread_id: ThreadId, *, taken: int, asked: int
+    ) -> None:
+        """Take the thread's next turn, if the claimant took something or was asked for more.
 
-        A run that took nothing, having failed or stopped before it started, hands over only
-        what was asked meanwhile, so a failure that repeats makes one turn per new command.
-        What it reads is read after the release, so a command it refused is seen.
+        A claimant that took nothing, as a run that failed or stopped before it started, hands
+        over only what was asked meanwhile, so a failure that repeats makes one turn per new
+        command. What it reads is read after the release, so a command it refused is seen.
         """
         try:
-            took = await _taken_seq(workspace, thread_id) > turn.taken
-            if took or await workspace.cursor(_asked(thread_id)) > turn.asked:
+            took = await _taken_seq(workspace, thread_id) > taken
+            if took or await workspace.cursor(_asked(thread_id)) > asked:
                 await self._take(workspace, thread_id, None)
         except Exception:
             logger.exception(
@@ -775,21 +790,18 @@ SQL migration 0005 records it, for each workspace that existed then.
 
 
 async def _taken_seq(workspace: Workspace, thread_id: ThreadId) -> int:
-    """How far runs have taken a thread's messages.
+    """How far runs have taken a thread's messages: never before the upgrade to ADR-0055.
 
-    A thread no run has recorded it for starts from the upgrade to ADR-0055, or from what its
-    agent was last told, as by a run without the runner, whichever is later. So nothing from
-    before the upgrade resurfaces, and a brand-new thread starts from its beginning.
+    Migration 0005 records the upgrade point, again after a downgrade and a second upgrade, so
+    what an older release carried out meanwhile is not carried out again. A thread no run has
+    recorded a position for starts from the upgrade, or from what its agent was last told, as
+    by a run without the runner, whichever is later. A brand-new thread starts from its
+    beginning.
     """
-    taken = await workspace.cursor(_taken(thread_id))
+    taken, upgraded = await workspace.cursor(_taken(thread_id)), await workspace.cursor(_UPGRADED)
     if taken:
-        return taken
-    return max(await workspace.cursor(_UPGRADED), await last_seen(workspace, thread_id))
-
-
-async def _asked_for(workspace: Workspace, thread_id: ThreadId) -> bool:
-    """Whether a message or an answer asked for a turn in a thread that no run has taken."""
-    return await workspace.cursor(_asked(thread_id)) > await _taken_seq(workspace, thread_id)
+        return max(taken, upgraded)  # after a downgrade and a second upgrade, the later point
+    return max(upgraded, await last_seen(workspace, thread_id))
 
 
 def _approval(run: Run, tool_call_id: str) -> bool | ToolDenied:

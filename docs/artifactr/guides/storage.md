@@ -75,7 +75,7 @@ Use a database file. A plain `:memory:` database is a single connection that con
 
 ### Migrations
 
-artifactr's Alembic migrations ship in the package. `migrate(engine)` upgrades the database to the latest schema, creating the tables if they do not exist, and does nothing if it is up to date, so it is safe to run on every start or deploy. The migrations record their version in their own table, `artifactr_alembic_version`, and every table's name starts with `artifactr_`, so they live beside your application's tables and migrations in the same database without interfering.
+artifactr's Alembic migrations ship in the package. `migrate(engine)` upgrades the database to the latest schema, creating the tables if they do not exist, and does nothing if it is up to date, so it is safe to run on every start or deploy. Migration 0005 records where each workspace's log stood when it ran, and the runner starts older threads from there ([ADR-0055](../adr/0055-turns-from-the-log.md)). The migrations record their version in their own table, `artifactr_alembic_version`, and every table's name starts with `artifactr_`, so they live beside your application's tables and migrations in the same database without interfering.
 
 If your application runs Alembic's autogenerate on the same database, exclude the `artifactr_` tables from it (with `include_name`, for example), or it will propose dropping them.
 

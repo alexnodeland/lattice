@@ -37,7 +37,11 @@ The log decides what each turn carries out. A thread's messages are taken in the
 - **Each thread keeps two positions**, in the storage's named cursors ([ADR-0046](0046-telemetry-that-composes-across-libraries.md)): `artifactr.runner/{thread_id}/asked` and `artifactr.runner/{thread_id}/taken`. Both only move forward.
   - `send`, `answer` and `resume` save **asked**: the seq of the message or answer they commit (for `resume`, the log's head). They save it *before* they try to claim the thread, so a holder that refuses them sees it when it releases the thread.
   - The claim's holder saves **taken**. When it starts a turn, it saves it through the message the turn starts with; for a run that resumes by its answers, through what it read. When the turn ends, it saves it through what the turn's watcher delivered, before the claim is released. So a message the watcher misses is left for the next turn.
-  - A thread with no taken position, such as one from before this record, counts what its agent last saw as taken: the `seq` of its last saved history.
+  - A thread with no taken position of its own starts from the upgrade, or from what its agent was last told, whichever is later. The upgrade point is where the workspace's log stood when SQL migration 0005 ran, as a deploy does. The migration records it once per existing workspace, as the cursor `artifactr.runner/upgraded`. So:
+    - Nothing from before the upgrade resurfaces: not old messages, not messages lost in the window, and not the prompts of runs that failed.
+    - A message committed after the upgrade is the next turn's, even before any turn has started, and whichever process touches the thread first.
+    - A brand-new thread starts from its beginning.
+    - What the agent was last told covers a run without the runner, which saves history but no position.
 - **Whoever holds the claim decides.** When more was asked than has been taken, the holder reads the log after the taken position and finds the messages others posted that no turn has taken. Then, holding the thread:
   - If the thread's run is paused with requests open, the oldest of those messages is the reply: it answers the questions, declines the approvals, and the run resumes.
   - If the paused run's requests are all answered, the run resumes.
@@ -61,6 +65,14 @@ Where the positions live:
 |---|---|---|---|
 | **The storage's named cursors (chosen)** | Unchanged. Storage already keeps cursors (SQL migration 0004) | Its start saved the position, before its task ran | Its start saved the position |
 | A field on `run_ended` and `run_paused` | A new field in `schemas/artifactr.v1.json` and in the frames every client reads, to carry an internal handoff | Records no end, unless `run_started` carries a start position as well | Has no end of its own to read |
+
+Where a thread from before this record starts:
+
+| Option | Assessment |
+|---|---|
+| **The upgrade point that migration 0005 records for each workspace (chosen)** | Exact: a message committed after the deploy is new, whichever process touches the thread first. Nothing older resurfaces |
+| The head as it stood at the thread's first touch, before that command's commit | A direct message committed after the deploy but before the first send would count as old |
+| What its agent last saw | The messages lost to the bug and the prompts of failed runs would resurface, as the first turn's input |
 
 What starts a turn:
 
@@ -90,7 +102,7 @@ And it still misses the stretch between the agent's run ending and its end being
 - Easier: a client may post the moment it sees `run_ended`, or while a run pauses. Its message is carried out.
 - `Sent.run`, and `Recorded.run_id` on the wire ([ADR-0048](0048-surfaces-over-the-runner.md)), name the turn a command started. That turn may take an older message first. They are `null` also when the thread's holder will hand the thread over to the turn that takes the message.
 - **Behaviour change:** a message committed directly is the input of the thread's next turn. Before, only a turn already running was told of it; in an idle thread the agent never was.
-- **Upgrading:** the first turn in each existing thread also takes the messages after the thread's last saved history. These are direct messages, messages lost in the window, and the prompts of runs that failed, since a failed run saves no history.
+- **Upgrading:** each existing thread starts from where its workspace stood at the upgrade, so the agent never suddenly answers old messages. Messages lost to the bug before the upgrade, and failed runs' prompts from before it, stay untaken. Recording the point at first touch would not do: a direct message committed after the deploy but before the first send would then count as old. A database made with `create_schema` has no upgrade point, and its threads start from their beginning, as brand-new ones do.
 - A run that fails keeps what it took: its prompt or reply, and what its watcher delivered, are not given again. The messages it had not been given yet go to the next turn. `resume` cannot retry a resume that failed before it began, since its answers are taken; the thread's next message resumes the run.
 - Cost: `send` and `answer` save one cursor and read two before they claim the thread. Every claimant reads the log after the taken position.
 - Tests wait for hand-overs with `Runner.drain`, since the ended run no longer carries them.

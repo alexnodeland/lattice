@@ -140,6 +140,8 @@ Behind the table is one rule: the log decides ([ADR-0055](../adr/0055-turns-from
 
 A message committed without the runner, with `ws.post_message`, asks for nothing, so it starts no turn. The thread's next turn takes it, as its prompt if it is the oldest.
 
+A thread from before this behaviour starts from where its workspace's log stood at the upgrade, which [`migrate`](storage.md#migrations) records. The agent never suddenly answers messages from before it.
+
 ```python
 sent = await runner.send(ws, thread.id, "Break the launch into tasks.")
 if sent.run is not None:  # None when the thread's run takes the message, or will hand it over

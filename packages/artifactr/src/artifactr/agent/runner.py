@@ -722,13 +722,24 @@ def _asked(thread_id: ThreadId) -> str:
     return f"artifactr.runner/{thread_id}/asked"
 
 
+_UPGRADED = "artifactr.runner/upgraded"
+"""The cursor at which a workspace's log stood when it was upgraded to ADR-0055's turns.
+
+SQL migration 0005 records it, for each workspace that existed then.
+"""
+
+
 async def _taken_seq(workspace: Workspace, thread_id: ThreadId) -> int:
     """How far runs have taken a thread's messages.
 
-    A thread whose runs never recorded it, as before ADR-0055, has taken what its agent last
-    saw.
+    A thread no run has recorded it for starts from the upgrade to ADR-0055, or from what its
+    agent was last told, as by a run without the runner, whichever is later. So nothing from
+    before the upgrade resurfaces, and a brand-new thread starts from its beginning.
     """
-    return await workspace.cursor(_taken(thread_id)) or await last_seen(workspace, thread_id)
+    taken = await workspace.cursor(_taken(thread_id))
+    if taken:
+        return taken
+    return max(await workspace.cursor(_UPGRADED), await last_seen(workspace, thread_id))
 
 
 async def _asked_for(workspace: Workspace, thread_id: ThreadId) -> bool:

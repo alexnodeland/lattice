@@ -18,7 +18,6 @@ from pydantic_ai import (
     AgentRunResult,
     DeferredToolRequests,
     FunctionToolset,
-    ModelRequest,
     ModelResponse,
     RunContext,
     ToolCallPart,
@@ -69,22 +68,6 @@ async def _entered(gate: Gate) -> None:
 def _replies(first: str, count: int = 4) -> Script:
     """A model that replies ``first``, then "ok" as often as it is asked, up to ``count``."""
     return Script(say(first), *[say("ok")] * count)
-
-
-def _conversation(script: Script) -> list[str]:
-    """The thread's messages as the model last saw them, in order: prompts and steering."""
-    return script.prompt_texts(len(script.requests) - 1)
-
-
-def _answers(script: Script) -> list[str]:
-    """The tool results the model last saw, in order: the answers to its questions among them."""
-    return [
-        str(part.content)
-        for message in script.requests[-1]
-        if isinstance(message, ModelRequest)
-        for part in message.parts
-        if part.part_kind == "tool-return"
-    ]
 
 
 # ─── a message sent as a run ends ─────────────────────────────────────────────
@@ -170,8 +153,8 @@ async def test_every_reply_sent_as_a_run_pauses_reaches_it(
     assert resumed is not None
     assert resumed.run_id == first.run_id
     await settled(runner, thread.id)
-    assert _answers(script) == ["Monday"]
-    assert _conversation(script)[-1] == "And book the big room", "the second reaches it too"
+    assert script.answers() == ["Monday"]
+    assert script.conversation()[-1] == "And book the big room", "the second reaches it too"
 
 
 async def test_an_answer_sent_as_a_run_pauses_waits_for_the_others(
@@ -301,7 +284,7 @@ async def test_a_resume_that_fails_before_it_starts_is_resumed_by_the_next_messa
     assert resumed.run_id == paused.run_id
     await settled(runner, thread.id)
     assert (await ws.run(paused.run_id)).status == "completed"
-    assert _conversation(script)[-1] == "Are you there?"
+    assert script.conversation()[-1] == "Are you there?"
 
 
 # ─── one turn per message, whoever takes the thread ───────────────────────────
@@ -346,7 +329,7 @@ async def test_a_turn_another_send_starts_takes_what_the_ending_run_missed_first
     await settled(other, thread.id)
     assert runner.running(thread.id) is None, "the hand-over finds both taken"
     assert script.prompt_texts(1)[:2] == ["Plan the launch", "Anything missed?"], "first"
-    assert _conversation(script) == ["Plan the launch", "Anything missed?", "And this"]
+    assert script.conversation() == ["Plan the launch", "Anything missed?", "And this"]
     assert taking.run_id != first.run_id
 
 
@@ -395,13 +378,13 @@ async def test_a_message_posted_directly_starts_no_turn_but_the_next_turn_takes_
     assert runner.running(thread.id) is None, "it starts no turn"
     started(await runner.send(ws, thread.id, "Anything else?"))
     await settled(runner, thread.id)
-    assert _conversation(script) == ["Plan the launch", "FYI: the venue changed", "Anything else?"]
+    assert script.conversation() == ["Plan the launch", "FYI: the venue changed", "Anything else?"]
 
 
 # ─── what the Runner does besides ─────────────────────────────────────────────
 
 
-async def test_a_thread_from_before_takes_what_its_agent_last_saw_as_taken(
+async def test_what_a_run_without_the_runner_was_told_counts_as_taken(
     ws: Workspace, thread: Thread, gate: Gate, runners: MakeRunner
 ) -> None:
     await ws.post_message(thread.id, "An old message")
@@ -449,7 +432,7 @@ async def test_a_hand_over_that_fails_is_logged_and_the_next_turn_carries_it_out
     assert [r.getMessage() for r in caplog.records] == [failed]
     started(await runner.send(ws, thread.id, "Hello?"))
     await settled(runner, thread.id)
-    assert _conversation(script) == ["Plan the launch", "Anything else?", "Hello?"]
+    assert script.conversation() == ["Plan the launch", "Anything else?", "Hello?"]
 
 
 async def test_a_run_whose_position_cannot_be_recorded_keeps_its_result(

@@ -75,6 +75,20 @@ class Script:
             if part.part_kind == "user-prompt"
         ]
 
+    def conversation(self) -> list[str]:
+        """The thread's messages as the model last saw them, in order: prompts and steering."""
+        return self.prompt_texts(len(self.requests) - 1)
+
+    def answers(self) -> list[str]:
+        """The tool results the model last saw, in order: its questions' answers among them."""
+        return [
+            str(part.content)
+            for message in self.requests[-1]
+            if isinstance(message, ModelRequest)
+            for part in message.parts
+            if part.part_kind == "tool-return"
+        ]
+
 
 class Gate:
     """Lets a test hold a tool call open until it chooses to release it."""

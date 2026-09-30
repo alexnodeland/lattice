@@ -1,6 +1,6 @@
 # ADR-0015: Reference implementation: incident response
 
-**Status:** Accepted; its events and rules are amended by [ADR-0031](0031-the-reference-implementations-events-and-rules.md)
+**Status:** Accepted; its events and rules are amended by [ADR-0031](0031-the-reference-implementations-events-and-rules.md), and its place by [ADR-0048](0048-reflexr-in-lattice.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

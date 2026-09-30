@@ -1,6 +1,6 @@
 # ADR-0011: The documentation site and brand
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0014](0014-one-site-for-the-family.md)
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 

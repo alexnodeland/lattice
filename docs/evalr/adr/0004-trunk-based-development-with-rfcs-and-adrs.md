@@ -1,6 +1,6 @@
 # ADR-0004: Trunk-based development with RFCs, ADRs and evergreen docs
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0014](0014-evalr-in-lattice.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

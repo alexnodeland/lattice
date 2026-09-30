@@ -1,6 +1,6 @@
 # ADR-0013: Quality gates
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0048](0048-reflexr-in-lattice.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

@@ -14,6 +14,8 @@ nav:
   - adr/0010-mit-license.md
   - adr/0011-documentation-site-and-brand.md
   - adr/0012-the-libraries-pinned-by-git-revision.md
+  - adr/0013-relayr-in-lattice.md
+  - adr/0014-one-site-for-the-family.md
   - adr/template.md
 - RFCs:
   - rfcs/README.md

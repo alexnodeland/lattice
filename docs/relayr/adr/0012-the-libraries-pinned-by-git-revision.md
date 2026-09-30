@@ -1,6 +1,6 @@
 # ADR-0012: The libraries pinned by git revision
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-0013](0013-relayr-in-lattice.md)
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 

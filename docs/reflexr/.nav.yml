@@ -84,6 +84,9 @@ nav:
     - adr/0045-scores-on-evalr.md
     - adr/0046-one-docs-build.md
     - adr/0047-commands-carried-out-once-per-id.md
+    - adr/0048-reflexr-in-lattice.md
+    - adr/0049-one-site-for-the-family.md
+    - adr/0050-dashboards-from-the-checkout.md
     - adr/template.md
   - RFCs:
     - rfcs/README.md

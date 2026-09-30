@@ -90,7 +90,9 @@ jobs:
         with:
           persist-credentials: false
       - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        # GitHub answers some of the ~2,500 links with a brief 502 now and then: retry each failure
+        # for about a minute before counting it.
         with:
-          args: --no-progress --exclude-loopback './**/*.md'
+          args: --no-progress --exclude-loopback --max-retries 5 --retry-wait-time 10 './**/*.md'
         env:
           GITHUB_TOKEN: ${{ github.token }}

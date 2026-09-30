@@ -33,7 +33,7 @@ from pydantic_ai.capabilities.abstract import (
     WrapRunHandler,
     WrapToolExecuteHandler,
 )
-from pydantic_ai.exceptions import ToolFailedError, ToolRetryError
+from pydantic_ai.exceptions import ToolFailedError, ToolRetryError, UserError
 
 from artifactr.agent.session import Session, last_seen
 from artifactr.agent.tools import artifact_tools
@@ -174,6 +174,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             )
         )
         watch_after = (started.seq if session.watch_after is None else session.watch_after) or 0
+        session.delivered.seq = watch_after
         thread = await workspace.thread(session.thread_id)
         notes = await workspace.change_notes(
             after_seq=await last_seen(workspace, session.thread_id),
@@ -201,21 +202,27 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         return result
 
     async def _watch(self, ctx: Context, after_seq: int, focus: set[ArtifactId]) -> None:
-        workspace = ctx.deps.workspace
-        thread_id = ctx.deps.thread_id
+        """Deliver what others do into the run, and note how far it got in the session."""
+        session = ctx.deps
+        workspace = session.workspace
         try:
-            async for envelope in workspace.subscribe(after_seq=after_seq, threads={thread_id}):
+            async for envelope in workspace.subscribe(
+                after_seq=after_seq, threads={session.thread_id}
+            ):
                 event = envelope.event
                 if isinstance(event, FocusChanged):
                     focus = set(event.artifact_ids)
                 elif same_participant(envelope.actor, workspace.actor):
-                    continue
+                    pass
                 elif isinstance(event, MessagePosted) and event.kind == "message":
                     ctx.enqueue(event.content)
                 elif notes := change_notes(
                     [envelope], viewer=workspace.actor, focus=focus, notices=self.notices
                 ):
                     ctx.enqueue(_wrap(notes))
+                session.delivered.seq = envelope.seq
+        except UserError:
+            return  # the agent's run is over, so it takes nothing more: the Runner carries it out
         except Exception:
             logger.exception(
                 "watching the workspace for run %s failed; the run goes on", ctx.deps.run_id

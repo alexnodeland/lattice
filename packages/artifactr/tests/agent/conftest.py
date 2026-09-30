@@ -16,11 +16,12 @@ from pydantic_ai import (
     ToolCallPart,
     ToolReturnPart,
 )
+from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from artifactr.agent import ArtifactWorkspace, RunHandle, Runner, Sent, Session, function_model
 from artifactr.core import Envelope, Thread, UserActor
-from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
+from artifactr.workspace import InMemoryStorage, Scope, Workspace, Workspaces
 from tests.artifact_types import Checklist, Note
 
 ALICE = UserActor(id="alice", name="Alice")
@@ -86,6 +87,19 @@ class Gate:
         await self.release.wait()
 
 
+class HeldRelease(InMemoryStorage):
+    """Storage that holds the release of thread claims at ``held``, once a test sets it."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.held: Gate | None = None
+
+    async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
+        if self.held is not None:
+            await self.held.wait()
+        await super().release_lease(scope, key, holder)
+
+
 async def settle() -> None:
     """Let the tasks that are ready run, such as a run's watcher delivering what was posted."""
     for _ in range(5):
@@ -132,13 +146,17 @@ def make_agent(
     ask: bool = False,
     notices: bool = False,
     output_type: Any = str,
+    capabilities: Sequence[AbstractCapability[Session[Gate]]] = (),
 ) -> Agent[Session[Gate], Any]:
     return Agent(
         script.model,
         deps_type=Session[Gate],
         output_type=output_type,
         toolsets=list(tools),
-        capabilities=[ArtifactWorkspace(types=[Note, Checklist], ask=ask, notices=notices)],
+        capabilities=[
+            ArtifactWorkspace(types=[Note, Checklist], ask=ask, notices=notices),
+            *capabilities,
+        ],
     )
 
 

@@ -15,6 +15,7 @@ from artifactr.telemetry import (
     Telemetry,
     annotate,
     attribution,
+    continued,
     current_trace_id,
     current_traceparent,
     kept_attributes,
@@ -127,6 +128,19 @@ def test_the_current_traceparent_is_the_w3c_trace_context(recorder: Recorder) ->
     assert traceparent == (
         f"00-{context.trace_id:032x}-{context.span_id:016x}-{context.trace_flags:02x}"
     )
+
+
+def test_a_block_continued_from_a_traceparent_is_in_its_span(recorder: Recorder) -> None:
+    tracer = recorder.tracer_provider.get_tracer("test")
+    with tracer.start_as_current_span("request") as request:
+        traceparent = current_traceparent()
+        with continued(None):
+            assert not trace.get_current_span().get_span_context().is_valid, "in no span"
+    with continued(traceparent), tracer.start_as_current_span("later"):
+        pass
+    parent = recorder.span("later").parent
+    assert parent is not None
+    assert parent.span_id == request.get_span_context().span_id
 
 
 def test_attribution_names_the_session_the_user_and_the_ids() -> None:

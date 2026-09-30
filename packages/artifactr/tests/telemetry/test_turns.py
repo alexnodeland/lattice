@@ -33,7 +33,7 @@ from artifactr.telemetry.attributes import (
     WORKSPACE_ID,
 )
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
-from tests.agent.conftest import Gate, Script, call, say, started
+from tests.agent.conftest import Gate, HeldRelease, Script, call, say, started
 from tests.artifact_types import Checklist, Note
 from tests.telemetry.conftest import Recorder, attributes, trace_id
 
@@ -147,6 +147,36 @@ async def test_a_turn_is_its_own_trace_linked_to_what_started_it(
     where = {TURN_TRIGGER: "message", TURN_OUTCOME: "completed", TENANT_ID: "t1"}
     assert recorder.total("artifactr.turns", where) == 1
     assert recorder.total("artifactr.turn.duration", where) == 1
+
+
+async def test_a_message_carried_out_as_a_run_ends_starts_a_turn_linked_to_it(
+    recorder: Recorder, gate: Gate
+) -> None:
+    storage = HeldRelease()
+    ws = await Workspaces(storage, **recorder.providers).open("t1", "w1", actor=ALICE)
+    thread = await ws.create_thread("Launch")
+    releasing = storage.held = Gate()
+    script = Script(say("Drafted."), say("Nothing else to do."))
+    runner = Runner(traced(script, recorder), app=gate, **recorder.providers)
+    first = started(await runner.send(ws, thread.id, "Plan the launch"))
+    await asyncio.wait_for(releasing.entered.wait(), timeout=2)
+    request_tracer = recorder.tracer_provider.get_tracer("the application")
+    with request_tracer.start_as_current_span("POST /commands"):
+        assert (await runner.send(ws.as_actor(BOB), thread.id, "Anything else?")).run is None
+    releasing.release.set()
+    await first.wait()
+    following = runner.running(thread.id)
+    assert following is not None
+    await following.wait()
+
+    _, turn = recorder.spans("invoke_workflow turn")
+    posted = [
+        span
+        for span in recorder.spans("artifactr.commit post_message")
+        if attributes(span)[ACTOR_KIND] == "user"
+    ]
+    assert [link.context.span_id for link in turn.links] == [span_id(posted[-1])]
+    assert (attributes(turn)[TURN_TRIGGER], attributes(turn)[USER_ID]) == ("message", "bob")
 
 
 async def test_each_attempt_of_a_paused_run_is_its_own_trace(

@@ -1,6 +1,6 @@
 """The agent's dependencies for one run, and its thread history."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from pydantic_ai import ModelMessage, ModelMessagesTypeAdapter
@@ -10,6 +10,15 @@ from artifactr.workspace import Workspace
 
 Trigger = Literal["message", "resume", "api"]
 """What started a run: a posted message, answers to a pause, or a direct call."""
+
+
+@dataclass
+class Delivered:
+    """How far a run's watcher has delivered the log into the run."""
+
+    seq: int = 0
+    """Every envelope up to this ``seq`` was delivered, or was not for the agent. The run took
+    nothing others sent after it."""
 
 
 @dataclass(frozen=True)
@@ -35,6 +44,10 @@ class Session[AppDepsT]:
     requested_by: Actor | None = None
     """Whose message or answer started this run segment, if anyone's. Spans record a person
     here as the user."""
+
+    delivered: Delivered = field(default_factory=Delivered, compare=False)
+    """How far the run's watcher has got. Once the run releases its thread, the
+    :class:`~artifactr.agent.Runner` carries out the messages and answers sent after it."""
 
     @classmethod
     def start(

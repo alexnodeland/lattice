@@ -4,10 +4,12 @@ The API is the port: artifactr records through it and never configures the SDK. 
 configured, everything here is a no-op.
 """
 
-from collections.abc import Iterable, Mapping
+import contextlib
+from collections.abc import Generator, Iterable, Mapping
 from importlib.metadata import version
 from typing import Final
 
+from opentelemetry import context as otel_context
 from opentelemetry import metrics, trace
 from opentelemetry.metrics import Counter, Histogram, MeterProvider, UpDownCounter
 from opentelemetry.trace import Span, TracerProvider
@@ -135,6 +137,21 @@ def current_traceparent() -> str | None:
     carrier: dict[str, str] = {}
     _W3C.inject(carrier)
     return carrier.get("traceparent")
+
+
+@contextlib.contextmanager
+def continued(traceparent: str | None) -> Generator[None]:
+    """Run a block as if in the span a W3C ``traceparent`` names, such as an envelope's.
+
+    What the block starts is that span's: its child, or a turn linked to it. With no
+    ``traceparent``, the block is in no span.
+    """
+    carrier = {} if traceparent is None else {"traceparent": traceparent}
+    token = otel_context.attach(_W3C.extract(carrier))
+    try:
+        yield
+    finally:
+        otel_context.detach(token)
 
 
 def annotate(attributes: Attributes, span: Span | None = None) -> None:

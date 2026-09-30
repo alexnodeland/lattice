@@ -52,6 +52,7 @@ async def test_a_message_during_a_run_steers_it(
     gate.release.set()
     await handle.wait()
     assert script.prompt_texts(1)[-1] == "Actually, make it Monday"
+    assert runner.running(thread.id) is None, "a message the run took is not carried out again"
 
 
 async def _fail(*args: Any, **kwargs: Any) -> AsyncIterator[Envelope]:

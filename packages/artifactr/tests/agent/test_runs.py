@@ -275,7 +275,7 @@ async def test_a_run_whose_claim_lapses_is_stopped_at_its_deadline(
     thread = await ws.create_thread()
     runner = Runner(make_agent(Script(call("hold")), tools=[app_tools]), app=gate, claim_ttl=TTL)
     handle = started(await runner.send(ws, thread.id, "Hold on"))
-    storage.cut_off.add(handle.run_id)  # its next renewal hangs
+    storage.cut_off.add(storage.holders[f"thread:{thread.id}"])  # its next renewal hangs
     async with asyncio.timeout(5):
         await gate.entered.wait()
         await asyncio.gather(handle.task, return_exceptions=True)

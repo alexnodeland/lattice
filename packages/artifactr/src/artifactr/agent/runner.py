@@ -8,6 +8,12 @@ comes from:
 - In a thread whose run is paused on questions, it is the reply: questions are answered with
   it, approvals are declined with it as the reason, and the run resumes.
 
+A run holds its thread from its start until it has recorded its end or its pause, but its agent
+takes no more messages once its own run is over. A message or an answer sent in between is
+carried out by the run as it releases the thread, as if it were sent then: the message starts
+the next run or replies to the paused one, and the answer resumes its run. A run that is
+stopped carries out nothing more.
+
 A notice, a ``post_message`` of kind ``notice``, is for people: it is committed as it is, so it
 starts no run, and the thread's agent is not told unless its capability asks for notices
 (ADR-0051).
@@ -34,6 +40,7 @@ When a turn ends, the Runner hands it to its evaluators, which judge it in the b
 
 import asyncio
 import contextlib
+import logging
 import time
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager
@@ -54,9 +61,11 @@ from artifactr.core import (
     AnswerDeferred,
     Command,
     CommandResult,
+    DeferredAnswered,
     InvalidState,
     LiveFrame,
     MessageId,
+    MessagePosted,
     NotFound,
     Outcome,
     PostMessage,
@@ -68,10 +77,12 @@ from artifactr.core import (
     StopRun,
     SystemActor,
     ThreadId,
+    new_id,
     new_message_id,
     new_run_id,
+    same_participant,
 )
-from artifactr.telemetry import Telemetry, attribution
+from artifactr.telemetry import Telemetry, attribution, continued
 from artifactr.telemetry.attributes import (
     ERROR_TYPE,
     GEN_AI_OPERATION_NAME,
@@ -85,6 +96,8 @@ from artifactr.telemetry.attributes import (
 )
 from artifactr.telemetry.metrics import TURN_DURATION, TURNS
 from artifactr.workspace import ThreadBusy, Workspace
+
+logger = logging.getLogger("artifactr.agent")
 
 type TurnContext = Callable[[Session[Any]], AbstractAsyncContextManager[object]]
 """A context entered around each turn, inside the turn's span, given the run's session.
@@ -155,6 +168,9 @@ class Sent:
     """The run it started or resumed, or ``None`` when it started none, which is not a failure:
 
     - The thread's run is already active, in this process or another, so the message steers it.
+    - The thread's run is ending or pausing, and takes no more messages, but still holds the
+      thread. It carries the message or answer out as it releases the thread, in its process,
+      as if it were sent then.
     - An answer leaves some of the paused run's requests unanswered, so the run waits for them.
     - Another message or answer resumed the paused run first.
     - The runner is closed (:meth:`Runner.aclose`), as the application shuts down.
@@ -262,18 +278,7 @@ class Runner[AppDepsT]:
             thread_id=thread_id, content=content, message_id=message_id or new_message_id()
         )
         posted = await workspace.commit(message)
-        paused = await workspace.runs(thread_id=thread_id, status="paused")
-        if paused:
-            return _sent(posted, await self._reply(workspace, paused[-1], content))
-        run = await self._start(
-            workspace,
-            thread_id,
-            new_run_id(),
-            prompt=content,
-            trigger="message",
-            watch_after=posted.seq,
-        )
-        return _sent(posted, run)
+        return _sent(posted, await self._act(workspace, thread_id, content, posted.seq))
 
     async def answer(self, workspace: Workspace, command: AnswerDeferred) -> Sent:
         """Answer one of a paused run's requests, resuming the run once all are answered."""
@@ -349,6 +354,17 @@ class Runner[AppDepsT]:
             case _:
                 return await workspace.commit(command)
 
+    async def _act(
+        self, workspace: Workspace, thread_id: ThreadId, content: str, seq: int | None
+    ) -> RunHandle | None:
+        """Act on a message posted at ``seq``: reply to the thread's paused run, or start one."""
+        paused = await workspace.runs(thread_id=thread_id, status="paused")
+        if paused:
+            return await self._reply(workspace, paused[-1], content)
+        return await self._start(
+            workspace, thread_id, new_run_id(), prompt=content, trigger="message", watch_after=seq
+        )
+
     async def _reply(self, workspace: Workspace, run: Run, content: str) -> RunHandle | None:
         for request in run.pending:
             if request.tool_call_id in run.answers:
@@ -375,10 +391,13 @@ class Runner[AppDepsT]:
         watch_after: int | None,
         deferred: DeferredToolResults | None = None,
     ) -> RunHandle | None:
+        # Each segment of a run claims the thread anew, so a run resuming cannot renew the claim
+        # its pausing segment still holds.
+        holder = f"{run_id}:{new_id('claim')}"
         async with contextlib.AsyncExitStack() as stack:
             try:
                 lost = await stack.enter_async_context(
-                    workspace.claim_thread(thread_id, holder=run_id, ttl=self._claim_ttl)
+                    workspace.claim_thread(thread_id, holder=holder, ttl=self._claim_ttl)
                 )
             except ThreadBusy:
                 return None
@@ -400,7 +419,7 @@ class Runner[AppDepsT]:
         task = asyncio.create_task(self._run(claim, lost, session, prompt, deferred, caller))
         handle = RunHandle(run_id=run_id, thread_id=thread_id, task=task)
         self._runs[run_id] = handle
-        task.add_done_callback(lambda done: self._finished(run_id, done))
+        task.add_done_callback(lambda _: self._finished(handle))
         return handle
 
     async def _run(
@@ -412,16 +431,59 @@ class Runner[AppDepsT]:
         deferred: DeferredToolResults | None,
         caller: SpanContext,
     ) -> AgentRunResult[Any]:
-        async with claim:
-            run = asyncio.current_task()
-            assert run is not None, "a run is a task"
-            stopping = asyncio.create_task(_cancel_when_lost(lost, run))
-            try:
-                return await self._turn(session, prompt, deferred, caller)
-            finally:
-                self.live.close(session.run_id)
-                stopping.cancel()
-                await asyncio.gather(stopping, return_exceptions=True)
+        run = asyncio.current_task()
+        assert run is not None, "a run is a task"
+        try:
+            async with claim:
+                stopping = asyncio.create_task(_cancel_when_lost(lost, run))
+                try:
+                    return await self._turn(session, prompt, deferred, caller)
+                finally:
+                    self.live.close(session.run_id)
+                    stopping.cancel()
+                    await asyncio.gather(stopping, return_exceptions=True)
+        finally:
+            if not run.cancelling():  # a run that is stopped carries out nothing more
+                await self._missed(session)
+
+    async def _missed(self, session: Session[AppDepsT]) -> None:
+        """Carry out what was sent to a run too late for it, now that its thread is free.
+
+        A message or an answer that finds its thread claimed is left to the run that holds the
+        claim. The run's watcher delivers messages until the agent's run is over, but the run
+        holds the claim until it has recorded its end (ADR-0020). What was sent in between,
+        after :attr:`Session.delivered`, is carried out here, in order and as if it had just
+        been sent, until something starts or resumes a run: a message starts one, or answers
+        the thread's paused run, and an answer resumes its run once every request is answered.
+
+        A failure is logged, not raised: the run has ended, and keeps its result.
+        """
+        workspace = session.workspace
+        try:
+            missed = await workspace.read(
+                after_seq=session.delivered.seq, threads={session.thread_id}
+            )
+            for envelope in missed:
+                sender = workspace.as_actor(envelope.actor)
+                with continued(envelope.traceparent):
+                    match envelope.event:
+                        case MessagePosted(kind="message") as posted if not same_participant(
+                            envelope.actor, workspace.actor
+                        ):
+                            run = await self._act(
+                                sender, posted.thread_id, posted.content, envelope.seq
+                            )
+                        case DeferredAnswered() as answered:
+                            run = await self.resume(sender, answered.run_id)
+                        case _:
+                            continue
+                if run is not None:
+                    return
+        except Exception:
+            logger.exception(
+                "carrying out what was sent as run %s ended failed; it is left undone",
+                session.run_id,
+            )
 
     async def _turn(
         self,
@@ -497,10 +559,11 @@ class Runner[AppDepsT]:
             except Exception as error:
                 span.record_exception(error)
 
-    def _finished(self, run_id: RunId, task: "asyncio.Task[AgentRunResult[Any]]") -> None:
-        self._runs.pop(run_id, None)
-        if not task.cancelled():
-            task.exception()  # the capability recorded any failure; mark it retrieved
+    def _finished(self, handle: RunHandle) -> None:
+        if self._runs.get(handle.run_id) is handle:  # not if the run resumed in a new task
+            del self._runs[handle.run_id]
+        if not handle.task.cancelled():
+            handle.task.exception()  # the capability recorded any failure; mark it retrieved
 
 
 async def _abandon(workspace: Workspace, thread_id: ThreadId) -> None:

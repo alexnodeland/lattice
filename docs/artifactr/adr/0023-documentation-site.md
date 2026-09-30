@@ -1,6 +1,6 @@
 # ADR-0023: The documentation site
 
-**Status:** Accepted, amended by [0026](0026-publishing-the-documentation-site.md) and [0050](0050-one-docs-build.md)
+**Status:** Accepted, amended by [0026](0026-publishing-the-documentation-site.md), [0050](0050-one-docs-build.md) and [0053](0053-one-site-for-the-family.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

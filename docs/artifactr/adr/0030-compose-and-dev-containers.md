@@ -1,6 +1,6 @@
 # ADR-0030: Contributor Compose and dev containers here, infrastructure in stackr
 
-**Status:** Accepted
+**Status:** Accepted; partly superseded by [lattice ADR-0009](../../adr/0009-one-dev-container-at-the-root.md) and [ADR-0054](0054-stackr-in-lattice-and-dashboards-from-the-checkout.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

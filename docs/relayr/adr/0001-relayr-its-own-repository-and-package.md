@@ -1,6 +1,6 @@
 # ADR-0001: relayr, its own repository and package
 
-**Status:** Accepted
+**Status:** Accepted; partly superseded by [ADR-0013](0013-relayr-in-lattice.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 

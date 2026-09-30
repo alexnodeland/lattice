@@ -1,6 +1,6 @@
 # ADR-0046: One docs build
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0049](0049-one-site-for-the-family.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 

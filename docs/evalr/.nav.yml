@@ -46,6 +46,8 @@ nav:
     - adr/0011-scores-shared-with-the-libraries.md
     - adr/0012-langfuse-score-adapters-in-evalr.md
     - adr/0013-docstrings-in-markdown-and-one-docs-build.md
+    - adr/0014-evalr-in-lattice.md
+    - adr/0015-one-site-for-the-family.md
     - adr/template.md
   - RFCs:
     - rfcs/README.md

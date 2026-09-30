@@ -1,6 +1,6 @@
 # ADR-0011: The application template, in detail
 
-**Status:** Accepted; partly superseded by [ADR-0013](0013-how-the-template-pins-the-libraries.md)
+**Status:** Accepted; partly superseded by [ADR-0013](0013-how-the-template-pins-the-libraries.md) and [ADR-0015](0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 
@@ -103,5 +103,3 @@ The maintainer decided to keep the libraries on GitHub rather than publish them 
 
 - **The reactor stops first, and never in the middle of a transaction.** `Automation.lifespan` runs reflexr's `reactor.serve(stop=, grace=)` ([reflexr#69](https://github.com/alexnodeland/reflexr/pull/69)) and, at shutdown, sets the event and awaits it before the feedback mirrors, the MCP server and the database close. Cancelling the reactor's task, as the template did, could land in a transaction and leave SQLite locked, which it caught and logged ([#17](https://github.com/alexnodeland/stackr/pull/17)).
 - **The shutdown fits the stop period.** The server lets open requests finish for `DRAIN` (2 seconds, `app.py`), then the reactor gives running actions `STOP_GRACE` (5 seconds, `automation.py`); both, with the rest of the shutdown, end within the app profile's `stop_grace_period`, Docker's 10 seconds, which its compose file states.
-
-The reflexr-only variant keeps a local streaming `function_model` for its tests, and types its MCP resolver with `Context[Any, Request]`, until reflexr has its own ([reflexr#77](https://github.com/alexnodeland/reflexr/issues/77), [reflexr#78](https://github.com/alexnodeland/reflexr/issues/78)).

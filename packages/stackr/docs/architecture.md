@@ -194,7 +194,7 @@ The `supabase/` directory is a Supabase CLI project, close to what `supabase ini
 
 ## The application template
 
-A Copier template generates an application on artifactr, reflexr or both, wired to the stack's ports only ([ADR-0004](adr/0004-the-application-template.md), [ADR-0011](adr/0011-the-application-template-in-detail.md)). Its questions are in `copier.yml` at the repository's root, and its files in `template/`:
+A Copier template generates an application on artifactr, reflexr or both, wired to the stack's ports only ([ADR-0004](adr/0004-the-application-template.md), [ADR-0011](adr/0011-the-application-template-in-detail.md), [ADR-0015](adr/0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md)). Its questions are in `copier.yml` at the repository's root, and its files in `template/`:
 
 ```bash
 uvx copier copy gh:alexnodeland/stackr my-app    # or a path to a clone of stackr
@@ -209,12 +209,12 @@ A generated application:
 | Part | Where | What |
 |---|---|---|
 | Surfaces | `app.py`, `collaboration.py`, `automation.py` | FastAPI with each library's REST and WebSocket routes and MCP server under its name: `/artifactr/v1`, `/artifactr/mcp/`, `/reflexr/v1`, `/reflexr/mcp/`; the reactor runs while the application is up, and stops gracefully with it, within the app profile's stop period |
-| Examples | `notes.py`, `tickets.py` | A `note` artifact type, its agent and a `rating` of turns; `ticket.opened` and `ticket.triaged` events, a `triage` rule, its agent, and a `triage-review` of runs |
+| Examples | `notes.py`, `tickets.py` | A `note` artifact type, its agent and a `rating` of turns; `ticket.opened` and `ticket.triaged` events, a `triage` rule, its agent, and a `triage-review` of runs, reflexr's names qualified with the application's namespace, its package's name |
 | Identity | `auth.py` | Supabase's access tokens, verified against its published keys (`AUTH_JWKS_URL`), or with a legacy HS256 secret (`AUTH_JWT_SECRET`); the user is `sub`, the tenant `app_metadata.tenant_id`; anything else is 401, the MCP servers included |
 | Database | `database.py` | The libraries' SQL storage on `DATABASE_URL`, migrated at startup, in a schema of the application's own (`DATABASE_SCHEMA`), since Supabase's Data API serves `public` |
-| Telemetry | `telemetry.py` | `configure_telemetry`, when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; Langfuse's client, when `LANGFUSE_PUBLIC_KEY` is set, for trace attributes and scores, while traces reach Langfuse through the Collector |
+| Telemetry | `telemetry.py` | `configure_telemetry`, once for both libraries, when `OTEL_EXPORTER_OTLP_ENDPOINT` is set: FastAPI, SQLAlchemy and httpx traced, the libraries' polling untraced; Langfuse's client, when `LANGFUSE_PUBLIC_KEY` is set, for trace attributes and scores only, while traces reach Langfuse through the Collector |
 | Gateway | `gateway.py` | Agents on `litellm_model("default")` with `LiteLLMGateway`: each request with its tenant's key and the `pii-mask` and `prompt-injection` guardrails |
-| Feedback | `scores.py` | A `FeedbackMirror` to Langfuse scores for each workspace the application uses, a score per field by evalr's score mapping, and the score configs, created at startup |
+| Feedback | `scores.py` | A `FeedbackMirror` to Langfuse scores for each workspace the application uses, a score per field by evalr's score mapping, carrying on after its cursor when the application restarts, and the score configs, created at startup |
 | Evals | `evals/` | The agents on a few examples, judged by evaluators of the feedback types: offline with a scripted model (`make evals`), or in Langfuse with the gateway's model (`make evals-langfuse`) |
 | Quality gates | `pyproject.toml`, `Makefile`, `.github/workflows/ci.yml`, `.pre-commit-config.yaml` | uv, ruff, pyright in strict mode, pytest with warnings as errors and 100% branch coverage, Conventional Commits; tests need no network or stack |
 | The `app` profile | `compose.yaml`, `Dockerfile`, `.env.example`, `stackr.env` | The application beside the stack (`make up`), on the `stackr` network and local Supabase's, where it reaches the stack's services by name, at the addresses in `stackr.env` |

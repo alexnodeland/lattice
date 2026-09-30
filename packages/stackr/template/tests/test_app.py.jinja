@@ -16,12 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 import {{ package_name }}.app
 import {{ package_name }}.telemetry
-from conftest import Script, app, bearer, settings
+from conftest import {% if use_reflexr %}TRIAGE, TRIAGED, {% endif %}Script, app, bearer, settings
 from {{ package_name }}.app import DRAIN
 from {{ package_name }}.database import create_schema, open_database
 from {{ package_name }}.gateway import Guardrails, TenantKeys, gateway_model
 from {{ package_name }}.settings import GatewaySettings, Settings
-from {{ package_name }}.telemetry import configure, through_the_collector
+from {{ package_name }}.telemetry import configure
 
 
 def test_the_root_describes_the_surfaces(client: TestClient) -> None:
@@ -79,9 +79,9 @@ def test_workspaces_can_live_in_a_database(script: Script, tmp_path: Path) -> No
 {%- if use_reflexr %}
             base = "/reflexr/v1/workspaces/main"
             if restart == 0:
-                event = {"type": "ticket.triaged", "priority": "low", "summary": "kept"}
+                event = {"type": TRIAGED, "priority": "low", "summary": "kept"}
                 assert client.post(f"{base}/events", json={"event": event}).status_code == 200
-            [kept] = client.get(f"{base}/events", params={"type": "ticket.triaged"}).json()
+            [kept] = client.get(f"{base}/events", params={"type": TRIAGED}).json()
             assert kept["event"]["summary"] == "kept", "a restarted app finds it"
 {%- endif %}
 
@@ -129,28 +129,29 @@ async def test_tenants_use_their_keys_and_the_same_guardrails() -> None:
     assert await guardrails.for_workspace("acme", "main") == ("pii-mask",)
 {%- endif %}
 {%- if use_reflexr %}
-    assert await guardrails.for_rule("acme", "main", "triage") == ("pii-mask",)
+    assert await guardrails.for_rule("acme", "main", TRIAGE) == ("pii-mask",)
 {%- endif %}
 
 
 def test_telemetry_is_configured_only_with_an_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
-    configured: list[dict[str, Any]] = []
+    configured: list[tuple[list[str], dict[str, Any]]] = []
 
-    def configure_telemetry(**options: Any) -> None:
-        configured.append(options)
+    def record(*contributions: Any, **options: Any) -> None:
+        configured.append(([contribution.name for contribution in contributions], options))
 
-    monkeypatch.setattr({{ package_name }}.telemetry, "configure_telemetry", configure_telemetry)
+    monkeypatch.setattr({{ package_name }}.telemetry, "configure_telemetry", record)
     assert configure(Settings()) is None
-    configure(Settings(telemetry=True, langfuse=True, environment="staging"))
-    [options] = configured
-    assert (options["service_name"], options["environment"]) == ("{{ project_slug }}", "staging")
-    assert options["langfuse"] is True
-    assert options["instrument"] == ("fastapi", "httpx")
-    assert options["langfuse_options"] == {"should_export_span": through_the_collector}
-    assert through_the_collector(cast(Any, None)) is False
+    configure(Settings(telemetry=True, environment="staging"))
+    configure(Settings(telemetry=True, langfuse=True))
+    [(contributions, options), (_, with_langfuse)] = configured
+    assert contributions == [{% if libraries == 'both' %}"reflexr"{% endif %}]
+    assert options["service_name"] == "{{ project_slug }}"
+    assert options["environment"] == "staging"
+    # Langfuse gets scores only: stackr's Collector sends it the traces.
+    assert (options["langfuse"], with_langfuse["langfuse"]) == (None, "scores")
 
 
-def test_main_serves_with_telemetry(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_serves_with_telemetry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     served: dict[str, Any] = {}
     shut_down: list[bool] = []
 
@@ -161,7 +162,10 @@ def test_main_serves_with_telemetry(monkeypatch: pytest.MonkeyPatch) -> None:
             return Instrumentation(settings=InstrumentationSettings())
 
         def instrument_app(self, app: object) -> None:
-            served["instrumented"] = True
+            served["app"] = "instrumented"
+
+        def instrument_engine(self, engine: AsyncEngine) -> None:
+            served["engine"] = "instrumented"
 
         def shutdown(self) -> None:
             shut_down.append(True)
@@ -171,9 +175,11 @@ def test_main_serves_with_telemetry(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AUTH_JWT_SECRET", "secret")
     monkeypatch.setenv("APP_HOST", "127.0.0.1")
     monkeypatch.setenv("APP_PORT", "9000")
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path / 'app.db'}")
     {{ package_name }}.app.main()
     assert served == {
-        "instrumented": True,
+        "app": "instrumented",
+        "engine": "instrumented",
         "host": "127.0.0.1",
         "port": 9000,
         "timeout_graceful_shutdown": DRAIN,

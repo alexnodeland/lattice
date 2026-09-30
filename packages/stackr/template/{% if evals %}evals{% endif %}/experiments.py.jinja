@@ -26,7 +26,7 @@ from langfuse import Langfuse
 from pydantic import BaseModel
 from pydantic_ai import ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models import Model
-from pydantic_ai.models.function import AgentInfo{% if not use_artifactr %}, FunctionModel{% endif %}
+from pydantic_ai.models.function import AgentInfo
 
 {% if use_artifactr -%}
 from artifactr import InMemoryStorage, Runner, UserActor, Workspaces
@@ -38,6 +38,9 @@ from evalr.core import Task
 from evalr.langfuse import LangfuseExperimentTracker
 from evalr.memory import InMemoryExperimentTracker
 {%- if use_reflexr %}
+{%- if not use_artifactr %}
+from reflexr.agent import function_model
+{%- endif %}
 from reflexr.core import Event
 from reflexr.evals import Replay, replay_task
 {%- endif %}
@@ -209,12 +212,8 @@ def scripted() -> Model:
 
     def answer(_messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
         return ModelResponse(parts=[TextPart("Done: a short, scripted answer.")])
-{% if use_artifactr %}
-    # artifactr's runner streams every run, and function_model streams the answer.
+
     return function_model(answer)
-{%- else %}
-    return FunctionModel(answer)
-{%- endif %}
 
 
 async def run(tracker: ExperimentTracker, model: Model) -> list[ExperimentResult[Any]]:

@@ -2,28 +2,26 @@
 
 Telemetry is on when ``OTEL_EXPORTER_OTLP_ENDPOINT`` is set (stackr's Collector takes OTLP over
 HTTP on port 4318), so the application and its tests run without the stack. Langfuse is on
-when ``LANGFUSE_PUBLIC_KEY`` is set too.{% if libraries == 'both' %} artifactr's ``configure_telemetry`` sets up the
-one handle both libraries use.{% endif %}
+when ``LANGFUSE_PUBLIC_KEY`` is set too.
 
-Traces reach Langfuse through the Collector, which sends it every trace (stackr's ADR-0007), so
-the Langfuse client exports no spans of its own; it still sets each turn's and run's session,
-user and tags on the spans, and sends feedback as scores.
+``configure_telemetry`` instruments what the libraries advise: FastAPI, SQLAlchemy and httpx.
+The libraries poll their storage untraced, so an idle application exports no spans, and a
+turn's or run's trace shows its queries. Instrumentation reaches only what is created after it,
+so ``create_app`` instruments the application and its database engine itself.
 
-FastAPI and HTTP clients are instrumented, the database driver is not: the libraries poll their
-storage (the reactor, subscriptions, the feedback mirrors), and each poll's queries would be a
-trace of its own, many a second. The libraries' own spans still time their commits and runs.
+stackr's Collector sends Langfuse every trace (its ADR-0007), so the application sends Langfuse
+only scores: the Langfuse client sets each turn's and run's session, user and tags on the spans,
+and records feedback as scores, but exports no spans of its own.
 """
 
 from importlib.metadata import version
 
-from opentelemetry.sdk.trace import ReadableSpan
-
-from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.otel import Instrumented, TelemetryHandle, configure_telemetry
+{% if libraries == 'both' -%}
+import reflexr.otel
+{% endif -%}
+from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.otel import TelemetryHandle, configure_telemetry
 
 from {{ package_name }}.settings import Settings
-
-INSTRUMENTED: tuple[Instrumented, ...] = ("fastapi", "httpx")
-"""The libraries the application's telemetry instruments."""
 
 
 def configure(settings: Settings) -> TelemetryHandle | None:
@@ -31,16 +29,11 @@ def configure(settings: Settings) -> TelemetryHandle | None:
     if not settings.telemetry:
         return None
     return configure_telemetry(
+{%- if libraries == 'both' %}
+        reflexr.otel.telemetry(),
+{%- endif %}
         service_name=settings.service_name,
         service_version=version("{{ project_slug }}"),
         environment=settings.environment,
-        instrument=INSTRUMENTED,
-        langfuse=settings.langfuse,
-        langfuse_options={"should_export_span": through_the_collector},
+        langfuse="scores" if settings.langfuse else None,
     )
-
-
-def through_the_collector(span: ReadableSpan) -> bool:
-    """Langfuse's span filter: none, since the Collector sends Langfuse every trace."""
-    del span
-    return False

@@ -37,8 +37,8 @@ The libraries aren't on PyPI yet, so the application template pins artifactr and
 
 | Library | Commit the template pins |
 |---|---|
-| artifactr | `6ec0bcebfb0b74088976da08a3632018f35b7f68` |
-| reflexr | `2f28e23d3ca1451d2d76fbf149b49f4363524f19` |
+| artifactr | `1a635ecb9800c2e414221e7293e8a2de2fdb600c` |
+| reflexr | `dc2d05916cd6d1bf36b7c2b26e29663dfdddc338` |
 
 <!-- end generated -->
 

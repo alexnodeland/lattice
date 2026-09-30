@@ -9,22 +9,21 @@ import asyncio
 import contextlib
 from collections.abc import AsyncGenerator
 from datetime import timedelta
-from typing import Any
 
 from fastapi import FastAPI
-from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.models import Model
 from sqlalchemy.ext.asyncio import AsyncEngine
-from starlette.requests import HTTPConnection, Request
+from starlette.requests import HTTPConnection
 
+from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
 from reflexr import Actor, ExternalAgentActor, SystemActor, UserActor
 from reflexr.core import TenantId
 from reflexr.fastapi import Unauthorized, reflexr_router
-from reflexr.langfuse import LangfuseScoreConfigs, LangfuseScores, langfuse_run
+from reflexr.langfuse import langfuse_run
 from reflexr.litellm import LiteLLMGateway
-from reflexr.mcp import ReflexrMcp
+from reflexr.mcp import McpContext, ReflexrMcp
 from reflexr.scores import FeedbackMirror, sync_score_configs
 from reflexr.sql import SqlStorage, migrate
 from reflexr.workspace import InMemoryStorage, Reaction, Reactor, Workspaces
@@ -102,16 +101,19 @@ class Automation:
             actions={"triage": triage_action(agent)},
             run_context=langfuse_run if langfuse else None,
         )
-        self.mcp = ReflexrMcp(self.workspaces, resolve=self._resolve_client, name=name)
         self._mirrors: Mirrors | None = None
         if langfuse is not None:
-            scores = LangfuseScores(langfuse)
+            sink = LangfuseScoreSink(langfuse)
 
             async def follow(tenant_id: str, workspace_id: str) -> None:
                 workspace = await self.workspaces.open(tenant_id, workspace_id, actor=SystemActor())
-                await FeedbackMirror(workspace, scores).follow()
+                await FeedbackMirror(workspace, sink, cursor="langfuse").follow()
 
             self._mirrors = Mirrors(follow)
+        self._authorize = self._mirrors.authorize if self._mirrors else None
+        self.mcp = ReflexrMcp(
+            self.workspaces, resolve=self._resolve_client, authorize=self._authorize, name=name
+        )
 
     async def migrate(self, engine: AsyncEngine) -> None:
         """Upgrade the database to reflexr's schema."""
@@ -121,31 +123,32 @@ class Automation:
     async def lifespan(self) -> AsyncGenerator[None]:
         """Run the MCP server and the reactor; with Langfuse, create score configs and mirror.
 
-        At shutdown the reactor stops first, never in the middle of a transaction: running
-        actions have ``grace`` to end, and those it then cancels are retried later.
+        At shutdown the MCP server stops first, then the reactor, never in the middle of a
+        transaction: running actions have ``grace`` to end, and those it then cancels are
+        retried later. Both stop before the database closes.
         """
-        async with self.mcp.lifespan():
-            if self._langfuse is not None:
-                configs = LangfuseScoreConfigs(self._langfuse)
-                await sync_configs(sync_score_configs(configs, [TriageReview]))
-            stop = asyncio.Event()
-            serving = asyncio.create_task(
-                self.reactor.serve(poll_interval=self._poll_interval, stop=stop, grace=self._grace)
-            )
-            try:
+        if self._langfuse is not None:
+            configs = LangfuseScoreConfigStore(self._langfuse)
+            await sync_configs(sync_score_configs(configs, [TriageReview]))
+        stop = asyncio.Event()
+        serving = asyncio.create_task(
+            self.reactor.serve(poll_interval=self._poll_interval, stop=stop, grace=self._grace)
+        )
+        try:
+            async with self.mcp.lifespan():
                 yield
-            finally:
-                stop.set()  # let running actions end, then let go of every lease
-                await serving
-                if self._mirrors is not None:
-                    await self._mirrors.aclose()
+        finally:
+            stop.set()  # let running actions end, then let go of every lease
+            await serving
+            if self._mirrors is not None:
+                await self._mirrors.aclose()
 
     def mount(self, app: FastAPI) -> None:
         """Add the REST and WebSocket routes and the MCP server to the application."""
         router = reflexr_router(
             self.workspaces,
             resolve_actor=self._resolve_actor,
-            authorize=self._mirrors.authorize if self._mirrors else None,
+            authorize=self._authorize,
         )
         app.include_router(router, prefix=f"{PREFIX}/v1")
         mcp = self.mcp.http_app(streamable_http_path="/")
@@ -158,10 +161,7 @@ class Automation:
             raise Unauthorized(str(error)) from error
         return principal.tenant_id, UserActor(id=principal.user_id, name=principal.name)
 
-    async def _resolve_client(
-        self, ctx: Context[Any, Request]
-    ) -> tuple[TenantId, ExternalAgentActor]:
-        # reflexr types the request as Any; over HTTP it is Starlette's (reflexr#78).
+    async def _resolve_client(self, ctx: McpContext) -> tuple[TenantId, ExternalAgentActor]:
         request = ctx.request_context.request  # None for a client in process, without a token
         if request is None:
             raise ToolError("connect over HTTP")

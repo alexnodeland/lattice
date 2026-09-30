@@ -20,8 +20,9 @@ type Follow = Callable[[str, str], Coroutine[Any, Any, None]]
 class Mirrors:
     """Mirrors the feedback of each workspace the application uses.
 
-    Each mirror reads its workspace's log from the start, so a restarted application catches
-    up; score ids are derived from the feedback, so Langfuse replaces scores it already has.
+    Each mirror saves a cursor in its workspace as it goes, and a restarted application's
+    mirror carries on after it. Score ids are derived from the feedback, so Langfuse replaces a
+    score it is sent again.
 
     Args:
         follow: Mirrors one workspace: a library's ``FeedbackMirror(...).follow()``.

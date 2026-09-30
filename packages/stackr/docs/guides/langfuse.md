@@ -39,7 +39,7 @@ otlp_http/langfuse:
 
 - **The credentials** are the project's keys as HTTP Basic, `LANGFUSE_OTLP_AUTH`, which `make env` derives from `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` on every run, so it always follows them.
 - **Only when the profile runs.** `make up` adds this exporter to the traces pipeline only with the `langfuse` profile, and Langfuse receives traces only when `observability` runs too.
-- **Never directly.** Langfuse's own client in an application exports no spans of its own: every trace takes the one route, so none arrives twice ([ADR-0011](../adr/0011-the-application-template-in-detail.md)).
+- **Never directly.** Langfuse's own client in an application exports no spans of its own: every trace takes the one route, so none arrives twice ([ADR-0011](../adr/0011-the-application-template-in-detail.md), [ADR-0015](../adr/0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md)).
 
 ### Events-only mode, and the ingestion header
 

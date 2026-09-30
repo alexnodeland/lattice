@@ -15,7 +15,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.otel import TelemetryHandle, configure_telemetry
 
-from conftest import TENANT, Script, app, bearer, say, wait_for
+from conftest import {% if use_reflexr %}OPENED, {% endif %}TENANT, Script, app, bearer, say, wait_for
 from {{ package_name }}.scores import Mirrors, sync_configs
 
 
@@ -55,13 +55,12 @@ def telemetry(langfuse: FakeLangfuse) -> Iterator[TelemetryHandle]:
         set_global=False,
         span_exporter=InMemorySpanExporter(),
         metric_reader=InMemoryMetricReader(),
-        langfuse=True,
+        langfuse="scores",
         langfuse_options={
             "public_key": f"pk-lf-{uuid.uuid4()}",
             "secret_key": "sk-lf-test",
             "base_url": "http://langfuse.test",
             "httpx_client": httpx.Client(transport=httpx.MockTransport(langfuse.handle)),
-            "span_exporter": InMemorySpanExporter(),
         },
     )
     yield handle
@@ -106,7 +105,7 @@ def test_feedback_becomes_scores_on_the_traces_it_is_about(
 {%- if use_reflexr %}
         events = "/reflexr/v1/workspaces/main"
         script.steps += [say("Low: a question about invoices.")]
-        opened = {"type": "ticket.opened", "subject": "Invoices", "body": "Where are they?"}
+        opened = {"type": OPENED, "subject": "Invoices", "body": "Where are they?"}
         client.post(f"{events}/events", json={"event": opened})
         wait_for(lambda: [r["status"] for r in client.get(f"{events}/runs").json()] != [])
         wait_for(lambda: client.get(f"{events}/runs").json()[0]["status"] == "succeeded")

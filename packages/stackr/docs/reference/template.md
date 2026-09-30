@@ -28,8 +28,8 @@ These are computed from the answers, or fixed by the template, as the libraries'
 
 | Value | Type | Derived as |
 |---|---|---|
-| `artifactr_rev` | str | `6ec0bcebfb0b74088976da08a3632018f35b7f68` |
-| `reflexr_rev` | str | `2f28e23d3ca1451d2d76fbf149b49f4363524f19` |
+| `artifactr_rev` | str | `1a635ecb9800c2e414221e7293e8a2de2fdb600c` |
+| `reflexr_rev` | str | `dc2d05916cd6d1bf36b7c2b26e29663dfdddc338` |
 | `package_name` | str | `{{ project_slug | replace('-', '_') }}` |
 | `use_artifactr` | bool | `{{ libraries in ['artifactr', 'both'] }}` |
 | `use_reflexr` | bool | `{{ libraries in ['reflexr', 'both'] }}` |

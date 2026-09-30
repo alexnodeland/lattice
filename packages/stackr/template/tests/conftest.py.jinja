@@ -8,7 +8,7 @@ next step; workspaces live in memory, or in SQLite.
 import asyncio
 import socket
 import time
-from collections.abc import AsyncIterator, {% if not use_artifactr %}Awaitable, {% endif %}Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 {%- if use_reflexr %}
 from datetime import timedelta
 {%- endif %}
@@ -20,13 +20,9 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic_ai import ModelMessage, ModelResponse, TextPart, ToolCallPart
-{%- if use_artifactr %}
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from artifactr.agent import function_model
-{%- else %}
-from pydantic_ai.models.function import AgentInfo, DeltaToolCall, FunctionModel
-{%- endif %}
+from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.agent import function_model
 
 from {{ package_name }}.app import create_app
 from {{ package_name }}.settings import AuthSettings, GatewaySettings, Settings
@@ -34,6 +30,13 @@ from {{ package_name }}.settings import AuthSettings, GatewaySettings, Settings
 SECRET = "a-secret-for-the-tests-at-least-32-characters-long"
 TENANT = "acme"
 TENANT_KEY = "sk-acme-key"
+{%- if use_reflexr %}
+
+# reflexr's names are qualified with the application's namespace.
+OPENED = "{{ package_name }}:ticket.opened"
+TRIAGED = "{{ package_name }}:ticket.triaged"
+TRIAGE = "{{ package_name }}:triage"
+{%- endif %}
 
 
 def token(
@@ -71,30 +74,6 @@ def say(text: str) -> ModelResponse:
 def call(tool: str, **args: Any) -> ModelResponse:
     """A step that calls one tool."""
     return ModelResponse(parts=[ToolCallPart(tool_name=tool, args=args)])
-
-
-{%- if not use_artifactr %}
-
-
-def function_model(
-    respond: Callable[[list[ModelMessage], AgentInfo], Awaitable[ModelResponse]],
-) -> FunctionModel:
-    """A model that answers each request with ``respond``, streamed when a request streams.
-
-    reflexr has no scripted model that streams yet (reflexr#77).
-    """
-
-    async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[Any]:
-        for index, part in enumerate((await respond(messages, info)).parts):
-            if isinstance(part, TextPart):
-                yield part.content
-            else:
-                assert isinstance(part, ToolCallPart)
-                args = part.args_as_json_str()
-                yield {index: DeltaToolCall(part.tool_name, args, tool_call_id=part.tool_call_id)}
-
-    return FunctionModel(respond, stream_function=stream)
-{%- endif %}
 
 
 class Script:

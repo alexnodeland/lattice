@@ -289,6 +289,8 @@ smoke_langfuse() {
 # --- app: an application from the template, in its app profile ----------------
 
 app_name=stackr-smoke-app
+# Its package: the name of its database schema and of its reflexr namespace.
+app_package=${app_name//-/_}
 app_port=${SMOKE_APP_PORT:-8800}
 app_url="http://127.0.0.1:$app_port"
 
@@ -325,7 +327,7 @@ cleanup_app() {
   fi
   # The application's tables, in its own schema on local Supabase's PostgreSQL.
   docker compose run --rm --no-deps -T db-init psql --no-psqlrc -qc \
-    "DROP SCHEMA IF EXISTS stackr_smoke_app CASCADE" >/dev/null 2>&1 || true
+    "DROP SCHEMA IF EXISTS $app_package CASCADE" >/dev/null 2>&1 || true
 }
 
 artifactr_turn_trace() {
@@ -425,7 +427,7 @@ ENV
   app_json "/artifactr/v1/workspaces/$run_id/commands" \
     '{"type": "command", "command_id": "c2", "command": {"type": "post_message", "thread_id": "t1", "content": "Say hello."}}'
   app_json "/reflexr/v1/workspaces/$run_id/events" \
-    '{"event": {"type": "ticket.opened", "subject": "Smoke", "body": "Is the smoke test passing?"}}'
+    "{\"event\": {\"type\": \"$app_package:ticket.opened\", \"subject\": \"Smoke\", \"body\": \"Is the smoke test passing?\"}}"
 
   local agent
   for agent in artifactr reflexr; do

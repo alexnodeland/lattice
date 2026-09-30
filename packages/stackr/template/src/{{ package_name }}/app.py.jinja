@@ -82,7 +82,8 @@ def create_app(
         settings: The settings; read from the environment by default.
         model: The agents' model; the gateway's model group by default. Tests pass a scripted
             one.
-        telemetry: OpenTelemetry and Langfuse, as ``telemetry.configure`` sets them up.
+        telemetry: OpenTelemetry and Langfuse, as ``telemetry.configure`` sets them up; it
+            traces the application's requests and its database's queries.
 {%- if use_reflexr %}
         poll_interval: How often the reactor looks for work.
         grace: How long the reactor's running actions have to end when the application stops;
@@ -160,6 +161,8 @@ def create_app(
 
     if telemetry is not None:
         telemetry.instrument_app(app)
+        if engine is not None:
+            telemetry.instrument_engine(engine)
     return app
 
 

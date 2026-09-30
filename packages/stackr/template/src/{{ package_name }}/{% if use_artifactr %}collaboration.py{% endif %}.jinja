@@ -17,11 +17,12 @@ from starlette.requests import HTTPConnection
 from artifactr import InMemoryStorage, Runner, Session, SystemActor, UserActor, Workspaces
 from artifactr.core import Actor, ExternalAgentActor, TenantId
 from artifactr.fastapi import Unauthorized, artifactr_router
-from artifactr.langfuse import LangfuseScoreConfigs, LangfuseScores, langfuse_turn
+from artifactr.langfuse import langfuse_turn
 from artifactr.litellm import LiteLLMGateway
 from artifactr.mcp import ArtifactrMcp, McpContext
 from artifactr.scores import FeedbackMirror, sync_score_configs
 from artifactr.sql import SqlStorage, migrate
+from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
 
 from {{ package_name }}.auth import RequireToken, TokenVerifier, Unauthenticated
 from {{ package_name }}.gateway import Guardrails, TenantKeys
@@ -83,18 +84,23 @@ class Collaboration:
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,
         )
-        self.mcp = ArtifactrMcp(
-            self.workspaces, self.runner, resolve=self._resolve_client, name=name
-        )
         self._mirrors: Mirrors | None = None
         if langfuse is not None:
-            scores = LangfuseScores(langfuse)
+            sink = LangfuseScoreSink(langfuse)
 
             async def follow(tenant_id: str, workspace_id: str) -> None:
                 workspace = await self.workspaces.open(tenant_id, workspace_id, actor=SystemActor())
-                await FeedbackMirror(workspace, scores).follow()
+                await FeedbackMirror(workspace, sink, cursor="langfuse").follow()
 
             self._mirrors = Mirrors(follow)
+        self._authorize = self._mirrors.authorize if self._mirrors else None
+        self.mcp = ArtifactrMcp(
+            self.workspaces,
+            self.runner,
+            resolve=self._resolve_client,
+            authorize=self._authorize,
+            name=name,
+        )
         self._tracer_provider = tracer_provider
         self._meter_provider = meter_provider
 
@@ -104,16 +110,21 @@ class Collaboration:
 
     @contextlib.asynccontextmanager
     async def lifespan(self) -> AsyncGenerator[None]:
-        """Run the MCP server; with Langfuse, create the score configs and mirror feedback."""
-        async with self.mcp.lifespan():
-            if self._langfuse is not None:
-                configs = LangfuseScoreConfigs(self._langfuse)
-                await sync_configs(sync_score_configs(configs, [Rating]))
-            try:
+        """Run the MCP server; with Langfuse, create the score configs and mirror feedback.
+
+        At shutdown the MCP server stops first, then the runner stops the agent's runs still
+        going, each recording that it stopped, before the database closes.
+        """
+        if self._langfuse is not None:
+            configs = LangfuseScoreConfigStore(self._langfuse)
+            await sync_configs(sync_score_configs(configs, [Rating]))
+        try:
+            async with self.mcp.lifespan():
                 yield
-            finally:
-                if self._mirrors is not None:
-                    await self._mirrors.aclose()
+        finally:
+            await self.runner.aclose()
+            if self._mirrors is not None:
+                await self._mirrors.aclose()
 
     def mount(self, app: FastAPI) -> None:
         """Add the REST and WebSocket routes and the MCP server to the application."""
@@ -121,7 +132,7 @@ class Collaboration:
             self.workspaces,
             self.runner,
             resolve_actor=self._resolve_actor,
-            authorize=self._mirrors.authorize if self._mirrors else None,
+            authorize=self._authorize,
             tracer_provider=self._tracer_provider,
             meter_provider=self._meter_provider,
         )

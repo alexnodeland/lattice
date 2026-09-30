@@ -72,12 +72,12 @@ app_port:
 # main, and evalr comes with them (ADR-0013). The rest are derived from the answers.
 artifactr_rev:
   type: str
-  default: 6ec0bcebfb0b74088976da08a3632018f35b7f68
+  default: 1a635ecb9800c2e414221e7293e8a2de2fdb600c
   when: false
 
 reflexr_rev:
   type: str
-  default: 2f28e23d3ca1451d2d76fbf149b49f4363524f19
+  default: dc2d05916cd6d1bf36b7c2b26e29663dfdddc338
   when: false
 
 package_name:

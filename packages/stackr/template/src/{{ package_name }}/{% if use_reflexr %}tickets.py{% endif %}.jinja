@@ -3,6 +3,9 @@
 Replace them with the application's own. Producers publish events into a workspace; when a
 rule's condition holds, the reactor runs its action, here a pydantic-ai agent that reads the
 log and publishes what it decides.
+
+Every event type and rule is named in the application's namespace, its package's name:
+``{{ package_name }}:ticket.opened``, for one.
 """
 
 from collections.abc import Sequence
@@ -24,19 +27,23 @@ INSTRUCTIONS = """\
 You triage support tickets. A ticket was just opened.
 
 - Decide its priority: urgent if customers can't work, normal if they can, low otherwise.
-- Publish your decision with emit_event, as a ticket.triaged event with a one-line summary.
+- Publish your decision and a one-line summary with emit_event.
 - Answer with the summary.
 """
 
 
-class TicketOpened(Event, name="ticket.opened"):
+class AppEvent(Event, abstract=True, event_namespace="{{ package_name }}"):
+    """Every event of the application, in its namespace."""
+
+
+class TicketOpened(AppEvent, name="ticket.opened"):
     """A customer opened a support ticket."""
 
     subject: str
     body: str = ""
 
 
-class TicketTriaged(Event, name="ticket.triaged"):
+class TicketTriaged(AppEvent, name="ticket.triaged"):
     """The triage agent decided a ticket's priority."""
 
     priority: Priority
@@ -47,7 +54,7 @@ EVENTS: list[type[Event]] = [TicketOpened, TicketTriaged]
 """The event types the workspaces accept."""
 
 triage_rule = Rule(
-    name="triage",
+    name="{{ package_name }}:triage",
     description="A ticket was opened. Decide its priority and summarize it.",
     when=on(TicketOpened),
     then=run("triage"),

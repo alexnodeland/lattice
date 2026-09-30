@@ -17,6 +17,9 @@ uv run copier copy --quiet --defaults --vcs-ref HEAD \
   --data evals="${TEMPLATE_EVALS:-true}" \
   --data python_version="${TEMPLATE_PYTHON:-3.12}" \
   ../.. "$scratch/app"
+# The application is outside lattice, where a version manager's shim (proto's, in CI) finds no
+# .prototools to choose a uv by, so it runs the uv binary that runs here. uv run exports its path.
+PATH="$(dirname "$(uv run --no-project printenv UV)"):$PATH"
 cd "$scratch/app"
 uv sync --all-groups
 make check

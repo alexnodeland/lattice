@@ -357,6 +357,60 @@ async def test_i3_a_command_that_asked_before_its_holder_read_is_handed_over(
     assert script.conversation() == ["Also book", "Plan"], "handed over, not left for a command"
 
 
+@pytest.mark.parametrize("ends", ["fails", "is stopped"])
+async def test_i3_a_message_left_to_a_holder_that_never_starts_is_handed_over(
+    ws: Workspace, there: Workspace, thread: Thread, runners: MakeRunner, ends: str
+) -> None:
+    held = Gate()
+
+    @contextlib.asynccontextmanager
+    async def begins(session: Session[Any]) -> AsyncIterator[None]:
+        if not held.release.is_set():
+            await held.wait()
+            if ends == "fails":
+                raise RuntimeError("the tracing backend blinked")
+        yield
+
+    script = Script(*[say("ok")] * 3)
+    runner = runners(make_agent(script), turn_context=begins)
+    other = runners(make_agent(script))
+    first = started(await runner.send(ws, thread.id, "Plan the launch"))
+    await _entered(held)
+    bystander = await other.send(there.as_actor(BOB), thread.id, "Also book the big room")
+    assert bystander.run is None, "its holder hands the thread over"
+    if ends == "is stopped":
+        assert await runner.stop(first.run_id)
+    held.release.set()
+    await asyncio.gather(first.task, return_exceptions=True)
+    await settled(thread.id, runner, other)
+    assert script.conversation() == ["Plan the launch", "Also book the big room"]
+
+
+# ─── I4: nothing consumed before a turn starts ───────────────────────────────
+
+
+async def test_i4_a_turn_that_keeps_failing_before_it_starts_consumes_nothing(
+    storage: Storage, ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    turns = 0
+
+    @contextlib.asynccontextmanager
+    async def broken(session: Session[Any]) -> AsyncIterator[None]:
+        nonlocal turns
+        turns += 1
+        raise RuntimeError("the tracing backend is down")
+        yield
+
+    runner = runners(make_agent(Script()), turn_context=broken)
+    for sent, content in enumerate(["Plan the launch", "Anything else?"], start=1):
+        handle = started(await runner.send(ws, thread.id, content))
+        with pytest.raises(RuntimeError, match="down"):
+            await handle.wait()
+        await runner.drain()
+        assert (turns, runner.running(thread.id)) == (sent, None), "one turn per command"
+        assert await _taken(storage, thread) == 0, "nothing consumed"
+
+
 async def test_i4_a_claimant_that_fails_after_a_command_asked_leaves_it_to_the_next_command(
     storages: tuple[Storage, Storage],
     ws: Workspace,
@@ -428,58 +482,30 @@ async def test_i4_two_processes_whose_plans_fail_now_and_then_consume_each_messa
     assert sorted(recorder.prompts) == sorted([*(f"m{index}" for index in range(12)), "last"])
 
 
-@pytest.mark.parametrize("ends", ["fails", "is stopped"])
-async def test_i3_a_message_left_to_a_holder_that_never_starts_is_handed_over(
-    ws: Workspace, there: Workspace, thread: Thread, runners: MakeRunner, ends: str
-) -> None:
-    held = Gate()
-
-    @contextlib.asynccontextmanager
-    async def begins(session: Session[Any]) -> AsyncIterator[None]:
-        if not held.release.is_set():
-            await held.wait()
-            if ends == "fails":
-                raise RuntimeError("the tracing backend blinked")
-        yield
-
-    script = Script(*[say("ok")] * 3)
-    runner = runners(make_agent(script), turn_context=begins)
-    other = runners(make_agent(script))
-    first = started(await runner.send(ws, thread.id, "Plan the launch"))
-    await _entered(held)
-    bystander = await other.send(there.as_actor(BOB), thread.id, "Also book the big room")
-    assert bystander.run is None, "its holder hands the thread over"
-    if ends == "is stopped":
-        assert await runner.stop(first.run_id)
-    held.release.set()
-    await asyncio.gather(first.task, return_exceptions=True)
-    await settled(thread.id, runner, other)
-    assert script.conversation() == ["Plan the launch", "Also book the big room"]
-
-
-# ─── I4: nothing consumed before a turn starts ───────────────────────────────
-
-
-async def test_i4_a_turn_that_keeps_failing_before_it_starts_consumes_nothing(
+async def test_i4_a_cancelled_error_no_one_asked_for_is_a_failure_and_never_spins(
     storage: Storage, ws: Workspace, thread: Thread, runners: MakeRunner
 ) -> None:
-    turns = 0
+    plans, runs = [0], storage.runs
 
-    @contextlib.asynccontextmanager
-    async def broken(session: Session[Any]) -> AsyncIterator[None]:
-        nonlocal turns
-        turns += 1
-        raise RuntimeError("the tracing backend is down")
-        yield
+    async def interrupted(*args: Any, **kwargs: Any) -> Any:
+        found = await runs(*args, **kwargs)
+        if kwargs.get("status") == "paused":
+            plans[0] += 1
+            if plans[0] <= 10:  # as a storage call's own cancellation surfaces; a spin ends
+                raise asyncio.CancelledError
+        return found
 
-    runner = runners(make_agent(Script()), turn_context=broken)
-    for sent, content in enumerate(["Plan the launch", "Anything else?"], start=1):
-        handle = started(await runner.send(ws, thread.id, content))
-        with pytest.raises(RuntimeError, match="down"):
-            await handle.wait()
-        await runner.drain()
-        assert (turns, runner.running(thread.id)) == (sent, None), "one turn per command"
-        assert await _taken(storage, thread) == 0, "nothing consumed"
+    storage.runs = interrupted
+    script = Script(*[say("ok")] * 3)
+    runner = runners(make_agent(script))
+    with pytest.raises(asyncio.CancelledError):
+        await runner.send(ws, thread.id, "Plan the launch")
+    await runner.drain()
+    assert plans[0] == 1, "no one cancelled it: it hands over only what was asked after"
+    storage.runs = runs
+    started(await runner.send(ws, thread.id, "Hello?"))
+    await settled(thread.id, runner)
+    assert script.conversation() == ["Plan the launch", "Hello?"]
 
 
 # ─── I5: a direct message, and a notice ──────────────────────────────────────

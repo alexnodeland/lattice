@@ -402,11 +402,13 @@ class Runner[AppDepsT]:
                 handle = await self._start(workspace, thread_id, caller)
             except ThreadBusy:
                 return None  # its holder hands the thread over as it releases it
-            except asyncio.CancelledError:  # the claim is released
-                self._hand_over(workspace, thread_id, taken=taken, asked=asked, cancelled=True)
-                raise
-            except Exception:  # as when storage fails: the claim is released
-                self._hand_over(workspace, thread_id, taken=taken, asked=asked, cancelled=False)
+            except (asyncio.CancelledError, Exception):  # the claim is released
+                # A CancelledError raised while no one cancels the claimant, as a storage call's
+                # own cancellation can be, is a failure like any other.
+                claimant = asyncio.current_task()
+                assert claimant is not None, "a claimant is a task"
+                cancelled = claimant.cancelling() > 0
+                self._hand_over(workspace, thread_id, taken=taken, asked=asked, cancelled=cancelled)
                 raise
             if handle is not None:
                 return handle
@@ -570,11 +572,12 @@ class Runner[AppDepsT]:
     ) -> None:
         """Take the thread's next turn, for what was asked and not taken, read after the release.
 
-        A claimant that was cancelled, or a run that was stopped, hands over whatever was asked
-        and not taken, since a command it refused may have asked before it read. One that
-        failed and took nothing hands over only what was asked after it read, so a failure that
-        persists makes one turn per new command. Neither can spin: only :meth:`aclose` cancels
-        a hand-over, and it closes the runner first.
+        A claimant whose task was cancelled, or a run that was stopped, hands over whatever was
+        asked and not taken, since a command it refused may have asked before it read. One that
+        failed and took nothing, even with a CancelledError no one asked for, hands over only
+        what was asked after it read, so a failure that persists makes one turn per new command.
+        Neither can spin: only :meth:`aclose` cancels a hand-over, and it closes the runner
+        first.
         """
         try:
             took = await _taken_seq(workspace, thread_id) > taken

@@ -26,6 +26,7 @@ jobs:
   release-please:
     name: Release pull request
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions: {}
     outputs:
       packages: ${{ steps.wheels.outputs.packages }}
@@ -55,6 +56,7 @@ jobs:
     needs: release-please
     if: needs.release-please.outputs.packages != '[]'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       attestations: write
       contents: write

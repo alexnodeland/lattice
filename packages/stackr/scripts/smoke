@@ -369,9 +369,11 @@ smoke_app() {
   app_dir="$(mktemp -d)/$app_name"
   trap cleanup_app EXIT
   log "app: generating $app_name from the template, and building it"
+  # uv locks the application from here, inside lattice, where a version manager's shim (proto's,
+  # in CI) finds the .prototools that chooses it.
   if ! uv run copier copy --quiet --defaults --vcs-ref HEAD --data project_name="stackr smoke app" \
     --data libraries=both --data evals=true ../.. "$app_dir" 2>/dev/null ||
-    ! (cd "$app_dir" && uv lock --quiet); then
+    ! uv lock --quiet --directory "$app_dir"; then
     log "FAIL: app: generating it from the template"
     return 1
   fi

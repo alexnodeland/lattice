@@ -1,8 +1,8 @@
 # Protocol JSON Schema
 
-[`schemas/artifactr.v1.json`](https://github.com/alexnodeland/artifactr/blob/main/schemas/artifactr.v1.json) is the JSON Schema of every frame in the [thread protocol](../protocol.md). Its two properties are `client`, any frame a client sends, and `server`, any frame a server sends; `$defs` holds every frame, command, event and live event they refer to.
+[`schemas/artifactr.v1.json`](https://github.com/alexnodeland/lattice/blob/main/packages/artifactr/schemas/artifactr.v1.json) is the JSON Schema of every frame in the [thread protocol](../protocol.md). Its two properties are `client`, any frame a client sends, and `server`, any frame a server sends; `$defs` holds every frame, command, event and live event they refer to.
 
-The schema is generated from the protocol's Pydantic models in `artifactr.core`, which are the source of truth, and checked in. A test fails if the checked-in file drifts from the models; regenerate it with `make schema`:
+The schema is generated from the protocol's Pydantic models in `artifactr.core`, which are the source of truth, and checked in. A test fails if the checked-in file drifts from the models; regenerate it with `moon run artifactr:schema`, which runs, in `packages/artifactr/`:
 
 ```bash
 uv run python -m artifactr.core.schema > schemas/artifactr.v1.json

@@ -24,4 +24,4 @@ Each is evalr's function, with the feedback type's registered name as the `{type
 
 ## evalr's ports and values
 
-`Score`, `ScoreConfig`, `ScoreSink`, `ScoreConfigStore`, `ScoreDataType` and `MAX_TEXT` are evalr's: import them from `evalr.core` ([evalr's reference](https://evalr.alexnodeland.com/reference/core/)).
+`Score`, `ScoreConfig`, `ScoreSink`, `ScoreConfigStore`, `ScoreDataType` and `MAX_TEXT` are evalr's: import them from `evalr.core` ([evalr's reference](../../evalr/reference/core.md)).

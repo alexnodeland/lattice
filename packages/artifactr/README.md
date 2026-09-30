@@ -4,8 +4,8 @@
 </picture>
 
 <p>
-  <a href="https://artifactr.alexnodeland.com"><img alt="Docs" src="https://img.shields.io/badge/docs-artifactr.alexnodeland.com-2D2A8C"></a>
-  <a href="https://github.com/alexnodeland/artifactr/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/alexnodeland/artifactr/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://lattice.alexnodeland.com/artifactr/"><img alt="Docs" src="https://img.shields.io/badge/docs-lattice.alexnodeland.com%2Fartifactr-2D2A8C"></a>
+  <a href="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml"><img alt="Nightly" src="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml/badge.svg?branch=main"></a>
   <img alt="Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-2D2A8C">
   <img alt="Coverage: 100%" src="https://img.shields.io/badge/coverage-100%25-2D2A8C">
   <img alt="Typed: pyright strict" src="https://img.shields.io/badge/typed-pyright%20strict-2D2A8C">
@@ -22,10 +22,10 @@ In most chat applications the conversation is the only channel. artifactr adds a
 
 ## Install
 
-Python 3.12 or newer. artifactr is distributed as **`artifactr-ai`** and imported as `artifactr` (the name `artifactr` on PyPI is an unrelated project). Until it is on PyPI, install it from this repository:
+Python 3.12 or newer. artifactr is distributed as **`artifactr-ai`** and imported as `artifactr` (the name `artifactr` on PyPI is an unrelated project). Until it is on PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the family's repository:
 
 ```bash
-uv add "artifactr-ai[fastapi] @ git+https://github.com/alexnodeland/artifactr"
+uv add "artifactr-ai[fastapi] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"
 ```
 
 Extras: `fastapi` (WebSocket and REST), `mcp` (external agents), `postgres` or `sqlite` (SQL storage with a driver), and `sql` (SQL storage without one).
@@ -90,7 +90,7 @@ It needs `ANTHROPIC_API_KEY`, or any other [pydantic-ai model](https://ai.pydant
 
 ## Try it
 
-[`examples/docplan`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/README.md) is a complete application built on the library: a person and an agent co-write a document and plan its work, over WebSocket, REST and MCP, with a terminal client.
+[`examples/docplan`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/README.md) is a complete application built on the library: a person and an agent co-write a document and plan its work, over WebSocket, REST and MCP, with a terminal client. From the root of a clone of lattice:
 
 ```sh
 make install
@@ -114,7 +114,7 @@ Set `DOCPLAN_DATABASE_URL` (for example `sqlite+aiosqlite:///docplan.db`) to kee
 
 ## Documentation
 
-The documentation site is at **<https://artifactr.alexnodeland.com>**. It is built from [`docs/`](https://lattice.alexnodeland.com/artifactr/) and published from `main` on every push; run `make docs-serve` to read it locally at <http://localhost:8000>.
+The documentation is artifactr's section of lattice's site, at **<https://lattice.alexnodeland.com/artifactr/>**. It is built from [`docs/artifactr/`](https://github.com/alexnodeland/lattice/tree/main/docs/artifactr) and published from `main` on every push; run `moon run lattice:docs-serve` to read it locally at <http://localhost:8000>.
 
 - [Getting started](https://lattice.alexnodeland.com/artifactr/getting-started/) and the [guides](https://lattice.alexnodeland.com/artifactr/guides/artifact-types/): artifact types, workspaces, storage, the agent, live output, serving, MCP, security and testing.
 - [Architecture](https://lattice.alexnodeland.com/artifactr/architecture/): concepts, layers, the write path, the agent, tenancy and concurrency.

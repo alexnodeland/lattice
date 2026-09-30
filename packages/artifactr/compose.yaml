@@ -1,6 +1,6 @@
 # The contributor stack (ADR-0030): what developing artifactr needs, and no more.
 #
-#   docker compose up -d --wait              PostgreSQL for the tests (make pg-up)
+#   docker compose up -d --wait              PostgreSQL for the tests (moon run artifactr:pg-up)
 #   docker compose --profile app up -d       and docplan, the reference app, on :8000
 #
 # The observability and LLM infrastructure (the OpenTelemetry Collector, Grafana, Langfuse and

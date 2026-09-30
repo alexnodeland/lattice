@@ -64,7 +64,7 @@ The override applies to runs the `Runner` starts inside the `with` block, since 
 
 To test what the agent does (which tools it calls, what it proposes, how it reacts to a rejection), script the model's responses. pydantic-ai's `FunctionModel` answers each request with a function of yours, but the `Runner` streams every run, so the model needs a stream function too. `artifactr.agent.function_model` builds both from one function, sync or async, that returns a `ModelResponse`: the stream carries its text, its thinking and its tool calls.
 
-A `Script` that answers each request with the next response is then a few lines, as in artifactr's own [`tests/agent/conftest.py`](https://github.com/alexnodeland/artifactr/blob/main/tests/agent/conftest.py):
+A `Script` that answers each request with the next response is then a few lines, as in artifactr's own [`tests/agent/conftest.py`](https://github.com/alexnodeland/lattice/blob/main/packages/artifactr/tests/agent/conftest.py):
 
 ```python
 from typing import Any
@@ -124,7 +124,7 @@ async def test_the_agent_proposes_tasks(ws: Workspace, thread: Thread) -> None:
     assert "Kinds of artifact you can create: plan." in (last.instructions or "")
 ```
 
-`script.requests` holds every message list the model received, so a test can check the instructions, the change notes (user-prompt parts wrapped in `<workspace-changes>`) and the tool results the agent saw. artifactr's own agent tests, in [`tests/agent/`](https://github.com/alexnodeland/artifactr/tree/main/tests/agent), use this to cover steering, pauses and conflicts.
+`script.requests` holds every message list the model received, so a test can check the instructions, the change notes (user-prompt parts wrapped in `<workspace-changes>`) and the tool results the agent saw. artifactr's own agent tests, in [`tests/agent/`](https://github.com/alexnodeland/lattice/tree/main/packages/artifactr/tests/agent), use this to cover steering, pauses and conflicts.
 
 To hold a run open while a test does something else (posting a steering message, stopping the run, watching its live output), give it an application tool that waits on an `asyncio.Event` the test controls, as the `Gate` in the same `conftest.py` does.
 
@@ -165,4 +165,4 @@ A `resolve_actor` that reads a test header, such as `x-user`, lets one test act 
 
 - pydantic-ai never prints its first-run banner under pytest or in CI, so tests need nothing to keep their output clean. [Serving](serving.md#logging-and-startup-output) says when it does print one.
 - Tests that start runs should wait for them (`await sent.run.wait()`) before the test ends, so no task outlives its event loop.
-- The [reference implementation's tests](https://github.com/alexnodeland/artifactr/tree/main/examples/docplan/tests) go one step further: they start the real server with uvicorn on a free port and drive it with the real terminal client, still with a scripted model.
+- The [reference implementation's tests](https://github.com/alexnodeland/lattice/tree/main/examples/docplan/tests) go one step further: they start the real server with uvicorn on a free port and drive it with the real terminal client, still with a scripted model.

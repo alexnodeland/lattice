@@ -387,7 +387,7 @@ In lattice, this list becomes a tracking issue with a sub-issue per phase (phase
 
 - [x] Sign-off on the decisions (2026-09-30)
 - [x] Phase 1: rehearsal (2026-09-30)
-- [ ] Phase 2: the day
+- [x] Phase 2: the day (2026-09-30)
 - [ ] Phase 3: package ADRs and the family architecture
 - [ ] Phase 4: the template in lattice
 - [ ] Phase 5: acceptance tests
@@ -420,6 +420,8 @@ Phase 1 rehearsed the move from fresh clones, and an independent review checked 
   - Title is its own workflow and a second required check, since CI never reruns when a title is edited. It checks the Conventional Commits types, not the scopes.
   - A `.prekignore` keeps prek from running the template's own hook configuration.
   - The repository's dependency graph is on, since dependency review needs it.
+  - Phase 6's timeouts landed on the day ([#4](https://github.com/alexnodeland/lattice/pull/4)): every test fails after a minute, and every job at a limit. docplan's tests hung in CI's Check job three times in five runs, and never locally.
+  - The Template task runs the generated application with the checkout's `uv`, since proto's shim chooses no version outside lattice, and only when stackr changes ([#3](https://github.com/alexnodeland/lattice/pull/3)). [#18](https://github.com/alexnodeland/lattice/issues/18) tracks the PostgreSQL variables that still make every pull request run artifactr's and reflexr's tests.
 - **Renovate** runs from lattice's own Actions (`renovate.yml`), not as Mend's hosted app, and its `pre-commit` manager is on.
 - **Docs.**
   - Each folder's `.nav.yml` applies only with `awesome-nav` listed under `plugins`.

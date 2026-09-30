@@ -143,22 +143,23 @@ default).
 With `ONCALL_LITELLM_URL` set, the triage agent calls that LiteLLM proxy instead of a provider
 (`reflexr.litellm`): the model group `ONCALL_LITELLM_MODEL` (`claude-sonnet` by default), with the
 key `ONCALL_LITELLM_KEY`, and every request carries the tenant, the causal chain and the trace.
-[stackr](https://github.com/alexnodeland/stackr) runs a Collector, Langfuse and the proxy.
+[stackr](https://lattice.alexnodeland.com/stackr/) runs a Collector, Langfuse and the proxy.
 
 ### In Docker
 
-The repository's Compose file runs oncall on PostgreSQL, from `examples/oncall/Dockerfile`. From
-the repository root:
+reflexr's Compose file, `packages/reflexr/compose.yaml`, runs oncall on PostgreSQL, from
+`examples/oncall/Dockerfile`:
 
 ```sh
-make app-up     # docker compose --profile app up -d --build --wait
+moon run reflexr:app-up     # docker compose --profile app up -d --build --wait, in packages/reflexr
 ```
 
 It passes `ONCALL_MODEL`, the providers' keys and the `ONCALL_LITELLM_*` settings through from
-your environment. While [stackr](https://github.com/alexnodeland/stackr)'s stack runs, add the
-overlay to send its telemetry to stackr's Collector:
+your environment. While [stackr](https://lattice.alexnodeland.com/stackr/)'s stack runs, add
+the overlay to send its telemetry to stackr's Collector, from lattice's root:
 
 ```sh
+cd packages/reflexr
 docker compose -f compose.yaml -f compose.stackr.yaml --profile app up -d --build
 ```
 

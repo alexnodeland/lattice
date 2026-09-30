@@ -105,10 +105,12 @@ With a LiteLLM proxy at `DOCPLAN_LITELLM_URL`, the agent calls its model group
 `DOCPLAN_LITELLM_MODEL` (`claude-sonnet` by default) with the key `DOCPLAN_LITELLM_KEY`, and every
 request carries docplan's tenant, thread and trace.
 
-[stackr](https://github.com/alexnodeland/stackr) runs the Collector, Grafana, Langfuse and LiteLLM.
-With its stack running, start docplan on stackr's network from the repository root:
+[stackr](https://lattice.alexnodeland.com/stackr/) runs the Collector, Grafana, Langfuse and LiteLLM.
+With its stack running, start docplan on stackr's network with artifactr's Compose files, from
+lattice's root:
 
 ```sh
+cd packages/artifactr
 docker compose -f compose.yaml -f compose.stackr.yaml --profile app up -d --build
 ```
 
@@ -125,7 +127,7 @@ actor from their own sessions in `resolve_actor`.
 ## Evaluating docplan
 
 docplan closes the evaluation loop with artifactr's `[evals]` extra and
-[evalr](https://github.com/alexnodeland/evalr), in [`evals.py`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/src/docplan/evals.py). Its agent is
+[evalr](https://lattice.alexnodeland.com/evalr/), in [`evals.py`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/src/docplan/evals.py). Its agent is
 told to keep its edits small, and people say when it did not:
 
 1. **People give feedback.** `/edits ok|big` says whether the agent's last turn changed more of the

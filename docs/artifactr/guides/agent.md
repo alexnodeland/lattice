@@ -136,9 +136,9 @@ await rule.post_message(thread.id, "The rule is live.", kind="notice")
 | Ending, or pausing: its run no longer takes messages but still holds the thread | is taken by the next turn, which the run starts as it releases the thread |
 | Paused on questions or approvals | is the reply: it answers the questions, declines the approvals with the message as the reason, and resumes the run |
 
-Behind the table is one rule: the log decides ([ADR-0055](../adr/0055-turns-from-the-log.md)). A thread's messages are taken in the log's order, each by one turn: as a run's prompt, as a paused run's reply, or through the watcher of the run that holds the thread. A message or an answer sent with the runner asks for a turn. Whoever holds the thread next, in any process, starts the turn with the oldest message no turn has taken, and its watcher delivers the rest. So a message sent the moment a client sees `run_ended` is answered, and no message is carried out twice.
+Behind the table is one rule: the log decides ([ADR-0055](../adr/0055-turns-from-the-log.md)). A thread's messages are taken in the log's order, each by one turn: as a run's prompt, as a paused run's reply, or through the watcher of the run that holds the thread. A message or an answer sent with the runner asks for a turn. Whoever holds the thread next, in any process, starts the turn with the oldest message no turn has taken, and its watcher delivers the rest. So a message sent the moment a client sees `run_ended` is answered, and no message is carried out twice. The one exception is a run whose process dies before it records how far it got. The thread's next turn carries its input out again, so people may see a second reply.
 
-A message committed without the runner, with `ws.post_message`, asks for nothing, so it starts no turn. The thread's next turn takes it, as its prompt if it is the oldest.
+A message is a message, however it was committed. One committed without the runner, with `ws.post_message`, asks for nothing, so it starts no turn, but the thread's next turn takes it: as its prompt, or, in a paused thread, as its reply, if it is the oldest. Post anything that should not answer the agent or steer it as a [notice](#notices), which is never a reply and starts nothing.
 
 A thread from before this behaviour starts from where its workspace's log stood at the upgrade, which [`migrate`](storage.md#migrations) records. The agent never suddenly answers messages from before it.
 
@@ -166,9 +166,9 @@ A message in an idle thread, such as one just created, starts a run unless anoth
 |---|---|
 | `send(workspace, thread_id, content, message_id=None)` | Posts a message and starts, steers or resumes a run |
 | `answer(workspace, AnswerDeferred(...))` | Answers one request of a paused run, resuming it once all are answered |
-| `resume(workspace, run_id)` | Resumes a paused run whose requests are all answered |
+| `resume(workspace, run_id)` | Asks for the thread's next turn, which resumes a paused run whose requests are answered; the oldest message not yet taken answers any left open |
 | `stop(run_id)` | Cancels a run in this process; it ends with status `stopped` |
-| `drain()` | Waits for the runs that have ended to hand their threads over |
+| `drain()` | Waits until no run that has ended is still handing its thread over; `aclose()` cancels them instead |
 | `aclose()` | Stops every run in this process, as the application shuts down; see [Serving](serving.md#adding-the-router) |
 | `watch(run_id)` | Yields the run's live output; see [Live output](live-output.md) |
 | `running(thread_id)` | This process's run in a thread, if any |

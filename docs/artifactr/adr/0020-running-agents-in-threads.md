@@ -1,6 +1,6 @@
 # ADR-0020: Running agents in threads
 
-**Status:** Accepted; what a message does, and its thread claims, amended by [ADR-0055](0055-turns-from-the-log.md)
+**Status:** Accepted; its messages and thread claims amended by [ADR-0055](0055-turns-from-the-log.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

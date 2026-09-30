@@ -23,7 +23,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0017](0017-application-toolsets-and-capability-events.md) | Application toolsets register on the agent; the capability emits capability events | Accepted |
 | [0018](0018-core-host-contract.md) | Core's host contract: needs, commit and record | Accepted |
 | [0019](0019-storage-protocol-and-workspace-handles.md) | One storage protocol behind workspace handles | Accepted |
-| [0020](0020-running-agents-in-threads.md) | Running agents in threads | Accepted; what a message does, and its thread claims, amended by 0055 |
+| [0020](0020-running-agents-in-threads.md) | Running agents in threads | Accepted; its messages and thread claims amended by 0055 |
 | [0021](0021-sql-storage.md) | SQL storage with one dialect-neutral implementation | Accepted |
 | [0022](0022-surfaces-over-one-command-handler.md) | Surfaces over one command handler | Superseded by 0048 |
 | [0023](0023-documentation-site.md) | The documentation site | Accepted, amended by 0026, 0050 and 0053 |
@@ -51,10 +51,10 @@ Each record captures one decision: the context that forced it, the options consi
 | [0045](0045-a-message-id-is-used-once.md) | A message id is used once in a workspace | Accepted |
 | [0046](0046-telemetry-that-composes-across-libraries.md) | Telemetry that composes across libraries, untraced polling and mirror cursors | Accepted |
 | [0047](0047-cancel-safe-storage.md) | Cancel-safe storage | Accepted |
-| [0048](0048-surfaces-over-the-runner.md) | Surfaces over the runner | Accepted; the run a recorded message names amended by 0055 |
+| [0048](0048-surfaces-over-the-runner.md) | Surfaces over the runner | Accepted; its recorded message's run amended by 0055 |
 | [0049](0049-scores-on-evalr.md) | Scores on evalr | Accepted |
 | [0050](0050-one-docs-build.md) | One docs build | Accepted, amended by 0053 |
-| [0051](0051-notices.md) | Notices: messages that start no turn | Accepted; what becomes of a message committed directly amended by 0055 |
+| [0051](0051-notices.md) | Notices: messages that start no turn | Accepted; its direct messages amended by 0055 |
 | [0052](0052-artifactr-in-lattice.md) | artifactr in lattice | Accepted |
 | [0053](0053-one-site-for-the-family.md) | One site for the family | Accepted |
 | [0054](0054-dashboards-from-the-checkout.md) | Dashboards from the checkout | Accepted |

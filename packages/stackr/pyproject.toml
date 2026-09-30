@@ -3,7 +3,7 @@
 # CI run the same versions from lattice's uv.lock.
 [project]
 name = "stackr"
-version = "0.0.0"
+version = "0.1.0"
 description = "The infrastructure template for artifactr, reflexr and evalr."
 readme = "README.md"
 license = "MIT"

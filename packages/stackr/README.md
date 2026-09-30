@@ -4,15 +4,15 @@
 </picture>
 
 <p>
-  <a href="https://stackr.alexnodeland.com"><img alt="Docs" src="https://img.shields.io/badge/docs-stackr.alexnodeland.com-1C1D26"></a>
-  <a href="https://github.com/alexnodeland/stackr/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/alexnodeland/stackr/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://lattice.alexnodeland.com/stackr/"><img alt="Docs" src="https://img.shields.io/badge/docs-lattice.alexnodeland.com%2Fstackr-1C1D26"></a>
+  <a href="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml"><img alt="Nightly" src="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml/badge.svg?branch=main"></a>
   <img alt="Docker Compose v2" src="https://img.shields.io/badge/docker%20compose-v2-1C1D26">
   <img alt="Application template: Copier" src="https://img.shields.io/badge/template-Copier-1C1D26">
   <img alt="Applications on Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/apps-python%203.12%20%7C%203.13%20%7C%203.14-1C1D26">
   <a href="https://github.com/alexnodeland/lattice/blob/main/packages/stackr/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-1C1D26"></a>
 </p>
 
-**stackr** is the infrastructure template for applications built on [artifactr](https://github.com/alexnodeland/artifactr), [reflexr](https://github.com/alexnodeland/reflexr) and [evalr](https://github.com/alexnodeland/evalr): local Supabase, the LiteLLM gateway, OpenTelemetry, Grafana's LGTM stack with Pyroscope, and Langfuse, as one Docker Compose project with profiles, and a [Copier](https://copier.readthedocs.io) template that generates an application already wired to all of them.
+**stackr** is the infrastructure template for applications built on [artifactr](https://lattice.alexnodeland.com/artifactr/), [reflexr](https://lattice.alexnodeland.com/reflexr/) and [evalr](https://lattice.alexnodeland.com/evalr/): local Supabase, the LiteLLM gateway, OpenTelemetry, Grafana's LGTM stack with Pyroscope, and Langfuse, as one Docker Compose project with profiles, and a [Copier](https://copier.readthedocs.io) template that generates an application already wired to all of them.
 
 > **Status:** pre-release. v0.1 is built, as planned in [RFC-0001](https://lattice.alexnodeland.com/stackr/rfcs/0001-v0.1-implementation-plan/), and not yet released.
 
@@ -25,8 +25,8 @@ Every application on the libraries needs the same infrastructure: a database wit
 You need Docker with Compose v2, [uv](https://docs.astral.sh/uv/), `make`, `jq`, and the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) (or Node, to run it through `npx`).
 
 ```bash
-git clone https://github.com/alexnodeland/stackr.git
-cd stackr
+git clone https://github.com/alexnodeland/lattice.git
+cd lattice/packages/stackr
 make env        # .env, with local secrets generated
 make up         # start the stack, with local Supabase
 make smoke      # send test telemetry through it and check it arrives
@@ -45,7 +45,7 @@ Applications send OTLP to `localhost:4317` (gRPC) or `localhost:4318` (HTTP), an
 ## Start an application
 
 ```bash
-uvx copier copy gh:alexnodeland/stackr my-app
+uvx copier copy gh:alexnodeland/lattice my-app
 cd my-app
 git init            # the git hooks and `copier update` need a repository
 make install        # writes uv.lock: commit it
@@ -59,13 +59,13 @@ It generates an application on artifactr, reflexr or both: FastAPI with each lib
 
 - **Profiles as adapter sets.** `observability`, `langfuse` and `gateway`, started together or one at a time, with local Supabase or plain PostgreSQL as the database behind one setting.
 - **An LLM gateway.** Model groups with fallbacks across providers, a team and a budget per tenant, and guardrails chosen per request.
-- **One route for telemetry.** The Collector sends traces to Tempo and Langfuse, metrics to Prometheus and logs to Loki, and Grafana links them to each other and to Pyroscope's profiles, with the libraries' dashboards pinned by release.
-- **Checked every way it can be.** `make validate` checks every configuration with each service's own validator, and the smoke tests start the stack and follow telemetry, a gateway request and an application's agents to where they land, on every pull request.
+- **One route for telemetry.** The Collector sends traces to Tempo and Langfuse, metrics to Prometheus and logs to Loki, and Grafana links them to each other and to Pyroscope's profiles, with the libraries' dashboards from the same checkout.
+- **Checked every way it can be.** `make validate` checks every configuration with each service's own validator, and the smoke tests start the stack and follow telemetry, a gateway request and an application's agents to where they land, on every pull request that changes stackr.
 - **Local by default.** Secrets generated into a gitignored `.env`, and every published port bound to `127.0.0.1`.
 
 ## Documentation
 
-The documentation site is at **<https://stackr.alexnodeland.com>**. It is built from [`docs/`](https://lattice.alexnodeland.com/stackr/) and published from `main` on every push; run `make docs-serve` to read it locally at <http://localhost:8000>.
+The documentation is stackr's section of lattice's site, at **<https://lattice.alexnodeland.com/stackr/>**. It is built from [`docs/stackr/`](https://github.com/alexnodeland/lattice/tree/main/docs/stackr) and published from `main` on every push; run `moon run lattice:docs-serve` to read it locally at <http://localhost:8000>.
 
 - [Getting started](https://lattice.alexnodeland.com/stackr/getting-started/) and the [guides](https://lattice.alexnodeland.com/stackr/guides/stack/): the stack and its profiles, local Supabase, the LLM gateway, observability, Langfuse, the application template, the smoke tests, validation and CI, security and troubleshooting.
 - [Reference](https://lattice.alexnodeland.com/stackr/reference/): every service, setting, pipeline, data source, model, template question, command and pinned version, generated from the files that define them.
@@ -76,7 +76,7 @@ The documentation site is at **<https://stackr.alexnodeland.com>**. It is built 
 
 ## The family
 
-stackr is the infrastructure of a family with [artifactr](https://github.com/alexnodeland/artifactr), for chats in which people and agents edit shared artifacts; [reflexr](https://github.com/alexnodeland/reflexr), for workflows that events start; and [evalr](https://github.com/alexnodeland/evalr), which evaluates both against people's feedback. The libraries' dev containers join its network, and its template generates applications on them.
+stackr is the infrastructure of the family of packages in [lattice](https://github.com/alexnodeland/lattice): [artifactr](https://lattice.alexnodeland.com/artifactr/), for chats in which people and agents edit shared artifacts; [reflexr](https://lattice.alexnodeland.com/reflexr/), for workflows that events start; [evalr](https://lattice.alexnodeland.com/evalr/), which evaluates both against people's feedback; and [relayr](https://lattice.alexnodeland.com/relayr/adr/), the bridge planned between artifactr and reflexr. The libraries' reference implementations join its network, and its template generates applications on artifactr and reflexr.
 
 ## Contributing
 

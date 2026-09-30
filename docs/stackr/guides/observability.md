@@ -110,23 +110,8 @@ Grafana is at <http://localhost:3000>, as `admin` with `GRAFANA_ADMIN_PASSWORD` 
 Dashboards are files under `deploy/grafana/dashboards/`, one Grafana folder per directory, rescanned every 30 seconds and read-only in the UI:
 
 - **`stackr/`** is committed. **Collector health** (`stackr-collector`) shows what the Collector receives, what each backend receives, send failures, queues, memory and CPU, and whether each of the stack's services is up.
-- **`artifactr/` and `reflexr/`** are the libraries' own dashboards, downloaded at the releases pinned in `versions.env`, and gitignored.
+- **`artifactr/` and `reflexr/`** are the libraries' own dashboards, mounted from the libraries' directories in lattice.
 
-### The libraries' dashboards, by version
+### The libraries' dashboards
 
-Each library publishes its dashboards with every release, as one archive of dashboard JSON files:
-
-```text
-https://github.com/alexnodeland/<library>/releases/download/v<version>/<library>-dashboards-<version>.tar.gz
-```
-
-`versions.env` pins the release to use for each library, with an optional sha256 of the archive:
-
-```bash
-ARTIFACTR_DASHBOARDS_VERSION=0.2.0
-ARTIFACTR_DASHBOARDS_SHA256=<sha256 of the archive>
-```
-
-`make dashboards`, which `make up` runs first, downloads each pinned archive, checks its sha256 when one is pinned, and replaces the library's folder with its JSON files. A library with no version pinned is skipped. A failed download is a warning, so `make up` works offline; `uv run scripts/fetch-dashboards --strict` makes it an error. `STACKR_DASHBOARDS_URL`, a URL with `{library}` and `{version}` in it, downloads from somewhere else, such as a library's own build.
-
-To move to a new release, change its version and sha256 in `versions.env`, then run `make dashboards` and `make smoke`. [Pinned versions](../reference/versions.md) shows what is pinned now.
+Each library generates its dashboards into its own `deploy/grafana/dashboards/`, and tests them against its metric registry ([artifactr's](../../artifactr/guides/observability.md#dashboards), [reflexr's](../../reflexr/guides/observability.md#dashboards)). `compose.yaml` mounts each library's directory, `packages/<library>/deploy/grafana/dashboards/` in lattice, read-only as a folder of its own beside `stackr/`, so Grafana shows the dashboards of the checkout the stack runs from, and a change to one appears within 30 seconds. Nothing is downloaded or pinned.

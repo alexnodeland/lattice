@@ -61,7 +61,7 @@ Applications push metrics once a minute by default, so a new series has too few 
 
 ### The libraries' dashboards aren't in Grafana
 
-They are downloaded at the releases pinned in `versions.env`, and a library with no release pinned is skipped. A failed download is only a warning, so `make up` works offline: look for `fetch-dashboards` in its output, or run `make dashboards`. Grafana picks up new files within 30 seconds.
+They are mounted from your checkout of lattice, from `packages/artifactr/deploy/grafana/dashboards/` and `packages/reflexr/deploy/grafana/dashboards/`, so start the stack from `packages/stackr/` in a full clone, and check that those directories hold the dashboards' JSON files. Grafana picks up new files within 30 seconds.
 
 ## The gateway
 

@@ -47,7 +47,7 @@ A span's link to its service's metrics offers three queries over Tempo's span me
 
 ## Dashboards
 
-Each directory under `deploy/grafana/dashboards/` is a folder in Grafana. `stackr/` is committed; the libraries' folders, `artifactr/` and `reflexr/`, are downloaded by `make dashboards` at the releases pinned in `versions.env`, and gitignored.
+Each directory under Grafana's `/var/lib/grafana/dashboards` is a folder: `stackr/`, from `deploy/grafana/dashboards/stackr/`, and the libraries' `artifactr/` and `reflexr/`, which `compose.yaml` mounts from their directories in lattice, `packages/<library>/deploy/grafana/dashboards/` ([Observability](../guides/observability.md#the-libraries-dashboards)).
 
 <!-- generated: grafana-dashboards -->
 

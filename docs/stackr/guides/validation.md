@@ -22,40 +22,38 @@ The Supabase, gateway and dashboard checks are `scripts/check-config`, which cov
 
 ## The documentation
 
-`make docs` builds this site as the Docs workflow does:
+stackr's pages are its section of lattice's site. `moon run lattice:docs` builds the whole site, as CI does:
 
-1. `make changelog`: `CHANGELOG.md` regenerated from the whole history, so the site shows `main`'s; leave the regenerated file out of your commit
-2. `scripts/docs-reference --check`: every generated block in `docs/reference/` matches the file it describes
-3. `zensical build --strict --clean`: a broken link or anchor fails the build
-4. `scripts/check_site.py site`: no list rendered as text, which happens when a list has no blank line before it, or a nested item isn't indented by its parent's text
+1. `zensical build --strict --clean`: a broken link or anchor fails the build
+2. `scripts/check_site.py site`: no list rendered as text, which happens when a list has no blank line before it, or a nested item isn't indented by its parent's text
 
-`make docs-serve` serves the site with live reload at <http://localhost:8000>. When you change a file a reference page describes (`compose.yaml`, `.env.example`, the Collector's, Grafana's or the gateway's configuration, `copier.yml`, the template's files, the Makefile or `versions.env`), run `make docs-reference` to regenerate the page, and commit both.
+`moon run stackr:reference` runs `scripts/docs-reference --check`: every generated block in `docs/stackr/reference/` matches the file it describes. `moon run lattice:docs-serve` serves the site with live reload at <http://localhost:8000>. When you change a file a reference page describes (`compose.yaml`, `.env.example`, the Collector's, Grafana's or the gateway's configuration, `copier.yml`, the template's files, the Makefile or `versions.env`), run `make docs-reference` to regenerate the page, and commit both.
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every pull request and every push to `main`:
+lattice's `.github/workflows/ci.yml` runs on every pull request, and runs stackr's checks when the pull request changes what they read:
 
 | Job | What it runs |
 |---|---|
-| Validate | `make validate`, after `make env` generates a throwaway `.env`, which also tests `scripts/setup-env` |
+| Check | `stackr:check`: `stackr:validate`, which is `make validate`, after `make` generates a throwaway `.env`, which also tests `scripts/setup-env`; and `stackr:reference` |
 | Template | Each of the six variants of the application template (three choices of libraries, with and without evals) on Python 3.12, and the largest on Python 3.14: generated from the pull request's commit, then its own `make check`, which is lint, strict types and the tests with 100% coverage |
-| Smoke | The stack started three ways, with `make smoke`, and `make smoke-app` beside the whole stack on local Supabase ([The smoke tests](smoke-tests.md)) |
+| Smoke | The stack started three ways, with `make up` and `make smoke`, and `make smoke-app` beside the whole stack on local Supabase ([The smoke tests](smoke-tests.md)) |
 
-The template and smoke jobs wait for Validate. Every job installs the tools from `uv.lock` with `uv sync --locked`, so CI runs the versions you run.
+The Template and Smoke jobs run `moon ci stackr:template` and `moon ci stackr:smoke`. Every job installs the tools from `uv.lock` with `uv sync --locked`, so CI runs the versions you run. lattice's nightly workflow runs every project's checks, stackr's included, on `main`.
 
 ## Building and publishing the site
 
-`.github/workflows/docs.yml` runs `make docs` in its Docs job on every pull request, on every push to `main` and when run by hand, and deploys the site to GitHub Pages at <https://stackr.alexnodeland.com> from `main` only. Runs on `main` wait their turn, so an older commit never deploys after a newer one. The site always shows `main` ([ADR-0012](../adr/0012-documentation-site.md), [ADR-0014](../adr/0014-one-docs-build.md)).
+lattice's `.github/workflows/docs.yml` builds the site on every push to `main` and when run by hand, and deploys it to GitHub Pages at <https://lattice.alexnodeland.com>, where stackr's section is <https://lattice.alexnodeland.com/stackr/>. Runs wait their turn, so an older commit never deploys after a newer one. The site always shows `main` ([ADR-0012](../adr/0012-documentation-site.md), [ADR-0014](../adr/0014-one-docs-build.md)).
 
 ## Dependencies
 
-Every image is pinned to a version, and where a registry publishes only `latest`, by digest as well. Dependabot proposes updates weekly for the images in `compose.yaml`, the GitHub Actions, and the tools in `uv.lock`; an update merges when CI passes, the smoke tests included. `versions.env` is bumped by hand, and the template's library revisions by `make bump-libraries` ([Pinned versions](../reference/versions.md)).
+Every image is pinned to a version, and where a registry publishes only `latest`, by digest as well. Renovate proposes updates for the images in `compose.yaml`, lattice's GitHub Actions and the tools in `uv.lock`, and CI's smoke tests run on each update to stackr's images. `versions.env` is bumped by hand, and the template's library revisions by `make bump-libraries` ([Pinned versions](../reference/versions.md)).
 
 ## Git hooks
 
-`make install` installs the development tools and two git hooks, which run the same tools as CI:
+lattice's `make install`, at its root, installs the development tools and two git hooks through prek, which run the same tools as CI:
 
-- **pre-commit:** whitespace and file checks, yamllint, shellcheck, and ruff's formatter and linter
+- **pre-commit:** whitespace and file checks, yamllint and shellcheck over stackr's files, ruff's formatter and linter, pyright, and actionlint and zizmor over the workflows
 - **commit-msg:** the message must be a [Conventional Commit](https://www.conventionalcommits.org/), since pull requests are squash-merged and their titles become the changelog
 
 [Contributing](../../project/contributing.md) has the rest of the workflow, and the definition of done.

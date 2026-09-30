@@ -1,11 +1,11 @@
 # The application template
 
-stackr's [Copier](https://copier.readthedocs.io) template generates an application on artifactr, reflexr or both, wired to the stack's ports and nothing else: Supabase for sign-in and PostgreSQL, the gateway for models, the Collector for telemetry, and Langfuse for feedback and experiments ([ADR-0004](../adr/0004-the-application-template.md), [ADR-0011](../adr/0011-the-application-template-in-detail.md), [ADR-0015](../adr/0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md)). Its questions are in `copier.yml` at the repository's root, and its files in `template/`.
+stackr's [Copier](https://copier.readthedocs.io) template generates an application on artifactr, reflexr or both, wired to the stack's ports and nothing else: Supabase for sign-in and PostgreSQL, the gateway for models, the Collector for telemetry, and Langfuse for feedback and experiments ([ADR-0004](../adr/0004-the-application-template.md), [ADR-0011](../adr/0011-the-application-template-in-detail.md), [ADR-0015](../adr/0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md)). Its questions are in stackr's `copier.yml`, which the `copier.yml` at lattice's root includes, since Copier reads a repository's root, and its files in `template/`.
 
 ## Generate an application
 
 ```bash
-uvx copier copy gh:alexnodeland/stackr my-app    # or a path to a clone of stackr
+uvx copier copy gh:alexnodeland/lattice my-app    # or a path to a clone of lattice
 cd my-app
 git init
 make install        # uv sync, which writes uv.lock (commit it), and the git hooks
@@ -13,7 +13,7 @@ make env            # .env from .env.example
 make check          # lint, types and tests, as its CI runs them
 ```
 
-- **Which version.** Copier uses the template's latest release tag. stackr has none yet, so Copier warns that it found no tags and uses `main`. From a clone, `--vcs-ref HEAD` takes the checkout as it is, uncommitted changes included, which is how stackr's own checks render it.
+- **Which version.** Copier uses the latest tag that is a version. lattice's tags carry their package's name, as in `artifactr-v0.1.0`, so none is, and Copier warns that it found no tags and uses `main`. From a clone, `--vcs-ref HEAD` takes the checkout as it is, uncommitted changes included, which is how stackr's own checks render it.
 - **`git init` first.** `make install` installs the git hooks, which need a repository, and stops with a message saying so when there is none; `copier update` later needs one with the generated files committed.
 - **No tasks.** The template runs nothing on your machine as it generates, so it needs no `--trust`.
 
@@ -32,7 +32,7 @@ The libraries' revisions aren't questions: the template pins each library to the
 Answer non-interactively with `--defaults` and `--data`, as CI does:
 
 ```bash
-uvx copier copy --defaults --data libraries=reflexr --data evals=false gh:alexnodeland/stackr my-app
+uvx copier copy --defaults --data libraries=reflexr --data evals=false gh:alexnodeland/lattice my-app
 ```
 
 [Template questions](../reference/template.md) lists every question with its choices, validation and the files each answer generates, and the values derived from them.
@@ -57,7 +57,7 @@ Every surface is mounted under its library's name in every variant, so a variant
 
 ### Settings
 
-The application reads the stack's ports from its environment ([`settings.py`](https://github.com/alexnodeland/stackr/blob/main/template/src/%7B%7B%20package_name%20%7D%7D/settings.py.jinja)); `.env.example` has every setting, with the stack's addresses on this machine:
+The application reads the stack's ports from its environment ([`settings.py`](https://github.com/alexnodeland/lattice/blob/main/packages/stackr/template/src/%7B%7B%20package_name%20%7D%7D/settings.py.jinja)); `.env.example` has every setting, with the stack's addresses on this machine:
 
 | Port | Settings |
 |---|---|
@@ -79,11 +79,11 @@ Fill in two things after `make env`: `LITELLM_API_KEY`, a tenant's key from `mak
 | `make up` | In the `app` profile: builds its image and runs it beside the stack, at <http://localhost:8800> (`app_port`) |
 | `make down`, `make logs` | Stops the app profile, or follows its logs |
 
-The **app profile** is the application's own `compose.yaml`, not a service in stackr's. Its service joins the `stackr` network and local Supabase's, and reads [`stackr.env`](https://github.com/alexnodeland/stackr/blob/main/template/stackr.env) after `.env`, which replaces the stack's addresses in `.env` with their names on those networks. Its `DATABASE_URL` is local Supabase's PostgreSQL by name, unless `STACK_DATABASE_URL` in `.env` names another database.
+The **app profile** is the application's own `compose.yaml`, not a service in stackr's. Its service joins the `stackr` network and local Supabase's, and reads [`stackr.env`](https://github.com/alexnodeland/lattice/blob/main/packages/stackr/template/stackr.env) after `.env`, which replaces the stack's addresses in `.env` with their names on those networks. Its `DATABASE_URL` is local Supabase's PostgreSQL by name, unless `STACK_DATABASE_URL` in `.env` names another database.
 
 So start the stack first, with local Supabase: stackr's default `make up`. The image is built in two stages, the first with git to fetch the libraries at their pinned commits, so building it needs the network.
 
-**Stopping:** the server lets open requests finish for `DRAIN`. Then each library's MCP server stops, then its work, then its feedback mirrors, and the database closes last ([ADR-0015](../adr/0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md)). reflexr's reactor gives running actions `STOP_GRACE` to end, and records those it then cancels as abandoned attempts, which the next start retries ([reflexr's graceful stop](https://github.com/alexnodeland/reflexr/blob/main/docs/guides/reactor.md#running-the-reactor)). artifactr's runner stops the agent's turns still going, each recording that it stopped ([artifactr's serving guide](https://github.com/alexnodeland/artifactr/blob/main/docs/guides/serving.md#adding-the-router)). Together, and with the rest of the shutdown, they must end within the app profile's `stop_grace_period`.
+**Stopping:** the server lets open requests finish for `DRAIN`. Then each library's MCP server stops, then its work, then its feedback mirrors, and the database closes last ([ADR-0015](../adr/0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md)). reflexr's reactor gives running actions `STOP_GRACE` to end, and records those it then cancels as abandoned attempts, which the next start retries ([reflexr's graceful stop](../../reflexr/guides/reactor.md#running-the-reactor)). artifactr's runner stops the agent's turns still going, each recording that it stopped ([artifactr's serving guide](../../artifactr/guides/serving.md#adding-the-router)). Together, and with the rest of the shutdown, they must end within the app profile's `stop_grace_period`.
 
 The **dev container** is built on `.devcontainer/compose.yaml`. When the stack is running, its `initialize.sh` adds the stack's networks and `stackr.env`'s addresses, so the application inside it reaches the stack by name; otherwise the dev container runs on its own.
 
@@ -99,13 +99,13 @@ pulls in the template's improvements since the application was generated, keepin
 
 ### The libraries' revisions
 
-artifactr and reflexr are pinned to commits in `pyproject.toml`'s `[tool.uv.sources]` ([ADR-0013](../adr/0013-how-the-template-pins-the-libraries.md)). The pins are the template's, not answers, so `copier update` moves them with the template code written for them. evalr has no pin of its own: it comes with the libraries, at the commit their own `[tool.uv.sources]` pin.
+artifactr and reflexr are pinned to commits in `pyproject.toml`'s `[tool.uv.sources]` ([ADR-0013](../adr/0013-how-the-template-pins-the-libraries.md)). Until phase 4 of [RFC-0003](../rfcs/0003-one-repository-lattice.md#phases), which pins them to the commit of lattice the template is rendered from, they are commits of the libraries' old repositories, which are frozen. The pins are the template's, not answers, so `copier update` moves them with the template code written for them. evalr has no pin of its own: it comes with the libraries, at the commit their own `[tool.uv.sources]` pin.
 
 To hold a library back, or try another commit, edit its `rev` there, then `uv lock && make check`. `copier update` keeps the edit, and marks a conflict when the template moves that pin or the other library's, on the line beside it.
 
 ### In stackr: bumping the template's pins
 
-The libraries install from GitHub rather than PyPI for now ([artifactr#23](https://github.com/alexnodeland/artifactr/issues/23)), so the template's pins, `artifactr_rev` and `reflexr_rev` in `copier.yml`, follow each library's `main` by hand. `make bump-libraries` does it:
+The libraries install from GitHub rather than PyPI for now ([lattice#7](https://github.com/alexnodeland/lattice/issues/7)), so the template's pins, `artifactr_rev` and `reflexr_rev` in `copier.yml`, follow each library's `main` by hand. `make bump-libraries` does it. It still reads the libraries' old repositories, whose `main`s are frozen, until phase 4 of [RFC-0003](../rfcs/0003-one-repository-lattice.md#phases) retires it:
 
 ```bash
 make bump-libraries                                  # every library, to the commit its main points to
@@ -133,7 +133,7 @@ Nothing runs this on a schedule, and CI doesn't run `--check`, which would fail 
 - **CI's template job** generates each variant, and the largest again on Python 3.14, and runs its own `make check`: lint, strict types, and the tests with 100% coverage.
 - **`make smoke-app`** generates an application with both libraries and evals, runs it in its app profile beside the whole stack, and traces its agents through the gateway into Tempo and Langfuse ([The smoke tests](smoke-tests.md)).
 
-To render and check one variant locally:
+To render and check one variant locally, from lattice's root, whose `copier.yml` points Copier at the template:
 
 ```bash
 uv run copier copy --defaults --vcs-ref HEAD --data libraries=both . /tmp/my-app

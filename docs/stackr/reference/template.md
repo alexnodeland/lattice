@@ -1,6 +1,6 @@
 # Template questions
 
-The application template's questions are in `copier.yml` at the repository's root, and its files in `template/` ([The application template](../guides/template.md)). Answer them interactively, or with `--defaults` and `--data NAME=VALUE`.
+The application template's questions are in stackr's `copier.yml`, which the `copier.yml` at lattice's root includes, and its files in `template/` ([The application template](../guides/template.md)). Answer them interactively, or with `--defaults` and `--data NAME=VALUE`.
 
 ## Questions
 

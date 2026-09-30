@@ -50,4 +50,4 @@ Where a service reports its usage to its vendor unless told not to, stackr's con
 
 ## Reporting a vulnerability
 
-Please don't open a public issue. Report it privately through GitHub's [private vulnerability reporting](https://github.com/alexnodeland/stackr/security/advisories/new), as the [security policy](../../project/security.md) describes. A default that exposes a service beyond the host, a committed secret, or a script that leaks a secret into logs or process listings is a vulnerability in stackr.
+Please don't open a public issue. Report it privately through GitHub's [private vulnerability reporting](https://github.com/alexnodeland/lattice/security/advisories/new), as the [security policy](../../project/security.md) describes. A default that exposes a service beyond the host, a committed secret, or a script that leaks a secret into logs or process listings is a vulnerability in stackr.

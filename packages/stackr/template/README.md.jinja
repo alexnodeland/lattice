@@ -2,11 +2,11 @@
 
 {{ description }}
 
-Built from [stackr](https://github.com/alexnodeland/stackr)'s application template on {% if libraries == 'both' %}[artifactr](https://github.com/alexnodeland/artifactr) and [reflexr](https://github.com/alexnodeland/reflexr){% elif use_artifactr %}[artifactr](https://github.com/alexnodeland/artifactr){% else %}[reflexr](https://github.com/alexnodeland/reflexr){% endif %}{% if evals %}, with [evalr](https://github.com/alexnodeland/evalr) for evaluation{% endif %}, and wired to stackr's stack: Supabase for the database and sign-in, the LiteLLM gateway for models, and OpenTelemetry, Grafana and Langfuse for telemetry and feedback.
+Built from [stackr](https://lattice.alexnodeland.com/stackr/)'s application template (`gh:alexnodeland/lattice`) on {% if libraries == 'both' %}[artifactr](https://lattice.alexnodeland.com/artifactr/) and [reflexr](https://lattice.alexnodeland.com/reflexr/){% elif use_artifactr %}[artifactr](https://lattice.alexnodeland.com/artifactr/){% else %}[reflexr](https://lattice.alexnodeland.com/reflexr/){% endif %}{% if evals %}, with [evalr](https://lattice.alexnodeland.com/evalr/) for evaluation{% endif %}, and wired to stackr's stack: Supabase for the database and sign-in, the LiteLLM gateway for models, and OpenTelemetry, Grafana and Langfuse for telemetry and feedback.
 
 ## Quick start
 
-You need [uv](https://docs.astral.sh/uv/), `make`, and Docker with Compose v2. Start stackr's stack first (`make env && make up` in a clone of stackr).
+You need [uv](https://docs.astral.sh/uv/), `make`, and Docker with Compose v2. Start stackr's stack first (`make env && make up` in `packages/stackr` of a clone of [lattice](https://github.com/alexnodeland/lattice)).
 
 ```bash
 git init            # the git hooks, and `copier update` later, need a repository

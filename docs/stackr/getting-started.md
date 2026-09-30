@@ -17,8 +17,8 @@ The first start pulls several gigabytes of images.
 ## Start the stack
 
 ```bash
-git clone https://github.com/alexnodeland/stackr.git
-cd stackr
+git clone https://github.com/alexnodeland/lattice.git
+cd lattice/packages/stackr
 make env
 make up
 ```
@@ -29,10 +29,9 @@ Provider keys are the only settings you fill in yourself, and only for the provi
 
 `make up` then:
 
-1. downloads the libraries' Grafana dashboards at the releases pinned in `versions.env`, skipping a library with no release pinned
-2. creates local Supabase's Docker network, `supabase_network_stackr-supabase`, if it doesn't exist
-3. runs `supabase start`, because the `langfuse` and `gateway` profiles keep data in PostgreSQL
-4. runs `docker compose` with the `observability`, `langfuse` and `gateway` profiles, and waits until every service with a health check is healthy
+1. creates local Supabase's Docker network, `supabase_network_stackr-supabase`, if it doesn't exist
+2. runs `supabase start`, because the `langfuse` and `gateway` profiles keep data in PostgreSQL
+3. runs `docker compose` with the `observability`, `langfuse` and `gateway` profiles, and waits until every service with a health check is healthy
 
 Langfuse and the gateway run their database migrations on the first start, so the first `make up` takes a few minutes.
 
@@ -116,15 +115,15 @@ The key is shown only once. Running it again keeps the team, and creates another
 The template asks a few questions (the name, which libraries, whether to include evals) and generates an application wired to the stack:
 
 ```bash
-cd ..
-uvx copier copy gh:alexnodeland/stackr my-app
+cd ../../..         # out of the clone of lattice
+uvx copier copy gh:alexnodeland/lattice my-app
 cd my-app
 git init            # the git hooks and `copier update` need a repository
 make install        # the dependencies, which writes uv.lock (commit it), and the git hooks
 make env            # .env, from .env.example
 ```
 
-Copier takes the latest release tag. stackr has none yet, so Copier warns that it found no tags and uses `main`.
+Copier takes the latest tag that is a version. lattice's tags carry their package's name, as in `artifactr-v0.1.0`, so none is, and Copier warns that it found no tags and uses `main`.
 
 Fill in `.env`, which the application reads:
 

@@ -48,10 +48,9 @@ A database only starts with a profile that keeps data in it: `make up PROFILES=o
 `make up` is a thin wrapper, so you can see exactly what it does:
 
 1. `make .env`, which runs `make env` only if `.env` is missing or older than `.env.example`
-2. `make dashboards`, which downloads the libraries' Grafana dashboards pinned in `versions.env`
-3. `docker network create supabase_network_stackr-supabase`, if that network doesn't exist
-4. `supabase start`, if a chosen profile needs PostgreSQL and the adapter is Supabase; `SUPABASE_START_FLAGS` passes flags to it, such as `-x studio,imgproxy` to skip services
-5. `docker compose --profile ... up --detach --wait`, with three variables derived from the profiles: `STACKR_TRACES_EXPORTERS` (the Collector's trace exporters), `STACKR_GATEWAY_TELEMETRY` (the gateway's telemetry), and, for the `postgres` adapter, `STACKR_DB_HOST` and `STACKR_DB_ADMIN_PASSWORD`
+2. `docker network create supabase_network_stackr-supabase`, if that network doesn't exist
+3. `supabase start`, if a chosen profile needs PostgreSQL and the adapter is Supabase; `SUPABASE_START_FLAGS` passes flags to it, such as `-x studio,imgproxy` to skip services
+4. `docker compose --profile ... up --detach --wait`, with three variables derived from the profiles: `STACKR_TRACES_EXPORTERS` (the Collector's trace exporters), `STACKR_GATEWAY_TELEMETRY` (the gateway's telemetry), and, for the `postgres` adapter, `STACKR_DB_HOST` and `STACKR_DB_ADMIN_PASSWORD`
 
 Compose's own defaults for those variables are the full stack on local Supabase, so plain `docker compose --profile observability --profile langfuse --profile gateway up` works too, once local Supabase is running and its network exists. (`--profile '*'` would start the `postgres` and `smoke` profiles as well.) With the `postgres` adapter, set the two database variables yourself, or use `make`.
 
@@ -59,7 +58,7 @@ Compose's own defaults for those variables are the full stack on local Supabase,
 
 ## Networks
 
-- **`stackr`** is the Compose project's network, with a fixed name. Every service is on it, and reaches the others by service name: `otel-collector:4317`, `litellm:4000`, `langfuse-web:3000`. The libraries' dev containers and applications join it as an external network to do the same ([ADR-0006](../adr/0006-networks-and-published-ports.md)).
+- **`stackr`** is the Compose project's network, with a fixed name. Every service is on it, and reaches the others by service name: `otel-collector:4317`, `litellm:4000`, `langfuse-web:3000`. Applications, and the libraries' reference implementations, join it as an external network to do the same ([ADR-0006](../adr/0006-networks-and-published-ports.md)).
 - **`supabase_network_stackr-supabase`** is local Supabase's network. The services that use PostgreSQL (`db-init`, Langfuse's web server and worker, and the gateway) join it as well, to reach `supabase_db_stackr-supabase` by name. `make up` creates it before `supabase start`, so the CLI joins it rather than owning it, and `supabase stop` never removes it from under running services.
 
 A container that needs both the stack and Supabase's PostgreSQL by name joins both networks, as the application template's app profile and dev container do. From the host, use the published ports instead.

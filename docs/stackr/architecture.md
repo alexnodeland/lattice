@@ -4,7 +4,7 @@
 
 ## What stackr is
 
-stackr is the **infrastructure template** for applications built on [artifactr](https://github.com/alexnodeland/artifactr), [reflexr](https://github.com/alexnodeland/reflexr) and evalr. It has two parts:
+stackr is the **infrastructure template** for applications built on [artifactr](../artifactr/index.md), [reflexr](../reflexr/index.md) and [evalr](../evalr/index.md). It has two parts:
 
 - **The stack:** the services those applications run on (a database platform, an LLM gateway, telemetry and LLM observability), as one Docker Compose project with profiles, beside local Supabase.
 - **The application template:** a Copier template that scaffolds an application already wired to the stack.
@@ -29,29 +29,31 @@ The settings are a contract with the libraries' extras and the application templ
 
 ## Layout
 
+In lattice, stackr is `packages/stackr/`:
+
 ```
 compose.yaml        the stack: one Compose project, with profiles
 copier.yml          the application template's questions; its files are in template/
 template/           the application template (Copier): an application on artifactr, reflexr or both
 .env.example        settings and placeholders; `make env` turns it into .env
-versions.env        versions pinned outside compose.yaml: the Supabase CLI, the libraries' dashboards
+versions.env        versions pinned outside compose.yaml: the Supabase CLI
 deploy/<service>/   each service's configuration, mounted read-only
 deploy/postgres/    init.sql: each service's role and database, created by db-init
 supabase/           the Supabase CLI project: config.toml (project id stackr-supabase) and seed.sql
-scripts/            setup-env, validate, smoke, fetch-dashboards, create-tenant, bump-libraries, check-config,
-                    check-template, docs-reference and check_site.py, run by make and CI; _env.py reads the
-                    settings files for the Python ones
-docs/               this document, ADRs and RFCs, and the documentation site's other pages
-mkdocs.yml          the documentation site's configuration, built with Zensical
+scripts/            setup-env, validate, smoke, create-tenant, bump-libraries, check-config, check-template,
+                    check-app and docs-reference, run by make, moon and CI; _env.py reads the settings files
+                    for the Python ones
 ```
+
+stackr's documentation, this page, its ADRs and its RFCs included, is lattice's `docs/stackr/`, which lattice's one docs build makes into stackr's section of the site.
 
 ## Conventions
 
 - **One Compose project, named `stackr`,** with profiles, so only what a task needs runs ([ADR-0001](adr/0001-compose-first-with-profiles.md)).
-- **A fixed network name, `stackr`.** The libraries' dev containers and applications join it as an external network and reach every service by name, such as `otel-collector:4317` ([ADR-0006](adr/0006-networks-and-published-ports.md)).
+- **A fixed network name, `stackr`.** Applications, and the libraries' reference implementations, join it as an external network and reach every service by name, such as `otel-collector:4317` ([ADR-0006](adr/0006-networks-and-published-ports.md)).
 - **Published ports bind to `STACKR_BIND`,** `127.0.0.1` by default, so the stack is reachable from this machine only. Each port is a setting in `.env`. Local Supabase's ports are the exception: its CLI publishes them on every interface ([ADR-0009](adr/0009-local-supabase-as-the-database-adapter.md)).
 - **Images run natively.** `make` unexports `DOCKER_DEFAULT_PLATFORM`, which would otherwise run them under emulation.
-- **Images are pinned** to versions, and Dependabot proposes updates.
+- **Images are pinned** to versions, and Renovate proposes updates.
 - **Secrets are generated** into a gitignored `.env` by `scripts/setup-env`. `.env.example` holds only settings and placeholders. Compose fails when a required value is missing, rather than starting a service with an empty secret.
 
 ## The observability profile
@@ -106,17 +108,11 @@ Prometheus translates OTLP metrics with its default strategy. The libraries' das
 - **Links between signals:** a span links to its service's logs around the span's time, filtered to the trace (Loki); to its service's span metrics (Prometheus); and to its service's CPU profile (Pyroscope). Log lines with a `trace_id` link to the trace, and histogram exemplars link to the trace that produced them. Tempo's service map and node graph read the service graph metrics.
 - **Dashboards** are files under `deploy/grafana/dashboards/`, one folder per directory:
   - `stackr/` is committed. **Collector health** (`stackr-collector`) shows what the Collector receives, what each backend receives, send failures, queues, memory and CPU, and whether each of the stack's services is up.
-  - `artifactr/` and `reflexr/` are the libraries' own dashboards, downloaded by `make dashboards` (and `make up`) at the release pinned in `versions.env`, and gitignored.
+  - `artifactr/` and `reflexr/` are the libraries' own dashboards, mounted from the libraries' directories in lattice.
 
 ### The libraries' dashboards
 
-Each library publishes its dashboards with every release, as one archive of dashboard JSON files at
-
-```
-https://github.com/alexnodeland/<library>/releases/download/v<version>/<library>-dashboards-<version>.tar.gz
-```
-
-`versions.env` pins the release for each library (`ARTIFACTR_DASHBOARDS_VERSION`, `REFLEXR_DASHBOARDS_VERSION`), with an optional sha256 of the archive. `scripts/fetch-dashboards` downloads each pinned archive, checks its sha256, and replaces the library's folder. A library with no version pinned is skipped, and a failed download is a warning (an error with `--strict`), so `make up` works offline and before a library has published. To move to a new release, change its version and sha256 in `versions.env`, then run `make dashboards` and `make smoke`.
+Each library generates its dashboards into its own `deploy/grafana/dashboards/`, and tests them against its metric registry. `compose.yaml` mounts each library's directory, `packages/<library>/deploy/grafana/dashboards/` in lattice, read-only as a folder of its own beside stackr's, so Grafana shows the dashboards of the checkout the stack runs from. Nothing is downloaded or pinned.
 
 ## The langfuse profile
 
@@ -194,15 +190,15 @@ The `supabase/` directory is a Supabase CLI project, close to what `supabase ini
 
 ## The application template
 
-A Copier template generates an application on artifactr, reflexr or both, wired to the stack's ports only ([ADR-0004](adr/0004-the-application-template.md), [ADR-0011](adr/0011-the-application-template-in-detail.md), [ADR-0015](adr/0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md)). Its questions are in `copier.yml` at the repository's root, and its files in `template/`:
+A Copier template generates an application on artifactr, reflexr or both, wired to the stack's ports only ([ADR-0004](adr/0004-the-application-template.md), [ADR-0011](adr/0011-the-application-template-in-detail.md), [ADR-0015](adr/0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md)). Its questions are in stackr's `copier.yml`, which the `copier.yml` at lattice's root includes, since Copier reads a repository's root, and its files in `template/`:
 
 ```bash
-uvx copier copy gh:alexnodeland/stackr my-app    # or a path to a clone of stackr
+uvx copier copy gh:alexnodeland/lattice my-app    # or a path to a clone of lattice
 cd my-app && git init && make install && make env && make check
 uvx copier update                                # later: the template's improvements
 ```
 
-It asks for the application's name, slug and description, which libraries it uses (`artifactr`, `reflexr` or `both`), whether to include evals, the Python version and the published port; [Template questions](reference/template.md) lists each, generated from `copier.yml`. The libraries' revisions aren't questions: the template pins artifactr and reflexr to commits, which `make bump-libraries` moves to each library's `main` and `copier update` carries to applications, and evalr comes with them at the commit their own sources pin ([ADR-0013](adr/0013-how-the-template-pins-the-libraries.md)).
+It asks for the application's name, slug and description, which libraries it uses (`artifactr`, `reflexr` or `both`), whether to include evals, the Python version and the published port; [Template questions](reference/template.md) lists each, generated from `copier.yml`. The libraries' revisions aren't questions: the template pins artifactr and reflexr to commits, which `make bump-libraries` moves to each library's `main` and `copier update` carries to applications, and evalr comes with them at the commit their own sources pin ([ADR-0013](adr/0013-how-the-template-pins-the-libraries.md)). Until phase 4 of [RFC-0003](rfcs/0003-one-repository-lattice.md#phases), those commits are in the libraries' old repositories, which are frozen.
 
 A generated application:
 
@@ -226,4 +222,4 @@ Every command is a `make` target, and `make` on its own lists them. [Makefile ta
 
 ## Validation
 
-CI checks the stack two ways on every pull request, with the same scripts you run locally. `make validate` checks every configuration without starting anything, with each service's own validator and with stackr's checks where a service has none. `make smoke` runs against a started stack, on each database adapter, and follows telemetry and a gateway request to where they land; `make smoke-app` follows an application generated from the template the same way. The Docs workflow builds this site with `make docs` ([ADR-0014](adr/0014-one-docs-build.md)). [Validation and CI](guides/validation.md) and [The smoke tests](guides/smoke-tests.md) describe each check.
+CI checks the stack two ways on every pull request that changes stackr, with the same scripts you run locally. `make validate` checks every configuration without starting anything, with each service's own validator and with stackr's checks where a service has none. `make smoke` runs against a started stack, on each database adapter, and follows telemetry and a gateway request to where they land; `make smoke-app` follows an application generated from the template the same way. lattice's one docs build, `moon run lattice:docs`, builds this site with the other packages' sections ([ADR-0014](adr/0014-one-docs-build.md)). [Validation and CI](guides/validation.md) and [The smoke tests](guides/smoke-tests.md) describe each check.

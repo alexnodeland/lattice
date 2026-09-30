@@ -35,7 +35,9 @@ tasks:
       - 'validate'
       - 'reference'
 
-  # CI's Template and Smoke jobs, with their matrix values in the environment.
+  # CI's Template and Smoke jobs, with their matrix values in the environment. The values aren't
+  # inputs: moon counts a variable that is set as a change, so every variant would run on every
+  # pull request.
   template:
     description: 'Generate one application from the template and run its own checks'
     command: 'scripts/check-app'
@@ -43,9 +45,6 @@ tasks:
       - '**/*'
       - '/copier.yml'
       - '/uv.lock'
-      - '$TEMPLATE_LIBRARIES'
-      - '$TEMPLATE_EVALS'
-      - '$TEMPLATE_PYTHON'
     options:
       cache: false
 

@@ -13,8 +13,6 @@ from inspect import isawaitable
 from itertools import groupby
 from typing import Any
 
-from evalr.core import Example, Task
-from evalr.measures import Turn
 from pydantic import BaseModel
 from pydantic_ai import (
     Agent,
@@ -46,6 +44,8 @@ from artifactr.core import (
     UserActor,
 )
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
+from evalr.core import Example, Task
+from evalr.measures import Turn
 
 REPLAYER = UserActor(id="replay", name="replay")
 """The person who sends a replayed turn's message, unless another is given."""

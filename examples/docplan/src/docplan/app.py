@@ -28,7 +28,6 @@ from importlib.metadata import version
 from typing import Any
 
 import uvicorn
-from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
 from fastapi import FastAPI
 from pydantic_ai.models import Model
 from sqlalchemy import make_url
@@ -48,6 +47,7 @@ from artifactr.workspace import Storage
 from docplan.agent import build_agent
 from docplan.artifacts import Doc, EditSize, Plan, Rating
 from docplan.evals import online_from_environment
+from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
 
 TENANT: TenantId = "demo"
 MIRRORED = "main"

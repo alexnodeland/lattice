@@ -13,8 +13,6 @@ from collections.abc import Collection, Sequence
 from inspect import isawaitable
 from typing import Literal
 
-from evalr.core import Evaluator, ScoreSink, Verdict
-from evalr.online import Budget, OnlineEvaluation, OnlineResult
 from opentelemetry import context, trace
 from pydantic import BaseModel
 
@@ -22,6 +20,8 @@ from artifactr.agent import EndedTurn, TurnOutcome
 from artifactr.core import EvaluatorActor, Feedback, GiveFeedback, ThreadTarget, TurnTarget
 from artifactr.evals.context import BuildTurnInput, target_context
 from artifactr.workspace import Workspace
+from evalr.core import Evaluator, ScoreSink, Verdict
+from evalr.online import Budget, OnlineEvaluation, OnlineResult
 
 logger = logging.getLogger("artifactr.evals")
 

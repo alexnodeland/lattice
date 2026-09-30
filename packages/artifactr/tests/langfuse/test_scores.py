@@ -1,11 +1,11 @@
 """The feedback mirror records through evalr's Langfuse score sink."""
 
-from evalr.langfuse import LangfuseScoreSink
 from opentelemetry.sdk.trace import TracerProvider
 
 from artifactr.core import AgentActor, GiveFeedback, RunStarted, TurnTarget, UserActor
 from artifactr.scores import FeedbackMirror
 from artifactr.workspace import InMemoryStorage, Workspaces
+from evalr.langfuse import LangfuseScoreSink
 from tests.langfuse.conftest import Backend
 
 TRACE = "4bf92f3577b34da6a3ce929d0e0e4736"

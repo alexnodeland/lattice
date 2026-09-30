@@ -8,11 +8,11 @@ from typing import Any
 import httpx
 import pytest
 import uvicorn
+from conftest import BASE, FakeClock, Script, log, publish, triage
 from mcp import Client
 from mcp.types import TextContent
 
 import oncall.app
-from conftest import BASE, FakeClock, Script, log, publish, triage
 from oncall.app import Oncall, create_app, open_database
 from oncall.services import Rollback
 

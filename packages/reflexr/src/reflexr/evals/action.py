@@ -3,9 +3,9 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import KW_ONLY, dataclass
 
-from evalr.core import Evaluator, HandOff
 from pydantic import BaseModel, JsonValue
 
+from evalr.core import Evaluator, HandOff
 from reflexr.core import EvaluatorActor, Feedback, FeedbackTarget
 from reflexr.workspace import Reaction
 

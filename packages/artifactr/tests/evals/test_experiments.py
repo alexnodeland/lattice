@@ -1,12 +1,12 @@
 """Experiment tasks: a thread's turn replayed against a candidate agent, in isolation."""
 
-from evalr.core import Dataset, Example, FunctionEvaluator
-from evalr.measures import Turn
-from evalr.memory import InMemoryExperimentTracker
 from pydantic import BaseModel
 from pydantic_ai import ModelMessage, ModelRequest, ModelResponse, TextPart, ToolReturnPart
 
 from artifactr.evals import Replay, Seed, replay_task
+from evalr.core import Dataset, Example, FunctionEvaluator
+from evalr.measures import Turn
+from evalr.memory import InMemoryExperimentTracker
 from tests.agent.conftest import Gate, Script, call, make_agent, say
 from tests.artifact_types import Checklist, Helpfulness, Note
 

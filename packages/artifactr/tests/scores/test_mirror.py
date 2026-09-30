@@ -6,8 +6,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from evalr.core import Score
-from evalr.memory import InMemoryScoreSink
 from opentelemetry.sdk.trace import TracerProvider
 
 from artifactr.core import (
@@ -27,6 +25,8 @@ from artifactr.core import (
 )
 from artifactr.scores import FeedbackMirror, sync_score_configs
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
+from evalr.core import Score
+from evalr.memory import InMemoryScoreSink
 from tests.artifact_types import Accuracy, Helpfulness, Note
 from tests.scores.fakes import seeded
 

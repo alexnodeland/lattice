@@ -8,11 +8,11 @@ with ``name=``.
 
 from collections.abc import Mapping
 
-import evalr.core
-from evalr.core import ScoreConfig
 from pydantic import JsonValue
 
+import evalr.core
 from artifactr.core import Feedback
+from evalr.core import ScoreConfig
 
 
 def score_configs(feedback_type: type[Feedback]) -> tuple[ScoreConfig, ...]:

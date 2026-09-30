@@ -21,28 +21,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from evalr import (
-    Dataset,
-    Evaluator,
-    Example,
-    ExperimentResult,
-    FunctionEvaluator,
-    Measurement,
-    collect,
-    measure,
-    optimize,
-)
-from evalr.measures import (
-    Turn,
-    completion_rate,
-    drop_off_evaluator,
-    drop_off_rate,
-    rewrite_evaluator,
-    rewrite_rate,
-    share_changed,
-)
-from evalr.memory import BestOf, InMemoryExperimentTracker
-from evalr.online import Budget
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
@@ -68,6 +46,28 @@ from artifactr.evals import (
     thread_sessions,
 )
 from docplan.artifacts import Doc, EditSize, Plan
+from evalr import (
+    Dataset,
+    Evaluator,
+    Example,
+    ExperimentResult,
+    FunctionEvaluator,
+    Measurement,
+    collect,
+    measure,
+    optimize,
+)
+from evalr.measures import (
+    Turn,
+    completion_rate,
+    drop_off_evaluator,
+    drop_off_rate,
+    rewrite_evaluator,
+    rewrite_rate,
+    share_changed,
+)
+from evalr.memory import BestOf, InMemoryExperimentTracker
+from evalr.online import Budget
 
 THRESHOLDS = (0.25, 0.5, 0.75)
 """The function judge's thresholds that :func:`calibrate` chooses from."""
@@ -175,6 +175,7 @@ def dspy_judge(model: str) -> Evaluator[TurnEdits, EditSize]:
     one that was not. It needs docplan's ``dspy`` extra, so DSPy is imported only here.
     """
     import dspy
+
     from evalr.dspy import DspyJudge
 
     return DspyJudge(EditSize, inputs=TurnEdits, name="edit-size-judge", lm=dspy.LM(model))

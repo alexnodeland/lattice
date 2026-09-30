@@ -10,8 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from evalr import Dataset, Example, measure
-from evalr.measures import Turn
+from conftest import Script, call, say, wait_for
 from fastapi.testclient import TestClient
 from pydantic_ai import ModelMessage, ModelRequest, ModelResponse, ToolReturnPart, UserPromptPart
 from rich.console import Console
@@ -19,7 +18,6 @@ from rich.console import Console
 from artifactr import SystemActor, Workspace, Workspaces
 from artifactr.core import EvaluatorActor, FeedbackGiven, TurnTarget
 from artifactr.sql import SqlStorage
-from conftest import Script, call, say, wait_for
 from docplan import evaluate
 from docplan.agent import build_agent
 from docplan.app import TENANT, create_app, open_database
@@ -36,6 +34,8 @@ from docplan.evals import (
     online_from_environment,
     replay,
 )
+from evalr import Dataset, Example, measure
+from evalr.measures import Turn
 
 BASE = "/v1/workspaces/main"
 DRAFT = "We ship search on Friday.\n\nThe index is ready."

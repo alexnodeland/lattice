@@ -5,10 +5,10 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 import pytest
-from evalr.core import Score
-from evalr.memory import InMemoryScoreSink
 from opentelemetry.sdk.trace import TracerProvider
 
+from evalr.core import Score
+from evalr.memory import InMemoryScoreSink
 from reflexr import Rule, SourceActor, UserActor, on, run
 from reflexr.core import ChainTarget, FeedbackGiven, FiringTarget, RunTarget
 from reflexr.scores import FeedbackMirror, sync_score_configs

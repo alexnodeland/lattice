@@ -20,8 +20,6 @@ from datetime import UTC, datetime
 from typing import assert_never
 
 import evalr.core
-from evalr.core import Score, ScoreConfigStore, ScoreSink
-
 from artifactr.core import (
     AgentActor,
     ArtifactTarget,
@@ -38,6 +36,7 @@ from artifactr.core import (
 from artifactr.scores.mapping import score_configs, score_values
 from artifactr.telemetry import untraced
 from artifactr.workspace import Workspace
+from evalr.core import Score, ScoreConfigStore, ScoreSink
 
 _SCORE_IDS = uuid.UUID("8d0e3b5c-3f7a-4a51-9c1e-6f2b7d4a9e10")
 """The namespace of score ids."""

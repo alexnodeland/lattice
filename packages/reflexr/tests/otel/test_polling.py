@@ -12,12 +12,12 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
-from evalr.memory import InMemoryScoreSink
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader, NumberDataPoint
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from evalr.memory import InMemoryScoreSink
 from reflexr import Rule, SourceActor, on, run
 from reflexr.core import Envelope
 from reflexr.otel import TelemetryHandle, configure_telemetry

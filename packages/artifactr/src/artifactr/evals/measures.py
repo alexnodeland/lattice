@@ -11,9 +11,6 @@
 from collections.abc import Callable
 from datetime import datetime
 
-from evalr import measures
-from evalr.measures import Activity, History, Role, Session, Transcript, Turn
-
 from artifactr.core import (
     Actor,
     Artifact,
@@ -39,6 +36,8 @@ from artifactr.core import (
 )
 from artifactr.evals.context import TargetContext
 from artifactr.workspace import Workspace
+from evalr import measures
+from evalr.measures import Activity, History, Role, Session, Transcript, Turn
 
 
 # evalr's TaskCompletion as a feedback type: people give it, evaluators' verdicts are recorded as

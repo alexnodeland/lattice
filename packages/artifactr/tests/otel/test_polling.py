@@ -11,7 +11,6 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
-from evalr.memory import InMemoryScoreSink
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader, NumberDataPoint
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -22,6 +21,7 @@ from artifactr.scores import FeedbackMirror
 from artifactr.sql import SqlStorage, create_schema, create_sqlite_engine
 from artifactr.telemetry import untraced
 from artifactr.workspace import Workspace, Workspaces
+from evalr.memory import InMemoryScoreSink
 
 POLL = timedelta(milliseconds=5)
 CURSOR = "langfuse"

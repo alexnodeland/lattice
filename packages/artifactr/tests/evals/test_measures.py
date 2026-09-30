@@ -3,19 +3,6 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from evalr.core import FunctionEvaluator
-from evalr.measures import (
-    Revision,
-    Transcript,
-    Turn,
-    completion_rate,
-    drop_off_evaluator,
-    drop_off_rate,
-    measure_drop_off,
-    measure_rewrites,
-    rewrite_evaluator,
-    rewrite_rate,
-)
 
 from artifactr.core import (
     Actor,
@@ -44,6 +31,19 @@ from artifactr.evals import (
     thread_sessions,
 )
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
+from evalr.core import FunctionEvaluator
+from evalr.measures import (
+    Revision,
+    Transcript,
+    Turn,
+    completion_rate,
+    drop_off_evaluator,
+    drop_off_rate,
+    measure_drop_off,
+    measure_rewrites,
+    rewrite_evaluator,
+    rewrite_rate,
+)
 from tests.artifact_types import Checklist, Note
 
 ALICE = UserActor(id="alice", name="Alice")

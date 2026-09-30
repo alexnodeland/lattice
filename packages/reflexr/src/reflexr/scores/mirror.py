@@ -20,7 +20,6 @@ from typing import assert_never
 
 import evalr.core
 from evalr.core import Score, ScoreConfigStore, ScoreSink
-
 from reflexr.core import (
     ChainTarget,
     Envelope,

@@ -5,10 +5,6 @@ import logging
 from typing import Any, cast
 
 import pytest
-from evalr.core import FunctionEvaluator, HandOff, Verdict
-from evalr.measures import Transcript
-from evalr.memory import InMemoryScoreSink
-from evalr.online import Budget, OnlineResult
 from pydantic import BaseModel
 from pydantic_ai import DeferredToolRequests
 
@@ -22,6 +18,10 @@ from artifactr.core import (
 )
 from artifactr.evals import OnlineEvaluator, TargetContext, TaskCompletion, completion_transcript
 from artifactr.workspace import Workspace
+from evalr.core import FunctionEvaluator, HandOff, Verdict
+from evalr.measures import Transcript
+from evalr.memory import InMemoryScoreSink
+from evalr.online import Budget, OnlineResult
 from tests.agent.conftest import Gate, Script, call, make_agent, say, started
 from tests.artifact_types import Accuracy, Helpfulness
 from tests.evals.conftest import Said, said

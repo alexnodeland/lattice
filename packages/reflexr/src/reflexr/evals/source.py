@@ -8,9 +8,9 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Collection
 from dataclasses import dataclass
 from inspect import isawaitable
 
-from evalr.core import Example
 from pydantic import BaseModel
 
+from evalr.core import Example
 from reflexr.core import (
     ChainTarget,
     Envelope,

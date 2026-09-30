@@ -5,11 +5,11 @@ evalr owns the mapping and pins it with a fixture of what these tests expected b
 
 from typing import Annotated
 
-from evalr.core import MAX_TEXT, ScoreConfig
 from pydantic import Field
 
 from artifactr.core import Feedback
 from artifactr.scores import score_configs, score_values
+from evalr.core import MAX_TEXT, ScoreConfig
 from tests.artifact_types import Accuracy, Helpfulness
 
 

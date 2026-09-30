@@ -1,8 +1,8 @@
 """The feedback mirror records through evalr's Langfuse score sink."""
 
-from evalr.langfuse import LangfuseScoreSink
 from opentelemetry.sdk.trace import TracerProvider
 
+from evalr.langfuse import LangfuseScoreSink
 from reflexr import Rule, SourceActor, UserActor, on, run
 from reflexr.core import RunTarget
 from reflexr.scores import FeedbackMirror

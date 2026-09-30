@@ -2,8 +2,6 @@
 
 from collections.abc import Collection
 
-from evalr.contracts import check_feedback_source
-from evalr.core import collect
 from pydantic import JsonValue
 
 from artifactr.core import (
@@ -20,6 +18,8 @@ from artifactr.core import (
 )
 from artifactr.evals import FeedbackContext, LogFeedbackSource, TargetContext, target_context
 from artifactr.workspace import Workspace
+from evalr.contracts import check_feedback_source
+from evalr.core import collect
 from tests.artifact_types import Accuracy, Helpfulness, Note
 from tests.evals.conftest import Said, chat, said
 from tests.telemetry.conftest import Recorder

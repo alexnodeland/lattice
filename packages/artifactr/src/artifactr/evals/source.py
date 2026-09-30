@@ -4,12 +4,12 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Collection, Sequ
 from dataclasses import dataclass
 from inspect import isawaitable
 
-from evalr.core import Example
 from pydantic import BaseModel
 
 from artifactr.core import Envelope, EvaluatorActor, Feedback, FeedbackGiven, TargetKind
 from artifactr.evals.context import TargetContext, read_context
 from artifactr.workspace import Workspace
+from evalr.core import Example
 
 
 @dataclass(frozen=True, kw_only=True)

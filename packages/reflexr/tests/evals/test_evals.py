@@ -2,11 +2,11 @@
 
 from typing import Any
 
-from evalr.contracts import check_feedback_source
-from evalr.core import FunctionEvaluator, HandOff
 from opentelemetry.sdk.trace import TracerProvider
 from pydantic import BaseModel
 
+from evalr.contracts import check_feedback_source
+from evalr.core import FunctionEvaluator, HandOff
 from reflexr import EvaluatorActor, F, Feedback, Rule, SourceActor, UserActor, by, on, run
 from reflexr.core import ChainTarget, FeedbackGiven, FiringTarget, RunSucceeded, RunTarget
 from reflexr.evals import (

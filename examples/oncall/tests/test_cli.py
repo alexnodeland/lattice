@@ -9,9 +9,9 @@ from typing import Any
 
 import httpx
 import pytest
+from conftest import FakeClock, Script, eventually, publish, triage
 from rich.console import Console
 
-from conftest import FakeClock, Script, eventually, publish, triage
 from oncall import cli
 from oncall.app import Oncall
 from oncall.cli import (

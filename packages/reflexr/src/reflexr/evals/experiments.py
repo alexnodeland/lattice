@@ -9,10 +9,10 @@ hands the result to the experiment's evaluators. Nothing touches the real worksp
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 
-from evalr.core import Example
-from evalr.core.experiments import Task
 from pydantic import BaseModel
 
+from evalr.core import Example
+from evalr.core.experiments import Task
 from reflexr.core import DEFAULT_REGISTRY, Envelope, Event, EventRegistry, Rule, Run, SourceActor
 from reflexr.workspace import Action, InMemoryStorage, Reactor, Workspaces
 

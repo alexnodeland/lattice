@@ -1,10 +1,10 @@
 """Experiment tasks: replaying examples against a candidate action, in isolation."""
 
 import pytest
-from evalr.core import Dataset, Example, FunctionEvaluator
-from evalr.memory import InMemoryExperimentTracker
 from pydantic import BaseModel
 
+from evalr.core import Dataset, Example, FunctionEvaluator
+from evalr.memory import InMemoryExperimentTracker
 from reflexr import Event, F, InvalidRule, Rule, by, on, run
 from reflexr.core import EventRegistry
 from reflexr.evals import Replay, replay_task

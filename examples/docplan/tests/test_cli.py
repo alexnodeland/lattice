@@ -9,13 +9,13 @@ from typing import Any, cast
 
 import httpx
 import pytest
+from conftest import Hold, Script, call, say
 from prompt_toolkit.application import create_app_session
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 from rich.console import Console
 from websockets.exceptions import ConnectionClosedError
 
-from conftest import Hold, Script, call, say
 from docplan import cli
 from docplan.cli import Client, Local, Renderer, State, command_frame, parse_line
 

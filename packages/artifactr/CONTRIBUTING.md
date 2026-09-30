@@ -22,7 +22,7 @@ Run `make` on its own to list every command:
 | `make typecheck` | Type-check with pyright (strict for `src/` and the example's code) |
 | `make test` | Run the tests with the 100% branch-coverage gate |
 | `make check` | Everything CI runs |
-| `make docs` | Build the documentation site in strict mode and check that its lists rendered, as CI does |
+| `make docs` | Build the documentation site, changelog included, in strict mode and check that its lists rendered, as the Docs workflow does |
 | `make docs-serve` | Serve the documentation site with live reload at <http://localhost:8000> |
 | `make schema` | Regenerate `schemas/artifactr.v1.json` from the protocol models (a test fails if it drifts) |
 | `make dashboards` | Regenerate the Grafana dashboards in `deploy/grafana/dashboards/` from `scripts/grafana_dashboards.py` (a test fails if they drift). Each published release gets them as assets, and as `artifactr-dashboards-<version>.tar.gz` for stackr, from the `Release assets` workflow |
@@ -89,7 +89,7 @@ fix(workspace): release the run lease when a run is cancelled
 docs(adr): record the documentation tooling decision
 ```
 
-Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Scopes are package or area names: `core`, `telemetry`, `workspace`, `agent`, `scores`, `sql`, `fastapi`, `mcp`, `otel`, `langfuse`, `litellm`, `examples`, `deploy`, `docs`, `adr`, `rfc`. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The changelog is generated from these messages. Don't edit `CHANGELOG.md` by hand: the documentation site regenerates it from `main`'s history on every build, and `make changelog` regenerates the file before a release.
+Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`. Scopes are package or area names: `core`, `telemetry`, `workspace`, `agent`, `scores`, `sql`, `fastapi`, `mcp`, `otel`, `langfuse`, `litellm`, `examples`, `deploy`, `docs`, `adr`, `rfc`. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The changelog is generated from these messages. Don't edit `CHANGELOG.md` by hand: `make docs` regenerates it from the history for the documentation site, as every build of the site does, and `make changelog` regenerates the file to commit before a release. Don't commit the `CHANGELOG.md` that `make docs` leaves in your working tree.
 
 ## Dependencies
 

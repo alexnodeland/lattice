@@ -26,10 +26,10 @@ Each record captures one decision: the context that forced it, the options consi
 | [0020](0020-running-agents-in-threads.md) | Running agents in threads | Accepted |
 | [0021](0021-sql-storage.md) | SQL storage with one dialect-neutral implementation | Accepted |
 | [0022](0022-surfaces-over-one-command-handler.md) | Surfaces over one command handler | Superseded by 0048 |
-| [0023](0023-documentation-site.md) | The documentation site | Accepted, amended by 0026 |
+| [0023](0023-documentation-site.md) | The documentation site | Accepted, amended by 0026 and 0050 |
 | [0024](0024-reference-implementation-as-a-workspace-member.md) | The reference implementation as a workspace member | Accepted |
 | [0025](0025-distribution-name.md) | Distributed as artifactr-ai, imported as artifactr | Accepted |
-| [0026](0026-publishing-the-documentation-site.md) | Publishing the documentation site from main | Accepted |
+| [0026](0026-publishing-the-documentation-site.md) | Publishing the documentation site from main | Accepted, amended by 0050 |
 | [0027](0027-opentelemetry-observability-with-langfuse.md) | OpenTelemetry-native observability, with Langfuse primary | Accepted |
 | [0028](0028-typed-feedback-as-events.md) | Typed feedback as events, mirrored to Langfuse | Accepted |
 | [0029](0029-evalr-shared-eval-kit.md) | evalr, a shared eval kit | Accepted |
@@ -53,5 +53,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0047](0047-cancel-safe-storage.md) | Cancel-safe storage | Accepted |
 | [0048](0048-surfaces-over-the-runner.md) | Surfaces over the runner | Accepted |
 | [0049](0049-scores-on-evalr.md) | Scores on evalr | Accepted |
+| [0050](0050-one-docs-build.md) | One docs build | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

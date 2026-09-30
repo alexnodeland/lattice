@@ -212,6 +212,7 @@ nav:
           - adr/0047-cancel-safe-storage.md
           - adr/0048-surfaces-over-the-runner.md
           - adr/0049-scores-on-evalr.md
+          - adr/0050-one-docs-build.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

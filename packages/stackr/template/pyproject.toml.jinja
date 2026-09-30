@@ -77,6 +77,8 @@ convention = "google"
 
 [tool.ruff.lint.isort]
 known-first-party = ["{{ package_name }}"{% if evals %}, "evals"{% endif %}]
+# The tests' helpers come last, whatever the package's name sorts as.
+known-local-folder = ["conftest"]
 # The libraries' adapters share their names with the libraries they adapt.
 known-third-party = ["fastapi", "mcp", "langfuse"]
 # The family's libraries get a section of their own, after the other third-party ones.

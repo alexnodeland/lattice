@@ -11,9 +11,10 @@ from mcp.types import TextContent
 
 from artifactr import new_id
 
-from conftest import TENANT, TENANT_KEY, Script, bearer, call, say, settings, wait_for
 from {{ package_name }}.auth import TokenVerifier
 from {{ package_name }}.collaboration import Collaboration
+
+from conftest import TENANT, TENANT_KEY, Script, bearer, call, say, settings, wait_for
 
 BASE = "/artifactr/v1/workspaces/main"
 

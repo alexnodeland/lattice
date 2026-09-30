@@ -15,8 +15,9 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.otel import TelemetryHandle, configure_telemetry
 
-from conftest import {% if use_reflexr %}OPENED, {% endif %}TENANT, Script, app, bearer, say, wait_for
 from {{ package_name }}.scores import Mirrors, sync_configs
+
+from conftest import {% if use_reflexr %}OPENED, {% endif %}TENANT, Script, app, bearer, say, wait_for
 
 
 class FakeLangfuse:

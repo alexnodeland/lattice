@@ -13,6 +13,10 @@ from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 from mcp.types import TextContent
 
+from {{ package_name }}.auth import TokenVerifier
+from {{ package_name }}.automation import Automation
+from {{ package_name }}.settings import Settings
+
 from conftest import (
     OPENED,
     TENANT,
@@ -27,9 +31,6 @@ from conftest import (
     settings,
     wait_for,
 )
-from {{ package_name }}.auth import TokenVerifier
-from {{ package_name }}.automation import Automation
-from {{ package_name }}.settings import Settings
 
 BASE = "/reflexr/v1/workspaces/main"
 

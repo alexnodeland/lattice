@@ -129,7 +129,7 @@ Nothing runs this on a schedule, and CI doesn't run `--check`, which would fail 
 
 ## How the template is checked
 
-- **`make validate`** renders all six variants (three choices of libraries, with and without evals) with `scripts/check-template`, and checks that nothing is left unrendered, that the Python passes the generated project's own ruff settings, and that the YAML, shell scripts and Compose file pass their linters.
+- **`make validate`** renders all six variants (three choices of libraries, with and without evals) with `scripts/check-template`, under a name whose slug is the longest Copier accepts and whose package sorts before `conftest`, and checks that nothing is left unrendered, that the Python passes the generated project's own ruff settings, and that the YAML, shell scripts and Compose file pass their linters.
 - **CI's template job** generates each variant, and the largest again on Python 3.14, and runs its own `make check`: lint, strict types, and the tests with 100% coverage.
 - **`make smoke-app`** generates an application with both libraries and evals, runs it in its app profile beside the whole stack, and traces its agents through the gateway into Tempo and Langfuse ([The smoke tests](smoke-tests.md)).
 

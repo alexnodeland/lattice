@@ -69,4 +69,4 @@ The rest of ADR-0011, and of its amendments, stands.
 
 ## Action items
 
-1. [ ] Refuse the libraries' names, `artifactr`, `artifactr-ai`, `reflexr` and `evalr`, in the `project_slug` validator.
+1. [x] Refuse the libraries' names, `artifactr`, `artifactr-ai`, `reflexr` and `evalr`, in the `project_slug` validator.

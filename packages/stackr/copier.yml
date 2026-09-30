@@ -33,6 +33,8 @@ project_slug:
     Lowercase letters, digits and single dashes, starting with a letter
     {% elif project_slug | length > 30 %}
     At most 30 characters
+    {% elif project_slug in ['artifactr', 'artifactr-ai', 'reflexr', 'evalr'] %}
+    One of the libraries' names
     {% endif %}
 
 description:

@@ -13,7 +13,7 @@ stackr is configuration, and most of what can go wrong with configuration shows 
 | Grafana dashboards | Every dashboard is valid JSON with a title and a unique uid, and refers only to the provisioned data sources' uids |
 | The Supabase project | Its project id differs from the Compose project's name, the Makefile and `compose.yaml` use it, and every Supabase container or network name in a tracked file, the template's and the documentation's included, is the one it gives |
 | The gateway's configuration | Every model group a fallback names exists, guardrails use integrations that need no licence and valid modes, every `os.environ/` reference is set on the `litellm` service in `compose.yaml`, and no key is written into the file. LiteLLM has no validator of its own, and starts without a guardrail it can't load |
-| The application template | Every variant rendered, with nothing left unrendered, and its Python, YAML, shell scripts and Compose file through their linters (`scripts/check-template`) |
+| The application template | Every variant rendered, under a 30-character slug whose package sorts before `conftest`, with nothing left unrendered, and its Python, YAML, shell scripts and Compose file through their linters (`scripts/check-template`) |
 | Service configurations | Each with its own validator, run from the image `compose.yaml` pins, offline: `otelcol-contrib validate` for the Collector, `promtool check config` for Prometheus, `-config.verify` for Tempo and `-verify-config` for Loki |
 | Shell scripts | shellcheck |
 | Python scripts | ruff's formatter and linter |

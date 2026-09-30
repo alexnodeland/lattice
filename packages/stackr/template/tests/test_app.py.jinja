@@ -16,12 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 import {{ package_name }}.app
 import {{ package_name }}.telemetry
-from conftest import {% if use_reflexr %}TRIAGE, TRIAGED, {% endif %}Script, app, bearer, settings
 from {{ package_name }}.app import DRAIN
 from {{ package_name }}.database import create_schema, open_database
 from {{ package_name }}.gateway import Guardrails, TenantKeys, gateway_model
 from {{ package_name }}.settings import GatewaySettings, Settings
 from {{ package_name }}.telemetry import configure
+
+from conftest import {% if use_reflexr %}TRIAGE, TRIAGED, {% endif %}Script, app, bearer, settings
 
 
 def test_the_root_describes_the_surfaces(client: TestClient) -> None:

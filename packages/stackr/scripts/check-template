@@ -4,7 +4,7 @@
 Usage: scripts/check-template [--keep DIR]
 
 Renders every variant of the template (artifactr, reflexr or both, with and without evals) from
-this checkout, working tree included, and checks each one:
+this checkout, working tree included, under the name in NAME, and checks each one:
 
 - every Jinja expression was rendered: nothing is left of `{{ ... }}` or `{% ... %}`, apart
   from GitHub Actions' own `${{ ... }}`
@@ -34,6 +34,10 @@ VARIANTS = list(itertools.product(["artifactr", "reflexr", "both"], [True, False
 LEFTOVER = re.compile(r"(?<!\$)\{\{|\{%|%\}")
 TEXT = {".py", ".toml", ".yaml", ".yml", ".md", ".json", ".sh", ".example", ""}
 ANSWERS = ".copier-answers.yml"
+NAME = "Acme Template Check At Max Len"
+"""The name every variant is rendered with: its slug is 30 characters, the longest Copier
+accepts, and its package sorts before `conftest`, so line lengths and import order are
+checked at their limits."""
 
 
 def render(libraries: str, evals: bool, destination: Path) -> None:
@@ -44,7 +48,7 @@ def render(libraries: str, evals: bool, destination: Path) -> None:
         run_copy(
             str(ROOT),
             destination,
-            data={"project_name": "Template Check", "libraries": libraries, "evals": evals},
+            data={"project_name": NAME, "libraries": libraries, "evals": evals},
             defaults=True,
             vcs_ref="HEAD",
             quiet=True,

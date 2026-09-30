@@ -18,7 +18,7 @@ The application template's questions are in `copier.yml` at the repository's roo
 
 <!-- end generated -->
 
-Copier checks each answer: the name can't be empty; the slug is lowercase letters, digits and single dashes, starting with a letter, and at most 30 characters; and the port is from 1024 to 65535.
+Copier checks each answer: the name can't be empty; the slug is lowercase letters, digits and single dashes, starting with a letter, at most 30 characters, and not one of the libraries' names (`artifactr`, `artifactr-ai`, `reflexr`, `evalr`), which its package would shadow; and the port is from 1024 to 65535.
 
 ## Derived values
 

@@ -1,6 +1,6 @@
 # ADR-0037: Joining stackr's network when it runs
 
-**Status:** Accepted
+**Status:** Accepted; partly superseded by [lattice ADR-0009](../../adr/0009-one-dev-container-at-the-root.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 

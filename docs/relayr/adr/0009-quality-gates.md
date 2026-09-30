@@ -1,6 +1,6 @@
 # ADR-0009: Quality gates
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0013](0013-relayr-in-lattice.md)
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 

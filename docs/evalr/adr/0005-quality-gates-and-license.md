@@ -1,6 +1,6 @@
 # ADR-0005: Quality gates and license
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0014](0014-evalr-in-lattice.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

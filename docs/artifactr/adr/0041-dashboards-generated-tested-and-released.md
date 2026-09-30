@@ -1,6 +1,6 @@
 # ADR-0041: Dashboards generated, tested and released
 
-**Status:** Accepted
+**Status:** Accepted; its release assets superseded by [ADR-0054](0054-stackr-in-lattice-and-dashboards-from-the-checkout.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

@@ -1,6 +1,6 @@
 # ADR-0012: Trunk-based development with RFCs, ADRs and evergreen docs
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0048](0048-reflexr-in-lattice.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

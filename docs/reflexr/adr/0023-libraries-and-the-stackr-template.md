@@ -1,6 +1,6 @@
 # ADR-0023: Libraries, and stackr as the infrastructure template
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0050](0050-stackr-in-lattice-and-dashboards-from-the-checkout.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

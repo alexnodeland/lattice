@@ -1,6 +1,6 @@
 # ADR-0008: Trunk-based development with RFCs, ADRs and evergreen docs
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0013](0013-relayr-in-lattice.md)
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 

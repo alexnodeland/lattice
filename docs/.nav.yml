@@ -1,6 +1,18 @@
 # The site's sections: the family's pages, and each package's, which its own .nav.yml orders.
 nav:
   - Home: index.md
+  - Architecture: architecture.md
+  - Decisions:
+      - adr/README.md
+      - adr/0002-ci-runs-every-affected-project-and-its-dependents.md
+      - adr/0003-two-required-checks-ci-and-title.md
+      - adr/0004-one-github-app-for-release-please-and-renovate.md
+      - adr/0005-renovate-runs-in-lattices-own-actions.md
+      - adr/0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md
+      - adr/0007-a-timeout-on-every-test-and-every-job.md
+      - adr/0008-one-resolution-litellm-held-at-1-83-0.md
+      - adr/0009-one-dev-container-at-the-root.md
+      - adr/template.md
   - artifactr: artifactr
   - reflexr: reflexr
   - evalr: evalr

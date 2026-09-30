@@ -8,3 +8,4 @@ export PATH="$HOME/.proto/bin:$HOME/.proto/shims:$PATH"
 proto install
 uv python install 3.12 3.13 3.14
 uv sync --all-packages --all-groups --all-extras
+uv run prek install

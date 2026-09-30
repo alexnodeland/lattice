@@ -1,0 +1,76 @@
+# The hooks, which prek runs (`make install` installs them). They run the same tool versions as
+# CI: the Python tools come from uv.lock through `uv run`, and the type checker through moon.
+default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # Each CHANGELOG.md is release-please's output, kept exactly as it writes it.
+      - id: trailing-whitespace
+        exclude: (^|/)CHANGELOG\.md$
+      - id: end-of-file-fixer
+        exclude: (^|/)CHANGELOG\.md$
+      - id: check-yaml
+        # The root copier.yml includes stackr's with a tag of Copier's own.
+        exclude: ^copier\.yml$
+      - id: check-toml
+      - id: check-json
+        exclude: ^\.devcontainer/ # JSON with comments
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        # The lockfile pins the extras' large dependency trees (DSPy, LiteLLM, datasets).
+        exclude: ^uv\.lock$
+      - id: check-executables-have-shebangs
+      - id: detect-private-key
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types: [python]
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+      # yamllint and shellcheck check stackr's files, as they did in stackr.
+      - id: yamllint
+        name: yamllint
+        entry: uv run yamllint --strict -c packages/stackr/.yamllint.yaml
+        language: system
+        types: [yaml]
+        files: ^packages/stackr/
+      - id: shellcheck
+        name: shellcheck
+        entry: uv run shellcheck
+        language: system
+        types: [shell]
+        files: ^packages/stackr/
+      - id: actionlint
+        name: actionlint
+        entry: uv run actionlint
+        language: system
+        files: ^\.github/workflows/
+      - id: zizmor
+        name: zizmor
+        entry: uv run zizmor
+        language: system
+        files: ^\.github/workflows/
+      # pyright, in every project, as each package's hook ran it; moon's cache skips the projects
+      # the change doesn't affect.
+      - id: typecheck
+        name: typecheck
+        entry: moon run :typecheck
+        language: system
+        types: [python]
+        pass_filenames: false

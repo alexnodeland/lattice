@@ -1,0 +1,37 @@
+name: Bug report
+description: Something in a package behaves differently from its documentation.
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options: [artifactr, reflexr, evalr, relayr, stackr, docplan, oncall, docs]
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: >-
+        The smallest code that shows the problem, or for stackr the commands you ran and the
+        relevant logs (`make logs`). Remove any secrets from `.env`.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: >-
+        The package's version or commit, Python's, and those of the libraries or tools involved
+        (for stackr: Docker, Docker Compose, the Supabase CLI and the operating system).
+      placeholder: "artifactr-ai 0.1.0, Python 3.13.2, pydantic-ai-slim 2.51.0"
+    validations:
+      required: true

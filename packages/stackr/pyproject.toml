@@ -1,7 +1,6 @@
 # stackr is not a Python package. This file pins the tools that develop and
-# validate it (linters, pre-commit, git-cliff, Copier for the application
-# template, and Zensical for the documentation site), so `make` and CI run the
-# same versions from uv.lock, as in the rest of the family.
+# validate it (linters, and Copier for the application template), so `make` and
+# CI run the same versions from lattice's uv.lock.
 [project]
 name = "stackr"
 version = "0.0.0"
@@ -14,7 +13,6 @@ dependencies = []
 [dependency-groups]
 dev = [
   "copier>=9.18",
-  "pre-commit>=4.6.2",
   "pyyaml>=6.0.3",
   "ruff>=0.16.9",
   "shellcheck-py>=0.11.0.1",

@@ -1,7 +1,7 @@
 # stackr: everyday commands. `make` lists them.
 #
-# The tools (linters, pre-commit, git-cliff, Zensical) run through uv, so their
-# versions are the ones in uv.lock. The stack itself needs Docker with Compose v2, the
+# The tools (linters and Copier) run through uv, so their versions are the ones in
+# lattice's uv.lock. The stack itself needs Docker with Compose v2, the
 # Supabase CLI for local Supabase, and jq for `validate` and `smoke`.
 
 .DEFAULT_GOAL := help

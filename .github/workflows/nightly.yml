@@ -1,0 +1,93 @@
+# On pushes to main and every night: every project's checks, whatever changed, the reference
+# implementations' images, osv-scanner over the lockfile, and a check of the links in the
+# Markdown. CI runs on pull requests only, so this is what runs on main.
+
+name: Nightly
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: lattice
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      ARTIFACTR_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:lattice@localhost:5432/artifactr
+      REFLEXR_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:lattice@localhost:5432/reflexr
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+        with:
+          auto-install: true
+      - name: One database per library
+        env:
+          PGPASSWORD: lattice
+        run: psql -h localhost -U postgres -c 'CREATE DATABASE artifactr' -c 'CREATE DATABASE reflexr'
+      - run: uv sync --locked --all-packages --all-groups --all-extras
+      - run: moon run :check
+
+  images:
+    name: Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+        with:
+          auto-install: true
+      - run: moon run :image
+
+  osv:
+    name: OSV
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+    with:
+      scan-args: |-
+        --lockfile=uv.lock
+
+  links:
+    name: Links
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: --no-progress --exclude-loopback './**/*.md'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

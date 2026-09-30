@@ -1,0 +1,62 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "f8923f54042264bd7f0091310fde3eeefef15d12",
+  "bump-minor-pre-major": true,
+  "packages": {
+    "packages/artifactr": {
+      "release-type": "python",
+      "package-name": "artifactr",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "/uv.lock",
+          "jsonpath": "$.package[?(@.name.value=='artifactr-ai')].version"
+        }
+      ]
+    },
+    "packages/reflexr": {
+      "release-type": "python",
+      "package-name": "reflexr",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "/uv.lock",
+          "jsonpath": "$.package[?(@.name.value=='reflexr')].version"
+        }
+      ]
+    },
+    "packages/evalr": {
+      "release-type": "python",
+      "package-name": "evalr",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "/uv.lock",
+          "jsonpath": "$.package[?(@.name.value=='evalr')].version"
+        }
+      ]
+    },
+    "packages/stackr": {
+      "release-type": "python",
+      "package-name": "stackr",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "/uv.lock",
+          "jsonpath": "$.package[?(@.name.value=='stackr')].version"
+        }
+      ]
+    },
+    "packages/relayr": {
+      "release-type": "python",
+      "package-name": "relayr",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "/uv.lock",
+          "jsonpath": "$.package[?(@.name.value=='relayr-ai')].version"
+        }
+      ]
+    }
+  }
+}

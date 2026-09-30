@@ -59,6 +59,13 @@ tasks:
     command: 'uv run zensical serve'
     preset: 'server'
 
+  workflows:
+    description: 'Lint the workflows with actionlint and zizmor'
+    script: 'uv run actionlint && uv run zizmor --quiet .github/workflows'
+    inputs:
+      - '.github/workflows/**/*'
+      - 'uv.lock'
+
   check:
     description: "Run the root's checks, as CI does"
     command: 'noop'
@@ -67,3 +74,4 @@ tasks:
       - 'typecheck'
       - 'test'
       - 'docs'
+      - 'workflows'

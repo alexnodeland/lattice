@@ -57,7 +57,6 @@ lint = ["ruff>=0.16", "pyright>=1.1.414"]
 dev = [
     { include-group = "test" },
     { include-group = "lint" },
-    "pre-commit>=4.6",
 ]
 
 [build-system]

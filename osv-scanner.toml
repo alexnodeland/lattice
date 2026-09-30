@@ -1,0 +1,81 @@
+# osv-scanner reads this file beside uv.lock, in CI's OSV job and in the nightly scan. Each
+# ignore says why it holds and lapses at its date, when it is reviewed again. A GHSA's ignore
+# covers the PYSEC and CVE ids that alias it.
+
+[[IgnoredVulns]]
+id = "GHSA-4g5m-c9r5-49xf"
+ignoreUntil = 2026-12-31
+reason = "Local file read through request-supplied OIDC file references, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
+id = "GHSA-4jcj-7x88-m979"
+ignoreUntil = 2026-12-31
+reason = "Improper authentication in the MCP proxy, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
+id = "GHSA-4xpc-pv4p-pm3w"
+ignoreUntil = 2026-12-31
+reason = "Authentication bypass through Host header injection, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
+id = "GHSA-5jmr-gcrj-2c9q"
+ignoreUntil = 2026-12-31
+reason = "Arbitrary file write through path traversal in Skills archive extraction, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
+id = "GHSA-6wvf-77m9-58rm"
+ignoreUntil = 2026-12-31
+reason = "Server-side template injection in the /prompts/test endpoint, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
+id = "GHSA-7488-6r32-c95q"
+ignoreUntil = 2026-12-31
+reason = "MCP authentication bypass through the OAuth2 passthrough fallback, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
+id = "GHSA-hx8v-g79f-8w5f"
+ignoreUntil = 2026-12-31
+reason = "Server-side request forgery through the user_config request parameter, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
+id = "GHSA-qrc4-49gv-mv9m"
+ignoreUntil = 2026-12-31
+reason = "An internal user can create API keys for routes their role doesn't allow, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
+id = "GHSA-r75f-5x8p-qvmc"
+ignoreUntil = 2026-12-31
+reason = "SQL injection in API key verification, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
+id = "GHSA-v4p8-mg3p-g94g"
+ignoreUntil = 2026-12-31
+reason = "Authenticated command execution through the MCP stdio test endpoints, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
+id = "GHSA-wpfp-gwwc-vwq6"
+ignoreUntil = 2026-12-31
+reason = "A user can change their own user_role through /user/update, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
+id = "GHSA-wxxx-gvqv-xp7p"
+ignoreUntil = 2026-12-31
+reason = "Sandbox escape in the custom-code guardrail, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
+id = "GHSA-xqmj-j6mv-4862"
+ignoreUntil = 2026-12-31
+reason = "Server-side template injection in the /prompts/test endpoint, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
+id = "GHSA-w8v5-vhqr-4h9v"
+ignoreUntil = 2026-12-31
+reason = "diskcache 5.6.3 unpickles what its cache directory holds, and no fixed version exists. lattice's cache directories are written only by the process that reads them."
+
+# lattice's oncall is examples/oncall, a workspace member installed from this repository; an
+# unrelated package on PyPI has the same name.
+[[PackageOverrides]]
+name = "oncall"
+ecosystem = "PyPI"
+ignore = true
+reason = "lattice's oncall is its reference implementation, installed from examples/oncall, not PyPI's oncall."

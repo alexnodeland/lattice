@@ -1,0 +1,55 @@
+# The family's one docs build (stackr's RFC-0003, Docs), published to GitHub Pages at
+# https://lattice.alexnodeland.com from main: on every push, so the site always shows main's
+# documentation, and by hand. CI builds the site strictly on every pull request, as the root
+# project's docs task. The custom domain is set in the repository's Pages settings, with
+# "GitHub Actions" as the source.
+
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+# Runs wait their turn, so an older commit never deploys after a newer one.
+concurrency:
+  group: docs
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+        with:
+          auto-install: true
+      # mkdocstrings reads every package from the workspace's environment.
+      - run: uv sync --locked --all-packages --all-groups --all-extras
+      - run: moon run lattice:docs
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+  deploy:
+    name: Deploy
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

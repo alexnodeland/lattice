@@ -1,0 +1,85 @@
+# Releases (stackr's RFC-0003, Releases and versioning). release-please keeps one release pull
+# request open for the packages with unreleased changes. Merging it tags each one
+# <package>-v<version>, updates its CHANGELOG.md and creates its GitHub release. Each released
+# package that ships a wheel is then built alone, as it is published, and its wheel and sdist are
+# attached to its release with a build-provenance attestation. Publishing to PyPI is a later job
+# here.
+#
+# release-please acts as the release GitHub App, with a token minted for each run, so that its
+# pull request's CI and Title checks run, which they never do for the workflow's own token. The
+# App's client ID and private key are the RELEASE_APP_CLIENT_ID and RELEASE_APP_PRIVATE_KEY
+# secrets.
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release pull request
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      packages: ${{ steps.wheels.outputs.packages }}
+      releases: ${{ toJSON(steps.release.outputs) }}
+    steps:
+      - id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+      # The released packages that ship a wheel: all of them but stackr.
+      - id: wheels
+        env:
+          RELEASED: ${{ steps.release.outputs.paths_released || '[]' }}
+        run: echo "packages=$(jq --compact-output 'map(select(. != "packages/stackr"))' <<<"$RELEASED")" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build (${{ matrix.path }})
+    needs: release-please
+    if: needs.release-please.outputs.packages != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        path: ${{ fromJSON(needs.release-please.outputs.packages) }}
+    env:
+      TAG: ${{ fromJSON(needs.release-please.outputs.releases)[format('{0}--tag_name', matrix.path)] }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+        with:
+          auto-install: true
+      - name: Build the package alone, as it is published
+        working-directory: ${{ matrix.path }}
+        run: uv build --no-sources --out-dir dist
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ${{ matrix.path }}/dist/*
+      - name: Attach the wheel and sdist to the release
+        working-directory: ${{ matrix.path }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" dist/*

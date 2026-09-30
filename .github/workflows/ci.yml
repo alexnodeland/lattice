@@ -1,0 +1,221 @@
+# lattice's CI, on every pull request (stackr's RFC-0003, CI and tooling). Check, Tests and Images
+# run their task in every project the pull request affects, and in every project that depends on
+# one, all the way down (scripts/affected.py); Template and Smoke run when stackr's own inputs
+# change. nightly.yml runs everything on main. CI, the last job, and Title (title.yml) are the
+# required checks.
+
+name: CI
+
+on:
+  pull_request:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# What the pull request changes, for moon: its merge commit against its base.
+env:
+  MOON_BASE: origin/${{ github.base_ref }}
+  MOON_HEAD: HEAD
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: lattice
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      ARTIFACTR_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:lattice@localhost:5432/artifactr
+      REFLEXR_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:lattice@localhost:5432/reflexr
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # moon compares with main to find what a change affects
+          persist-credentials: false
+      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+        with:
+          auto-install: true
+      # The libraries' SQL tests run in parallel, so each gets its own database.
+      - name: One database per library
+        env:
+          PGPASSWORD: lattice
+        run: psql -h localhost -U postgres -c 'CREATE DATABASE artifactr' -c 'CREATE DATABASE reflexr'
+      - run: uv sync --locked --all-packages --all-groups --all-extras
+      - run: uv run --no-project python scripts/affected.py check
+
+  tests:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.13", "3.14"]
+    env:
+      UV_PYTHON: ${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+        with:
+          auto-install: true
+      - run: uv sync --locked --all-packages --all-groups --all-extras
+      - run: uv run --no-project python scripts/affected.py test
+
+  # docplan's and oncall's images, each built from the root and started on PostgreSQL.
+  images:
+    name: Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+        with:
+          auto-install: true
+      - run: uv run --no-project python scripts/affected.py image
+
+  # Each variant of the application template, generated and checked as its own CI would: lint,
+  # strict types, and the tests with 100% coverage. It runs only when stackr's inputs change: the
+  # template pins the libraries by revision, so a library's change can't reach what it generates.
+  template:
+    name: Template (${{ matrix.libraries }}${{ matrix.evals && ', evals' || '' }}, Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        libraries: [artifactr, reflexr, both]
+        evals: [true, false]
+        python: ["3.12"]
+        include:
+          - libraries: both
+            evals: true
+            python: "3.14"
+    env:
+      TEMPLATE_LIBRARIES: ${{ matrix.libraries }}
+      TEMPLATE_EVALS: ${{ matrix.evals }}
+      TEMPLATE_PYTHON: ${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+        with:
+          auto-install: true
+      - run: uv sync --locked --all-packages --all-groups --all-extras
+      - run: moon ci stackr:template
+
+  # The stack, started with each set of profiles, and telemetry sent through it. It runs only
+  # when stackr's inputs change.
+  smoke:
+    name: Smoke (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: observability
+            profiles: observability
+            database: supabase
+          - name: everything on local Supabase, and an application
+            profiles: observability langfuse gateway
+            database: supabase
+            app: true
+          - name: everything on PostgreSQL
+            profiles: observability langfuse gateway
+            database: postgres
+    env:
+      PROFILES: ${{ matrix.profiles }}
+      STACKR_DATABASE: ${{ matrix.database }}
+      # Local Supabase without the services the smoke test doesn't use.
+      SUPABASE_START_FLAGS: >-
+        -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta,storage-api,postgrest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+        with:
+          auto-install: true
+      - run: uv sync --locked --all-packages --all-groups --all-extras
+      - name: Read versions.env
+        run: grep -E '^[A-Z_]+=' packages/stackr/versions.env >> "$GITHUB_ENV"
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        if: matrix.database == 'supabase' && matrix.profiles != 'observability'
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+      - run: moon ci stackr:smoke
+      # An application from the template, beside the whole stack (stackr ADR-0011).
+      - if: matrix.app
+        run: moon ci stackr:smoke-app
+      - name: Logs
+        if: failure() && hashFiles('packages/stackr/.env') != ''
+        working-directory: packages/stackr
+        run: |
+          docker ps -a
+          docker compose --profile '*' logs --no-color --tail=200
+      - name: Stop the stack
+        if: always() && hashFiles('packages/stackr/.env') != ''
+        working-directory: packages/stackr
+        run: make reset
+
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+
+  # GitHub's dependency graph doesn't read uv.lock, so osv-scanner compares the pull request's
+  # lockfile with its base's.
+  osv:
+    name: OSV
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+    with:
+      scan-args: |-
+        --lockfile=uv.lock
+
+  ci:
+    name: CI
+    if: always()
+    needs: [check, tests, images, template, smoke, dependency-review, osv]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
+        with:
+          jobs: ${{ toJSON(needs) }}

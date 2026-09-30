@@ -10,7 +10,10 @@ tasks:
     inputs:
       # The layering test holds docplan, the reference implementation, to the public API.
       - '/examples/docplan/src/**/*'
-      - '$ARTIFACTR_TEST_POSTGRES_URL'
+      # $ARTIFACTR_TEST_POSTGRES_URL isn't an input: moon counts a variable that is set as a change, and CI
+      # always sets it, so every pull request would run these tests. CI never restores moon's
+      # cache; locally, `moon run artifactr:test --force` runs the PostgreSQL tests past a cached
+      # run without them.
 
   schema:
     description: 'Regenerate the protocol JSON Schema from the frame models'

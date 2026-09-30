@@ -76,12 +76,7 @@ The log decides what each turn carries out, and each message is consumed in the 
   - The turn's watcher follows from there, so later messages reach the same turn.
   - With no message to consume, the holder counts what it read, up to the head, as taken. It releases the thread and looks again.
   - A claimant that finds the thread claimed does nothing more: the holder hands the thread over.
-- **A run hands its thread over as it releases it**, in a task of its own. So does a claimant that is cancelled, or fails, before it becomes a run, as when a client that sent a command disconnects. The hand-over reads what was asked, and what was taken, after the release, and it proceeds in three cases:
-  - the claimant consumed something;
-  - it was cancelled or stopped;
-  - more was asked since it read.
-
-  A failure that consumed nothing thus hands over only a new ask, so it makes one turn per command. A cancelled or stopped claimant hands over everything not taken, since a command it refused may have asked before it read. Neither can spin: only `aclose` cancels a hand-over, and it closes the runner first.
+- **A run hands its thread over as it releases it**, in a task of its own. So does a claimant that is cancelled, or fails, before it becomes a run, as when a client that sent a command disconnects. The hand-over reads what was asked, and what was taken, after the release. It proceeds if the claimant consumed something, if it was cancelled or stopped, or if more was asked since it read. A failure that consumed nothing hands over only a new ask, so it makes one turn per command. A cancelled or stopped claimant hands over everything not taken, since a command it refused may have asked before it read. Neither can spin: only `aclose` cancels a hand-over, and it closes the runner first.
   - The run's end does not wait for the hand-over: `RunHandle.wait` returns the run's result, and `stop` does not reach it.
   - `Runner.drain` waits until no hand-over is pending, and `aclose` cancels them instead.
   - A closed runner hands nothing over, and starts no run once `aclose` has begun. The thread's next claimant, in any process, carries it out.

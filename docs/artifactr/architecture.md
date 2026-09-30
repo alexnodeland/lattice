@@ -396,6 +396,7 @@ class Transaction(Protocol):
         self, result: CommitResult, *, actor: Actor, traceparent: str | None = None
     ) -> list[Envelope]: ...  # assigns seq
     async def append_history(self, thread_id: ThreadId, messages: bytes) -> None: ...
+    async def save_cursor(self, name: str, seq: int) -> None: ...  # with the transaction
 
 
 class Storage(Protocol):
@@ -650,6 +651,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0052](adr/0052-artifactr-in-lattice.md) | artifactr in lattice |
 | [0053](adr/0053-one-site-for-the-family.md) | One site for the family |
 | [0054](adr/0054-dashboards-from-the-checkout.md) | Dashboards from the checkout |
+| [0055](adr/0055-turns-from-the-log.md) | Turns from the log |
 
 ## Open questions
 

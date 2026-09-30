@@ -1,0 +1,50 @@
+# Hooks run the same tool versions as CI: the tools come from uv.lock via `uv run`.
+default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # CHANGELOG.md is git-cliff's output, kept exactly as it generates it.
+      - id: trailing-whitespace
+        exclude: ^CHANGELOG\.md$
+      - id: end-of-file-fixer
+        exclude: ^CHANGELOG\.md$
+      - id: check-yaml
+      - id: check-json
+        exclude: ^\.devcontainer/  # JSON with comments
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: check-executables-have-shebangs
+      - id: detect-private-key
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+
+  - repo: local
+    hooks:
+      - id: yamllint
+        name: yamllint
+        entry: uv run yamllint --strict
+        language: system
+        types: [yaml]
+      - id: shellcheck
+        name: shellcheck
+        entry: uv run shellcheck
+        language: system
+        types: [shell]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types_or: [python]
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix
+        language: system
+        types_or: [python]

@@ -1,0 +1,140 @@
+# The LiteLLM proxy: the LLM gateway port (ADR-0005, ADR-0010). Applications
+# call its OpenAI-compatible API with a team's virtual key and a model name
+# from this file, never a provider's; the providers are adapters behind it.
+# Provider keys come from .env; a missing one fails only the requests that
+# need it.
+
+model_list:
+  # --- aliases: one provider model each ---------------------------------------
+
+  # Anthropic (Console API key)
+  - model_name: claude-sonnet
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: claude-opus
+    litellm_params:
+      model: anthropic/claude-opus-4-7
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: claude-haiku
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # OpenAI
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  # Google Gemini (AI Studio key)
+  - model_name: gemini-2.5-pro
+    litellm_params:
+      model: gemini/gemini-2.5-pro
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: gemini-2.5-flash
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  # OpenRouter: any of its models, as openrouter/<vendor>/<model>
+  - model_name: openrouter/*
+    litellm_params:
+      model: openrouter/*
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  # Local model servers on the host, reached from the container through
+  # host.docker.internal: LM Studio, and oMLX (any of its models, as
+  # omlx/<model>).
+  - model_name: lmstudio
+    litellm_params:
+      model: lm_studio/local-model
+      api_base: os.environ/LM_STUDIO_API_BASE
+      api_key: lm-studio
+  - model_name: omlx/*
+    litellm_params:
+      model: openai/*
+      api_base: os.environ/OMLX_API_BASE
+      api_key: omlx-local
+
+  # --- model groups: what applications ask for --------------------------------
+  # A group can hold several deployments, which the router balances; on
+  # errors it falls back to the groups in router_settings.fallbacks.
+
+  - model_name: default
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: fast
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 2
+  allowed_fails: 3
+  cooldown_time: 30
+  # Each group falls back across providers, in order.
+  fallbacks:
+    - default: [gpt-4o, gemini-2.5-pro]
+    - fast: [gpt-4o-mini, gemini-2.5-flash]
+  # Routing state (cooldowns, usage) shared through the Redis protocol,
+  # database 1.
+  redis_url: os.environ/REDIS_URL
+
+# Guardrails, defined once and selected per request with
+# `"guardrails": ["pii-mask"]` in the body: the libraries' [litellm] extras
+# choose them from each workspace's or rule's policy. Both run in the proxy,
+# without another service.
+guardrails:
+  - guardrail_name: pii-mask
+    litellm_params:
+      guardrail: litellm_content_filter
+      mode: pre_call
+      default_on: false
+      patterns:
+        - {pattern_type: prebuilt, pattern_name: email, action: MASK}
+        - {pattern_type: prebuilt, pattern_name: us_phone, action: MASK}
+        - {pattern_type: prebuilt, pattern_name: us_ssn, action: MASK}
+        - {pattern_type: prebuilt, pattern_name: visa, action: MASK}
+        - {pattern_type: prebuilt, pattern_name: mastercard, action: MASK}
+        - {pattern_type: prebuilt, pattern_name: amex, action: MASK}
+        - {pattern_type: prebuilt, pattern_name: aws_access_key, action: MASK}
+        - {pattern_type: prebuilt, pattern_name: aws_secret_key, action: MASK}
+        - {pattern_type: prebuilt, pattern_name: github_token, action: MASK}
+  - guardrail_name: prompt-injection
+    litellm_params:
+      guardrail: litellm_content_filter
+      mode: pre_call
+      default_on: false
+      categories:
+        - {category: prompt_injection_jailbreak, enabled: true, action: BLOCK, severity_threshold: medium}
+        - {category: prompt_injection_system_prompt, enabled: true, action: BLOCK, severity_threshold: medium}
+        - {category: prompt_injection_data_exfiltration, enabled: true, action: BLOCK, severity_threshold: medium}
+
+litellm_settings:
+  drop_params: true
+  request_timeout: 600
+  # Responses cached in the Redis protocol's database 1, for 10 minutes.
+  cache: true
+  cache_params:
+    type: redis
+    redis_url: os.environ/REDIS_URL
+    ttl: 600
+
+# The gateway's metrics (token usage, cost, durations) keep the model, the
+# provider and the tenant's team, but not per-key or per-deployment ids, which
+# would make a series per key.
+callback_settings:
+  otel:
+    attributes:
+      exclude_list: [metadata.user_api_key_hash, metadata.user_api_key_alias, hidden_params]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL

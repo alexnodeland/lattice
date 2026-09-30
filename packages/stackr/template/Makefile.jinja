@@ -1,0 +1,68 @@
+# {{ project_name }}: everyday commands. `make` lists them.
+#
+# Everything runs through uv, so the versions used are the ones in uv.lock. The app profile
+# needs Docker with Compose v2 and stackr's stack running (`make up` in stackr).
+
+.DEFAULT_GOAL := help
+UV ?= uv
+COMPOSE ?= docker compose
+
+# Images build and run natively: a DOCKER_DEFAULT_PLATFORM set for other work would build them
+# for another architecture, under emulation.
+unexport DOCKER_DEFAULT_PLATFORM
+
+# Local commands read .env, when there is one.
+ENV_FILE := $(if $(wildcard .env),--env-file .env)
+
+.PHONY: help install env fmt lint typecheck test check serve {% if evals %}evals evals-langfuse {% endif %}up down logs clean
+
+help: ## List the available commands
+	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+install: ## Install the dependencies and the git hooks
+	@git rev-parse --git-dir >/dev/null 2>&1 || { echo 'make install: the git hooks need a git repository, and there is none here; run `git init` first' >&2; exit 1; }
+	$(UV) sync --all-groups
+	$(UV) run pre-commit install --hook-type pre-commit --hook-type commit-msg
+
+env: ## Create .env from .env.example, if there is none
+	@test -f .env && echo ".env exists; compare it with .env.example" || (cp .env.example .env && echo "created .env")
+
+fmt: ## Format the code and apply safe lint fixes
+	$(UV) run ruff format .
+	$(UV) run ruff check --fix .
+
+lint: ## Check formatting and lint rules
+	$(UV) run ruff format --check .
+	$(UV) run ruff check .
+
+typecheck: ## Type-check, strictly
+	$(UV) run pyright
+
+test: ## Run the tests with the 100% branch-coverage gate
+	$(UV) run pytest --cov --cov-report=term-missing
+
+check: lint typecheck test ## Run everything CI runs
+
+serve: ## Serve the application on this machine, with the settings in .env
+	$(UV) run $(ENV_FILE) {{ project_slug }}
+{%- if evals %}
+
+evals: ## Run the starter experiments offline, with a scripted model
+	$(UV) run python -m evals
+
+evals-langfuse: ## Run them in Langfuse, with the gateway's model, as .env configures them
+	$(UV) run $(ENV_FILE) python -m evals --langfuse
+{%- endif %}
+
+up: ## Build and start the application in the app profile, beside stackr's stack
+	$(COMPOSE) --profile app up --detach --build --wait
+
+down: ## Stop the application
+	$(COMPOSE) --profile app down
+
+logs: ## Follow the application's logs
+	$(COMPOSE) --profile app logs --follow --tail=100
+
+clean: ## Remove caches
+	rm -rf .pytest_cache .ruff_cache .coverage coverage.xml htmlcov dist
+	find . -name __pycache__ -type d -prune -not -path './.venv/*' -exec rm -rf {} +

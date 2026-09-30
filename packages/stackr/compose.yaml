@@ -1,0 +1,427 @@
+# stackr: the services applications on artifactr, reflexr and evalr run on.
+#
+# Services are grouped in profiles, which are adapter sets behind stable ports
+# (ADR-0005). Only what a task needs runs:
+#   observability  the OpenTelemetry Collector (the telemetry port), with
+#                  Tempo, Prometheus, Loki, Pyroscope and Grafana behind it
+#   langfuse       Langfuse, behind the Collector for traces, with ClickHouse,
+#                  MinIO (the S3 port) and Valkey (the Redis protocol)
+#   gateway        the LiteLLM proxy (the LLM gateway port), with Valkey
+#   postgres       plain PostgreSQL, the alternative database adapter
+#   smoke          telemetrygen, for scripts/smoke
+# The database adapter is local Supabase by default, run beside this project
+# by its CLI (supabase/). `make up` starts both; see docs/architecture.md.
+#
+# Published ports bind to STACKR_BIND (127.0.0.1 by default), and each is a
+# setting in .env (ADR-0006).
+
+name: stackr
+
+networks:
+  # A fixed name, so the libraries' dev containers and applications can join
+  # it as an external network and reach the services by name.
+  default:
+    name: stackr
+  # Local Supabase's network (ADR-0002). The services that use PostgreSQL join
+  # it to reach supabase_db_stackr-supabase by name. `make up` creates it when
+  # it's missing, so it exists with the plain PostgreSQL adapter too, and the
+  # Supabase CLI joins it rather than creating its own.
+  supabase:
+    name: supabase_network_stackr-supabase
+    external: true
+
+volumes:
+  prometheus-data:
+  tempo-data:
+  loki-data:
+  pyroscope-data:
+  grafana-data:
+  postgres-data:
+  redis-data:
+  minio-data:
+  clickhouse-data:
+  clickhouse-logs:
+
+# Langfuse's web and worker share their settings. SALT and ENCRYPTION_KEY
+# must match between them and never change.
+x-langfuse-env: &langfuse-env
+  # yamllint disable-line rule:line-length
+  DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD:?run make env}@${STACKR_DB_HOST:-supabase_db_stackr-supabase}:5432/langfuse
+  SALT: ${LANGFUSE_SALT:?run make env}
+  ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?run make env}
+  NEXTAUTH_URL: http://localhost:${LANGFUSE_PORT:-3300}
+  TELEMETRY_ENABLED: "false"
+  # Listen on every interface, not only the container's own address.
+  HOSTNAME: 0.0.0.0
+  CLICKHOUSE_URL: http://clickhouse:8123
+  CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+  CLICKHOUSE_USER: langfuse
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?run make env}
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  # Database 0 of the shared Valkey; the gateway uses database 1.
+  REDIS_CONNECTION_STRING: redis://:${REDIS_PASSWORD:?run make env}@redis:6379/0
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: ${S3_REGION:-auto}
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-stackr}
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?run make env}
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: ${S3_REGION:-auto}
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-stackr}
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?run make env}
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+
+services:
+  # The telemetry port: every application, and the LiteLLM proxy, sends OTLP
+  # here. Swapping a backend changes the Collector's exporters only.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.161.0
+    profiles: [observability]
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      STACKR_ENVIRONMENT: ${STACKR_ENVIRONMENT:-local}
+      # Where traces go. `make up` leaves Langfuse out when its profile isn't
+      # running (see the Makefile).
+      STACKR_TRACES_EXPORTERS: ${STACKR_TRACES_EXPORTERS:-[otlp_grpc/tempo, otlp_http/langfuse]}
+      LANGFUSE_OTLP_AUTH: ${LANGFUSE_OTLP_AUTH:?run make env}
+    volumes:
+      - ./deploy/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${OTLP_GRPC_PORT:-4317}:4317
+      - ${STACKR_BIND:-127.0.0.1}:${OTLP_HTTP_PORT:-4318}:4318
+    depends_on:
+      - tempo
+      - prometheus
+      - loki
+
+  tempo:
+    image: grafana/tempo:3.0.3
+    profiles: [observability]
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./deploy/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${TEMPO_PORT:-3200}:3200
+    depends_on:
+      - prometheus
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    profiles: [observability]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      # Metrics arrive as OTLP from the Collector, and by remote write from
+      # Tempo's metrics generator (ADR-0007).
+      - --web.enable-otlp-receiver
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${PROMETHEUS_PORT:-9090}:9090
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  loki:
+    image: grafana/loki:3.7.8
+    profiles: [observability]
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - ./deploy/loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki-data:/loki
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${LOKI_PORT:-3100}:3100
+
+  # The profiles port: applications push profiles here directly, until OTLP
+  # profiles are stable in the Collector (ADR-0005).
+  pyroscope:
+    image: grafana/pyroscope:2.3.1
+    profiles: [observability]
+    restart: unless-stopped
+    command: ["-config.file=/etc/pyroscope/config.yaml"]
+    volumes:
+      - ./deploy/pyroscope/config.yaml:/etc/pyroscope/config.yaml:ro
+      - pyroscope-data:/data
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${PYROSCOPE_PORT:-4040}:4040
+
+  grafana:
+    image: grafana/grafana:13.2.2
+    profiles: [observability]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?run make env}
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      - ./deploy/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./deploy/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+      - pyroscope
+
+  # The database port's alternative adapter: plain PostgreSQL, selected with
+  # STACKR_DATABASE=postgres. Local Supabase is the default (supabase/).
+  postgres:
+    image: postgres:17.11-alpine
+    profiles: [postgres]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?run make env}
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${POSTGRES_PORT:-55432}:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # Creates each service's role and database on the database adapter, on
+  # every start (deploy/postgres/init.sql), then exits.
+  db-init:
+    image: postgres:17.11-alpine
+    profiles: [langfuse, gateway]
+    restart: "no"
+    command: ["psql", "--no-psqlrc", "--quiet", "--file=/init.sql"]
+    # The adapter's host and admin password default to local Supabase's
+    # (whose local password is fixed); `make up` sets both for the plain
+    # PostgreSQL adapter.
+    environment:
+      PGHOST: ${STACKR_DB_HOST:-supabase_db_stackr-supabase}
+      PGPORT: "5432"
+      PGDATABASE: postgres
+      PGUSER: postgres
+      PGPASSWORD: ${STACKR_DB_ADMIN_PASSWORD:-postgres}
+      PGCONNECT_TIMEOUT: "10"
+      LANGFUSE_DB_PASSWORD: ${LANGFUSE_DB_PASSWORD:?run make env}
+      LITELLM_DB_PASSWORD: ${LITELLM_DB_PASSWORD:?run make env}
+    volumes:
+      - ./deploy/postgres/init.sql:/init.sql:ro
+    networks: [default, supabase]
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+
+  # The Redis protocol, with Valkey as its adapter: Langfuse's queues and
+  # cache (database 0) and the gateway's routing state and cache (database 1).
+  # `noeviction`, because queued jobs must not be dropped; the gateway's
+  # entries expire by their TTLs.
+  redis:
+    image: valkey/valkey:9.1.2-alpine
+    profiles: [langfuse, gateway]
+    restart: unless-stopped
+    # The password goes into a config file, never onto the command line.
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        printf 'requirepass %s\n' "$$REDIS_PASSWORD" > /tmp/valkey.conf &&
+        exec valkey-server /tmp/valkey.conf --maxmemory-policy noeviction --save 60 1
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?run make env}
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?run make env}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # The S3 port, with MinIO as its adapter. Chainguard publishes only
+  # `latest` for free, so the image is pinned by digest (ADR-0008).
+  minio:
+    image: cgr.dev/chainguard/minio:latest@sha256:71674988a1c7ddd5724928633199152b11e4ddefd6c6ce2d60772ff4a8f22ca9
+    profiles: [langfuse]
+    restart: unless-stopped
+    entrypoint:
+      - sh
+      - -c
+      - mkdir -p /data/langfuse && exec minio server --address :9000 --console-address :9001 /data
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-stackr}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:?run make env}
+    volumes:
+      - minio-data:/data
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${MINIO_PORT:-9000}:9000
+      - ${STACKR_BIND:-127.0.0.1}:${MINIO_CONSOLE_PORT:-9001}:9001
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.9.3.38
+    profiles: [langfuse]
+    restart: unless-stopped
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?run make env}
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - clickhouse-logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8123/ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:4.46.0
+    profiles: [langfuse]
+    restart: unless-stopped
+    environment:
+      <<: *langfuse-env
+    networks: [default, supabase]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3030/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 60s
+    depends_on: &langfuse-depends-on
+      db-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
+  # Langfuse's web server runs the database migrations on start, and creates
+  # the organisation, project, API keys and admin user from .env on first
+  # start (headless initialization).
+  langfuse-web:
+    image: langfuse/langfuse:4.46.0
+    profiles: [langfuse]
+    restart: unless-stopped
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?run make env}
+      AUTH_DISABLE_SIGNUP: "true"
+      # Browsers and SDKs upload media to MinIO's published port directly.
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://localhost:${MINIO_PORT:-9000}
+      LANGFUSE_S3_MEDIA_UPLOAD_INTERNAL_ENDPOINT: http://minio:9000
+      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-stackr}
+      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_ID:-stackr}
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-stackr}
+      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_ID:-stackr}
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?run make env}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?run make env}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_ADMIN_EMAIL:-admin@stackr.local}
+      LANGFUSE_INIT_USER_NAME: admin
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_ADMIN_PASSWORD:?run make env}
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${LANGFUSE_PORT:-3300}:3000
+    networks: [default, supabase]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/public/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 120s
+    depends_on: *langfuse-depends-on
+
+  # The LLM gateway port: an OpenAI-compatible API in front of the providers
+  # and local model servers in deploy/litellm/config.yaml (ADR-0010).
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.103.0
+    profiles: [gateway]
+    restart: unless-stopped
+    command: ["--config", "/etc/litellm/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?run make env}
+      # Encrypts credentials stored in the database; must never change.
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?run make env}
+      # yamllint disable-line rule:line-length
+      DATABASE_URL: postgresql://litellm:${LITELLM_DB_PASSWORD:?run make env}@${STACKR_DB_HOST:-supabase_db_stackr-supabase}:5432/litellm
+      REDIS_URL: redis://:${REDIS_PASSWORD:?run make env}@redis:6379/1
+      # Provider keys: empty ones fail only the requests that need them.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      LM_STUDIO_API_BASE: ${LM_STUDIO_API_BASE:-http://host.docker.internal:1234/v1}
+      OMLX_API_BASE: ${OMLX_API_BASE:-http://host.docker.internal:4243/v1}
+      # Traces to the Collector, continuing the caller's `traceparent`, with
+      # prompts and responses left out. `make up` turns it off when the
+      # observability profile isn't running.
+      LITELLM_OTEL_V2: ${STACKR_GATEWAY_TELEMETRY:-true}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_SERVICE_NAME: litellm
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=${STACKR_ENVIRONMENT:-local}
+      LITELLM_OTEL_INTEGRATION_ENABLE_METRICS: ${STACKR_GATEWAY_TELEMETRY:-true}
+      # Use the bundled model prices, and read no .env of its own.
+      LITELLM_LOCAL_MODEL_COST_MAP: "True"
+      LITELLM_MODE: PRODUCTION
+    volumes:
+      - ./deploy/litellm/config.yaml:/etc/litellm/config.yaml:ro
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${LITELLM_PORT:-4400}:4000
+    # Local model servers run on the host.
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    networks: [default, supabase]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import sys, urllib.request;
+          sys.exit(urllib.request.urlopen('http://127.0.0.1:4000/health/readiness', timeout=3).status != 200)
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  # Sends test telemetry for scripts/smoke; not a service.
+  telemetrygen:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.162.0
+    profiles: [smoke]

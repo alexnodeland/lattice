@@ -1,0 +1,39 @@
+"""The telemetry port: OpenTelemetry to the Collector, and Langfuse for trace attributes and scores.
+
+Telemetry is on when ``OTEL_EXPORTER_OTLP_ENDPOINT`` is set (stackr's Collector takes OTLP over
+HTTP on port 4318), so the application and its tests run without the stack. Langfuse is on
+when ``LANGFUSE_PUBLIC_KEY`` is set too.
+
+``configure_telemetry`` instruments what the libraries advise: FastAPI, SQLAlchemy and httpx.
+The libraries poll their storage untraced, so an idle application exports no spans, and a
+turn's or run's trace shows its queries. Instrumentation reaches only what is created after it,
+so ``create_app`` instruments the application and its database engine itself.
+
+stackr's Collector sends Langfuse every trace (its ADR-0007), so the application sends Langfuse
+only scores: the Langfuse client sets each turn's and run's session, user and tags on the spans,
+and records feedback as scores, but exports no spans of its own.
+"""
+
+from importlib.metadata import version
+
+{% if libraries == 'both' -%}
+import reflexr.otel
+{% endif -%}
+from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.otel import TelemetryHandle, configure_telemetry
+
+from {{ package_name }}.settings import Settings
+
+
+def configure(settings: Settings) -> TelemetryHandle | None:
+    """Set up OpenTelemetry, and Langfuse, as the settings ask; or nothing."""
+    if not settings.telemetry:
+        return None
+    return configure_telemetry(
+{%- if libraries == 'both' %}
+        reflexr.otel.telemetry(),
+{%- endif %}
+        service_name=settings.service_name,
+        service_version=version("{{ project_slug }}"),
+        environment=settings.environment,
+        langfuse="scores" if settings.langfuse else None,
+    )

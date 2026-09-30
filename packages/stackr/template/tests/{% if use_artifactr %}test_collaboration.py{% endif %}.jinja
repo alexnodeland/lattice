@@ -1,0 +1,102 @@
+"""artifactr's surfaces: people and the agent write notes together, signed in with Supabase."""
+
+from typing import Any
+
+import httpx
+import httpx2
+from fastapi.testclient import TestClient
+from mcp import Client
+from mcp.client.streamable_http import streamable_http_client
+from mcp.types import TextContent
+
+from artifactr import new_id
+
+from {{ package_name }}.auth import TokenVerifier
+from {{ package_name }}.collaboration import Collaboration
+
+from conftest import TENANT, TENANT_KEY, Script, bearer, call, say, settings, wait_for
+
+BASE = "/artifactr/v1/workspaces/main"
+
+
+def command(client: TestClient, **body: Any) -> dict[str, Any]:
+    frame = {"type": "command", "command_id": new_id("cmd"), "command": body}
+    return client.post(f"{BASE}/commands", json=frame).json()
+
+
+def events(client: TestClient, event_type: str) -> list[dict[str, Any]]:
+    return [e for e in client.get(f"{BASE}/events").json() if e["event"]["type"] == event_type]
+
+
+def ask(client: TestClient, content: str, *, runs: int = 1) -> None:
+    """Post a message in thread t1, and wait for the agent's ``runs``-th run to end."""
+    command(client, type="post_message", thread_id="t1", content=content)
+    wait_for(lambda: len(events(client, "run_ended")) >= runs)
+
+
+def test_the_agent_writes_a_note(client: TestClient, script: Script) -> None:
+    command(client, type="create_thread", thread_id="t1")
+    script.steps += [
+        call("create_artifact", kind="note", data={"title": "Launch", "text": "Ship on Friday."}),
+        say("I started a note for the launch."),
+    ]
+    ask(client, "Start a note about the launch")
+    [note] = client.get(f"{BASE}/artifacts").json()
+    assert (note["kind"], note["data"]["title"]) == ("note", "Launch")
+    assert note["updated_by"]["kind"] == "agent"
+    [asked, answered] = events(client, "message_posted")
+    assert asked["actor"] == {"kind": "user", "id": "alice", "name": "alice@example.com"}
+    assert answered["event"]["content"] == "I started a note for the launch."
+
+
+def test_requests_carry_the_tenants_key_and_the_guardrails(
+    client: TestClient, script: Script
+) -> None:
+    command(client, type="create_thread", thread_id="t1")
+    script.steps += [say("Hello.")]
+    ask(client, "Hello")
+    [sent] = script.settings
+    assert sent["extra_headers"]["Authorization"] == f"Bearer {TENANT_KEY}"
+    assert sent["extra_body"]["guardrails"] == ["pii-mask", "prompt-injection"]
+    assert sent["extra_body"]["metadata"]["tenant_id"] == TENANT
+
+
+def test_tenants_are_kept_apart(client: TestClient) -> None:
+    assert command(client, type="create_artifact", kind="note", data={"title": "Acme's"})["ok"]
+    theirs = client.get(f"{BASE}/artifacts", headers=bearer("carol", tenant="initech"))
+    assert theirs.json() == []
+
+
+async def test_mcp_clients_act_for_the_user_of_their_token(server: str) -> None:
+    headers = bearer("bob")
+    async with (
+        httpx2.AsyncClient(headers=headers) as http,
+        Client(streamable_http_client(f"{server}/artifactr/mcp/", http_client=http)) as mcp,
+    ):
+        created = await mcp.call_tool(
+            "create_artifact", {"workspace_id": "main", "kind": "note", "data": {"title": "MCP"}}
+        )
+        assert not created.is_error
+    async with httpx.AsyncClient(base_url=server, headers=headers) as client:
+        [note] = (await client.get(f"{BASE}/artifacts")).json()
+    assert note["updated_by"] == {
+        "kind": "external_agent",
+        "client_id": "bob",
+        "name": "bob@example.com (MCP)",
+    }
+
+
+async def test_mcp_clients_in_process_are_refused(script: Script) -> None:
+    config = settings()
+    collaboration = Collaboration(
+        name="{{ project_slug }}",
+        verifier=TokenVerifier.from_settings(config.auth),
+        model=script.model,
+        gateway=config.gateway,
+    )
+    async with Client(collaboration.mcp.server) as mcp:
+        refused = await mcp.call_tool("list_artifacts", {"workspace_id": "main"})
+    [content] = refused.content
+    assert refused.is_error
+    assert isinstance(content, TextContent)
+    assert "connect over HTTP" in content.text

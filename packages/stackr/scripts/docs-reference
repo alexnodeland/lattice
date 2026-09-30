@@ -1,0 +1,922 @@
+#!/usr/bin/env python3
+"""Generate the documentation's reference pages from the files they describe (ADR-0012).
+
+Usage: scripts/docs-reference [--check]
+
+Each page under docs/reference/ is written by hand around blocks that this script generates:
+
+    <!-- generated: compose-services -->
+    ...
+    <!-- end generated -->
+
+It regenerates every block from the file the block describes: compose.yaml, .env.example,
+deploy/otel-collector/, deploy/grafana/, deploy/litellm/, copier.yml and template/, the Makefile
+and versions.env. With `--check` it writes nothing, and fails when a block is out of date, a page
+names a block this script doesn't know, or a block is on no page; `make docs` runs it that way,
+so a page can't drift from its source. `make docs-reference` rewrites the blocks.
+
+Images are named without their tags: Dependabot changes those every week, and compose.yaml pins
+them. A service in compose.yaml without a role below fails, so a new service gets described.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+from collections.abc import Callable, Iterator
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from _env import LINE, ROOT, read_env
+
+PAGES = ROOT / "docs" / "reference"
+BLOCK = re.compile(
+    r"(<!-- generated: (?P<name>[a-z0-9-]+) -->\n)(?P<body>.*?)(\n<!-- end generated -->)", re.S
+)
+
+# What each of compose.yaml's services is for: one sentence each.
+ROLES = {
+    "otel-collector": (
+        "The telemetry port. Receives OTLP from applications and the gateway, and exports "
+        "each signal to its backend."
+    ),
+    "tempo": "Traces, with its metrics generator for span metrics and service graphs.",
+    "prometheus": (
+        "Metrics: OTLP from the Collector, remote write from Tempo, and scrapes of the "
+        "stack's own services."
+    ),
+    "loki": "Logs, over OTLP.",
+    "pyroscope": "Profiles, pushed by applications.",
+    "grafana": "Dashboards and exploration, over the four backends.",
+    "postgres": (
+        "Plain PostgreSQL, the alternative database adapter, used when STACKR_DATABASE is "
+        "`postgres`."
+    ),
+    "db-init": (
+        "Creates each service's role and database on the database adapter, on every start, "
+        "then exits."
+    ),
+    "redis": (
+        "Valkey, for the Redis protocol: Langfuse's queues and cache in database 0, the "
+        "gateway's routing state and cache in database 1."
+    ),
+    "minio": "MinIO, for the S3 port: Langfuse's event and media bucket, `langfuse`.",
+    "clickhouse": "Langfuse's traces, observations and scores.",
+    "langfuse-worker": "Langfuse's worker: runs ingestion and evaluation jobs from the queues.",
+    "langfuse-web": (
+        "Langfuse's UI and public API. Receives traces from the Collector, and runs the "
+        "migrations on start."
+    ),
+    "litellm": "The LLM gateway port: the LiteLLM proxy's OpenAI-compatible API.",
+    "telemetrygen": "Sends test telemetry for scripts/smoke; not a service that stays up.",
+}
+
+GENERATED_SECRETS = {
+    "hex": "64 hex characters",
+    "token": "43 URL-safe characters",
+    "uuid": "a UUID",
+}
+
+
+class Problem(Exception):
+    """A source this script can't describe as it is."""
+
+
+# --- helpers ------------------------------------------------------------------------------------
+
+
+def load_yaml(relative: str) -> Any:
+    """Parse a YAML file in the repository."""
+    return yaml.safe_load((ROOT / relative).read_text())
+
+
+def code(value: object) -> str:
+    """A value as inline code. Python-Markdown keeps a `|` inside code in a table cell."""
+    text = str(value)
+    if "`" in text:
+        raise Problem(f"can't put {text!r} in inline code")
+    return f"`{text}`"
+
+
+def codes(values: Iterator[object] | list[Any] | tuple[Any, ...]) -> str:
+    """Values as comma-separated inline code, or a dash for none."""
+    items = [code(value) for value in values]
+    return ", ".join(items) if items else "none"
+
+
+def flow(value: object) -> str:
+    """A YAML value on one line, in flow style."""
+    return yaml.safe_dump(value, default_flow_style=True, sort_keys=False, width=10_000).strip()
+
+
+def scalar(value: object) -> str:
+    """A YAML scalar as its file spells it."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return flow(value) if isinstance(value, list | dict) else str(value)
+
+
+def table(header: list[str], rows: list[list[str]]) -> str:
+    """A Markdown table."""
+    lines = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
+    lines += ["| " + " | ".join(row) + " |" for row in rows]
+    return "\n".join(lines)
+
+
+def unescape(text: str) -> str:
+    """Compose's and Grafana's `$$` escape, as the program sees it."""
+    return text.replace("$$", "$")
+
+
+def command(value: str | list[str]) -> str:
+    """A command from compose.yaml, as one line."""
+    parts = [value] if isinstance(value, str) else [str(part) for part in value]
+    return unescape(" ".join(" ".join(part.split()) for part in parts))
+
+
+# --- compose.yaml -------------------------------------------------------------------------------
+
+PORT = re.compile(
+    r"^\$\{(?P<bind>\w+):-(?P<address>[^}]+)\}:\$\{(?P<var>\w+):-(?P<port>\d+)\}:(?P<target>\d+)$"
+)
+
+
+def compose() -> dict[str, Any]:
+    """compose.yaml, with every service described in ROLES."""
+    document: dict[str, Any] = load_yaml("compose.yaml")
+    services = set(document["services"])
+    if missing := sorted(services - set(ROLES)):
+        raise Problem(f"compose.yaml's services {missing} need a role in scripts/docs-reference")
+    if stale := sorted(set(ROLES) - services):
+        raise Problem(f"scripts/docs-reference describes services compose.yaml lacks: {stale}")
+    return document
+
+
+def network_name(document: dict[str, Any], key: str) -> str:
+    """The name Docker knows a Compose network by."""
+    return str(document["networks"][key].get("name", key))
+
+
+def ports(service: dict[str, Any], defaults: dict[str, str]) -> str:
+    """A service's published ports: the host port's setting and default, and the container's."""
+    published: list[str] = []
+    for entry in service.get("ports", []):
+        match = PORT.match(str(entry))
+        if match is None:
+            raise Problem(f"a published port isn't bound to a setting: {entry!r}")
+        if match["bind"] != "STACKR_BIND":
+            raise Problem(f"a published port isn't bound to STACKR_BIND: {entry!r}")
+        if defaults.get(match["var"]) != match["port"]:
+            raise Problem(
+                f"{match['var']} defaults to {match['port']} in compose.yaml, but .env.example "
+                f"has {defaults.get(match['var'])!r}"
+            )
+        published.append(f"{match['port']} (`{match['var']}`) → {match['target']}")
+    return ", ".join(published) if published else "none"
+
+
+def depends(service: dict[str, Any]) -> str:
+    """What a service waits for."""
+    needs = service.get("depends_on") or []
+    if isinstance(needs, list):
+        return codes(needs)
+    conditions = {
+        "service_started": "started",
+        "service_healthy": "healthy",
+        "service_completed_successfully": "completed",
+    }
+    described: list[str] = []
+    for name, spec in needs.items():
+        condition = conditions[spec.get("condition", "service_started")]
+        optional = ", when it runs" if spec.get("required") is False else ""
+        described.append(f"`{name}` ({condition}{optional})")
+    return ", ".join(described)
+
+
+def volumes(service: dict[str, Any]) -> str:
+    """A service's volumes and bind mounts."""
+    mounts: list[str] = []
+    for entry in service.get("volumes", []):
+        source, target, *mode = str(entry).split(":")
+        read_only = " (read-only)" if mode == ["ro"] else ""
+        mounts.append(f"`{source}` → `{target}`{read_only}")
+    return ", ".join(mounts) if mounts else "none"
+
+
+def networks(document: dict[str, Any], service: dict[str, Any]) -> list[str]:
+    """The Docker names of the networks a service joins."""
+    return [network_name(document, key) for key in service.get("networks", ["default"])]
+
+
+def default_profiles() -> set[str]:
+    """The profiles `make up` starts when PROFILES isn't given."""
+    match = MAKE_ALL_PROFILES.search(makefile())
+    if match is None:
+        raise Problem("the Makefile has no ALL_PROFILES")
+    return set(match["profiles"].split())
+
+
+def block_compose_profiles() -> str:
+    document = compose()
+    defaults = default_profiles()
+    by_profile: dict[str, list[str]] = {}
+    for name, service in document["services"].items():
+        for profile in service.get("profiles", []):
+            by_profile.setdefault(profile, []).append(name)
+    rows = [
+        [code(profile), codes(names), "yes" if profile in defaults else "no"]
+        for profile, names in by_profile.items()
+    ]
+    return table(["Profile", "Services", "In `make up`'s default"], rows)
+
+
+def block_compose_services() -> str:
+    document = compose()
+    defaults = read_env(ROOT / ".env.example")
+    sections: list[str] = []
+    for name, service in document["services"].items():
+        image = str(service["image"]).split("@")[0].rsplit(":", 1)[0]
+        pinned = "by tag and digest" if "@sha256:" in str(service["image"]) else "by tag"
+        rows = [
+            ["Profiles", codes(service.get("profiles", []))],
+            ["Image", f"{code(image)}, pinned {pinned} in `compose.yaml`"],
+            ["Published ports", ports(service, defaults)],
+            ["Networks", codes(networks(document, service))],
+            ["Volumes", volumes(service)],
+            ["Depends on", depends(service)],
+        ]
+        if "entrypoint" in service or "command" in service:
+            rows.append(["Runs", code(command(service.get("entrypoint", service.get("command"))))])
+        if "healthcheck" in service:
+            check = service["healthcheck"]["test"]
+            test = check[1] if check[0] == "CMD-SHELL" else command(check[1:])
+            rows.append(
+                ["Health check", f"{code(unescape(test))}, every {check_interval(service)}"]
+            )
+        if "restart" in service:
+            rows.append(["Restart", code(service["restart"])])
+        section = [f"### `{name}`", "", ROLES[name], "", table(["Property", "Value"], rows)]
+        environment = service.get("environment") or {}
+        if environment:
+            env_rows = [[code(key), code(value)] for key, value in environment.items()]
+            env_table = table(["Variable", "Value"], env_rows).replace("\n", "\n    ")
+            section += ["", '??? note "Environment"', "", "    " + env_table]
+        sections.append("\n".join(section))
+    return "\n\n".join(sections)
+
+
+def check_interval(service: dict[str, Any]) -> str:
+    """How often a service's health check runs."""
+    return str(service["healthcheck"].get("interval", "30s"))
+
+
+def block_compose_volumes() -> str:
+    document = compose()
+    rows: list[list[str]] = []
+    for volume in document.get("volumes", {}):
+        users = [
+            (name, str(entry).split(":")[1])
+            for name, service in document["services"].items()
+            for entry in service.get("volumes", [])
+            if str(entry).split(":")[0] == volume
+        ]
+        rows.append(
+            [code(volume), ", ".join(f"`{name}` at `{path}`" for name, path in users) or "none"]
+        )
+    return table(["Volume", "Mounted by"], rows)
+
+
+def block_compose_networks() -> str:
+    document = compose()
+    rows: list[list[str]] = []
+    for key, network in document["networks"].items():
+        members = [
+            name
+            for name, service in document["services"].items()
+            if key in service.get("networks", ["default"])
+        ]
+        created = "by `make up`, if missing" if network.get("external") else "by Compose"
+        rows.append([code(network_name(document, key)), created, codes(members)])
+    return table(["Network", "Created", "Joined by"], rows)
+
+
+# --- .env.example -------------------------------------------------------------------------------
+
+SECTION = re.compile(r"^# --- (?P<title>.+?) -+$")
+LISTED = re.compile(r"^\s{2,}(?P<term>\S+)\s{2,}(?P<text>.+)$")
+
+
+def describe_value(value: str) -> str:
+    """What `make env` writes for a value of .env.example."""
+    if value.startswith("generate:"):
+        _, kind, *prefix = value.split(":", 2)
+        secret = GENERATED_SECRETS[kind]
+        return f"Generated: `{prefix[0]}` and {secret}" if prefix else f"Generated: {secret}"
+    if value.startswith("basic-auth:"):
+        _, user, password = value.split(":")
+        return f"Derived: base64 of `{user}:{password}`, for HTTP Basic"
+    return code(value) if value else "Empty"
+
+
+def comment_markdown(lines: list[str]) -> str:
+    """A comment as Markdown: sentences as a paragraph, aligned `term  text` lines as a list."""
+    parts: list[str] = []
+    paragraph: list[str] = []
+    listing: list[str] = []
+
+    def flush() -> None:
+        if paragraph:
+            parts.append(" ".join(paragraph))
+            paragraph.clear()
+        if listing:
+            parts.append("\n".join(listing))
+            listing.clear()
+
+    for line in lines:
+        if (match := LISTED.match(line)) is not None:
+            if paragraph:
+                flush()
+            listing.append(f"- `{match['term']}`: {match['text']}")
+        else:
+            if listing:
+                flush()
+            paragraph.append(line.strip())
+    flush()
+    return "\n\n".join(parts)
+
+
+def block_env_settings() -> str:
+    output: list[str] = []
+    groups = [group.splitlines() for group in (ROOT / ".env.example").read_text().split("\n\n")]
+    for index, group in enumerate(groups):
+        if index == 0 and not any(LINE.match(line) for line in group):
+            continue  # the file's header, which the page introduces by hand
+        comment: list[str] = []
+        rows: list[list[str]] = []
+
+        def flush(comment: list[str], rows: list[list[str]]) -> None:
+            if comment:
+                output.append(comment_markdown(comment))
+                comment.clear()
+            if rows:
+                output.append(table(["Setting", "In `.env.example`"], rows.copy()))
+                rows.clear()
+
+        if not output and not SECTION.match(group[0]):
+            output.append("### The stack as a whole")
+        for line in group:
+            if (section := SECTION.match(line)) is not None:
+                flush(comment, rows)
+                title = section["title"]
+                output.append(f"### {title[0].upper()}{title[1:]}")
+            elif (setting := LINE.match(line)) is not None:
+                if comment and rows:
+                    flush([], rows)
+                if comment:
+                    flush(comment, [])
+                rows.append([code(setting["key"]), describe_value(setting["value"])])
+            elif line.startswith("#"):
+                if rows:
+                    flush([], rows)
+                comment.append(line[1:].removeprefix(" "))
+        flush(comment, rows)
+    return "\n\n".join(output)
+
+
+# --- the Collector ------------------------------------------------------------------------------
+
+
+def collector() -> dict[str, Any]:
+    return load_yaml("deploy/otel-collector/config.yaml")
+
+
+def exporters_of(pipeline: dict[str, Any]) -> str:
+    exporters = pipeline["exporters"]
+    if isinstance(exporters, str):
+        return f"{code(exporters)}: set by `make up` from the profiles"
+    return codes(exporters)
+
+
+def transport(name: str, exporter: dict[str, Any]) -> str:
+    """How an exporter sends: OTLP over gRPC or HTTP, with TLS or without."""
+    endpoint = str(exporter["endpoint"])
+    if name.startswith("otlp_grpc"):
+        insecure = (exporter.get("tls") or {}).get("insecure", False)
+        return "OTLP gRPC, without TLS" if insecure else "OTLP gRPC, with TLS"
+    if name.startswith("otlp_http"):
+        return (
+            "OTLP HTTP, with TLS" if endpoint.startswith("https://") else "OTLP HTTP, without TLS"
+        )
+    raise Problem(f"exporter {name!r} isn't OTLP; describe it in scripts/docs-reference")
+
+
+def block_collector_pipelines() -> str:
+    config = collector()
+    rows = [
+        [
+            code(signal),
+            codes(pipeline["receivers"]),
+            codes(pipeline.get("processors", [])),
+            exporters_of(pipeline),
+        ]
+        for signal, pipeline in config["service"]["pipelines"].items()
+    ]
+    return table(["Pipeline", "Receivers", "Processors", "Exporters"], rows)
+
+
+def block_collector_components() -> str:
+    config = collector()
+    receivers: list[list[str]] = []
+    for name, receiver in config["receivers"].items():
+        for protocol, settings in (receiver.get("protocols") or {}).items():
+            extra = ""
+            if origins := (settings.get("cors") or {}).get("allowed_origins"):
+                extra = f"CORS from {codes(origins)}"
+            receivers.append([code(name), code(protocol), code(settings["endpoint"]), extra])
+    processors = [
+        [code(name), code(flow(settings or {}))] for name, settings in config["processors"].items()
+    ]
+    exporters: list[list[str]] = []
+    for name, exporter in config["exporters"].items():
+        headers = ", ".join(
+            f"`{header}: {value}`" for header, value in (exporter.get("headers") or {}).items()
+        )
+        exporters.append(
+            [code(name), code(exporter["endpoint"]), transport(name, exporter), headers]
+        )
+    extensions = [
+        [code(name), code(flow(settings or {}))] for name, settings in config["extensions"].items()
+    ]
+    telemetry = config["service"].get("telemetry", {})
+    own = [[code(signal), code(flow(settings))] for signal, settings in telemetry.items()]
+    return "\n\n".join(
+        [
+            "### Receivers",
+            table(["Receiver", "Protocol", "Listens on", "Notes"], receivers),
+            "### Processors",
+            table(["Processor", "Settings"], processors),
+            "### Exporters",
+            table(["Exporter", "Endpoint", "Sends", "Headers"], exporters),
+            "### Extensions",
+            table(["Extension", "Settings"], extensions),
+            "### The Collector's own telemetry",
+            table(["Signal", "Settings"], own),
+        ]
+    )
+
+
+# --- Grafana ------------------------------------------------------------------------------------
+
+GRAFANA = ROOT / "deploy" / "grafana"
+
+
+def datasources() -> list[dict[str, Any]]:
+    sources: list[dict[str, Any]] = []
+    for path in sorted((GRAFANA / "provisioning" / "datasources").glob("*.yaml")):
+        sources += (yaml.safe_load(path.read_text()) or {}).get("datasources", [])
+    return sources
+
+
+def block_grafana_datasources() -> str:
+    rows: list[list[str]] = []
+    for source in datasources():
+        data = source.get("jsonData") or {}
+        settings = [
+            f"`{key}: {scalar(value)}`"
+            for key, value in data.items()
+            if not isinstance(value, list | dict)
+        ]
+        rows.append(
+            [
+                source["name"],
+                code(source["uid"]),
+                code(source["type"]),
+                code(source["url"]),
+                "yes" if source.get("isDefault") else "no",
+                ", ".join(settings) or "none",
+            ]
+        )
+    return table(["Data source", "uid", "Type", "URL", "Default", "Settings"], rows)
+
+
+def block_grafana_links() -> str:
+    by_uid = {source["uid"]: source for source in datasources()}
+    rows: list[list[str]] = []
+    for source in by_uid.values():
+        data = source.get("jsonData") or {}
+        name = source["name"]
+        if logs := data.get("tracesToLogsV2"):
+            tags = ", ".join(f"`{t['key']}` as `{t['value']}`" for t in logs.get("tags", []))
+            window = f"{logs.get('spanStartTimeShift')} to +{logs.get('spanEndTimeShift')}"
+            by_trace = ", filtered by trace id" if logs.get("filterByTraceID") else ""
+            rows.append(
+                [
+                    f"{name}: a span",
+                    f"`{logs['datasourceUid']}`",
+                    f"Its service's logs ({tags}), from {window} around it{by_trace}",
+                ]
+            )
+        if metrics := data.get("tracesToMetrics"):
+            queries = ", ".join(query["name"] for query in metrics.get("queries", []))
+            rows.append(
+                [
+                    f"{name}: a span",
+                    f"`{metrics['datasourceUid']}`",
+                    f"Its service's span metrics: {queries}",
+                ]
+            )
+        if profiles := data.get("tracesToProfiles"):
+            rows.append(
+                [
+                    f"{name}: a span",
+                    f"`{profiles['datasourceUid']}`",
+                    f"Its service's profile, {code(profiles['profileTypeId'])}",
+                ]
+            )
+        if service_map := data.get("serviceMap"):
+            rows.append(
+                [
+                    f"{name}: service map and node graph",
+                    f"`{service_map['datasourceUid']}`",
+                    "Tempo's service graph metrics",
+                ]
+            )
+        for field in data.get("derivedFields", []):
+            rows.append(
+                [
+                    f"{name}: a log line's `{field['matcherRegex']}`",
+                    f"`{field['datasourceUid']}`",
+                    "The trace",
+                ]
+            )
+        for exemplar in data.get("exemplarTraceIdDestinations", []):
+            rows.append(
+                [
+                    f"{name}: an exemplar's `{exemplar['name']}`",
+                    f"`{exemplar['datasourceUid']}`",
+                    "The trace that produced it",
+                ]
+            )
+    return table(["From", "To", "Shows"], rows)
+
+
+def block_grafana_span_metrics() -> str:
+    rows: list[list[str]] = []
+    for source in datasources():
+        for query in (source.get("jsonData") or {}).get("tracesToMetrics", {}).get("queries", []):
+            rows.append([query["name"], code(unescape(query["query"]))])
+    return table(["Query", "PromQL"], rows)
+
+
+def block_grafana_dashboards() -> str:
+    providers: list[list[str]] = []
+    for path in sorted((GRAFANA / "provisioning" / "dashboards").glob("*.yaml")):
+        for provider in (yaml.safe_load(path.read_text()) or {}).get("providers", []):
+            options = provider.get("options") or {}
+            providers.append(
+                [
+                    code(provider["name"]),
+                    code(options.get("path")),
+                    "yes" if options.get("foldersFromFilesStructure") else "no",
+                    "yes" if provider.get("allowUiUpdates") else "no",
+                    f"every {provider.get('updateIntervalSeconds', 10)}s",
+                ]
+            )
+    dashboards: list[str] = []
+    # Only stackr's own folder is committed; the libraries' are downloaded, and gitignored.
+    for path in sorted((GRAFANA / "dashboards" / "stackr").glob("*.json")):
+        dashboard = json.loads(path.read_text())
+        rows: list[list[str]] = []
+        for panel in all_panels(dashboard):
+            if panel.get("type") == "row":
+                rows.append([panel.get("title", ""), ""])
+            elif rows:
+                # Semicolons, since panel titles have commas of their own.
+                rows[-1][1] += ("; " if rows[-1][1] else "") + panel.get("title", "")
+            else:
+                rows.append(["", panel.get("title", "")])
+        dashboards += [
+            f"**{dashboard['title']}** (`{dashboard['uid']}`), from `{path.relative_to(ROOT)}`:",
+            table(["Row", "Panels"], rows),
+        ]
+    return "\n\n".join(
+        [
+            table(
+                ["Provider", "Path", "A folder per directory", "Editable in the UI", "Rescanned"],
+                providers,
+            ),
+            *dashboards,
+        ]
+    )
+
+
+def all_panels(dashboard: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    for panel in dashboard.get("panels", []):
+        yield panel
+        yield from panel.get("panels", [])
+
+
+# --- LiteLLM ------------------------------------------------------------------------------------
+
+
+def litellm() -> dict[str, Any]:
+    return load_yaml("deploy/litellm/config.yaml")
+
+
+def block_litellm_models() -> str:
+    rows: list[list[str]] = []
+    for entry in litellm()["model_list"]:
+        params = entry["litellm_params"]
+        key = str(params.get("api_key", ""))
+        credential = (
+            code(key.removeprefix("os.environ/"))
+            if key.startswith("os.environ/")
+            else "a placeholder"
+        )
+        base = str(params.get("api_base", ""))
+        rows.append(
+            [
+                code(entry["model_name"]),
+                code(params["model"]),
+                credential if key else "none",
+                code(base.removeprefix("os.environ/")) if base else "the provider's",
+            ]
+        )
+    return table(["Model name", "Routes to", "Key", "API base"], rows)
+
+
+def block_litellm_fallbacks() -> str:
+    rows = [
+        [code(group), " then ".join(f"`{target}`" for target in targets)]
+        for fallback in litellm()["router_settings"].get("fallbacks", [])
+        for group, targets in fallback.items()
+    ]
+    return table(["Model group", "Falls back to, in order"], rows)
+
+
+def block_litellm_guardrails() -> str:
+    rows: list[list[str]] = []
+    for guardrail in litellm().get("guardrails", []):
+        params = guardrail["litellm_params"]
+        checks = [
+            f"{pattern['pattern_name']} ({pattern['action'].lower()})"
+            for pattern in params.get("patterns", [])
+        ] + [
+            f"{c['category']} ({c['action'].lower()} at {c['severity_threshold']})"
+            for c in params.get("categories", [])
+            if c.get("enabled", True)
+        ]
+        rows.append(
+            [
+                code(guardrail["guardrail_name"]),
+                code(params["guardrail"]),
+                code(params["mode"]),
+                "yes" if params.get("default_on") else "no",
+                ", ".join(checks),
+            ]
+        )
+    return table(["Guardrail", "Integration", "Mode", "On by default", "Checks"], rows)
+
+
+def settings_rows(prefix: str, node: object) -> Iterator[list[str]]:
+    """Flatten a settings mapping into dotted keys and values."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            yield from settings_rows(f"{prefix}.{key}" if prefix else str(key), value)
+    else:
+        yield [code(prefix), code(scalar(node))]
+
+
+def block_litellm_settings() -> str:
+    config = litellm()
+    rows: list[list[str]] = []
+    for section in ("router_settings", "litellm_settings", "callback_settings", "general_settings"):
+        values = dict(config.get(section) or {})
+        values.pop("fallbacks", None)
+        rows += settings_rows(section, values)
+    return table(["Setting", "Value"], rows)
+
+
+# --- the application template -------------------------------------------------------------------
+
+
+def copier_questions() -> dict[str, Any]:
+    return load_yaml("copier.yml")
+
+
+def default_text(spec: dict[str, Any]) -> str:
+    default = spec.get("default")
+    if isinstance(default, bool):
+        return "yes" if default else "no"
+    return code(" ".join(str(default).split())) if default is not None else "none"
+
+
+def block_template_questions() -> str:
+    rows: list[list[str]] = []
+    for name, spec in copier_questions().items():
+        if name.startswith("_") or spec.get("when") is False:
+            continue
+        choices = spec.get("choices")
+        if isinstance(choices, dict):
+            choice_text = ", ".join(f"`{value}`" for value in choices.values())
+        elif isinstance(choices, list):
+            choice_text = ", ".join(f"`{value}`" for value in choices)
+        else:
+            choice_text = ""
+        when = str(spec.get("when", "")).strip()
+        asked = code(when.removeprefix("{{ ").removesuffix(" }}")) if when else "always"
+        rows.append(
+            [
+                code(name),
+                spec.get("type", "str"),
+                default_text(spec),
+                choice_text,
+                asked,
+                " ".join(str(spec.get("help", "")).split()),
+            ]
+        )
+    return table(["Question", "Type", "Default", "Choices", "Asked when", "Help"], rows)
+
+
+def block_template_derived() -> str:
+    rows = [
+        [code(name), spec.get("type", "str"), default_text(spec)]
+        for name, spec in copier_questions().items()
+        if not name.startswith("_") and spec.get("when") is False
+    ]
+    settings = [
+        [code(name), code(value)]
+        for name, value in copier_questions().items()
+        if name.startswith("_")
+    ]
+    return "\n\n".join(
+        [table(["Value", "Type", "Derived as"], rows), table(["Copier setting", "Value"], settings)]
+    )
+
+
+CONDITIONAL = re.compile(r"\{% if (?P<condition>[^%]+?) %\}(?P<name>[^{]*)\{% endif %\}")
+
+
+def template_paths(template: Path) -> list[Path]:
+    """The template's files as git sees them: tracked or new, but not ignored.
+
+    Walking the directory would also describe stray local files (.DS_Store, a render, caches).
+    """
+    listed = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "."],
+        cwd=template,
+        capture_output=True,
+        check=True,
+        text=True,
+    ).stdout
+    # --cached also lists a tracked file deleted from the working tree; describe what's there.
+    return sorted(
+        path for name in set(listed.split("\0")) if name and (path := template / name).is_file()
+    )
+
+
+def block_template_files() -> str:
+    template = ROOT / str(copier_questions()["_subdirectory"])
+    rows: list[list[str]] = []
+    for path in template_paths(template):
+        relative = str(path.relative_to(template)).removesuffix(".jinja")
+        conditions = sorted({m["condition"].strip() for m in CONDITIONAL.finditer(relative)})
+        rendered = CONDITIONAL.sub(lambda m: m["name"], relative)
+        rendered = rendered.replace("{{ package_name }}", "<package>")
+        if "{" in rendered:
+            raise Problem(f"template/{relative}: can't describe its name")
+        rows.append(
+            [
+                code(rendered),
+                " and ".join(f"`{condition}`" for condition in conditions) or "always",
+                "rendered" if path.suffix == ".jinja" else "copied",
+            ]
+        )
+    return table(["File in the application", "Generated when", "How"], rows)
+
+
+# --- the Makefile -------------------------------------------------------------------------------
+
+MAKE_ALL_PROFILES = re.compile(r"^ALL_PROFILES := (?P<profiles>.+)$", re.M)
+TARGET = re.compile(r"^(?P<target>[a-zA-Z_-]+):.*## (?P<help>.+)$", re.M)
+VARIABLE = re.compile(r"^(?P<name>[A-Z_]+) \?= ?(?P<value>.*)$", re.M)
+
+
+def makefile() -> str:
+    return (ROOT / "Makefile").read_text()
+
+
+def block_makefile_targets() -> str:
+    rows = [[code(f"make {m['target']}"), m["help"]] for m in TARGET.finditer(makefile())]
+    return table(["Command", "What it does"], rows)
+
+
+def block_makefile_variables() -> str:
+    rows = [
+        [code(m["name"]), code(m["value"]) if m["value"] else "empty"]
+        for m in VARIABLE.finditer(makefile())
+    ]
+    return table(["Variable", "Default"], rows)
+
+
+# --- versions.env -------------------------------------------------------------------------------
+
+
+def block_versions_env() -> str:
+    rows = [
+        [code(key), code(value) if value else "not pinned"]
+        for key, value in read_env(ROOT / "versions.env").items()
+    ]
+    return table(["Pin", "Value"], rows)
+
+
+def block_template_revisions() -> str:
+    rows = [
+        [name.removesuffix("_rev"), code(spec["default"])]
+        for name, spec in copier_questions().items()
+        if name.endswith("_rev")
+    ]
+    return table(["Library", "Commit the template pins"], rows)
+
+
+# --- the pages ----------------------------------------------------------------------------------
+
+BLOCKS: dict[str, Callable[[], str]] = {
+    "compose-profiles": block_compose_profiles,
+    "compose-services": block_compose_services,
+    "compose-volumes": block_compose_volumes,
+    "compose-networks": block_compose_networks,
+    "env-settings": block_env_settings,
+    "collector-pipelines": block_collector_pipelines,
+    "collector-components": block_collector_components,
+    "grafana-datasources": block_grafana_datasources,
+    "grafana-links": block_grafana_links,
+    "grafana-span-metrics": block_grafana_span_metrics,
+    "grafana-dashboards": block_grafana_dashboards,
+    "litellm-models": block_litellm_models,
+    "litellm-fallbacks": block_litellm_fallbacks,
+    "litellm-guardrails": block_litellm_guardrails,
+    "litellm-settings": block_litellm_settings,
+    "template-questions": block_template_questions,
+    "template-derived": block_template_derived,
+    "template-files": block_template_files,
+    "template-revisions": block_template_revisions,
+    "makefile-targets": block_makefile_targets,
+    "makefile-variables": block_makefile_variables,
+    "versions-env": block_versions_env,
+}
+
+
+def render(page: str, used: set[str]) -> str:
+    """A page with every generated block regenerated."""
+
+    def replace(match: re.Match[str]) -> str:
+        name = match["name"]
+        if name not in BLOCKS:
+            raise Problem(f"unknown block {name!r}")
+        used.add(name)
+        return f"{match[1]}\n{BLOCKS[name]()}\n{match[4]}"
+
+    return BLOCK.sub(replace, page)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--check", action="store_true", help="change nothing; fail if out of date")
+    args = parser.parse_args()
+    used: set[str] = set()
+    stale: list[str] = []
+    for path in sorted(PAGES.glob("*.md")):
+        text = path.read_text()
+        try:
+            updated = render(text, used)
+        except (Problem, KeyError, TypeError, ValueError) as error:
+            print(f"docs-reference: {path.relative_to(ROOT)}: {error}", file=sys.stderr)
+            return 1
+        if updated != text:
+            stale.append(str(path.relative_to(ROOT)))
+            if not args.check:
+                path.write_text(updated)
+    if unused := sorted(set(BLOCKS) - used):
+        print(f"docs-reference: blocks on no page: {', '.join(unused)}", file=sys.stderr)
+        return 1
+    if args.check and stale:
+        print(
+            f"docs-reference: out of date: {', '.join(stale)}; run `make docs-reference`",
+            file=sys.stderr,
+        )
+        return 1
+    for page in stale:
+        print(f"docs-reference: updated {page}")
+    if not stale:
+        print("docs-reference: every reference page matches its source")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

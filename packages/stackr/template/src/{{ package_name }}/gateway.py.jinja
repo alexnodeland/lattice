@@ -1,0 +1,72 @@
+"""The LLM gateway port: agents call the LiteLLM proxy's model groups, never a provider.
+
+Every request carries its tenant's key, so the tenant's team pays for it within its budget and
+rate limits, and asks for the gateway's guardrails. Routing, fallbacks and the guardrails
+themselves are the gateway's configuration.
+"""
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+
+from pydantic_ai.models import Model
+from pydantic_ai.settings import ModelSettings
+
+from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.litellm import litellm_model
+
+from {{ package_name }}.settings import GatewaySettings
+
+
+def gateway_model(settings: GatewaySettings) -> Model:
+    """The model group agents use, through the gateway; with a mocked reply, for smoke tests."""
+    mock = settings.mock_response
+    return litellm_model(
+        settings.model,
+        api_base=settings.base_url,
+        api_key=settings.api_key,
+        settings=None if mock is None else ModelSettings(extra_body={"mock_response": mock}),
+    )
+
+
+class TenantKeys:
+    """Each tenant's gateway key, from ``LITELLM_TENANT_KEYS``.
+
+    A tenant without a key of its own uses ``LITELLM_API_KEY``. Replace this with a lookup in
+    the application's secret store as tenants come and go; ``make tenant`` in stackr creates a
+    tenant's team and key.
+
+    Args:
+        keys: The keys, by tenant.
+    """
+
+    def __init__(self, keys: Mapping[str, str]) -> None:
+        self._keys = dict(keys)
+
+    async def __call__(self, tenant_id: str) -> str | None:
+        """Return a tenant's key, or None for the default key."""
+        return self._keys.get(tenant_id)
+
+
+@dataclass(frozen=True)
+class Guardrails:
+    """The gateway's guardrails requests ask for: the same everywhere, from ``LITELLM_GUARDRAILS``.
+
+    stackr's gateway defines ``pii-mask`` (masks personal data before it reaches a model) and
+    ``prompt-injection`` (blocks jailbreaks with HTTP 400, which fails the run). Choose them per
+    workspace or rule here, by returning different names.
+    """
+
+    names: tuple[str, ...]
+{%- if use_artifactr %}
+
+    async def for_workspace(self, tenant_id: str, workspace_id: str) -> Sequence[str]:
+        """The guardrails of an artifactr workspace's requests."""
+        del tenant_id, workspace_id
+        return self.names
+{%- endif %}
+{%- if use_reflexr %}
+
+    async def for_rule(self, tenant_id: str, workspace_id: str, rule: str) -> Sequence[str]:
+        """The guardrails of a reflexr rule's requests in a workspace."""
+        del tenant_id, workspace_id, rule
+        return self.names
+{%- endif %}

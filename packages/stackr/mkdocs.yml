@@ -1,0 +1,159 @@
+# The documentation site, built with Zensical (ADR-0012). `make docs` builds it in strict mode;
+# `make docs-serve` serves it with live reload.
+
+site_name: stackr
+site_description: >-
+  The infrastructure template for artifactr, reflexr and evalr: local Supabase, the LiteLLM
+  gateway, OpenTelemetry, Grafana LGTM with Pyroscope, and Langfuse, with an application template.
+site_author: Alex Nodeland
+site_url: https://stackr.alexnodeland.com/
+repo_url: https://github.com/alexnodeland/stackr
+repo_name: alexnodeland/stackr
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 Alex Nodeland. Released under the MIT License.
+docs_dir: docs
+
+theme:
+  name: material
+  variant: modern
+  language: en
+  logo: assets/brand/mark-light.svg
+  favicon: assets/brand/favicon.svg
+  font:
+    text: Schibsted Grotesk
+    code: Fragment Mono
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: lucide/sun-moon
+        name: Use the light scheme
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: lucide/sun
+        name: Use the dark scheme
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: lucide/moon
+        name: Follow the system scheme
+  features:
+    - content.action.edit
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - navigation.footer
+    - navigation.indexes
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - toc.follow
+
+extra_css:
+  - assets/stylesheets/brand.css
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  # Nested lists are indented by two spaces, as GitHub renders them; Python-Markdown needs four
+  # without this.
+  - mdx_truly_sane_lists:
+      nested_indent: 2
+      truly_sane: true
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      # Pages under docs/project/ include the repository's root files (CONTRIBUTING.md and
+      # others) instead of copying them, and the reference pages include the configuration
+      # files they describe.
+      base_path: [.]
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Guides:
+      - The stack and its profiles: guides/stack.md
+      - Local Supabase: guides/supabase.md
+      - The LLM gateway: guides/gateway.md
+      - Observability: guides/observability.md
+      - Langfuse: guides/langfuse.md
+      - The application template: guides/template.md
+      - The smoke tests: guides/smoke-tests.md
+      - Validation and CI: guides/validation.md
+      - Security: guides/security.md
+      - Troubleshooting: guides/troubleshooting.md
+  - Reference:
+      - reference/index.md
+      - Compose services and profiles: reference/compose.md
+      - Settings in .env: reference/settings.md
+      - Collector pipelines: reference/collector.md
+      - Grafana provisioning: reference/grafana.md
+      - LiteLLM configuration: reference/litellm.md
+      - Template questions: reference/template.md
+      - Makefile targets: reference/makefile.md
+      - Pinned versions: reference/versions.md
+  - Design:
+      - Architecture: architecture.md
+      - Decisions:
+          - adr/README.md
+          - adr/0001-compose-first-with-profiles.md
+          - adr/0002-local-supabase-through-its-cli.md
+          - adr/0003-observability-and-gateway-services.md
+          - adr/0004-the-application-template.md
+          - adr/0005-ports-and-adapters-for-the-stack.md
+          - adr/0006-networks-and-published-ports.md
+          - adr/0007-how-telemetry-reaches-the-backends.md
+          - adr/0008-langfuse-and-its-services.md
+          - adr/0009-local-supabase-as-the-database-adapter.md
+          - adr/0010-the-llm-gateway.md
+          - adr/0011-the-application-template-in-detail.md
+          - adr/0012-documentation-site.md
+          - adr/0013-how-the-template-pins-the-libraries.md
+          - adr/0014-one-docs-build.md
+          - adr/0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md
+          - adr/template.md
+      - RFCs:
+          - rfcs/README.md
+          - rfcs/0001-v0.1-implementation-plan.md
+          - rfcs/0002-the-combined-system.md
+          - rfcs/0003-one-repository-lattice.md
+          - rfcs/template.md
+  - Project:
+      - Contributing: project/contributing.md
+      - Changelog: project/changelog.md
+      - Code of conduct: project/code-of-conduct.md
+      - Security: project/security.md
+      - License: project/license.md
+      - Brand: assets/brand/README.md

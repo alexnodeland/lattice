@@ -1,0 +1,149 @@
+"""Settings, read from the environment: the stack's ports, and a few of the application's own.
+
+The ports are stackr's (its ``docs/architecture.md``): OpenTelemetry's ``OTEL_*`` for telemetry,
+``DATABASE_URL`` for the database, ``AUTH_*`` for identity, ``LITELLM_*`` for the LLM gateway and
+``LANGFUSE_*`` for evaluation data. Swapping what is behind a port changes these settings, never
+the code.
+"""
+
+import json
+import os
+import re
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from typing import Self, cast
+
+SCHEMA_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
+"""The PostgreSQL schemas the application accepts: plain lowercase identifiers."""
+
+
+@dataclass(frozen=True)
+class AuthSettings:
+    """How access tokens are verified: the identity port.
+
+    Attributes:
+        jwks_url: The issuer's JSON Web Key Set, for asymmetrically signed tokens (ES256, RS256),
+            as local Supabase issues them.
+        jwt_secret: A shared secret, for HS256 tokens, as Supabase projects on the legacy JWT
+            secret issue them.
+        audience: The ``aud`` a token must carry.
+        issuer: The ``iss`` a token must carry, when set.
+        tenant_claim: Where the tenant is in the token's claims, as a dotted path.
+    """
+
+    jwks_url: str | None = None
+    jwt_secret: str | None = None
+    audience: str = "authenticated"
+    issuer: str | None = None
+    tenant_claim: str = "app_metadata.tenant_id"
+
+
+@dataclass(frozen=True)
+class GatewaySettings:
+    """How agents reach models: the LLM gateway port.
+
+    Attributes:
+        base_url: The gateway's OpenAI-compatible API.
+        api_key: The key requests use when their tenant has none of its own.
+        model: The model group agents ask for.
+        tenant_keys: Each tenant's own key, for its team's budget and rate limits.
+        guardrails: The gateway's guardrails every request asks for.
+        mock_response: A reply the gateway sends instead of calling a model, for smoke tests;
+            the gateway honours it only for keys whose team allows mocked responses.
+    """
+
+    base_url: str = "http://localhost:4400"
+    api_key: str | None = None
+    model: str = "default"
+    tenant_keys: Mapping[str, str] = field(default_factory=dict[str, str])
+    guardrails: tuple[str, ...] = ("pii-mask", "prompt-injection")
+    mock_response: str | None = None
+
+
+@dataclass(frozen=True)
+class Settings:
+    """Everything the application reads from its environment.
+
+    Attributes:
+        service_name: The service's name in telemetry.
+        environment: The deployment environment in telemetry; the Collector's when unset.
+        host: The address to listen on.
+        port: The port to listen on.
+        database_url: A SQLAlchemy URL with an async driver. Without one, workspaces live in
+            memory and are gone when the process stops.
+        database_schema: The PostgreSQL schema the libraries' tables live in. A schema of its
+            own keeps them out of ``public``, which Supabase's Data API serves.
+        auth: How access tokens are verified.
+        gateway: How agents reach models.
+        telemetry: Whether to export OpenTelemetry, to ``OTEL_EXPORTER_OTLP_ENDPOINT``.
+        langfuse: Whether to use Langfuse, with the ``LANGFUSE_*`` keys, for trace attributes
+            and scores.
+    """
+
+    service_name: str = "{{ project_slug }}"
+    environment: str | None = None
+    host: str = "127.0.0.1"
+    port: int = {{ app_port }}
+    database_url: str | None = None
+    database_schema: str = "{{ package_name }}"
+    auth: AuthSettings = field(default_factory=AuthSettings)
+    gateway: GatewaySettings = field(default_factory=GatewaySettings)
+    telemetry: bool = False
+    langfuse: bool = False
+
+    def __post_init__(self) -> None:
+        if not SCHEMA_NAME.match(self.database_schema):
+            raise ValueError(
+                f"DATABASE_SCHEMA must be a lowercase identifier, not {self.database_schema!r}"
+            )
+
+    @classmethod
+    def from_environ(cls, environ: Mapping[str, str] | None = None) -> Self:
+        """Read the settings from environment variables; empty ones count as unset."""
+        env = {k: v for k, v in (os.environ if environ is None else environ).items() if v}
+        auth = AuthSettings(
+            jwks_url=env.get("AUTH_JWKS_URL"),
+            jwt_secret=env.get("AUTH_JWT_SECRET"),
+            audience=env.get("AUTH_AUDIENCE", AuthSettings.audience),
+            issuer=env.get("AUTH_ISSUER"),
+            tenant_claim=env.get("AUTH_TENANT_CLAIM", AuthSettings.tenant_claim),
+        )
+        guardrails = env.get("LITELLM_GUARDRAILS", ",".join(GatewaySettings.guardrails))
+        gateway = GatewaySettings(
+            base_url=env.get("LITELLM_BASE_URL", GatewaySettings.base_url),
+            api_key=env.get("LITELLM_API_KEY"),
+            model=env.get("LITELLM_MODEL", GatewaySettings.model),
+            tenant_keys=_tenant_keys(env.get("LITELLM_TENANT_KEYS", "{}")),
+            guardrails=_names(guardrails),
+            mock_response=env.get("LITELLM_MOCK_RESPONSE"),
+        )
+        return cls(
+            service_name=env.get("OTEL_SERVICE_NAME", cls.service_name),
+            environment=env.get("APP_ENVIRONMENT"),
+            host=env.get("APP_HOST", cls.host),
+            port=int(env.get("APP_PORT", cls.port)),
+            database_url=env.get("DATABASE_URL"),
+            database_schema=env.get("DATABASE_SCHEMA", cls.database_schema),
+            auth=auth,
+            gateway=gateway,
+            telemetry="OTEL_EXPORTER_OTLP_ENDPOINT" in env,
+            langfuse="LANGFUSE_PUBLIC_KEY" in env,
+        )
+
+
+def _tenant_keys(text: str) -> dict[str, str]:
+    """Parse ``LITELLM_TENANT_KEYS``: a JSON object from tenant ids to gateway keys."""
+    try:
+        keys: object = json.loads(text)
+    except json.JSONDecodeError as error:
+        raise ValueError("LITELLM_TENANT_KEYS must be a JSON object of tenant keys") from error
+    if not isinstance(keys, dict):
+        raise ValueError("LITELLM_TENANT_KEYS must be a JSON object of tenant keys")
+    pairs = cast(dict[object, object], keys)
+    return {str(tenant): str(key) for tenant, key in pairs.items()}
+
+
+def _names(text: str) -> tuple[str, ...]:
+    """Parse a comma-separated list of names, where ``none`` is the empty list."""
+    names = tuple(name.strip() for name in text.split(",") if name.strip())
+    return () if names == ("none",) else names

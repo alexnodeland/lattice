@@ -1,0 +1,98 @@
+# The application template (RFC-0001 phase 5, ADR-0011): a new application on artifactr,
+# reflexr or both, wired to the stack's ports.
+#
+#   uvx copier copy gh:alexnodeland/stackr my-app     # from GitHub
+#   uvx copier copy path/to/stackr my-app             # from a clone
+#   uvx copier update                                 # later, in the application
+#
+# Copier takes the latest release tag. stackr has none yet, so Copier warns that it found no
+# tags and takes HEAD instead: main's, from GitHub. `--vcs-ref` names another revision.
+#
+# The template's files are in template/. Copier takes a repository, not a directory of one,
+# so these questions live at the repository's root and point it there.
+
+_subdirectory: template
+_min_copier_version: "9.4"
+_answers_file: .copier-answers.yml
+
+project_name:
+  type: str
+  help: The application's name, as people read it
+  default: My App
+  validator: >-
+    {% if not project_name.strip() %}The name can't be empty{% endif %}
+
+project_slug:
+  type: str
+  help: >-
+    Its slug: the Python distribution, the OpenTelemetry service and the Compose project
+  default: >-
+    {{ project_name.strip().lower() | regex_replace('[^a-z0-9]+', '-') | trim('-') }}
+  validator: >-
+    {% if not (project_slug | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$')) %}
+    Lowercase letters, digits and single dashes, starting with a letter
+    {% elif project_slug | length > 30 %}
+    At most 30 characters
+    {% elif project_slug in ['artifactr', 'artifactr-ai', 'reflexr', 'evalr'] %}
+    One of the libraries' names
+    {% endif %}
+
+description:
+  type: str
+  help: One line about what it does
+  default: An application on stackr.
+
+libraries:
+  type: str
+  help: The libraries it uses
+  choices:
+    artifactr (people and agents edit shared artifacts): artifactr
+    reflexr (rules over event streams run agents): reflexr
+    both, mounted side by side on one database: both
+  default: both
+
+evals:
+  type: bool
+  help: Include evaluation with evalr (an evals/ directory and a starter experiment)?
+  default: true
+
+python_version:
+  type: str
+  help: The Python version it runs on
+  choices: ["3.12", "3.13", "3.14"]
+  default: "3.12"
+
+app_port:
+  type: int
+  help: The port it is published on, on this machine
+  default: 8800
+  validator: >-
+    {% if app_port < 1024 or app_port > 65535 %}Choose a port from 1024 to 65535{% endif %}
+
+# Never asked, and not recorded in the answers. The libraries' commits are the template's, so
+# `copier update` moves them with its code; `make bump-libraries` moves them to each library's
+# main, and evalr comes with them (ADR-0013). The rest are derived from the answers.
+artifactr_rev:
+  type: str
+  default: 1a635ecb9800c2e414221e7293e8a2de2fdb600c
+  when: false
+
+reflexr_rev:
+  type: str
+  default: dc2d05916cd6d1bf36b7c2b26e29663dfdddc338
+  when: false
+
+package_name:
+  type: str
+  default: "{{ project_slug | replace('-', '_') }}"
+  when: false
+
+use_artifactr:
+  type: bool
+  default: "{{ libraries in ['artifactr', 'both'] }}"
+  when: false
+
+use_reflexr:
+  type: bool
+  default: "{{ libraries in ['reflexr', 'both'] }}"
+  when: false

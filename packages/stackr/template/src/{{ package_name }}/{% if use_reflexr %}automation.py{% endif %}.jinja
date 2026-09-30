@@ -1,0 +1,171 @@
+"""reflexr's surfaces: REST and the WebSocket at ``/reflexr/v1``, MCP at ``/reflexr/mcp/``.
+
+Producers publish events with a Supabase access token; the tenant and user come from it. The
+reactor evaluates the rules and runs their actions while the application is up, and stops
+gracefully with it.
+"""
+
+import asyncio
+import contextlib
+from collections.abc import AsyncGenerator
+from datetime import timedelta
+
+from fastapi import FastAPI
+from mcp.server.mcpserver.exceptions import ToolError
+from pydantic_ai.capabilities import AbstractCapability
+from pydantic_ai.models import Model
+from sqlalchemy.ext.asyncio import AsyncEngine
+from starlette.requests import HTTPConnection
+
+from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
+from reflexr import Actor, ExternalAgentActor, SystemActor, UserActor
+from reflexr.core import TenantId
+from reflexr.fastapi import Unauthorized, reflexr_router
+from reflexr.langfuse import langfuse_run
+from reflexr.litellm import LiteLLMGateway
+from reflexr.mcp import McpContext, ReflexrMcp
+from reflexr.scores import FeedbackMirror, sync_score_configs
+from reflexr.sql import SqlStorage, migrate
+from reflexr.workspace import InMemoryStorage, Reaction, Reactor, Workspaces
+
+from {{ package_name }}.auth import RequireToken, TokenVerifier, Unauthenticated
+from {{ package_name }}.gateway import Guardrails, TenantKeys
+from {{ package_name }}.scores import Mirrors, sync_configs
+from {{ package_name }}.settings import GatewaySettings
+from {{ package_name }}.telemetry import TelemetryHandle
+from {{ package_name }}.tickets import (
+    EVENTS,
+    RULES,
+    TriageReview,
+    build_triage_agent,
+    triage_action,
+)
+
+PREFIX = "/reflexr"
+
+STOP_GRACE = timedelta(seconds=5)
+"""How long running actions have to end when the application stops, within the budget ``DRAIN``
+in ``app.py`` states."""
+
+
+class Automation:
+    """reflexr in the application: workspaces of events, the rules, the reactor and surfaces.
+
+    Args:
+        name: The application's name, as MCP clients and the gateway's tags see it.
+        verifier: Verifies access tokens.
+        model: The agents' model.
+        gateway: The gateway's settings: tenant keys and guardrails.
+        engine: The database; without one, workspaces live in memory.
+        telemetry: OpenTelemetry, and Langfuse when it has a client.
+        poll_interval: How often the reactor looks for work.
+        grace: How long running actions have to end when the application stops.
+    """
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        verifier: TokenVerifier,
+        model: Model,
+        gateway: GatewaySettings,
+        engine: AsyncEngine | None = None,
+        telemetry: TelemetryHandle | None = None,
+        poll_interval: timedelta = timedelta(seconds=1),
+        grace: timedelta = STOP_GRACE,
+    ) -> None:
+        self._verifier = verifier
+        self._poll_interval = poll_interval
+        self._grace = grace
+        self.workspaces = Workspaces(
+            SqlStorage(engine) if engine else InMemoryStorage(),
+            events=EVENTS,
+            rules=RULES,
+            tracer_provider=telemetry.tracer_provider if telemetry else None,
+            meter_provider=telemetry.meter_provider if telemetry else None,
+        )
+        capabilities: list[AbstractCapability[Reaction[None]]] = [
+            LiteLLMGateway(
+                tenant_key=TenantKeys(gateway.tenant_keys),
+                guardrails=Guardrails(gateway.guardrails).for_rule,
+                tags=[name],
+            )
+        ]
+        if telemetry is not None:
+            capabilities.append(telemetry.capability())
+        langfuse = telemetry.langfuse if telemetry else None
+        self._langfuse = langfuse
+        agent = build_triage_agent(model, capabilities=capabilities)
+        self.reactor = Reactor[None](
+            self.workspaces,
+            actions={"triage": triage_action(agent)},
+            run_context=langfuse_run if langfuse else None,
+        )
+        self._mirrors: Mirrors | None = None
+        if langfuse is not None:
+            sink = LangfuseScoreSink(langfuse)
+
+            async def follow(tenant_id: str, workspace_id: str) -> None:
+                workspace = await self.workspaces.open(tenant_id, workspace_id, actor=SystemActor())
+                await FeedbackMirror(workspace, sink, cursor="langfuse").follow()
+
+            self._mirrors = Mirrors(follow)
+        self._authorize = self._mirrors.authorize if self._mirrors else None
+        self.mcp = ReflexrMcp(
+            self.workspaces, resolve=self._resolve_client, authorize=self._authorize, name=name
+        )
+
+    async def migrate(self, engine: AsyncEngine) -> None:
+        """Upgrade the database to reflexr's schema."""
+        await migrate(engine)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(self) -> AsyncGenerator[None]:
+        """Run the MCP server and the reactor; with Langfuse, create score configs and mirror.
+
+        At shutdown the MCP server stops first, then the reactor, never in the middle of a
+        transaction: running actions have ``grace`` to end, and those it then cancels are
+        retried later. Both stop before the database closes.
+        """
+        if self._langfuse is not None:
+            configs = LangfuseScoreConfigStore(self._langfuse)
+            await sync_configs(sync_score_configs(configs, [TriageReview]))
+        stop = asyncio.Event()
+        serving = asyncio.create_task(
+            self.reactor.serve(poll_interval=self._poll_interval, stop=stop, grace=self._grace)
+        )
+        try:
+            async with self.mcp.lifespan():
+                yield
+        finally:
+            stop.set()  # let running actions end, then let go of every lease
+            await serving
+            if self._mirrors is not None:
+                await self._mirrors.aclose()
+
+    def mount(self, app: FastAPI) -> None:
+        """Add the REST and WebSocket routes and the MCP server to the application."""
+        router = reflexr_router(
+            self.workspaces,
+            resolve_actor=self._resolve_actor,
+            authorize=self._authorize,
+        )
+        app.include_router(router, prefix=f"{PREFIX}/v1")
+        mcp = self.mcp.http_app(streamable_http_path="/")
+        app.mount(f"{PREFIX}/mcp", RequireToken(mcp, self._verifier))
+
+    async def _resolve_actor(self, connection: HTTPConnection) -> tuple[TenantId, Actor]:
+        try:
+            principal = await self._verifier.authenticate(connection)
+        except Unauthenticated as error:
+            raise Unauthorized(str(error)) from error
+        return principal.tenant_id, UserActor(id=principal.user_id, name=principal.name)
+
+    async def _resolve_client(self, ctx: McpContext) -> tuple[TenantId, ExternalAgentActor]:
+        request = ctx.request_context.request  # None for a client in process, without a token
+        if request is None:
+            raise ToolError("connect over HTTP")
+        principal = await self._verifier.authenticate(request)
+        return principal.tenant_id, ExternalAgentActor(
+            client_id=principal.user_id, name=f"{principal.name} (MCP)"
+        )

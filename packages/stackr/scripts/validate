@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# Validate the stack's configuration without starting it. CI runs exactly this.
+#
+# Usage: scripts/validate   (after `make env`, so `.env` exists)
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+failures=0
+step() { printf '\n==> %s\n' "$*"; }
+fail() {
+  printf 'FAIL: %s\n' "$*" >&2
+  failures=$((failures + 1))
+}
+
+if [[ ! -f .env ]]; then
+  echo "validate: .env is missing; run \`make env\` first" >&2
+  exit 1
+fi
+
+step "YAML lint"
+uv run yamllint --strict . || fail "yamllint"
+
+step "Compose configuration, per profile"
+# Every profile on its own and all of them together, failing on warnings such
+# as a variable missing from .env.
+check_compose() {
+  local label=$1 output
+  shift
+  if ! output=$(docker compose "$@" config --quiet 2>&1); then
+    fail "compose ($label): $output"
+  elif [[ -n $output ]]; then
+    fail "compose ($label) warned: $output"
+  else
+    echo "ok: $label"
+  fi
+}
+check_compose "no profile"
+for profile in $(docker compose config --profiles); do
+  check_compose "$profile" --profile "$profile"
+done
+check_compose "all profiles" --profile '*'
+
+step "Grafana dashboards"
+uv run scripts/check-config dashboards || fail "dashboards"
+
+step "The Supabase project"
+uv run scripts/check-config supabase || fail "supabase"
+
+step "The gateway's configuration"
+uv run scripts/check-config litellm || fail "litellm"
+
+step "The application template, rendered in every variant"
+uv run scripts/check-template || fail "template"
+
+step "Service configurations, with each service's own validator"
+# Each runs the image compose.yaml pins, offline, with the config mounted as
+# the service would see it.
+compose_json=$(docker compose --profile '*' config --format json)
+image_of() { jq -r --arg name "$1" '.services[$name].image' <<<"$compose_json"; }
+# The environment compose.yaml gives a service, in a private file rather than
+# on docker's command line.
+env_dir=$(mktemp -d)
+trap 'rm -rf "$env_dir"' EXIT
+env_file_of() {
+  (umask 077 && jq -r --arg name "$1" \
+    '.services[$name].environment // {} | to_entries[] | "\(.key)=\(.value)"' \
+    <<<"$compose_json" >"$env_dir/$1.env")
+  printf '%s' "$env_dir/$1.env"
+}
+check_service() {
+  local label=$1 output
+  shift
+  if output=$(docker run --rm --network none "$@" 2>&1); then
+    echo "ok: $label"
+  else
+    fail "$label: $output"
+  fi
+}
+check_service "OpenTelemetry Collector" \
+  --env-file "$(env_file_of otel-collector)" \
+  -v "$PWD/deploy/otel-collector:/etc/otelcol-contrib:ro" \
+  "$(image_of otel-collector)" validate --config=/etc/otelcol-contrib/config.yaml
+check_service "Prometheus" \
+  -v "$PWD/deploy/prometheus:/etc/prometheus:ro" --entrypoint promtool \
+  "$(image_of prometheus)" check config --syntax-only /etc/prometheus/prometheus.yml
+check_service "Tempo" \
+  -v "$PWD/deploy/tempo:/etc/tempo:ro" \
+  "$(image_of tempo)" -config.file=/etc/tempo/tempo.yaml -config.verify=true
+check_service "Loki" \
+  -v "$PWD/deploy/loki:/etc/loki:ro" \
+  "$(image_of loki)" -config.file=/etc/loki/loki.yaml -verify-config=true
+
+step "Shell scripts"
+shell_scripts=()
+while IFS= read -r file; do shell_scripts+=("$file"); done \
+  < <(grep -rlE '^#!/usr/bin/env (bash|sh)' scripts .devcontainer template | sort)
+if uv run shellcheck "${shell_scripts[@]}"; then
+  echo "ok: ${shell_scripts[*]}"
+else
+  fail "shellcheck"
+fi
+
+step "Python scripts"
+if uv run ruff format --check . && uv run ruff check .; then
+  echo "ok"
+else
+  fail "ruff"
+fi
+
+if ((failures > 0)); then
+  printf '\nvalidate: %d check(s) failed\n' "$failures" >&2
+  exit 1
+fi
+printf '\nvalidate: all checks passed\n'

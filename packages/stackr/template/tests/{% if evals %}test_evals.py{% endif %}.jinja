@@ -1,0 +1,93 @@
+"""The starter experiments run offline, and in Langfuse when asked."""
+
+import runpy
+import sys
+from typing import Any
+
+import pytest
+from pydantic import BaseModel
+
+from evalr import ExperimentResult
+from evalr.core import ItemResult
+from evalr.memory import InMemoryExperimentTracker
+
+import evals.experiments
+from evals.experiments import main, run, scripted, summary
+
+
+async def test_the_experiments_run_offline() -> None:
+    tracker = InMemoryExperimentTracker()
+    results = await run(tracker, scripted())
+    assert [result.name for result in results] == [
+{%- if use_artifactr %}
+        "notes-replies",
+{%- endif %}
+{%- if use_reflexr %}
+        "ticket-triage",
+{%- endif %}
+    ]
+    for result in results:
+        assert all(item.verdicts and not item.errors for item in result.items), result
+{%- if use_artifactr %}
+    replies = results[0].verdicts("rate_reply")
+    assert {verdict.value.model_dump()["stars"] for verdict in replies.values()} == {5}
+{%- endif %}
+{%- if use_reflexr %}
+    reviews = results[-1].verdicts("review_triage")
+    assert {verdict.value.model_dump()["correct"] for verdict in reviews.values()} == {True}
+{%- endif %}
+
+
+def test_main_prints_the_results(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main([]) == 0
+    printed = capsys.readouterr().out
+{%- if use_artifactr %}
+    assert "notes-replies #1: 2 examples of notes-replies" in printed
+{%- endif %}
+{%- if use_reflexr %}
+    assert "ticket-triage #1: 2 examples of ticket-triage" in printed
+{%- endif %}
+
+
+def test_a_failed_example_is_reported() -> None:
+    failed: ExperimentResult[BaseModel] = ExperimentResult(
+        name="x",
+        run_name="x #1",
+        dataset="x",
+        dataset_version="0",
+        items=(ItemResult("broken", None, errors=("task: RuntimeError: boom",)),),
+        url="http://langfuse/runs/1",
+    )
+    assert summary(failed).splitlines() == [
+        "x #1: 1 examples of x",
+        "  broken: task: RuntimeError: boom",
+        "  http://langfuse/runs/1",
+    ]
+
+
+def test_they_run_in_langfuse_with_the_gateways_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    flushed: list[bool] = []
+
+    class Langfuse:
+        def flush(self) -> None:
+            flushed.append(True)
+
+    trackers: list[Any] = []
+
+    def tracker(client: Any) -> InMemoryExperimentTracker:
+        trackers.append(client)
+        return InMemoryExperimentTracker()
+
+    monkeypatch.setattr(evals.experiments, "Langfuse", Langfuse)
+    monkeypatch.setattr(evals.experiments, "LangfuseExperimentTracker", tracker)
+    monkeypatch.setattr(evals.experiments, "gateway_model", lambda settings: scripted())
+    assert main(["--langfuse"]) == 0
+    assert len(trackers) == 1
+    assert flushed == [True]
+
+
+def test_the_module_runs_as_a_command(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["python -m evals"])
+    with pytest.raises(SystemExit) as exited:
+        runpy.run_module("evals", run_name="__main__")
+    assert exited.value.code == 0

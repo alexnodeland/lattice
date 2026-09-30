@@ -1,0 +1,39 @@
+# {{ project_name }}'s image, as the app profile runs it: `make up` builds it.
+#
+# The family's libraries come from GitHub at the revisions uv.lock pins, so the build needs git
+# and the network. The runtime image holds the virtual environment and nothing else.
+
+FROM ghcr.io/astral-sh/uv:0.12-python{{ python_version }}-trixie-slim AS build
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0
+
+# The dependencies first, so they stay cached until uv.lock changes.
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-install-project
+
+COPY README.md ./
+COPY src ./src
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-editable
+
+
+FROM python:{{ python_version }}-slim-trixie
+
+RUN useradd --create-home --uid 10001 app
+COPY --from=build --chown=app:app /app/.venv /app/.venv
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    APP_HOST=0.0.0.0 \
+    APP_PORT=8000 \
+    OTEL_PYTHON_FASTAPI_EXCLUDED_URLS=healthz
+
+USER app
+EXPOSE 8000
+CMD ["{{ project_slug }}"]

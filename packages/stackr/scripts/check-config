@@ -1,0 +1,234 @@
+#!/usr/bin/env python3
+"""Static checks that no service's own validator covers. Run by scripts/validate.
+
+Usage: scripts/check-config {dashboards,supabase,litellm}
+
+dashboards: every dashboard under deploy/grafana/dashboards is valid JSON, has
+a unique uid and a title, and refers only to the data sources Grafana is
+provisioned with (by uid), or to a dashboard variable.
+
+supabase: supabase/config.toml's project_id differs from the Compose project's
+name (the CLI labels its containers as a Compose project too), the Makefile
+and compose.yaml use it, every Supabase container or network name in a tracked
+file (the template's and the documentation's included) is the one it gives, and
+every postgres image in compose.yaml has the major version local Supabase runs,
+so both database adapters are the same PostgreSQL.
+
+litellm: the gateway's config has no validator of its own, and the proxy
+starts without a guardrail it can't load. Every model group a fallback names
+exists, guardrails use integrations that need no licence and valid modes,
+every `os.environ/` reference is set on the litellm service in compose.yaml,
+and no key is written into the file.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+import sys
+import tomllib
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+ROOT = Path(__file__).resolve().parent.parent
+GRAFANA = ROOT / "deploy" / "grafana"
+
+
+def walk(node: Any) -> Iterator[dict[str, Any]]:
+    """Yield every JSON object in a document, depth first."""
+    if isinstance(node, dict):
+        yield node
+        for value in node.values():
+            yield from walk(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from walk(item)
+
+
+def provisioned_uids() -> set[str]:
+    """The uids of the data sources in Grafana's provisioning."""
+    uids: set[str] = set()
+    for path in (GRAFANA / "provisioning" / "datasources").glob("*.yaml"):
+        document = yaml.safe_load(path.read_text()) or {}
+        uids |= {source["uid"] for source in document.get("datasources", [])}
+    return uids
+
+
+def check_dashboards() -> list[str]:
+    """Check every dashboard file; return the problems found."""
+    problems: list[str] = []
+    known = provisioned_uids()
+    seen: dict[str, Path] = {}
+    for path in sorted((GRAFANA / "dashboards").rglob("*.json")):
+        name = path.relative_to(ROOT)
+        before = len(problems)
+        try:
+            dashboard = json.loads(path.read_text())
+        except json.JSONDecodeError as error:
+            problems.append(f"{name}: invalid JSON: {error}")
+            continue
+        uid, title = dashboard.get("uid"), dashboard.get("title")
+        if not uid or not title:
+            problems.append(f"{name}: needs a uid and a title")
+        elif uid in seen:
+            problems.append(f"{name}: uid {uid!r} is also used by {seen[uid]}")
+        else:
+            seen[uid] = name
+        for node in walk(dashboard):
+            source = node.get("datasource")
+            if isinstance(source, dict) and "uid" in source:
+                ref = str(source["uid"])
+                if ref not in known and not ref.startswith("$") and not ref.startswith("-- "):
+                    problems.append(f"{name}: unknown data source uid {ref!r}")
+        if len(problems) == before:
+            print(f"ok: {name}")
+    if not seen and not problems:
+        print("none yet")
+    return problems
+
+
+def supabase_names() -> Iterator[tuple[str, str, str]]:
+    """Every Supabase container or network name in a tracked file: where, its kind and project.
+
+    CHANGELOG.md is left out: it is generated from commit messages, which can't change.
+    """
+    pattern = r"supabase_(db|kong|network)_[[:alnum:]_-]+"
+    found = subprocess.run(
+        ["git", "grep", "-I", "-n", "-o", "-E", pattern, "--", ":!CHANGELOG.md"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if found.returncode > 1:  # 1 is no match
+        raise SystemExit(f"check-config: git grep: {found.stderr.strip()}")
+    for line in found.stdout.splitlines():
+        where, _, name = line.rpartition(":")
+        _, kind, project = name.split("_", 2)
+        yield where, kind, project
+
+
+def check_supabase() -> list[str]:
+    """Check that the Supabase project id and its names agree everywhere."""
+    config = tomllib.loads((ROOT / "supabase" / "config.toml").read_text())
+    project, major = config["project_id"], str(config["db"]["major_version"])
+    compose_text = (ROOT / "compose.yaml").read_text()
+    compose = yaml.safe_load(compose_text)
+    makefile = (ROOT / "Makefile").read_text()
+    network, host = f"supabase_network_{project}", f"supabase_db_{project}"
+    problems: list[str] = []
+    if project == compose["name"]:
+        problems.append(f"project_id {project!r} is also the Compose project's name")
+    if compose["networks"]["supabase"]["name"] != network:
+        problems.append(f"compose.yaml's supabase network isn't {network}")
+    if host not in compose_text:
+        problems.append(f"compose.yaml doesn't refer to {host}")
+    problems.extend(
+        f"{where}: supabase_{kind}_{other} should be supabase_{kind}_{project}"
+        for where, kind, other in supabase_names()
+        if other != project
+    )
+    if f"SUPABASE_PROJECT := {project}" not in makefile:
+        problems.append(f"the Makefile's SUPABASE_PROJECT isn't {project}")
+    images = {
+        service["image"]
+        for service in compose["services"].values()
+        if service.get("image", "").startswith("postgres:")
+    }
+    problems.extend(
+        f"compose.yaml's {image} isn't PostgreSQL {major}, the major version local Supabase runs"
+        for image in sorted(images)
+        if image.removeprefix("postgres:").split(".")[0].split("-")[0] != major
+    )
+    if not problems:
+        print(f"ok: project {project}, in every file's Supabase names; PostgreSQL {major}")
+    return problems
+
+
+# Guardrail integrations that run in the open-source proxy (ADR-0010).
+OPEN_GUARDRAILS = {
+    "litellm_content_filter",
+    "presidio",
+    "openai_moderation",
+    "lakera_v2",
+    "bedrock",
+    "generic_guardrail_api",
+}
+GUARDRAIL_MODES = {"pre_call", "post_call", "during_call", "logging_only"}
+ENV_REF = re.compile(r"^os\.environ/(\w+)$")
+
+
+def check_litellm() -> list[str]:
+    """Check the gateway's config against itself and compose.yaml."""
+    config = yaml.safe_load((ROOT / "deploy" / "litellm" / "config.yaml").read_text())
+    compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
+    environment = set(compose["services"]["litellm"].get("environment") or {})
+    problems: list[str] = []
+
+    models = {entry["model_name"] for entry in config.get("model_list", [])}
+    for entry in config.get("model_list", []):
+        params = entry.get("litellm_params") or {}
+        if "model" not in params:
+            problems.append(f"model {entry['model_name']!r} has no litellm_params.model")
+        key = str(params.get("api_key", ""))
+        if key and not ENV_REF.match(key) and (key.startswith("sk-") or len(key) > 20):
+            problems.append(f"model {entry['model_name']!r} has a key in the file; use os.environ/")
+
+    for fallback in (config.get("router_settings") or {}).get("fallbacks", []):
+        for group, targets in fallback.items():
+            for name in [group, *targets]:
+                if name not in models:
+                    problems.append(f"fallback names {name!r}, which isn't a model_name")
+
+    names: set[str] = set()
+    for guardrail in config.get("guardrails", []):
+        name, params = guardrail.get("guardrail_name"), guardrail.get("litellm_params") or {}
+        if name in names:
+            problems.append(f"guardrail {name!r} is defined twice")
+        names.add(name)
+        if params.get("guardrail") not in OPEN_GUARDRAILS:
+            problems.append(
+                f"guardrail {name!r} uses {params.get('guardrail')!r}, not an open integration"
+            )
+        modes = params.get("mode")
+        modes = modes if isinstance(modes, list) else [modes]
+        if not set(modes) <= GUARDRAIL_MODES:
+            problems.append(f"guardrail {name!r} has mode {params.get('mode')!r}")
+
+    def references(node: Any) -> Iterator[str]:
+        if isinstance(node, str) and (match := ENV_REF.match(node)):
+            yield match[1]
+        elif isinstance(node, dict):
+            for value in node.values():
+                yield from references(value)
+        elif isinstance(node, list):
+            for item in node:
+                yield from references(item)
+
+    for name in sorted(set(references(config)) - environment):
+        problems.append(f"os.environ/{name} isn't set on the litellm service in compose.yaml")
+    if not ENV_REF.match(str((config.get("general_settings") or {}).get("master_key", ""))):
+        problems.append("general_settings.master_key must come from os.environ/")
+
+    if not problems:
+        print(f"ok: {len(models)} model names, {len(names)} guardrails, every reference set")
+    return problems
+
+
+def main() -> int:
+    checks = {"dashboards": check_dashboards, "supabase": check_supabase, "litellm": check_litellm}
+    if len(sys.argv) != 2 or sys.argv[1] not in checks:
+        print(f"usage: scripts/check-config {{{','.join(checks)}}}", file=sys.stderr)
+        return 2
+    problems = checks[sys.argv[1]]()
+    for problem in problems:
+        print(f"FAIL: {problem}", file=sys.stderr)
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

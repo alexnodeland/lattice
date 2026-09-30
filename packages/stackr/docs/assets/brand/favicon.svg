@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+<title id="title">stackr</title>
+<style>.a{fill:#6A6C7C}.o{fill:#1C1D26}@media (prefers-color-scheme:dark){.a{fill:#8C8E9E}.o{fill:#F1F1F6}}</style>
+<polygon class="a" points="19.31,16 61.31,16 54.04,30 12.04,30"/>
+<polygon class="a" points="14.63,25 56.63,25 49.37,39 7.37,39"/>
+<polygon class="a" points="9.96,34 51.96,34 44.69,48 2.69,48"/>
+<polygon class="o" points="14.63,25 56.63,25 54.04,30 12.04,30"/>
+<polygon class="o" points="9.96,34 51.96,34 49.37,39 7.37,39"/>
+</svg>

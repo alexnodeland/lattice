@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""Create or update `.env` from `.env.example`, generating local secrets.
+
+Usage: scripts/setup-env [--example PATH] [--env-file PATH]
+
+`.env.example` is the template, in order, with its comments. For each key:
+
+- A key already in `.env` keeps its value, so running this again is safe,
+  and picks up keys added to `.env.example` since the last run.
+- `generate:KIND` or `generate:KIND:PREFIX` becomes a fresh random secret:
+  `hex` (64 hex characters), `token` (43 URL-safe characters) or `uuid`,
+  after the optional prefix (`generate:token:sk-`).
+- `basic-auth:USER_KEY:PASSWORD_KEY` is derived as base64("user:password"),
+  the credentials of an HTTP Basic header. Derived values are recomputed on
+  every run, so they always follow the keys they come from.
+- Any other value is copied as it is.
+
+Keys in `.env` that `.env.example` doesn't have (provider API keys you added,
+for example) are kept at the end. The file is written with mode 0600.
+"""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import os
+import secrets
+import sys
+import uuid
+from pathlib import Path
+
+from _env import LINE, read_env
+
+LOCAL_HEADER = "# Local additions: keys that are not in .env.example."
+
+
+def generate(spec: str) -> str:
+    """Make a secret from a `generate:KIND[:PREFIX]` spec."""
+    _, kind, *rest = spec.split(":", 2)
+    prefix = rest[0] if rest else ""
+    if kind == "hex":
+        return prefix + secrets.token_hex(32)
+    if kind == "token":
+        return prefix + secrets.token_urlsafe(32)
+    if kind == "uuid":
+        return prefix + str(uuid.uuid4())
+    raise SystemExit(f"setup-env: unknown generator {spec!r}")
+
+
+def derive(spec: str, values: dict[str, str]) -> str:
+    """Compute a `basic-auth:USER_KEY:PASSWORD_KEY` value from other keys."""
+    kind, *keys = spec.split(":")
+    if kind != "basic-auth" or len(keys) != 2:
+        raise SystemExit(f"setup-env: unknown derivation {spec!r}")
+    missing = [key for key in keys if key not in values]
+    if missing:
+        raise SystemExit(f"setup-env: {spec!r} needs {', '.join(missing)} earlier in the file")
+    user, password = (values[key] for key in keys)
+    return base64.b64encode(f"{user}:{password}".encode()).decode()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--example", type=Path, default=Path(".env.example"))
+    parser.add_argument("--env-file", type=Path, default=Path(".env"))
+    args = parser.parse_args()
+
+    existing = read_env(args.env_file)
+    resolved: dict[str, str] = {}
+    lines: list[str] = []
+    added: list[str] = []
+    generated: list[str] = []
+
+    for line in args.example.read_text().splitlines():
+        match = LINE.match(line.strip())
+        if not match:
+            lines.append(line)
+            continue
+        key, template = match["key"], match["value"]
+        if template.startswith("basic-auth:"):
+            value = derive(template, resolved)
+        elif key in existing:
+            value = existing[key]
+        elif template.startswith("generate:"):
+            value = generate(template)
+            generated.append(key)
+        else:
+            value = template
+        if key not in existing:
+            added.append(key)
+        resolved[key] = value
+        lines.append(f"{key}={value}")
+
+    extra = {key: value for key, value in existing.items() if key not in resolved}
+    if extra:
+        lines += ["", LOCAL_HEADER, *(f"{key}={value}" for key, value in extra.items())]
+
+    created = not args.env_file.exists()
+    fd = os.open(args.env_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as out:
+        out.write("\n".join(lines).rstrip() + "\n")
+    os.chmod(args.env_file, 0o600)
+
+    print(f"setup-env: {'created' if created else 'updated'} {args.env_file}", file=sys.stderr)
+    if added and not created:
+        print(f"  added: {', '.join(added)}", file=sys.stderr)
+    if generated:
+        print(f"  generated: {', '.join(generated)}", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

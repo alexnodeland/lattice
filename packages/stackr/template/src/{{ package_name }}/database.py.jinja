@@ -1,0 +1,38 @@
+"""The database port: one engine for every library, on ``DATABASE_URL``.
+
+On PostgreSQL (local Supabase's, by default) the libraries' tables live in a schema of the
+application's own, ``DATABASE_SCHEMA``. Supabase's Data API serves the ``public`` schema, and
+Supabase grants its anonymous role access to every table created there, so tables in ``public``
+would be readable with the project's public key. SQLite, for tests and prototypes, has no
+schemas.
+"""
+
+from sqlalchemy import make_url, text
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+
+from {% if use_reflexr %}reflexr{% else %}artifactr{% endif %}.sql import create_sqlite_engine
+
+
+def open_database(url: str, *, schema: str) -> AsyncEngine:
+    """Create the engine for a database URL with an async driver.
+
+    Args:
+        url: Such as ``postgresql+asyncpg://user:password@host:5432/postgres`` or
+            ``sqlite+aiosqlite:///app.db``.
+        schema: The PostgreSQL schema the tables live in: every connection's ``search_path``.
+    """
+    if make_url(url).get_backend_name() == "sqlite":
+        # The libraries' SQLite engines serialize transactions, as their storage needs.
+        return create_sqlite_engine(url)
+    return create_async_engine(url, connect_args={"server_settings": {"search_path": schema}})
+
+
+async def create_schema(engine: AsyncEngine, schema: str) -> None:
+    """Create the application's schema, if the database has schemas and it doesn't exist yet.
+
+    The schema name must be a plain lowercase identifier, as ``Settings`` checks.
+    """
+    if engine.dialect.name != "postgresql":
+        return
+    async with engine.begin() as connection:
+        await connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))

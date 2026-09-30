@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""Download the libraries' Grafana dashboards, at the releases pinned in versions.env.
+
+Usage: scripts/fetch-dashboards [--strict]
+
+Each library publishes its dashboards with every release, as one archive of
+dashboard JSON files. For each library pinned in `versions.env`:
+
+    ARTIFACTR_DASHBOARDS_VERSION=0.2.0
+    ARTIFACTR_DASHBOARDS_SHA256=<optional sha256 of the archive>
+
+this script downloads
+
+    https://github.com/alexnodeland/<library>/releases/download/v<version>/<library>-dashboards-<version>.tar.gz
+
+(or `STACKR_DASHBOARDS_URL`, a template with `{library}` and `{version}`),
+checks its sha256 when one is pinned, and replaces
+`deploy/grafana/dashboards/<library>/` with its JSON files. Grafana shows that
+directory as a folder named after the library.
+
+A library with an empty version is skipped. A failed download is a warning, so
+`make up` works offline and before a library publishes its dashboards; with
+`--strict` it is an error.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import io
+import os
+import shutil
+import sys
+import tarfile
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+from _env import ROOT, read_env
+
+LIBRARIES = ("artifactr", "reflexr")
+DEFAULT_URL = (
+    "https://github.com/alexnodeland/{library}/releases/download/"
+    "v{version}/{library}-dashboards-{version}.tar.gz"
+)
+TARGET = ROOT / "deploy" / "grafana" / "dashboards"
+
+
+def fetch(library: str, version: str, sha256: str) -> None:
+    """Download one library's archive and install its dashboards."""
+    url = os.environ.get("STACKR_DASHBOARDS_URL", DEFAULT_URL).format(
+        library=library, version=version
+    )
+    with urllib.request.urlopen(url, timeout=60) as response:
+        data = response.read()
+    digest = hashlib.sha256(data).hexdigest()
+    if sha256 and digest != sha256:
+        raise ValueError(f"sha256 mismatch: expected {sha256}, got {digest}")
+
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
+        members = [
+            member
+            for member in archive.getmembers()
+            if member.isfile()
+            and member.name.endswith(".json")
+            # Skip hidden files, such as the `._*` metadata macOS's tar adds.
+            and not Path(member.name).name.startswith(".")
+        ]
+        if not members:
+            raise ValueError("the archive has no dashboard JSON files")
+        destination = TARGET / library
+        shutil.rmtree(destination, ignore_errors=True)
+        destination.mkdir(parents=True)
+        for member in members:
+            source = archive.extractfile(member)
+            assert source is not None
+            (destination / Path(member.name).name).write_bytes(source.read())
+
+    print(f"fetch-dashboards: {library} {version}: {len(members)} dashboards (sha256 {digest})")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--strict", action="store_true", help="fail when a download fails")
+    args = parser.parse_args()
+
+    versions = read_env(ROOT / "versions.env")
+    failed = False
+    for library in LIBRARIES:
+        prefix = f"{library.upper()}_DASHBOARDS"
+        version = versions.get(f"{prefix}_VERSION", "")
+        if not version:
+            print(f"fetch-dashboards: {library}: no version pinned, skipped")
+            continue
+        try:
+            fetch(library, version, versions.get(f"{prefix}_SHA256", ""))
+        except (OSError, ValueError, tarfile.TarError, urllib.error.URLError) as error:
+            failed = True
+            print(f"fetch-dashboards: {library} {version}: {error}", file=sys.stderr)
+    return 1 if failed and args.strict else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

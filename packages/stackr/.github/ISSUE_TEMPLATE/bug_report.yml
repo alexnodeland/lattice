@@ -1,0 +1,34 @@
+name: Bug report
+description: Something in stackr behaves differently from its documentation.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The commands you ran, and the relevant logs (`make logs`). Remove any secrets from `.env`.
+      render: shell
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [compose, observability, langfuse, supabase, gateway, template, scripts, ci, docs]
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: stackr commit, Docker, Docker Compose and Supabase CLI versions, and the operating system.
+      placeholder: "stackr 1a2b3c4, Docker 29.4.0, Compose 5.1.2, Supabase CLI 2.60.0, macOS 26"
+    validations:
+      required: true

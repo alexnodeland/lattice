@@ -1,0 +1,143 @@
+"""reflexr's surfaces: an opened ticket fires the triage rule, and the agent triages it."""
+
+import logging
+from datetime import timedelta
+from pathlib import Path
+from typing import Any
+
+import httpx
+import httpx2
+import pytest
+from fastapi.testclient import TestClient
+from mcp import Client
+from mcp.client.streamable_http import streamable_http_client
+from mcp.types import TextContent
+
+from {{ package_name }}.auth import TokenVerifier
+from {{ package_name }}.automation import Automation
+from {{ package_name }}.settings import Settings
+
+from conftest import (
+    OPENED,
+    TENANT,
+    TENANT_KEY,
+    TRIAGE,
+    TRIAGED,
+    Script,
+    app,
+    bearer,
+    call,
+    say,
+    settings,
+    wait_for,
+)
+
+BASE = "/reflexr/v1/workspaces/main"
+
+
+def publish(client: TestClient, **event: Any) -> dict[str, Any]:
+    response = client.post(f"{BASE}/events", json={"event": event})
+    assert response.status_code == 200, response.text
+    [outcome] = response.json()
+    return outcome
+
+
+def runs(client: TestClient) -> list[dict[str, Any]]:
+    return client.get(f"{BASE}/runs").json()
+
+
+def test_an_opened_ticket_is_triaged(client: TestClient, script: Script) -> None:
+    triaged = {"priority": "urgent", "summary": "Checkout is down for every customer"}
+    script.steps += [
+        call("emit_event", type=TRIAGED, fields=triaged),
+        say("Urgent: checkout is down."),
+    ]
+    publish(client, type=OPENED, subject="Checkout fails", body="Every payment errors.")
+    wait_for(lambda: [run["status"] for run in runs(client)] == ["succeeded"])
+    [run] = runs(client)
+    assert (run["rule"], run["output"]) == (TRIAGE, "Urgent: checkout is down.")
+    [envelope] = client.get(f"{BASE}/events", params={"type": TRIAGED}).json()
+    assert envelope["event"] == {"type": TRIAGED, **triaged}
+    assert (envelope["actor"]["kind"], envelope["actor"]["rule"]) == ("agent", TRIAGE)
+
+    first = script.settings[0]
+    assert first["extra_headers"]["Authorization"] == f"Bearer {TENANT_KEY}"
+    assert first["extra_body"]["guardrails"] == ["pii-mask", "prompt-injection"]
+    metadata = first["extra_body"]["metadata"]
+    assert (metadata["tenant_id"], metadata["rule"]) == (TENANT, TRIAGE)
+
+
+def test_publishers_are_the_users_of_their_tokens(client: TestClient) -> None:
+    publish(client, type=TRIAGED, priority="low", summary="A question")
+    [envelope] = client.get(f"{BASE}/events").json()
+    assert envelope["actor"] == {"kind": "user", "id": "alice", "name": "alice@example.com"}
+
+
+def test_only_the_applications_events_are_accepted(client: TestClient) -> None:
+    response = client.post(f"{BASE}/events", json={"event": {"type": "billing:invoice.paid"}})
+    assert response.status_code == 404
+
+
+def test_the_rules_are_described(client: TestClient) -> None:
+    [rule] = client.get("/reflexr/v1/rules").json()
+    assert (rule["name"], rule["then"]["action"]) == (TRIAGE, "triage")
+
+
+async def test_mcp_clients_publish_for_the_user_of_their_token(server: str) -> None:
+    headers = bearer("bob")
+    async with (
+        httpx2.AsyncClient(headers=headers) as http,
+        Client(streamable_http_client(f"{server}/reflexr/mcp/", http_client=http)) as mcp,
+    ):
+        event = {"type": TRIAGED, "priority": "normal", "summary": "From MCP"}
+        published = await mcp.call_tool("publish_event", {"workspace_id": "main", "event": event})
+        assert not published.is_error
+    async with httpx.AsyncClient(base_url=server, headers=headers) as client:
+        [envelope] = (await client.get(f"{BASE}/events")).json()
+    assert envelope["actor"] == {
+        "kind": "external_agent",
+        "client_id": "bob",
+        "name": "bob@example.com (MCP)",
+    }
+
+
+async def test_mcp_clients_in_process_are_refused(script: Script) -> None:
+    config = settings()
+    automation = Automation(
+        name="{{ project_slug }}",
+        verifier=TokenVerifier.from_settings(config.auth),
+        model=script.model,
+        gateway=config.gateway,
+    )
+    event = {"type": TRIAGED, "priority": "normal", "summary": "In process"}
+    async with Client(automation.mcp.server) as mcp:
+        refused = await mcp.call_tool("publish_event", {"workspace_id": "main", "event": event})
+    [content] = refused.content
+    assert refused.is_error
+    assert isinstance(content, TextContent)
+    assert "connect over HTTP" in content.text
+
+
+def test_the_application_stops_cleanly_with_a_run_in_flight(
+    script: Script, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # On SQLite, where a reactor cancelled in the middle of a transaction left the database
+    # locked as it stopped.
+    config = Settings(
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'app.db'}", auth=settings().auth
+    )
+    script.steps += [say("Urgent: checkout is down.")]
+    script.delay = 3600  # the model answers long after the stop's grace
+    stopping = app(script, config, grace=timedelta(milliseconds=100))
+    with TestClient(stopping, headers=bearer()) as client:
+        publish(client, type=OPENED, subject="Checkout fails")
+        wait_for(lambda: script.settings)
+    assert not [record for record in caplog.records if record.levelno >= logging.WARNING]
+
+    # The stop recorded the attempt as abandoned and let go of its lease, so the next start
+    # tries the run again after the rule's backoff, not once the lease lapses.
+    script.delay = 0
+    with TestClient(app(script, config), headers=bearer()) as client:
+        wait_for(lambda: [run["status"] for run in runs(client)] == ["succeeded"])
+        [retried] = client.get(f"{BASE}/events", params={"type": "reflexr:run_retrying"}).json()
+    assert (retried["event"]["attempt"], retried["event"]["reason"]) == (1, "abandoned")

@@ -1,0 +1,3 @@
+-- Seed data for local development. The Supabase CLI loads it into the
+-- `postgres` database on the first `supabase start` and after every
+-- `supabase db reset`. Applications built from stackr add their own.

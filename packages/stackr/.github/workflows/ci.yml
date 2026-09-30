@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      # Generates a throwaway .env first, which also tests scripts/setup-env.
+      - run: make validate
+
+  # Each variant of the application template, generated and checked as its own CI would:
+  # lint, strict types, and the tests with 100% coverage. `make validate` checks the template's
+  # rendering and lint in every variant; this installs and runs what it generates.
+  template:
+    name: Template (${{ matrix.libraries }}${{ matrix.evals && ', evals' || '' }}, Python ${{ matrix.python }})
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        libraries: [artifactr, reflexr, both]
+        evals: [true, false]
+        python: ["3.12"]
+        include:
+          - libraries: both
+            evals: true
+            python: "3.14"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Generate the application
+        run: >-
+          uv run copier copy --defaults --vcs-ref HEAD
+          --data libraries=${{ matrix.libraries }} --data evals=${{ matrix.evals }}
+          --data python_version=${{ matrix.python }}
+          . "$RUNNER_TEMP/app"
+      - name: Its checks
+        working-directory: ${{ runner.temp }}/app
+        run: |
+          uv sync --all-groups
+          make check
+
+  smoke:
+    name: Smoke (${{ matrix.name }})
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: observability
+            profiles: observability
+            database: supabase
+          - name: everything on local Supabase, and an application
+            profiles: observability langfuse gateway
+            database: supabase
+            app: true
+          - name: everything on PostgreSQL
+            profiles: observability langfuse gateway
+            database: postgres
+    env:
+      PROFILES: ${{ matrix.profiles }}
+      STACKR_DATABASE: ${{ matrix.database }}
+      # Local Supabase without the services the smoke test doesn't use.
+      SUPABASE_START_FLAGS: >-
+        -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta,storage-api,postgrest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Read versions.env
+        run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+      - uses: supabase/setup-cli@v3
+        if: matrix.database == 'supabase' && matrix.profiles != 'observability'
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+      - run: make env
+      - run: make up
+      - run: make smoke
+      # An application from the template, beside the whole stack (ADR-0011).
+      - if: matrix.app
+        run: make smoke-app
+      - name: Logs
+        if: failure()
+        run: |
+          docker ps -a
+          docker compose --profile '*' logs --no-color --tail=200
+      - name: Stop the stack
+        if: always()
+        run: make reset

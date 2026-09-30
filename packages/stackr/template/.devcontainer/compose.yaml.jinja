@@ -1,0 +1,10 @@
+# The dev container. Paths are relative to this directory; the project is its parent.
+
+name: {{ project_slug }}-dev
+
+services:
+  dev:
+    image: mcr.microsoft.com/devcontainers/base:jammy
+    command: sleep infinity
+    volumes:
+      - ..:/workspaces/{{ project_slug }}:cached

@@ -26,11 +26,17 @@ _ROLE = re.compile(
 _PUBLIC_MODULES = frozenset(
     {
         "artifactr.core",
+        "artifactr.telemetry",
         "artifactr.workspace",
         "artifactr.agent",
+        "artifactr.scores",
+        "artifactr.sql",
         "artifactr.fastapi",
         "artifactr.mcp",
-        "artifactr.sql",
+        "artifactr.otel",
+        "artifactr.langfuse",
+        "artifactr.litellm",
+        "artifactr.evals",
     }
 )
 

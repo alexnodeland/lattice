@@ -1,9 +1,9 @@
 """Command results, remembered so that a retried command is carried out once.
 
-Every surface sends commands to :meth:`artifactr.agent.Runner.execute_once` with the id the
-client chose, and the runner remembers each result in a :class:`CommandResults`. A client that
-retries a command it never heard back about gets the first result, and the command is not
-carried out twice (ADR-0022).
+Every surface sends commands to :meth:`artifactr.agent.Runner.execute` with the id the client
+chose, and the runner remembers each result in a :class:`CommandResults`. A client that retries
+a command it never heard back about gets the first result, and the command is not carried out
+twice (ADR-0048).
 """
 
 from collections import OrderedDict

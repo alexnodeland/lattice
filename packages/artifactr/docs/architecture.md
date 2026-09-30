@@ -86,7 +86,7 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | Adapter for `Storage` | Durable storage on PostgreSQL and SQLite, and its migrations. |
 | `artifactr.otel` (extra) | telemetry, the OpenTelemetry SDK, exporters and instrumentations | Adapter for the OpenTelemetry API | `configure_telemetry`: providers, OTLP export, instrumentations and metric views, for applications, composed with other libraries' contributions ([ADR-0046](adr/0046-telemetry-that-composes-across-libraries.md)). |
 | `artifactr.litellm` (extra) | agent, pydantic-ai's OpenAI support | Adapter for pydantic-ai's `Model` | `litellm_model` and the `LiteLLMGateway` capability: each request's tenancy, session, trace, key and guardrails, and guardrail blocks as typed failures ([ADR-0043](adr/0043-the-litellm-adapter.md)). |
-| `artifactr.langfuse` (extra) | scores, agent, langfuse, evalr's core | Adapter for evalr's `ScoreSink` and `ScoreConfigStore`, and for `TurnContext` | Feedback as Langfuse scores and score configs, a span filter that keeps whole traces, and each turn's trace attributes ([ADR-0039](adr/0039-the-langfuse-adapter.md)). |
+| `artifactr.langfuse` (extra) | agent, langfuse | Adapter for `TurnContext` | A span filter that keeps whole traces, and each turn's trace attributes ([ADR-0039](adr/0039-the-langfuse-adapter.md)); feedback reaches Langfuse through evalr's score adapters ([ADR-0049](adr/0049-scores-on-evalr.md)). |
 | `artifactr.evals` (extra) | agent, evalr | Adapter for `TurnEvaluator`, and for evalr's `FeedbackSource` and experiment `Task` | Datasets from the log, experiments that replay turns, online evaluation of turns with verdicts recorded as feedback, and the end-to-end measures ([ADR-0044](adr/0044-the-evalr-adapter.md)). |
 | `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
 | `artifactr.mcp` (extra) | agent, mcp | Driving adapter | Artifacts as MCP resources, commands and reads as MCP tools. |
@@ -308,7 +308,7 @@ class Helpfulness(Feedback, name="helpfulness", targets={"turn", "thread"}):
 
 Feedback is the `give_feedback` command, so it goes through the one write path and every surface has it. Core checks the type is registered and declares the target's kind, validates the value, and checks the target exists, then records `feedback_given` with the validated value. An evaluator's verdict is an instance of the same types, given by an `EvaluatorActor(name, version)`, which may give feedback and nothing else; people's and evaluators' judgements can then be compared directly. Feedback is counted in `artifactr.feedback` by type, target and kind of actor.
 
-**Scores.** Evaluation backends see feedback as scores, one per field, named `{type}.{field}` and typed by the field: numbers are numeric, `bool` boolean, `Literal` and `Enum` categorical, `str` text ([ADR-0038](adr/0038-feedback-as-scores.md)). The mapping and the ports are evalr's, shared with reflexr and with evalr's evaluators, so a person's scores and an evaluator's match by construction; `artifactr.scores` passes each type's registered name as the `{type}`. `artifactr.scores.FeedbackMirror` follows a workspace's log and records each `feedback_given`'s scores in a `ScoreSink`, attached to a trace or else a session:
+**Scores.** Evaluation backends see feedback as scores, one per field, named `{type}.{field}` and typed by the field: numbers are numeric, `bool` boolean, `Literal` and `Enum` categorical, `str` text ([ADR-0049](adr/0049-scores-on-evalr.md)). The mapping and the ports are evalr's, shared with reflexr and with evalr's evaluators, so a person's scores and an evaluator's match by construction; `artifactr.scores` passes each type's registered name as the `{type}`. `artifactr.scores.FeedbackMirror` follows a workspace's log and records each `feedback_given`'s scores in a `ScoreSink`, attached to a trace or else a session:
 
 | Target | Scored on |
 |---|---|
@@ -317,7 +317,7 @@ Feedback is the `give_feedback` command, so it goes through the one write path a
 | An artifact version | The trace the version was committed in; else the session of the agent that wrote it |
 | A thread | The thread's session |
 
-Score ids are derived from the envelope's id in artifactr's own namespace, so mirroring the log again replaces scores rather than adding more. A mirror keeps a named cursor in the workspace, saved after it records a piece of feedback and every 500 other envelopes, and carries on after it when it restarts; mirroring is at least once ([ADR-0046](adr/0046-telemetry-that-composes-across-libraries.md)). A score has no evaluator; where the feedback came from (tenant, workspace, type, target, actor and `seq`) is its `source`, recorded as metadata. `sync_score_configs` creates each type's missing score configs in a `ScoreConfigStore`, through evalr's `sync_score_configs`. `ScoreSink` and `ScoreConfigStore` are evalr's ports: `artifactr.langfuse` adapts Langfuse to them, and passes evalr's contract suites for both. `artifactr.scores` re-exports evalr's `Score`, `ScoreConfig`, `ScoreSink`, `ScoreConfigStore`, `ScoreType` (as `ScoreDataType`) and `MAX_TEXT`, which it has always offered. It needs evalr, so it is used through the `langfuse` or `evals` extra; the inner layers never import it.
+Score ids are derived from the envelope's id in artifactr's own namespace, so mirroring the log again replaces scores rather than adding more. A mirror keeps a named cursor in the workspace, saved after it records a piece of feedback and every 500 other envelopes, and carries on after it when it restarts; mirroring is at least once ([ADR-0046](adr/0046-telemetry-that-composes-across-libraries.md)). A score has no evaluator; where the feedback came from (tenant, workspace, type, target, actor and `seq`) is its `source`, recorded as metadata. `sync_score_configs` creates each type's missing score configs in a `ScoreConfigStore`, through evalr's `sync_score_configs`. `Score`, `ScoreConfig`, `ScoreSink` and `ScoreConfigStore` are evalr's, imported from `evalr.core`, and `evalr.langfuse`'s `LangfuseScoreSink` and `LangfuseScoreConfigStore` adapt Langfuse to the ports. `artifactr.scores` needs evalr, so it is used through the `langfuse` or `evals` extra; the inner layers never import it.
 
 **Evaluation.** With the `[evals]` extra, feedback feeds evalr, the eval kit shared with reflexr ([ADR-0029](adr/0029-evalr-shared-eval-kit.md), [ADR-0044](adr/0044-the-evalr-adapter.md)):
 
@@ -343,7 +343,7 @@ await agent.run(
 )
 ```
 
-The `Runner` does this for every run it starts, sending frames to its `FanoutChannel`, an in-process fan-out keyed by `run_id`. It keeps each active run's frames (bounded), so any connection can `runner.watch(run_id)` mid-run and receive what the run has produced so far, then the rest until it ends; watchers that fall behind lose their oldest frames rather than slowing the run. `NullChannel` drops frames for headless runs, and a pub/sub channel (Redis, NATS) can fan out across replicas.
+The `Runner` does this for every run it starts, sending frames to its `FanoutChannel`, an in-process fan-out keyed by `run_id`. It keeps each active run's frames (bounded), so any connection can `runner.watch(run_id)` mid-run and receive what the run has produced so far, then the rest until it ends; watchers that fall behind lose their oldest frames rather than slowing the run. `NullChannel` drops frames for headless runs.
 
 The run holds a thread claim, not a socket: if the connection that started it drops, the run continues. Losing live frames is harmless, because the durable `message_posted`, `tool_returned` and `artifact_changed` events are authoritative. A client that reconnects mid-run replays the log from its last `seq` and watches the run again if it is still active.
 
@@ -358,7 +358,7 @@ The run holds a thread claim, not a socket: if the connection that started it dr
 
 ## Surfaces
 
-Every surface is a thin adapter: it authenticates, asks whether the client may use the workspace, turns its input into commands, and hands them to `Runner.execute`, through `Runner.execute_once` when the client gave a `command_id` ([ADR-0022](adr/0022-surfaces-over-one-command-handler.md)). Messages therefore start, steer or answer runs the same way everywhere, and every other command is a plain `Workspace.commit`. Authentication and authorization are the host's: the router takes `resolve_actor` and the MCP server `resolve`, and both take the same `authorize(tenant_id, workspace_id, actor)` hook (`artifactr.workspace.Authorize`), which the MCP server also asks before a resource read or subscription ([ADR-0012](adr/0012-surfaces-websocket-rest-mcp.md)).
+Every surface is a thin adapter: it authenticates, opens the workspace for the client, turns its input into commands, and hands each to `Runner.execute(workspace, command, command_id=...)`, which returns its `command_result` ([ADR-0048](adr/0048-surfaces-over-the-runner.md)). Messages therefore start, steer or answer runs the same way everywhere, and every other command is a plain `Workspace.commit`. Authentication and authorization are the host's: the router takes `resolve_actor` and the MCP server `resolve`, and both take the same `authorize(tenant_id, workspace_id, actor)` hook (`artifactr.workspace.Authorize`) and pass it to `Workspaces.open(..., authorize=)`, which refuses a workspace with `Forbidden`. The MCP server also opens a workspace that way before a resource read or subscription.
 
 | Surface | Package | Role |
 |---|---|---|
@@ -376,7 +376,7 @@ app.mount(
 )  # run mcp.lifespan() in the app's lifespan
 ```
 
-The WebSocket session reads with a single task and runs each command as its own task, so a `stop_run` is never stuck behind a slow command. All outgoing frames pass through one bounded outbox and one writer; a client too slow to keep up is disconnected (close code 4429) rather than holding events back, and resumes by `seq` when it reconnects. `Runner.execute_once` remembers each command's result in a `CommandResults` port, keyed by tenant, workspace, sender and `command_id`, so a retried command returns its original result on every surface. The default adapter, `InMemoryCommandResults`, keeps the 10,000 most recent per process. Beyond that memory, core refuses a create or message whose id is already used, as `invalid_state` ([ADR-0045](adr/0045-a-message-id-is-used-once.md)).
+The WebSocket session reads with a single task and runs each command as its own task, so a `stop_run` is never stuck behind a slow command. All outgoing frames pass through one bounded outbox and one writer; a client too slow to keep up is disconnected (close code 4429) rather than holding events back, and resumes by `seq` when it reconnects. `Runner.execute` remembers each command's result in a `CommandResults` port, keyed by tenant, workspace, sender and `command_id`, so a retried command returns its original result on every surface; an MCP tool call without a `command_id` gets a new one. The default adapter, `InMemoryCommandResults`, keeps the 10,000 most recent per process. Beyond that memory, core refuses a create or message whose id is already used, as `invalid_state` ([ADR-0045](adr/0045-a-message-id-is-used-once.md)).
 
 The protocol's frames are Pydantic models in `artifactr.core.protocol`. `schemas/artifactr.v1.json` is generated from them (`make schema`) for clients to generate types from, and a test fails if it drifts.
 
@@ -417,7 +417,7 @@ class Storage(Protocol):
 - **Transactions serialize per workspace from the moment they begin**, so what a transaction loads cannot change before it saves. Writes are staged and applied atomically when the block exits normally; an exception rolls back entities, log and history together.
 - **Message ids are looked up by key.** `load` says whether each message id in `needs` is used, and `save` records a result's `messages` as used.
 - **`read` takes a window of the log** (`after_seq < seq < before_seq`), for some threads by `delivered_to`'s rule, and its first `limit` or last `last` envelopes, oldest first. Storage filters, so a tail read of a long log reads only its tail; `Workspace.read` refuses both `limit` and `last`.
-- **`subscribe(after_seq)` replays, then follows live**, on one iterator. Because a subscription starts from a `seq`, there is no gap to manage between history and live events. It is the only read path for replay, live fan-out, hooks, MCP notifications and change notes.
+- **`subscribe(after_seq)` replays, then follows live**, on one iterator. Because a subscription starts from a `seq`, there is no gap to manage between history and live events. The WebSocket's replay, MCP notifications, the feedback mirror and a run's watcher follow the log this way; the notes a run starts with are a window `read`.
 - **Leases** back `Workspace.claim_thread`: a time-limited, renewed claim that holds across processes and lapses if its holder dies.
 - **A cancelled caller leaves no lock or connection behind**; cancellation may be deferred until the current statement ends ([ADR-0047](adr/0047-cancel-safe-storage.md)). Runs, connections and claims are cancelled wherever they are, so every storage keeps this, and the behaviour suite checks it.
 - **Cursors** record how far a named consumer of the log has got, such as a feedback mirror. A cursor only moves forward, so a consumer running in several processes cannot move it back ([ADR-0046](adr/0046-telemetry-that-composes-across-libraries.md)).
@@ -516,7 +516,34 @@ The `Runner` takes a `turn_context`: an async context entered around each turn, 
 
 ### Langfuse
 
-Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opentelemetry-observability-with-langfuse.md), [ADR-0039](adr/0039-the-langfuse-adapter.md)). The `[langfuse]` extra adds `should_export_span`, a filter that keeps artifactr's, pydantic-graph's, the MCP SDK's and the HTTP and database instrumentations' spans as well as Langfuse's default LLM spans, so traces stay whole; `langfuse_turn`, a `TurnContext` that propagates each turn's session, user, tags (tenant, workspace, the kinds of artifact followed), trace name and metadata; and `LangfuseScores` and `LangfuseScoreConfigs`, which put feedback in Langfuse through evalr's score ports, sending a yes or no as 1 or 0. `configure_telemetry(langfuse="traces")` adds Langfuse to the same tracer provider, keeping a span if any library's contribution keeps it. A Collector can also send plain OTLP to Langfuse's HTTP endpoint, with the `x-langfuse-ingestion-version: 4` header; then `langfuse="scores"` sends Langfuse no spans, and the client only sets trace attributes and records scores.
+Langfuse is the primary backend for traces and scores ([ADR-0027](adr/0027-opentelemetry-observability-with-langfuse.md), [ADR-0039](adr/0039-the-langfuse-adapter.md)). The `[langfuse]` extra adds `should_export_span`, a filter that keeps artifactr's, pydantic-graph's, the MCP SDK's and the HTTP and database instrumentations' spans as well as Langfuse's default LLM spans, so traces stay whole, and `langfuse_turn`, a `TurnContext` that propagates each turn's session, user, tags (tenant, workspace, the kinds of artifact followed), trace name and metadata. A `FeedbackMirror` puts feedback in Langfuse through evalr's `LangfuseScoreSink` and `LangfuseScoreConfigStore`. `configure_telemetry(langfuse="traces")` adds Langfuse to the same tracer provider, keeping a span if any library's contribution keeps it. A Collector can also send plain OTLP to Langfuse's HTTP endpoint, with the `x-langfuse-ingestion-version: 4` header; then `langfuse="scores"` sends Langfuse no spans, and the client only sets trace attributes and records scores.
+
+## Aligned with reflexr
+
+reflexr, the sibling library for event-driven agents, is released on its own, and neither imports the other. Their conventions are aligned, so that a system using both can bridge them with thin adapters (reflexr's [ADR-0003](https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0003-independent-sibling-of-artifactr.md)).
+
+| Convention | artifactr | reflexr |
+|---|---|---|
+| Tenancy | Tenants own workspaces; `workspaces.open(tenant, workspace, actor=)` | The same |
+| Authorization | `Workspaces.open(..., authorize=)` refuses a workspace with `Forbidden`, for every surface | The same |
+| Log | One per workspace, envelopes with a gap-free `seq` and a `traceparent` | The same |
+| Actors | user, agent, external agent, system, evaluator | The same, plus source |
+| Types | `Artifact` subclasses registered by name | `Event` subclasses registered by name |
+| Core | Sans-IO `commit`, conformance fixtures | Sans-IO `evaluate`, conformance fixtures |
+| Storage | Protocol, in-memory and SQL, leases, one behaviour suite, cancel-safe | The same |
+| Telemetry | `configure_telemetry(*contributions)`, `telemetry()`, `untraced()`, `langfuse="traces" \| "scores"` | The same, each taking the other's contribution |
+| Log consumers | `cursor` and `save_cursor`, which only move forward; `FeedbackMirror(cursor=)` | The same |
+| pydantic-ai | A capability plus a deps type (`ArtifactWorkspace`, `Session`) | A capability plus a deps type (`EventContext`, `Reaction`) |
+| WebSocket | `hello`, replay, `replay_complete`, close codes | The same shape |
+| MCP | Tenant in resource URIs | The same |
+
+Some code is shared verbatim, at the same path under `src/reflexr/`, and each copy's docstring says so. A change to one is made to both:
+
+- `_logging_left_alone`, in `src/artifactr/mcp/server.py`
+- `litellm_model`, in `src/artifactr/litellm/gateway.py`
+- `create_sqlite_engine`, in `src/artifactr/sql/sqlite.py`
+- `langfuse_client`, in `src/artifactr/langfuse/client.py`
+- `_to_the_end` and `_awaited_to_the_end`, in `src/artifactr/sql/storage.py` ([ADR-0047](adr/0047-cancel-safe-storage.md))
 
 ## Dependencies
 
@@ -543,7 +570,7 @@ Python 3.12+. Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical wi
 - **SQL:** concurrent transactions, lease races, cross-process subscriptions and calls cancelled at random on both databases, and a check that the migrations build exactly the models' schema.
 - **Agent:** scripted runs with pydantic-ai's `TestModel`, and `FunctionModel`s built by `function_model`, which streams as the `Runner` needs, so no test calls a model API. Assertions are on the events written, including conflicts, steering and deferred pauses.
 - **Adapters:** WebSocket contract tests with FastAPI's `TestClient`, and an MCP client round-trip.
-- **Evaluation:** the feedback source passes evalr's `check_feedback_source` contract, and the Langfuse score adapters its `check_score_sink` and `check_score_config_store`; experiments run through evalr's in-memory tracker, and evaluators are evalr's `FunctionEvaluator`s.
+- **Evaluation:** the feedback source passes evalr's `check_feedback_source` contract, and the mirror records through evalr's `LangfuseScoreSink` against a fake Langfuse; experiments run through evalr's in-memory tracker, and evaluators are evalr's `FunctionEvaluator`s.
 - **Telemetry:** spans and metrics are asserted through the OpenTelemetry SDK's `InMemorySpanExporter` and `InMemoryMetricReader`, and the registry's cardinality policy is checked for every metric.
 - **Protocol:** the JSON Schema in `schemas/` is generated from the models and checked in. CI fails if it drifts.
 
@@ -576,7 +603,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0009](adr/0009-write-policies-and-non-blocking-proposals.md) | Write policies and non-blocking proposals |
 | [0010](adr/0010-pausing-with-deferred-tools.md) | Pausing with pydantic-ai deferred tools |
 | [0011](adr/0011-workspace-scoped-artifacts-and-tenant-handles.md) | Workspace-scoped artifacts and tenant-scoped handles |
-| [0012](adr/0012-surfaces-websocket-rest-mcp.md) | Surfaces: WebSocket thread protocol, REST commands, MCP |
+| [0012](adr/0012-surfaces-websocket-rest-mcp.md) | Surfaces: WebSocket thread protocol, REST commands, MCP (superseded by 0048) |
 | [0013](adr/0013-library-with-reference-implementation.md) | A library with adapters and a reference implementation |
 | [0014](adr/0014-trunk-based-development-with-rfcs-and-adrs.md) | Trunk-based development with RFCs, ADRs and evergreen docs |
 | [0015](adr/0015-quality-gates.md) | Quality gates |
@@ -586,7 +613,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0019](adr/0019-storage-protocol-and-workspace-handles.md) | One storage protocol behind workspace handles |
 | [0020](adr/0020-running-agents-in-threads.md) | Running agents in threads |
 | [0021](adr/0021-sql-storage.md) | SQL storage with one dialect-neutral implementation |
-| [0022](adr/0022-surfaces-over-one-command-handler.md) | Surfaces over one command handler |
+| [0022](adr/0022-surfaces-over-one-command-handler.md) | Surfaces over one command handler (superseded by 0048) |
 | [0023](adr/0023-documentation-site.md) | The documentation site |
 | [0024](adr/0024-reference-implementation-as-a-workspace-member.md) | The reference implementation as a workspace member |
 | [0025](adr/0025-distribution-name.md) | Distributed as artifactr-ai, imported as artifactr |
@@ -602,8 +629,8 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0035](adr/0035-a-turn-is-its-own-trace.md) | A turn is its own trace |
 | [0036](adr/0036-metric-cardinality-through-sdk-views.md) | Metric cardinality through SDK views |
 | [0037](adr/0037-feedback-targets-and-evaluators.md) | Feedback targets and evaluators |
-| [0038](adr/0038-feedback-as-scores.md) | Feedback as scores, through ports |
-| [0039](adr/0039-the-langfuse-adapter.md) | The Langfuse adapter |
+| [0038](adr/0038-feedback-as-scores.md) | Feedback as scores, through ports (superseded by 0049) |
+| [0039](adr/0039-the-langfuse-adapter.md) | The Langfuse adapter (its score adapters superseded by 0049) |
 | [0040](adr/0040-joining-stackrs-network.md) | Joining stackr's network when it runs |
 | [0041](adr/0041-dashboards-generated-tested-and-released.md) | Dashboards generated, tested and released |
 | [0042](adr/0042-typed-run-failures.md) | Typed run failures |
@@ -612,6 +639,8 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0045](adr/0045-a-message-id-is-used-once.md) | A message id is used once in a workspace |
 | [0046](adr/0046-telemetry-that-composes-across-libraries.md) | Telemetry that composes across libraries, untraced polling and mirror cursors |
 | [0047](adr/0047-cancel-safe-storage.md) | Cancel-safe storage |
+| [0048](adr/0048-surfaces-over-the-runner.md) | Surfaces over the runner |
+| [0049](adr/0049-scores-on-evalr.md) | Scores on evalr |
 
 ## Open questions
 
@@ -621,7 +650,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 - **Crash recovery for runs.** A run interrupted by a process crash stays `running`: its thread claim lapses, so the thread takes new runs, but nothing records the old one as ended ([#68](https://github.com/alexnodeland/artifactr/issues/68)). A message whose process died after posting it and before starting its turn has no turn, and a retry with the same `message_id` is refused ([ADR-0045](adr/0045-a-message-id-is-used-once.md)). pydantic-ai's durable execution integrations (Temporal, DBOS, Prefect) could make such runs resumable.
 - **Pushing log updates across processes.** `SqlStorage` subscriptions learn about commits from other processes by polling. PostgreSQL's `LISTEN/NOTIFY` could wake them at once: an optimisation behind the same `subscribe`, with polling kept for SQLite and as a fallback ([ADR-0021](adr/0021-sql-storage.md)).
 - **Cross-process runs.** Runs are tasks in the process that started them, so `Runner.stop` and `Runner.watch` reach only local runs. A pub/sub channel would make both work across replicas.
-- **Cross-process deduplication.** `InMemoryCommandResults` remembers results in one process, and a retry that arrives while the first attempt is still being carried out runs again. A `CommandResults` over shared storage, with a claim on a command while it runs, would close both gaps ([ADR-0022](adr/0022-surfaces-over-one-command-handler.md)). Core already refuses a repeated create or message by its id, whichever process it reaches ([ADR-0045](adr/0045-a-message-id-is-used-once.md)), so the gaps matter only for commands whose ids the client leaves out, and for `give_feedback`, which has none.
+- **Cross-process deduplication.** `InMemoryCommandResults` remembers results in one process, and a retry that arrives while the first attempt is still being carried out runs again. A `CommandResults` over shared storage, with a claim on a command while it runs, would close both gaps ([ADR-0048](adr/0048-surfaces-over-the-runner.md)). Core already refuses a repeated create or message by its id, whichever process it reaches ([ADR-0045](adr/0045-a-message-id-is-used-once.md)), so the gaps matter only for commands whose ids the client leaves out, and for `give_feedback`, which has none.
 - **`jsonpatch` maintenance.** It is stable but rarely updated; its surface is small enough to vendor if needed.
 - **The session on database and HTTP spans in a real deployment.** A `BaggageSpanProcessor` carries a turn's `session.id` onto every span in it, as a test shows in process ([ADR-0035](adr/0035-a-turn-is-its-own-trace.md)). Whether a deployed Collector and Langfuse keep it end to end is left for stackr's integration tests.
 - **Guardrail error shapes.** A guardrail block is recognised as an HTTP 400 whose error mentions a guardrail ([ADR-0043](adr/0043-the-litellm-adapter.md)). If LiteLLM adds a typed error code for blocks, the gateway should use it.

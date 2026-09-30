@@ -1,6 +1,6 @@
 # Serving over WebSocket and REST
 
-`artifactr.fastapi` (the `fastapi` extra) serves workspaces to your frontend: the thread protocol over WebSocket, and REST endpoints for the same commands and for reads. Both are one FastAPI router, and both hand every command to `Runner.execute`, so a message or an edit behaves the same whichever way it arrives ([ADR-0012](../adr/0012-surfaces-websocket-rest-mcp.md), [ADR-0022](../adr/0022-surfaces-over-one-command-handler.md)). The wire format is specified in the [thread protocol](../protocol.md).
+`artifactr.fastapi` (the `fastapi` extra) serves workspaces to your frontend: the thread protocol over WebSocket, and REST endpoints for the same commands and for reads. Both are one FastAPI router, and both hand every command to `Runner.execute`, so a message or an edit behaves the same whichever way it arrives ([ADR-0048](../adr/0048-surfaces-over-the-runner.md)). The wire format is specified in the [thread protocol](../protocol.md).
 
 ## Adding the router
 

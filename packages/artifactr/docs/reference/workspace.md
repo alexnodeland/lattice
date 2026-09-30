@@ -30,4 +30,6 @@ The storage protocol, and the in-memory implementation. See [Storage](../guides/
 
 ::: artifactr.workspace.HistoryChunk
 
+::: artifactr.workspace.seal
+
 ::: artifactr.workspace.InMemoryStorage

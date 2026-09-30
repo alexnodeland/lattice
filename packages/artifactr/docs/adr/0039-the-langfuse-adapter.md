@@ -1,6 +1,6 @@
 # ADR-0039: The Langfuse adapter
 
-**Status:** Accepted
+**Status:** Accepted; its score adapters superseded by [ADR-0049](0049-scores-on-evalr.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

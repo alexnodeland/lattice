@@ -1,6 +1,6 @@
 # Thread protocol v1
 
-> **Status:** v1, implemented by `artifactr.fastapi` and `artifactr.mcp`, with its JSON Schema in `schemas/artifactr.v1.json`. Its structure is settled by [ADR-0005](adr/0005-one-event-log-per-workspace.md), [ADR-0007](adr/0007-caller-owned-live-output.md), [ADR-0012](adr/0012-surfaces-websocket-rest-mcp.md) and [ADR-0022](adr/0022-surfaces-over-one-command-handler.md). Field names may still change before the first release; after it, v1 changes only additively (see [Versioning and schema](#versioning-and-schema)).
+> **Status:** v1, implemented by `artifactr.fastapi` and `artifactr.mcp`, with its JSON Schema in `schemas/artifactr.v1.json`. Its structure is settled by [ADR-0005](adr/0005-one-event-log-per-workspace.md), [ADR-0007](adr/0007-caller-owned-live-output.md) and [ADR-0048](adr/0048-surfaces-over-the-runner.md). Field names may still change before the first release; after it, v1 changes only additively (see [Versioning and schema](#versioning-and-schema)).
 
 Clients connect to a workspace over WebSocket. They receive the workspace's durable events with resume, send commands, and receive live frames for runs they are watching. REST exposes the same commands and the same reads.
 
@@ -212,7 +212,7 @@ Every command is carried out by `artifactr.agent.Runner.execute`, whichever tran
 
 ### Deduplication
 
-Every surface hands a command with its id to `Runner.execute_once`, which carries it out the first time the id is seen and remembers the result in the runner's `CommandResults`. A command is known by the tenant and workspace it was sent to, the sender (its actor's participant, so a changed display name does not matter) and its `command_id`; a repeated id returns the first result whatever command it comes with. By default the runner remembers the 10,000 most recent results in its process (`InMemoryCommandResults`), so a retry that reaches another process, or arrives after the result was forgotten, runs again, and so does one that arrives while the first is still being carried out.
+Every surface hands a command with its id to `Runner.execute`, which carries it out the first time the id is seen and remembers the result in the runner's `CommandResults`. A command is known by the tenant and workspace it was sent to, the sender (its actor's participant, so a changed display name does not matter) and its `command_id`; a repeated id returns the first result whatever command it comes with. By default the runner remembers the 10,000 most recent results in its process (`InMemoryCommandResults`), so a retry that reaches another process, or arrives after the result was forgotten, runs again, and so does one that arrives while the first is still being carried out.
 
 Beyond the memory, core refuses a command that creates something with an id already used, as `invalid_state`, whichever process it reaches: `create_thread`, `create_artifact`, `propose_change` and `post_message` ([ADR-0045](adr/0045-a-message-id-is-used-once.md)). A client that chooses those ids and repeats them on a retry gets each command carried out once; `invalid_state` then means an earlier attempt succeeded. For `post_message` it means the message was posted, but not that its turn ran: if the process that posted it died before starting the turn, the turn never runs. An id the client omits is generated anew each time.
 
@@ -244,7 +244,7 @@ REST mirrors the commands and exposes reads; `artifactr.fastapi.artifactr_router
 | `GET /v1/workspaces/{workspace_id}/proposals?status=` | Proposals, pending by default. |
 | `GET /v1/workspaces/{workspace_id}/runs/{run_id}` | A run, with any requests it is paused on. |
 
-Authentication is the host's: `resolve_actor(request)` returns the tenant and actor, or raises `Unauthorized` (401). An optional `authorize(tenant, workspace, actor)` refuses with 403.
+Authentication is the host's: `resolve_actor(request)` returns the tenant and actor, or raises `Unauthorized` (401). An optional `authorize(tenant, workspace, actor)` refuses with 403, whose `detail` is the `forbidden` rejection, as for every other rejection a read raises.
 
 Rejections map to HTTP status codes (`artifactr.fastapi.STATUS_CODES`): `version_conflict` and `invalid_state` → 409, `validation_failed` and `patch_failed` → 422, `not_found` → 404, `forbidden` → 403. `watch_run` over REST is rejected as `invalid_state`.
 

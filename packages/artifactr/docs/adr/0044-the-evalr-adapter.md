@@ -1,6 +1,6 @@
 # ADR-0044: The evalr adapter
 
-**Status:** Accepted
+**Status:** Accepted; its amendment superseded by [ADR-0049](0049-scores-on-evalr.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 

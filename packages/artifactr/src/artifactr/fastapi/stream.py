@@ -18,6 +18,7 @@ from artifactr.core import (
     CommandResult,
     ErrorFrame,
     EventFrame,
+    Forbidden,
     Hello,
     Recorded,
     Rejection,
@@ -41,7 +42,6 @@ from artifactr.workspace import Workspace
 logger = logging.getLogger("artifactr.fastapi")
 
 OpenWorkspace = Callable[[HTTPConnection, WorkspaceId], Awaitable[Workspace]]
-Execute = Callable[[Workspace, CommandFrame], Awaitable[CommandResult]]
 
 
 class Stream:
@@ -63,7 +63,6 @@ class Stream:
         *,
         open_workspace: OpenWorkspace,
         runner: Runner[Any],
-        execute: Execute,
         hello_timeout: float,
         outbox_size: int,
         telemetry: Telemetry,
@@ -72,7 +71,6 @@ class Stream:
         self._workspace_id = workspace_id
         self._open_workspace = open_workspace
         self._runner = runner
-        self._execute = execute
         self._hello_timeout = hello_timeout
         self._outbox: asyncio.Queue[str] = asyncio.Queue(maxsize=outbox_size)
         self._overflowed = False
@@ -113,9 +111,11 @@ class Stream:
     async def _session(self) -> None:
         try:
             workspace = await self._open_workspace(self._ws, self._workspace_id)
-        except HTTPException as refused:
-            code = 4401 if refused.status_code == 401 else 4403
-            await self._close(code, str(refused.detail))
+        except HTTPException as refused:  # not authenticated
+            await self._close(4401, str(refused.detail))
+            return
+        except Forbidden as refused:
+            await self._close(4403, refused.message)
             return
         self._tenancy[TENANT_ID] = workspace.tenant_id
         hello = await self._hello()
@@ -193,7 +193,10 @@ class Stream:
                 self._watch(frame.command.run_id)
                 self._put(CommandResult(command_id=frame.command_id, ok=True, outcome=Recorded()))
             else:
-                self._put(await self._execute(workspace, frame))
+                result = await self._runner.execute(
+                    workspace, frame.command, command_id=frame.command_id
+                )
+                self._put(result)
         except Rejection as rejection:
             result = CommandResult(
                 command_id=frame.command_id, ok=False, rejection=rejection.payload()

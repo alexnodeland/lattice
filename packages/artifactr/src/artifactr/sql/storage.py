@@ -14,7 +14,6 @@ connection, which on SQLite can keep the database's write lock, or the pool's on
 import asyncio
 import contextlib
 import functools
-import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable, Collection, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -44,7 +43,6 @@ from artifactr.core import (
     ThreadId,
     Versioned,
     load_versioned,
-    scope_of,
 )
 from artifactr.core.actors import Actor
 from artifactr.sql.tables import (
@@ -62,7 +60,7 @@ from artifactr.sql.tables import (
     ThreadRow,
     WorkspaceRow,
 )
-from artifactr.workspace import HistoryChunk, Scope
+from artifactr.workspace import HistoryChunk, Scope, seal
 
 Clock = Callable[[], datetime]
 """Returns the current time; injectable so tests control expiry."""
@@ -75,6 +73,7 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+# Shared verbatim with reflexr's src/reflexr/sql/storage.py; change both.
 async def _to_the_end[T](call: Awaitable[T]) -> T:
     """Await a database call to its end; a cancellation that came meanwhile is raised after."""
     task = asyncio.ensure_future(call)
@@ -91,6 +90,7 @@ async def _to_the_end[T](call: Awaitable[T]) -> T:
     return task.result()
 
 
+# Shared verbatim with reflexr's src/reflexr/sql/storage.py; change both.
 def _awaited_to_the_end[**P, T](
     method: Callable[P, Awaitable[T]],
 ) -> Callable[P, "CoroutineType[Any, Any, T]"]:  # subscriptable at run time from Python 3.13
@@ -152,23 +152,14 @@ class _Transaction:
         self, result: CommitResult, *, actor: Actor, traceparent: str | None = None
     ) -> list[Envelope]:
         head = self._workspace.head_seq
-        now = self._clock()
-        envelopes: list[Envelope] = []
-        for offset, event in enumerate(result.events, start=1):
-            thread_id, run_id = scope_of(event)
-            envelopes.append(
-                Envelope(
-                    seq=head + offset,
-                    id=str(uuid.uuid4()),
-                    ts=now,
-                    workspace_id=self._scope.workspace_id,
-                    thread_id=thread_id,
-                    run_id=run_id,
-                    actor=actor,
-                    traceparent=traceparent,
-                    event=event,
-                )
-            )
+        envelopes = seal(
+            result.events,
+            after_seq=head,
+            scope=self._scope,
+            actor=actor,
+            ts=self._clock(),
+            traceparent=traceparent,
+        )
         self._workspace.head_seq = head + len(envelopes)
         for artifact in result.artifacts:
             artifact_row = await self._entity(ArtifactRow, artifact.id)

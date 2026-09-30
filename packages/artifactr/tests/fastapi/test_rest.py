@@ -4,19 +4,15 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-import artifactr.fastapi
-import artifactr.workspace
-from artifactr.agent import InMemoryCommandResults
 from tests.agent.conftest import Script, call, say
 from tests.fastapi.conftest import build, command, wait_for
 
 BASE = "/v1/workspaces/w1"
 
 
-def test_a_command_is_executed_once_per_id(client: TestClient) -> None:
+def test_a_command_is_carried_out_through_the_runner(client: TestClient) -> None:
     create = command("c1", type="create_thread", thread_id="t1", title="Launch")
     first = client.post(f"{BASE}/commands", json=create)
-    assert first.status_code == 200
     assert first.json() == {
         "type": "command_result",
         "command_id": "c1",
@@ -26,11 +22,6 @@ def test_a_command_is_executed_once_per_id(client: TestClient) -> None:
     }
     again = client.post(f"{BASE}/commands", json=create)
     assert again.json() == first.json(), "a repeated command id returns the same result"
-    assert len(client.get(f"{BASE}/events").json()) == 1
-    bob = client.post(f"{BASE}/commands", json=create, headers={"x-user": "bob"})
-    assert bob.status_code == 409, "another person's c1 is another command: t1 exists"
-    elsewhere = client.post(f"{BASE}/commands", json=create, headers={"x-tenant": "other"})
-    assert elsewhere.json()["ok"], "and so is c1 in another tenant's w1"
 
 
 def test_rejections_map_to_status_codes(client: TestClient) -> None:
@@ -54,9 +45,13 @@ def test_rejections_map_to_status_codes(client: TestClient) -> None:
 
 
 def test_authentication_and_authorization(client: TestClient) -> None:
-    assert artifactr.fastapi.Authorize is artifactr.workspace.Authorize  # every surface's hook
     assert client.get(f"{BASE}/threads", headers={"x-token": "bad"}).status_code == 401
-    assert client.get("/v1/workspaces/secret/threads").status_code == 403
+    refused = client.get("/v1/workspaces/secret/threads")
+    assert refused.status_code == 403
+    assert refused.json()["detail"] == {
+        "type": "forbidden",
+        "message": "this workspace is not yours to use",
+    }, "a rejection's payload, as every REST error"
 
 
 def test_reads(client: TestClient) -> None:
@@ -145,40 +140,6 @@ def test_a_posted_message_runs_the_agent() -> None:
         assert other.json()["rejection"]["entity"] == "run", (
             "runs of other workspaces are invisible"
         )
-
-
-def test_only_recent_command_ids_are_remembered() -> None:
-    app, _ = build(Script(), results=InMemoryCommandResults(capacity=1))
-    with TestClient(app) as client:
-        first = command("c1", type="create_thread", thread_id="t1")
-        client.post(f"{BASE}/commands", json=first)
-        client.post(f"{BASE}/commands", json=command("c2", type="create_thread", thread_id="t2"))
-        repeated = client.post(f"{BASE}/commands", json=first)
-        assert repeated.status_code == 409, "c1 was forgotten, so it ran again and was rejected"
-
-
-def test_a_message_is_posted_once_per_id_after_its_command_is_forgotten() -> None:
-    app, _ = build(Script(say("On it.")), results=InMemoryCommandResults(capacity=1))
-    with TestClient(app) as client:
-        client.post(f"{BASE}/commands", json=command("c1", type="create_thread", thread_id="t1"))
-        message = command(
-            "c2", type="post_message", thread_id="t1", message_id="m1", content="Plan it"
-        )
-        assert client.post(f"{BASE}/commands", json=message).json()["ok"]
-
-        def events() -> list[dict[str, Any]]:
-            return [e["event"] for e in client.get(f"{BASE}/events").json()]
-
-        wait_for(lambda: "run_ended" in [e["type"] for e in events()])
-        client.post(f"{BASE}/commands", json=command("c3", type="create_thread", thread_id="t2"))
-        repeated = client.post(f"{BASE}/commands", json=message)
-        assert repeated.status_code == 409, "c2 was forgotten, but m1 is in the log"
-        assert repeated.json()["rejection"] == {
-            "type": "invalid_state",
-            "message": "message m1 already exists",
-        }
-        posted = [e["content"] for e in events() if e["type"] == "message_posted"]
-        assert posted == ["Plan it", "On it."], "posted once, and answered once"
 
 
 def test_feedback_is_a_command_like_any_other(client: TestClient) -> None:

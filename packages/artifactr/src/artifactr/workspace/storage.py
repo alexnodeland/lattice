@@ -6,10 +6,11 @@ implement :class:`Storage` themselves; the workspace behaviour suite in the test
 what an implementation must do.
 """
 
+import uuid
 from collections.abc import AsyncGenerator, Collection, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Literal, Protocol
 
 from artifactr.core import (
@@ -17,6 +18,7 @@ from artifactr.core import (
     ArtifactId,
     CommitResult,
     Envelope,
+    KnownEvent,
     Needs,
     Proposal,
     ProposalId,
@@ -30,6 +32,7 @@ from artifactr.core import (
     ThreadId,
     Versioned,
     WorkspaceId,
+    scope_of,
 )
 from artifactr.core.actors import Actor
 
@@ -214,3 +217,36 @@ class Storage(Protocol):
         consumer running in several processes cannot move it back.
         """
         ...
+
+
+def seal(
+    events: Sequence[KnownEvent],
+    *,
+    after_seq: int,
+    scope: Scope,
+    actor: Actor,
+    ts: datetime,
+    traceparent: str | None,
+) -> list[Envelope]:
+    """Put a result's events in envelopes, numbered on from ``after_seq``, to log them.
+
+    Implementations of :meth:`Transaction.save` call it, so every storage stamps, scopes and
+    numbers envelopes alike.
+    """
+    envelopes: list[Envelope] = []
+    for seq, event in enumerate(events, start=after_seq + 1):
+        thread_id, run_id = scope_of(event)
+        envelopes.append(
+            Envelope(
+                seq=seq,
+                id=str(uuid.uuid4()),
+                ts=ts,
+                workspace_id=scope.workspace_id,
+                thread_id=thread_id,
+                run_id=run_id,
+                actor=actor,
+                traceparent=traceparent,
+                event=event,
+            )
+        )
+    return envelopes

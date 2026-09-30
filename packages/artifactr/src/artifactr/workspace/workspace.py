@@ -41,6 +41,7 @@ from artifactr.core import (
     EditArtifact,
     Envelope,
     Fact,
+    Forbidden,
     GiveFeedback,
     InvalidState,
     MessageId,
@@ -103,7 +104,8 @@ Authorize = Callable[[TenantId, WorkspaceId, Actor], Awaitable[bool]]
 """Decides whether an actor may use a workspace of its tenant.
 
 The surfaces that serve workspaces, the FastAPI router and the MCP server, take one as their
-``authorize`` hook, and ask it before opening a workspace for a request.
+``authorize`` hook, and pass it to :meth:`Workspaces.open` for every request that names a
+workspace.
 """
 
 
@@ -136,13 +138,23 @@ class Workspaces:
         self._telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
 
     async def open(
-        self, tenant_id: TenantId, workspace_id: WorkspaceId, *, actor: Actor
+        self,
+        tenant_id: TenantId,
+        workspace_id: WorkspaceId,
+        *,
+        actor: Actor,
+        authorize: Authorize | None = None,
     ) -> "Workspace":
         """Return a handle on a tenant's workspace, acting as ``actor``.
 
         This is the only place a tenant id enters; nothing on the handle can reach another
-        tenant.
+        tenant. The surfaces pass their ``authorize`` hook, so each refuses a workspace alike.
+
+        Raises:
+            Forbidden: If ``authorize`` is given and refuses the actor this workspace.
         """
+        if authorize is not None and not await authorize(tenant_id, workspace_id, actor):
+            raise Forbidden("this workspace is not yours to use")
         scope = Scope(tenant_id, workspace_id)
         return Workspace(self._storage, scope, actor, self._kinds, self._telemetry)
 
@@ -236,7 +248,7 @@ class Workspace:
         ) as span:
             try:
                 self._check_kind(command)
-                outcome = await self._execute(
+                outcome = await self._transact(
                     command, lambda state: commit(command, state, actor=self._actor)
                 )
             except Rejection as rejection:
@@ -274,7 +286,7 @@ class Workspace:
             history: Serialized model messages to append to the fact's thread history in the
                 same transaction, typically with ``RunPaused`` or ``RunEnded``.
         """
-        outcome = await self._execute(
+        outcome = await self._transact(
             fact,
             lambda state: record(fact, state, actor=self._actor),
             history=(fact.thread_id, history) if history is not None and fact.thread_id else None,
@@ -315,7 +327,7 @@ class Workspace:
         )
         return await self.commit(message)
 
-    async def _execute(
+    async def _transact(
         self,
         item: Command | Fact,
         decide: Callable[[State], CommitResult],
@@ -368,10 +380,22 @@ class Workspace:
         return await self.get(Artifact, artifact_id)
 
     async def artifacts[A: Artifact](
-        self, artifact_type: type[A] = Artifact, *, include_archived: bool = False
+        self,
+        artifact_type: type[A] = Artifact,
+        *,
+        kind: str | None = None,
+        include_archived: bool = False,
     ) -> list[Versioned[A]]:
-        """Return current artifacts that are instances of ``artifact_type``, oldest first."""
-        artifacts = await self._storage.artifacts(self._scope, include_archived=include_archived)
+        """Return current artifacts that are instances of ``artifact_type``, oldest first.
+
+        Args:
+            artifact_type: Only artifacts of this type, or a subclass of it.
+            kind: Only artifacts registered under this kind.
+            include_archived: Archived artifacts too.
+        """
+        artifacts = await self._storage.artifacts(
+            self._scope, kind=kind, include_archived=include_archived
+        )
         return [
             cast("Versioned[A]", artifact)
             for artifact in artifacts
@@ -379,8 +403,15 @@ class Workspace:
         ]
 
     async def revisions(self, artifact_id: ArtifactId) -> list[Revision]:
-        """Return an artifact's revisions, oldest first."""
-        return await self._storage.revisions(self._scope, artifact_id)
+        """Return an artifact's revisions, oldest first.
+
+        Raises:
+            NotFound: If there is no such artifact: every artifact has a revision.
+        """
+        revisions = await self._storage.revisions(self._scope, artifact_id)
+        if not revisions:
+            raise NotFound("artifact", artifact_id)
+        return revisions
 
     async def thread(self, thread_id: ThreadId) -> Thread:
         """Return a thread.
@@ -498,17 +529,21 @@ class Workspace:
         self,
         *,
         after_seq: int,
+        before_seq: int | None = None,
         focus: Collection[ArtifactId] | None = None,
         viewer: Actor | None = None,
     ) -> list[Note]:
-        """Return notes about what others did since ``after_seq``.
+        """Return notes about what others did in the window ``after_seq < seq < before_seq``.
 
         Args:
             after_seq: Only consider envelopes with a greater ``seq``.
+            before_seq: Only consider envelopes with a lesser ``seq``; ``None`` reads to the head.
             focus: The artifacts the viewer follows; ``None`` means all.
             viewer: Who the notes are for; defaults to this handle's actor.
         """
-        envelopes = await self._storage.read(self._scope, after_seq=after_seq)
+        envelopes = await self._storage.read(
+            self._scope, after_seq=after_seq, before_seq=before_seq
+        )
         return change_notes(envelopes, viewer=viewer or self._actor, focus=focus)
 
     async def cursor(self, name: str) -> int:

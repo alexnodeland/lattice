@@ -1,6 +1,6 @@
 # artifactr.scores
 
-Feedback as scores: the mirror, on evalr's mapping and ports. See [Evaluation](../guides/evaluation.md#scores) and [ADR-0038](../adr/0038-feedback-as-scores.md). It needs evalr, which the `langfuse` and `evals` extras install.
+Feedback as scores: the mirror, on evalr's mapping and ports. See [Evaluation](../guides/evaluation.md#scores) and [ADR-0049](../adr/0049-scores-on-evalr.md). It needs evalr, which the `langfuse` and `evals` extras install.
 
 ::: artifactr.scores
     options:
@@ -24,13 +24,4 @@ Each is evalr's function, with the feedback type's registered name as the `{type
 
 ## evalr's ports and values
 
-`artifactr.scores` re-exports these from `evalr.core`, where they are documented:
-
-| Name | In evalr |
-|---|---|
-| `Score` | [`evalr.core.Score`](https://evalr.alexnodeland.com/reference/core/#evalr.core.Score) |
-| `ScoreSink` | [`evalr.core.ScoreSink`](https://evalr.alexnodeland.com/reference/core/#evalr.core.ScoreSink) |
-| `ScoreConfig` | [`evalr.core.ScoreConfig`](https://evalr.alexnodeland.com/reference/core/#evalr.core.ScoreConfig) |
-| `ScoreConfigStore` | [`evalr.core.ScoreConfigStore`](https://evalr.alexnodeland.com/reference/core/#evalr.core.ScoreConfigStore) |
-| `ScoreDataType` | [`evalr.core.ScoreType`](https://evalr.alexnodeland.com/reference/core/#evalr.core.ScoreType) |
-| `MAX_TEXT` | [`evalr.core.MAX_TEXT`](https://evalr.alexnodeland.com/reference/core/#evalr.core.MAX_TEXT) |
+`Score`, `ScoreConfig`, `ScoreSink`, `ScoreConfigStore`, `ScoreDataType` and `MAX_TEXT` are evalr's: import them from `evalr.core` ([evalr's reference](https://evalr.alexnodeland.com/reference/core/)).

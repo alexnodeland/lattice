@@ -210,6 +210,8 @@ nav:
           - adr/0045-a-message-id-is-used-once.md
           - adr/0046-telemetry-that-composes-across-libraries.md
           - adr/0047-cancel-safe-storage.md
+          - adr/0048-surfaces-over-the-runner.md
+          - adr/0049-scores-on-evalr.md
           - adr/template.md
       - RFCs:
           - rfcs/README.md

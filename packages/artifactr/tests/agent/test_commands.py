@@ -28,15 +28,15 @@ from tests.artifact_types import Note
 
 async def test_a_command_is_carried_out_once_per_id(ws: Workspace, gate: Gate) -> None:
     runner = make_runner(make_agent(Script()), gate)
-    first = await runner.execute_once(ws, CreateThread(thread_id="t1"), command_id="c1")
+    first = await runner.execute(ws, CreateThread(thread_id="t1"), command_id="c1")
     assert first.ok
     assert first.outcome == Recorded(seq=1)
-    again = await runner.execute_once(ws, CreateThread(thread_id="t1"), command_id="c1")
+    again = await runner.execute(ws, CreateThread(thread_id="t1"), command_id="c1")
     assert again == first, "the first result, and the thread was not created twice"
-    rejected = await runner.execute_once(ws, CreateThread(thread_id="t1"), command_id="c2")
+    rejected = await runner.execute(ws, CreateThread(thread_id="t1"), command_id="c2")
     assert rejected.rejection is not None
     assert rejected.rejection["type"] == "invalid_state"
-    other = await runner.execute_once(ws, CreateThread(thread_id="t2"), command_id="c2")
+    other = await runner.execute(ws, CreateThread(thread_id="t2"), command_id="c2")
     assert other == rejected, "the id alone names the command, and a rejection is remembered"
     assert [t.id for t in await ws.threads()] == ["t1"]
 
@@ -52,11 +52,11 @@ async def test_the_same_id_elsewhere_or_from_someone_else_is_another_command(
         await workspaces.open("tenant", "elsewhere", actor=ws.actor),  # another workspace
         await workspaces.open("another", "ws", actor=ws.actor),  # another tenant's "ws"
     ]
-    await runner.execute_once(ws, CreateThread(thread_id="t1"), command_id="c1")
+    await runner.execute(ws, CreateThread(thread_id="t1"), command_id="c1")
     for sender in senders:
-        result = await runner.execute_once(sender, CreateThread(thread_id="t2"), command_id="c1")
+        result = await runner.execute(sender, CreateThread(thread_id="t2"), command_id="c1")
         assert result.ok, sender
-    repeated = await runner.execute_once(alice_again, CreateThread(thread_id="t3"), command_id="c1")
+    repeated = await runner.execute(alice_again, CreateThread(thread_id="t3"), command_id="c1")
     assert repeated.outcome == Recorded(seq=1), "the same participant, whatever its name"
     assert [t.id for t in await ws.threads()] == ["t1", "t2"]
 
@@ -66,12 +66,12 @@ async def test_a_message_is_posted_once_per_id_whichever_process_it_reaches(
 ) -> None:
     first, second = (make_runner(make_agent(Script(say("On it."))), gate) for _ in range(2))
     post = PostMessage(thread_id=thread.id, message_id="m1", content="Plan it")
-    sent = await first.execute_once(ws, post, command_id="c1")
+    sent = await first.execute(ws, post, command_id="c1")
     assert isinstance(sent.outcome, Recorded)
     handle = first.running(thread.id)
     assert handle is not None
     await handle.wait()
-    retried = await second.execute_once(ws, post, command_id="c1")
+    retried = await second.execute(ws, post, command_id="c1")
     assert retried.rejection is not None, "another process does not remember c1"
     assert retried.rejection["type"] == "invalid_state"
     with pytest.raises(InvalidState):

@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from artifactr.core import (
+    Actor,
     AgentActor,
     AppEvent,
     Applied,
@@ -16,6 +17,7 @@ from artifactr.core import (
     EditArtifact,
     EvaluatorActor,
     FeedbackGiven,
+    Forbidden,
     GiveFeedback,
     InvalidState,
     MarkdownArtifact,
@@ -80,6 +82,8 @@ async def test_edits_advance_versions_and_revisions(ws: Workspace) -> None:
     assert outcome == Applied(artifact_id="n1", version=2, seq=2)
     assert (await ws.get(Note, "n1")).data.text == "Ship Monday"
     assert [r.version for r in await ws.revisions("n1")] == [1, 2]
+    with pytest.raises(NotFound):
+        await ws.revisions("n2")
     with pytest.raises(VersionConflict):
         await ws.commit(note.edit_text("Friday", "Sunday"))
     assert await ws.head_seq() == 2
@@ -295,6 +299,15 @@ async def test_change_notes_are_from_the_viewers_point_of_view(ws: Workspace) ->
     assert note.render() == "Alice created n1 (note, v2): edited text (1 replacement)"
     assert await ws.change_notes(after_seq=0) == []
     assert len(await ws.change_notes(after_seq=0, viewer=AGENT)) == 1
+
+
+async def test_a_workspace_opens_only_if_authorize_allows_it(workspaces: Workspaces) -> None:
+    async def authorize(tenant_id: str, workspace_id: str, actor: Actor) -> bool:
+        return workspace_id != "secret"
+
+    assert await workspaces.open("tenant_a", "ws_1", actor=ALICE, authorize=authorize)
+    with pytest.raises(Forbidden, match="this workspace is not yours to use"):
+        await workspaces.open("tenant_a", "secret", actor=ALICE, authorize=authorize)
 
 
 async def test_a_thread_is_claimed_by_one_run_at_a_time(ws: Workspace) -> None:

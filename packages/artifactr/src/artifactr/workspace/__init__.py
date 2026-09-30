@@ -5,7 +5,7 @@ and every write runs core's rules in one storage transaction.
 """
 
 from artifactr.workspace.memory import InMemoryStorage
-from artifactr.workspace.storage import HistoryChunk, Scope, Storage, Transaction
+from artifactr.workspace.storage import HistoryChunk, Scope, Storage, Transaction, seal
 from artifactr.workspace.workspace import Authorize, ThreadBusy, Workspace, Workspaces
 
 __all__ = [
@@ -18,4 +18,5 @@ __all__ = [
     "Transaction",
     "Workspace",
     "Workspaces",
+    "seal",
 ]

@@ -86,8 +86,8 @@ with contextlib.suppress(InvalidState):  # an earlier attempt posted it
 |---|---|
 | `get(Plan, artifact_id)` | The current `Versioned[Plan]`, or raises `NotFound` if there is none of that type |
 | `artifact(artifact_id)` | The current version, whatever its type |
-| `artifacts(Plan, include_archived=False)` | Current artifacts of a type (all types by default), oldest first |
-| `revisions(artifact_id)` | Every `Revision` of an artifact, oldest first |
+| `artifacts(Plan, kind=None, include_archived=False)` | Current artifacts of a type (all types by default), or of one registered `kind`, oldest first |
+| `revisions(artifact_id)` | Every `Revision` of an artifact, oldest first, or raises `NotFound` if there is no such artifact |
 | `thread(thread_id)`, `threads()` | Threads, with their mode and focus |
 | `proposal(proposal_id)`, `proposals(status="pending")` | Proposals; `status=None` for all |
 | `run(run_id)`, `runs(thread_id=None, status=None)` | Agent runs, with any requests a paused run is waiting on |
@@ -206,7 +206,7 @@ await ws.record(AppEvent(name="exported", data={"format": "pdf"}, thread_id=thre
 
 ## Change notes
 
-`change_notes` turns a slice of the log into short, attributed notes for one viewer. It is what the agent is told, and a UI can show the same thing to people:
+`change_notes` turns a slice of the log, `after_seq < seq < before_seq`, into short, attributed notes for one viewer. It is what the agent is told, and a UI can show the same thing to people:
 
 ```python
 from artifactr.core import render_notes

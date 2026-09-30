@@ -1,6 +1,6 @@
 # External agents over MCP
 
-Agents outside your application, such as a coding assistant, a desktop assistant or another service, can join a workspace over the [Model Context Protocol](https://modelcontextprotocol.io). `artifactr.mcp` (the `mcp` extra) serves one: artifacts are resources, commands are tools, and changes arrive as resource-updated notifications. An external agent is a participant like any other, with the same rules and the same attribution ([ADR-0012](../adr/0012-surfaces-websocket-rest-mcp.md)).
+Agents outside your application, such as a coding assistant, a desktop assistant or another service, can join a workspace over the [Model Context Protocol](https://modelcontextprotocol.io). `artifactr.mcp` (the `mcp` extra) serves one: artifacts are resources, commands are tools, and changes arrive as resource-updated notifications. An external agent is a participant like any other, with the same rules and the same attribution ([ADR-0048](../adr/0048-surfaces-over-the-runner.md)).
 
 ## Serving it
 

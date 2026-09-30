@@ -92,8 +92,8 @@ async def show_replay(
     examples = await dataset(workspace)
     judge = judge_from_environment()
     result = await replay(agent, examples, judge)
-    verdicts = [verdict.value for verdict in result.verdicts(judge.name).values()]
-    judged = [v for v in verdicts if isinstance(v, EditSize) and v.too_big]
+    verdicts = result.verdicts(judge.name, verdict_type=EditSize).values()
+    judged = [verdict for verdict in verdicts if verdict.value.too_big]
     people = [e for e in examples if e.verdict and e.verdict.too_big]
     failed = [item for item in result.items if item.errors]
     console.print(

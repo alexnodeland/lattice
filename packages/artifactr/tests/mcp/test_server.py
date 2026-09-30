@@ -12,14 +12,13 @@ from mcp.server.mcpserver import Context
 from mcp.server.subscriptions import InMemorySubscriptionBus, ResourceUpdated, ServerEvent
 from mcp.shared.exceptions import MCPError
 from mcp.types import INVALID_PARAMS, TextContent, TextResourceContents
-from pydantic_ai import ToolCallPart
 from starlette.requests import Request
 
 from artifactr.agent import Runner
 from artifactr.core import Actor, ExternalAgentActor, TenantId, UserActor, WorkspaceId
 from artifactr.mcp import ArtifactrMcp, McpContext, artifact_uri
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
-from tests.agent.conftest import Gate, Script, call, make_agent, say
+from tests.agent.conftest import Gate, Script, make_agent, say
 from tests.artifact_types import Checklist, Note
 
 CLAUDE = ExternalAgentActor(client_id="claude-code", name="Claude Code")
@@ -179,32 +178,10 @@ async def test_agents_read_the_log_from_its_end_and_backwards(
 
 async def test_a_retried_command_is_carried_out_once(mcp: ArtifactrMcp, ws: Workspace) -> None:
     async with Client(mcp.server) as client:
-        schema = next(t for t in (await client.list_tools()).tools if t.name == "post_message")
-        assert (
-            "retry with the same id"
-            in schema.input_schema["properties"]["command_id"]["description"]
-        )
         create = {"kind": "note", "data": {"text": "Ship Friday"}, "command_id": "c1"}
         created = await _call(client, "create_artifact", **create)
         assert await _call(client, "create_artifact", **create) == created, "the first result"
-        [note] = await ws.artifacts()
-        edit = {"artifact_id": note.id, "old": "Friday", "new": "Monday", "command_id": "c2"}
-        assert (await _call(client, "edit_text", **edit))[1].endswith("version 2.")
-        stale = {**edit, "base_version": 1, "command_id": "c3"}
-        conflict = await _call(client, "edit_text", **stale)
-        assert conflict[0] is True
-        assert await _call(client, "edit_text", **stale) == conflict, "a rejection is remembered"
-        await _call(client, "archive_artifact", artifact_id=note.id, command_id="c4")
-        assert (await _call(client, "archive_artifact", artifact_id=note.id, command_id="c4"))[
-            1
-        ].endswith("version 3."), "not archived twice"
-        thread = await ws.create_thread("Launch")
-        post = {"thread_id": thread.id, "content": "Plan it", "command_id": "c5"}
-        posted = await _call(client, "post_message", **post)
-        assert await _call(client, "post_message", **post) == posted, "the run it started"
-        run_id = posted[1].removeprefix("Posted; the agent started run ").rstrip(".")
-        await _wait_for_run(ws, run_id)
-    assert [e.event.type for e in await ws.read()].count("message_posted") == 2, "one, and a reply"
+    assert len(await ws.artifacts()) == 1
 
 
 async def test_proposals_are_reviewed_by_someone_else(
@@ -421,15 +398,6 @@ async def test_changes_notify_resource_subscribers(
     assert bus.events == [ResourceUpdated(uri=artifact_uri("tenant", "w1", "n1"))]
 
 
-async def test_the_http_app_runs_in_a_lifespan(mcp: ArtifactrMcp) -> None:
-    app = mcp.http_app(streamable_http_path="/")
-    assert app is not None
-    async with Client(mcp.server) as client:
-        await _call(client, "list_artifacts")
-    async with mcp.lifespan():
-        pass
-
-
 async def test_a_resolver_reads_its_request_without_a_cast(
     workspaces: Workspaces, ws: Workspace, gate: Gate
 ) -> None:
@@ -451,12 +419,6 @@ async def test_a_resolver_reads_its_request_without_a_cast(
 
 def test_resource_uris_carry_the_tenant() -> None:
     assert artifact_uri("t1", "w1", "n1") == "artifactr://t1/w1/artifacts/n1"
-
-
-def test_the_agent_script_helpers_are_shared() -> None:
-    part = call("x").parts[0]
-    assert isinstance(part, ToolCallPart)
-    assert part.tool_name == "x"
 
 
 async def test_external_agents_give_feedback(mcp: ArtifactrMcp, ws: Workspace) -> None:

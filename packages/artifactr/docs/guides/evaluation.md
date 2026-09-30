@@ -88,9 +88,9 @@ It is also counted in the `artifactr.feedback` metric, by type, target and kind 
 
 ## Scores
 
-Evaluation backends see feedback as scores: one per field, named `{type}.{field}`, typed by the field ([ADR-0038](../adr/0038-feedback-as-scores.md)). `Helpfulness` above becomes `helpfulness.rating`, a numeric score from 1 to 5, and `helpfulness.reason`, a text score. Booleans are yes or no (1 or 0 in Langfuse), `Literal` and `Enum` fields are categories, text is cut at 500 characters, and fields left empty are not scored.
+Evaluation backends see feedback as scores: one per field, named `{type}.{field}`, typed by the field ([ADR-0049](../adr/0049-scores-on-evalr.md)). `Helpfulness` above becomes `helpfulness.rating`, a numeric score from 1 to 5, and `helpfulness.reason`, a text score. Booleans are yes or no (1 or 0 in Langfuse), `Literal` and `Enum` fields are categories, text is cut at 500 characters, and fields left empty are not scored.
 
-The mapping and the ports are [evalr](https://github.com/alexnodeland/evalr)'s, shared with reflexr and with evalr's own evaluators, so an evaluator's `helpfulness.rating` and a person's are the same score ([evalr's scores guide](https://evalr.alexnodeland.com/guides/scores/)). `artifactr.scores` needs evalr, which the `langfuse` and `evals` extras install; it names each type's scores as the type is registered, and re-exports evalr's `Score`, `ScoreConfig`, `ScoreSink` and `ScoreConfigStore`.
+The mapping and the ports are [evalr](https://github.com/alexnodeland/evalr)'s, shared with reflexr and with evalr's own evaluators, so an evaluator's `helpfulness.rating` and a person's are the same score ([evalr's scores guide](https://evalr.alexnodeland.com/guides/scores/)). `artifactr.scores` needs evalr, which the `langfuse` and `evals` extras install; it names each type's scores as the type is registered. `Score`, `ScoreConfig`, `ScoreSink` and `ScoreConfigStore` are imported from `evalr.core`.
 
 `artifactr.scores.FeedbackMirror` follows a workspace's log and records each piece of feedback's scores in a `ScoreSink`, attached to the trace the feedback is about when there is one, and to the session (the thread) otherwise:
 
@@ -112,7 +112,7 @@ The sink and the store are small protocols, so any backend can implement them, a
 ```python
 from collections.abc import Sequence
 
-from artifactr.scores import Score
+from evalr.core import Score
 
 
 class PrintingSink:
@@ -125,21 +125,24 @@ For tests, `evalr.memory` has an `InMemoryScoreSink` and an `InMemoryScoreConfig
 
 ## Scores in Langfuse
 
-With the `langfuse` extra, feedback becomes Langfuse scores beside the traces it judges. `LangfuseScores` is a `ScoreSink`, and `LangfuseScoreConfigs` a `ScoreConfigStore`, both passing evalr's contract suites:
+With the `langfuse` extra, feedback becomes Langfuse scores beside the traces it judges. evalr's `LangfuseScoreSink` is the `ScoreSink`, and `LangfuseScoreConfigStore` the `ScoreConfigStore`, the same adapters evalr's evaluators record their scores through ([ADR-0049](../adr/0049-scores-on-evalr.md)):
 
 ```python
 import asyncio
 
-from artifactr.langfuse import LangfuseScoreConfigs, LangfuseScores, langfuse_client
+from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
+
+from artifactr.langfuse import langfuse_client
 from artifactr.scores import FeedbackMirror, sync_score_configs
 
 langfuse = langfuse_client(tracer_provider=telemetry.tracer_provider)  # or telemetry.langfuse
-await sync_score_configs(LangfuseScoreConfigs(langfuse))  # once, at startup
-mirror = FeedbackMirror(workspace, LangfuseScores(langfuse), cursor="langfuse")
+await sync_score_configs(LangfuseScoreConfigStore(langfuse))  # once, at startup
+sink = LangfuseScoreSink(langfuse)
+mirror = FeedbackMirror(workspace, sink, cursor="langfuse")
 task = asyncio.create_task(mirror.follow())
 ```
 
-Score configs give Langfuse each score's type, range and categories, so its UI can offer the same scales for annotation. Langfuse accepts config names of up to 35 characters; a longer `{type}.{field}` raises, and a shorter `name=` on the feedback type fixes it. Scores are queued by the Langfuse client and sent in the background; call `langfuse.flush()` before a short-lived process exits.
+Score configs give Langfuse each score's type, range and categories, so its UI can offer the same scales for annotation. Langfuse accepts config names of up to 35 characters; a longer `{type}.{field}` raises, and a shorter `name=` on the feedback type fixes it. Scores are sent in the background; `await sink.flush()` waits for them, before a short-lived process exits.
 
 ## Evaluating with evalr
 

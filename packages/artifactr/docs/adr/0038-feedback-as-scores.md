@@ -1,6 +1,6 @@
 # ADR-0038: Feedback as scores, through ports
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-0049](0049-scores-on-evalr.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

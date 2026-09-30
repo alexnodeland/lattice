@@ -37,7 +37,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "workspace": ({"artifactr.core", "artifactr.telemetry", "artifactr.workspace"}, OTEL_API),
     "agent": (INNER, {"pydantic", "pydantic_ai", *OTEL_API}),
     "sql": ({"artifactr.core", "artifactr.workspace", "artifactr.sql"}, {"sqlalchemy", "alembic"}),
-    # Feedback as scores: the mirror, on evalr's mapping and ports (ADR-0038).
+    # Feedback as scores: the mirror, on evalr's mapping and ports (ADR-0049).
     "scores": (
         {"artifactr.core", "artifactr.telemetry", "artifactr.workspace", "artifactr.scores"},
         {"pydantic", "evalr.core"},
@@ -57,13 +57,10 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {*INNER, "artifactr.litellm"},
         {"pydantic_ai", "httpx2", "opentelemetry.propagate", *OTEL_API},
     ),
-    # The Langfuse adapter: evalr's score ports, a TurnContext and a span filter.
-    "langfuse": (
-        {*INNER, "artifactr.scores", "artifactr.langfuse"},
-        {"langfuse", "opentelemetry", "evalr.core"},
-    ),
+    # The Langfuse adapter: a TurnContext, a span filter and the client. Scores are evalr's.
+    "langfuse": ({*INNER, "artifactr.langfuse"}, {"langfuse", "opentelemetry"}),
     # The evalr adapter: a feedback source, experiment tasks, a TurnEvaluator and measures.
-    # Only this layer, and the score mirror and its Langfuse adapter, may import evalr.
+    # Only this layer and the score mirror may import evalr.
     "evals": (
         {*INNER, "artifactr.evals"},
         {"evalr", "pydantic", "pydantic_ai", *OTEL_API},

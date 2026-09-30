@@ -73,7 +73,7 @@ async def add_task(ctx: RunContext[Session[AppDeps]], plan_id: str, title: str) 
 - **Commit through `ctx.deps.workspace`.** It acts as the agent (an `AgentActor` for this thread and run), so every change is attributed to it, and write policies apply.
 - **Do not catch rejections.** The capability turns any `Rejection` a tool raises into a retry carrying the rejection's message, and for a `VersionConflict` adds "Read the artifact again, then retry." A tool may also raise pydantic-ai's `ModelRetry` itself, to ask the model to try again with better arguments. Other exceptions are recorded and fail the run.
 - **Annotate the context literally** as `RunContext[...]`. pydantic-ai recognizes a tool that takes its context by that annotation, so a type alias would hide it.
-- `artifactr.agent.describe_outcome(outcome)` gives the model a standard sentence for an `Applied` or `Proposed` outcome, and `artifactr.agent.submit(workspace, change, propose=..., rationale=...)` commits a change or proposes it, as the generic tools do.
+- `artifactr.agent.describe_outcome(outcome)` gives the model a standard sentence for any outcome, and `artifactr.agent.submit(workspace, change, propose=..., rationale=...)` commits a change or proposes it, as the generic tools do.
 
 Every tool call, yours included, is recorded as `tool_called` and `tool_returned` events, with clipped summaries of the arguments and result.
 
@@ -140,8 +140,7 @@ A message in an idle thread, such as one just created, starts a run unless anoth
 | `aclose()` | Stops every run in this process, as the application shuts down; see [Serving](serving.md#adding-the-router) |
 | `watch(run_id)` | Yields the run's live output; see [Live output](live-output.md) |
 | `running(thread_id)` | This process's run in a thread, if any |
-| `execute(workspace, command)` | Carries out any command the way every surface does |
-| `execute_once(workspace, command, command_id=...)` | Carries it out the first time its id is seen, and returns its `command_result`; a repeated id returns the first result. Every surface calls this |
+| `execute(workspace, command, command_id=...)` | Carries out any command the way every surface does, the first time its id is seen, and returns its `command_result`; a repeated id returns the first result |
 
 One run is active per thread. The runner claims the thread with a lease in storage, renewed while the run lasts, so the rule holds across processes. A message sent while another process holds the claim steers that run instead of starting a second. Runs are asyncio tasks in the process that started them, so `stop` and `watch` reach only local runs.
 

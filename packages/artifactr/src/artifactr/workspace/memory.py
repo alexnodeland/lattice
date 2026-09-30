@@ -6,7 +6,6 @@ restarts and cannot be shared between processes.
 """
 
 import asyncio
-import uuid
 from collections.abc import AsyncGenerator, Callable, Collection, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -31,10 +30,9 @@ from artifactr.core import (
     ThreadId,
     Versioned,
     delivered_to,
-    scope_of,
 )
 from artifactr.core.actors import Actor
-from artifactr.workspace.storage import HistoryChunk, Scope
+from artifactr.workspace.storage import HistoryChunk, Scope, seal
 
 Clock = Callable[[], datetime]
 """Returns the current time; injectable so tests control expiry."""
@@ -95,24 +93,14 @@ class _Transaction:
     async def save(
         self, result: CommitResult, *, actor: Actor, traceparent: str | None = None
     ) -> list[Envelope]:
-        head = len(self._data.log) + len(self._envelopes)
-        now = self._clock()
-        envelopes: list[Envelope] = []
-        for offset, event in enumerate(result.events, start=1):
-            thread_id, run_id = scope_of(event)
-            envelopes.append(
-                Envelope(
-                    seq=head + offset,
-                    id=str(uuid.uuid4()),
-                    ts=now,
-                    workspace_id=self._scope.workspace_id,
-                    thread_id=thread_id,
-                    run_id=run_id,
-                    actor=actor,
-                    traceparent=traceparent,
-                    event=event,
-                )
-            )
+        envelopes = seal(
+            result.events,
+            after_seq=len(self._data.log) + len(self._envelopes),
+            scope=self._scope,
+            actor=actor,
+            ts=self._clock(),
+            traceparent=traceparent,
+        )
         self._results.append(result)
         self._envelopes.extend(envelopes)
         return envelopes

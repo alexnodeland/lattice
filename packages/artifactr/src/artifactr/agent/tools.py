@@ -166,8 +166,7 @@ async def list_artifacts_text(
         kind: Only list artifacts of this kind.
         include_archived: List archived artifacts too, marked as archived.
     """
-    listed = await workspace.artifacts(include_archived=include_archived)
-    artifacts = [a for a in listed if kind is None or a.kind == kind]
+    artifacts = await workspace.artifacts(kind=kind, include_archived=include_archived)
     if not artifacts:
         return "There are no artifacts yet."
     return "\n".join(
@@ -196,7 +195,7 @@ async def submit(
 
 
 def describe_outcome(outcome: Outcome) -> str:
-    """Tell a model what its command did."""
+    """Tell a model what its command did, whatever the outcome."""
     match outcome:
         case Applied():
             return f"Done: {outcome.artifact_id} is now at version {outcome.version}."

@@ -19,7 +19,6 @@ The agent is told to keep its edits small, and people say when it did not: an
 import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from difflib import SequenceMatcher
 from typing import Any
 
 from evalr import (
@@ -28,17 +27,19 @@ from evalr import (
     Example,
     ExperimentResult,
     FunctionEvaluator,
+    Measurement,
     collect,
     measure,
     optimize,
 )
-from evalr.core import Measurement
 from evalr.measures import (
     Turn,
+    completion_rate,
     drop_off_evaluator,
     drop_off_rate,
     rewrite_evaluator,
     rewrite_rate,
+    share_changed,
 )
 from evalr.memory import BestOf, InMemoryExperimentTracker
 from evalr.online import Budget
@@ -141,15 +142,14 @@ async def _as_the_turn_started(context: TargetContext, doc_id: str, ended: Doc) 
 
 
 def changed(turn: TurnEdits) -> float:
-    """The most of any one doc the turn changed, from 0 to 1: one minus difflib's similarity.
+    """The most of any one doc the turn changed, from 0 to 1, as evalr's ``share_changed``.
 
     Docs the turn created do not count, and docs it dropped changed entirely.
     """
     most = 0.0
     for doc_id, doc in turn.before.items():
         ended = turn.after.get(doc_id, Doc())
-        similar = SequenceMatcher(None, doc.render_for_agent(), ended.render_for_agent()).ratio()
-        most = max(most, 1 - similar)
+        most = max(most, share_changed(doc.render_for_agent(), ended.render_for_agent()))
     return most
 
 
@@ -291,14 +291,14 @@ async def measures(workspace: Workspace, *, window: timedelta, now: datetime) ->
     """
     dropping = drop_off_evaluator(window=window, now=now)
     rewriting = rewrite_evaluator(window=window)
-    completed = {
-        envelope.thread_id: TaskCompletion.model_validate(envelope.event.value).completed
+    latest = {
+        envelope.thread_id: TaskCompletion.model_validate(envelope.event.value)
         for envelope in await workspace.read()
         if isinstance(envelope.event, FeedbackGiven)
         and envelope.event.feedback_type == TaskCompletion.feedback_type
     }
     return Measures(
-        completion=sum(completed.values()) / len(completed) if completed else None,
+        completion=completion_rate(latest.values()),
         drop_off=drop_off_rate(
             [await dropping.evaluate(s) for s in await thread_sessions(workspace)]
         ),

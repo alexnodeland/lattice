@@ -337,17 +337,17 @@ async def test_execute_routes_answers_and_stops(
     runner = make_runner(make_agent(script, ask=True, tools=[app_tools], output_type=ASKING), gate)
     await started(await runner.send(ws, thread.id, "Plan")).wait()
     [paused] = await ws.runs(status="paused")
-    answered = await runner.execute(
-        ws, AnswerDeferred(run_id=paused.id, tool_call_id="q1", answer="Monday")
-    )
-    assert answered == Recorded(seq=answered.seq, run_id=paused.id), "it resumed the run"
+    answer = AnswerDeferred(run_id=paused.id, tool_call_id="q1", answer="Monday")
+    answered = await runner.execute(ws, answer, command_id="c1")
+    assert isinstance(answered.outcome, Recorded)
+    assert answered.outcome.run_id == paused.id, "it resumed the run"
     handle = runner.running(thread.id)
     assert handle is not None
     await handle.wait()
     running = started(await runner.send(ws, thread.id, "Wait for me"))
     await asyncio.wait_for(gate.entered.wait(), timeout=2)
-    stopped = await runner.execute(ws, StopRun(run_id=running.run_id))
-    assert stopped.type == "recorded"
+    stopped = await runner.execute(ws, StopRun(run_id=running.run_id), command_id="c2")
+    assert stopped.outcome == Recorded()
     assert (await ws.run(running.run_id)).status == "stopped"
 
 

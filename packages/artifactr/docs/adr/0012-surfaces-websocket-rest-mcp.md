@@ -1,6 +1,6 @@
 # ADR-0012: Surfaces: WebSocket thread protocol, REST commands, MCP
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-0048](0048-surfaces-over-the-runner.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

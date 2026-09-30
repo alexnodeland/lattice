@@ -12,10 +12,9 @@ Include it in an application and give it the host's authentication::
     )
 
 Every command, over either transport, goes through :meth:`artifactr.agent.Runner.execute`, so it
-behaves identically (ADR-0012). See ``docs/protocol.md`` for the wire format.
+behaves identically (ADR-0048). See ``docs/protocol.md`` for the wire format.
 """
 
 from artifactr.fastapi.router import STATUS_CODES, ResolveActor, Unauthorized, artifactr_router
-from artifactr.workspace import Authorize  # defined with the workspaces, for every surface
 
-__all__ = ["STATUS_CODES", "Authorize", "ResolveActor", "Unauthorized", "artifactr_router"]
+__all__ = ["STATUS_CODES", "ResolveActor", "Unauthorized", "artifactr_router"]

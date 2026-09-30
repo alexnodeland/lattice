@@ -1,6 +1,6 @@
 # ADR-0022: Surfaces over one command handler
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-0048](0048-surfaces-over-the-runner.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

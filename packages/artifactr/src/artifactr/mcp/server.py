@@ -1,4 +1,4 @@
-"""The MCP server: external agents as workspace participants (ADR-0012)."""
+"""The MCP server: external agents as workspace participants (ADR-0048)."""
 
 import asyncio
 import contextlib
@@ -38,6 +38,7 @@ from artifactr.core import (
     RespondToProposal,
     TenantId,
     WorkspaceId,
+    new_id,
 )
 from artifactr.telemetry import annotate, attribution
 from artifactr.workspace import Authorize, Workspace, Workspaces
@@ -74,9 +75,6 @@ _CommandId = Annotated[
 _READ_LIMIT = 50
 """How many envelopes ``read_events`` returns when it is given neither ``limit`` nor ``last``."""
 
-_FORBIDDEN = "this workspace is not yours to use"
-"""Why ``authorize`` refused, as the router's 403 says it."""
-
 _NO_PROPOSALS = {
     "pending": "No proposals are awaiting review.",
     "accepted": "No proposals have been accepted.",
@@ -100,6 +98,8 @@ def _logging_left_alone() -> Generator[None]:
     option to skip it: if the root logger has no handlers yet, the whole process then logs at
     INFO through a rich handler. Logging is the application's to configure, so the handlers the
     block added are removed and closed, and the level restored.
+
+    Shared verbatim with reflexr's ``src/reflexr/mcp/server.py``; change both.
     """
     root = logging.getLogger()
     handlers, level = list(root.handlers), root.level
@@ -126,8 +126,8 @@ class ArtifactrMcp:
 
     Args:
         workspaces: Opens tenant-scoped workspaces.
-        runner: Carries out every tool's command, so a message reaches the thread's agent, and a
-            command sent with a ``command_id`` is carried out once, as on REST.
+        runner: Carries out every tool's command, once per ``command_id``, so a message reaches
+            the thread's agent and a retry is safe, as on REST.
         resolve: Authenticates each request.
         authorize: Whether a client may use a workspace of its tenant: the router's hook, asked
             on every tool call, resource read and resource subscription that names a workspace;
@@ -183,11 +183,6 @@ class ArtifactrMcp:
         await asyncio.gather(*self._watchers.values(), return_exceptions=True)
         self._watchers.clear()
 
-    async def _allows(
-        self, tenant_id: TenantId, workspace_id: WorkspaceId, actor: ExternalAgentActor
-    ) -> bool:
-        return self._authorize is None or await self._authorize(tenant_id, workspace_id, actor)
-
     async def _open(
         self,
         ctx: Context,
@@ -201,9 +196,9 @@ class ArtifactrMcp:
         """
         tenant_id, actor = client or await self._resolve(ctx)
         annotate(attribution(tenant_id=tenant_id, workspace_id=workspace_id, actor=actor))
-        if not await self._allows(tenant_id, workspace_id, actor):
-            raise Forbidden(_FORBIDDEN)
-        workspace = await self._workspaces.open(tenant_id, workspace_id, actor=actor)
+        workspace = await self._workspaces.open(
+            tenant_id, workspace_id, actor=actor, authorize=self._authorize
+        )
         key = (tenant_id, workspace_id)
         if key not in self._watchers:
             self._watchers[key] = asyncio.create_task(self._notify(tenant_id, workspace))
@@ -221,21 +216,22 @@ class ArtifactrMcp:
         """Open a workspace for a tool, whose refusal is a tool error."""
         return await _tool(self._open(ctx, workspace_id))
 
-    async def _execute(
+    async def _outcome(
         self, workspace: Workspace, command: Command, command_id: str | None
     ) -> Outcome:
-        """Carry out a tool's command through the runner, once per ``command_id`` if given.
+        """Carry out a tool's command through the runner, once per ``command_id``.
+
+        A command without one gets a new id, so it is carried out, and remembered, like any.
 
         Raises:
             ToolError: If the command is rejected, now or when it was first carried out.
         """
         if command_id is None:
-            return await _tool(self._runner.execute(workspace, command))
-        result = await self._runner.execute_once(workspace, command, command_id=command_id)
-        if result.outcome is not None:
-            return result.outcome
-        rejection = result.rejection or {}
-        raise ToolError(str(rejection.get("message")))
+            command_id = new_id("cmd")
+        result = await self._runner.execute(workspace, command, command_id=command_id)
+        if result.outcome is None:
+            raise ToolError(str((result.rejection or {}).get("message")))
+        return result.outcome
 
     async def _check_subscriptions(
         self, ctx: ServerRequestContext[Any, Any], call_next: CallNext
@@ -263,8 +259,12 @@ class ArtifactrMcp:
         for (tenant, workspace_id), uri in scopes.items():
             if tenant != tenant_id:
                 raise _refused(uri, Forbidden(_unavailable(tenant)))
-            if not await self._allows(tenant_id, workspace_id, actor):
-                raise _refused(uri, Forbidden(_FORBIDDEN))
+            try:
+                await self._workspaces.open(
+                    tenant_id, workspace_id, actor=actor, authorize=self._authorize
+                )
+            except Forbidden as refused:
+                raise _refused(uri, refused) from refused
 
     def _register(self) -> None:
         server = self.server
@@ -290,8 +290,7 @@ class ArtifactrMcp:
             Each has its version, its data, the patch that made it and who made it.
             """
             workspace = await self._workspace(ctx, workspace_id)
-            await _tool(workspace.artifact(artifact_id))  # it must exist, as REST checks
-            return _json_lines(await workspace.revisions(artifact_id))
+            return _json_lines(await _tool(workspace.revisions(artifact_id)))
 
         @server.tool()
         async def create_artifact(
@@ -304,7 +303,7 @@ class ArtifactrMcp:
             """Create an artifact of a kind the workspace accepts, from its JSON data."""
             workspace = await self._workspace(ctx, workspace_id)
             command = CreateArtifact(kind=kind, data=data)
-            return describe_outcome(await self._execute(workspace, command, command_id))
+            return describe_outcome(await self._outcome(workspace, command, command_id))
 
         @server.tool()
         async def edit_text(
@@ -329,8 +328,8 @@ class ArtifactrMcp:
             edit = artifact.edit_text(old, new, field=field, summary=summary)
             if base_version is not None:
                 edit = edit.model_copy(update={"base_version": base_version})
-            command = _proposed(edit, rationale) if propose else edit
-            return describe_outcome(await self._execute(workspace, command, command_id))
+            command = ProposeChange(change=edit, rationale=rationale) if propose else edit
+            return describe_outcome(await self._outcome(workspace, command, command_id))
 
         @server.tool()
         async def edit_artifact(
@@ -352,8 +351,8 @@ class ArtifactrMcp:
                 patch=JsonPatch(ops=tuple(ops)),
                 summary=summary,
             )
-            command = _proposed(edit, rationale) if propose else edit
-            return describe_outcome(await self._execute(workspace, command, command_id))
+            command = ProposeChange(change=edit, rationale=rationale) if propose else edit
+            return describe_outcome(await self._outcome(workspace, command, command_id))
 
         @server.tool()
         async def archive_artifact(
@@ -362,7 +361,7 @@ class ArtifactrMcp:
             """Archive an artifact that is no longer needed. It stays readable."""
             workspace = await self._workspace(ctx, workspace_id)
             artifact = await _tool(workspace.artifact(artifact_id))
-            outcome = await self._execute(workspace, artifact.archive(), command_id)
+            outcome = await self._outcome(workspace, artifact.archive(), command_id)
             return describe_outcome(outcome)
 
         @server.tool()
@@ -394,7 +393,7 @@ class ArtifactrMcp:
             """Accept or reject a proposal made by someone else."""
             workspace = await self._workspace(ctx, workspace_id)
             command = RespondToProposal(proposal_id=proposal_id, decision=decision, reason=reason)
-            return describe_outcome(await self._execute(workspace, command, command_id))
+            return describe_outcome(await self._outcome(workspace, command, command_id))
 
         @server.tool()
         async def give_feedback(
@@ -411,7 +410,7 @@ class ArtifactrMcp:
             """
             workspace = await self._workspace(ctx, workspace_id)
             command = GiveFeedback(feedback_type=feedback_type, target=target, value=value or {})
-            await self._execute(workspace, command, command_id)
+            await self._outcome(workspace, command, command_id)
             return f"Recorded {feedback_type} feedback on the {target.kind}."
 
         @server.tool()
@@ -437,7 +436,7 @@ class ArtifactrMcp:
             """Post a message in a thread. The thread's agent reads it and may reply."""
             workspace = await self._workspace(ctx, workspace_id)
             command = PostMessage(thread_id=thread_id, content=content)
-            outcome = await self._execute(workspace, command, command_id)
+            outcome = await self._outcome(workspace, command, command_id)
             run_id = outcome.run_id if isinstance(outcome, Recorded) else None
             if run_id is None:
                 return "Posted; the agent already working in this thread will see it."
@@ -513,10 +512,6 @@ def _refused(uri: str, rejection: Rejection) -> MCPError:
     """
     data = {"uri": uri, "rejection": rejection.payload()}
     return MCPError(INVALID_PARAMS, rejection.message, data=data)
-
-
-def _proposed(change: EditArtifact, rationale: str | None) -> ProposeChange:
-    return ProposeChange(change=change, rationale=rationale)
 
 
 def _json_lines(models: Sequence[BaseModel]) -> str:

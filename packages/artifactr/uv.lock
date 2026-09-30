@@ -225,7 +225,7 @@ fastapi = [
     { name = "fastapi" },
 ]
 langfuse = [
-    { name = "evalr" },
+    { name = "evalr", extra = ["langfuse"] },
     { name = "langfuse" },
 ]
 litellm = [
@@ -306,8 +306,8 @@ requires-dist = [
     { name = "artifactr-ai", extras = ["sql"], marker = "extra == 'postgres'" },
     { name = "artifactr-ai", extras = ["sql"], marker = "extra == 'sqlite'" },
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31" },
-    { name = "evalr", marker = "extra == 'evals'", git = "https://github.com/alexnodeland/evalr?rev=c6866c4b3f338f4dbace7b625765105e4a0dc7a1" },
-    { name = "evalr", marker = "extra == 'langfuse'", git = "https://github.com/alexnodeland/evalr?rev=c6866c4b3f338f4dbace7b625765105e4a0dc7a1" },
+    { name = "evalr", marker = "extra == 'evals'", git = "https://github.com/alexnodeland/evalr?rev=7a290123aa25011b48ae9ae9cfc3e847c8cab10c" },
+    { name = "evalr", extras = ["langfuse"], marker = "extra == 'langfuse'", git = "https://github.com/alexnodeland/evalr?rev=7a290123aa25011b48ae9ae9cfc3e847c8cab10c" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.141" },
     { name = "jsonpatch", specifier = ">=1.33" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
@@ -903,7 +903,7 @@ dspy = [
 [package.metadata]
 requires-dist = [
     { name = "artifactr-ai", extras = ["fastapi", "mcp", "sqlite", "postgres", "otel", "langfuse", "litellm", "evals"], editable = "." },
-    { name = "evalr", extras = ["dspy"], marker = "extra == 'dspy'", git = "https://github.com/alexnodeland/evalr?rev=c6866c4b3f338f4dbace7b625765105e4a0dc7a1" },
+    { name = "evalr", extras = ["dspy"], marker = "extra == 'dspy'", git = "https://github.com/alexnodeland/evalr?rev=7a290123aa25011b48ae9ae9cfc3e847c8cab10c" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "prompt-toolkit", specifier = ">=3.0.53" },
     { name = "pydantic-ai-slim", extras = ["anthropic", "openai"], specifier = ">=2.51" },
@@ -950,7 +950,7 @@ wheels = [
 [[package]]
 name = "evalr"
 version = "0.1.0.dev0"
-source = { git = "https://github.com/alexnodeland/evalr?rev=c6866c4b3f338f4dbace7b625765105e4a0dc7a1#c6866c4b3f338f4dbace7b625765105e4a0dc7a1" }
+source = { git = "https://github.com/alexnodeland/evalr?rev=7a290123aa25011b48ae9ae9cfc3e847c8cab10c#7a290123aa25011b48ae9ae9cfc3e847c8cab10c" }
 dependencies = [
     { name = "opentelemetry-api" },
     { name = "pydantic" },
@@ -959,6 +959,9 @@ dependencies = [
 [package.optional-dependencies]
 dspy = [
     { name = "dspy" },
+]
+langfuse = [
+    { name = "langfuse" },
 ]
 
 [[package]]

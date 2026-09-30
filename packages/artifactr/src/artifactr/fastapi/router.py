@@ -15,6 +15,7 @@ from artifactr.core import (
     CommandFrame,
     CommandResult,
     Envelope,
+    InvalidState,
     Proposal,
     Rejection,
     Revision,
@@ -77,35 +78,36 @@ def artifactr_router(
     telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
 
     async def open_workspace(connection: HTTPConnection, workspace_id: WorkspaceId) -> Workspace:
+        """Authenticate a request or connection, and open its workspace if it may use it.
+
+        Raises:
+            HTTPException: 401, if ``resolve_actor`` refuses it.
+            Forbidden: If ``authorize`` refuses the actor this workspace.
+        """
         try:
             tenant_id, actor = await resolve_actor(connection)
         except Unauthorized as error:
             raise HTTPException(status_code=401, detail=str(error) or "unauthorized") from error
         annotate(attribution(tenant_id=tenant_id, workspace_id=workspace_id, actor=actor))
-        if authorize is not None and not await authorize(tenant_id, workspace_id, actor):
-            raise HTTPException(status_code=403, detail="this workspace is not yours to use")
-        return await workspaces.open(tenant_id, workspace_id, actor=actor)
+        return await workspaces.open(tenant_id, workspace_id, actor=actor, authorize=authorize)
 
     async def workspace_dependency(request: Request, workspace_id: WorkspaceId) -> Workspace:
-        return await open_workspace(request, workspace_id)
+        return await _or_http(open_workspace(request, workspace_id))
 
     current_workspace = Depends(workspace_dependency)
-
-    async def execute(workspace: Workspace, frame: CommandFrame) -> CommandResult:
-        if isinstance(frame.command, WatchRun):
-            return CommandResult(
-                command_id=frame.command_id,
-                ok=False,
-                rejection={"type": "invalid_state", "message": "watch_run needs a WebSocket"},
-            )
-        return await runner.execute_once(workspace, frame.command, command_id=frame.command_id)
 
     @router.post("/workspaces/{workspace_id}/commands")
     async def post_command(
         frame: CommandFrame, response: Response, workspace: Workspace = current_workspace
     ) -> CommandResult:
         """Submit one command. The body is the same frame as over the WebSocket."""
-        result = await execute(workspace, frame)
+        if isinstance(frame.command, WatchRun):
+            refused = InvalidState("watch_run needs a WebSocket")
+            result = CommandResult(
+                command_id=frame.command_id, ok=False, rejection=refused.payload()
+            )
+        else:
+            result = await runner.execute(workspace, frame.command, command_id=frame.command_id)
         if result.rejection is not None:
             response.status_code = STATUS_CODES.get(str(result.rejection["type"]), 400)
         return result
@@ -117,10 +119,8 @@ def artifactr_router(
         workspace: Workspace = current_workspace,
     ) -> JSONResponse:
         """List current artifacts, optionally of one kind."""
-        artifacts = await workspace.artifacts(include_archived=include_archived)
-        return JSONResponse(
-            [a.model_dump(mode="json") for a in artifacts if kind is None or a.kind == kind]
-        )
+        artifacts = await workspace.artifacts(kind=kind, include_archived=include_archived)
+        return JSONResponse([a.model_dump(mode="json") for a in artifacts])
 
     @router.get("/workspaces/{workspace_id}/artifacts/{artifact_id}")
     async def get_artifact(
@@ -135,8 +135,7 @@ def artifactr_router(
         artifact_id: str, workspace: Workspace = current_workspace
     ) -> list[Revision]:
         """Return an artifact's revisions, oldest first."""
-        await _or_http(workspace.artifact(artifact_id))
-        return await workspace.revisions(artifact_id)
+        return await _or_http(workspace.revisions(artifact_id))
 
     @router.get("/workspaces/{workspace_id}/events")
     async def list_events(
@@ -193,7 +192,6 @@ def artifactr_router(
             workspace_id,
             open_workspace=open_workspace,
             runner=runner,
-            execute=execute,
             hello_timeout=hello_timeout,
             outbox_size=outbox_size,
             telemetry=telemetry,

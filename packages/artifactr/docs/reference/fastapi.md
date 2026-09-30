@@ -14,8 +14,6 @@ The `fastapi` extra. See [Serving over WebSocket and REST](../guides/serving.md)
 
 ::: artifactr.fastapi.ResolveActor
 
-::: artifactr.fastapi.Authorize
-
 ::: artifactr.fastapi.Unauthorized
 
 ::: artifactr.fastapi.STATUS_CODES

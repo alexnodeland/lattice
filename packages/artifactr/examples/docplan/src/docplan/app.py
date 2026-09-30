@@ -28,6 +28,7 @@ from importlib.metadata import version
 from typing import Any
 
 import uvicorn
+from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
 from fastapi import FastAPI
 from pydantic_ai.models import Model
 from sqlalchemy import make_url
@@ -38,7 +39,7 @@ from artifactr import InMemoryStorage, Runner, SystemActor, UserActor, Workspace
 from artifactr.core import Actor, ExternalAgentActor, TenantId
 from artifactr.evals import TaskCompletion
 from artifactr.fastapi import artifactr_router
-from artifactr.langfuse import LangfuseScoreConfigs, LangfuseScores, langfuse_turn
+from artifactr.langfuse import langfuse_turn
 from artifactr.mcp import ArtifactrMcp
 from artifactr.otel import LangfuseMode, TelemetryHandle, configure_telemetry
 from artifactr.scores import FeedbackMirror, sync_score_configs
@@ -117,10 +118,10 @@ def create_app(
                 await migrate(engine)
                 stack.push_async_callback(engine.dispose)
             if langfuse is not None:
-                configs = LangfuseScoreConfigs(langfuse)
+                configs = LangfuseScoreConfigStore(langfuse)
                 await sync_score_configs(configs, [Rating, EditSize, TaskCompletion])
                 workspace = await workspaces.open(TENANT, MIRRORED, actor=SystemActor())
-                mirror = FeedbackMirror(workspace, LangfuseScores(langfuse), cursor="langfuse")
+                mirror = FeedbackMirror(workspace, LangfuseScoreSink(langfuse), cursor="langfuse")
                 stack.push_async_callback(_cancel, asyncio.create_task(mirror.follow()))
             if judging is not None:  # finish judging before the database closes
                 stack.push_async_callback(judging.drain)

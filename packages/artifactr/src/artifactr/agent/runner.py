@@ -12,9 +12,9 @@ Runs are asyncio tasks in this process. Their live frames go to :attr:`Runner.li
 connection can :meth:`Runner.watch` them. An application stops them with :meth:`Runner.aclose`
 as it shuts down, before its storage closes.
 
-Surfaces send each command with the id its client chose to :meth:`Runner.execute_once`, which
+Surfaces send each command with the id its client chose to :meth:`Runner.execute`, which
 remembers results in :class:`~artifactr.agent.CommandResults`, so a retried command is carried
-out once (ADR-0022).
+out once (ADR-0048).
 
 Each turn (a run started by a message, or resumed by answers) is traced as its own trace, an
 ``invoke_workflow turn`` span linked to the span that started it (ADR-0035). The thread is the
@@ -165,8 +165,8 @@ class Runner[AppDepsT]:
         turn_context: Entered around each turn, inside its span.
         evaluators: Given each turn as it ends, to judge it in the background, such as
             ``artifactr.evals.OnlineEvaluator``s.
-        results: Where :meth:`execute_once` remembers commands' results. Defaults to the
-            10,000 most recent, in this process.
+        results: Where :meth:`execute` remembers commands' results. Defaults to the 10,000
+            most recent, in this process.
     """
 
     def __init__(
@@ -195,43 +195,19 @@ class Runner[AppDepsT]:
         self._closed = False
         self._telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
 
-    async def execute(self, workspace: Workspace, command: Command | StopRun) -> Outcome:
-        """Carry out any command the way every surface should.
-
-        Messages and answers go through :meth:`send` and :meth:`answer`, so they start, steer
-        and resume runs; ``stop_run`` stops a run of this workspace; everything else is
-        committed as-is.
-
-        Raises:
-            Rejection: If the command is rejected, or the run to stop is not in this workspace
-                or not running in this process.
-        """
-        match command:
-            case PostMessage():
-                sent = await self.send(
-                    workspace, command.thread_id, command.content, message_id=command.message_id
-                )
-                return sent.outcome
-            case AnswerDeferred():
-                return (await self.answer(workspace, command)).outcome
-            case StopRun():
-                await workspace.run(command.run_id)  # the run must belong to this workspace
-                if not await self.stop(command.run_id):
-                    raise NotFound("running run", command.run_id)
-                return Recorded()
-            case _:
-                return await workspace.commit(command)
-
-    async def execute_once(
+    async def execute(
         self, workspace: Workspace, command: Command | StopRun, *, command_id: str
     ) -> CommandResult:
-        """Carry out a command the first time its id is seen, and return its result.
+        """Carry out a command the way every surface should, once per ``command_id``.
+
+        Messages and answers go through :meth:`send` and :meth:`answer`, so they start, steer
+        and resume runs; ``stop_run`` stops a run of this workspace that runs in this process;
+        everything else is committed as-is. A rejection is the result, not raised.
 
         A command is known by its tenant, workspace, sender (the handle's actor, as a
-        participant) and ``command_id``. The first time, it is carried out by :meth:`execute`
-        and its result, outcome or rejection, is remembered. A repeated id returns the
-        remembered result and carries nothing out, whatever command it comes with. REST, the
-        WebSocket and MCP all call this, so a retry is safe on every surface.
+        participant) and ``command_id``. The first time, it is carried out and its result is
+        remembered. A repeated id returns the remembered result and carries nothing out,
+        whatever command it comes with, so a retry is safe on every surface.
         """
         key = CommandKey(
             tenant_id=workspace.tenant_id,
@@ -242,7 +218,7 @@ class Runner[AppDepsT]:
         if (remembered := await self._results.get(key)) is not None:
             return remembered
         try:
-            outcome = await self.execute(workspace, command)
+            outcome = await self._carry_out(workspace, command)
         except Rejection as rejection:
             result = CommandResult(command_id=command_id, ok=False, rejection=rejection.payload())
         else:
@@ -336,6 +312,23 @@ class Runner[AppDepsT]:
     def running(self, thread_id: ThreadId) -> RunHandle | None:
         """Return this process's run in a thread, if there is one."""
         return next((h for h in self._runs.values() if h.thread_id == thread_id), None)
+
+    async def _carry_out(self, workspace: Workspace, command: Command | StopRun) -> Outcome:
+        match command:
+            case PostMessage():
+                sent = await self.send(
+                    workspace, command.thread_id, command.content, message_id=command.message_id
+                )
+                return sent.outcome
+            case AnswerDeferred():
+                return (await self.answer(workspace, command)).outcome
+            case StopRun():
+                await workspace.run(command.run_id)  # the run must belong to this workspace
+                if not await self.stop(command.run_id):
+                    raise NotFound("running run", command.run_id)
+                return Recorded()
+            case _:
+                return await workspace.commit(command)
 
     async def _reply(self, workspace: Workspace, run: Run, content: str) -> RunHandle | None:
         for request in run.pending:

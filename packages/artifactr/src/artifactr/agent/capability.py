@@ -165,14 +165,16 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
                 trace_id=current_trace_id(),
             )
         )
-        watch_after = started.seq if session.watch_after is None else session.watch_after
+        watch_after = (started.seq if session.watch_after is None else session.watch_after) or 0
         thread = await workspace.thread(session.thread_id)
-        since = await last_seen(workspace, session.thread_id)
-        missed = [e for e in await workspace.read(after_seq=since) if e.seq <= (watch_after or 0)]
-        notes = change_notes(missed, viewer=workspace.actor, focus=thread.focus)
+        notes = await workspace.change_notes(
+            after_seq=await last_seen(workspace, session.thread_id),
+            before_seq=watch_after + 1,
+            focus=thread.focus,
+        )
         if notes:
             ctx.enqueue(_wrap(notes))
-        watcher = asyncio.create_task(self._watch(ctx, watch_after or 0, set(thread.focus)))
+        watcher = asyncio.create_task(self._watch(ctx, watch_after, set(thread.focus)))
         try:
             result = await handler()
         except asyncio.CancelledError:

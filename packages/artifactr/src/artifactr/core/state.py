@@ -142,9 +142,11 @@ class Recorded(_Outcome):
 
     type: Literal["recorded"] = "recorded"
     run_id: RunId | None = None
-    """The run a message or an answer started or resumed, set by the runner; ``None`` when it
-    started none: it steered the thread's active run, or left a paused run's requests
-    unanswered."""
+    """The run a message or an answer started or resumed, or ``None`` if it started none.
+
+    Only the runner that carries the command out knows it, so the runner sets it, and core
+    never does (ADR-0048).
+    """
 
 
 Outcome = Annotated[Applied | Proposed | Resolved | Recorded, Field(discriminator="type")]

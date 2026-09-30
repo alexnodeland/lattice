@@ -73,12 +73,12 @@ def command_attributes(
         case GiveFeedback():
             details |= {FEEDBACK_TYPE: command.feedback_type, FEEDBACK_TARGET: command.target.kind}
             match command.target:
-                case ThreadTarget(thread_id=thread_id):
-                    pass
-                case TurnTarget(run_id=run_id):
-                    pass
-                case MessageTarget(thread_id=thread_id, run_id=run_id):
-                    pass
+                case ThreadTarget():
+                    thread_id = command.target.thread_id
+                case TurnTarget():
+                    run_id = command.target.run_id
+                case MessageTarget():
+                    thread_id, run_id = command.target.thread_id, command.target.run_id
                 case _:
                     details |= {
                         ARTIFACT_ID: command.target.artifact_id,

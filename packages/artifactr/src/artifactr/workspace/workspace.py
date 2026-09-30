@@ -223,10 +223,17 @@ class Workspace:
         | SetThreadMode
         | AnswerDeferred
         | GiveFeedback,
+        *,
+        cursor: tuple[str, int] | None = None,
     ) -> Recorded: ...
 
-    async def commit(self, command: Command) -> Outcome:
+    async def commit(self, command: Command, *, cursor: tuple[str, int] | None = None) -> Outcome:
         """Submit a command.
+
+        Args:
+            command: The command.
+            cursor: A named cursor, ``(name, seq)``, to save in the same transaction, as with
+                :meth:`save_cursor`: it moves only if the command is applied.
 
         Returns:
             What the command did, with the ``seq`` of the last event it appended.
@@ -250,7 +257,7 @@ class Workspace:
             try:
                 self._check_kind(command)
                 outcome = await self._transact(
-                    command, lambda state: commit(command, state, actor=self._actor)
+                    command, lambda state: commit(command, state, actor=self._actor), cursor=cursor
                 )
             except Rejection as rejection:
                 span.set_attributes({OUTCOME: "rejected", REJECTION: rejection.code})
@@ -279,18 +286,27 @@ class Workspace:
         self._telemetry.add(COMMANDS, 1, attributes)
         self._telemetry.record(COMMIT_DURATION, time.perf_counter() - started, attributes)
 
-    async def record(self, fact: Fact, *, history: bytes | None = None) -> Recorded:
+    async def record(
+        self,
+        fact: Fact,
+        *,
+        history: bytes | None = None,
+        cursor: tuple[str, int] | None = None,
+    ) -> Recorded:
         """Record a fact about an agent run, or an application event.
 
         Args:
             fact: The fact to record.
             history: Serialized model messages to append to the fact's thread history in the
                 same transaction, typically with ``RunPaused`` or ``RunEnded``.
+            cursor: A named cursor, ``(name, seq)``, to save in the same transaction, as with
+                :meth:`save_cursor`: it moves only if the fact is recorded.
         """
         outcome = await self._transact(
             fact,
             lambda state: record(fact, state, actor=self._actor),
             history=(fact.thread_id, history) if history is not None and fact.thread_id else None,
+            cursor=cursor,
         )
         return cast("Recorded", outcome)
 
@@ -343,6 +359,7 @@ class Workspace:
         decide: Callable[[State], CommitResult],
         *,
         history: tuple[ThreadId, bytes] | None = None,
+        cursor: tuple[str, int] | None = None,
     ) -> Outcome:
         async with self._storage.transaction(self._scope) as transaction:
             state = State()
@@ -354,6 +371,8 @@ class Workspace:
             )
             if history is not None:
                 await transaction.append_history(*history)
+            if cursor is not None:
+                await transaction.save_cursor(*cursor)
         record_events(self._telemetry, result.events, actor=self._actor, scope=self._tenancy)
         if not envelopes:
             return result.outcome

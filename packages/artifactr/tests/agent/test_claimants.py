@@ -1,13 +1,12 @@
 """Who takes a thread, and when (ADR-0055).
 
-Covered here: a workspace whose other threads are busy; a claimant cancelled or closed as it
-plans; a resume by answers; a message committed directly in a paused thread; and a run whose
-position is never recorded, as when its process dies.
+Covered here: a workspace whose other threads are busy; a claimant cancelled, or its runner
+closed, at each step; a resume by answers; and a message committed directly in a paused
+thread.
 """
 
 import asyncio
 import contextlib
-import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -105,16 +104,18 @@ async def test_a_partial_answer_while_another_thread_commits_ends(
 # ─── a claimant cancelled, or a runner closed, before its turn starts ────────
 
 
-@pytest.mark.parametrize("when", ["as it plans", "once a position is saved"])
-async def test_a_send_cancelled_leaves_its_message_for_the_next_turn(
+@pytest.mark.parametrize("when", ["as it asks", "as it plans", "as its turn begins"])
+async def test_a_send_cancelled_at_any_step_has_its_message_carried_out_once(
     storage: HeldStorage, ws: Workspace, thread: Thread, runners: MakeRunner, when: str
 ) -> None:
     script = Script(*[say("ok")] * 3)
     runner = runners(make_agent(script))
-    if when == "as it plans":
+    if when == "as it asks":
+        held = storage.held_read = Gate()
+    elif when == "as it plans":
         held = storage.held_runs = Gate()
     else:
-        held = storage.held_taken = Gate()
+        held = storage.held_history = Gate()
     sending = asyncio.create_task(runner.send(ws, thread.id, "Plan the launch"))
     await _entered(held)
     sending.cancel()
@@ -128,10 +129,20 @@ async def test_a_send_cancelled_leaves_its_message_for_the_next_turn(
 
 
 @pytest.mark.parametrize(
-    "when", ["as it plans", "once a position is saved", "before the turn starts"]
+    ("when", "expected"),
+    [
+        ("as it plans", ["Plan the launch", "Anything else?", "Hello?"]),
+        ("before its turn starts", ["Plan the launch", "Anything else?", "Hello?"]),
+        ("once its turn has started", ["Plan the launch", "Hello?"]),
+    ],
 )
-async def test_a_runner_closed_as_it_hands_over_leaves_the_message_for_the_next(
-    storage: HeldStorage, ws: Workspace, thread: Thread, runners: MakeRunner, when: str
+async def test_a_runner_closed_as_it_hands_over_consumes_a_message_at_most_once(
+    storage: HeldStorage,
+    ws: Workspace,
+    thread: Thread,
+    runners: MakeRunner,
+    when: str,
+    expected: list[str],
 ) -> None:
     releasing = storage.held = Gate()
     script = Script(say("Drafted."), *[say("ok")] * 3)
@@ -141,10 +152,10 @@ async def test_a_runner_closed_as_it_hands_over_leaves_the_message_for_the_next(
     assert (await runner.send(ws, thread.id, "Anything else?")).run is None
     if when == "as it plans":
         closing = storage.held_runs = Gate()
-    elif when == "once a position is saved":
-        closing = storage.held_taken = Gate()
-    else:
+    elif when == "before its turn starts":
         closing = storage.held_history = Gate()  # the turn loads the thread's history first
+    else:
+        closing = storage.held_thread = Gate()  # the run has recorded its start
     releasing.release.set()
     await first.wait()
     await _entered(closing)
@@ -152,7 +163,7 @@ async def test_a_runner_closed_as_it_hands_over_leaves_the_message_for_the_next(
     restarted = runners(make_agent(script))
     started(await restarted.send(ws, thread.id, "Hello?"))
     await settled(thread.id, restarted)
-    assert script.conversation() == ["Plan the launch", "Anything else?", "Hello?"]
+    assert script.conversation() == expected, "a run stopped once it started keeps its input"
 
 
 async def test_a_runner_closed_as_a_send_plans_starts_no_run(
@@ -298,45 +309,3 @@ async def test_a_notice_posted_in_a_paused_thread_answers_nothing(
     await ws.as_actor(BOB).post_message(thread.id, "CI is green", kind="notice")
     assert await runner.resume(ws, paused.run_id) is None
     assert (await ws.run(paused.run_id)).status == "paused"
-
-
-# ─── a run whose position is never recorded ──────────────────────────────────
-
-
-async def test_a_run_whose_position_is_not_recorded_is_carried_out_again(
-    ws: Workspace,
-    thread: Thread,
-    gate: Gate,
-    runners: MakeRunner,
-    app_tools: FunctionToolset[Session[Gate]],
-    caplog: pytest.LogCaptureFixture,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    script = Script(say("Hi."), call("hold"), say("Done, and noted."), *[say("ok")] * 3)
-    runner = runners(make_agent(script, tools=[app_tools]))
-    await started(await runner.send(ws, thread.id, "Hello")).wait()
-    await runner.drain()
-    handle = started(await runner.send(ws, thread.id, "Hold on"))
-    await _entered(gate)
-    assert (await runner.send(ws, thread.id, "The venue changed")).run is None  # it steers
-    record = Workspace.save_cursor
-
-    async def dies(self: Workspace, name: str, seq: int) -> None:
-        if name.endswith("/taken"):
-            raise ConnectionError("the process died")
-        await record(self, name, seq)
-
-    with monkeypatch.context() as patched, caplog.at_level(logging.ERROR, logger="artifactr"):
-        patched.setattr(Workspace, "save_cursor", dies)
-        gate.release.set()
-        assert (await handle.wait()).output == "Done, and noted."
-        await runner.drain()
-    assert [r.getMessage() for r in caplog.records] == [
-        f"recording what run {handle.run_id} took failed"
-    ]
-    assert runner.running(thread.id) is None, "it hands nothing over"
-    started(await runner.send(ws, thread.id, "Hello?"))
-    await settled(thread.id, runner)
-    conversation = script.conversation()
-    assert conversation.count("Hold on") == 2, "the one exception: carried out again, once"
-    assert conversation[-1] == "Hello?"

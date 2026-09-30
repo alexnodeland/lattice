@@ -14,14 +14,22 @@ Trigger = Literal["message", "resume", "api"]
 
 @dataclass
 class Delivered:
-    """How far a run's watcher has delivered the log into the run.
+    """How far a run has taken the log: a handoff between the capability and the Runner.
 
-    A handoff inside the agent layer, from the capability to the
-    :class:`~artifactr.agent.Runner`.
+    The Runner names a cursor for it. The capability then saves it with the run's start, as its
+    input, and with the run's end, as far as its watcher delivered: in the same transaction as
+    each record, so a message is taken exactly when the write that consumes it is made.
     """
 
     seq: int = 0
     """Every envelope up to this ``seq`` was delivered, or was not for the agent."""
+
+    cursor: str | None = None
+    """The cursor that records ``seq``, when the Runner keeps one."""
+
+    def at(self, seq: int) -> tuple[str, int] | None:
+        """The cursor to save as taken through ``seq``, with a record, if there is one."""
+        return None if self.cursor is None else (self.cursor, seq)
 
 
 @dataclass(frozen=True)
@@ -50,7 +58,7 @@ class Session[AppDepsT]:
 
     delivered: Delivered = field(default_factory=Delivered, init=False, repr=False, compare=False)
     """How far the run has taken the log: to ``watch_after`` once it has started, then as far as
-    its watcher delivers. When the run ends, the :class:`~artifactr.agent.Runner` records it."""
+    its watcher delivers. The capability records it with the run's start and its end."""
 
     @classmethod
     def start(

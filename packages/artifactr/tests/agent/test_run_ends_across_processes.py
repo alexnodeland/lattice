@@ -10,13 +10,7 @@ import pytest
 from pydantic_ai import (
     Agent,
     DeferredToolRequests,
-    ModelMessage,
-    ModelRequest,
-    ModelResponse,
-    TextPart,
-    UserPromptPart,
 )
-from pydantic_ai.models.function import AgentInfo
 
 from artifactr.agent import ArtifactWorkspace, Session, function_model
 from artifactr.core import AnswerDeferred
@@ -26,6 +20,7 @@ from tests.agent.conftest import (
     ALICE,
     Gate,
     MakeRunner,
+    Recorder,
     Script,
     call,
     make_agent,
@@ -153,27 +148,6 @@ async def test_an_answer_and_a_message_from_another_process_as_a_run_pauses_reac
     await settled(thread.id, runner, other)
     assert script.answers() == ["Monday"]
     assert script.conversation() == ["Plan the launch", "And book the big room"]
-
-
-class Recorder:
-    """One model for two processes' agents: it replies at once, and records each new prompt."""
-
-    def __init__(self) -> None:
-        self.prompts: list[str] = []
-
-    def respond(self, messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-        answered = max(
-            (i for i, message in enumerate(messages) if isinstance(message, ModelResponse)),
-            default=-1,
-        )
-        self.prompts += [
-            str(part.content)
-            for message in messages[answered + 1 :]
-            if isinstance(message, ModelRequest)
-            for part in message.parts
-            if isinstance(part, UserPromptPart)
-        ]
-        return ModelResponse(parts=[TextPart("ok")])
 
 
 @pytest.mark.parametrize("seed", range(3))

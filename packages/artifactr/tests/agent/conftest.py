@@ -92,6 +92,27 @@ class Script:
         ]
 
 
+class Recorder:
+    """One model for two processes' agents: it replies at once, and records each new prompt."""
+
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def respond(self, messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        answered = max(
+            (i for i, message in enumerate(messages) if isinstance(message, ModelResponse)),
+            default=-1,
+        )
+        self.prompts += [
+            str(part.content)
+            for message in messages[answered + 1 :]
+            if isinstance(message, ModelRequest)
+            for part in message.parts
+            if isinstance(part, UserPromptPart)
+        ]
+        return ModelResponse(parts=[TextPart("ok")])
+
+
 class Gate:
     """Lets a test hold a tool call open until it chooses to release it."""
 
@@ -110,10 +131,9 @@ class HeldStorage(InMemoryStorage):
     ``held`` holds every release of a claim until the gate is released. The others hold the
     next call of their kind, once: a claim, a read of a cursor, a read of the log's head, a
     read of a thread's paused runs (as a claimant plans), a read of a thread's history (as a
-    turn starts), a subscription (as a run's watcher starts), and the save of a thread's
-    taken position, held once it is saved, as SQL storage finishes a save and only then
-    raises a cancellation. It counts claims, and refuses one past ``MAX_CLAIMS``, so a
-    claimant that never stops fails its test rather than hanging it.
+    turn begins, before its run starts), a read of a thread (as a run has just started), and a
+    subscription (as a run's watcher starts). It counts claims, and refuses one past
+    ``MAX_CLAIMS``, so a claimant that never stops fails its test rather than hanging it.
     """
 
     MAX_CLAIMS = 50
@@ -127,7 +147,7 @@ class HeldStorage(InMemoryStorage):
         self.held_history: Gate | None = None
         self.held_subscribe: Gate | None = None
         self.held_head: Gate | None = None
-        self.held_taken: Gate | None = None
+        self.held_thread: Gate | None = None
         self.claims = 0
 
     async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
@@ -156,11 +176,11 @@ class HeldStorage(InMemoryStorage):
             await gate.wait()
         return await super().head_seq(scope)
 
-    async def save_cursor(self, scope: Scope, name: str, seq: int) -> None:
-        await super().save_cursor(scope, name, seq)
-        if name.endswith("/taken") and (gate := self.held_taken) is not None:
-            self.held_taken = None
+    async def thread(self, scope: Scope, thread_id: ThreadId) -> Thread | None:
+        if (gate := self.held_thread) is not None:
+            self.held_thread = None
             await gate.wait()
+        return await super().thread(scope, thread_id)
 
     async def runs(
         self, scope: Scope, *, thread_id: ThreadId | None = None, status: RunStatus | None = None

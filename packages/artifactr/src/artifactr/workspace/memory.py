@@ -72,6 +72,7 @@ class _Transaction:
         self._results: list[CommitResult] = []
         self._envelopes: list[Envelope] = []
         self._history: list[tuple[ThreadId, bytes]] = []
+        self._cursors: dict[str, int] = {}
 
     async def load(self, needs: Needs) -> State:
         pending = _Data()
@@ -108,6 +109,9 @@ class _Transaction:
     async def append_history(self, thread_id: ThreadId, messages: bytes) -> None:
         self._history.append((thread_id, messages))
 
+    async def save_cursor(self, name: str, seq: int) -> None:
+        self._cursors[name] = max(self._cursors.get(name, 0), seq)
+
     def commit(self) -> None:
         for result in self._results:
             _apply(self._data, result)
@@ -116,6 +120,8 @@ class _Transaction:
         for thread_id, messages in self._history:
             chunk = HistoryChunk(seq=head, messages=messages)
             self._data.history.setdefault(thread_id, []).append(chunk)
+        for name, seq in self._cursors.items():
+            self._data.cursors[name] = max(self._data.cursors.get(name, 0), seq)
 
 
 def _latest[K, V](pending: dict[K, V], committed: dict[K, V], key: K) -> V | None:

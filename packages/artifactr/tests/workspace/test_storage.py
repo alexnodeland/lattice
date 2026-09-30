@@ -187,6 +187,25 @@ async def test_an_expired_lease_can_be_taken(storage_factory: StorageFactory) ->
     assert await storage.acquire_lease(SCOPE, "k", "b", timedelta(seconds=30))
 
 
+async def test_a_transaction_saves_a_cursor_as_it_commits(storage: Storage) -> None:
+    async with storage.transaction(SCOPE) as tx:
+        await tx.save_cursor("consumed", 4)
+        await tx.save_cursor("consumed", 2)
+    assert await storage.cursor(SCOPE, "consumed") == 4
+
+    async def fails() -> None:
+        async with storage.transaction(SCOPE) as tx:
+            await tx.save_cursor("consumed", 9)
+            raise RuntimeError("rolled back")
+
+    with pytest.raises(RuntimeError, match="rolled back"):
+        await fails()
+    assert await storage.cursor(SCOPE, "consumed") == 4, "not with a transaction that failed"
+    async with storage.transaction(SCOPE) as tx:
+        await tx.save_cursor("consumed", 3)
+    assert await storage.cursor(SCOPE, "consumed") == 4, "only forward"
+
+
 async def test_cursors_only_move_forward(storage: Storage) -> None:
     assert await storage.cursor(SCOPE, "mirror") == 0
     await storage.save_cursor(SCOPE, "mirror", 5)

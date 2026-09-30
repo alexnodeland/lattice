@@ -15,10 +15,10 @@ from artifactr.telemetry import (
     Telemetry,
     annotate,
     attribution,
-    continued,
     current_trace_id,
     current_traceparent,
     kept_attributes,
+    parse_traceparent,
 )
 from artifactr.telemetry.attributes import (
     ACTOR_KIND,
@@ -130,17 +130,18 @@ def test_the_current_traceparent_is_the_w3c_trace_context(recorder: Recorder) ->
     )
 
 
-def test_a_block_continued_from_a_traceparent_is_in_its_span(recorder: Recorder) -> None:
-    tracer = recorder.tracer_provider.get_tracer("test")
-    with tracer.start_as_current_span("request") as request:
+def test_a_traceparent_names_a_span_context(recorder: Recorder) -> None:
+    with recorder.tracer_provider.get_tracer("test").start_as_current_span("work") as span:
         traceparent = current_traceparent()
-        with continued(None):
-            assert not trace.get_current_span().get_span_context().is_valid, "in no span"
-    with continued(traceparent), tracer.start_as_current_span("later"):
-        pass
-    parent = recorder.span("later").parent
-    assert parent is not None
-    assert parent.span_id == request.get_span_context().span_id
+    parsed, context = parse_traceparent(traceparent), span.get_span_context()
+    assert parsed is not None
+    assert (parsed.trace_id, parsed.span_id, parsed.is_remote) == (
+        context.trace_id,
+        context.span_id,
+        True,
+    )
+    assert parse_traceparent(None) is None
+    assert parse_traceparent("00-not-a-trace-01") is None
 
 
 def test_attribution_names_the_session_the_user_and_the_ids() -> None:

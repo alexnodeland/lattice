@@ -1,7 +1,8 @@
 """A scripted model and fixtures for agent tests: no test calls a model API."""
 
 import asyncio
-from collections.abc import Callable, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -87,17 +88,35 @@ class Gate:
         await self.release.wait()
 
 
-class HeldRelease(InMemoryStorage):
-    """Storage that holds the release of thread claims at ``held``, once a test sets it."""
+class HeldStorage(InMemoryStorage):
+    """Storage that holds calls where a test asks it to, each at a :class:`Gate`.
+
+    ``held`` holds every release of a claim until the gate is released. ``held_claim`` and
+    ``held_read`` hold the next claim, or the next read of a cursor, once.
+    """
 
     def __init__(self) -> None:
         super().__init__()
         self.held: Gate | None = None
+        self.held_claim: Gate | None = None
+        self.held_read: Gate | None = None
 
     async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
         if self.held is not None:
             await self.held.wait()
         await super().release_lease(scope, key, holder)
+
+    async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
+        if (gate := self.held_claim) is not None:
+            self.held_claim = None
+            await gate.wait()
+        return await super().acquire_lease(scope, key, holder, ttl)
+
+    async def cursor(self, scope: Scope, name: str) -> int:
+        if (gate := self.held_read) is not None:
+            self.held_read = None
+            await gate.wait()
+        return await super().cursor(scope, name)
 
 
 async def settle() -> None:
@@ -162,6 +181,35 @@ def make_agent(
 
 def make_runner(agent: Agent[Session[Gate], Any], gate: Gate) -> Runner[Gate]:
     return Runner(agent, app=gate)
+
+
+type MakeRunner = Callable[..., Runner[Gate]]
+"""Makes a runner of an agent, with the runner's other arguments."""
+
+
+@pytest.fixture
+async def runners(gate: Gate) -> AsyncIterator[MakeRunner]:
+    """Make runners that are closed as the test ends, so one that is stuck fails the test."""
+    made: list[Runner[Gate]] = []
+
+    def make(agent: Agent[Session[Gate], Any], **options: Any) -> Runner[Gate]:
+        runner = Runner(agent, app=gate, **options)
+        made.append(runner)
+        return runner
+
+    yield make
+    for runner in made:
+        await runner.aclose()
+
+
+async def settled(runner: Runner[Gate], thread_id: str) -> None:
+    """Wait until the runner has nothing more to do in a thread: every hand-over and every run."""
+    while True:
+        await runner.drain()
+        handle = runner.running(thread_id)
+        if handle is None:
+            return
+        await asyncio.gather(handle.task, return_exceptions=True)
 
 
 def types(envelopes: Sequence[Envelope]) -> list[str]:

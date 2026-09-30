@@ -33,7 +33,7 @@ from artifactr.telemetry.attributes import (
     WORKSPACE_ID,
 )
 from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
-from tests.agent.conftest import Gate, HeldRelease, Script, call, say, started
+from tests.agent.conftest import Gate, HeldStorage, Script, call, say, started
 from tests.artifact_types import Checklist, Note
 from tests.telemetry.conftest import Recorder, attributes, trace_id
 
@@ -152,7 +152,7 @@ async def test_a_turn_is_its_own_trace_linked_to_what_started_it(
 async def test_a_message_carried_out_as_a_run_ends_starts_a_turn_linked_to_it(
     recorder: Recorder, gate: Gate
 ) -> None:
-    storage = HeldRelease()
+    storage = HeldStorage()
     ws = await Workspaces(storage, **recorder.providers).open("t1", "w1", actor=ALICE)
     thread = await ws.create_thread("Launch")
     releasing = storage.held = Gate()
@@ -165,6 +165,7 @@ async def test_a_message_carried_out_as_a_run_ends_starts_a_turn_linked_to_it(
         assert (await runner.send(ws.as_actor(BOB), thread.id, "Anything else?")).run is None
     releasing.release.set()
     await first.wait()
+    await runner.drain()
     following = runner.running(thread.id)
     assert following is not None
     await following.wait()

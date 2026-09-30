@@ -32,7 +32,7 @@ from artifactr.agent.runner import (
     TurnEvaluator,
     TurnOutcome,
 )
-from artifactr.agent.session import Delivered, Session, Trigger, last_seen, load_history
+from artifactr.agent.session import Session, Trigger, last_seen, load_history
 from artifactr.agent.tools import (
     artifact_text,
     artifact_tools,
@@ -46,7 +46,6 @@ __all__ = [
     "ArtifactWorkspace",
     "CommandKey",
     "CommandResults",
-    "Delivered",
     "EndedTurn",
     "FanoutChannel",
     "InMemoryCommandResults",

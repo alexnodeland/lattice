@@ -174,7 +174,6 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             )
         )
         watch_after = (started.seq if session.watch_after is None else session.watch_after) or 0
-        session.delivered.seq = watch_after
         thread = await workspace.thread(session.thread_id)
         notes = await workspace.change_notes(
             after_seq=await last_seen(workspace, session.thread_id),
@@ -186,7 +185,11 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             ctx.enqueue(_wrap(notes))
         watcher = asyncio.create_task(self._watch(ctx, watch_after, set(thread.focus)))
         try:
-            result = await handler()
+            try:
+                result = await handler()
+            finally:  # the watcher stops before the run's end is recorded, however it ends
+                watcher.cancel()
+                await asyncio.gather(watcher, return_exceptions=True)
         except asyncio.CancelledError:
             await _record(workspace, self._ended(session, "stopped"))
             raise
@@ -195,14 +198,11 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             failed = self._ended(session, "failed", error=str(error), reason=reason)
             await _record(workspace, failed)
             raise
-        finally:
-            watcher.cancel()
-            await asyncio.gather(watcher, return_exceptions=True)
         await self._finish(session, result)
         return result
 
     async def _watch(self, ctx: Context, after_seq: int, focus: set[ArtifactId]) -> None:
-        """Deliver what others do into the run, and note how far it got in the session."""
+        """Deliver what others do into the run, and note in the session how far it got."""
         session = ctx.deps
         workspace = session.workspace
         try:
@@ -222,7 +222,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
                     ctx.enqueue(_wrap(notes))
                 session.delivered.seq = envelope.seq
         except UserError:
-            return  # the agent's run is over, so it takes nothing more: the Runner carries it out
+            return  # the agent's run is over and takes nothing more: the thread's next turn will
         except Exception:
             logger.exception(
                 "watching the workspace for run %s failed; the run goes on", ctx.deps.run_id

@@ -8,11 +8,12 @@ comes from:
 - In a thread whose run is paused on questions, it is the reply: questions are answered with
   it, approvals are declined with it as the reason, and the run resumes.
 
-A run holds its thread from its start until it has recorded its end or its pause, but its agent
-takes no more messages once its own run is over. A message or an answer sent in between is
-carried out by the run as it releases the thread, as if it were sent then: the message starts
-the next run or replies to the paused one, and the answer resumes its run. A run that is
-stopped carries out nothing more.
+The log decides what each turn carries out (ADR-0055). A thread's messages are taken in order,
+each by one turn: as the prompt of a run, the reply to a paused one, or through the watcher of
+the run that holds the thread. A message or an answer sent with the runner asks for a turn;
+whoever holds the thread next, in any process, starts it with the oldest message not yet
+taken, and a run that ends hands its thread over the same way. A message committed directly,
+without the runner, asks for nothing, so it starts no turn, but the thread's next turn takes it.
 
 A notice, a ``post_message`` of kind ``notice``, is for people: it is committed as it is, so it
 starts no run, and the thread's agent is not told unless its capability asks for notices
@@ -40,6 +41,7 @@ When a turn ends, the Runner hands it to its evaluators, which judge it in the b
 
 import asyncio
 import contextlib
+import contextvars
 import logging
 import time
 from collections.abc import AsyncIterator, Callable, Sequence
@@ -51,17 +53,27 @@ from typing import Any, Literal, Protocol
 from opentelemetry import baggage, trace
 from opentelemetry import context as otel_context
 from opentelemetry.metrics import MeterProvider
-from opentelemetry.trace import Link, Span, SpanContext, StatusCode, TracerProvider
+from opentelemetry.trace import (
+    INVALID_SPAN_CONTEXT,
+    Link,
+    Span,
+    SpanContext,
+    StatusCode,
+    TracerProvider,
+)
 from pydantic_ai import Agent, AgentRunResult, DeferredToolRequests, DeferredToolResults, ToolDenied
 
 from artifactr.agent.live import FanoutChannel, forward_live
 from artifactr.agent.results import CommandKey, CommandResults, InMemoryCommandResults
-from artifactr.agent.session import Session, Trigger, load_history
+from artifactr.agent.session import Session, Trigger, last_seen, load_history
 from artifactr.core import (
+    Actor,
+    AgentActor,
     AnswerDeferred,
     Command,
     CommandResult,
     DeferredAnswered,
+    Envelope,
     InvalidState,
     LiveFrame,
     MessageId,
@@ -80,9 +92,8 @@ from artifactr.core import (
     new_id,
     new_message_id,
     new_run_id,
-    same_participant,
 )
-from artifactr.telemetry import Telemetry, attribution, continued
+from artifactr.telemetry import Telemetry, attribution, parse_traceparent
 from artifactr.telemetry.attributes import (
     ERROR_TYPE,
     GEN_AI_OPERATION_NAME,
@@ -167,16 +178,17 @@ class Sent:
     run: RunHandle | None
     """The run it started or resumed, or ``None`` when it started none, which is not a failure:
 
-    - The thread's run is already active, in this process or another, so the message steers it.
-    - The thread's run is ending or pausing, and takes no more messages, but still holds the
-      thread. It carries the message or answer out as it releases the thread, in its process,
-      as if it were sent then.
+    - The thread's run is active, in this process or another, so the message steers it. If
+      that run is ending or pausing and takes no more messages, it hands the thread over as it
+      releases it, and the next turn takes the message.
+    - Another message or answer took the thread first, and its turn takes this one too.
     - An answer leaves some of the paused run's requests unanswered, so the run waits for them.
-    - Another message or answer resumed the paused run first.
-    - The runner is closed (:meth:`Runner.aclose`), as the application shuts down.
+    - The runner is closed (:meth:`Runner.aclose`), as the application shuts down. The thread's
+      next claimant, in any process, carries the message or answer out.
 
-    A message in an idle thread, such as one just created, starts a run unless another starts
-    one first, so code that owns its thread can assert that ``run`` is set.
+    The run it started may take an older message first: the thread's oldest message that no
+    turn has taken. A message in an idle thread, such as one just created, starts a run unless
+    another starts one first, so code that owns its thread can assert that ``run`` is set.
     """
 
 
@@ -226,6 +238,7 @@ class Runner[AppDepsT]:
         self._agent_name = agent_name
         self._claim_ttl = claim_ttl
         self._runs: dict[RunId, RunHandle] = {}
+        self._handovers: set[asyncio.Task[None]] = set()
         self._closed = False
         self._telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
 
@@ -269,7 +282,7 @@ class Runner[AppDepsT]:
         *,
         message_id: MessageId | None = None,
     ) -> Sent:
-        """Post a message as the workspace handle's actor, and act on it.
+        """Post a message as the workspace handle's actor, and ask for the thread's next turn.
 
         Raises:
             InvalidState: If ``message_id`` is already used in the workspace; nothing is done.
@@ -278,7 +291,7 @@ class Runner[AppDepsT]:
             thread_id=thread_id, content=content, message_id=message_id or new_message_id()
         )
         posted = await workspace.commit(message)
-        return _sent(posted, await self._act(workspace, thread_id, content, posted.seq))
+        return _sent(posted, await self._ask(workspace, thread_id, posted.seq))
 
     async def answer(self, workspace: Workspace, command: AnswerDeferred) -> Sent:
         """Answer one of a paused run's requests, resuming the run once all are answered."""
@@ -286,31 +299,13 @@ class Runner[AppDepsT]:
         return _sent(answered, await self.resume(workspace, command.run_id))
 
     async def resume(self, workspace: Workspace, run_id: RunId) -> RunHandle | None:
-        """Resume a paused run whose requests are all answered; otherwise do nothing."""
+        """Resume a paused run whose requests are all answered; otherwise do nothing.
+
+        Like a message, it asks for the thread's next turn, so the messages no turn has taken
+        reach the run as it resumes.
+        """
         run = await workspace.run(run_id)
-        if not run.all_answered:
-            return None
-        results = DeferredToolResults(
-            calls={
-                r.tool_call_id: run.answers[r.tool_call_id].answer
-                for r in run.pending
-                if r.kind == "question"
-            },
-            approvals={
-                r.tool_call_id: _approval(run, r.tool_call_id)
-                for r in run.pending
-                if r.kind == "approval"
-            },
-        )
-        return await self._start(
-            workspace,
-            run.thread_id,
-            run.id,
-            prompt=None,
-            trigger="resume",
-            watch_after=await workspace.head_seq(),
-            deferred=results,
-        )
+        return await self._ask(workspace, run.thread_id, await workspace.head_seq())
 
     async def stop(self, run_id: RunId) -> bool:
         """Cancel a run of this process. Returns whether there was one to stop."""
@@ -321,10 +316,20 @@ class Runner[AppDepsT]:
         await asyncio.gather(handle.task, return_exceptions=True)
         return True
 
+    async def drain(self) -> None:
+        """Wait until each run of this process that has released its thread has handed it over.
+
+        A run that ends hands its thread over in the background (ADR-0055): it starts the
+        thread's next turn if a message or an answer asked for one meanwhile, and otherwise
+        does nothing. This waits for those in progress, not for the turns they start.
+        """
+        await asyncio.gather(*self._handovers)
+
     async def aclose(self) -> None:
         """Stop every run of this process, wait for them to end, and start no more."""
         self._closed = True
-        tasks = [handle.task for handle in self._runs.values()]
+        tasks: list[asyncio.Task[Any]] = [handle.task for handle in self._runs.values()]
+        tasks += self._handovers
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -354,73 +359,126 @@ class Runner[AppDepsT]:
             case _:
                 return await workspace.commit(command)
 
-    async def _act(
-        self, workspace: Workspace, thread_id: ThreadId, content: str, seq: int | None
-    ) -> RunHandle | None:
-        """Act on a message posted at ``seq``: reply to the thread's paused run, or start one."""
-        paused = await workspace.runs(thread_id=thread_id, status="paused")
-        if paused:
-            return await self._reply(workspace, paused[-1], content)
-        return await self._start(
-            workspace, thread_id, new_run_id(), prompt=content, trigger="message", watch_after=seq
-        )
+    # ─── turns, from the log (ADR-0055) ───────────────────────────────────────
 
-    async def _reply(self, workspace: Workspace, run: Run, content: str) -> RunHandle | None:
-        for request in run.pending:
-            if request.tool_call_id in run.answers:
-                continue
-            if request.kind == "question":
-                command = AnswerDeferred(
-                    run_id=run.id, tool_call_id=request.tool_call_id, answer=content
-                )
-            else:
-                command = AnswerDeferred(
-                    run_id=run.id, tool_call_id=request.tool_call_id, answer=content, approved=False
-                )
-            await workspace.commit(command)
-        return await self.resume(workspace, run.id)
+    async def _ask(
+        self, workspace: Workspace, thread_id: ThreadId, seq: int | None
+    ) -> RunHandle | None:
+        """Ask for a turn for what is committed up to ``seq``, and take it if the thread is free.
+
+        The ask is saved before the thread is claimed, so a run that holds the thread and
+        refuses this claim sees it when it releases the thread, and hands the thread over.
+        """
+        await workspace.save_cursor(_asked(thread_id), seq or 0)
+        return await self._take(workspace, thread_id, trace.get_current_span().get_span_context())
+
+    async def _take(
+        self, workspace: Workspace, thread_id: ThreadId, caller: SpanContext | None
+    ) -> RunHandle | None:
+        """Start the turn the thread was asked for and no run has taken, if it is free.
+
+        A claimant that starts nothing looks again once it has released the thread, since a
+        command it refused meanwhile relies on it. Each round starts a turn, finds nothing
+        asked, finds the thread busy, or records what it found as taken, so it ends. The turn
+        links to ``caller``, or else to where the message or answer it carries out was
+        committed.
+        """
+        while not self._closed and await _asked_for(workspace, thread_id):
+            try:
+                handle = await self._start(workspace, thread_id, caller)
+            except ThreadBusy:
+                return None  # its holder hands the thread over as it releases it
+            if handle is not None:
+                return handle
+        return None
 
     async def _start(
-        self,
-        workspace: Workspace,
-        thread_id: ThreadId,
-        run_id: RunId,
-        *,
-        prompt: str | None,
-        trigger: Trigger,
-        watch_after: int | None,
-        deferred: DeferredToolResults | None = None,
+        self, workspace: Workspace, thread_id: ThreadId, caller: SpanContext | None
     ) -> RunHandle | None:
-        # Each segment of a run claims the thread anew, so a run resuming cannot renew the claim
-        # its pausing segment still holds.
-        holder = f"{run_id}:{new_id('claim')}"
+        """Claim the thread and start the turn the log calls for, if any.
+
+        Raises:
+            ThreadBusy: If another holder has the thread.
+        """
+        # Each claim has a holder of its own, so a run resuming cannot renew the claim its
+        # pausing segment still holds.
         async with contextlib.AsyncExitStack() as stack:
-            try:
-                lost = await stack.enter_async_context(
-                    workspace.claim_thread(thread_id, holder=holder, ttl=self._claim_ttl)
-                )
-            except ThreadBusy:
-                return None
+            lost = await stack.enter_async_context(
+                workspace.claim_thread(thread_id, holder=new_id("claim"), ttl=self._claim_ttl)
+            )
             await _abandon(workspace, thread_id)
             if self._closed:
                 return None
+            turn = await self._plan(workspace, thread_id)
+            if turn is None:
+                return None
+            await workspace.save_cursor(_taken(thread_id), turn.through)
             claim = stack.pop_all()  # the run's task holds the claim from here
         session = Session[AppDepsT].start(
             workspace,
             thread_id,
             app=self._app,
-            run_id=run_id,
+            run_id=turn.run_id,
             agent_name=self._agent_name,
-            trigger=trigger,
-            watch_after=watch_after,
-            requested_by=workspace.actor,
+            trigger=turn.trigger,
+            watch_after=turn.watch_after,
+            requested_by=turn.requested_by,
         )
-        caller = trace.get_current_span().get_span_context()
-        task = asyncio.create_task(self._run(claim, lost, session, prompt, deferred, caller))
-        handle = RunHandle(run_id=run_id, thread_id=thread_id, task=task)
-        self._runs[run_id] = handle
+        if caller is None:  # a hand-over: the turn links to what it carries out
+            caller = parse_traceparent(turn.traceparent) or INVALID_SPAN_CONTEXT
+        task = asyncio.create_task(
+            self._run(claim, lost, session, turn.prompt, turn.deferred, caller)
+        )
+        handle = RunHandle(run_id=turn.run_id, thread_id=thread_id, task=task)
+        self._runs[turn.run_id] = handle
         task.add_done_callback(lambda _: self._finished(handle))
         return handle
+
+    async def _plan(self, workspace: Workspace, thread_id: ThreadId) -> "_Turn | None":
+        """Decide, holding the thread, which turn carries out the oldest message not taken.
+
+        With a paused run, that message is its reply: it answers the questions and declines the
+        approvals left, and the run resumes. A paused run whose requests are all answered
+        resumes, and its watcher delivers the messages. Otherwise the message starts a run.
+        Either way the turn's watcher follows from there, so the later messages reach it too.
+        """
+        taken = await _taken_seq(workspace, thread_id)
+        if await workspace.cursor(_asked(thread_id)) <= taken:
+            return None  # what was asked for is taken
+        paused = await workspace.runs(thread_id=thread_id, status="paused")
+        log = await workspace.read(after_seq=taken, threads={thread_id})
+        through = log[-1].seq if log else taken
+        untaken = [envelope for envelope in log if _from_others(envelope, thread_id)]
+        if paused:
+            run = paused[-1]
+            if run.all_answered:
+                # Resumed by its last answer, unless a resume that failed before it began took
+                # the answers: then by whoever asks now.
+                answered = [e for e in log if isinstance(e.event, DeferredAnswered)]
+                if not answered:
+                    return _resume(run, taken, through, workspace.actor, None)
+                last = answered[-1]
+                return _resume(run, taken, through, last.actor, last.traceparent)
+            if untaken:
+                reply = untaken[0]
+                await _reply(workspace.as_actor(reply.actor), run, reply)
+                run = await workspace.run(run.id)
+                return _resume(run, reply.seq, reply.seq, reply.actor, reply.traceparent)
+        elif untaken:
+            first = untaken[0]
+            assert isinstance(first.event, MessagePosted)
+            return _Turn(
+                run_id=new_run_id(),
+                trigger="message",
+                prompt=first.event.content,
+                deferred=None,
+                watch_after=first.seq,
+                through=first.seq,
+                requested_by=first.actor,
+                traceparent=first.traceparent,
+            )
+        await workspace.save_cursor(_taken(thread_id), through)  # no message in it to carry out
+        return None
 
     async def _run(
         self,
@@ -442,47 +500,31 @@ class Runner[AppDepsT]:
                     self.live.close(session.run_id)
                     stopping.cancel()
                     await asyncio.gather(stopping, return_exceptions=True)
+                    await _record_taken(session)
         finally:
-            if not run.cancelling():  # a run that is stopped carries out nothing more
-                await self._missed(session)
+            self._hand_over(session)
 
-    async def _missed(self, session: Session[AppDepsT]) -> None:
-        """Carry out what was sent to a run too late for it, now that its thread is free.
+    def _hand_over(self, session: Session[AppDepsT]) -> None:
+        """Once a run has released its thread, take the turn it was asked for meanwhile.
 
-        A message or an answer that finds its thread claimed is left to the run that holds the
-        claim. The run's watcher delivers messages until the agent's run is over, but the run
-        holds the claim until it has recorded its end (ADR-0020). What was sent in between,
-        after :attr:`Session.delivered`, is carried out here, in order and as if it had just
-        been sent, until something starts or resumes a run: a message starts one, or answers
-        the thread's paused run, and an answer resumes its run once every request is answered.
-
-        A failure is logged, not raised: the run has ended, and keeps its result.
+        It runs in the background, in a context of its own, so the run's end does not wait for
+        it and the turn it starts links to what it carries out.
         """
-        workspace = session.workspace
+        if self._closed:
+            return  # the thread's next claimant, in any process, carries it out
+        handover = asyncio.create_task(
+            self._take_over(session.workspace, session.thread_id), context=contextvars.Context()
+        )
+        self._handovers.add(handover)
+        handover.add_done_callback(self._handovers.discard)
+
+    async def _take_over(self, workspace: Workspace, thread_id: ThreadId) -> None:
         try:
-            missed = await workspace.read(
-                after_seq=session.delivered.seq, threads={session.thread_id}
-            )
-            for envelope in missed:
-                sender = workspace.as_actor(envelope.actor)
-                with continued(envelope.traceparent):
-                    match envelope.event:
-                        case MessagePosted(kind="message") as posted if not same_participant(
-                            envelope.actor, workspace.actor
-                        ):
-                            run = await self._act(
-                                sender, posted.thread_id, posted.content, envelope.seq
-                            )
-                        case DeferredAnswered() as answered:
-                            run = await self.resume(sender, answered.run_id)
-                        case _:
-                            continue
-                if run is not None:
-                    return
+            await self._take(workspace, thread_id, None)
         except Exception:
             logger.exception(
-                "carrying out what was sent as run %s ended failed; it is left undone",
-                session.run_id,
+                "handing thread %s over failed; its next turn carries out what was sent",
+                thread_id,
             )
 
     async def _turn(
@@ -595,6 +637,114 @@ def _sent(recorded: Recorded, run: RunHandle | None) -> Sent:
     """What a message or an answer did, with the run it started or resumed in its outcome."""
     run_id = None if run is None else run.run_id
     return Sent(recorded.model_copy(update={"run_id": run_id}), run)
+
+
+@dataclass(frozen=True)
+class _Turn:
+    """A turn the log calls for: what to run, and how far it carries the thread's log out."""
+
+    run_id: RunId
+    trigger: Trigger
+    prompt: str | None
+    deferred: DeferredToolResults | None
+    watch_after: int
+    """Its watcher delivers the thread's log after this ``seq``."""
+    through: int
+    """The ``seq`` up to which it takes the thread's messages as it starts: its prompt or its
+    reply, or, resuming by its answers, what was read. The rest are taken as its watcher
+    delivers them, so a message it misses is left for the next turn."""
+    requested_by: Actor
+    traceparent: str | None
+    """Where the message or answer it carries out was committed."""
+
+
+def _resume(run: Run, watch_after: int, through: int, by: Actor, traceparent: str | None) -> _Turn:
+    """The turn that resumes a paused run whose requests are all answered."""
+    deferred = DeferredToolResults(
+        calls={
+            r.tool_call_id: run.answers[r.tool_call_id].answer
+            for r in run.pending
+            if r.kind == "question"
+        },
+        approvals={
+            r.tool_call_id: _approval(run, r.tool_call_id)
+            for r in run.pending
+            if r.kind == "approval"
+        },
+    )
+    return _Turn(
+        run_id=run.id,
+        trigger="resume",
+        prompt=None,
+        deferred=deferred,
+        watch_after=watch_after,
+        through=through,
+        requested_by=by,
+        traceparent=traceparent,
+    )
+
+
+async def _reply(workspace: Workspace, run: Run, message: Envelope) -> None:
+    """Answer a paused run's open questions with a message, and decline its open approvals."""
+    assert isinstance(message.event, MessagePosted)
+    content = message.event.content
+    for request in run.pending:
+        if request.tool_call_id in run.answers:
+            continue
+        declined = request.kind == "approval"
+        await workspace.commit(
+            AnswerDeferred(
+                run_id=run.id,
+                tool_call_id=request.tool_call_id,
+                answer=content,
+                approved=False if declined else None,
+            )
+        )
+
+
+def _from_others(envelope: Envelope, thread_id: ThreadId) -> bool:
+    """Whether an envelope is a message for the thread's agent: one it did not post itself."""
+    event = envelope.event
+    return (
+        isinstance(event, MessagePosted)
+        and event.kind == "message"
+        and envelope.actor.participant != AgentActor(thread_id=thread_id).participant
+    )
+
+
+def _taken(thread_id: ThreadId) -> str:
+    """The cursor up to which runs have taken a thread's messages: each is carried out."""
+    return f"artifactr.runner/{thread_id}/taken"
+
+
+def _asked(thread_id: ThreadId) -> str:
+    """The cursor up to which messages and answers asked runners for a turn in a thread."""
+    return f"artifactr.runner/{thread_id}/asked"
+
+
+async def _taken_seq(workspace: Workspace, thread_id: ThreadId) -> int:
+    """How far runs have taken a thread's messages.
+
+    A thread whose runs never recorded it, as before ADR-0055, has taken what its agent last
+    saw.
+    """
+    return await workspace.cursor(_taken(thread_id)) or await last_seen(workspace, thread_id)
+
+
+async def _asked_for(workspace: Workspace, thread_id: ThreadId) -> bool:
+    """Whether a message or an answer asked for a turn in a thread that no run has taken."""
+    return await workspace.cursor(_asked(thread_id)) > await _taken_seq(workspace, thread_id)
+
+
+async def _record_taken(session: Session[Any]) -> None:
+    """Record what a run's watcher delivered as taken; a failure is logged, never raised.
+
+    If it fails, the thread's next turn is given what the watcher delivered again.
+    """
+    try:
+        await session.workspace.save_cursor(_taken(session.thread_id), session.delivered.seq)
+    except Exception:
+        logger.exception("recording what run %s took failed", session.run_id)
 
 
 def _approval(run: Run, tool_call_id: str) -> bool | ToolDenied:

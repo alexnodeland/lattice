@@ -14,11 +14,14 @@ Trigger = Literal["message", "resume", "api"]
 
 @dataclass
 class Delivered:
-    """How far a run's watcher has delivered the log into the run."""
+    """How far a run's watcher has delivered the log into the run.
+
+    A handoff inside the agent layer, from the capability to the
+    :class:`~artifactr.agent.Runner`.
+    """
 
     seq: int = 0
-    """Every envelope up to this ``seq`` was delivered, or was not for the agent. The run took
-    nothing others sent after it."""
+    """Every envelope up to this ``seq`` was delivered, or was not for the agent."""
 
 
 @dataclass(frozen=True)
@@ -46,8 +49,8 @@ class Session[AppDepsT]:
     here as the user."""
 
     delivered: Delivered = field(default_factory=Delivered, compare=False)
-    """How far the run's watcher has got. Once the run releases its thread, the
-    :class:`~artifactr.agent.Runner` carries out the messages and answers sent after it."""
+    """How far the run's watcher has got, from ``watch_after``. When the run ends, the
+    :class:`~artifactr.agent.Runner` records it as how far the thread's messages are taken."""
 
     @classmethod
     def start(
@@ -84,6 +87,7 @@ class Session[AppDepsT]:
             trigger=trigger,
             watch_after=watch_after,
             requested_by=requested_by,
+            delivered=Delivered(watch_after or 0),
         )
 
 

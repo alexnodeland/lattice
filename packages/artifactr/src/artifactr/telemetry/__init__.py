@@ -26,9 +26,9 @@ from artifactr.telemetry.recording import (
     VERSION,
     Telemetry,
     annotate,
-    continued,
     current_trace_id,
     current_traceparent,
+    parse_traceparent,
     record_events,
 )
 from artifactr.telemetry.spans import command_attributes, outcome_attributes
@@ -48,12 +48,12 @@ __all__ = [
     "annotate",
     "attribution",
     "command_attributes",
-    "continued",
     "current_trace_id",
     "current_traceparent",
     "is_trace_scope",
     "kept_attributes",
     "outcome_attributes",
+    "parse_traceparent",
     "record_events",
     "untraced",
 ]

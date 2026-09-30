@@ -30,6 +30,8 @@ from pathlib import Path
 from copier import run_copy
 
 ROOT = Path(__file__).resolve().parent.parent
+LATTICE = ROOT.parent.parent
+"""lattice's root, whose copier.yml points Copier at the template."""
 VARIANTS = list(itertools.product(["artifactr", "reflexr", "both"], [True, False]))
 LEFTOVER = re.compile(r"(?<!\$)\{\{|\{%|%\}")
 TEXT = {".py", ".toml", ".yaml", ".yml", ".md", ".json", ".sh", ".example", ""}
@@ -46,7 +48,7 @@ def render(libraries: str, evals: bool, destination: Path) -> None:
         # A checkout with uncommitted changes renders them, with a warning.
         warnings.simplefilter("ignore")
         run_copy(
-            str(ROOT),
+            str(LATTICE),
             destination,
             data={"project_name": NAME, "libraries": libraries, "evals": evals},
             defaults=True,

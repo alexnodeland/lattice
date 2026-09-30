@@ -370,7 +370,7 @@ smoke_app() {
   trap cleanup_app EXIT
   log "app: generating $app_name from the template, and building it"
   if ! uv run copier copy --quiet --defaults --vcs-ref HEAD --data project_name="stackr smoke app" \
-    --data libraries=both --data evals=true . "$app_dir" 2>/dev/null ||
+    --data libraries=both --data evals=true ../.. "$app_dir" 2>/dev/null ||
     ! (cd "$app_dir" && uv lock --quiet); then
     log "FAIL: app: generating it from the template"
     return 1

@@ -1,15 +1,16 @@
 # The application template (RFC-0001 phase 5, ADR-0011): a new application on artifactr,
 # reflexr or both, wired to the stack's ports.
 #
-#   uvx copier copy gh:alexnodeland/stackr my-app     # from GitHub
-#   uvx copier copy path/to/stackr my-app             # from a clone
+#   uvx copier copy gh:alexnodeland/lattice my-app    # from GitHub
+#   uvx copier copy path/to/lattice my-app            # from a clone
 #   uvx copier update                                 # later, in the application
 #
-# Copier takes the latest release tag. stackr has none yet, so Copier warns that it found no
-# tags and takes HEAD instead: main's, from GitHub. `--vcs-ref` names another revision.
+# Copier takes the latest tag that parses as a version. lattice's tags carry their package's
+# name (stackr-v0.1.0), and none parses, so Copier warns that it found no release and takes
+# HEAD instead: main's, from GitHub. `--vcs-ref` names another revision.
 #
 # The template's files are in template/. Copier takes a repository, not a directory of one,
-# so these questions live at the repository's root and point it there.
+# so lattice's root copier.yml includes these questions and points Copier at template/.
 
 _subdirectory: template
 _min_copier_version: "9.4"

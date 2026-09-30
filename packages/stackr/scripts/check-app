@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Generate one application from the template, from lattice's root, and run the checks its own CI
+# runs: lint, strict types, and the tests with 100% coverage. scripts/check-template checks every
+# variant without installing it; CI's Template job runs this once per variant.
+#
+# Usage: scripts/check-app
+#   TEMPLATE_LIBRARIES   artifactr, reflexr or both (default: both)
+#   TEMPLATE_EVALS       true or false (default: true)
+#   TEMPLATE_PYTHON      the application's Python version (default: 3.12)
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+uv run copier copy --quiet --defaults --vcs-ref HEAD \
+  --data libraries="${TEMPLATE_LIBRARIES:-both}" \
+  --data evals="${TEMPLATE_EVALS:-true}" \
+  --data python_version="${TEMPLATE_PYTHON:-3.12}" \
+  ../.. "$scratch/app"
+cd "$scratch/app"
+uv sync --all-groups
+make check

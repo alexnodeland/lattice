@@ -17,6 +17,7 @@ tasks:
       - '**/*'
       - '/pyproject.toml'
       - '/uv.lock'
+      - '/copier.yml'
 
   reference:
     description: "Check that the documentation's reference pages match the files they describe"
@@ -32,3 +33,29 @@ tasks:
     deps:
       - 'validate'
       - 'reference'
+
+  # CI's Template and Smoke jobs, with their matrix values in the environment.
+  template:
+    description: 'Generate one application from the template and run its own checks'
+    command: 'scripts/check-app'
+    inputs:
+      - '**/*'
+      - '/copier.yml'
+      - '/uv.lock'
+      - '$TEMPLATE_LIBRARIES'
+      - '$TEMPLATE_EVALS'
+      - '$TEMPLATE_PYTHON'
+    options:
+      cache: false
+
+  smoke:
+    description: 'Start the stack (PROFILES, STACKR_DATABASE) and send telemetry through it'
+    script: 'make up && make smoke'
+    options:
+      cache: false
+
+  smoke-app:
+    description: 'Run an application from the template beside the running stack'
+    command: 'make smoke-app'
+    options:
+      cache: false

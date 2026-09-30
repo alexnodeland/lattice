@@ -1,0 +1,9 @@
+# The application template is stackr's: its questions are packages/stackr/copier.yml, and its
+# files are packages/stackr/template/. Copier reads copier.yml at a repository's root, so this
+# file points it there; a later document's settings replace an earlier one's.
+#
+#   uvx copier copy gh:alexnodeland/lattice my-app
+---
+!include packages/stackr/copier.yml
+---
+_subdirectory: packages/stackr/template

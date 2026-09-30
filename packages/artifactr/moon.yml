@@ -1,0 +1,57 @@
+# artifactr, distributed as artifactr-ai.
+language: 'python'
+layer: 'library'
+tags: ['distribution']
+dependsOn:
+  - 'evalr'
+
+tasks:
+  test:
+    inputs:
+      # The layering test holds docplan, the reference implementation, to the public API.
+      - '/examples/docplan/src/**/*'
+      - '$ARTIFACTR_TEST_POSTGRES_URL'
+
+  schema:
+    description: 'Regenerate the protocol JSON Schema from the frame models'
+    script: 'uv run python -m artifactr.core.schema > schemas/artifactr.v1.json'
+    options:
+      cache: false
+      runInCI: false
+
+  dashboards:
+    description: 'Regenerate the Grafana dashboards in deploy/grafana/dashboards'
+    command: 'uv run python scripts/grafana_dashboards.py'
+    options:
+      cache: false
+      runInCI: false
+
+  pg-up:
+    description: "Start PostgreSQL for the SQL tests, from compose.yaml, on port 54329"
+    command: 'docker compose up -d --wait postgres'
+    options:
+      cache: false
+      runInCI: false
+
+  pg-down:
+    description: 'Stop the contributor stack: PostgreSQL, and docplan if it runs'
+    command: 'docker compose --profile app down'
+    options:
+      cache: false
+      runInCI: false
+
+  app-up:
+    description: 'Build and start docplan, the reference app, on PostgreSQL, at http://localhost:8000'
+    command: 'docker compose --profile app up -d --build --wait'
+    options:
+      cache: false
+      runInCI: false
+
+  test-pg:
+    description: 'Run the tests on PostgreSQL as well as SQLite (after pg-up)'
+    command: 'uv run pytest --cov --cov-report=term-missing'
+    env:
+      ARTIFACTR_TEST_POSTGRES_URL: 'postgresql+asyncpg://postgres:artifactr@localhost:54329/postgres'
+    options:
+      cache: false
+      runInCI: false

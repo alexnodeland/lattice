@@ -193,3 +193,6 @@ cython_debug/
 
 # Local agent settings
 .claude/settings.local.json
+
+# moon's cache
+.moon/cache/

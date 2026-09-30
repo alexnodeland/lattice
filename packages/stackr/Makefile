@@ -63,14 +63,10 @@ COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEM
 # scripts/smoke runs Compose as `make up` does, and the Supabase CLI as make runs it.
 SMOKE = $(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) SUPABASE="$(SUPABASE)" scripts/smoke
 
-.PHONY: help install env up down reset ps logs dashboards tenant bump-libraries validate smoke smoke-app docs docs-serve docs-reference changelog clean
+.PHONY: help env up down reset ps logs dashboards tenant bump-libraries validate smoke smoke-app docs docs-serve docs-reference changelog clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-
-install: ## Install the development tools and the git hooks
-	$(UV) sync
-	$(UV) run pre-commit install --hook-type pre-commit --hook-type commit-msg
 
 env: ## Create or update .env, generating local secrets
 	$(UV) run scripts/setup-env

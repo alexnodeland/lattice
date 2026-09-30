@@ -9,7 +9,6 @@ Every command is a `make` target; `make` on its own lists them. The tools run th
 | Command | What it does |
 |---|---|
 | `make help` | List the available commands |
-| `make install` | Install the development tools and the git hooks |
 | `make env` | Create or update .env, generating local secrets |
 | `make up` | Start the chosen PROFILES (default: all of them), with the database adapter they need |
 | `make down` | Stop the stack, keeping its data |

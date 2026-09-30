@@ -1,0 +1,48 @@
+# lattice, the root-level project: the family's own tests, and lint and types for the root's
+# Python. It inherits none of the Python projects' tasks, which would check every package again.
+workspace:
+  inheritedTasks:
+    include: []
+
+fileGroups:
+  python:
+    - 'scripts/**/*'
+    - 'tests/**/*'
+
+tasks:
+  lint:
+    description: "Check the root's Python for formatting and lint rules"
+    script: 'uv run ruff format --check scripts tests && uv run ruff check scripts tests'
+    inputs:
+      - '@group(python)'
+      - 'pyproject.toml'
+      - 'uv.lock'
+
+  typecheck:
+    description: "Type-check the root's Python with pyright"
+    command: 'uv run pyright'
+    inputs:
+      - '@group(python)'
+      - 'pyproject.toml'
+      - 'uv.lock'
+
+  # The quality test reads every package's Python, and the edges test every project's
+  # configuration.
+  test:
+    description: "Run the family's tests"
+    command: 'uv run pytest'
+    inputs:
+      - '**/*.py'
+      - 'packages/*/scripts/*'
+      - '**/pyproject.toml'
+      - '**/moon.yml'
+      - '.moon/workspace.yml'
+      - 'uv.lock'
+
+  check:
+    description: "Run the root's checks, as CI does"
+    command: 'noop'
+    deps:
+      - 'lint'
+      - 'typecheck'
+      - 'test'

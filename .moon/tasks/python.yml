@@ -1,0 +1,39 @@
+# The tasks of every project with `language: python`. moon's Python toolchain is off until it is
+# stable (D3), so each task is a plain `uv run` command, and the shared configuration and the lock
+# are inputs of every one.
+inheritedBy:
+  language: 'python'
+
+implicitInputs:
+  - '/pyproject.toml'
+  - '/uv.lock'
+
+tasks:
+  lint:
+    description: 'Check formatting and lint rules'
+    script: 'uv run ruff format --check . && uv run ruff check .'
+
+  typecheck:
+    description: 'Type-check with pyright'
+    command: 'uv run pyright'
+
+  test:
+    description: 'Run the tests with the 100% branch-coverage gate'
+    command: 'uv run pytest --cov --cov-report=term-missing'
+    inputs:
+      - '**/*'
+
+  check:
+    description: "Run the project's checks, as CI does"
+    command: 'noop'
+    deps:
+      - 'lint'
+      - 'typecheck'
+      - 'test'
+
+  format:
+    description: 'Format the code and apply safe lint fixes'
+    script: 'uv run ruff format . && uv run ruff check --fix .'
+    options:
+      cache: false
+      runInCI: false

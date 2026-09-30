@@ -1,0 +1,7 @@
+# relayr, distributed as relayr-ai: the bridge between artifactr and reflexr.
+language: 'python'
+layer: 'library'
+tags: ['distribution']
+dependsOn:
+  - 'artifactr'
+  - 'reflexr'

@@ -1,0 +1,6 @@
+# docplan, artifactr's reference implementation.
+language: 'python'
+layer: 'application'
+dependsOn:
+  - 'artifactr'
+  - 'evalr'

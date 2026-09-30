@@ -1,0 +1,18 @@
+# moon runs every task, and only the ones a change affects (stackr's RFC-0003, moon). uv manages
+# the dependencies; moon never edits a manifest or a lockfile.
+
+# lattice is the root-level project: the family's documentation site and its own tests.
+projects:
+  lattice: '.'
+  artifactr: 'packages/artifactr'
+  reflexr: 'packages/reflexr'
+  evalr: 'packages/evalr'
+  relayr: 'packages/relayr'
+  stackr: 'packages/stackr'
+  docplan: 'examples/docplan'
+  oncall: 'examples/oncall'
+
+vcs:
+  defaultBranch: 'main'
+
+versionConstraint: '>=2.5.6'

@@ -1,0 +1,31 @@
+# The tasks of every package that ships a wheel (tagged `distribution`): the standalone check,
+# which proves the package installs and imports outside the workspace, and deptry.
+inheritedBy:
+  tag: 'distribution'
+
+tasks:
+  build:
+    description: 'Build the wheel and sdist, as they are published, without the workspace sources'
+    command: 'uv build --quiet --no-sources --out-dir dist'
+    outputs:
+      - 'dist/**/*'
+
+  standalone:
+    description: 'Install the wheel, its extras and its siblings, outside the workspace, and import it'
+    command: 'uv run --no-project python $workspaceRoot/scripts/standalone.py'
+    inputs:
+      - '/scripts/standalone.py'
+    deps:
+      - 'build'
+      - '^:build'
+
+  # deptry over the shipped code, run from the package's directory so that its default exclusion
+  # of tests/ applies. DEP002 (unused) stays off, since extras such as [postgres] name drivers the
+  # library never imports.
+  deptry:
+    description: 'Check that the shipped code imports only what the package declares'
+    command: 'uv run deptry src --ignore DEP002'
+
+  check:
+    deps:
+      - 'standalone'

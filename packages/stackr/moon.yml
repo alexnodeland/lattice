@@ -1,0 +1,34 @@
+# stackr: the stack and the application template. It ships no wheel, and its checks are its own,
+# so it inherits none of the Python projects' tasks.
+language: 'bash'
+layer: 'tool'
+# The template generates applications on the libraries.
+dependsOn:
+  - 'artifactr'
+  - 'reflexr'
+  - 'evalr'
+
+# Its tasks run the workspace's tools, so the lock and the root's configuration are inputs too.
+tasks:
+  validate:
+    description: 'Validate every configuration without starting containers'
+    command: 'make validate'
+    inputs:
+      - '**/*'
+      - '/pyproject.toml'
+      - '/uv.lock'
+
+  reference:
+    description: "Check that the documentation's reference pages match the files they describe"
+    command: 'uv run scripts/docs-reference --check'
+    inputs:
+      - '**/*'
+      - '/pyproject.toml'
+      - '/uv.lock'
+
+  check:
+    description: "Run the project's checks, as CI does"
+    command: 'noop'
+    deps:
+      - 'validate'
+      - 'reference'

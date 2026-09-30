@@ -27,7 +27,8 @@ services:
   oncall:
     profiles: [app]
     build:
-      context: .
+      # lattice's root, which holds the one uv.lock.
+      context: ../..
       dockerfile: examples/oncall/Dockerfile
     environment:
       ONCALL_DATABASE_URL: postgresql+asyncpg://postgres:reflexr@postgres:5432/postgres

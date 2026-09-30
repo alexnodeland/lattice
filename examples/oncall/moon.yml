@@ -3,3 +3,33 @@ language: 'python'
 layer: 'application'
 dependsOn:
   - 'reflexr'
+
+tasks:
+  image:
+    description: "Build oncall's image from lattice's root, and start it on PostgreSQL"
+    script: >-
+      (docker compose up --detach --build --wait oncall
+      || (docker compose logs oncall; docker compose down --volumes; exit 1))
+      && docker compose down --volumes
+    env:
+      COMPOSE_FILE: '../../packages/reflexr/compose.yaml'
+      COMPOSE_PROFILES: 'app'
+    inputs:
+      - 'Dockerfile'
+      - 'Dockerfile.dockerignore'
+      - 'README.md'
+      - 'pyproject.toml'
+      - 'src/**/*'
+      - '/pyproject.toml'
+      - '/uv.lock'
+      - '/packages/*/pyproject.toml'
+      - '/examples/*/pyproject.toml'
+      - '/packages/reflexr/compose.yaml'
+      - '/packages/reflexr/README.md'
+      - '/packages/reflexr/LICENSE'
+      - '/packages/reflexr/src/**/*'
+      - '/packages/evalr/README.md'
+      - '/packages/evalr/LICENSE'
+      - '/packages/evalr/src/**/*'
+    options:
+      mutex: 'reference-app'

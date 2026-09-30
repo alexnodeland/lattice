@@ -4,3 +4,33 @@ layer: 'application'
 dependsOn:
   - 'artifactr'
   - 'evalr'
+
+tasks:
+  image:
+    description: "Build docplan's image from lattice's root, and start it on PostgreSQL"
+    script: >-
+      (docker compose up --detach --build --wait docplan
+      || (docker compose logs docplan; docker compose down --volumes; exit 1))
+      && docker compose down --volumes
+    env:
+      COMPOSE_FILE: '../../packages/artifactr/compose.yaml'
+      COMPOSE_PROFILES: 'app'
+    inputs:
+      - 'Dockerfile'
+      - 'Dockerfile.dockerignore'
+      - 'README.md'
+      - 'pyproject.toml'
+      - 'src/**/*'
+      - '/pyproject.toml'
+      - '/uv.lock'
+      - '/packages/*/pyproject.toml'
+      - '/examples/*/pyproject.toml'
+      - '/packages/artifactr/compose.yaml'
+      - '/packages/artifactr/README.md'
+      - '/packages/artifactr/LICENSE'
+      - '/packages/artifactr/src/**/*'
+      - '/packages/evalr/README.md'
+      - '/packages/evalr/LICENSE'
+      - '/packages/evalr/src/**/*'
+    options:
+      mutex: 'reference-app'

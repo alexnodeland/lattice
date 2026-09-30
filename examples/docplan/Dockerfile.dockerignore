@@ -1,0 +1,17 @@
+# What docplan's image is built from, out of lattice's root, which holds the workspace's one uv.lock:
+# the workspace's manifests, which `uv sync --locked` checks the lock against, and the packages
+# docplan installs, with the README and LICENSE their metadata names. Nothing else goes in.
+*
+!pyproject.toml
+!uv.lock
+!packages/*/pyproject.toml
+!examples/*/pyproject.toml
+!examples/docplan/README.md
+!examples/docplan/src/
+!packages/artifactr/README.md
+!packages/artifactr/LICENSE
+!packages/artifactr/src/
+!packages/evalr/README.md
+!packages/evalr/LICENSE
+!packages/evalr/src/
+**/__pycache__

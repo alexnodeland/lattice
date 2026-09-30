@@ -1,0 +1,17 @@
+# What oncall's image is built from, out of lattice's root, which holds the workspace's one uv.lock:
+# the workspace's manifests, which `uv sync --locked` checks the lock against, and the packages
+# oncall installs, with the README and LICENSE their metadata names. Nothing else goes in.
+*
+!pyproject.toml
+!uv.lock
+!packages/*/pyproject.toml
+!examples/*/pyproject.toml
+!examples/oncall/README.md
+!examples/oncall/src/
+!packages/reflexr/README.md
+!packages/reflexr/LICENSE
+!packages/reflexr/src/
+!packages/evalr/README.md
+!packages/evalr/LICENSE
+!packages/evalr/src/
+**/__pycache__

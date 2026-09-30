@@ -1,0 +1,43 @@
+{
+  "name": "lattice",
+  // One dev container for every package (stackr's RFC-0003). Docker runs inside it, for stackr's
+  // stack, the reference implementations and the PostgreSQL tests, and Node runs the Supabase
+  // CLI through npx. post-create.sh installs proto, which installs moon and uv from .prototools,
+  // and the workspace.
+  "image": "mcr.microsoft.com/devcontainers/base:jammy",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {}
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  // The reference implementations and the documentation site, when you run them.
+  "forwardPorts": [8000],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        },
+        "python.defaultInterpreterPath": ".venv/bin/python",
+        "remote.containers.forwardAgent": true
+      },
+      "extensions": [
+        "charliermarsh.ruff",
+        "ms-python.python",
+        "moonrepo.moon-console",
+        "tamasfe.even-better-toml",
+        "redhat.vscode-yaml",
+        "timonwong.shellcheck",
+        "ms-azuretools.vscode-docker",
+        "yzhang.markdown-all-in-one",
+        "bierner.markdown-mermaid"
+      ]
+    }
+  },
+  "remoteUser": "vscode"
+}

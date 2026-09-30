@@ -27,7 +27,8 @@ services:
   docplan:
     profiles: [app]
     build:
-      context: .
+      # lattice's root, which holds the one uv.lock.
+      context: ../..
       dockerfile: examples/docplan/Dockerfile
     environment:
       DOCPLAN_DATABASE_URL: postgresql+asyncpg://postgres:artifactr@postgres:5432/postgres

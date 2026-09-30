@@ -16,7 +16,6 @@ ADR-0012 built stackr's site from its own `docs/` and `mkdocs.yml`, with referen
 - **`moon run lattice:docs` is the build,** in place of `make docs`: the strict build and the list check, over the whole site. CI runs it on every pull request that changes what the site is built from, and `docs.yml` deploys it from `main`, one run at a time.
 - **stackr's `reference` task checks the reference pages** (ADR-0014's "the Docs build owns the reference check"). It runs `scripts/docs-reference --check` as part of stackr's `check`, whenever stackr's files or its reference pages change, and `make docs-reference` still rewrites the pages.
 - **The changelog page includes `packages/stackr/CHANGELOG.md`** as release-please writes it ([ADR-0016](0016-stackr-in-lattice.md)). Nothing regenerates it, so the build needs no full history, and `make changelog` is gone.
-- **Renovate, which replaces Dependabot, moves the images' tags,** so the reference pages still name the images without them.
 - **The project pages are the family's,** and stackr keeps its changelog and brand pages. Its section's home opens with its lockup. stackr's key stylesheet became lattice's, which styles the whole site.
 - **`stackr.alexnodeland.com` keeps serving the old pages** until it is retired separately (RFC-0003, D1).
 

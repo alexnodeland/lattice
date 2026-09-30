@@ -86,7 +86,7 @@ nav:
     - adr/0047-commands-carried-out-once-per-id.md
     - adr/0048-reflexr-in-lattice.md
     - adr/0049-one-site-for-the-family.md
-    - adr/0050-stackr-in-lattice-and-dashboards-from-the-checkout.md
+    - adr/0050-dashboards-from-the-checkout.md
     - adr/template.md
   - RFCs:
     - rfcs/README.md

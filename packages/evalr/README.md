@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/banner-dark.svg">
-  <img alt="evalr: judges that give typed verdicts, trained on people's feedback and measured against it." src="docs/assets/brand/banner-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alexnodeland/lattice/main/docs/evalr/assets/brand/banner-dark.svg">
+  <img alt="evalr: judges that give typed verdicts, trained on people's feedback and measured against it." src="https://raw.githubusercontent.com/alexnodeland/lattice/main/docs/evalr/assets/brand/banner-light.svg" width="100%">
 </picture>
 
 <p>
@@ -9,12 +9,12 @@
   <img alt="Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-00704F">
   <img alt="Coverage: 100%" src="https://img.shields.io/badge/coverage-100%25-00704F">
   <img alt="Typed: pyright strict" src="https://img.shields.io/badge/typed-pyright%20strict-00704F">
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-00704F"></a>
+  <a href="https://github.com/alexnodeland/lattice/blob/main/packages/evalr/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-00704F"></a>
 </p>
 
 **evalr** is a Python library for typed evaluation of agent systems. An evaluator judges an input (a chat thread, a workflow run, an artifact version) and returns a verdict: an instance of a Pydantic type, typically one of the feedback types people also give. Because people and evaluators produce the same types, evaluators can be trained on people's feedback and measured against it.
 
-> **Status:** pre-release. v0.1 is built, as planned in [RFC-0001](docs/rfcs/0001-v0.1-implementation-plan.md), and not yet released. The API may still change before 1.0.
+> **Status:** pre-release. v0.1 is built, as planned in [RFC-0001](https://lattice.alexnodeland.com/evalr/rfcs/0001-v0.1-implementation-plan/), and not yet released. The API may still change before 1.0.
 
 ## Why
 
@@ -100,13 +100,13 @@ It needs `OPENAI_API_KEY` (or another provider's, with the models renamed) and `
 
 ## Documentation
 
-The documentation site is at **<https://evalr.alexnodeland.com>**. It is built from [`docs/`](docs/index.md) and published from `main` on every push; run `make docs-serve` to read it locally at <http://localhost:8000>.
+The documentation site is at **<https://evalr.alexnodeland.com>**. It is built from [`docs/`](https://lattice.alexnodeland.com/evalr/) and published from `main` on every push; run `make docs-serve` to read it locally at <http://localhost:8000>.
 
-- [Getting started](docs/getting-started.md), [concepts](docs/concepts.md) and the [guides](docs/guides/verdicts.md): verdicts, evaluators, DSPy judges, decision evaluators, calibration, datasets, feedback sources, scores, experiments, metrics, workflow measures, online evaluation and testing.
-- [Architecture](docs/architecture.md): concepts, packages and how each part works.
-- [Architecture decision records](docs/adr/README.md): why each part is the way it is.
-- [RFCs](docs/rfcs/README.md): proposals and the v0.1 build plan.
-- [Brand](docs/assets/brand/README.md): the mark, colours and type.
+- [Getting started](https://lattice.alexnodeland.com/evalr/getting-started/), [concepts](https://lattice.alexnodeland.com/evalr/concepts/) and the [guides](https://lattice.alexnodeland.com/evalr/guides/verdicts/): verdicts, evaluators, DSPy judges, decision evaluators, calibration, datasets, feedback sources, scores, experiments, metrics, workflow measures, online evaluation and testing.
+- [Architecture](https://lattice.alexnodeland.com/evalr/architecture/): concepts, packages and how each part works.
+- [Architecture decision records](https://lattice.alexnodeland.com/evalr/adr/): why each part is the way it is.
+- [RFCs](https://lattice.alexnodeland.com/evalr/rfcs/): proposals and the v0.1 build plan.
+- [Brand](https://lattice.alexnodeland.com/evalr/assets/brand/): the mark, colours and type.
 
 ## The family
 
@@ -114,8 +114,8 @@ evalr is part of a family with [artifactr](https://github.com/alexnodeland/artif
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the trunk-based workflow, and the RFC and ADR process.
+See [CONTRIBUTING.md](https://github.com/alexnodeland/lattice/blob/main/CONTRIBUTING.md) for setup, the trunk-based workflow, and the RFC and ADR process.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/alexnodeland/lattice/blob/main/packages/evalr/LICENSE)

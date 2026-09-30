@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/banner-dark.svg">
-  <img alt="stackr: the stack artifactr, reflexr and evalr run on: LiteLLM, OpenTelemetry, Langfuse and Supabase." src="docs/assets/brand/banner-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alexnodeland/lattice/main/docs/stackr/assets/brand/banner-dark.svg">
+  <img alt="stackr: the stack artifactr, reflexr and evalr run on: LiteLLM, OpenTelemetry, Langfuse and Supabase." src="https://raw.githubusercontent.com/alexnodeland/lattice/main/docs/stackr/assets/brand/banner-light.svg" width="100%">
 </picture>
 
 <p>
@@ -9,12 +9,12 @@
   <img alt="Docker Compose v2" src="https://img.shields.io/badge/docker%20compose-v2-1C1D26">
   <img alt="Application template: Copier" src="https://img.shields.io/badge/template-Copier-1C1D26">
   <img alt="Applications on Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/apps-python%203.12%20%7C%203.13%20%7C%203.14-1C1D26">
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-1C1D26"></a>
+  <a href="https://github.com/alexnodeland/lattice/blob/main/packages/stackr/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-1C1D26"></a>
 </p>
 
 **stackr** is the infrastructure template for applications built on [artifactr](https://github.com/alexnodeland/artifactr), [reflexr](https://github.com/alexnodeland/reflexr) and [evalr](https://github.com/alexnodeland/evalr): local Supabase, the LiteLLM gateway, OpenTelemetry, Grafana's LGTM stack with Pyroscope, and Langfuse, as one Docker Compose project with profiles, and a [Copier](https://copier.readthedocs.io) template that generates an application already wired to all of them.
 
-> **Status:** pre-release. v0.1 is built, as planned in [RFC-0001](docs/rfcs/0001-v0.1-implementation-plan.md), and not yet released.
+> **Status:** pre-release. v0.1 is built, as planned in [RFC-0001](https://lattice.alexnodeland.com/stackr/rfcs/0001-v0.1-implementation-plan/), and not yet released.
 
 ## Why
 
@@ -65,14 +65,14 @@ It generates an application on artifactr, reflexr or both: FastAPI with each lib
 
 ## Documentation
 
-The documentation site is at **<https://stackr.alexnodeland.com>**. It is built from [`docs/`](docs/index.md) and published from `main` on every push; run `make docs-serve` to read it locally at <http://localhost:8000>.
+The documentation site is at **<https://stackr.alexnodeland.com>**. It is built from [`docs/`](https://lattice.alexnodeland.com/stackr/) and published from `main` on every push; run `make docs-serve` to read it locally at <http://localhost:8000>.
 
-- [Getting started](docs/getting-started.md) and the [guides](docs/guides/stack.md): the stack and its profiles, local Supabase, the LLM gateway, observability, Langfuse, the application template, the smoke tests, validation and CI, security and troubleshooting.
-- [Reference](docs/reference/index.md): every service, setting, pipeline, data source, model, template question, command and pinned version, generated from the files that define them.
-- [Architecture](docs/architecture.md): the ports, the profiles and what exists today.
-- [Architecture decision records](docs/adr/README.md): why each part is the way it is.
-- [RFCs](docs/rfcs/README.md): proposals and the v0.1 build plan.
-- [Brand](docs/assets/brand/README.md): the mark, colours and type.
+- [Getting started](https://lattice.alexnodeland.com/stackr/getting-started/) and the [guides](https://lattice.alexnodeland.com/stackr/guides/stack/): the stack and its profiles, local Supabase, the LLM gateway, observability, Langfuse, the application template, the smoke tests, validation and CI, security and troubleshooting.
+- [Reference](https://lattice.alexnodeland.com/stackr/reference/): every service, setting, pipeline, data source, model, template question, command and pinned version, generated from the files that define them.
+- [Architecture](https://lattice.alexnodeland.com/stackr/architecture/): the ports, the profiles and what exists today.
+- [Architecture decision records](https://lattice.alexnodeland.com/stackr/adr/): why each part is the way it is.
+- [RFCs](https://lattice.alexnodeland.com/stackr/rfcs/): proposals and the v0.1 build plan.
+- [Brand](https://lattice.alexnodeland.com/stackr/assets/brand/): the mark, colours and type.
 
 ## The family
 
@@ -80,8 +80,8 @@ stackr is the infrastructure of a family with [artifactr](https://github.com/ale
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the trunk-based workflow, and the RFC and ADR process.
+See [CONTRIBUTING.md](https://github.com/alexnodeland/lattice/blob/main/CONTRIBUTING.md) for setup, the trunk-based workflow, and the RFC and ADR process.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/alexnodeland/lattice/blob/main/packages/stackr/LICENSE)

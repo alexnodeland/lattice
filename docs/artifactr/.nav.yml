@@ -1,0 +1,98 @@
+# artifactr's section of the site, in order. Paths are from docs/artifactr/.
+nav:
+- Home: index.md
+- Getting started: getting-started.md
+- Reference implementation: reference-implementation.md
+- Guides:
+  - Defining artifact types: guides/artifact-types.md
+  - Workspaces, commits and the log: guides/workspaces.md
+  - Storage: guides/storage.md
+  - The agent: guides/agent.md
+  - Live output: guides/live-output.md
+  - Serving over WebSocket and REST: guides/serving.md
+  - External agents over MCP: guides/mcp.md
+  - Multi-tenancy and security: guides/security.md
+  - Observability: guides/observability.md
+  - Evaluation: guides/evaluation.md
+  - The LLM gateway: guides/gateway.md
+  - Testing your application: guides/testing.md
+- Reference:
+  - reference/index.md
+  - artifactr.core: reference/core.md
+  - artifactr.telemetry: reference/telemetry.md
+  - artifactr.workspace: reference/workspace.md
+  - artifactr.agent: reference/agent.md
+  - artifactr.scores: reference/scores.md
+  - artifactr.sql: reference/sql.md
+  - artifactr.fastapi: reference/fastapi.md
+  - artifactr.mcp: reference/mcp.md
+  - artifactr.otel: reference/otel.md
+  - artifactr.langfuse: reference/langfuse.md
+  - artifactr.litellm: reference/litellm.md
+  - artifactr.evals: reference/evals.md
+  - Thread protocol: protocol.md
+  - Protocol JSON Schema: reference/schema.md
+- Design:
+  - Architecture: architecture.md
+  - Decisions:
+    - adr/README.md
+    - adr/0001-python-library-with-sans-io-core.md
+    - adr/0002-single-write-path.md
+    - adr/0003-artifact-types-as-pydantic-subclasses.md
+    - adr/0004-optimistic-concurrency-and-revisions.md
+    - adr/0005-one-event-log-per-workspace.md
+    - adr/0006-agent-integration-as-pydantic-ai-capability.md
+    - adr/0007-caller-owned-live-output.md
+    - adr/0008-agent-perception-and-steering.md
+    - adr/0009-write-policies-and-non-blocking-proposals.md
+    - adr/0010-pausing-with-deferred-tools.md
+    - adr/0011-workspace-scoped-artifacts-and-tenant-handles.md
+    - adr/0012-surfaces-websocket-rest-mcp.md
+    - adr/0013-library-with-reference-implementation.md
+    - adr/0014-trunk-based-development-with-rfcs-and-adrs.md
+    - adr/0015-quality-gates.md
+    - adr/0016-mit-license.md
+    - adr/0017-application-toolsets-and-capability-events.md
+    - adr/0018-core-host-contract.md
+    - adr/0019-storage-protocol-and-workspace-handles.md
+    - adr/0020-running-agents-in-threads.md
+    - adr/0021-sql-storage.md
+    - adr/0022-surfaces-over-one-command-handler.md
+    - adr/0023-documentation-site.md
+    - adr/0024-reference-implementation-as-a-workspace-member.md
+    - adr/0025-distribution-name.md
+    - adr/0026-publishing-the-documentation-site.md
+    - adr/0027-opentelemetry-observability-with-langfuse.md
+    - adr/0028-typed-feedback-as-events.md
+    - adr/0029-evalr-shared-eval-kit.md
+    - adr/0030-compose-and-dev-containers.md
+    - adr/0031-litellm-proxy-first.md
+    - adr/0032-libraries-and-the-stackr-template.md
+    - adr/0033-trace-links-on-runs-and-revisions.md
+    - adr/0034-ports-and-adapters-for-integrations.md
+    - adr/0035-a-turn-is-its-own-trace.md
+    - adr/0036-metric-cardinality-through-sdk-views.md
+    - adr/0037-feedback-targets-and-evaluators.md
+    - adr/0038-feedback-as-scores.md
+    - adr/0039-the-langfuse-adapter.md
+    - adr/0040-joining-stackrs-network.md
+    - adr/0041-dashboards-generated-tested-and-released.md
+    - adr/0042-typed-run-failures.md
+    - adr/0043-the-litellm-adapter.md
+    - adr/0044-the-evalr-adapter.md
+    - adr/0045-a-message-id-is-used-once.md
+    - adr/0046-telemetry-that-composes-across-libraries.md
+    - adr/0047-cancel-safe-storage.md
+    - adr/0048-surfaces-over-the-runner.md
+    - adr/0049-scores-on-evalr.md
+    - adr/0050-one-docs-build.md
+    - adr/0051-notices.md
+    - adr/template.md
+  - RFCs:
+    - rfcs/README.md
+    - rfcs/0001-v0.1-implementation-plan.md
+    - rfcs/0002-observability-feedback-and-evaluation.md
+    - rfcs/template.md
+- Project:
+  - Changelog: project/changelog.md
+  - Brand: assets/brand/README.md

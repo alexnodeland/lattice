@@ -39,6 +39,26 @@ tasks:
       - '.moon/workspace.yml'
       - 'uv.lock'
 
+  docs:
+    description: 'Build the documentation site in strict mode, and check that its lists rendered'
+    script: 'uv run zensical build --strict --clean && uv run python scripts/check_site.py site'
+    inputs:
+      - 'mkdocs.yml'
+      - 'docs/**/*'
+      - 'scripts/**/*'
+      - 'packages/*/src/**/*'
+      - 'packages/*/CHANGELOG.md'
+      - 'packages/*/schemas/**/*'
+      - 'packages/stackr/**/*'
+      - '*.md'
+      - 'LICENSE'
+      - 'uv.lock'
+
+  docs-serve:
+    description: 'Serve the documentation site with live reload at http://localhost:8000'
+    command: 'uv run zensical serve'
+    preset: 'server'
+
   check:
     description: "Run the root's checks, as CI does"
     command: 'noop'
@@ -46,3 +66,4 @@ tasks:
       - 'lint'
       - 'typecheck'
       - 'test'
+      - 'docs'

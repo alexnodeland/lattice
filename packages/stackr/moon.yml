@@ -26,6 +26,7 @@ tasks:
       - '**/*'
       - '/pyproject.toml'
       - '/uv.lock'
+      - '/docs/stackr/reference/**/*'
 
   check:
     description: "Run the project's checks, as CI does"

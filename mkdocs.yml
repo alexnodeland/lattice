@@ -1,0 +1,133 @@
+# The family's documentation site, built with Zensical: one build, with a section per package
+# under docs/<package>/, each ordered by its own .nav.yml (stackr's RFC-0003, Docs).
+# `moon run lattice:docs` builds it in strict mode; `moon run lattice:docs-serve` serves it with
+# live reload.
+
+site_name: lattice
+site_description: >-
+  The family's packages: artifactr, reflexr, evalr, relayr and stackr, for applications in which
+  people and agents work together.
+site_author: Alex Nodeland
+site_url: https://lattice.alexnodeland.com/
+repo_url: https://github.com/alexnodeland/lattice
+repo_name: alexnodeland/lattice
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 Alex Nodeland. Released under the MIT License.
+docs_dir: docs
+
+# lattice's mark and favicon wait for its brand ADR; until then the site has the theme's.
+theme:
+  name: material
+  variant: modern
+  language: en
+  font:
+    text: Schibsted Grotesk
+    code: Fragment Mono
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: lucide/sun-moon
+        name: Use the light scheme
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: lucide/sun
+        name: Use the dark scheme
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: lucide/moon
+        name: Follow the system scheme
+  features:
+    - content.action.edit
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - navigation.footer
+    - navigation.indexes
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - toc.follow
+
+extra_css:
+  - assets/stylesheets/lattice.css
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  # Nested lists are indented by two spaces, as GitHub renders them; Python-Markdown needs four
+  # without this.
+  - mdx_truly_sane_lists:
+      nested_indent: 2
+      truly_sane: true
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      # Pages include files from the repository instead of copying them: the root's
+      # CONTRIBUTING.md and others under docs/project/, each package's CHANGELOG.md, and the
+      # files stackr's reference pages describe. Paths are from the repository's root.
+      base_path: [.]
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+# One build resolves the cross-references between packages, so no package needs another's
+# inventory. Every member is installed in the workspace's environment, so mkdocstrings finds
+# them without paths.
+plugins:
+  - search
+  # Zensical implements awesome-nav itself: each folder's .nav.yml orders its section.
+  - awesome-nav
+  - mkdocstrings:
+      handlers:
+        python:
+          inventories:
+            - https://docs.python.org/3/objects.inv
+            - https://docs.pydantic.dev/latest/objects.inv
+            - https://ai.pydantic.dev/objects.inv
+            - https://opentelemetry-python.readthedocs.io/en/latest/objects.inv
+          options:
+            docstring_style: google
+            extensions:
+              - griffe_pydantic:
+                  schema: false
+              - scripts/griffe_sphinx_roles.py:SphinxRoles
+            filters: ["!^_", "!^model_config$"]
+            heading_level: 3
+            members_order: source
+            merge_init_into_class: true
+            separate_signature: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_signature_annotations: true
+            show_source: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            signature_crossrefs: true

@@ -10,14 +10,14 @@ It is a small, complete application built only on reflexr's public API:
 
 | Piece | File | What it shows |
 |---|---|---|
-| Events | [`events.py`](src/oncall/events.py) | Five `Event` types: three that producers publish, two that the workflows emit |
-| Rules | [`rules.py`](src/oncall/rules.py) | A count within a window, an event, and an absence, each scoped by service; a `Schedule` whose ticks keep time moving |
-| Triage agent | [`triage.py`](src/oncall/triage.py) | A pydantic-ai `Agent` over `Reaction[OncallDeps]` with the `EventContext` capability, allowed to emit `oncall:incident.opened`, and a structured verdict |
-| Runbook graph | [`runbook.py`](src/oncall/runbook.py) | A pydantic-graph `GraphBuilder` graph with a decision, checkpointed after every step, that reads the log and emits through the `Reaction` |
-| Paging | [`actions.py`](src/oncall/actions.py) | A plain async function, idempotent by its run id |
-| Services | [`services.py`](src/oncall/services.py) | The pager and deployer the workflows act on: in-memory fakes, given to every action as `reaction.deps` |
-| Server | [`app.py`](src/oncall/app.py) | FastAPI with REST and the WebSocket stream at `/v1` and MCP at `/mcp`, running the `Reactor` in its lifespan, over in-memory or SQL storage, with OpenTelemetry, Langfuse and a LiteLLM proxy when configured |
-| Terminal client | [`cli.py`](src/oncall/cli.py) | Publishes events, follows the stream live, and operates runs |
+| Events | [`events.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/events.py) | Five `Event` types: three that producers publish, two that the workflows emit |
+| Rules | [`rules.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/rules.py) | A count within a window, an event, and an absence, each scoped by service; a `Schedule` whose ticks keep time moving |
+| Triage agent | [`triage.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/triage.py) | A pydantic-ai `Agent` over `Reaction[OncallDeps]` with the `EventContext` capability, allowed to emit `oncall:incident.opened`, and a structured verdict |
+| Runbook graph | [`runbook.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/runbook.py) | A pydantic-graph `GraphBuilder` graph with a decision, checkpointed after every step, that reads the log and emits through the `Reaction` |
+| Paging | [`actions.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/actions.py) | A plain async function, idempotent by its run id |
+| Services | [`services.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/services.py) | The pager and deployer the workflows act on: in-memory fakes, given to every action as `reaction.deps` |
+| Server | [`app.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/app.py) | FastAPI with REST and the WebSocket stream at `/v1` and MCP at `/mcp`, running the `Reactor` in its lifespan, over in-memory or SQL storage, with OpenTelemetry, Langfuse and a LiteLLM proxy when configured |
+| Terminal client | [`cli.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/cli.py) | Publishes events, follows the stream live, and operates runs |
 
 ## How it fits together
 
@@ -189,7 +189,7 @@ Every command takes `--url` (default `http://127.0.0.1:8000`), `--workspace` (de
     -d '{"event": {"type": "oncall:incident.opened", "service": "api", "severity": 7, "summary": "checkout is slow"}}'
   ```
 
-  See the [protocol](../../docs/protocol.md) for commands and reads.
+  See the [protocol](https://lattice.alexnodeland.com/reflexr/protocol/) for commands and reads.
 - **MCP:** point an MCP client at `http://127.0.0.1:8000/mcp/`. It can publish events, read the
   log, and list, retry, skip and cancel runs, like any other participant.
 

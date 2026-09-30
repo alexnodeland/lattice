@@ -1,0 +1,13 @@
+# The site's sections: the family's pages, and each package's, which its own .nav.yml orders.
+nav:
+  - Home: index.md
+  - artifactr: artifactr
+  - reflexr: reflexr
+  - evalr: evalr
+  - relayr: relayr
+  - stackr: stackr
+  - Project:
+      - Contributing: project/contributing.md
+      - Code of conduct: project/code-of-conduct.md
+      - Security: project/security.md
+      - License: project/license.md

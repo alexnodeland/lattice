@@ -8,11 +8,11 @@ It is a small, complete application built only on artifactr's public API:
 
 | Piece | File | What it shows |
 |---|---|---|
-| Artifact types | [`artifacts.py`](src/docplan/artifacts.py) | A Markdown `Doc`, and a `Plan` with `write_policy="propose"`, its own methods, `render_for_agent` and `describe_change` |
-| Agent | [`agent.py`](src/docplan/agent.py) | A pydantic-ai agent with the `ArtifactWorkspace` capability, plus the plan's own tools |
-| Server | [`app.py`](src/docplan/app.py) | FastAPI with the thread protocol over WebSocket, REST at `/v1`, and MCP at `/mcp`, over in-memory or SQL storage |
-| Terminal client | [`cli.py`](src/docplan/cli.py) | A chat client that speaks the thread protocol |
-| Evaluation | [`evals.py`](src/docplan/evals.py), [`evaluate.py`](src/docplan/evaluate.py) | The `[evals]` extra: people's feedback as a dataset, a judge that agrees with them, online verdicts, replays and measures |
+| Artifact types | [`artifacts.py`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/src/docplan/artifacts.py) | A Markdown `Doc`, and a `Plan` with `write_policy="propose"`, its own methods, `render_for_agent` and `describe_change` |
+| Agent | [`agent.py`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/src/docplan/agent.py) | A pydantic-ai agent with the `ArtifactWorkspace` capability, plus the plan's own tools |
+| Server | [`app.py`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/src/docplan/app.py) | FastAPI with the thread protocol over WebSocket, REST at `/v1`, and MCP at `/mcp`, over in-memory or SQL storage |
+| Terminal client | [`cli.py`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/src/docplan/cli.py) | A chat client that speaks the thread protocol |
+| Evaluation | [`evals.py`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/src/docplan/evals.py), [`evaluate.py`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/src/docplan/evaluate.py) | The `[evals]` extra: people's feedback as a dataset, a judge that agrees with them, online verdicts, replays and measures |
 
 ## Run it
 
@@ -115,7 +115,7 @@ docker compose -f compose.yaml -f compose.stackr.yaml --profile app up -d --buil
 ### Other surfaces
 
 - **REST:** `curl -H 'x-user: alice' localhost:8000/v1/workspaces/main/artifacts`. See the
-  [protocol](../../docs/protocol.md) for commands and reads.
+  [protocol](https://lattice.alexnodeland.com/artifactr/protocol/) for commands and reads.
 - **MCP:** point an MCP client at `http://127.0.0.1:8000/mcp/`. It works in the `main`
   workspace like any other participant: artifacts are resources, and commands are tools.
 
@@ -125,7 +125,7 @@ actor from their own sessions in `resolve_actor`.
 ## Evaluating docplan
 
 docplan closes the evaluation loop with artifactr's `[evals]` extra and
-[evalr](https://github.com/alexnodeland/evalr), in [`evals.py`](src/docplan/evals.py). Its agent is
+[evalr](https://github.com/alexnodeland/evalr), in [`evals.py`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/src/docplan/evals.py). Its agent is
 told to keep its edits small, and people say when it did not:
 
 1. **People give feedback.** `/edits ok|big` says whether the agent's last turn changed more of the
@@ -187,7 +187,7 @@ person has to come back to the agent, or to rewrite what it wrote, for the measu
 ## Test it
 
 The tests run the whole stack with scripted models, so they need no API key. The evaluation loop's
-tests, in [`test_evals.py`](tests/test_evals.py), run it offline end to end:
+tests, in [`test_evals.py`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/tests/test_evals.py), run it offline end to end:
 
 ```sh
 uv run pytest examples/docplan/tests

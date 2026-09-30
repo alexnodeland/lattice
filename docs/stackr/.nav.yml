@@ -1,0 +1,54 @@
+# stackr's section of the site, in order. Paths are from docs/stackr/.
+nav:
+- Home: index.md
+- Getting started: getting-started.md
+- Guides:
+  - The stack and its profiles: guides/stack.md
+  - Local Supabase: guides/supabase.md
+  - The LLM gateway: guides/gateway.md
+  - Observability: guides/observability.md
+  - Langfuse: guides/langfuse.md
+  - The application template: guides/template.md
+  - The smoke tests: guides/smoke-tests.md
+  - Validation and CI: guides/validation.md
+  - Security: guides/security.md
+  - Troubleshooting: guides/troubleshooting.md
+- Reference:
+  - reference/index.md
+  - Compose services and profiles: reference/compose.md
+  - Settings in .env: reference/settings.md
+  - Collector pipelines: reference/collector.md
+  - Grafana provisioning: reference/grafana.md
+  - LiteLLM configuration: reference/litellm.md
+  - Template questions: reference/template.md
+  - Makefile targets: reference/makefile.md
+  - Pinned versions: reference/versions.md
+- Design:
+  - Architecture: architecture.md
+  - Decisions:
+    - adr/README.md
+    - adr/0001-compose-first-with-profiles.md
+    - adr/0002-local-supabase-through-its-cli.md
+    - adr/0003-observability-and-gateway-services.md
+    - adr/0004-the-application-template.md
+    - adr/0005-ports-and-adapters-for-the-stack.md
+    - adr/0006-networks-and-published-ports.md
+    - adr/0007-how-telemetry-reaches-the-backends.md
+    - adr/0008-langfuse-and-its-services.md
+    - adr/0009-local-supabase-as-the-database-adapter.md
+    - adr/0010-the-llm-gateway.md
+    - adr/0011-the-application-template-in-detail.md
+    - adr/0012-documentation-site.md
+    - adr/0013-how-the-template-pins-the-libraries.md
+    - adr/0014-one-docs-build.md
+    - adr/0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md
+    - adr/template.md
+  - RFCs:
+    - rfcs/README.md
+    - rfcs/0001-v0.1-implementation-plan.md
+    - rfcs/0002-the-combined-system.md
+    - rfcs/0003-one-repository-lattice.md
+    - rfcs/template.md
+- Project:
+  - Changelog: project/changelog.md
+  - Brand: assets/brand/README.md

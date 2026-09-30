@@ -1,0 +1,22 @@
+# relayr's section of the site, in order. Paths are from docs/relayr/.
+nav:
+- Decisions:
+  - adr/README.md
+  - adr/0001-relayr-its-own-repository-and-package.md
+  - adr/0002-the-outbound-actor-an-external-agent-per-rule.md
+  - adr/0003-a-thread-is-never-a-chain.md
+  - adr/0004-sessions-linked-not-continued.md
+  - adr/0005-where-a-rules-source-of-truth-lives.md
+  - adr/0006-bridged-types-in-the-artifactr-namespace.md
+  - adr/0007-notices-by-default.md
+  - adr/0008-trunk-based-development-with-rfcs-and-adrs.md
+  - adr/0009-quality-gates.md
+  - adr/0010-mit-license.md
+  - adr/0011-documentation-site-and-brand.md
+  - adr/0012-the-libraries-pinned-by-git-revision.md
+  - adr/template.md
+- RFCs:
+  - rfcs/README.md
+  - rfcs/0001-v0.1-implementation-plan.md
+  - rfcs/template.md
+- Brand: assets/brand/README.md

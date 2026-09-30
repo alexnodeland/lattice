@@ -63,7 +63,7 @@ COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEM
 # scripts/smoke runs Compose as `make up` does, and the Supabase CLI as make runs it.
 SMOKE = $(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) SUPABASE="$(SUPABASE)" scripts/smoke
 
-.PHONY: help env up down reset ps logs tenant bump-libraries validate smoke smoke-app docs docs-serve docs-reference changelog clean
+.PHONY: help env up down reset ps logs tenant bump-libraries validate smoke smoke-app docs-reference changelog clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -112,14 +112,6 @@ smoke: ## Send test telemetry through the running stack and find it (PROFILES as
 smoke-app: ## Run an application from the template beside the running stack, and trace its agents
 	$(SMOKE) app
 
-docs: changelog ## Build the documentation site strictly, changelog included, and check its reference pages and lists, as CI does
-	$(UV) run scripts/docs-reference --check
-	$(UV) run zensical build --strict --clean
-	$(UV) run python scripts/check_site.py site
-
-docs-serve: ## Serve the documentation site with live reload at http://localhost:8000
-	$(UV) run zensical serve
-
 docs-reference: ## Regenerate the reference pages from the files they describe
 	$(UV) run scripts/docs-reference
 
@@ -127,5 +119,5 @@ changelog: ## Regenerate CHANGELOG.md from conventional commits
 	$(UV) run git-cliff --output CHANGELOG.md
 	@$(UV) run python -c "import pathlib; p = pathlib.Path('CHANGELOG.md'); p.write_text(p.read_text().rstrip() + '\n')"
 
-clean: ## Remove tool caches and the built site
-	rm -rf .ruff_cache .cache site
+clean: ## Remove tool caches
+	rm -rf .ruff_cache .cache

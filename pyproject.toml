@@ -17,6 +17,13 @@ dev = [
     "pyyaml>=6.0.3",
     "ruff>=0.16",
 ]
+# The documentation site: one build over every package (docs/, mkdocs.yml).
+docs = [
+    "zensical>=0.0.66",
+    "mkdocstrings-python>=2.0.9",
+    "griffe-pydantic>=1.3.1",
+    "mdx-truly-sane-lists>=1.3",
+]
 
 [tool.uv]
 package = false

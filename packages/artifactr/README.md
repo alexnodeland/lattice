@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/banner-dark.svg">
-  <img alt="artifactr: people and agents editing the same artifacts, every change versioned and attributed." src="docs/assets/brand/banner-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alexnodeland/lattice/main/docs/artifactr/assets/brand/banner-dark.svg">
+  <img alt="artifactr: people and agents editing the same artifacts, every change versioned and attributed." src="https://raw.githubusercontent.com/alexnodeland/lattice/main/docs/artifactr/assets/brand/banner-light.svg" width="100%">
 </picture>
 
 <p>
@@ -9,12 +9,12 @@
   <img alt="Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-2D2A8C">
   <img alt="Coverage: 100%" src="https://img.shields.io/badge/coverage-100%25-2D2A8C">
   <img alt="Typed: pyright strict" src="https://img.shields.io/badge/typed-pyright%20strict-2D2A8C">
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2D2A8C"></a>
+  <a href="https://github.com/alexnodeland/lattice/blob/main/packages/artifactr/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2D2A8C"></a>
 </p>
 
 **artifactr** is a Python library for chat applications in which people and agents work on the same documents, plans and specs, with every change versioned, attributed and fed back into the agent's context.
 
-> **Status:** alpha. [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) is the first release and delivers [RFC-0001](docs/rfcs/0001-v0.1-implementation-plan.md), the v0.1 plan. The API may still change before 1.0.
+> **Status:** alpha. [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) is the first release and delivers [RFC-0001](https://lattice.alexnodeland.com/artifactr/rfcs/0001-v0.1-implementation-plan/), the v0.1 plan. The API may still change before 1.0.
 
 ## Why
 
@@ -90,7 +90,7 @@ It needs `ANTHROPIC_API_KEY`, or any other [pydantic-ai model](https://ai.pydant
 
 ## Try it
 
-[`examples/docplan`](examples/docplan/README.md) is a complete application built on the library: a person and an agent co-write a document and plan its work, over WebSocket, REST and MCP, with a terminal client.
+[`examples/docplan`](https://github.com/alexnodeland/lattice/blob/main/examples/docplan/README.md) is a complete application built on the library: a person and an agent co-write a document and plan its work, over WebSocket, REST and MCP, with a terminal client.
 
 ```sh
 make install
@@ -114,14 +114,14 @@ Set `DOCPLAN_DATABASE_URL` (for example `sqlite+aiosqlite:///docplan.db`) to kee
 
 ## Documentation
 
-The documentation site is at **<https://artifactr.alexnodeland.com>**. It is built from [`docs/`](docs/index.md) and published from `main` on every push; run `make docs-serve` to read it locally at <http://localhost:8000>.
+The documentation site is at **<https://artifactr.alexnodeland.com>**. It is built from [`docs/`](https://lattice.alexnodeland.com/artifactr/) and published from `main` on every push; run `make docs-serve` to read it locally at <http://localhost:8000>.
 
-- [Getting started](docs/getting-started.md) and the [guides](docs/guides/artifact-types.md): artifact types, workspaces, storage, the agent, live output, serving, MCP, security and testing.
-- [Architecture](docs/architecture.md): concepts, layers, the write path, the agent, tenancy and concurrency.
-- [Thread protocol v1](docs/protocol.md): the WebSocket, REST and MCP contracts, with a generated [JSON Schema](schemas/artifactr.v1.json).
-- [Architecture decision records](docs/adr/README.md): why each part is the way it is.
-- [RFCs](docs/rfcs/README.md): proposals and the v0.1 build plan.
-- [Brand](docs/assets/brand/README.md): the mark, colours and type.
+- [Getting started](https://lattice.alexnodeland.com/artifactr/getting-started/) and the [guides](https://lattice.alexnodeland.com/artifactr/guides/artifact-types/): artifact types, workspaces, storage, the agent, live output, serving, MCP, security and testing.
+- [Architecture](https://lattice.alexnodeland.com/artifactr/architecture/): concepts, layers, the write path, the agent, tenancy and concurrency.
+- [Thread protocol v1](https://lattice.alexnodeland.com/artifactr/protocol/): the WebSocket, REST and MCP contracts, with a generated [JSON Schema](https://github.com/alexnodeland/lattice/blob/main/packages/artifactr/schemas/artifactr.v1.json).
+- [Architecture decision records](https://lattice.alexnodeland.com/artifactr/adr/): why each part is the way it is.
+- [RFCs](https://lattice.alexnodeland.com/artifactr/rfcs/): proposals and the v0.1 build plan.
+- [Brand](https://lattice.alexnodeland.com/artifactr/assets/brand/): the mark, colours and type.
 
 ## Built on
 
@@ -129,8 +129,8 @@ The documentation site is at **<https://artifactr.alexnodeland.com>**. It is bui
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the trunk-based workflow, and the RFC and ADR process.
+See [CONTRIBUTING.md](https://github.com/alexnodeland/lattice/blob/main/CONTRIBUTING.md) for setup, the trunk-based workflow, and the RFC and ADR process.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/alexnodeland/lattice/blob/main/packages/artifactr/LICENSE)

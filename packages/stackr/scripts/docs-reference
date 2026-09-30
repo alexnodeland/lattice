@@ -34,7 +34,9 @@ import yaml
 
 from _env import LINE, ROOT, read_env
 
-PAGES = ROOT / "docs" / "reference"
+LATTICE = ROOT.parent.parent
+"""lattice's root, where docs/stackr/ is stackr's section of the site."""
+PAGES = LATTICE / "docs" / "stackr" / "reference"
 BLOCK = re.compile(
     r"(<!-- generated: (?P<name>[a-z0-9-]+) -->\n)(?P<body>.*?)(\n<!-- end generated -->)", re.S
 )
@@ -896,10 +898,10 @@ def main() -> int:
         try:
             updated = render(text, used)
         except (Problem, KeyError, TypeError, ValueError) as error:
-            print(f"docs-reference: {path.relative_to(ROOT)}: {error}", file=sys.stderr)
+            print(f"docs-reference: {path.relative_to(LATTICE)}: {error}", file=sys.stderr)
             return 1
         if updated != text:
-            stale.append(str(path.relative_to(ROOT)))
+            stale.append(str(path.relative_to(LATTICE)))
             if not args.check:
                 path.write_text(updated)
     if unused := sorted(set(BLOCKS) - used):

@@ -110,7 +110,7 @@ The documentation is evalr's section of lattice's site, at **<https://lattice.al
 
 ## The family
 
-evalr is part of a family of packages in [lattice](https://github.com/alexnodeland/lattice): [artifactr](https://lattice.alexnodeland.com/artifactr/) and [reflexr](https://lattice.alexnodeland.com/reflexr/), which record typed feedback from people and depend on evalr through their `[evals]` extras; [relayr](https://lattice.alexnodeland.com/relayr/adr/), the bridge planned between them; and [stackr](https://lattice.alexnodeland.com/stackr/), the infrastructure they run on. evalr imports none of them.
+evalr is part of a family of packages in [lattice](https://github.com/alexnodeland/lattice): [artifactr](https://lattice.alexnodeland.com/artifactr/) and [reflexr](https://lattice.alexnodeland.com/reflexr/), which record typed feedback from people and depend on evalr through their `[evals]` extras; [relayr](https://lattice.alexnodeland.com/relayr/), the bridge planned between them; and [stackr](https://lattice.alexnodeland.com/stackr/), the infrastructure they run on. evalr imports none of them.
 
 ## Contributing
 

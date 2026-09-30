@@ -31,8 +31,8 @@ sqlite = ["relayr-ai[sql]", "aiosqlite>=0.22"]
 postgres = ["relayr-ai[sql]", "asyncpg>=0.31"]
 
 [project.urls]
-Homepage = "https://lattice.alexnodeland.com/relayr/adr/"
-Documentation = "https://lattice.alexnodeland.com/relayr/adr/"
+Homepage = "https://lattice.alexnodeland.com/relayr/"
+Documentation = "https://lattice.alexnodeland.com/relayr/"
 Repository = "https://github.com/alexnodeland/lattice"
 Issues = "https://github.com/alexnodeland/lattice/issues"
 Changelog = "https://github.com/alexnodeland/lattice/blob/main/packages/relayr/CHANGELOG.md"

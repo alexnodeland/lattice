@@ -1,5 +1,6 @@
 # relayr's section of the site, in order. Paths are from docs/relayr/.
 nav:
+- Home: index.md
 - Decisions:
   - adr/README.md
   - adr/0001-relayr-its-own-repository-and-package.md

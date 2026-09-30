@@ -4,7 +4,8 @@ Events from chats and artifacts become events for rules, and runs act back in th
 proposals and notices. relayr uses only the two libraries' public APIs, and neither library
 imports it or the other.
 
-See `docs/architecture.md` for the design.
+It is planned, and holds only its version so far. Its documentation, with its decisions and the
+plan that builds it, is at <https://lattice.alexnodeland.com/relayr/>.
 """
 
 from importlib.metadata import version

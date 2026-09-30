@@ -87,7 +87,6 @@ nav:
     - adr/0048-reflexr-in-lattice.md
     - adr/0049-one-site-for-the-family.md
     - adr/0050-dashboards-from-the-checkout.md
-    - adr/template.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

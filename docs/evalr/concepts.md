@@ -119,5 +119,5 @@ evalr is one of the packages in [lattice](https://github.com/alexnodeland/lattic
 - [artifactr](../artifactr/index.md): chat applications where people and agents collaborate on shared, versioned artifacts. It records people's feedback on threads, turns, messages and artifact versions.
 - [reflexr](../reflexr/index.md): rules over event streams that run agents, graphs and functions. It records feedback on runs, firings and causal chains.
 - **evalr**: evaluators trained on that feedback and measured against it. The libraries depend on evalr through their `[evals]` extras; evalr imports neither.
-- [relayr](../relayr/adr/README.md): the bridge planned between artifactr and reflexr, so that events from chats and artifacts become events for rules, and runs act back in the chat.
+- [relayr](../relayr/index.md): the bridge planned between artifactr and reflexr, so that events from chats and artifacts become events for rules, and runs act back in the chat.
 - [stackr](../stackr/index.md): the infrastructure they run on: LiteLLM, OpenTelemetry, Langfuse and Supabase.

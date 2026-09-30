@@ -31,6 +31,7 @@ The core install covers artifact types, workspaces with in-memory storage, and t
 | `postgres` | [SQL storage](guides/storage.md#sql-storage) on PostgreSQL, with asyncpg | `"artifactr-ai[postgres] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
 | `sqlite` | SQL storage on SQLite, with aiosqlite | `"artifactr-ai[sqlite] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
 | `sql` | SQL storage without a driver, if you bring your own | `"artifactr-ai[sql] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
+| `evals` | [Evaluation with evalr](guides/evaluation.md#evaluating-with-evalr): datasets of people's feedback from the log, turns replayed as experiments, live turns judged as they end, and end-to-end measures. It needs evalr, installed as the note below says | `"artifactr-ai[evals] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
 | `langfuse` | [Langfuse](guides/observability.md#langfuse): whole traces, each turn's session and user, and feedback as scores | `"artifactr-ai[langfuse] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
 | `litellm` | [The LLM gateway](guides/gateway.md): models over a LiteLLM proxy, with tenancy, keys and guardrails per request | `"artifactr-ai[litellm] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
 | `otel` | [`configure_telemetry`](guides/observability.md): the OpenTelemetry SDK, OTLP export and instrumentation in one call | `"artifactr-ai[otel] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"` |
@@ -39,7 +40,7 @@ Combine extras with commas, as in `artifactr-ai[fastapi,postgres]`. You also nee
 
 !!! note "evalr comes from lattice too"
 
-    The `langfuse` extra, and the `evals` extra ([Evaluation](guides/evaluation.md#evaluating-with-evalr)), depend on [evalr](../evalr/index.md), which is not on PyPI yet either. uv installs it from the same commit of lattice as artifactr. pip reads only the version ranges, so with pip, install evalr from lattice as well: `pip install "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" "artifactr-ai[langfuse] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"`.
+    The `evals` and `langfuse` extras depend on [evalr](../evalr/index.md), which is not on PyPI yet either. uv installs it from the same commit of lattice as artifactr. pip reads only the version ranges, so with pip, install evalr from lattice as well: `pip install "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" "artifactr-ai[langfuse] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"`.
 
 ## 1. Define an artifact type
 

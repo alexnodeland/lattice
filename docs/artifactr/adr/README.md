@@ -59,4 +59,4 @@ Each record captures one decision: the context that forced it, the options consi
 | [0053](0053-one-site-for-the-family.md) | One site for the family | Accepted |
 | [0054](0054-dashboards-from-the-checkout.md) | Dashboards from the checkout | Accepted |
 
-To add a record, copy [`template.md`](template.md) to the next number and add a row above.
+To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

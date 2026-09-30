@@ -4,7 +4,7 @@
 </picture>
 
 <p>
-  <a href="https://lattice.alexnodeland.com/relayr/adr/"><img alt="Docs" src="https://img.shields.io/badge/docs-lattice.alexnodeland.com%2Frelayr-9E0A5E"></a>
+  <a href="https://lattice.alexnodeland.com/relayr/"><img alt="Docs" src="https://img.shields.io/badge/docs-lattice.alexnodeland.com%2Frelayr-9E0A5E"></a>
   <a href="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml"><img alt="Nightly" src="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml/badge.svg?branch=main"></a>
   <img alt="Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-9E0A5E">
   <img alt="Coverage: 100%" src="https://img.shields.io/badge/coverage-100%25-9E0A5E">
@@ -32,7 +32,7 @@ An application can mount artifactr and reflexr side by side, on one database and
 
 ## Documentation
 
-relayr's documentation is its section of lattice's site, at **<https://lattice.alexnodeland.com/relayr/adr/>**, built from [`docs/relayr/`](https://github.com/alexnodeland/lattice/tree/main/docs/relayr). Its guides and architecture come with the phases that build what they describe.
+relayr's documentation is its section of lattice's site, at **<https://lattice.alexnodeland.com/relayr/>**, built from [`docs/relayr/`](https://github.com/alexnodeland/lattice/tree/main/docs/relayr). Its guides and architecture come with the phases that build what they describe.
 
 - [Architecture decision records](https://lattice.alexnodeland.com/relayr/adr/): why each part will be the way it is.
 - [RFCs](https://lattice.alexnodeland.com/relayr/rfcs/): the v0.1 plan, its phases and what each waits on.

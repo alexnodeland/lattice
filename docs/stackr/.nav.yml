@@ -44,7 +44,6 @@ nav:
     - adr/0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md
     - adr/0016-stackr-in-lattice.md
     - adr/0017-one-site-for-the-family.md
-    - adr/template.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

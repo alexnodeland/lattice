@@ -388,7 +388,8 @@ In lattice, this list becomes a tracking issue with a sub-issue per phase (phase
 - [x] Sign-off on the decisions (2026-09-30)
 - [x] Phase 1: rehearsal (2026-09-30)
 - [x] Phase 2: the day (2026-09-30)
-- [ ] Phase 3: package ADRs and the family architecture
+- [x] Phase 3: package ADRs and the family architecture (2026-09-30)
+  - The family's architecture and ADRs ([#30](https://github.com/alexnodeland/lattice/pull/30)), each package's ADRs for the move ([#36](https://github.com/alexnodeland/lattice/pull/36)), lattice's brand and site styling ([#34](https://github.com/alexnodeland/lattice/pull/34)), every package's docs describing lattice ([#32](https://github.com/alexnodeland/lattice/pull/32)), and their follow-ups ([#33](https://github.com/alexnodeland/lattice/issues/33)).
 - [ ] Phase 4: the template in lattice
 - [ ] Phase 5: acceptance tests
 - [ ] Phase 6: test signal and hardening

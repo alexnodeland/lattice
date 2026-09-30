@@ -26,7 +26,7 @@
 | [artifactr](packages/artifactr) | Chat applications where people and agents collaborate through shared, versioned artifacts | [artifactr](https://lattice.alexnodeland.com/artifactr/) | `artifactr-ai` |
 | [reflexr](packages/reflexr) | Rules over event streams that run LLM workflows: pydantic-ai agents, pydantic-graph graphs and functions | [reflexr](https://lattice.alexnodeland.com/reflexr/) | `reflexr` |
 | [evalr](packages/evalr) | Typed evaluation of agent systems: judges that give typed verdicts, trained on people's feedback and measured against it | [evalr](https://lattice.alexnodeland.com/evalr/) | `evalr` |
-| [relayr](packages/relayr) | The bridge between artifactr and reflexr: events from chats and artifacts become events for rules, and runs act back in the chat | [relayr](https://lattice.alexnodeland.com/relayr/adr/) | `relayr-ai` |
+| [relayr](packages/relayr) | The bridge between artifactr and reflexr: events from chats and artifacts become events for rules, and runs act back in the chat | [relayr](https://lattice.alexnodeland.com/relayr/) | `relayr-ai` |
 | [stackr](packages/stackr) | The infrastructure the libraries run on (local Supabase, the LiteLLM gateway, OpenTelemetry, Grafana and Langfuse), and an application template | [stackr](https://lattice.alexnodeland.com/stackr/) | none: it ships no wheel |
 
 Two more are planned. **grantr** is identity and access for artifactr and reflexr: users, groups, roles and permissions, bound to tenants and workspaces and checked by their authorize hooks. **portalr** is the portal into the system: chat with your agents, see artifacts, rules and runs, and manage access, traces, feedback, evals and analytics.

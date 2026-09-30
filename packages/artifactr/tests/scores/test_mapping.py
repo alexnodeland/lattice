@@ -1,0 +1,59 @@
+"""Feedback types as score configs, and feedback values as scores, named as registered.
+
+evalr owns the mapping and pins it with a fixture of what these tests expected before it did.
+"""
+
+from typing import Annotated
+
+from evalr.core import MAX_TEXT, ScoreConfig
+from pydantic import Field
+
+from artifactr.core import Feedback
+from artifactr.scores import score_configs, score_values
+from tests.artifact_types import Accuracy, Helpfulness
+
+
+def test_each_field_is_scored_by_its_type() -> None:
+    assert score_configs(Helpfulness) == (
+        ScoreConfig(
+            name="helpfulness.rating",
+            type_name="helpfulness",
+            field="rating",
+            data_type="NUMERIC",
+            minimum=1,
+            maximum=5,
+        ),
+        ScoreConfig(
+            name="helpfulness.reason", type_name="helpfulness", field="reason", data_type="TEXT"
+        ),
+    )
+    correct, verdict, tone, confidence = score_configs(Accuracy)
+    assert correct.data_type == "BOOLEAN"
+    assert (verdict.data_type, verdict.categories) == ("CATEGORICAL", ("right", "wrong"))
+    assert (tone.data_type, tone.categories) == ("CATEGORICAL", ("formal", "casual"))
+    assert (confidence.minimum, confidence.maximum) == (0, 1)
+
+
+def test_optional_constrained_and_unscorable_fields() -> None:
+    class Review(Feedback, name="review_for_scores", targets={"thread"}):
+        effort: Annotated[int, Field(gt=0, lt=10, description="How hard it was")] | None = None
+        tags: tuple[str, ...] = ()
+        either: int | str = 0
+        unbounded: float = 0.0
+
+    [effort, unbounded] = score_configs(Review)
+    assert (effort.name, effort.minimum, effort.maximum) == ("review_for_scores.effort", 0, 10)
+    assert effort.description == "How hard it was"
+    assert (unbounded.minimum, unbounded.maximum) == (None, None)
+
+
+def test_values_become_scores() -> None:
+    assert [(c.field, v) for c, v in score_values(Helpfulness, {"rating": 4, "reason": None})] == [
+        ("rating", 4.0)
+    ]
+    assert score_values(Helpfulness, {"rating": 4, "reason": ""})[1:] == []
+    long = score_values(Helpfulness, {"rating": 1, "reason": "x" * 900})[1][1]
+    assert long == "x" * MAX_TEXT
+    value = {"correct": False, "verdict": "wrong", "tone": "casual", "confidence": 0.5}
+    assert [v for _, v in score_values(Accuracy, value)] == [False, "wrong", "casual", 0.5]
+    assert score_values(Accuracy, value | {"correct": True})[0][1] is True

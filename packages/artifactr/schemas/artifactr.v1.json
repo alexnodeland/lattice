@@ -1,0 +1,2827 @@
+{
+  "$defs": {
+    "ActiveRun": {
+      "description": "A run in progress, as listed in ``welcome``.",
+      "properties": {
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        }
+      },
+      "required": [
+        "run_id",
+        "thread_id"
+      ],
+      "title": "ActiveRun",
+      "type": "object"
+    },
+    "AgentActor": {
+      "description": "The built-in agent of one thread, acting within one run.",
+      "properties": {
+        "kind": {
+          "const": "agent",
+          "default": "agent",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "default": "assistant",
+          "title": "Name",
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        }
+      },
+      "required": [
+        "thread_id"
+      ],
+      "title": "AgentActor",
+      "type": "object"
+    },
+    "AnswerDeferred": {
+      "additionalProperties": false,
+      "description": "Answer a paused run's question, or approve or deny one of its tool calls.",
+      "properties": {
+        "answer": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "approved": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approved"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "tool_call_id": {
+          "title": "Tool Call Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "answer_deferred",
+          "default": "answer_deferred",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "tool_call_id"
+      ],
+      "title": "AnswerDeferred",
+      "type": "object"
+    },
+    "AppEvent": {
+      "description": "An application-defined fact. ``name`` identifies it; ``data`` is free-form JSON.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThreadId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "app_event",
+          "default": "app_event",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "AppEvent",
+      "type": "object"
+    },
+    "AppLive": {
+      "description": "An application's own live event.",
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "const": "app_live",
+          "default": "app_live",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "AppLive",
+      "type": "object"
+    },
+    "Applied": {
+      "description": "The change was applied: the artifact is now at ``version``.",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "type": {
+          "const": "applied",
+          "default": "applied",
+          "title": "Type",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "version"
+      ],
+      "title": "Applied",
+      "type": "object"
+    },
+    "ArchiveArtifact": {
+      "additionalProperties": false,
+      "description": "Archive an artifact. Archived artifacts can be read but not changed.",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "base_version": {
+          "minimum": 1,
+          "title": "Base Version",
+          "type": "integer"
+        },
+        "proposal_id": {
+          "$ref": "#/$defs/ProposalId"
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThreadId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "archive_artifact",
+          "default": "archive_artifact",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "base_version"
+      ],
+      "title": "ArchiveArtifact",
+      "type": "object"
+    },
+    "ArtifactArchived": {
+      "description": "An artifact was archived.",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "proposal_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProposalId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThreadId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "artifact_archived",
+          "default": "artifact_archived",
+          "title": "Type",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "kind",
+        "version"
+      ],
+      "title": "ArtifactArchived",
+      "type": "object"
+    },
+    "ArtifactChanged": {
+      "description": "An artifact was changed by a patch.",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "patch": {
+          "discriminator": {
+            "mapping": {
+              "json_patch": "#/$defs/JsonPatch",
+              "text_edits": "#/$defs/TextEdits"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/JsonPatch"
+            },
+            {
+              "$ref": "#/$defs/TextEdits"
+            }
+          ],
+          "title": "Patch"
+        },
+        "proposal_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProposalId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThreadId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "artifact_changed",
+          "default": "artifact_changed",
+          "title": "Type",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "kind",
+        "version",
+        "patch",
+        "summary"
+      ],
+      "title": "ArtifactChanged",
+      "type": "object"
+    },
+    "ArtifactCreated": {
+      "description": "An artifact was created at version 1.",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "data": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Data",
+          "type": "object"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "proposal_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProposalId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThreadId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "artifact_created",
+          "default": "artifact_created",
+          "title": "Type",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "kind",
+        "version",
+        "data"
+      ],
+      "title": "ArtifactCreated",
+      "type": "object"
+    },
+    "ArtifactId": {
+      "type": "string"
+    },
+    "ArtifactTarget": {
+      "additionalProperties": false,
+      "description": "Feedback on one version of an artifact.",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "kind": {
+          "const": "artifact",
+          "default": "artifact",
+          "title": "Kind",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "version"
+      ],
+      "title": "ArtifactTarget",
+      "type": "object"
+    },
+    "CommandFrame": {
+      "description": "A client's command, with an id that correlates it with its result.\n\n``command_id`` is also an idempotency key: the server deduplicates repeated ids.",
+      "properties": {
+        "command": {
+          "discriminator": {
+            "mapping": {
+              "answer_deferred": "#/$defs/AnswerDeferred",
+              "archive_artifact": "#/$defs/ArchiveArtifact",
+              "create_artifact": "#/$defs/CreateArtifact",
+              "create_thread": "#/$defs/CreateThread",
+              "edit_artifact": "#/$defs/EditArtifact",
+              "give_feedback": "#/$defs/GiveFeedback",
+              "post_message": "#/$defs/PostMessage",
+              "propose_change": "#/$defs/ProposeChange",
+              "respond_to_proposal": "#/$defs/RespondToProposal",
+              "set_focus": "#/$defs/SetFocus",
+              "set_thread_mode": "#/$defs/SetThreadMode",
+              "stop_run": "#/$defs/StopRun",
+              "watch_run": "#/$defs/WatchRun"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CreateArtifact"
+            },
+            {
+              "$ref": "#/$defs/EditArtifact"
+            },
+            {
+              "$ref": "#/$defs/ArchiveArtifact"
+            },
+            {
+              "$ref": "#/$defs/ProposeChange"
+            },
+            {
+              "$ref": "#/$defs/RespondToProposal"
+            },
+            {
+              "$ref": "#/$defs/CreateThread"
+            },
+            {
+              "$ref": "#/$defs/PostMessage"
+            },
+            {
+              "$ref": "#/$defs/SetFocus"
+            },
+            {
+              "$ref": "#/$defs/SetThreadMode"
+            },
+            {
+              "$ref": "#/$defs/AnswerDeferred"
+            },
+            {
+              "$ref": "#/$defs/GiveFeedback"
+            },
+            {
+              "$ref": "#/$defs/StopRun"
+            },
+            {
+              "$ref": "#/$defs/WatchRun"
+            }
+          ],
+          "title": "Command"
+        },
+        "command_id": {
+          "minLength": 1,
+          "title": "Command Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "command",
+          "default": "command",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "command"
+      ],
+      "title": "CommandFrame",
+      "type": "object"
+    },
+    "CommandResult": {
+      "description": "The result of one command frame.",
+      "properties": {
+        "command_id": {
+          "title": "Command Id",
+          "type": "string"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "applied": "#/$defs/Applied",
+                  "proposed": "#/$defs/Proposed",
+                  "recorded": "#/$defs/Recorded",
+                  "resolved": "#/$defs/Resolved"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/Applied"
+                },
+                {
+                  "$ref": "#/$defs/Proposed"
+                },
+                {
+                  "$ref": "#/$defs/Resolved"
+                },
+                {
+                  "$ref": "#/$defs/Recorded"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Outcome"
+        },
+        "rejection": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rejection"
+        },
+        "type": {
+          "const": "command_result",
+          "default": "command_result",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "ok"
+      ],
+      "title": "CommandResult",
+      "type": "object"
+    },
+    "CreateArtifact": {
+      "additionalProperties": false,
+      "description": "Create an artifact.\n\nIf the artifact type's write policy (or the thread's mode) requires an agent to propose,\nthe command is recorded as a proposal with ``proposal_id`` instead.",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "data": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Data",
+          "type": "object"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "proposal_id": {
+          "$ref": "#/$defs/ProposalId"
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThreadId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "create_artifact",
+          "default": "create_artifact",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "data"
+      ],
+      "title": "CreateArtifact",
+      "type": "object"
+    },
+    "CreateThread": {
+      "additionalProperties": false,
+      "description": "Create a thread.",
+      "properties": {
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        },
+        "title": {
+          "default": "",
+          "title": "Title",
+          "type": "string"
+        },
+        "type": {
+          "const": "create_thread",
+          "default": "create_thread",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "title": "CreateThread",
+      "type": "object"
+    },
+    "DeferredAnswered": {
+      "description": "A paused run's request was answered.",
+      "properties": {
+        "answer": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "approved": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approved"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        },
+        "tool_call_id": {
+          "title": "Tool Call Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "deferred_answered",
+          "default": "deferred_answered",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "thread_id",
+        "tool_call_id"
+      ],
+      "title": "DeferredAnswered",
+      "type": "object"
+    },
+    "DeferredRequest": {
+      "description": "A tool call a paused run is waiting on: a question to answer or a call to approve.",
+      "properties": {
+        "args": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "default": {},
+          "title": "Args",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "question",
+            "approval"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "tool_call_id": {
+          "title": "Tool Call Id",
+          "type": "string"
+        },
+        "tool_name": {
+          "title": "Tool Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool_call_id",
+        "tool_name",
+        "kind"
+      ],
+      "title": "DeferredRequest",
+      "type": "object"
+    },
+    "Draft": {
+      "description": "A full snapshot of an artifact being generated, not yet committed.",
+      "properties": {
+        "artifact_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "data": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Data",
+          "type": "object"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "type": {
+          "const": "draft",
+          "default": "draft",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "data"
+      ],
+      "title": "Draft",
+      "type": "object"
+    },
+    "EditArtifact": {
+      "additionalProperties": false,
+      "description": "Apply a patch to an artifact, based on a specific version.\n\nIf the artifact type's write policy (or the thread's mode) requires an agent to propose,\nthe command is recorded as a proposal with ``proposal_id`` instead.",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "base_version": {
+          "minimum": 1,
+          "title": "Base Version",
+          "type": "integer"
+        },
+        "patch": {
+          "discriminator": {
+            "mapping": {
+              "json_patch": "#/$defs/JsonPatch",
+              "text_edits": "#/$defs/TextEdits"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/JsonPatch"
+            },
+            {
+              "$ref": "#/$defs/TextEdits"
+            }
+          ],
+          "title": "Patch"
+        },
+        "proposal_id": {
+          "$ref": "#/$defs/ProposalId"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary"
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThreadId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "edit_artifact",
+          "default": "edit_artifact",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "base_version",
+        "patch"
+      ],
+      "title": "EditArtifact",
+      "type": "object"
+    },
+    "ErrorFrame": {
+      "description": "A frame the server could not understand, or a failure it could not attribute.",
+      "properties": {
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "type": {
+          "const": "error",
+          "default": "error",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "title": "ErrorFrame",
+      "type": "object"
+    },
+    "EvaluatorActor": {
+      "description": "An evaluator: a judge or decision model whose verdicts are recorded as feedback.\n\nEvaluators only give feedback; every other command from one is forbidden.",
+      "properties": {
+        "kind": {
+          "const": "evaluator",
+          "default": "evaluator",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "title": "EvaluatorActor",
+      "type": "object"
+    },
+    "EventFrame": {
+      "description": "A durable event, delivered in its envelope.",
+      "properties": {
+        "actor": {
+          "discriminator": {
+            "mapping": {
+              "agent": "#/$defs/AgentActor",
+              "evaluator": "#/$defs/EvaluatorActor",
+              "external_agent": "#/$defs/ExternalAgentActor",
+              "system": "#/$defs/SystemActor",
+              "user": "#/$defs/UserActor"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/UserActor"
+            },
+            {
+              "$ref": "#/$defs/AgentActor"
+            },
+            {
+              "$ref": "#/$defs/ExternalAgentActor"
+            },
+            {
+              "$ref": "#/$defs/SystemActor"
+            },
+            {
+              "$ref": "#/$defs/EvaluatorActor"
+            }
+          ],
+          "title": "Actor"
+        },
+        "event": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ThreadCreated"
+            },
+            {
+              "$ref": "#/$defs/ThreadModeChanged"
+            },
+            {
+              "$ref": "#/$defs/FocusChanged"
+            },
+            {
+              "$ref": "#/$defs/MessagePosted"
+            },
+            {
+              "$ref": "#/$defs/ArtifactCreated"
+            },
+            {
+              "$ref": "#/$defs/ArtifactChanged"
+            },
+            {
+              "$ref": "#/$defs/ArtifactArchived"
+            },
+            {
+              "$ref": "#/$defs/ProposalCreated"
+            },
+            {
+              "$ref": "#/$defs/ProposalResolved"
+            },
+            {
+              "$ref": "#/$defs/RunStarted"
+            },
+            {
+              "$ref": "#/$defs/ToolCalled"
+            },
+            {
+              "$ref": "#/$defs/ToolReturned"
+            },
+            {
+              "$ref": "#/$defs/RunPaused"
+            },
+            {
+              "$ref": "#/$defs/DeferredAnswered"
+            },
+            {
+              "$ref": "#/$defs/RunEnded"
+            },
+            {
+              "$ref": "#/$defs/FeedbackGiven"
+            },
+            {
+              "$ref": "#/$defs/AppEvent"
+            },
+            {
+              "$ref": "#/$defs/UnknownEvent"
+            }
+          ],
+          "title": "Event"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThreadId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "traceparent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Traceparent"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "event",
+          "default": "event",
+          "title": "Type",
+          "type": "string"
+        },
+        "workspace_id": {
+          "$ref": "#/$defs/WorkspaceId"
+        }
+      },
+      "required": [
+        "seq",
+        "id",
+        "ts",
+        "workspace_id",
+        "actor",
+        "event"
+      ],
+      "title": "EventFrame",
+      "type": "object"
+    },
+    "ExternalAgentActor": {
+      "description": "An agent outside artifactr, connected over MCP.",
+      "properties": {
+        "client_id": {
+          "title": "Client Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "external_agent",
+          "default": "external_agent",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        }
+      },
+      "required": [
+        "client_id"
+      ],
+      "title": "ExternalAgentActor",
+      "type": "object"
+    },
+    "FeedbackGiven": {
+      "description": "A person or an evaluator gave feedback. Who gave it is the envelope's actor.\n\nIt is thread-scoped when its target belongs to a thread (a thread, a turn or a message),\nand workspace-scoped for an artifact version.",
+      "properties": {
+        "feedback_type": {
+          "title": "Feedback Type",
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "target": {
+          "$ref": "#/$defs/FeedbackTarget"
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThreadId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "feedback_given",
+          "default": "feedback_given",
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Value",
+          "type": "object"
+        }
+      },
+      "required": [
+        "feedback_type",
+        "target",
+        "value"
+      ],
+      "title": "FeedbackGiven",
+      "type": "object"
+    },
+    "FeedbackTarget": {
+      "discriminator": {
+        "mapping": {
+          "artifact": "#/$defs/ArtifactTarget",
+          "message": "#/$defs/MessageTarget",
+          "thread": "#/$defs/ThreadTarget",
+          "turn": "#/$defs/TurnTarget"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ArtifactTarget"
+        },
+        {
+          "$ref": "#/$defs/ThreadTarget"
+        },
+        {
+          "$ref": "#/$defs/TurnTarget"
+        },
+        {
+          "$ref": "#/$defs/MessageTarget"
+        }
+      ]
+    },
+    "FocusChanged": {
+      "description": "The set of artifacts a thread is focused on changed.",
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "$ref": "#/$defs/ArtifactId"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        },
+        "type": {
+          "const": "focus_changed",
+          "default": "focus_changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "thread_id",
+        "artifact_ids"
+      ],
+      "title": "FocusChanged",
+      "type": "object"
+    },
+    "GiveFeedback": {
+      "additionalProperties": false,
+      "description": "Give feedback of a registered type on an artifact version, a thread, a turn or a message.\n\n``value`` holds the feedback type's fields; core validates it against the type, checks the\ntype can be given on the target, and checks the target exists.",
+      "properties": {
+        "feedback_type": {
+          "title": "Feedback Type",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/FeedbackTarget"
+        },
+        "type": {
+          "const": "give_feedback",
+          "default": "give_feedback",
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "default": {},
+          "title": "Value",
+          "type": "object"
+        }
+      },
+      "required": [
+        "feedback_type",
+        "target"
+      ],
+      "title": "GiveFeedback",
+      "type": "object"
+    },
+    "Hello": {
+      "description": "The first frame a client sends on a connection.",
+      "properties": {
+        "from_head": {
+          "default": false,
+          "title": "From Head",
+          "type": "boolean"
+        },
+        "protocol": {
+          "title": "Protocol",
+          "type": "string"
+        },
+        "resume_after_seq": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Resume After Seq",
+          "type": "integer"
+        },
+        "threads": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ThreadId"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threads"
+        },
+        "type": {
+          "const": "hello",
+          "default": "hello",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol"
+      ],
+      "title": "Hello",
+      "type": "object"
+    },
+    "JsonPatch": {
+      "description": "An RFC 6902 JSON Patch.",
+      "properties": {
+        "kind": {
+          "const": "json_patch",
+          "default": "json_patch",
+          "title": "Kind",
+          "type": "string"
+        },
+        "ops": {
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Ops",
+          "type": "array"
+        }
+      },
+      "required": [
+        "ops"
+      ],
+      "title": "JsonPatch",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "LiveFrame": {
+      "description": "A live event of one run, as sent on the wire.",
+      "properties": {
+        "event": {
+          "discriminator": {
+            "mapping": {
+              "app_live": "#/$defs/AppLive",
+              "draft": "#/$defs/Draft",
+              "part_ended": "#/$defs/PartEnded",
+              "part_started": "#/$defs/PartStarted",
+              "text_delta": "#/$defs/TextDelta",
+              "thinking_delta": "#/$defs/ThinkingDelta",
+              "tool_args_delta": "#/$defs/ToolArgsDelta"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PartStarted"
+            },
+            {
+              "$ref": "#/$defs/TextDelta"
+            },
+            {
+              "$ref": "#/$defs/ThinkingDelta"
+            },
+            {
+              "$ref": "#/$defs/ToolArgsDelta"
+            },
+            {
+              "$ref": "#/$defs/PartEnded"
+            },
+            {
+              "$ref": "#/$defs/Draft"
+            },
+            {
+              "$ref": "#/$defs/AppLive"
+            }
+          ],
+          "title": "Event"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "type": {
+          "const": "live",
+          "default": "live",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "event"
+      ],
+      "title": "LiveFrame",
+      "type": "object"
+    },
+    "MessageId": {
+      "type": "string"
+    },
+    "MessagePosted": {
+      "description": "A message, or a notice, was posted in a thread. Its author is the envelope's actor.",
+      "properties": {
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "kind": {
+          "default": "message",
+          "enum": [
+            "message",
+            "notice"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "message_id": {
+          "$ref": "#/$defs/MessageId"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        },
+        "type": {
+          "const": "message_posted",
+          "default": "message_posted",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "thread_id",
+        "message_id",
+        "content"
+      ],
+      "title": "MessagePosted",
+      "type": "object"
+    },
+    "MessageTarget": {
+      "additionalProperties": false,
+      "description": "Feedback on one message in a thread.\n\nMessages live only in the log, so the target names the thread they were posted in, and,\nfor the agent's messages, the run that posted them (the ``run_id`` of its\n``message_posted``), which links the feedback to the run's trace.",
+      "properties": {
+        "kind": {
+          "const": "message",
+          "default": "message",
+          "title": "Kind",
+          "type": "string"
+        },
+        "message_id": {
+          "$ref": "#/$defs/MessageId"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        }
+      },
+      "required": [
+        "message_id",
+        "thread_id"
+      ],
+      "title": "MessageTarget",
+      "type": "object"
+    },
+    "PartEnded": {
+      "description": "A response part is complete.",
+      "properties": {
+        "part": {
+          "title": "Part",
+          "type": "integer"
+        },
+        "type": {
+          "const": "part_ended",
+          "default": "part_ended",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "part"
+      ],
+      "title": "PartEnded",
+      "type": "object"
+    },
+    "PartStarted": {
+      "description": "The model started a response part: text, thinking, or a tool call.",
+      "properties": {
+        "part": {
+          "title": "Part",
+          "type": "integer"
+        },
+        "part_kind": {
+          "enum": [
+            "text",
+            "thinking",
+            "tool_call"
+          ],
+          "title": "Part Kind",
+          "type": "string"
+        },
+        "tool_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Name"
+        },
+        "type": {
+          "const": "part_started",
+          "default": "part_started",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "part",
+        "part_kind"
+      ],
+      "title": "PartStarted",
+      "type": "object"
+    },
+    "PostMessage": {
+      "additionalProperties": false,
+      "description": "Post a message, or a notice, in a thread, attributed to the actor who commits it.",
+      "properties": {
+        "content": {
+          "minLength": 1,
+          "title": "Content",
+          "type": "string"
+        },
+        "kind": {
+          "default": "message",
+          "enum": [
+            "message",
+            "notice"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "message_id": {
+          "$ref": "#/$defs/MessageId"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        },
+        "type": {
+          "const": "post_message",
+          "default": "post_message",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "thread_id",
+        "content"
+      ],
+      "title": "PostMessage",
+      "type": "object"
+    },
+    "ProposalCreated": {
+      "description": "A change was proposed.",
+      "properties": {
+        "change": {
+          "discriminator": {
+            "mapping": {
+              "archive_artifact": "#/$defs/ArchiveArtifact",
+              "create_artifact": "#/$defs/CreateArtifact",
+              "edit_artifact": "#/$defs/EditArtifact"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CreateArtifact"
+            },
+            {
+              "$ref": "#/$defs/EditArtifact"
+            },
+            {
+              "$ref": "#/$defs/ArchiveArtifact"
+            }
+          ],
+          "title": "Change"
+        },
+        "proposal_id": {
+          "$ref": "#/$defs/ProposalId"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rationale"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThreadId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "proposal_created",
+          "default": "proposal_created",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "change"
+      ],
+      "title": "ProposalCreated",
+      "type": "object"
+    },
+    "ProposalId": {
+      "type": "string"
+    },
+    "ProposalResolved": {
+      "description": "A proposal was accepted or rejected.",
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/ArtifactId"
+        },
+        "changes": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "json_patch": "#/$defs/JsonPatch",
+                  "text_edits": "#/$defs/TextEdits"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/JsonPatch"
+                },
+                {
+                  "$ref": "#/$defs/TextEdits"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Changes"
+        },
+        "decision": {
+          "enum": [
+            "accept",
+            "reject"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "proposal_id": {
+          "$ref": "#/$defs/ProposalId"
+        },
+        "proposed_by": {
+          "discriminator": {
+            "mapping": {
+              "agent": "#/$defs/AgentActor",
+              "evaluator": "#/$defs/EvaluatorActor",
+              "external_agent": "#/$defs/ExternalAgentActor",
+              "system": "#/$defs/SystemActor",
+              "user": "#/$defs/UserActor"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/UserActor"
+            },
+            {
+              "$ref": "#/$defs/AgentActor"
+            },
+            {
+              "$ref": "#/$defs/ExternalAgentActor"
+            },
+            {
+              "$ref": "#/$defs/SystemActor"
+            },
+            {
+              "$ref": "#/$defs/EvaluatorActor"
+            }
+          ],
+          "title": "Proposed By"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThreadId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "proposal_resolved",
+          "default": "proposal_resolved",
+          "title": "Type",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "decision",
+        "proposed_by",
+        "artifact_id"
+      ],
+      "title": "ProposalResolved",
+      "type": "object"
+    },
+    "ProposeChange": {
+      "additionalProperties": false,
+      "description": "Propose a change for someone else to accept, whatever the write policy.",
+      "properties": {
+        "change": {
+          "discriminator": {
+            "mapping": {
+              "archive_artifact": "#/$defs/ArchiveArtifact",
+              "create_artifact": "#/$defs/CreateArtifact",
+              "edit_artifact": "#/$defs/EditArtifact"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CreateArtifact"
+            },
+            {
+              "$ref": "#/$defs/EditArtifact"
+            },
+            {
+              "$ref": "#/$defs/ArchiveArtifact"
+            }
+          ],
+          "title": "Change"
+        },
+        "proposal_id": {
+          "$ref": "#/$defs/ProposalId"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rationale"
+        },
+        "type": {
+          "const": "propose_change",
+          "default": "propose_change",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "change"
+      ],
+      "title": "ProposeChange",
+      "type": "object"
+    },
+    "Proposed": {
+      "description": "The change was recorded as a proposal instead of being applied.",
+      "properties": {
+        "proposal_id": {
+          "$ref": "#/$defs/ProposalId"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "type": {
+          "const": "proposed",
+          "default": "proposed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposal_id"
+      ],
+      "title": "Proposed",
+      "type": "object"
+    },
+    "Recorded": {
+      "description": "The command was recorded; it changed no artifact.",
+      "properties": {
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "type": {
+          "const": "recorded",
+          "default": "recorded",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "title": "Recorded",
+      "type": "object"
+    },
+    "ReplayComplete": {
+      "description": "Every event up to ``up_to_seq`` has been replayed; what follows is live.",
+      "properties": {
+        "type": {
+          "const": "replay_complete",
+          "default": "replay_complete",
+          "title": "Type",
+          "type": "string"
+        },
+        "up_to_seq": {
+          "title": "Up To Seq",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "up_to_seq"
+      ],
+      "title": "ReplayComplete",
+      "type": "object"
+    },
+    "Resolved": {
+      "description": "A proposal was accepted (the artifact is now at ``version``) or rejected.",
+      "properties": {
+        "decision": {
+          "enum": [
+            "accept",
+            "reject"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "proposal_id": {
+          "$ref": "#/$defs/ProposalId"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "type": {
+          "const": "resolved",
+          "default": "resolved",
+          "title": "Type",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "decision"
+      ],
+      "title": "Resolved",
+      "type": "object"
+    },
+    "RespondToProposal": {
+      "additionalProperties": false,
+      "description": "Accept or reject a pending proposal.\n\n``changes`` is an optional patch applied on top of the proposed result when accepting, so a\nperson can accept a proposal with their own edits.",
+      "properties": {
+        "changes": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "json_patch": "#/$defs/JsonPatch",
+                  "text_edits": "#/$defs/TextEdits"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/JsonPatch"
+                },
+                {
+                  "$ref": "#/$defs/TextEdits"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Changes"
+        },
+        "decision": {
+          "enum": [
+            "accept",
+            "reject"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "proposal_id": {
+          "$ref": "#/$defs/ProposalId"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "type": {
+          "const": "respond_to_proposal",
+          "default": "respond_to_proposal",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "decision"
+      ],
+      "title": "RespondToProposal",
+      "type": "object"
+    },
+    "RunEnded": {
+      "description": "An agent run ended.",
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "stopped",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        },
+        "type": {
+          "const": "run_ended",
+          "default": "run_ended",
+          "title": "Type",
+          "type": "string"
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunUsage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "run_id",
+        "thread_id",
+        "status"
+      ],
+      "title": "RunEnded",
+      "type": "object"
+    },
+    "RunId": {
+      "type": "string"
+    },
+    "RunPaused": {
+      "description": "A run paused until the listed requests are answered.",
+      "properties": {
+        "requests": {
+          "items": {
+            "$ref": "#/$defs/DeferredRequest"
+          },
+          "minItems": 1,
+          "title": "Requests",
+          "type": "array"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        },
+        "type": {
+          "const": "run_paused",
+          "default": "run_paused",
+          "title": "Type",
+          "type": "string"
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunUsage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "run_id",
+        "thread_id",
+        "requests"
+      ],
+      "title": "RunPaused",
+      "type": "object"
+    },
+    "RunStarted": {
+      "description": "An agent run started, or resumed after a pause.",
+      "properties": {
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        },
+        "trace_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraceId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "trigger": {
+          "default": "message",
+          "enum": [
+            "message",
+            "resume",
+            "api"
+          ],
+          "title": "Trigger",
+          "type": "string"
+        },
+        "type": {
+          "const": "run_started",
+          "default": "run_started",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "thread_id"
+      ],
+      "title": "RunStarted",
+      "type": "object"
+    },
+    "RunUsage": {
+      "description": "Token and request counts for a run.",
+      "properties": {
+        "input_tokens": {
+          "default": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "output_tokens": {
+          "default": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        },
+        "requests": {
+          "default": 0,
+          "title": "Requests",
+          "type": "integer"
+        }
+      },
+      "title": "RunUsage",
+      "type": "object"
+    },
+    "SetFocus": {
+      "additionalProperties": false,
+      "description": "Set the artifacts a thread is focused on.",
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "$ref": "#/$defs/ArtifactId"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        },
+        "type": {
+          "const": "set_focus",
+          "default": "set_focus",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "thread_id",
+        "artifact_ids"
+      ],
+      "title": "SetFocus",
+      "type": "object"
+    },
+    "SetThreadMode": {
+      "additionalProperties": false,
+      "description": "Switch a thread between ``edit`` and ``suggest`` mode.",
+      "properties": {
+        "mode": {
+          "enum": [
+            "edit",
+            "suggest"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        },
+        "type": {
+          "const": "set_thread_mode",
+          "default": "set_thread_mode",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "thread_id",
+        "mode"
+      ],
+      "title": "SetThreadMode",
+      "type": "object"
+    },
+    "StopRun": {
+      "additionalProperties": false,
+      "description": "Cancel a run. Handled by the transport, not by core's rules.",
+      "properties": {
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "type": {
+          "const": "stop_run",
+          "default": "stop_run",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "StopRun",
+      "type": "object"
+    },
+    "SystemActor": {
+      "description": "The application itself, for automated changes.",
+      "properties": {
+        "kind": {
+          "const": "system",
+          "default": "system",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "default": "system",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "title": "SystemActor",
+      "type": "object"
+    },
+    "TextDelta": {
+      "description": "More text for a text part.",
+      "properties": {
+        "delta": {
+          "title": "Delta",
+          "type": "string"
+        },
+        "part": {
+          "title": "Part",
+          "type": "integer"
+        },
+        "type": {
+          "const": "text_delta",
+          "default": "text_delta",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "part",
+        "delta"
+      ],
+      "title": "TextDelta",
+      "type": "object"
+    },
+    "TextEdit": {
+      "description": "Replace one exact occurrence of ``old`` with ``new``.",
+      "properties": {
+        "new": {
+          "title": "New",
+          "type": "string"
+        },
+        "old": {
+          "title": "Old",
+          "type": "string"
+        }
+      },
+      "required": [
+        "old",
+        "new"
+      ],
+      "title": "TextEdit",
+      "type": "object"
+    },
+    "TextEdits": {
+      "description": "A sequence of anchored replacements in one text field.\n\nEach ``old`` must occur exactly once in the field at the moment it is applied. An empty\n``old`` is allowed only when the field is empty, to write its first content.",
+      "properties": {
+        "edits": {
+          "items": {
+            "$ref": "#/$defs/TextEdit"
+          },
+          "minItems": 1,
+          "title": "Edits",
+          "type": "array"
+        },
+        "field": {
+          "default": "text",
+          "title": "Field",
+          "type": "string"
+        },
+        "kind": {
+          "const": "text_edits",
+          "default": "text_edits",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "edits"
+      ],
+      "title": "TextEdits",
+      "type": "object"
+    },
+    "ThinkingDelta": {
+      "description": "More text for a thinking part.",
+      "properties": {
+        "delta": {
+          "title": "Delta",
+          "type": "string"
+        },
+        "part": {
+          "title": "Part",
+          "type": "integer"
+        },
+        "type": {
+          "const": "thinking_delta",
+          "default": "thinking_delta",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "part",
+        "delta"
+      ],
+      "title": "ThinkingDelta",
+      "type": "object"
+    },
+    "ThreadCreated": {
+      "description": "A thread was created.",
+      "properties": {
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "type": {
+          "const": "thread_created",
+          "default": "thread_created",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "thread_id",
+        "title"
+      ],
+      "title": "ThreadCreated",
+      "type": "object"
+    },
+    "ThreadId": {
+      "type": "string"
+    },
+    "ThreadModeChanged": {
+      "description": "A thread switched between ``edit`` and ``suggest`` mode.",
+      "properties": {
+        "mode": {
+          "enum": [
+            "edit",
+            "suggest"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        },
+        "type": {
+          "const": "thread_mode_changed",
+          "default": "thread_mode_changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "thread_id",
+        "mode"
+      ],
+      "title": "ThreadModeChanged",
+      "type": "object"
+    },
+    "ThreadTarget": {
+      "additionalProperties": false,
+      "description": "Feedback on a whole thread: the session.",
+      "properties": {
+        "kind": {
+          "const": "thread",
+          "default": "thread",
+          "title": "Kind",
+          "type": "string"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        }
+      },
+      "required": [
+        "thread_id"
+      ],
+      "title": "ThreadTarget",
+      "type": "object"
+    },
+    "ToolArgsDelta": {
+      "description": "More of a tool call's JSON arguments.",
+      "properties": {
+        "delta": {
+          "title": "Delta",
+          "type": "string"
+        },
+        "part": {
+          "title": "Part",
+          "type": "integer"
+        },
+        "type": {
+          "const": "tool_args_delta",
+          "default": "tool_args_delta",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "part",
+        "delta"
+      ],
+      "title": "ToolArgsDelta",
+      "type": "object"
+    },
+    "ToolCalled": {
+      "description": "The agent called a tool.",
+      "properties": {
+        "args_summary": {
+          "default": "",
+          "title": "Args Summary",
+          "type": "string"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        },
+        "tool_call_id": {
+          "title": "Tool Call Id",
+          "type": "string"
+        },
+        "tool_name": {
+          "title": "Tool Name",
+          "type": "string"
+        },
+        "type": {
+          "const": "tool_called",
+          "default": "tool_called",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "thread_id",
+        "tool_call_id",
+        "tool_name"
+      ],
+      "title": "ToolCalled",
+      "type": "object"
+    },
+    "ToolReturned": {
+      "description": "A tool call finished.",
+      "properties": {
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "error",
+            "retry"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "default": "",
+          "title": "Summary",
+          "type": "string"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/ThreadId"
+        },
+        "tool_call_id": {
+          "title": "Tool Call Id",
+          "type": "string"
+        },
+        "tool_name": {
+          "default": "",
+          "title": "Tool Name",
+          "type": "string"
+        },
+        "type": {
+          "const": "tool_returned",
+          "default": "tool_returned",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "thread_id",
+        "tool_call_id",
+        "status"
+      ],
+      "title": "ToolReturned",
+      "type": "object"
+    },
+    "TraceId": {
+      "pattern": "^[0-9a-f]{32}$",
+      "type": "string"
+    },
+    "TurnTarget": {
+      "additionalProperties": false,
+      "description": "Feedback on the agent's turn: its run, which may span pauses.",
+      "properties": {
+        "kind": {
+          "const": "turn",
+          "default": "turn",
+          "title": "Kind",
+          "type": "string"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "TurnTarget",
+      "type": "object"
+    },
+    "UnknownEvent": {
+      "additionalProperties": true,
+      "description": "An event type this version does not know, kept as-is so it round-trips.",
+      "properties": {
+        "type": {
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "UnknownEvent",
+      "type": "object"
+    },
+    "UserActor": {
+      "description": "A person, identified by the host application's user id.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "user",
+          "default": "user",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "UserActor",
+      "type": "object"
+    },
+    "WatchRun": {
+      "additionalProperties": false,
+      "description": "Receive a run's live frames on this connection. WebSocket only.",
+      "properties": {
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "type": {
+          "const": "watch_run",
+          "default": "watch_run",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "WatchRun",
+      "type": "object"
+    },
+    "Welcome": {
+      "description": "The server's answer to ``hello``.",
+      "properties": {
+        "active_runs": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ActiveRun"
+          },
+          "title": "Active Runs",
+          "type": "array"
+        },
+        "head_seq": {
+          "title": "Head Seq",
+          "type": "integer"
+        },
+        "protocol": {
+          "default": "artifactr.v1",
+          "title": "Protocol",
+          "type": "string"
+        },
+        "reset": {
+          "default": false,
+          "title": "Reset",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "welcome",
+          "default": "welcome",
+          "title": "Type",
+          "type": "string"
+        },
+        "workspace_id": {
+          "$ref": "#/$defs/WorkspaceId"
+        }
+      },
+      "required": [
+        "workspace_id",
+        "head_seq"
+      ],
+      "title": "Welcome",
+      "type": "object"
+    },
+    "WorkspaceId": {
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Frames of the artifactr.v1 thread protocol: `client` is any frame a client sends, `server` any frame a server sends.",
+  "properties": {
+    "client": {
+      "discriminator": {
+        "mapping": {
+          "command": "#/$defs/CommandFrame",
+          "hello": "#/$defs/Hello"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Hello"
+        },
+        {
+          "$ref": "#/$defs/CommandFrame"
+        }
+      ],
+      "title": "Client"
+    },
+    "server": {
+      "discriminator": {
+        "mapping": {
+          "command_result": "#/$defs/CommandResult",
+          "error": "#/$defs/ErrorFrame",
+          "event": "#/$defs/EventFrame",
+          "live": "#/$defs/LiveFrame",
+          "replay_complete": "#/$defs/ReplayComplete",
+          "welcome": "#/$defs/Welcome"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Welcome"
+        },
+        {
+          "$ref": "#/$defs/EventFrame"
+        },
+        {
+          "$ref": "#/$defs/ReplayComplete"
+        },
+        {
+          "$ref": "#/$defs/LiveFrame"
+        },
+        {
+          "$ref": "#/$defs/CommandResult"
+        },
+        {
+          "$ref": "#/$defs/ErrorFrame"
+        }
+      ],
+      "title": "Server"
+    }
+  },
+  "title": "artifactr.v1",
+  "type": "object"
+}

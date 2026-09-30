@@ -15,11 +15,13 @@ edit_uri: edit/main/docs/
 copyright: Copyright &copy; 2026 Alex Nodeland. Released under the MIT License.
 docs_dir: docs
 
-# lattice's mark and favicon wait for its brand ADR; until then the site has the theme's.
+# lattice's mark and favicon (ADR-0001). lattice.css shows the dark mark in the dark scheme.
 theme:
   name: material
   variant: modern
   language: en
+  logo: assets/brand/mark-light.svg
+  favicon: assets/brand/favicon.svg
   font:
     text: Schibsted Grotesk
     code: Fragment Mono

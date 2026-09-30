@@ -3,9 +3,19 @@ title: lattice
 description: The family's packages, for applications in which people and agents work together, and the stack they run on.
 ---
 
-# lattice
+<div class="lattice-hero" markdown>
+
+<h1 class="lattice-visually-hidden">lattice</h1>
+
+![lattice](assets/brand/lockup-light.svg#gh-light-mode-only)
+![lattice](assets/brand/lockup-dark.svg#gh-dark-mode-only)
 
 The family's packages, in one repository: libraries for applications in which people and agents work together, and the stack they run on. Each package has its own section.
+
+</div>
+
+![The marks of artifactr, reflexr, evalr, relayr, stackr and lattice, over their names](assets/brand/family-light.svg#gh-light-mode-only)
+![The marks of artifactr, reflexr, evalr, relayr, stackr and lattice, over their names](assets/brand/family-dark.svg#gh-dark-mode-only)
 
 | Package | What it is |
 |---|---|
@@ -17,4 +27,6 @@ The family's packages, in one repository: libraries for applications in which pe
 
 Two more are planned: grantr, identity and access for artifactr and reflexr, and portalr, the portal into the system.
 
-The source is [alexnodeland/lattice](https://github.com/alexnodeland/lattice). To work on it, see [Contributing](project/contributing.md).
+lattice's mark is one cell of the lattice that every mark in the family is drawn on. Its [brand page](assets/brand/README.md) has the mark, the colours and the family's brand system, and [ADR-0001](adr/0001-lattices-brand.md) records why.
+
+How the family fits together, in one repository, is in [Architecture](architecture.md), and the decisions about the family as a whole are in [its ADRs](adr/README.md). The source is [alexnodeland/lattice](https://github.com/alexnodeland/lattice). To work on it, see [Contributing](project/contributing.md).

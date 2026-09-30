@@ -567,21 +567,30 @@ class Workspace:
     @contextlib.asynccontextmanager
     async def claim_thread(
         self, thread_id: ThreadId, *, holder: str, ttl: timedelta = timedelta(seconds=30)
-    ) -> AsyncGenerator[None]:
+    ) -> AsyncGenerator[asyncio.Event]:
         """Hold a thread exclusively, renewing the claim until the block exits.
 
         One run is active per thread. The claim is a lease in storage, so it holds across
         processes and lapses by itself if the holder dies.
 
+        Yields:
+            An event set once the claim is lost: it lapsed, a whole ``ttl`` after its last
+            renewal began, even while a renewal hangs, or a renewal found that another holder
+            has the thread. The claim is never renewed after that, even if storage would allow
+            it. Its lease is released only when the block exits, so exit promptly once the event
+            is set.
+
         Raises:
             ThreadBusy: If another holder has the thread.
         """
         key = f"thread:{thread_id}"
+        lapses = asyncio.get_running_loop().time() + ttl.total_seconds()
         if not await self._storage.acquire_lease(self._scope, key, holder, ttl):
             raise ThreadBusy(f"thread {thread_id} is busy with another run")
-        renewal = asyncio.create_task(self._renew(key, holder, ttl))
+        lost = asyncio.Event()
+        renewal = asyncio.create_task(self._renew(key, holder, ttl, lapses, lost))
         try:
-            yield
+            yield lost
         finally:
             renewal.cancel()
             try:
@@ -589,15 +598,41 @@ class Workspace:
             finally:
                 await self._storage.release_lease(self._scope, key, holder)
 
-    async def _renew(self, key: str, holder: str, ttl: timedelta) -> None:
-        # Renewing is bookkeeping, not part of the turn that holds the thread.
+    async def _renew(
+        self, key: str, holder: str, ttl: timedelta, lapses: float, lost: asyncio.Event
+    ) -> None:
+        # Renewing is bookkeeping, not part of the turn that holds the thread. A timer on the
+        # loop's monotonic clock marks the claim lost when it lapses, at ``lapses``, a ttl after
+        # its last renewal began, whatever storage is doing.
+        loop = asyncio.get_running_loop()
         with untraced():
-            while True:
-                await asyncio.sleep(ttl.total_seconds() / 3)
-                try:
-                    await self._storage.acquire_lease(self._scope, key, holder, ttl)
-                except Exception:
-                    logger.exception("renewing the claim %s failed; retrying", key)
+            lapse = loop.call_at(lapses, _lose, key, lost)
+            try:
+                while True:
+                    await asyncio.sleep(ttl.total_seconds() / 3)
+                    if lost.is_set():
+                        return
+                    renewing = loop.time()
+                    try:
+                        kept = await self._storage.acquire_lease(self._scope, key, holder, ttl)
+                    except Exception:
+                        logger.exception("renewing the claim %s failed; retrying", key)
+                        continue
+                    if lost.is_set():
+                        return  # it lapsed while the renewal was in flight
+                    if not kept:
+                        _lose(key, lost)  # another holder has the thread
+                        return
+                    lapse.cancel()
+                    lapse = loop.call_at(renewing + ttl.total_seconds(), _lose, key, lost)
+            finally:
+                lapse.cancel()
+
+
+def _lose(key: str, lost: asyncio.Event) -> None:
+    """Mark a thread claim lost: it lapsed, or another holder has the thread."""
+    logger.warning("the claim %s lapsed, so it is lost", key)
+    lost.set()
 
 
 def _check_page(

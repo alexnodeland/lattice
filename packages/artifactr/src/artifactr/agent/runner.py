@@ -12,6 +12,8 @@ Runs are asyncio tasks in this process. Their live frames go to :attr:`Runner.li
 connection can :meth:`Runner.watch` them. An application stops them with :meth:`Runner.aclose`
 as it shuts down, before its storage closes. A run whose process dies instead stays ``running``
 until its thread is next claimed, and is then recorded as failed, with the reason ``abandoned``.
+A run whose claim lapses while its process lives on is cancelled then; if the thread's next run
+records it as abandoned first, the capability drops what it records afterwards.
 
 Surfaces send each command with the id its client chose to :meth:`Runner.execute`, which
 remembers results in :class:`~artifactr.agent.CommandResults`, so a retried command is carried
@@ -90,8 +92,9 @@ propagated trace attributes, implements it, and the Runner stays free of the bac
 type TurnOutcome = Literal["completed", "paused", "failed", "stopped"]
 """How a turn ended: the agent finished, paused on questions, raised, or was stopped."""
 
-_ABANDONED = "the run was abandoned: its process stopped"
-"""The error recorded for a run whose process stopped before it ended."""
+_ABANDONED = "the run was abandoned: its claim lapsed"
+"""The error recorded for a run whose claim lapsed before it ended, whether its process stopped
+or lived on."""
 
 
 @dataclass(frozen=True)
@@ -167,7 +170,10 @@ class Runner[AppDepsT]:
         live: Where runs' live frames go. Defaults to an in-process fan-out.
         agent_name: How the agent is named in the workspace.
         claim_ttl: How long a thread claim lasts without renewal, should this process die. Once
-            it lapses, the thread's next run records the run left behind as abandoned.
+            it lapses, the thread's next run records the run left behind as abandoned, and a run
+            of this process whose claim lapsed is cancelled. A claim is renewed every third of
+            it, so a run survives one failed renewal, or storage that stalls for about two thirds
+            of it. It must exceed the clock skew between replicas.
         tracer_provider: Where turn spans go. Defaults to the global tracer provider.
         meter_provider: Where turn metrics go. Defaults to the global meter provider.
         turn_context: Entered around each turn, inside its span.
@@ -366,7 +372,7 @@ class Runner[AppDepsT]:
     ) -> RunHandle | None:
         async with contextlib.AsyncExitStack() as stack:
             try:
-                await stack.enter_async_context(
+                lost = await stack.enter_async_context(
                     workspace.claim_thread(thread_id, holder=run_id, ttl=self._claim_ttl)
                 )
             except ThreadBusy:
@@ -386,7 +392,7 @@ class Runner[AppDepsT]:
             requested_by=workspace.actor,
         )
         caller = trace.get_current_span().get_span_context()
-        task = asyncio.create_task(self._run(claim, session, prompt, deferred, caller))
+        task = asyncio.create_task(self._run(claim, lost, session, prompt, deferred, caller))
         handle = RunHandle(run_id=run_id, thread_id=thread_id, task=task)
         self._runs[run_id] = handle
         task.add_done_callback(lambda done: self._finished(run_id, done))
@@ -395,16 +401,22 @@ class Runner[AppDepsT]:
     async def _run(
         self,
         claim: contextlib.AsyncExitStack,
+        lost: asyncio.Event,
         session: Session[AppDepsT],
         prompt: str | None,
         deferred: DeferredToolResults | None,
         caller: SpanContext,
     ) -> AgentRunResult[Any]:
         async with claim:
+            run = asyncio.current_task()
+            assert run is not None, "a run is a task"
+            stopping = asyncio.create_task(_cancel_when_lost(lost, run))
             try:
                 return await self._turn(session, prompt, deferred, caller)
             finally:
                 self.live.close(session.run_id)
+                stopping.cancel()
+                await asyncio.gather(stopping, return_exceptions=True)
 
     async def _turn(
         self,
@@ -503,6 +515,12 @@ async def _abandon(workspace: Workspace, thread_id: ThreadId) -> None:
         )
         with contextlib.suppress(InvalidState):  # it ended meanwhile
             await system.record(abandoned)
+
+
+async def _cancel_when_lost(lost: asyncio.Event, run: "asyncio.Task[Any]") -> None:
+    """Cancel a run once its thread claim is lost, before the claim's next holder abandons it."""
+    await lost.wait()
+    run.cancel()
 
 
 def _sent(recorded: Recorded, run: RunHandle | None) -> Sent:

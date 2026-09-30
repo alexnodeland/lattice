@@ -41,10 +41,12 @@ from artifactr.core import (
     ArtifactId,
     DeferredRequest,
     FocusChanged,
+    InvalidState,
     MessagePosted,
     Note,
     Rejection,
     RunEnded,
+    RunEvent,
     RunPaused,
     RunStarted,
     RunUsage,
@@ -57,6 +59,7 @@ from artifactr.core import (
 )
 from artifactr.telemetry import annotate, attribution, current_trace_id
 from artifactr.telemetry.attributes import ARTIFACT_ID
+from artifactr.workspace import Workspace
 
 type Context = RunContext[Session[Any]]
 
@@ -178,12 +181,12 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         try:
             result = await handler()
         except asyncio.CancelledError:
-            await workspace.record(self._ended(session, "stopped"))
+            await _record(workspace, self._ended(session, "stopped"))
             raise
         except Exception as error:
             reason = error.reason if isinstance(error, RunFailure) else None
             failed = self._ended(session, "failed", error=str(error), reason=reason)
-            await workspace.record(failed)
+            await _record(workspace, failed)
             raise
         finally:
             watcher.cancel()
@@ -230,11 +233,11 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
                 requests=requests,
                 usage=usage,
             )
-            await workspace.record(paused, history=history)
+            await _record(workspace, paused, history=history)
             return
         if isinstance(output, str) and output.strip():
             await workspace.post_message(session.thread_id, output)
-        await workspace.record(self._ended(session, "completed", usage=usage), history=history)
+        await _record(workspace, self._ended(session, "completed", usage=usage), history=history)
 
     @staticmethod
     def _ended(
@@ -285,7 +288,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         except (ToolRetryError, ToolFailedError) as error:
             status = "retry" if isinstance(error, ToolRetryError) else "error"
             summary = _clip(str(error), self.max_summary_chars)
-            await ctx.deps.workspace.record(self._tool_returned(ctx, call, status, summary))
+            await _record(ctx.deps.workspace, self._tool_returned(ctx, call, status, summary))
             raise
 
     @override
@@ -300,7 +303,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
     ) -> Any:
         """Record the tool's result."""
         summary = _clip(str(result), self.max_summary_chars)
-        await ctx.deps.workspace.record(self._tool_returned(ctx, call, "ok", summary))
+        await _record(ctx.deps.workspace, self._tool_returned(ctx, call, "ok", summary))
         return result
 
     @override
@@ -316,7 +319,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         """Turn rejections into retries the model can act on; record every failure."""
         workspace = ctx.deps.workspace
         if isinstance(error, Rejection):
-            await workspace.record(self._tool_returned(ctx, call, "retry", error.message))
+            await _record(workspace, self._tool_returned(ctx, call, "retry", error.message))
             hint = (
                 " Read the artifact again, then retry."
                 if isinstance(error, VersionConflict)
@@ -324,7 +327,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             )
             raise ModelRetry(error.message + hint) from error
         summary = _clip(f"{type(error).__name__}: {error}", self.max_summary_chars)
-        await workspace.record(self._tool_returned(ctx, call, "error", summary))
+        await _record(workspace, self._tool_returned(ctx, call, "error", summary))
         raise error
 
     @staticmethod
@@ -347,6 +350,23 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             status=status,
             summary=summary,
         )
+
+
+async def _record(workspace: Workspace, fact: RunEvent, *, history: bytes | None = None) -> None:
+    """Record how a tool call or the run ended, unless the run was abandoned meanwhile.
+
+    Once a run's claim lapsed, the thread's next claim records it as failed, abandoned, and core
+    refuses what the run records afterwards as ``invalid_state``. Such an end, of a tool already
+    running or of the run, is dropped and logged, as reflexr drops an abandoned attempt's
+    outcome. A tool call is recorded without this, so its refusal fails the run before the tool
+    runs.
+    """
+    try:
+        await workspace.record(fact, history=history)
+    except InvalidState as refused:
+        if (await workspace.run(fact.run_id)).status != "failed":
+            raise
+        logger.info("the %s of a run that has failed is dropped: %s", fact.type, refused.message)
 
 
 def _attribution(session: Session[Any]) -> dict[str, Any]:

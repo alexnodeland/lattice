@@ -142,9 +142,11 @@ A message in an idle thread, such as one just created, starts a run unless anoth
 | `running(thread_id)` | This process's run in a thread, if any |
 | `execute(workspace, command, command_id=...)` | Carries out any command the way every surface does, the first time its id is seen, and returns its `command_result`; a repeated id returns the first result |
 
-One run is active per thread. The runner claims the thread with a lease in storage, renewed while the run lasts, so the rule holds across processes. A renewal that fails is logged and retried, so a storage that blinks does not cost a live run its claim. A message sent while another process holds the claim steers that run instead of starting a second. Runs are asyncio tasks in the process that started them, so `stop` and `watch` reach only local runs.
+One run is active per thread. The runner claims the thread with a lease in storage, renewed every third of `claim_ttl` while the run lasts, so the rule holds across processes. A renewal that fails is logged and retried, so a run survives one failed renewal, or storage that stalls for about two thirds of `claim_ttl`; keep it above the clock skew between replicas. A message sent while another process holds the claim steers that run instead of starting a second. Runs are asyncio tasks in the process that started them, so `stop` and `watch` reach only local runs.
 
-A process that dies mid-run cannot record how its run ended, so the run stays `running`. Its claim lapses after `claim_ttl`, and the next run to claim the thread first records the one left behind as failed, with the error "the run was abandoned: its process stopped" and the reason `abandoned`, attributed to `SystemActor(name="runner")`. A run the runner starts holds its claim until it has recorded its end, so holding the claim means the other run's process is gone. The abandoned turn is not resumed.
+A process that dies mid-run cannot record how its run ended, so the run stays `running`. Its claim lapses after `claim_ttl`, and the next run to claim the thread first records the one left behind as failed, with the error "the run was abandoned: its claim lapsed" and the reason `abandoned`, attributed to `SystemActor(name="runner")`. A run the runner starts holds its claim until it has recorded its end, so holding the claim means the other run's process is gone, or its claim lapsed. The abandoned turn is not resumed.
+
+A run whose process lives on loses its claim if no renewal succeeds for a whole `claim_ttl`, even while a renewal hangs, and the runner then cancels it, before another run can claim the thread. If the thread's next run records it as abandoned first, as when its process cannot reach storage to record that it stopped, a tool call it makes is refused, and fails it; the end of a tool already running, and the run's own end, are dropped and logged, so its abandonment is the only end it has.
 
 A runner's `evaluators` judge each turn as it ends, in the background, and record their verdicts as feedback; see [Online evaluation](evaluation.md#online-evaluation).
 
@@ -162,7 +164,7 @@ result = await agent.run(
 )
 ```
 
-The run is recorded the same way (with trigger `api`) and its history is saved. The prompt itself is not posted to the thread; post it with `ws.post_message` first if people should see it. A direct run takes no claim: nothing stops two in one thread at once, and a runner that claims the thread meanwhile records the direct run as abandoned. If a runner also serves the thread, hold the claim around the run: `async with ws.claim_thread(thread_id, holder=...)`.
+The run is recorded the same way (with trigger `api`) and its history is saved. The prompt itself is not posted to the thread; post it with `ws.post_message` first if people should see it. A direct run takes no claim: nothing stops two in one thread at once, and a runner that claims the thread meanwhile records the direct run as abandoned. A direct run a runner has recorded as abandoned returns normally if it ends without calling another tool, but its end and history are dropped. If a runner also serves the thread, hold the claim around the run: `async with ws.claim_thread(thread_id, holder=...) as lost:`, and stop the run if the event `lost` is set, as the runner does.
 
 ## What is recorded
 
@@ -179,7 +181,7 @@ run_ended        status: completed (with token usage), stopped or failed (with t
                  and a reason when a RunFailure said why)
 ```
 
-A run that pauses ends its segment with `run_paused` instead, listing the requests it waits on, with the usage so far. A tool or capability that fails the run for a known reason raises `RunFailure(message, reason="...")`: the run is recorded as failed with that `reason`, which clients and dashboards can count on ([ADR-0042](../adr/0042-typed-run-failures.md)). The [LLM gateway](gateway.md) uses it for guardrail blocks. The runner itself records the reason `abandoned`, as the system, for a run whose process stopped before it ended (see [Running the agent](#running-the-agent)). The run's new model messages are stored in the same transaction as `run_ended` or `run_paused`, so the history and the log never disagree.
+A run that pauses ends its segment with `run_paused` instead, listing the requests it waits on, with the usage so far. A tool or capability that fails the run for a known reason raises `RunFailure(message, reason="...")`: the run is recorded as failed with that `reason`, which clients and dashboards can count on ([ADR-0042](../adr/0042-typed-run-failures.md)). The [LLM gateway](gateway.md) uses it for guardrail blocks. The runner itself records the reason `abandoned`, as the system, for a run whose claim lapsed before it ended (see [Running the agent](#running-the-agent)). The run's new model messages are stored in the same transaction as `run_ended` or `run_paused`, so the history and the log never disagree.
 
 ## Proposals
 

@@ -354,7 +354,7 @@ The run holds a thread claim, not a socket: if the connection that started it dr
 - **Type allowlist.** `Workspaces(storage, types=[Doc, Plan])` rejects creating any other artifact type, even one registered elsewhere in the process.
 - **Optimistic concurrency.** Every edit names the version it was based on. A stale edit is rejected with the changes made since, so the agent retries against fresh state and a UI can rebase or ask the person.
 - **One active run per thread**, enforced by `Workspace.claim_thread`: a storage lease with a time-to-live, renewed while held, that works across replicas and lapses if its holder dies. Concurrency happens across threads. A message sent during a run steers it instead of queueing.
-- **A run whose process died** is recorded as failed, with the reason `abandoned`, when the `Runner` next claims its thread ([ADR-0020](adr/0020-running-agents-in-threads.md), [the agent guide](guides/agent.md#running-the-agent)).
+- **A run whose process died, or whose claim lapsed,** is recorded as failed, with the reason `abandoned`, when the `Runner` next claims its thread. A run still going is cancelled when its claim lapses ([ADR-0020](adr/0020-running-agents-in-threads.md), [the agent guide](guides/agent.md#running-the-agent)).
 - **Sequencing.** `seq` is assigned inside the commit transaction, which holds its workspace's lock from the moment it begins (in SQL, the workspace row, locked `FOR UPDATE`). The lock's holder advances the workspace's `head_seq`, giving a gap-free total order per workspace. This serializes commits within one workspace; tokens are not in the log, so commit volume stays modest.
 
 ## Surfaces

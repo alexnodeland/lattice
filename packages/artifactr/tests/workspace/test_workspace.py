@@ -1,7 +1,7 @@
 """Workspace behaviour, independent of the storage implementation."""
 
 import asyncio
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -34,8 +34,9 @@ from artifactr.core import (
     ValidationFailed,
     VersionConflict,
 )
-from artifactr.workspace import InMemoryStorage, Scope, Storage, ThreadBusy, Workspace, Workspaces
+from artifactr.workspace import InMemoryStorage, Storage, ThreadBusy, Workspace, Workspaces
 from tests.artifact_types import Checklist, Counter, Item, Note
+from tests.leases import Partitioned
 from tests.workspace.conftest import ALICE
 
 AGENT = AgentActor(thread_id="thr_1", run_id="run_1")
@@ -323,45 +324,88 @@ async def test_a_thread_is_claimed_by_one_run_at_a_time(ws: Workspace) -> None:
 async def test_a_claim_is_renewed_while_held(ws: Workspace) -> None:
     thread = await ws.create_thread()
     # Renewed every ttl/3, so the claim lapses only if a renewal stalls for most of the ttl.
-    ttl = timedelta(milliseconds=300)
-    async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl):
-        await asyncio.sleep(0.5)  # longer than the ttl: only renewal keeps the claim
+    ttl = timedelta(seconds=1)
+    async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl) as lost:
+        await asyncio.sleep(1.2)  # longer than the ttl: only renewal keeps the claim
         with pytest.raises(ThreadBusy):
             async with ws.claim_thread(thread.id, holder="run_2", ttl=ttl):
                 pass
-
-
-class RenewalFails(InMemoryStorage):
-    """Storage that fails a claim's first renewal, as a database that blinks."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.acquired = 0
-        self.failed = asyncio.Event()
-
-    async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
-        self.acquired += 1
-        if self.acquired == 2:
-            self.failed.set()
-            raise RuntimeError("the database blinked")
-        return await super().acquire_lease(scope, key, holder, ttl)
+        assert not lost.is_set()
 
 
 async def test_a_claim_renewal_that_fails_is_logged_and_retried(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    storage = RenewalFails()
+    storage = Partitioned()
     ws = await Workspaces(storage).open("tenant_a", "ws_1", actor=ALICE)
     thread = await ws.create_thread()
-    ttl = timedelta(milliseconds=300)
-    async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl):
+    ttl = timedelta(seconds=1)
+    async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl) as lost:
+        storage.cut_off.add("run_1")
         async with asyncio.timeout(5):
-            await storage.failed.wait()
-        await asyncio.sleep(0.5)  # longer than the ttl: only a later renewal keeps the claim
+            await storage.reached.wait()
+        storage.heal()  # the next renewal, a third of the ttl later, keeps the claim
+        await asyncio.sleep(1.2)  # longer than the ttl: only a later renewal keeps the claim
         with pytest.raises(ThreadBusy):
             async with ws.claim_thread(thread.id, holder="run_2", ttl=ttl):
                 pass
+        assert not lost.is_set()
     assert f"renewing the claim thread:{thread.id} failed; retrying" in caplog.text
+
+
+async def test_a_claim_that_lapsed_is_lost_once_another_holder_has_it(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    now = datetime(2026, 9, 30, tzinfo=UTC)
+    ws = await Workspaces(InMemoryStorage(clock=lambda: now)).open("tenant_a", "ws_1", actor=ALICE)
+    thread = await ws.create_thread()
+    ttl = timedelta(milliseconds=300)
+    async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl) as lost:
+        now += ttl  # the lease lapses in storage
+        async with ws.claim_thread(thread.id, holder="run_2", ttl=ttl):
+            async with asyncio.timeout(5):
+                await lost.wait()
+    assert f"the claim thread:{thread.id} lapsed, so it is lost" in caplog.text
+
+
+async def test_a_claim_not_renewed_for_a_whole_ttl_is_lost(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    storage = Partitioned()
+    ws = await Workspaces(storage).open("tenant_a", "ws_1", actor=ALICE)
+    thread = await ws.create_thread()
+    ttl = timedelta(milliseconds=300)
+    async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl) as lost:
+        storage.cut_off.add("run_1")  # every renewal fails, though no other holder takes it
+        async with asyncio.timeout(5):
+            await lost.wait()
+        asked = storage.asked["run_1"]
+        storage.heal()
+        await asyncio.sleep(ttl.total_seconds() / 2)  # past when the next renewal was due
+        assert storage.asked["run_1"] == asked, "a lost claim is not renewed"
+    assert f"the claim thread:{thread.id} lapsed, so it is lost" in caplog.text
+
+
+async def test_a_claim_is_lost_at_its_deadline_while_a_renewal_hangs() -> None:
+    storage = Partitioned(in_flight=True)
+    ws = await Workspaces(storage).open("tenant_a", "ws_1", actor=ALICE)
+    thread = await ws.create_thread()
+    ttl = timedelta(milliseconds=300)
+    async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl) as lost:  # it ignores lost
+        storage.cut_off.add("run_1")
+        async with asyncio.timeout(5):
+            await storage.reached.wait()
+            await lost.wait()
+        asked = storage.asked["run_1"]
+        storage.heal()
+        await asyncio.sleep(0)  # the renewal in flight goes through, taking the lease back
+        with pytest.raises(ThreadBusy):
+            async with ws.claim_thread(thread.id, holder="run_2", ttl=ttl):
+                pass
+        await asyncio.sleep(ttl.total_seconds() / 2)  # past when the next renewal was due
+        assert storage.asked["run_1"] == asked, "a lost claim is not renewed"
+    async with ws.claim_thread(thread.id, holder="run_2", ttl=ttl):
+        pass  # leaving the block released the lease
 
 
 def test_subclassing_artifact_is_all_it_takes() -> None:

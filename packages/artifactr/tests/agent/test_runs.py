@@ -1,14 +1,17 @@
 """A run's life in the workspace: what is recorded, what the agent is told, and history."""
 
 import asyncio
+import logging
+from datetime import timedelta
 
 import pytest
 from pydantic import BaseModel
-from pydantic_ai import ModelMessage, ModelRequest, ModelResponse
+from pydantic_ai import FunctionToolset, ModelMessage, ModelRequest, ModelResponse
 
-from artifactr.agent import Session, last_seen, load_history
+from artifactr.agent import Runner, Session, last_seen, load_history
 from artifactr.core import (
     AgentActor,
+    InvalidState,
     Run,
     RunEnded,
     RunStarted,
@@ -31,6 +34,7 @@ from tests.agent.conftest import (
     types,
 )
 from tests.artifact_types import Note
+from tests.leases import Partitioned
 
 
 async def test_a_message_starts_a_recorded_run(ws: Workspace, thread: Thread, gate: Gate) -> None:
@@ -175,7 +179,7 @@ async def test_a_run_left_running_is_abandoned_when_its_thread_is_next_claimed(
         run_id="run_left",
         thread_id=thread.id,
         status="failed",
-        error="the run was abandoned: its process stopped",
+        error="the run was abandoned: its claim lapsed",
         reason="abandoned",
     )
     assert log[3].actor == SystemActor(name="runner")
@@ -257,6 +261,74 @@ async def test_a_run_that_ended_meanwhile_is_left_as_it_ended(gate: Gate) -> Non
     runner = make_runner(make_agent(Script(say("On it."))), gate)
     await started(await runner.send(ws, thread.id, "Are you there?")).wait()
     assert (await ws.run("run_done")).status == "completed"
+
+
+TTL = timedelta(milliseconds=300)
+"""A claim ttl short enough for a test to outlast, renewed every 100 ms."""
+
+
+async def test_a_run_whose_claim_lapses_is_stopped_at_its_deadline(
+    gate: Gate, app_tools: FunctionToolset[Session[Gate]], caplog: pytest.LogCaptureFixture
+) -> None:
+    storage = Partitioned(in_flight=True)
+    ws = await Workspaces(storage).open("tenant", "ws", actor=ALICE)
+    thread = await ws.create_thread()
+    runner = Runner(make_agent(Script(call("hold")), tools=[app_tools]), app=gate, claim_ttl=TTL)
+    handle = started(await runner.send(ws, thread.id, "Hold on"))
+    storage.cut_off.add(handle.run_id)  # its next renewal hangs
+    async with asyncio.timeout(5):
+        await gate.entered.wait()
+        await asyncio.gather(handle.task, return_exceptions=True)
+    assert handle.task.cancelled()
+    assert types(await ws.read()) == [
+        "thread_created",
+        "message_posted",
+        "run_started",
+        "tool_called",
+        "run_ended",
+    ]
+    assert (await ws.run(handle.run_id)).status == "stopped", "nothing is left to abandon"
+    async with ws.claim_thread(thread.id, holder="next"):
+        pass
+    assert f"the claim thread:{thread.id} lapsed, so it is lost" in caplog.text
+
+
+async def test_an_abandoned_run_calls_no_more_tools(
+    ws: Workspace,
+    thread: Thread,
+    gate: Gate,
+    app_tools: FunctionToolset[Session[Gate]],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger="artifactr")
+    script = Script(call("hold"), call("create_artifact", "call_2", kind="note", data={}))
+    runner = make_runner(make_agent(script, tools=[app_tools]), gate)
+    handle = started(await runner.send(ws, thread.id, "Hold on, then take a note"))
+    async with asyncio.timeout(5):
+        await gate.entered.wait()
+    abandoned = RunEnded(run_id=handle.run_id, thread_id=thread.id, status="failed")
+    await ws.as_actor(SystemActor(name="runner")).record(abandoned)
+    gate.release.set()  # the tool already running finishes
+    with pytest.raises(InvalidState, match="is failed"):
+        await handle.wait()
+    assert await ws.artifacts() == [], "the next tool call is refused"
+    assert types(await ws.read())[-2:] == ["tool_called", "run_ended"], "and nothing is recorded"
+    for dropped in ("tool_returned", "run_ended"):
+        assert f"the {dropped} of a run that has failed is dropped" in caplog.text
+
+
+async def test_a_run_ended_otherwise_meanwhile_fails(
+    ws: Workspace, thread: Thread, gate: Gate, app_tools: FunctionToolset[Session[Gate]]
+) -> None:
+    runner = make_runner(make_agent(Script(call("hold")), tools=[app_tools]), gate)
+    handle = started(await runner.send(ws, thread.id, "Hold on"))
+    async with asyncio.timeout(5):
+        await gate.entered.wait()
+    stopped = RunEnded(run_id=handle.run_id, thread_id=thread.id, status="stopped")
+    await ws.as_actor(SystemActor(name="ops")).record(stopped)
+    gate.release.set()
+    with pytest.raises(InvalidState, match="is stopped"):
+        await handle.wait()
 
 
 async def test_an_unwatched_failure_does_not_warn(

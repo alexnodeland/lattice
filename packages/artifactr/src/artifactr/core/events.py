@@ -231,7 +231,7 @@ class RunEnded(_Event):
     error: str | None = None
     reason: str | None = None
     """Why a failed run failed, when a capability or the runner said, such as
-    ``guardrail_blocked``, or ``abandoned`` for a run whose process stopped."""
+    ``guardrail_blocked``, or ``abandoned`` for a run whose claim lapsed."""
 
 
 # ─── feedback ─────────────────────────────────────────────────────────────────

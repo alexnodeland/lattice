@@ -44,7 +44,7 @@ uv add "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=package
 uv add "relayr-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/relayr"
 ```
 
-uv takes relayr's own dependencies, artifactr and reflexr, from the same commit. Each package's getting-started page lists its extras, such as artifactr's `fastapi`, `mcp` and `postgres`.
+uv takes relayr's own dependencies, artifactr and reflexr, from the same commit. The extras are listed on [artifactr's](https://lattice.alexnodeland.com/artifactr/getting-started/), [reflexr's](https://lattice.alexnodeland.com/reflexr/getting-started/) and [evalr's](https://lattice.alexnodeland.com/evalr/getting-started/) getting-started pages, such as artifactr's `fastapi`, `mcp` and `postgres`; relayr's are `sql`, `sqlite` and `postgres`.
 
 ## Starting an application
 

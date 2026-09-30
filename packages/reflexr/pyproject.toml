@@ -55,11 +55,11 @@ otel = [
 ]
 
 [project.urls]
-Homepage = "https://reflexr.alexnodeland.com"
-Documentation = "https://reflexr.alexnodeland.com"
-Repository = "https://github.com/alexnodeland/reflexr"
-Issues = "https://github.com/alexnodeland/reflexr/issues"
-Changelog = "https://github.com/alexnodeland/reflexr/blob/main/CHANGELOG.md"
+Homepage = "https://lattice.alexnodeland.com/reflexr/"
+Documentation = "https://lattice.alexnodeland.com/reflexr/"
+Repository = "https://github.com/alexnodeland/lattice"
+Issues = "https://github.com/alexnodeland/lattice/issues"
+Changelog = "https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/CHANGELOG.md"
 
 [dependency-groups]
 test = [

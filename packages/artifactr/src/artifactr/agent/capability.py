@@ -183,6 +183,8 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         )
         if notes:
             ctx.enqueue(_wrap(notes))
+        # The run has started: its input covers the log to here, and its watcher goes on.
+        session.delivered.seq = max(session.delivered.seq, watch_after)
         watcher = asyncio.create_task(self._watch(ctx, watch_after, set(thread.focus)))
         try:
             try:

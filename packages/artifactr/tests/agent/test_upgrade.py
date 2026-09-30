@@ -14,12 +14,22 @@ from alembic import command
 from pydantic_ai import DeferredToolRequests
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from artifactr.agent import Runner, Session
-from artifactr.core import AnswerDeferred, RunId, Thread, ThreadId
+from artifactr.agent import Session
+from artifactr.core import AnswerDeferred, RunId, Thread
 from artifactr.sql import SqlStorage, migrate
 from artifactr.sql.schema import _alembic_config
 from artifactr.workspace import Workspace, Workspaces
-from tests.agent.conftest import ALICE, Gate, MakeRunner, Script, call, make_agent, say, started
+from tests.agent.conftest import (
+    ALICE,
+    Gate,
+    MakeRunner,
+    Script,
+    call,
+    make_agent,
+    say,
+    settled,
+    started,
+)
 from tests.databases import SQL_BACKENDS, Database, empty_database
 
 ASKING = [str, DeferredToolRequests]
@@ -57,18 +67,9 @@ async def _before_the_upgrade(engine: AsyncEngine, gate: Gate, *, pauses: bool =
         await make_agent(Script(say("Drafted."))).run("Plan the launch", deps=session)
     await ws.post_message(thread.id, LOST)
     await migrate(engine)
+    elsewhere = await ws.create_thread("Elsewhere")  # the workspace goes on in other threads
+    await ws.post_message(elsewhere.id, "Over there")
     return Before(ws, thread, session.run_id)
-
-
-async def _settled(thread_id: ThreadId, *runners: Runner[Gate]) -> None:
-    """Wait until no runner has a hand-over in progress or a run in the thread."""
-    while True:
-        for runner in runners:
-            await runner.drain()
-        runs = [handle.task for runner in runners if (handle := runner.running(thread_id))]
-        if not runs:
-            return
-        await asyncio.gather(*runs, return_exceptions=True)
 
 
 async def test_a_thread_from_before_the_upgrade_takes_only_what_is_sent_after_it(
@@ -78,7 +79,7 @@ async def test_a_thread_from_before_the_upgrade_takes_only_what_is_sent_after_it
     script = Script(say("Hello again."))
     runner = runners(make_agent(script))
     await started(await runner.send(before.ws, before.thread.id, "Anything new?")).wait()
-    await _settled(before.thread.id, runner)
+    await settled(before.thread.id, runner)
     assert script.conversation() == ["Plan the launch", "Anything new?"], "not the lost one"
 
 
@@ -94,7 +95,7 @@ async def test_two_processes_that_touch_it_first_at_once_take_only_what_is_new(
         here_runner.send(before.ws, thread_id, "From here"),
         there_runner.send(there, thread_id, "From there"),
     )
-    await _settled(thread_id, here_runner, there_runner)
+    await settled(thread_id, here_runner, there_runner)
     in_order = sorted(
         zip((s.outcome.seq or 0 for s in sent), ["From here", "From there"], strict=True)
     )
@@ -111,7 +112,7 @@ async def test_a_paused_run_from_before_the_upgrade_resumes_on_its_answer(
     resumed = started(await runner.answer(before.ws, answer))
     assert resumed.run_id == before.run_id
     assert (await resumed.wait()).output == "Monday it is."
-    await _settled(before.thread.id, runner)
+    await settled(before.thread.id, runner)
     assert script.answers() == ["Monday"]
     assert LOST not in script.conversation()
 
@@ -124,5 +125,5 @@ async def test_a_message_posted_directly_after_the_upgrade_is_taken_by_the_next_
     script = Script(*[say("ok")] * 3)
     runner = runners(make_agent(script))
     started(await runner.send(before.ws, before.thread.id, "Anything new?"))
-    await _settled(before.thread.id, runner)
+    await settled(before.thread.id, runner)
     assert script.conversation() == ["Plan the launch", "Posted after the upgrade", "Anything new?"]

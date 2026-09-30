@@ -10,10 +10,14 @@ comes from:
 
 The log decides what each turn carries out (ADR-0055). A thread's messages are taken in order,
 each by one turn: as the prompt of a run, the reply to a paused one, or through the watcher of
-the run that holds the thread. A message or an answer sent with the runner asks for a turn;
-whoever holds the thread next, in any process, starts it with the oldest message not yet
-taken, and a run that ends hands its thread over the same way. A message committed directly,
-without the runner, asks for nothing, so it starts no turn, but the thread's next turn takes it.
+the run that holds the thread. A message is a message, however it was committed: in a paused
+thread the oldest one not taken is the reply. Post a notice for what should not be one. A
+message or an answer sent with the runner asks for a turn; whoever holds the thread next, in any
+process, starts it with the oldest message not yet taken, and a run that has started hands its
+thread over the same way as it ends. A message committed directly, without the runner, asks for
+nothing, so it starts no turn, but the thread's next turn takes it. A turn takes its input once
+it has started, so one that fails or is stopped before then leaves it for the next; a run whose
+process dies before it records what it took leaves it too, to be carried out again.
 
 A notice, a ``post_message`` of kind ``notice``, is for people: it is committed as it is, so it
 starts no run, and the thread's agent is not told unless its capability asks for notices
@@ -187,8 +191,9 @@ class Sent:
       next claimant, in any process, carries the message or answer out.
 
     The run it started may take an older message first: the thread's oldest message that no
-    turn has taken. A message in an idle thread, such as one just created, starts a run unless
-    another starts one first, so code that owns its thread can assert that ``run`` is set.
+    turn has taken, however it was committed. In a paused thread, that message is the reply. A
+    message in an idle thread, such as one just created, starts a run unless another starts one
+    first, so code that owns its thread can assert that ``run`` is set.
     """
 
 
@@ -299,10 +304,12 @@ class Runner[AppDepsT]:
         return _sent(answered, await self.resume(workspace, command.run_id))
 
     async def resume(self, workspace: Workspace, run_id: RunId) -> RunHandle | None:
-        """Resume a paused run whose requests are all answered; otherwise do nothing.
+        """Ask for the thread's next turn, which resumes a paused run whose requests are answered.
 
-        Like a message, it asks for the thread's next turn, so the messages no turn has taken
-        reach the run as it resumes.
+        The turn is whatever the thread's log calls for, as for a message: the thread's oldest
+        message that no turn has taken answers the run's open requests, if it has any, and
+        otherwise goes to the resumed run with any later ones. With nothing asked of the thread
+        that no turn has taken, it does nothing.
         """
         run = await workspace.run(run_id)
         return await self._ask(workspace, run.thread_id, await workspace.head_seq())
@@ -317,13 +324,15 @@ class Runner[AppDepsT]:
         return True
 
     async def drain(self) -> None:
-        """Wait until each run of this process that has released its thread has handed it over.
+        """Wait until no run of this process is handing its thread over.
 
         A run that ends hands its thread over in the background (ADR-0055): it starts the
-        thread's next turn if a message or an answer asked for one meanwhile, and otherwise
-        does nothing. This waits for those in progress, not for the turns they start.
+        thread's next turn if a message or an answer asked for one meanwhile. This waits until
+        none is pending, not for the turns they start. :meth:`aclose` cancels them instead; a
+        hand-over it cancels ends this wait, rather than raising here.
         """
-        await asyncio.gather(*self._handovers)
+        while pending := [handover for handover in self._handovers if not handover.done()]:
+            await asyncio.gather(*pending, return_exceptions=True)
 
     async def aclose(self) -> None:
         """Stop every run of this process, wait for them to end, and start no more."""
@@ -407,12 +416,9 @@ class Runner[AppDepsT]:
                 workspace.claim_thread(thread_id, holder=new_id("claim"), ttl=self._claim_ttl)
             )
             await _abandon(workspace, thread_id)
-            if self._closed:
+            turn = None if self._closed else await self._plan(workspace, thread_id)
+            if turn is None or self._closed:
                 return None
-            turn = await self._plan(workspace, thread_id)
-            if turn is None:
-                return None
-            await workspace.save_cursor(_taken(thread_id), turn.through)
             claim = stack.pop_all()  # the run's task holds the claim from here
         session = Session[AppDepsT].start(
             workspace,
@@ -424,10 +430,15 @@ class Runner[AppDepsT]:
             watch_after=turn.watch_after,
             requested_by=turn.requested_by,
         )
+        session.delivered.seq = turn.taken
         if caller is None:  # a hand-over: the turn links to what it carries out
             caller = parse_traceparent(turn.traceparent) or INVALID_SPAN_CONTEXT
-        task = asyncio.create_task(
-            self._run(claim, lost, session, turn.prompt, turn.deferred, caller)
+        # Started eagerly, the task holds the claim before anything can cancel it, so a run
+        # stopped at once still releases the thread.
+        task = asyncio.Task(
+            self._run(claim, lost, session, turn.prompt, turn.deferred, caller),
+            loop=asyncio.get_running_loop(),
+            eager_start=True,
         )
         handle = RunHandle(run_id=turn.run_id, thread_id=thread_id, task=task)
         self._runs[turn.run_id] = handle
@@ -439,31 +450,32 @@ class Runner[AppDepsT]:
 
         With a paused run, that message is its reply: it answers the questions and declines the
         approvals left, and the run resumes. A paused run whose requests are all answered
-        resumes, and its watcher delivers the messages. Otherwise the message starts a run.
-        Either way the turn's watcher follows from there, so the later messages reach it too.
+        resumes, with the messages not taken as its prompt. Otherwise the oldest message starts
+        a run. The turn's watcher follows from there, so later messages reach it too.
         """
         taken = await _taken_seq(workspace, thread_id)
         if await workspace.cursor(_asked(thread_id)) <= taken:
             return None  # what was asked for is taken
+        # Read before the log, the head is covered by what the log read returns: every event
+        # of the thread up to it, although the head itself may be another thread's.
+        head = await workspace.head_seq()
         paused = await workspace.runs(thread_id=thread_id, status="paused")
         log = await workspace.read(after_seq=taken, threads={thread_id})
-        through = log[-1].seq if log else taken
+        through = max(log[-1].seq if log else taken, head)
         untaken = [envelope for envelope in log if _from_others(envelope, thread_id)]
         if paused:
             run = paused[-1]
             if run.all_answered:
-                # Resumed by its last answer, unless a resume that failed before it began took
-                # the answers: then by whoever asks now.
-                answered = [e for e in log if isinstance(e.event, DeferredAnswered)]
-                if not answered:
-                    return _resume(run, taken, through, workspace.actor, None)
-                last = answered[-1]
-                return _resume(run, taken, through, last.actor, last.traceparent)
+                # Resumed by the last answer or message, unless a resume that failed before it
+                # began took the answers: then by whoever asks now.
+                asked = [e for e in log if isinstance(e.event, DeferredAnswered) or e in untaken]
+                by = asked[-1] if asked else None
+                return _resume(run, taken, through, untaken, by, workspace.actor)
             if untaken:
                 reply = untaken[0]
                 await _reply(workspace.as_actor(reply.actor), run, reply)
                 run = await workspace.run(run.id)
-                return _resume(run, reply.seq, reply.seq, reply.actor, reply.traceparent)
+                return _resume(run, taken, reply.seq, [], reply, reply.actor)
         elif untaken:
             first = untaken[0]
             assert isinstance(first.event, MessagePosted)
@@ -473,7 +485,7 @@ class Runner[AppDepsT]:
                 prompt=first.event.content,
                 deferred=None,
                 watch_after=first.seq,
-                through=first.seq,
+                taken=taken,
                 requested_by=first.actor,
                 traceparent=first.traceparent,
             )
@@ -485,12 +497,14 @@ class Runner[AppDepsT]:
         claim: contextlib.AsyncExitStack,
         lost: asyncio.Event,
         session: Session[AppDepsT],
-        prompt: str | None,
+        prompt: str | list[str] | None,
         deferred: DeferredToolResults | None,
         caller: SpanContext,
     ) -> AgentRunResult[Any]:
         run = asyncio.current_task()
         assert run is not None, "a run is a task"
+        taken = session.delivered.seq
+        recorded = False
         try:
             async with claim:
                 stopping = asyncio.create_task(_cancel_when_lost(lost, run))
@@ -500,9 +514,14 @@ class Runner[AppDepsT]:
                     self.live.close(session.run_id)
                     stopping.cancel()
                     await asyncio.gather(stopping, return_exceptions=True)
-                    await _record_taken(session)
+                    # A turn that started took the log to where its watcher got. One that
+                    # failed or stopped before it started took nothing, and asks for no
+                    # hand-over: the thread's next command carries its input out.
+                    if session.delivered.seq > taken:
+                        recorded = await _record_taken(session)
         finally:
-            self._hand_over(session)
+            if recorded:
+                self._hand_over(session)
 
     def _hand_over(self, session: Session[AppDepsT]) -> None:
         """Once a run has released its thread, take the turn it was asked for meanwhile.
@@ -530,7 +549,7 @@ class Runner[AppDepsT]:
     async def _turn(
         self,
         session: Session[AppDepsT],
-        prompt: str | None,
+        prompt: str | list[str] | None,
         deferred: DeferredToolResults | None,
         caller: SpanContext,
     ) -> AgentRunResult[Any]:
@@ -641,25 +660,34 @@ def _sent(recorded: Recorded, run: RunHandle | None) -> Sent:
 
 @dataclass(frozen=True)
 class _Turn:
-    """A turn the log calls for: what to run, and how far it carries the thread's log out."""
+    """A turn the log calls for: what to run, and from where in the thread's log."""
 
     run_id: RunId
     trigger: Trigger
-    prompt: str | None
+    prompt: str | list[str] | None
     deferred: DeferredToolResults | None
     watch_after: int
-    """Its watcher delivers the thread's log after this ``seq``."""
-    through: int
-    """The ``seq`` up to which it takes the thread's messages as it starts: its prompt or its
-    reply, or, resuming by its answers, what was read. The rest are taken as its watcher
-    delivers them, so a message it misses is left for the next turn."""
+    """The log up to this ``seq`` is the turn's input; its watcher delivers what follows."""
+    taken: int
+    """How far the thread's messages were taken before the turn."""
     requested_by: Actor
     traceparent: str | None
     """Where the message or answer it carries out was committed."""
 
 
-def _resume(run: Run, watch_after: int, through: int, by: Actor, traceparent: str | None) -> _Turn:
-    """The turn that resumes a paused run whose requests are all answered."""
+def _resume(
+    run: Run,
+    taken: int,
+    watch_after: int,
+    untaken: list[Envelope],
+    by: Envelope | None,
+    anyone: Actor,
+) -> _Turn:
+    """The turn that resumes a paused run whose requests are all answered.
+
+    The messages no turn has taken are its prompt, beside the answers, so they reach the model
+    as the run resumes. It is requested by whoever committed ``by``, or else by ``anyone``.
+    """
     deferred = DeferredToolResults(
         calls={
             r.tool_call_id: run.answers[r.tool_call_id].answer
@@ -675,12 +703,12 @@ def _resume(run: Run, watch_after: int, through: int, by: Actor, traceparent: st
     return _Turn(
         run_id=run.id,
         trigger="resume",
-        prompt=None,
+        prompt=[e.event.content for e in untaken if isinstance(e.event, MessagePosted)] or None,
         deferred=deferred,
         watch_after=watch_after,
-        through=through,
-        requested_by=by,
-        traceparent=traceparent,
+        taken=taken,
+        requested_by=anyone if by is None else by.actor,
+        traceparent=None if by is None else by.traceparent,
     )
 
 
@@ -747,15 +775,18 @@ async def _asked_for(workspace: Workspace, thread_id: ThreadId) -> bool:
     return await workspace.cursor(_asked(thread_id)) > await _taken_seq(workspace, thread_id)
 
 
-async def _record_taken(session: Session[Any]) -> None:
-    """Record what a run's watcher delivered as taken; a failure is logged, never raised.
+async def _record_taken(session: Session[Any]) -> bool:
+    """Record how far a run took the thread's log; a failure is logged, never raised.
 
-    If it fails, the thread's next turn is given what the watcher delivered again.
+    If it fails, as when the process dies first, the thread's next turn is given the run's
+    input again: the one case in which a message is carried out twice (ADR-0055).
     """
     try:
         await session.workspace.save_cursor(_taken(session.thread_id), session.delivered.seq)
     except Exception:
         logger.exception("recording what run %s took failed", session.run_id)
+        return False
+    return True
 
 
 def _approval(run: Run, tool_call_id: str) -> bool | ToolDenied:

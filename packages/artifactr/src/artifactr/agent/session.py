@@ -48,9 +48,9 @@ class Session[AppDepsT]:
     """Whose message or answer started this run segment, if anyone's. Spans record a person
     here as the user."""
 
-    delivered: Delivered = field(default_factory=Delivered, compare=False)
-    """How far the run's watcher has got, from ``watch_after``. When the run ends, the
-    :class:`~artifactr.agent.Runner` records it as how far the thread's messages are taken."""
+    delivered: Delivered = field(default_factory=Delivered, init=False, repr=False, compare=False)
+    """How far the run has taken the log: to ``watch_after`` once it has started, then as far as
+    its watcher delivers. When the run ends, the :class:`~artifactr.agent.Runner` records it."""
 
     @classmethod
     def start(
@@ -87,7 +87,6 @@ class Session[AppDepsT]:
             trigger=trigger,
             watch_after=watch_after,
             requested_by=requested_by,
-            delivered=Delivered(watch_after or 0),
         )
 
 

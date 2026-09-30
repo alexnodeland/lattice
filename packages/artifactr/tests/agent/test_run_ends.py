@@ -17,7 +17,6 @@ import pytest
 from pydantic_ai import (
     AgentRunResult,
     DeferredToolRequests,
-    FunctionToolset,
     ModelResponse,
     RunContext,
     ToolCallPart,
@@ -152,7 +151,7 @@ async def test_every_reply_sent_as_a_run_pauses_reaches_it(
     resumed = runner.running(thread.id)
     assert resumed is not None
     assert resumed.run_id == first.run_id
-    await settled(runner, thread.id)
+    await settled(thread.id, runner)
     assert script.answers() == ["Monday"]
     assert script.conversation()[-1] == "And book the big room", "the second reaches it too"
 
@@ -185,7 +184,7 @@ async def test_an_answer_sent_as_a_run_pauses_waits_for_the_others(
 # ─── turns that fail ──────────────────────────────────────────────────────────
 
 
-async def test_a_turn_that_fails_before_it_starts_is_not_carried_out_again(
+async def test_a_turn_that_fails_before_it_starts_leaves_its_message_to_the_next(
     ws: Workspace, thread: Thread, runners: MakeRunner
 ) -> None:
     entered: list[str] = []
@@ -197,15 +196,17 @@ async def test_a_turn_that_fails_before_it_starts_is_not_carried_out_again(
             raise RuntimeError("the tracing backend blinked")
         yield
 
-    script = Script(say("Drafted."))
+    script = _replies("Drafted.")
     runner = runners(make_agent(script), turn_context=flaky)
     await started(await runner.send(ws, thread.id, "Plan the launch")).wait()
     second = started(await runner.send(ws, thread.id, "Anything else?"))
     with pytest.raises(RuntimeError, match="blinked"):
         await second.wait()
     await runner.drain()
-    assert runner.running(thread.id) is None, "no turn for an old message, nor for this one"
-    assert len(entered) == 2
+    assert runner.running(thread.id) is None, "it hands nothing over: no old message again"
+    started(await runner.send(ws, thread.id, "Hello?"))
+    await settled(thread.id, runner)
+    assert script.conversation() == ["Plan the launch", "Anything else?", "Hello?"]
 
 
 async def test_a_turn_that_keeps_failing_is_one_turn_per_message(
@@ -229,7 +230,7 @@ async def test_a_turn_that_keeps_failing_is_one_turn_per_message(
         assert (turns, runner.running(thread.id)) == (sent, None)
 
 
-async def test_a_message_whose_turn_failed_is_not_carried_out_again(
+async def test_a_message_whose_turn_failed_before_it_started_is_carried_out_once(
     storage: HeldStorage, ws: Workspace, thread: Thread, runners: MakeRunner
 ) -> None:
     turns: list[str] = []
@@ -242,7 +243,8 @@ async def test_a_message_whose_turn_failed_is_not_carried_out_again(
         yield
 
     releasing = storage.held = Gate()
-    runner = runners(make_agent(Script(say("Drafted."))), turn_context=second_fails)
+    script = _replies("Drafted.")
+    runner = runners(make_agent(script), turn_context=second_fails)
     first = started(await runner.send(ws, thread.id, "Plan the launch"))
     await _entered(releasing)
     looking = storage.held_read = Gate()
@@ -253,9 +255,8 @@ async def test_a_message_whose_turn_failed_is_not_carried_out_again(
     with pytest.raises(RuntimeError, match="blinked"):
         await second.wait()
     looking.release.set()
-    await runner.drain()
-    assert runner.running(thread.id) is None
-    assert len(turns) == 2, "the hand-over finds the message taken"
+    await settled(thread.id, runner)
+    assert script.conversation() == ["Plan the launch", "Anything else?"], "the model saw it once"
 
 
 async def test_a_resume_that_fails_before_it_starts_is_resumed_by_the_next_message(
@@ -282,7 +283,7 @@ async def test_a_resume_that_fails_before_it_starts_is_resumed_by_the_next_messa
     assert (await ws.run(paused.run_id)).status == "paused"
     resumed = started(await runner.send(ws, thread.id, "Are you there?"))
     assert resumed.run_id == paused.run_id
-    await settled(runner, thread.id)
+    await settled(thread.id, runner)
     assert (await ws.run(paused.run_id)).status == "completed"
     assert script.conversation()[-1] == "Are you there?"
 
@@ -302,7 +303,7 @@ async def test_a_message_is_carried_out_once_though_its_send_stalls(
     await _entered(stalled)  # it committed the message and asked for a turn; then it stalls
     releasing.release.set()
     await first.wait()
-    await settled(runner, thread.id)  # the hand-over carries the message out
+    await settled(thread.id, runner)  # the hand-over carries the message out
     stalled.release.set()
     assert (await sending).run is None, "its message is taken"
     await runner.drain()
@@ -326,7 +327,7 @@ async def test_a_turn_another_send_starts_takes_what_the_ending_run_missed_first
     taking = started(await other.send(ws, thread.id, "And this"))  # another process takes it
     looking.release.set()
     await runner.drain()
-    await settled(other, thread.id)
+    await settled(thread.id, other)
     assert runner.running(thread.id) is None, "the hand-over finds both taken"
     assert script.prompt_texts(1)[:2] == ["Plan the launch", "Anything missed?"], "first"
     assert script.conversation() == ["Plan the launch", "Anything missed?", "And this"]
@@ -377,7 +378,7 @@ async def test_a_message_posted_directly_starts_no_turn_but_the_next_turn_takes_
     await runner.drain()
     assert runner.running(thread.id) is None, "it starts no turn"
     started(await runner.send(ws, thread.id, "Anything else?"))
-    await settled(runner, thread.id)
+    await settled(thread.id, runner)
     assert script.conversation() == ["Plan the launch", "FYI: the venue changed", "Anything else?"]
 
 
@@ -431,30 +432,5 @@ async def test_a_hand_over_that_fails_is_logged_and_the_next_turn_carries_it_out
     failed = f"handing thread {thread.id} over failed; its next turn carries out what was sent"
     assert [r.getMessage() for r in caplog.records] == [failed]
     started(await runner.send(ws, thread.id, "Hello?"))
-    await settled(runner, thread.id)
+    await settled(thread.id, runner)
     assert script.conversation() == ["Plan the launch", "Anything else?", "Hello?"]
-
-
-async def test_a_run_whose_position_cannot_be_recorded_keeps_its_result(
-    ws: Workspace,
-    thread: Thread,
-    gate: Gate,
-    runners: MakeRunner,
-    app_tools: FunctionToolset[Session[Gate]],
-    caplog: pytest.LogCaptureFixture,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    runner = runners(make_agent(Script(call("hold"), say("Done.")), tools=[app_tools]))
-    handle = started(await runner.send(ws, thread.id, "Hold on"))
-    await _entered(gate)
-
-    async def unsaved(*args: Any, **kwargs: Any) -> None:
-        raise ConnectionError("the database went away")
-
-    with monkeypatch.context() as patched, caplog.at_level(logging.ERROR, logger="artifactr"):
-        patched.setattr(Workspace, "save_cursor", unsaved)
-        gate.release.set()
-        assert (await handle.wait()).output == "Done."
-    assert [r.getMessage() for r in caplog.records] == [
-        f"recording what run {handle.run_id} took failed"
-    ]

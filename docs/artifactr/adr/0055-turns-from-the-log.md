@@ -54,8 +54,10 @@ The log decides what each turn carries out, and each message is consumed in the 
   - the start of the run it prompts;
   - the answer it replies with;
   - the end of the run it was delivered to.
-- **I3.** A claim is never held without a task to release it. A claim is never released while more was asked than taken, unless a hand-over reads what was asked *after* the release, so it sees any command it refused.
-- **I4.** A turn that fails or is stopped before it starts consumes nothing, and it hands over if more was asked meanwhile.
+- **I3.** A claim is never held without a task to release it. A claim is never released while more was asked than taken, unless a hand-over reads what was asked *after* the release, so it sees any command it refused. After a run ends, or a claimant or a run is cancelled or stopped, the hand-over takes whatever was asked and not taken. After a claimant or a run fails having consumed nothing, it takes only what was asked after the claimant's read.
+- **I4.** A turn that fails or is stopped before it starts consumes nothing.
+  - If it was cancelled or stopped, it hands over whatever was asked and not taken, including a command that asked before its holder read, and its own input.
+  - If it failed, it hands over only what was asked after its holder read. A command that asked before that read waits for the thread's next command, which consumes it first. So a failure that persists makes one turn per command, and never spins.
 - **I5.** A message committed directly, without the runner, starts no turn, and the thread's next turn consumes it. A notice is never a prompt or a reply.
 - **I6.** A message is a message. In a paused thread, the oldest message not yet consumed is the reply, however it was committed and whoever posted it. Anything that should not answer is posted as a notice ([ADR-0051](0051-notices.md)).
 - **I7.** A thread from before this record consumes nothing from before the upgrade point, which migration 0005 records again after a downgrade and a second upgrade.
@@ -74,7 +76,12 @@ The log decides what each turn carries out, and each message is consumed in the 
   - The turn's watcher follows from there, so later messages reach the same turn.
   - With no message to consume, the holder counts what it read, up to the head, as taken. It releases the thread and looks again.
   - A claimant that finds the thread claimed does nothing more: the holder hands the thread over.
-- **A run hands its thread over as it releases it**, in a task of its own, when it consumed something or more was asked while it held the thread. It reads both after the release. So does a claimant that is cancelled, or fails, before it becomes a run, as when a client that sent a command disconnects. A turn that failed or was stopped before it started consumed nothing, so it hands over only a new ask. A failure that repeats therefore makes one turn per command, and never spins.
+- **A run hands its thread over as it releases it**, in a task of its own. So does a claimant that is cancelled, or fails, before it becomes a run, as when a client that sent a command disconnects. The hand-over reads what was asked, and what was taken, after the release, and it proceeds in three cases:
+  - the claimant consumed something;
+  - it was cancelled or stopped;
+  - more was asked since it read.
+
+  A failure that consumed nothing thus hands over only a new ask, so it makes one turn per command. A cancelled or stopped claimant hands over everything not taken, since a command it refused may have asked before it read. Neither can spin: only `aclose` cancels a hand-over, and it closes the runner first.
   - The run's end does not wait for the hand-over: `RunHandle.wait` returns the run's result, and `stop` does not reach it.
   - `Runner.drain` waits until no hand-over is pending, and `aclose` cancels them instead.
   - A closed runner hands nothing over, and starts no run once `aclose` has begun. The thread's next claimant, in any process, carries it out.

@@ -5,10 +5,11 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Before lattice]
 
 ### Features
 
+- **core**: Own the score mapping and ports the libraries share ([#32](https://github.com/alexnodeland/evalr/pull/32))
 - **online**: Run evaluators on live traffic, sampled and within a budget ([#21](https://github.com/alexnodeland/evalr/pull/21))
 - **measures**: Define task completion, drop-off and rewrites generically ([#20](https://github.com/alexnodeland/evalr/pull/20))
 - **hf**: Publish, pin and import datasets on the Hugging Face Hub ([#19](https://github.com/alexnodeland/evalr/pull/19))
@@ -28,10 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug fixes
 
+- Read people's feedback in rates, type experiment verdicts, and drop difflib's autojunk ([#33](https://github.com/alexnodeland/evalr/pull/33)) (**breaking**)
+- Build generic results through their parametrized alias on Python 3.12 ([#30](https://github.com/alexnodeland/evalr/pull/30))
+- **langfuse**: Match the dataset store and its fake to a real Langfuse ([#29](https://github.com/alexnodeland/evalr/pull/29))
 - **core**: Never shorten a list that windowing alone can fit ([#25](https://github.com/alexnodeland/evalr/pull/25))
 
 ### Documentation
 
+- Regenerate the changelog, and have the site regenerate it on every build ([#28](https://github.com/alexnodeland/evalr/pull/28))
 - Render lists on the site as GitHub does, and gate scripts/ like the library ([#27](https://github.com/alexnodeland/evalr/pull/27))
 - Publish the site at evalr.alexnodeland.com from main ([#24](https://github.com/alexnodeland/evalr/pull/24))
 - Add the documentation site and brand ([#23](https://github.com/alexnodeland/evalr/pull/23))
@@ -39,9 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **adr**: Build evalr as ports and adapters ([#6](https://github.com/alexnodeland/evalr/pull/6))
 - Add the evalr design: RFC-0001 and ADRs ([#1](https://github.com/alexnodeland/evalr/pull/1))
 
+### Refactoring
+
+- One set of Langfuse score adapters, scores that check their own values, and one docs build ([#34](https://github.com/alexnodeland/evalr/pull/34)) (**breaking**)
+
 ### Miscellaneous
 
 - Lay the foundation for the evalr library ([#3](https://github.com/alexnodeland/evalr/pull/3))
 - Initial commit
-
-

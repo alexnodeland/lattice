@@ -48,7 +48,6 @@ dev = [
     { include-group = "test" },
     { include-group = "lint" },
     "pre-commit>=4.6",
-    "git-cliff>=2.14",
 ]
 
 # In lattice, the libraries are the checkout's. A built wheel keeps the ranges in [project]

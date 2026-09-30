@@ -5,10 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Before lattice]
 
 ### Features
 
+- Commands carried out once per id on every surface, MCP's tools included ([#90](https://github.com/alexnodeland/reflexr/pull/90)) (**breaking**)
+- Read a workspace's rule over REST and MCP, and change stored rules with MCP tools ([#89](https://github.com/alexnodeland/reflexr/pull/89))
+- Stored rules installed, updated and archived in a workspace, and run by the reactor ([#88](https://github.com/alexnodeland/reflexr/pull/88)) (**breaking**)
+- Storage for stored rules, in memory and in SQL, with migration 0006 ([#87](https://github.com/alexnodeland/reflexr/pull/87)) (**breaking**)
+- Typed params for actions, and core's configuration and checks for stored rules ([#86](https://github.com/alexnodeland/reflexr/pull/86)) (**breaking**)
+- Qualify every event type and rule name with its namespace ([#83](https://github.com/alexnodeland/reflexr/pull/83)) (**breaking**)
+- **otel**: Telemetry that composes with artifactr's, untraced polling and mirror cursors ([#76](https://github.com/alexnodeland/reflexr/pull/76)) (**breaking**)
+- **workspace**: A graceful stop for Reactor.serve ([#69](https://github.com/alexnodeland/reflexr/pull/69))
+- **scores**: Build the mirror on evalr's score mapping and ports ([#70](https://github.com/alexnodeland/reflexr/pull/70))
+- **litellm**: Litellm_model takes model settings, as pydantic-ai models do ([#68](https://github.com/alexnodeland/reflexr/pull/68))
+- **protocol**: Read a window, types and the tail of the log, and join at its head ([#67](https://github.com/alexnodeland/reflexr/pull/67))
 - **agent**: Infer decisions' and forks' input types for graph checkpoints ([#52](https://github.com/alexnodeland/reflexr/pull/52))
 - **deploy**: Grafana dashboards, tested against the metric registry ([#51](https://github.com/alexnodeland/reflexr/pull/51))
 - **oncall**: Add the reference implementation, an incident-response app on the public API ([#40](https://github.com/alexnodeland/reflexr/pull/40))
@@ -35,12 +46,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug fixes
 
+- Refuse a workspace with its rejection, over REST and MCP, as artifactr does ([#82](https://github.com/alexnodeland/reflexr/pull/82)) (**breaking**)
+- Cancel-safe storage, and an executor that cancels plainly ([#79](https://github.com/alexnodeland/reflexr/pull/79)) (**breaking**)
+- **agent**: Save graph checkpoints only if they read back, and start over from stale ones ([#71](https://github.com/alexnodeland/reflexr/pull/71))
+- **mcp**: Leave logging as it was when building the MCP server ([#73](https://github.com/alexnodeland/reflexr/pull/73))
+- **workspace**: Due runs are the runs that can start, and settling waits out other reactors ([#64](https://github.com/alexnodeland/reflexr/pull/64)) (**breaking**)
+- **mcp**: Report what REST reports, and check run subscriptions ([#61](https://github.com/alexnodeland/reflexr/pull/61))
 - **fastapi**: Show a tenant only its own schedule targets ([#59](https://github.com/alexnodeland/reflexr/pull/59))
 - What the documentation found: disabled rules, filter checks, feedback sources, MCP authorization, chains ([#56](https://github.com/alexnodeland/reflexr/pull/56)) (**breaking**)
 - **workspace**: What the oncall example found: emitted ids per checkpoint, run-only events ([#44](https://github.com/alexnodeland/reflexr/pull/44))
 
 ### Documentation
 
+- **rfc**: RFC-0003's migration is 0006, and its rule names landed with [reflexr#45](https://github.com/alexnodeland/reflexr/issues/45) ([#84](https://github.com/alexnodeland/reflexr/pull/84))
+- **rfc**: RFC-0003 managing rules at runtime ([#75](https://github.com/alexnodeland/reflexr/pull/75))
+- **adr**: Namespaced event types ([#74](https://github.com/alexnodeland/reflexr/pull/74))
+- Regenerate the changelog, and have the site regenerate it on every build ([#60](https://github.com/alexnodeland/reflexr/pull/60))
 - Render lists on the site as GitHub does, and check them in the build ([#55](https://github.com/alexnodeland/reflexr/pull/55))
 - Mark RFC-0002 Implemented, and list the docs targets in CONTRIBUTING ([#54](https://github.com/alexnodeland/reflexr/pull/54))
 - The documentation site and the brand family ([#49](https://github.com/alexnodeland/reflexr/pull/49))
@@ -48,14 +69,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **adr**: Give reflexr tenants and workspaces, like artifactr ([#16](https://github.com/alexnodeland/reflexr/pull/16))
 - Add the reflexr design: architecture, protocol, RFC-0001 and ADRs ([#14](https://github.com/alexnodeland/reflexr/pull/14))
 
+### Refactoring
+
+- Scores through evalr's Langfuse adapters, on [evalr#34](https://github.com/alexnodeland/evalr/issues/34) ([#81](https://github.com/alexnodeland/reflexr/pull/81)) (**breaking**)
+- Say each rule once, save nothing before a decision, and match artifactr ([#80](https://github.com/alexnodeland/reflexr/pull/80)) (**breaking**)
+
 ### Testing
 
 - Register test event types once, with no inline suppressions anywhere ([#38](https://github.com/alexnodeland/reflexr/pull/38))
 
 ### Miscellaneous
 
+- Build the docs once, and deploy them in order ([#85](https://github.com/alexnodeland/reflexr/pull/85))
+- Build oncall's image and start it, not only validate Compose ([#66](https://github.com/alexnodeland/reflexr/pull/66))
 - A contributor Compose stack and a Compose-based dev container ([#50](https://github.com/alexnodeland/reflexr/pull/50))
 - Pin evalr at its v0.1, and check the feedback source against evalr's contract ([#43](https://github.com/alexnodeland/reflexr/pull/43))
 - Lay the foundation for the reflexr library ([#15](https://github.com/alexnodeland/reflexr/pull/15))
-
-

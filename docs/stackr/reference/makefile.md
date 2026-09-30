@@ -21,7 +21,6 @@ Every command is a `make` target; `make` on its own lists them. The tools run th
 | `make smoke` | Send test telemetry through the running stack and find it (PROFILES as for up) |
 | `make smoke-app` | Run an application from the template beside the running stack, and trace its agents |
 | `make docs-reference` | Regenerate the reference pages from the files they describe |
-| `make changelog` | Regenerate CHANGELOG.md from conventional commits |
 | `make clean` | Remove tool caches |
 
 <!-- end generated -->

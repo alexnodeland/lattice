@@ -2,6 +2,6 @@
 title: Changelog
 ---
 
-<!-- This page includes the repository's CHANGELOG.md, which `make docs` regenerates. -->
+<!-- This page includes the package's CHANGELOG.md, which release-please updates with every release. -->
 
 --8<-- "packages/evalr/CHANGELOG.md"

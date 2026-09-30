@@ -1,5 +1,5 @@
 [project]
-name = "relayr"
+name = "relayr-ai"
 version = "0.1.0.dev0"
 description = "The bridge between artifactr and reflexr: events from chats and artifacts become events for rules, and runs act back in the chat as proposals and notices."
 readme = "README.md"
@@ -27,8 +27,8 @@ dependencies = [
 
 [project.optional-dependencies]
 sql = ["sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
-sqlite = ["relayr[sql]", "aiosqlite>=0.22"]
-postgres = ["relayr[sql]", "asyncpg>=0.31"]
+sqlite = ["relayr-ai[sql]", "aiosqlite>=0.22"]
+postgres = ["relayr-ai[sql]", "asyncpg>=0.31"]
 
 [project.urls]
 Homepage = "https://relayr.alexnodeland.com"
@@ -58,42 +58,19 @@ dev = [
     "git-cliff>=2.14",
 ]
 
-# The libraries are not on PyPI: they install from GitHub, pinned by commit, and evalr comes
-# with them at the commit their own sources pin (ADR-0012).
+# In lattice, the libraries are the checkout's. A built wheel keeps the ranges in [project]
+# alone.
 [tool.uv.sources]
-artifactr-ai = { git = "https://github.com/alexnodeland/artifactr", rev = "22d3a1496a9e62012f01da68656ae089026d2a2c" }
-reflexr = { git = "https://github.com/alexnodeland/reflexr", rev = "34b9390af74e3381f089b12d7fba086fa0d2f4b3" }
+artifactr-ai = { workspace = true }
+reflexr = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
 
-# ─── lint and format ──────────────────────────────────────────────────────────
-
-[tool.ruff]
-line-length = 100
-target-version = "py312"
-src = ["src", "tests"]
-
-[tool.ruff.format]
-docstring-code-format = true
-
-[tool.ruff.lint]
-select = [
-    "E", "W", "F", "I", "N", "D", "UP", "B", "SIM", "RUF", "C4", "PIE", "RET",
-    "PT", "ASYNC", "PERF", "ARG", "T20", "ERA",
-]
-ignore = [
-    "D105", # magic methods document themselves
-    "D107", # __init__ is documented on the class
-    "N818", # exceptions are named for what happened, as the libraries' are, not with an Error suffix
-]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-
-[tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "ARG"]
+# Distributed as relayr-ai; imported as relayr.
+[tool.uv.build-backend]
+module-name = "relayr"
 
 # ─── types ────────────────────────────────────────────────────────────────────
 
@@ -102,7 +79,7 @@ include = ["src", "tests", "scripts"]
 strict = ["src", "scripts"]
 typeCheckingMode = "standard"
 pythonVersion = "3.12"
-venvPath = "."
+venvPath = "../.."
 venv = ".venv"
 
 # ─── tests and coverage ───────────────────────────────────────────────────────

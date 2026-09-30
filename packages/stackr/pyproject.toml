@@ -32,8 +32,8 @@ dev = [
 package = false
 
 [tool.ruff]
-line-length = 100
-target-version = "py312"
+# The root's configuration, with stackr's own rules for its scripts.
+extend = "../../pyproject.toml"
 # The scripts import scripts/_env.py as a first-party module.
 src = [".", "scripts"]
 # The scripts are Python without a `.py` suffix, so they read as commands.

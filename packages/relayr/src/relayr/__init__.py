@@ -9,6 +9,6 @@ See `docs/architecture.md` for the design.
 
 from importlib.metadata import version
 
-__version__ = version("relayr")
+__version__ = version("relayr-ai")
 
 __all__ = ["__version__"]

@@ -88,10 +88,9 @@ dev = [
     "git-cliff>=2.14",
 ]
 
-# evalr is not published yet: the [evals] and [langfuse] extras resolve it from GitHub, pinned
-# (ADR-0044, ADR-0049).
+# In lattice, evalr is the checkout's. A built wheel keeps the range in [project] alone.
 [tool.uv.sources]
-evalr = { git = "https://github.com/alexnodeland/evalr", rev = "7a290123aa25011b48ae9ae9cfc3e847c8cab10c" }
+evalr = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]
@@ -101,60 +100,20 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-name = "artifactr"
 
-# The reference implementation is a workspace member, built on the public API only.
-[tool.uv.workspace]
-members = ["examples/docplan"]
-
-# ─── lint and format ──────────────────────────────────────────────────────────
-
-[tool.ruff]
-line-length = 100
-target-version = "py312"
-src = ["src", "tests", "examples/docplan/src"]
-
-[tool.ruff.format]
-docstring-code-format = true
-
-[tool.ruff.lint]
-select = [
-    "E", "W", "F", "I", "N", "D", "UP", "B", "SIM", "RUF", "C4", "PIE", "RET",
-    "PT", "ASYNC", "PERF", "ARG", "T20", "ERA",
-]
-ignore = [
-    "D105", # magic methods document themselves
-    "D107", # __init__ is documented on the class
-    "N818", # exceptions are named for what happened (VersionConflict), not with an Error suffix
-]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-
-[tool.ruff.lint.isort]
-# artifactr.fastapi, artifactr.mcp and artifactr.langfuse share their names with the libraries they
-# adapt; without this, isort's same-package detection files the libraries as first-party.
-known-third-party = ["fastapi", "mcp", "langfuse"]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "ARG"]
-"examples/*/tests/**" = ["D", "ARG"]
-# pydantic-ai hides a tool's RunContext from the model, so tool docstrings don't document it.
-"src/artifactr/agent/tools.py" = ["D417"]
-"examples/docplan/src/docplan/agent.py" = ["D417"]
-
 # ─── types ────────────────────────────────────────────────────────────────────
 
 [tool.pyright]
-include = ["src", "tests", "examples", "scripts"]
-strict = ["src", "examples/docplan/src", "scripts"]
+include = ["src", "tests", "scripts"]
+strict = ["src", "scripts"]
 typeCheckingMode = "standard"
 pythonVersion = "3.12"
-venvPath = "."
+venvPath = "../.."
 venv = ".venv"
 
 # ─── tests and coverage ───────────────────────────────────────────────────────
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "examples/docplan/tests"]
+testpaths = ["tests"]
 addopts = ["--strict-markers", "--strict-config", "-ra"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -170,7 +129,7 @@ markers = [
 [tool.coverage.run]
 branch = true
 # By path rather than package name, so the migrations Alembic loads from files are measured too.
-source = ["src/artifactr", "examples/docplan/src/docplan"]
+source = ["src/artifactr"]
 
 [tool.coverage.report]
 fail_under = 100

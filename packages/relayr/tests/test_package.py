@@ -4,4 +4,4 @@ import relayr
 
 
 def test_version_matches_the_distribution() -> None:
-    assert relayr.__version__ == version("relayr")
+    assert relayr.__version__ == version("relayr-ai")

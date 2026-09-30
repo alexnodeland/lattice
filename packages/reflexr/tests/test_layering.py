@@ -93,7 +93,7 @@ def test_layer_imports_only_what_it_may(layer: str) -> None:
                 assert _within(name, third_party), f"{where}: not a dependency of this layer"
 
 
-EXAMPLE = Path(__file__).parent.parent / "examples" / "oncall" / "src" / "oncall"
+EXAMPLE = Path(__file__).parents[3] / "examples" / "oncall" / "src" / "oncall"
 PUBLIC = {"reflexr", *(f"reflexr.{layer}" for layer in LAYERS)}
 """What an application imports from: reflexr and its packages, never the modules inside them."""
 

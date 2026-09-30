@@ -17,7 +17,7 @@ import pytest
 
 ROOT = Path(__file__).parent.parent
 SRC = ROOT / "src" / "artifactr"
-EXAMPLE = ROOT / "examples" / "docplan" / "src" / "docplan"
+EXAMPLE = ROOT.parent.parent / "examples" / "docplan" / "src" / "docplan"
 
 OTEL_API = {
     "opentelemetry.baggage",
@@ -114,6 +114,6 @@ def test_the_reference_implementation_uses_only_the_public_api() -> None:
     for path in modules:
         for name in _imports(path):
             if name.split(".")[0] == "artifactr":
-                where = f"{path.relative_to(ROOT)} imports {name}, not a package's public name"
+                where = f"{path.relative_to(EXAMPLE)} imports {name}, not a package's public name"
                 assert _within(name, PUBLIC), where
                 assert name.count(".") <= 2, where

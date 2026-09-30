@@ -459,6 +459,12 @@ async def test_external_agents_give_feedback(mcp: ArtifactrMcp, ws: Workspace) -
     assert envelope.event.type == "feedback_given"
 
 
+async def test_the_http_app_and_lifespan(mcp: ArtifactrMcp) -> None:
+    assert mcp.http_app() is not None
+    async with mcp.lifespan():
+        pass
+
+
 async def test_building_the_server_leaves_logging_as_it_was(
     workspaces: Workspaces, identity: Identity, gate: Gate, monkeypatch: pytest.MonkeyPatch
 ) -> None:

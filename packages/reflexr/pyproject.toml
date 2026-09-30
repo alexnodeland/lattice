@@ -89,68 +89,28 @@ dev = [
     "git-cliff>=2.14",
 ]
 
-# evalr is not published yet: the [evals] and [langfuse] extras resolve it from GitHub, pinned
-# (ADR-0020).
+# In lattice, evalr is the checkout's. A built wheel keeps the range in [project] alone.
 [tool.uv.sources]
-evalr = { git = "https://github.com/alexnodeland/evalr", rev = "7a290123aa25011b48ae9ae9cfc3e847c8cab10c" }
+evalr = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
 
-# The reference implementation is a workspace member, built on the public API only.
-[tool.uv.workspace]
-members = ["examples/oncall"]
-
-# ─── lint and format ──────────────────────────────────────────────────────────
-
-[tool.ruff]
-line-length = 100
-target-version = "py312"
-src = ["src", "tests", "examples/oncall/src"]
-
-[tool.ruff.format]
-docstring-code-format = true
-
-[tool.ruff.lint]
-select = [
-    "E", "W", "F", "I", "N", "D", "UP", "B", "SIM", "RUF", "C4", "PIE", "RET",
-    "PT", "ASYNC", "PERF", "ARG", "T20", "ERA",
-]
-ignore = [
-    "D105", # magic methods document themselves
-    "D107", # __init__ is documented on the class
-    "N818", # exceptions are named for what happened (NotFound), not with an Error suffix
-]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-
-[tool.ruff.lint.isort]
-# reflexr.fastapi, reflexr.mcp and reflexr.langfuse share their names with the libraries they adapt; without
-# this, isort's same-package detection files the libraries as first-party.
-known-third-party = ["fastapi", "mcp", "evalr", "langfuse"]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "ARG"]
-"examples/*/tests/**" = ["D", "ARG"]
-# pydantic-ai hides a tool's RunContext from the model, so tool docstrings don't document it.
-"src/reflexr/agent/tools.py" = ["D417"]
-
 # ─── types ────────────────────────────────────────────────────────────────────
 
 [tool.pyright]
-include = ["src", "tests", "examples", "scripts"]
-strict = ["src", "examples/oncall/src", "scripts"]
+include = ["src", "tests", "scripts"]
+strict = ["src", "scripts"]
 typeCheckingMode = "standard"
 pythonVersion = "3.12"
-venvPath = "."
+venvPath = "../.."
 venv = ".venv"
 
 # ─── tests and coverage ───────────────────────────────────────────────────────
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "examples/oncall/tests"]
+testpaths = ["tests"]
 addopts = ["--strict-markers", "--strict-config", "-ra"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -167,7 +127,7 @@ markers = [
 branch = true
 # By path, not package name, so that modules loaded under other names (such as Alembic
 # migrations) are still measured.
-source = ["src/reflexr", "examples/oncall/src/oncall"]
+source = ["src/reflexr"]
 
 [tool.coverage.report]
 fail_under = 100

@@ -71,40 +71,6 @@ dev = [
 requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
 
-# ─── lint and format ──────────────────────────────────────────────────────────
-
-[tool.ruff]
-line-length = 100
-target-version = "py312"
-src = ["src", "tests"]
-
-[tool.ruff.format]
-docstring-code-format = true
-
-[tool.ruff.lint]
-select = [
-    "E", "W", "F", "I", "N", "D", "UP", "B", "SIM", "RUF", "C4", "PIE", "RET",
-    "PT", "ASYNC", "PERF", "ARG", "T20", "ERA",
-]
-ignore = [
-    "D105", # magic methods document themselves
-    "D107", # __init__ is documented on the class
-    "N818", # exceptions are named for what happened (UnknownField), not with an Error suffix
-]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-
-[tool.ruff.lint.isort]
-# evalr.dspy and evalr.langfuse share their names with the libraries they adapt; without this,
-# isort's same-package detection files the libraries as first-party.
-known-third-party = ["dspy", "langfuse"]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "ARG"]
-# Stubs for untyped libraries mirror the libraries' own names (DSPy's InputField, toDict).
-"typings/**" = ["N802"]
-
 # ─── types ────────────────────────────────────────────────────────────────────
 
 [tool.pyright]
@@ -112,7 +78,7 @@ include = ["src", "tests", "scripts"]
 strict = ["src", "scripts"]
 typeCheckingMode = "standard"
 pythonVersion = "3.12"
-venvPath = "."
+venvPath = "../.."
 venv = ".venv"
 
 # ─── tests and coverage ───────────────────────────────────────────────────────

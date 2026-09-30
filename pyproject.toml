@@ -1,0 +1,80 @@
+# lattice: the uv workspace root (stackr's RFC-0003). It is a virtual project: it lists the
+# members and holds the family's tools and their shared configuration, and builds nothing.
+[project]
+name = "lattice"
+version = "0.0.0"
+description = "The family's packages: artifactr, reflexr, evalr, relayr and stackr."
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+# The family's own checks: the root tests, lint and types for the root's Python, and deptry over
+# each package's shipped code.
+dev = [
+    "deptry>=0.25",
+    "pyright>=1.1.414",
+    "pytest>=9.1",
+    "pyyaml>=6.0.3",
+    "ruff>=0.16",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*", "examples/*"]
+
+# ─── lint and format ──────────────────────────────────────────────────────────
+# One configuration for every package. A package that needs its own settings has a [tool.ruff]
+# that extends this one.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Every package's and example's code is first-party, wherever it is imported.
+src = ["packages/*/src", "examples/*/src"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "N", "D", "UP", "B", "SIM", "RUF", "C4", "PIE", "RET",
+    "PT", "ASYNC", "PERF", "ARG", "T20", "ERA",
+]
+ignore = [
+    "D105", # magic methods document themselves
+    "D107", # __init__ is documented on the class
+    "N818", # exceptions are named for what happened (VersionConflict), not with an Error suffix
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["D", "ARG"]
+# pydantic-ai hides a tool's RunContext from the model, so tool docstrings don't document it.
+"packages/artifactr/src/artifactr/agent/tools.py" = ["D417"]
+"packages/reflexr/src/reflexr/agent/tools.py" = ["D417"]
+"examples/docplan/src/docplan/agent.py" = ["D417"]
+# Stubs for untyped libraries mirror the libraries' own names (DSPy's InputField, toDict).
+"packages/evalr/typings/**" = ["N802"]
+
+# ─── types ────────────────────────────────────────────────────────────────────
+# pyright stays per package until ty replaces it with one root configuration. This one covers
+# the root's own Python.
+
+[tool.pyright]
+include = ["scripts", "tests"]
+strict = ["scripts"]
+typeCheckingMode = "standard"
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+
+# ─── tests ────────────────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config", "-ra"]
+filterwarnings = ["error"]

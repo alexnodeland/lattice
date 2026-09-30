@@ -40,6 +40,7 @@ async def test_each_save_is_one_commit_of_the_examples_and_a_card(hub: FakeHub) 
         "version": dataset.version,
         "description": dataset.description,
     }
+    assert "Made with [evalr](https://lattice.alexnodeland.com/evalr/)" in card
     assert "| Examples | 3, 3 with a verdict |" in card
     assert "| `rating` | ordinal | How good it is |" in card
     assert '"path": "data/train.jsonl"' in card

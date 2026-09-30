@@ -42,7 +42,7 @@ def dataset_card[InputT: BaseModel, VerdictT: BaseModel](dataset: Dataset[InputT
 
 {dataset.description or "An evaluation dataset."}
 
-Made with [evalr](https://github.com/alexnodeland/evalr): each example is an input
+Made with [evalr](https://lattice.alexnodeland.com/evalr/): each example is an input
 (`{dataset.input_type.__name__}`) with the verdict people gave it
 (`{dataset.verdict_type.__name__}`), a reference output, or both.
 

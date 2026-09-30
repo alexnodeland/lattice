@@ -92,7 +92,7 @@ Your own actions and tools can fail a run the same way. Raise `RunFailure` with 
 
 ## Testing
 
-The gateway works with any pydantic-ai model, so the patterns in [Testing your application](testing.md) apply. To test against the proxy's wire format without a proxy, give `litellm_model` an `httpx2.AsyncClient` over an `httpx2.MockTransport` that answers chat completions, and read the requests it received, as reflexr's own tests do in [`tests/litellm/test_gateway.py`](https://github.com/alexnodeland/reflexr/blob/main/tests/litellm/test_gateway.py):
+The gateway works with any pydantic-ai model, so the patterns in [Testing your application](testing.md) apply. To test against the proxy's wire format without a proxy, give `litellm_model` an `httpx2.AsyncClient` over an `httpx2.MockTransport` that answers chat completions, and read the requests it received, as reflexr's own tests do in [`tests/litellm/test_gateway.py`](https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/tests/litellm/test_gateway.py):
 
 ```python
 import httpx2

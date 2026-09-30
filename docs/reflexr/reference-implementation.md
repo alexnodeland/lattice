@@ -1,20 +1,20 @@
 # The reference implementation
 
-[`examples/oncall`](https://github.com/alexnodeland/reflexr/tree/main/examples/oncall) is a small, complete application built on reflexr: incident response. Monitoring fires alerts, CI reports deploys, and services send heartbeats. A burst of severe alerts runs a triage agent, which opens an incident; an opened incident runs a runbook graph, which rolls back a recent deploy or pages a person, then resolves the incident; and a service that stops sending heartbeats is paged. It uses only the library's public API, a test enforces that, and it is held to the same quality gates as the library ([ADR-0015](adr/0015-reference-implementation-oncall.md), [ADR-0031](adr/0031-the-reference-implementations-events-and-rules.md)). Read it when you want to see every piece of this documentation working together.
+[`examples/oncall`](https://github.com/alexnodeland/lattice/tree/main/examples/oncall) is a small, complete application built on reflexr: incident response. Monitoring fires alerts, CI reports deploys, and services send heartbeats. A burst of severe alerts runs a triage agent, which opens an incident; an opened incident runs a runbook graph, which rolls back a recent deploy or pages a person, then resolves the incident; and a service that stops sending heartbeats is paged. It uses only the library's public API, a test enforces that, and it is held to the same quality gates as the library ([ADR-0015](adr/0015-reference-implementation-oncall.md), [ADR-0031](adr/0031-the-reference-implementations-events-and-rules.md)). Read it when you want to see every piece of this documentation working together.
 
 ## What it contains
 
 | Piece | Source | What it shows |
 |---|---|---|
-| Events | [`events.py`](https://github.com/alexnodeland/reflexr/blob/main/examples/oncall/src/oncall/events.py) | Five `Event` types: `oncall:alert.fired`, `oncall:deploy.completed` and `oncall:service.heartbeat`, which producers publish, and `oncall:incident.opened` and `oncall:incident.resolved`, which the workflows emit |
-| Rules | [`rules.py`](https://github.com/alexnodeland/reflexr/blob/main/examples/oncall/src/oncall/rules.py) | `oncall:triage`, a count of severe alerts per service within five minutes; `oncall:runbook`, every opened incident per service, with its own retry policy; `oncall:silence`, no heartbeat from a service for two minutes; and a `Schedule` whose ticks keep time moving |
-| Triage agent | [`triage.py`](https://github.com/alexnodeland/reflexr/blob/main/examples/oncall/src/oncall/triage.py) | A pydantic-ai `Agent` over `Reaction[OncallDeps]` with the `EventContext` capability, allowed to emit `oncall:incident.opened` only, with a structured verdict, usage limits, and the LiteLLM gateway when a proxy is configured |
-| Runbook graph | [`runbook.py`](https://github.com/alexnodeland/reflexr/blob/main/examples/oncall/src/oncall/runbook.py) | A pydantic-graph `GraphBuilder` graph with a decision, checkpointed after every step, that reads the log and emits through the `Reaction` |
-| Paging | [`actions.py`](https://github.com/alexnodeland/reflexr/blob/main/examples/oncall/src/oncall/actions.py) | A plain async function, idempotent by its run id, and the table of actions by the names rules use |
-| Services | [`services.py`](https://github.com/alexnodeland/reflexr/blob/main/examples/oncall/src/oncall/services.py) | The pager and deployer the workflows act on: in-memory fakes, given to every action as `reaction.deps` |
-| Server | [`app.py`](https://github.com/alexnodeland/reflexr/blob/main/examples/oncall/src/oncall/app.py) | FastAPI with REST and the WebSocket stream at `/v1` and MCP at `/mcp`, the reactor in its lifespan, in-memory or SQL storage, and OpenTelemetry and Langfuse from the environment |
-| Terminal client | [`cli.py`](https://github.com/alexnodeland/reflexr/blob/main/examples/oncall/src/oncall/cli.py) | Publishes events, follows the stream live, and operates runs: a template for a client in any language |
-| Tests | [`tests/`](https://github.com/alexnodeland/reflexr/tree/main/examples/oncall/tests) | The whole stack end to end with a scripted model and a clock the tests move, inside the coverage gate |
+| Events | [`events.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/events.py) | Five `Event` types: `oncall:alert.fired`, `oncall:deploy.completed` and `oncall:service.heartbeat`, which producers publish, and `oncall:incident.opened` and `oncall:incident.resolved`, which the workflows emit |
+| Rules | [`rules.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/rules.py) | `oncall:triage`, a count of severe alerts per service within five minutes; `oncall:runbook`, every opened incident per service, with its own retry policy; `oncall:silence`, no heartbeat from a service for two minutes; and a `Schedule` whose ticks keep time moving |
+| Triage agent | [`triage.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/triage.py) | A pydantic-ai `Agent` over `Reaction[OncallDeps]` with the `EventContext` capability, allowed to emit `oncall:incident.opened` only, with a structured verdict, usage limits, and the LiteLLM gateway when a proxy is configured |
+| Runbook graph | [`runbook.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/runbook.py) | A pydantic-graph `GraphBuilder` graph with a decision, checkpointed after every step, that reads the log and emits through the `Reaction` |
+| Paging | [`actions.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/actions.py) | A plain async function, idempotent by its run id, and the table of actions by the names rules use |
+| Services | [`services.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/services.py) | The pager and deployer the workflows act on: in-memory fakes, given to every action as `reaction.deps` |
+| Server | [`app.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/app.py) | FastAPI with REST and the WebSocket stream at `/v1` and MCP at `/mcp`, the reactor in its lifespan, in-memory or SQL storage, and OpenTelemetry and Langfuse from the environment |
+| Terminal client | [`cli.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/cli.py) | Publishes events, follows the stream live, and operates runs: a template for a client in any language |
+| Tests | [`tests/`](https://github.com/alexnodeland/lattice/tree/main/examples/oncall/tests) | The whole stack end to end with a scripted model and a clock the tests move, inside the coverage gate |
 
 ## How it fits together
 
@@ -51,7 +51,7 @@ graph LR
 
 ## Run it
 
-oncall is a member of the repository's uv workspace, so it runs against the library in the same checkout. From the repository root, with an Anthropic key:
+oncall is a member of lattice's uv workspace, so it runs against the library in the same checkout. From lattice's root, with an Anthropic key:
 
 ```bash
 uv sync --all-packages          # or: make install
@@ -70,7 +70,7 @@ uv run oncall --user monitor alert api --severity 9 --message "p99 latency above
 uv run oncall --user monitor alert api --severity 8 --message "5xx rate above 5%"
 ```
 
-The watch shows the alerts, the triage rule firing, the agent opening an incident, the runbook's steps as they are checkpointed, and the resolution. The [README](https://github.com/alexnodeland/reflexr/blob/main/examples/oncall/README.md) shows a whole session and lists every client command and flag.
+The watch shows the alerts, the triage rule firing, the agent opening an incident, the runbook's steps as they are checkpointed, and the resolution. The [README](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/README.md) shows a whole session and lists every client command and flag.
 
 To use another provider, set `ONCALL_MODEL` to any [pydantic-ai model name](https://ai.pydantic.dev/models/) and that provider's key. The server listens on `127.0.0.1:8000`; set `ONCALL_HOST` and `ONCALL_PORT` to change it.
 
@@ -82,9 +82,9 @@ To use another provider, set `ONCALL_MODEL` to any [pydantic-ai model name](http
 | `ONCALL_LANGFUSE=scores` | Sends Langfuse the runs' sessions, users and tags but no spans, for a Collector that sends it the traces, as stackr's does | [Observability](guides/observability.md#langfuse) |
 | `ONCALL_LITELLM_URL` | Sends the triage agent's requests through a LiteLLM proxy, with the tenant, chain and trace on each | [The LLM gateway](guides/gateway.md) |
 
-[stackr](https://github.com/alexnodeland/stackr) runs a Collector, Langfuse and the proxy.
+[stackr](../stackr/index.md) runs a Collector, Langfuse and the proxy.
 
-In Docker, the repository's Compose file runs oncall on PostgreSQL: `make app-up` builds and starts it, passing `ONCALL_MODEL`, the providers' keys and the `ONCALL_LITELLM_*` settings through from your environment. While stackr's stack runs, the `compose.stackr.yaml` overlay puts oncall on stackr's network, reporting to its Collector ([Contributing](../project/contributing.md#the-contributor-stack-and-the-dev-container)).
+In Docker, reflexr's Compose file, `packages/reflexr/compose.yaml`, runs oncall on PostgreSQL: `moon run reflexr:app-up` builds and starts it, passing `ONCALL_MODEL`, the providers' keys and the `ONCALL_LITELLM_*` settings through from your environment. While stackr's stack runs, the `compose.stackr.yaml` overlay puts oncall on stackr's network, reporting to its Collector ([Contributing](../project/contributing.md#the-contributor-stack-and-the-dev-container)).
 
 The same server speaks the other surfaces too: REST under `/v1` (the demo trusts an `x-user` header, as in `curl -H 'x-user: alice' localhost:8000/v1/workspaces/prod/runs`), and MCP at `http://127.0.0.1:8000/mcp/` for external agents. Opening an incident by hand over REST runs the runbook as well.
 

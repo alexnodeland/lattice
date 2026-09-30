@@ -33,9 +33,9 @@ Each record captures one decision: the context that forced it, the options consi
 | [0027](0027-opentelemetry-observability-with-langfuse.md) | OpenTelemetry-native observability, with Langfuse primary | Accepted |
 | [0028](0028-typed-feedback-as-events.md) | Typed feedback as events, mirrored to Langfuse | Accepted |
 | [0029](0029-evalr-shared-eval-kit.md) | evalr, a shared eval kit | Accepted |
-| [0030](0030-compose-and-dev-containers.md) | Contributor Compose and dev containers here, infrastructure in stackr | Accepted; partly superseded by lattice ADR-0009 and 0054 |
+| [0030](0030-compose-and-dev-containers.md) | Contributor Compose and dev containers here, infrastructure in stackr | Accepted; its dev container superseded by lattice ADR-0009, and its dashboard releases by 0054 |
 | [0031](0031-litellm-proxy-first.md) | LiteLLM, proxy first, for routing and guardrails | Accepted |
-| [0032](0032-libraries-and-the-stackr-template.md) | Libraries, and stackr as the infrastructure template | Accepted, amended by 0054 |
+| [0032](0032-libraries-and-the-stackr-template.md) | Libraries, and stackr as the infrastructure template | Accepted, amended by 0052 and 0054 |
 | [0033](0033-trace-links-on-runs-and-revisions.md) | Trace links on runs and revisions | Accepted |
 | [0034](0034-ports-and-adapters-for-integrations.md) | Ports and adapters for integrations | Accepted |
 | [0035](0035-a-turn-is-its-own-trace.md) | A turn is its own trace | Accepted |
@@ -43,7 +43,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0037](0037-feedback-targets-and-evaluators.md) | Feedback targets and evaluators | Accepted |
 | [0038](0038-feedback-as-scores.md) | Feedback as scores, through ports | Superseded by 0049 |
 | [0039](0039-the-langfuse-adapter.md) | The Langfuse adapter | Accepted; its score adapters superseded by 0049 |
-| [0040](0040-joining-stackrs-network.md) | Joining stackr's network when it runs | Accepted; partly superseded by lattice ADR-0009 |
+| [0040](0040-joining-stackrs-network.md) | Joining stackr's network when it runs | Accepted; its override superseded by lattice ADR-0009 |
 | [0041](0041-dashboards-generated-tested-and-released.md) | Dashboards generated, tested and released | Accepted; its release assets superseded by 0054 |
 | [0042](0042-typed-run-failures.md) | Typed run failures | Accepted |
 | [0043](0043-the-litellm-adapter.md) | The LiteLLM adapter | Accepted |
@@ -57,6 +57,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0051](0051-notices.md) | Notices: messages that start no turn | Accepted |
 | [0052](0052-artifactr-in-lattice.md) | artifactr in lattice | Accepted |
 | [0053](0053-one-site-for-the-family.md) | One site for the family | Accepted |
-| [0054](0054-stackr-in-lattice-and-dashboards-from-the-checkout.md) | stackr in lattice, and dashboards from the checkout | Accepted |
+| [0054](0054-dashboards-from-the-checkout.md) | Dashboards from the checkout | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

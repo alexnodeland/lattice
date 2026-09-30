@@ -1,6 +1,6 @@
 # ADR-0024: The reference implementation as a workspace member
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0052](0052-artifactr-in-lattice.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

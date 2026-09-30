@@ -87,6 +87,9 @@ nav:
     - adr/0049-scores-on-evalr.md
     - adr/0050-one-docs-build.md
     - adr/0051-notices.md
+    - adr/0052-artifactr-in-lattice.md
+    - adr/0053-one-site-for-the-family.md
+    - adr/0054-dashboards-from-the-checkout.md
     - adr/template.md
   - RFCs:
     - rfcs/README.md

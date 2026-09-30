@@ -1,6 +1,6 @@
 # ADR-0026: Publishing the documentation site from main
 
-**Status:** Accepted, amended by [ADR-0050](0050-one-docs-build.md)
+**Status:** Accepted, amended by [ADR-0050](0050-one-docs-build.md) and [ADR-0053](0053-one-site-for-the-family.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

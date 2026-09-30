@@ -1,6 +1,6 @@
 # ADR-0012: The documentation site, and publishing it from main
 
-**Status:** Accepted; amended by [ADR-0014](0014-one-docs-build.md)
+**Status:** Accepted; amended by [ADR-0014](0014-one-docs-build.md), [ADR-0016](0016-stackr-in-lattice.md) and [ADR-0017](0017-one-site-for-the-family.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 

@@ -15,18 +15,18 @@ Each record captures one decision: the context that forced it, the options consi
 | [0009](0009-graph-checkpoints.md) | Graph checkpoints at step boundaries | Superseded by 0043 |
 | [0010](0010-loop-and-spend-safety.md) | Loop and spend safety | Accepted |
 | [0011](0011-surfaces.md) | Surfaces: ingest, REST, WebSocket, schedules and MCP | Superseded by 0044 |
-| [0012](0012-trunk-based-development-with-rfcs-and-adrs.md) | Trunk-based development with RFCs, ADRs and evergreen docs | Accepted |
-| [0013](0013-quality-gates.md) | Quality gates | Accepted |
+| [0012](0012-trunk-based-development-with-rfcs-and-adrs.md) | Trunk-based development with RFCs, ADRs and evergreen docs | Accepted, amended by 0048 |
+| [0013](0013-quality-gates.md) | Quality gates | Accepted, amended by 0048 |
 | [0014](0014-mit-license.md) | MIT license | Accepted |
-| [0015](0015-reference-implementation-oncall.md) | Reference implementation: incident response | Accepted, amended by 0031 |
+| [0015](0015-reference-implementation-oncall.md) | Reference implementation: incident response | Accepted, amended by 0031 and 0048 |
 | [0016](0016-tenants-and-workspaces-like-artifactr.md) | Tenants and workspaces, like artifactr | Accepted |
 | [0017](0017-the-cores-evaluation-contract.md) | The core's evaluation contract | Accepted |
 | [0018](0018-opentelemetry-observability-with-langfuse.md) | OpenTelemetry-native observability, with Langfuse primary | Accepted |
 | [0019](0019-typed-feedback-as-events.md) | Typed feedback as events, mirrored to Langfuse | Accepted |
-| [0020](0020-evalr-shared-eval-kit.md) | evalr, a shared eval kit | Accepted; its last amendment superseded by 0045 |
-| [0021](0021-contributor-compose-and-dev-containers.md) | Contributor Compose and dev containers here, infrastructure in stackr | Accepted |
+| [0020](0020-evalr-shared-eval-kit.md) | evalr, a shared eval kit | Accepted; its last amendment superseded by 0045, and its pin of evalr by 0048 |
+| [0021](0021-contributor-compose-and-dev-containers.md) | Contributor Compose and dev containers here, infrastructure in stackr | Accepted; its dev container superseded by lattice ADR-0009, and its dashboard releases by 0050 |
 | [0022](0022-litellm-proxy-first.md) | LiteLLM, proxy first, for routing and guardrails | Accepted |
-| [0023](0023-libraries-and-the-stackr-template.md) | Libraries, and stackr as the infrastructure template | Accepted |
+| [0023](0023-libraries-and-the-stackr-template.md) | Libraries, and stackr as the infrastructure template | Accepted, amended by 0048 and 0050 |
 | [0024](0024-causal-chains-and-operator-actions.md) | Which chain a firing joins, and operator actions in the log | Accepted |
 | [0025](0025-ports-and-adapters.md) | Ports and adapters | Accepted; its amendment superseded by 0045 |
 | [0026](0026-the-reactors-evaluation.md) | The reactor's evaluation: rules on workspaces, the depth of reflexr's facts, and rebuilds | Accepted |
@@ -35,11 +35,11 @@ Each record captures one decision: the context that forced it, the options consi
 | [0029](0029-metric-detail-through-sdk-views.md) | Metric detail through SDK views, and the OpenTelemetry and Langfuse adapters | Accepted; its score adapters superseded by 0045 |
 | [0030](0030-sql-storage.md) | SQL storage with one dialect-neutral implementation | Accepted |
 | [0031](0031-the-reference-implementations-events-and-rules.md) | The reference implementation's events and rules | Accepted |
-| [0032](0032-documentation-site.md) | The documentation site, and a brand shared by the family | Accepted, amended by 0046 |
-| [0033](0033-publishing-the-documentation-site.md) | Publishing the documentation site from main | Accepted, amended by 0046 |
+| [0032](0032-documentation-site.md) | The documentation site, and a brand shared by the family | Accepted, amended by 0046 and 0049 |
+| [0033](0033-publishing-the-documentation-site.md) | Publishing the documentation site from main | Accepted, amended by 0046 and 0049 |
 | [0036](0036-typed-run-failures.md) | Typed run failures | Accepted |
-| [0037](0037-joining-stackrs-network.md) | Joining stackr's network when it runs | Accepted |
-| [0038](0038-dashboards-generated-tested-and-released.md) | Dashboards generated, tested and released | Accepted |
+| [0037](0037-joining-stackrs-network.md) | Joining stackr's network when it runs | Accepted; its override superseded by lattice ADR-0009 |
+| [0038](0038-dashboards-generated-tested-and-released.md) | Dashboards generated, tested and released | Accepted; its release assets superseded by 0050 |
 | [0039](0039-namespaced-event-types.md) | Namespaced event types | Accepted |
 | [0040](0040-telemetry-that-composes-across-libraries.md) | Telemetry that composes across libraries, untraced polling and mirror cursors | Accepted |
 | [0041](0041-executing-runs.md) | Executing runs | Accepted |
@@ -47,7 +47,10 @@ Each record captures one decision: the context that forced it, the options consi
 | [0043](0043-graph-checkpoints.md) | Graph checkpoints | Accepted |
 | [0044](0044-surfaces.md) | Surfaces | Accepted; partly superseded by 0047 |
 | [0045](0045-scores-on-evalr.md) | Scores on evalr | Accepted |
-| [0046](0046-one-docs-build.md) | One docs build | Accepted |
+| [0046](0046-one-docs-build.md) | One docs build | Accepted, amended by 0049 |
 | [0047](0047-commands-carried-out-once-per-id.md) | Commands carried out once per id | Accepted |
+| [0048](0048-reflexr-in-lattice.md) | reflexr in lattice | Accepted |
+| [0049](0049-one-site-for-the-family.md) | One site for the family | Accepted |
+| [0050](0050-dashboards-from-the-checkout.md) | Dashboards from the checkout | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

@@ -30,6 +30,7 @@ from artifactr.core import (
     Forbidden,
     GiveFeedback,
     JsonPatch,
+    MessageKind,
     Outcome,
     PostMessage,
     ProposeChange,
@@ -431,13 +432,19 @@ class ArtifactrMcp:
             thread_id: str,
             content: str,
             ctx: Context,
+            kind: MessageKind = "message",
             command_id: _CommandId = None,
         ) -> str:
-            """Post a message in a thread. The thread's agent reads it and may reply."""
+            """Post a message in a thread. The thread's agent reads it and may reply.
+
+            A ``notice`` is for the people in the thread instead, and starts no run.
+            """
             workspace = await self._workspace(ctx, workspace_id)
-            command = PostMessage(thread_id=thread_id, content=content)
+            command = PostMessage(thread_id=thread_id, content=content, kind=kind)
             outcome = await self._outcome(workspace, command, command_id)
             run_id = outcome.run_id if isinstance(outcome, Recorded) else None
+            if kind == "notice":
+                return "Posted a notice; it starts no run."
             if run_id is None:
                 return "Posted; the agent already working in this thread will see it."
             return f"Posted; the agent started run {run_id}."

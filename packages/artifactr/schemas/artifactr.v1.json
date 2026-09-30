@@ -1414,10 +1414,19 @@
       "type": "string"
     },
     "MessagePosted": {
-      "description": "A message was posted in a thread. Its author is the envelope's actor.",
+      "description": "A message, or a notice, was posted in a thread. Its author is the envelope's actor.",
       "properties": {
         "content": {
           "title": "Content",
+          "type": "string"
+        },
+        "kind": {
+          "default": "message",
+          "enum": [
+            "message",
+            "notice"
+          ],
+          "title": "Kind",
           "type": "string"
         },
         "message_id": {
@@ -1551,11 +1560,20 @@
     },
     "PostMessage": {
       "additionalProperties": false,
-      "description": "Post a message in a thread, attributed to the actor who commits it.",
+      "description": "Post a message, or a notice, in a thread, attributed to the actor who commits it.",
       "properties": {
         "content": {
           "minLength": 1,
           "title": "Content",
+          "type": "string"
+        },
+        "kind": {
+          "default": "message",
+          "enum": [
+            "message",
+            "notice"
+          ],
+          "title": "Kind",
           "type": "string"
         },
         "message_id": {

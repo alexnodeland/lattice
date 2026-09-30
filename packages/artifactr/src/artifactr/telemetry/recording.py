@@ -38,6 +38,7 @@ from artifactr.telemetry.attributes import (
     FEEDBACK_TYPE,
     GEN_AI_TOKEN_TYPE,
     GEN_AI_TOOL_NAME,
+    MESSAGE_KIND,
     PROPOSAL_ACTION,
     RUN_REASON,
     RUN_STATUS,
@@ -158,7 +159,7 @@ def record_events(
     for event in events:
         match event:
             case MessagePosted():
-                telemetry.add(MESSAGES, 1, by_actor)
+                telemetry.add(MESSAGES, 1, {**by_actor, MESSAGE_KIND: event.kind})
             case ArtifactCreated() | ArtifactChanged() | ArtifactArchived():
                 change = event.type.removeprefix("artifact_")
                 attributes = {**by_actor, ARTIFACT_KIND: event.kind, CHANGE: change}

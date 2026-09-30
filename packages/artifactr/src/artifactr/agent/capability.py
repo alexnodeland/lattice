@@ -3,7 +3,8 @@
 Add it to an agent whose ``deps_type`` is :class:`~artifactr.agent.Session`. It contributes
 the generic artifact tools and instructions, and its hooks make every run a participant in the
 workspace: runs and tool calls are recorded, what others did is told to the agent, and messages
-sent during a run steer it.
+sent during a run steer it. Notices are for people, so the agent is not told of them unless it
+asks (ADR-0051).
 
 Its hooks run inside pydantic-ai's spans when the agent is instrumented: ``wrap_run`` inside
 ``invoke_agent`` and ``wrap_tool_execute`` inside ``execute_tool``. They add artifactr's
@@ -102,6 +103,9 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         max_render_chars: How much of each followed artifact's rendering to include in the
             instructions.
         max_summary_chars: How much of each tool call's arguments and result to record.
+        notices: Tell the agent about the notices others post in its thread, as change notes,
+            when a run starts and while it runs, so they are kept in its history. They are left
+            out by default.
     """
 
     types: Sequence[type[Artifact]]
@@ -109,6 +113,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
     ask: bool = False
     max_render_chars: int = 4000
     max_summary_chars: int = 200
+    notices: bool = False
     _toolset: FunctionToolset[Session[Any]] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -174,6 +179,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             after_seq=await last_seen(workspace, session.thread_id),
             before_seq=watch_after + 1,
             focus=thread.focus,
+            notices=self.notices,
         )
         if notes:
             ctx.enqueue(_wrap(notes))
@@ -200,13 +206,15 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         try:
             async for envelope in workspace.subscribe(after_seq=after_seq, threads={thread_id}):
                 event = envelope.event
-                if isinstance(event, FocusChanged) and event.thread_id == thread_id:
+                if isinstance(event, FocusChanged):
                     focus = set(event.artifact_ids)
                 elif same_participant(envelope.actor, workspace.actor):
                     continue
-                elif isinstance(event, MessagePosted) and event.thread_id == thread_id:
+                elif isinstance(event, MessagePosted) and event.kind == "message":
                     ctx.enqueue(event.content)
-                elif notes := change_notes([envelope], viewer=workspace.actor, focus=focus):
+                elif notes := change_notes(
+                    [envelope], viewer=workspace.actor, focus=focus, notices=self.notices
+                ):
                     ctx.enqueue(_wrap(notes))
         except Exception:
             logger.exception(

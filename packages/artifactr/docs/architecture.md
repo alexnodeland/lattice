@@ -106,7 +106,7 @@ save(result)  # entities and events, in one transaction
 - `needs` returns the ids of the artifacts, proposals, threads, runs and messages a command depends on. Some commands only know their full needs once their first entities are loaded (accepting a proposal needs the proposal before it knows which artifact), so hosts loop until nothing is missing.
 - `commit` decides a command. For artifact changes it applies the type's write policy, checks the base version, applies the patch, and validates the result against the type. It returns a `CommitResult`: the outcome (`Applied`, `Proposed`, `Resolved` or `Recorded`), the entities to save, the revisions to append, and the events to log. Accepting or rejecting a proposal is the `RespondToProposal` command; an accepted change is rebased onto the artifact's current version, with the person's own changes layered on top.
 - `record` decides a fact about an agent run (`RunStarted`, `ToolCalled`, `ToolReturned`, `RunPaused`, `RunEnded`) or an application `AppEvent`. Only the thread's own agent, or the system, may record facts about its runs.
-- `change_notes` turns a slice of the log into short, attributed notes for a viewer. It keeps changes by other participants to the artifacts the viewer follows (and artifacts created in the viewer's thread), proposals others made on them, and decisions on the viewer's own proposals; several changes to one artifact become one note.
+- `change_notes` turns a slice of the log into short, attributed notes for a viewer. It keeps changes by other participants to the artifacts the viewer follows (and artifacts created in the viewer's thread), proposals others made on them, and decisions on the viewer's own proposals; several changes to one artifact become one note. Asked with `notices=True`, it also keeps the notices others posted in the viewer's thread.
 - `resume` decides where a reconnecting client's replay starts, and whether it must reset because it has seen events the log does not have.
 
 Commands carry the ids of everything they create, including the proposal id to use if a write policy turns the change into a proposal. The same command against the same state therefore always yields the same result. Ids are plain strings; aliases such as `ArtifactId` document intent.
@@ -281,6 +281,7 @@ Application tools emit ephemeral progress with `ctx.emit(...)`. `ArtifactDraft(k
 - When a run starts, the agent receives the notes it has missed, such as *"Alice changed plan_1 (plan, v7 → v8): completed Ship v1"*. They cover only the artifacts the thread follows (plus artifacts created in the thread), exclude the agent's own changes, and are delivered as a user-prompt part wrapped in `<workspace-changes>` tags, so they are stored in history with the rest of the conversation.
 - The last-seen point is the `seq` at which the thread's history was last saved, so nothing is reported twice and nothing is skipped.
 - While a run is in progress, a watcher subscribes to the log. Others' changes to followed artifacts are delivered the same way, and a new message in the thread is delivered as-is: a person can steer a long run without stopping it. Both use `ctx.enqueue(priority="asap")`, so they reach the model at its next request.
+- A notice, a message of kind `notice`, is for people: it starts, steers and answers no run, and clients can show it apart from the conversation. The agent is told of notices only if the application asks, with `ArtifactWorkspace(notices=True)`: they then arrive as notes, when a run starts and while it runs ([ADR-0051](adr/0051-notices.md)).
 
 ### Proposals and pausing
 
@@ -359,7 +360,7 @@ The run holds a thread claim, not a socket: if the connection that started it dr
 
 ## Surfaces
 
-Every surface is a thin adapter: it authenticates, opens the workspace for the client, turns its input into commands, and hands each to `Runner.execute(workspace, command, command_id=...)`, which returns its `command_result` ([ADR-0048](adr/0048-surfaces-over-the-runner.md)). Messages therefore start, steer or answer runs the same way everywhere, and every other command is a plain `Workspace.commit`. Authentication and authorization are the host's: the router takes `resolve_actor` and the MCP server `resolve`, and both take the same `authorize(tenant_id, workspace_id, actor)` hook (`artifactr.workspace.Authorize`) and pass it to `Workspaces.open(..., authorize=)`, which refuses a workspace with `Forbidden`. The MCP server also opens a workspace that way before a resource read or subscription.
+Every surface is a thin adapter: it authenticates, opens the workspace for the client, turns its input into commands, and hands each to `Runner.execute(workspace, command, command_id=...)`, which returns its `command_result` ([ADR-0048](adr/0048-surfaces-over-the-runner.md)). Messages therefore start, steer or answer runs the same way everywhere, and every other command, notices included, is a plain `Workspace.commit`. Authentication and authorization are the host's: the router takes `resolve_actor` and the MCP server `resolve`, and both take the same `authorize(tenant_id, workspace_id, actor)` hook (`artifactr.workspace.Authorize`) and pass it to `Workspaces.open(..., authorize=)`, which refuses a workspace with `Forbidden`. The MCP server also opens a workspace that way before a resource read or subscription.
 
 | Surface | Package | Role |
 |---|---|---|
@@ -478,7 +479,7 @@ The metric registry, `artifactr.telemetry.metrics`, declares every metric with i
 | `artifactr.runs` | counter | `artifactr.run.status` and `artifactr.run.reason`, for each segment that ends or pauses |
 | `artifactr.tool_calls` | counter | `gen_ai.tool.name`, `artifactr.tool.status` |
 | `artifactr.tokens` | counter | `gen_ai.token.type` |
-| `artifactr.messages` | counter | `artifactr.actor.kind` |
+| `artifactr.messages` | counter | `artifactr.message.kind` (`message`, `notice`), `artifactr.actor.kind` |
 | `artifactr.artifact.changes` | counter | `artifactr.artifact.kind`, `artifactr.change`, `artifactr.actor.kind` |
 | `artifactr.proposals` | counter | `artifactr.proposal.action`, `artifactr.actor.kind` |
 | `artifactr.feedback` | counter | `artifactr.feedback.type`, `artifactr.feedback.target`, `artifactr.actor.kind` |
@@ -642,6 +643,8 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0047](adr/0047-cancel-safe-storage.md) | Cancel-safe storage |
 | [0048](adr/0048-surfaces-over-the-runner.md) | Surfaces over the runner |
 | [0049](adr/0049-scores-on-evalr.md) | Scores on evalr |
+| [0050](adr/0050-one-docs-build.md) | One docs build |
+| [0051](adr/0051-notices.md) | Notices: messages that start no turn |
 
 ## Open questions
 

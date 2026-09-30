@@ -92,7 +92,8 @@
             "thread_id": "thr_1",
             "message_id": "msg_1",
             "content": "Let's ship Monday",
-            "run_id": null
+            "run_id": null,
+            "kind": "message"
           }
         ],
         "messages": [
@@ -198,6 +199,81 @@
       "expect": {
         "rejection": {
           "type": "invalid_state"
+        }
+      }
+    },
+    {
+      "name": "a rule posts a notice",
+      "actor": {
+        "kind": "external_agent",
+        "client_id": "reflexr:timeline-entry",
+        "name": "timeline-entry"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ]
+      },
+      "command": {
+        "type": "post_message",
+        "thread_id": "thr_1",
+        "message_id": "msg_1",
+        "content": "The rule timeline-entry is live",
+        "kind": "notice"
+      },
+      "expect": {
+        "outcome": {
+          "type": "recorded"
+        },
+        "events": [
+          {
+            "type": "message_posted",
+            "thread_id": "thr_1",
+            "message_id": "msg_1",
+            "content": "The rule timeline-entry is live",
+            "run_id": null,
+            "kind": "notice"
+          }
+        ],
+        "messages": [
+          "msg_1"
+        ]
+      }
+    },
+    {
+      "name": "a notice's id is a message id",
+      "actor": {
+        "kind": "external_agent",
+        "client_id": "reflexr:timeline-entry",
+        "name": "timeline-entry"
+      },
+      "given": {
+        "threads": [
+          {
+            "id": "thr_1",
+            "title": "Launch",
+            "mode": "edit"
+          }
+        ],
+        "messages": [
+          "msg_1"
+        ]
+      },
+      "command": {
+        "type": "post_message",
+        "thread_id": "thr_1",
+        "message_id": "msg_1",
+        "content": "The rule timeline-entry is live",
+        "kind": "notice"
+      },
+      "expect": {
+        "rejection": {
+          "type": "invalid_state",
+          "message": "message msg_1 already exists"
         }
       }
     },

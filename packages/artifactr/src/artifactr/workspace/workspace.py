@@ -45,6 +45,7 @@ from artifactr.core import (
     GiveFeedback,
     InvalidState,
     MessageId,
+    MessageKind,
     Note,
     NotFound,
     Outcome,
@@ -312,18 +313,27 @@ class Workspace:
         return await self.thread(command.thread_id)
 
     async def post_message(
-        self, thread_id: ThreadId, content: str, *, message_id: MessageId | None = None
+        self,
+        thread_id: ThreadId,
+        content: str,
+        *,
+        message_id: MessageId | None = None,
+        kind: MessageKind = "message",
     ) -> Recorded:
-        """Post a message in a thread as this handle's actor.
+        """Post a message, or a notice, in a thread as this handle's actor.
 
         Args:
             thread_id: The thread to post in.
             content: What the message says.
             message_id: The message's id; a new one when omitted. An id already used in the
                 workspace is refused with :class:`~artifactr.core.InvalidState`.
+            kind: ``notice`` for a notice, which is for people and starts no run (ADR-0051).
         """
         message = PostMessage(
-            thread_id=thread_id, content=content, message_id=message_id or new_message_id()
+            thread_id=thread_id,
+            content=content,
+            message_id=message_id or new_message_id(),
+            kind=kind,
         )
         return await self.commit(message)
 
@@ -532,6 +542,7 @@ class Workspace:
         before_seq: int | None = None,
         focus: Collection[ArtifactId] | None = None,
         viewer: Actor | None = None,
+        notices: bool = False,
     ) -> list[Note]:
         """Return notes about what others did in the window ``after_seq < seq < before_seq``.
 
@@ -540,11 +551,13 @@ class Workspace:
             before_seq: Only consider envelopes with a lesser ``seq``; ``None`` reads to the head.
             focus: The artifacts the viewer follows; ``None`` means all.
             viewer: Who the notes are for; defaults to this handle's actor.
+            notices: Include the notices others posted in the viewer's thread, when the viewer
+                is a thread's agent.
         """
         envelopes = await self._storage.read(
             self._scope, after_seq=after_seq, before_seq=before_seq
         )
-        return change_notes(envelopes, viewer=viewer or self._actor, focus=focus)
+        return change_notes(envelopes, viewer=viewer or self._actor, focus=focus, notices=notices)
 
     async def cursor(self, name: str) -> int:
         """Return how far a named consumer of the log has got: the ``seq`` it saved, or 0.

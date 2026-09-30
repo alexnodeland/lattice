@@ -8,6 +8,10 @@ comes from:
 - In a thread whose run is paused on questions, it is the reply: questions are answered with
   it, approvals are declined with it as the reason, and the run resumes.
 
+A notice, a ``post_message`` of kind ``notice``, is for people: it is committed as it is, so it
+starts no run, and the thread's agent is not told unless its capability asks for notices
+(ADR-0051).
+
 Runs are asyncio tasks in this process. Their live frames go to :attr:`Runner.live`, where any
 connection can :meth:`Runner.watch` them. An application stops them with :meth:`Runner.aclose`
 as it shuts down, before its storage closes. A run whose process dies instead stays ``running``
@@ -216,7 +220,8 @@ class Runner[AppDepsT]:
 
         Messages and answers go through :meth:`send` and :meth:`answer`, so they start, steer
         and resume runs; ``stop_run`` stops a run of this workspace that runs in this process;
-        everything else is committed as-is. A rejection is the result, not raised.
+        everything else, notices included, is committed as-is. A rejection is the result, not
+        raised.
 
         A command is known by its tenant, workspace, sender (the handle's actor, as a
         participant) and ``command_id``. The first time, it is carried out and its result is
@@ -329,7 +334,7 @@ class Runner[AppDepsT]:
 
     async def _carry_out(self, workspace: Workspace, command: Command | StopRun) -> Outcome:
         match command:
-            case PostMessage():
+            case PostMessage(kind="message"):
                 sent = await self.send(
                     workspace, command.thread_id, command.content, message_id=command.message_id
                 )

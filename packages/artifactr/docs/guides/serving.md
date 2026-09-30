@@ -94,7 +94,7 @@ curl -X POST localhost:8000/v1/workspaces/launch/commands \
 {"type": "command_result", "command_id": "c_1", "ok": true, "outcome": {"seq": 12, "type": "recorded", "run_id": "run_8"}, "rejection": null}
 ```
 
-A message's outcome names the run it started or resumed, which `GET /workspaces/{workspace_id}/runs/{run_id}` reads; `run_id` is `null` when the message steered the thread's active run instead.
+A message's outcome names the run it started or resumed, which `GET /workspaces/{workspace_id}/runs/{run_id}` reads; `run_id` is `null` when the message steered the thread's active run instead, or was a notice.
 
 A rejection answers with its status code (`STATUS_CODES`): 409 for `version_conflict` and `invalid_state`, 422 for `validation_failed` and `patch_failed`, 404 for `not_found` and 403 for `forbidden`. The body is still a `command_result`, with `ok: false` and the rejection's details.
 

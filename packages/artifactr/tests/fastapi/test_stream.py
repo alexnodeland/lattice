@@ -161,6 +161,20 @@ def test_commands_invalid_frames_and_rejections(client: TestClient) -> None:
         assert (rejected["ok"], rejected["rejection"]["type"]) == (False, "not_found")
 
 
+def test_a_notice_arrives_as_a_notice(client: TestClient) -> None:
+    _post(client, "c1", type="create_thread", thread_id="t1")
+    with client.websocket_connect(STREAM) as ws:
+        ws.send_json(hello(from_head=True))
+        _receive_until(ws, "replay_complete")
+        notice = command("c2", type="post_message", thread_id="t1", content="Hi", kind="notice")
+        ws.send_json(notice)
+        frames = [ws.receive_json(), ws.receive_json()]
+        [event] = [f["event"] for f in frames if f["type"] == "event"]
+        [result] = [f for f in frames if f["type"] == "command_result"]
+        assert (event["type"], event["kind"]) == ("message_posted", "notice")
+        assert result["outcome"]["run_id"] is None, "it started no run"
+
+
 def test_a_command_that_crashes_reports_an_error(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

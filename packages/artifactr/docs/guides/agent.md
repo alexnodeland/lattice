@@ -27,7 +27,7 @@ runner = Runner(agent, app=AppDeps(search=SearchClient()))
 ```
 
 - **`deps_type=Session[AppDeps]`.** The run's dependencies are a `Session`: `workspace` (a handle acting as this thread's agent), `thread_id`, `run_id`, and `app`, your own dependencies. Use `Session[None]` if you have none.
-- **`ArtifactWorkspace(types=...)`** lists the artifact types the agent may create. `ask=True` adds the `ask_user` tool (see [Pausing](#pausing-for-people)); `max_render_chars` (4,000) limits how much of each followed artifact goes into the instructions; `max_summary_chars` (200) limits how much of each tool call's arguments and result is recorded.
+- **`ArtifactWorkspace(types=...)`** lists the artifact types the agent may create. `ask=True` adds the `ask_user` tool (see [Pausing](#pausing-for-people)); `max_render_chars` (4,000) limits how much of each followed artifact goes into the instructions; `max_summary_chars` (200) limits how much of each tool call's arguments and result is recorded; `notices=True` tells the agent about notices (see [Notices](#notices)).
 - **`Runner(agent, app=...)`** passes `app` to every run as `ctx.deps.app`. Its other options are `agent_name` (how the agent is named in the workspace, `"assistant"` by default), `claim_ttl` (how long a thread claim survives a dead process, 30 seconds), `live` (where live output goes; see [Live output](live-output.md)) and `results` (where commands' results are remembered, so a retried command is carried out once; see [Serving](serving.md#rest)).
 
 The capability composes with any other capabilities, toolsets, output types and model settings the agent has. A turn is an ordinary pydantic-ai run.
@@ -102,6 +102,28 @@ The agent is told what other participants did, as short notes in their own words
 - **While a run is in progress**, a watcher follows the log. Others' changes to followed artifacts arrive as notes, and a new message in the thread arrives as-is. Both reach the model at its next request, so a person can steer a long run without stopping it.
 
 Notes cover the artifacts the thread follows, plus artifacts created in the thread. They leave out the agent's own changes, including those of its earlier runs: every run of one thread's agent is the same participant. They arrive as user-prompt parts, so they are stored in the model history with the rest of the conversation.
+
+## Notices
+
+A notice is a message for the people in a thread rather than its agent, such as a rule saying it has gone live: a `PostMessage` of kind `notice` ([ADR-0051](../adr/0051-notices.md)). Whoever may post a message may post a notice.
+
+```python
+from artifactr.core import ExternalAgentActor
+
+rule = ws.as_actor(ExternalAgentActor(client_id="reflexr:timeline-entry", name="timeline-entry"))
+await rule.post_message(thread.id, "The rule is live.", kind="notice")
+```
+
+- **It starts no run, steers none and answers no paused run,** from every surface: `Runner.execute` commits it as it is, and `runner.send` posts messages only.
+- **Clients can show it apart:** its `message_posted` has `kind: "notice"`.
+- **Its `message_id` is used once,** as a message's is.
+- **The agent is not told,** so a notice stays out of the model history, unless the application asks with `ArtifactWorkspace(types=..., notices=True)`. The agent is then told of the notices others post in its thread as notes, when a run starts and while it runs:
+
+```text
+<workspace-changes>
+- timeline-entry posted a notice: The rule is live.
+</workspace-changes>
+```
 
 ## Running the agent
 

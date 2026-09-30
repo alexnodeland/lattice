@@ -16,7 +16,7 @@ from typing import Annotated, Final, Literal, cast, get_args
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, JsonValue, Tag
 
 from artifactr.core.actors import Actor
-from artifactr.core.commands import ProposedChange, ThreadMode
+from artifactr.core.commands import MessageKind, ProposedChange, ThreadMode
 from artifactr.core.feedback import FeedbackTarget
 from artifactr.core.ids import (
     ArtifactId,
@@ -62,13 +62,14 @@ class FocusChanged(_Event):
 
 
 class MessagePosted(_Event):
-    """A message was posted in a thread. Its author is the envelope's actor."""
+    """A message, or a notice, was posted in a thread. Its author is the envelope's actor."""
 
     type: Literal["message_posted"] = "message_posted"
     thread_id: ThreadId
     message_id: MessageId
     content: str
     run_id: RunId | None = None
+    kind: MessageKind = "message"
 
 
 # ─── artifacts and proposals ──────────────────────────────────────────────────

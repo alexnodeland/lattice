@@ -3,7 +3,8 @@
 :func:`change_notes` turns a slice of the log into short, attributed notes. It keeps only
 what the viewer should hear about: changes by *other* participants to the artifacts the
 viewer is focused on (or created in the viewer's thread), proposals others made on those
-artifacts, and decisions on the viewer's own proposals.
+artifacts, decisions on the viewer's own proposals, and, when asked, notices others posted
+in the viewer's thread (ADR-0051).
 """
 
 from collections.abc import Collection, Iterable
@@ -17,6 +18,7 @@ from artifactr.core.events import (
     ArtifactChanged,
     ArtifactCreated,
     Envelope,
+    MessagePosted,
     ProposalCreated,
     ProposalResolved,
 )
@@ -74,7 +76,21 @@ class ProposalNote(BaseModel):
         return f"{text}: {self.detail}" if self.detail else text
 
 
-Note = ChangeNote | ProposalNote
+class NoticeNote(BaseModel):
+    """A notice someone else posted in the viewer's thread."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["notice"] = "notice"
+    actor: str
+    content: str
+
+    def render(self) -> str:
+        """Return the note as text."""
+        return f"{self.actor} posted a notice: {self.content}"
+
+
+Note = ChangeNote | ProposalNote | NoticeNote
 
 
 def change_notes(
@@ -82,6 +98,7 @@ def change_notes(
     *,
     viewer: Actor,
     focus: Collection[ArtifactId] | None = None,
+    notices: bool = False,
 ) -> list[Note]:
     """Return notes about what others did, in the order it happened.
 
@@ -89,10 +106,12 @@ def change_notes(
         envelopes: A slice of the log, in ``seq`` order.
         viewer: Who the notes are for; their own actions are left out.
         focus: The artifacts the viewer follows. ``None`` means every artifact.
+        notices: Include the notices others posted in the viewer's thread, when the viewer is
+            a thread's agent.
 
     Returns:
-        One :class:`ChangeNote` per artifact others changed, and one :class:`ProposalNote` per
-        relevant proposal event.
+        One :class:`ChangeNote` per artifact others changed, one :class:`ProposalNote` per
+        relevant proposal event, and, with ``notices``, one :class:`NoticeNote` per notice.
     """
     envelopes = list(envelopes)
     own_proposals = {
@@ -102,7 +121,7 @@ def change_notes(
         and same_participant(env.event.proposed_by, viewer)
     }
     thread_id = viewer.thread_id if isinstance(viewer, AgentActor) else None
-    slots: list[ArtifactId | ProposalNote] = []
+    slots: list[ArtifactId | ProposalNote | NoticeNote] = []
     changes: dict[ArtifactId, _Accumulator] = {}
     for env in envelopes:
         event = env.event
@@ -135,6 +154,8 @@ def change_notes(
             case ProposalResolved():
                 if event.proposal_id in own_proposals:
                     slots.append(_decision_note(event, env.actor.display_name))
+            case MessagePosted(kind="notice") if notices and event.thread_id == thread_id:
+                slots.append(NoticeNote(actor=env.actor.display_name, content=event.content))
             case _:
                 pass
     return [changes[slot].note() if isinstance(slot, str) else slot for slot in slots]

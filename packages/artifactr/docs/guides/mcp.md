@@ -86,7 +86,7 @@ The tools that change something:
 | `edit_artifact(workspace_id, artifact_id, base_version, ops, summary=None, propose=False, rationale=None)` | Applies JSON Patch operations |
 | `archive_artifact(workspace_id, artifact_id)` | Archives an artifact |
 | `respond_to_proposal(workspace_id, proposal_id, decision, reason=None)` | Accepts or rejects someone else's proposal |
-| `post_message(workspace_id, thread_id, content)` | Posts a message in a thread, and says which run it started |
+| `post_message(workspace_id, thread_id, content, kind="message")` | Posts a message in a thread, and says which run it started; a `notice` is for people, and starts no run |
 | `give_feedback(workspace_id, feedback_type, target, value=None)` | Gives feedback of an application's type on an artifact, thread, turn or message |
 
 Each also takes an optional `command_id` ([Retries](#retries)). The reads cover [REST](serving.md#rest)'s reads of artifacts, revisions, proposals, threads, runs and the log:

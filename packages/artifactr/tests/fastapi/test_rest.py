@@ -142,6 +142,15 @@ def test_a_posted_message_runs_the_agent() -> None:
         )
 
 
+def test_a_notice_starts_no_run_and_reads_as_a_notice(client: TestClient) -> None:
+    client.post(f"{BASE}/commands", json=command("c1", type="create_thread", thread_id="t1"))
+    notice = command("c2", type="post_message", thread_id="t1", content="Deployed", kind="notice")
+    posted = client.post(f"{BASE}/commands", json=notice)
+    assert posted.json()["outcome"] == {"type": "recorded", "seq": 2, "run_id": None}
+    [event] = client.get(f"{BASE}/events", params={"after_seq": 1}).json()
+    assert (event["event"]["type"], event["event"]["kind"]) == ("message_posted", "notice")
+
+
 def test_feedback_is_a_command_like_any_other(client: TestClient) -> None:
     client.post(f"{BASE}/commands", json=command("c1", type="create_thread", thread_id="t1"))
     feedback = command(

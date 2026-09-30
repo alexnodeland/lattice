@@ -200,7 +200,7 @@ A context is read **as of the end of its target**, so a dataset built weeks late
 | An artifact version | The change that made it | The revision, the version as its type, and the trace it was committed in |
 | A thread | The feedback | |
 
-Every context also has the thread's transcript (its `message_posted` envelopes) and the artifacts the thread followed then, at their versions then. Example ids are the envelopes' ids, and examples carry their target's trace id, so datasets link back to traces. Pass `targets={"turn"}` to take one kind of target.
+Every context also has the thread's transcript (the `message_posted` envelopes of its messages, not its notices) and the artifacts the thread followed then, at their versions then. Example ids are the envelopes' ids, and examples carry their target's trace id, so datasets link back to traces. Pass `targets={"turn"}` to take one kind of target.
 
 Evaluators' own verdicts are left out unless you pass `include_evaluators=True`: online evaluators record feedback of the same types, and a judge must not be trained on its own verdicts. The source passes evalr's `check_feedback_source` contract.
 

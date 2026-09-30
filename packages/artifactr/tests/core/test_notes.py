@@ -14,7 +14,10 @@ from artifactr.core import (
     CreateArtifact,
     EditArtifact,
     Envelope,
+    ExternalAgentActor,
     KnownEvent,
+    MessagePosted,
+    NoticeNote,
     ProposalCreated,
     ProposalNote,
     ProposalResolved,
@@ -102,8 +105,23 @@ def test_focus_limits_notes_but_creations_in_the_viewers_thread_are_kept() -> No
         viewer=AGENT,
         focus={"n1"},
     )
-    assert [note.artifact_id for note in notes] == ["n1", "n3"]
-    assert notes[1].render() == "Alice created n3 (note, v1)"
+    assert [note.render() for note in notes] == [
+        "Alice changed n1 (note, v1 → v2): followed",
+        "Alice created n3 (note, v1)",
+    ]
+
+
+def test_notices_in_the_viewers_thread_when_asked() -> None:
+    rule = ExternalAgentActor(client_id="reflexr:timeline-entry", name="timeline-entry")
+    log = [
+        env(rule, MessagePosted(thread_id="t1", message_id="m1", content="Live", kind="notice")),
+        env(rule, MessagePosted(thread_id="t9", message_id="m2", content="Other", kind="notice")),
+        env(ALICE, MessagePosted(thread_id="t1", message_id="m3", content="Hi")),
+    ]
+    assert change_notes(log, viewer=AGENT) == [], "left out by default"
+    [note] = change_notes(log, viewer=AGENT, notices=True)
+    assert note == NoticeNote(actor="timeline-entry", content="Live"), "not t9's, nor a message"
+    assert note.render() == "timeline-entry posted a notice: Live"
 
 
 def test_creation_then_changes_and_archiving() -> None:

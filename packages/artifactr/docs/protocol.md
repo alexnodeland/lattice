@@ -88,7 +88,7 @@ Every durable event arrives in the same envelope. The stored envelope and the wi
 | `thread_created` | thread | `thread_id`, `title` |
 | `thread_mode_changed` | thread | `thread_id`, `mode` (`edit`, `suggest`) |
 | `focus_changed` | thread | `thread_id`, `artifact_ids` |
-| `message_posted` | thread | `thread_id`, `message_id`, `content`, `run_id?`. The author is the envelope's actor. |
+| `message_posted` | thread | `thread_id`, `message_id`, `content`, `run_id?`, `kind` (`message`, `notice`). The author is the envelope's actor. A `notice` is for people, not the thread's agent, so clients can show it apart from the conversation. |
 | `artifact_created` | workspace | `artifact_id`, `kind`, `version`, `data`, `proposal_id?` |
 | `artifact_changed` | workspace | `artifact_id`, `kind`, `version`, `patch`, `summary`, `proposal_id?` |
 | `artifact_archived` | workspace | `artifact_id`, `kind`, `version`, `proposal_id?` |
@@ -149,7 +149,7 @@ Every command gets exactly one result.
 }
 ```
 
-`outcome.type` is `applied` (`artifact_id`, `version`), `proposed` (`proposal_id`), `resolved` (`proposal_id`, `decision`, `version?`) or `recorded` (`run_id?`: the run a `post_message` or `answer_deferred` started or resumed, or `null` when it steered the thread's active run or left a paused run's requests unanswered). `rejection.type` is one of `version_conflict`, `validation_failed`, `patch_failed`, `not_found`, `forbidden` or `invalid_state`; every rejection has a `message` and its typed details.
+`outcome.type` is `applied` (`artifact_id`, `version`), `proposed` (`proposal_id`), `resolved` (`proposal_id`, `decision`, `version?`) or `recorded` (`run_id?`: the run a `post_message` or `answer_deferred` started or resumed, or `null` when it steered the thread's active run, left a paused run's requests unanswered, or was a notice). `rejection.type` is one of `version_conflict`, `validation_failed`, `patch_failed`, `not_found`, `forbidden` or `invalid_state`; every rejection has a `message` and its typed details.
 
 ### `replay_complete`
 
@@ -182,7 +182,7 @@ The command is one of the `Command` models in `artifactr.core`, or `stop_run` or
 | `type` | Fields | Effect |
 |---|---|---|
 | `create_thread` | `thread_id?`, `title?` | `thread_created` |
-| `post_message` | `thread_id`, `content`, `message_id?` | `message_posted`. Starts a run if the thread is idle, steers the running run if there is one, and answers a paused run's pending requests (declining approvals, with the message as the reason) before resuming it. A `message_id` already used in the workspace is `invalid_state`. |
+| `post_message` | `thread_id`, `content`, `message_id?`, `kind?` (`message`, the default, or `notice`) | `message_posted`. A message starts a run if the thread is idle, steers the running run if there is one, and answers a paused run's pending requests (declining approvals, with the message as the reason) before resuming it. A notice does none of these, and the thread's agent is told of it only if the application asks ([ADR-0051](adr/0051-notices.md)). A `message_id` already used in the workspace, by a message or a notice, is `invalid_state`. |
 | `set_focus` | `thread_id`, `artifact_ids` | `focus_changed` |
 | `set_thread_mode` | `thread_id`, `mode` (`edit`, `suggest`) | `thread_mode_changed` |
 | `create_artifact` | `kind`, `data`, `artifact_id?`, `thread_id?`, `proposal_id?` | `artifact_created`, or `proposal_created` under the type's write policy |
@@ -260,7 +260,7 @@ External agents connect over MCP (`artifactr.mcp.ArtifactrMcp`) with the same au
 | Tool `list_revisions` | `GET .../artifacts/{artifact_id}/revisions`, as JSON lines. |
 | Tools `list_proposals`, `respond_to_proposal` | Review others' proposals. `list_proposals` takes REST's `status`, `pending` by default. |
 | Tools `list_threads`, `get_thread` | `GET .../threads` and `GET .../threads/{thread_id}`, as JSON lines and JSON. |
-| Tool `post_message` | A message in a thread, handled like any other: it starts, steers or answers the thread's agent. The reply names the run it started. |
+| Tool `post_message` | A message in a thread, handled like any other: it starts, steers or answers the thread's agent. The reply names the run it started. `kind="notice"` posts a notice, which starts no run. |
 | Tool `get_run` | `GET .../runs/{run_id}`, as JSON. |
 | Tool `give_feedback` | Feedback of an application's type on an artifact version, a thread, a turn or a message. |
 | Tool `read_events` | `GET .../events`, as JSON lines, with its window, `threads` and tail. It returns 50 when given neither `limit` nor `last`. |

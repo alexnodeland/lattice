@@ -29,6 +29,7 @@ from artifactr.telemetry.attributes import (
     FEEDBACK_TYPE,
     GEN_AI_TOKEN_TYPE,
     GEN_AI_TOOL_NAME,
+    MESSAGE_KIND,
     OUTCOME,
     PROPOSAL_ACTION,
     REJECTION,
@@ -177,7 +178,8 @@ MESSAGES = _artifactr(
     "artifactr.messages",
     "counter",
     "{message}",
-    "Messages posted in threads, by the kind of actor that posted them.",
+    "Messages and notices posted in threads, by their kind and the kind of actor that posted them.",
+    MESSAGE_KIND,
     ACTOR_KIND,
 )
 ARTIFACT_CHANGES = _artifactr(

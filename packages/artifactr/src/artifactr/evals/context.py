@@ -55,7 +55,8 @@ class TargetContext:
         seq: The log position the context is read at: the end of the target.
         thread: The thread the target belongs to, as it is now; ``None`` for an artifact
             version written outside any thread.
-        transcript: The thread's ``message_posted`` envelopes up to ``seq``, oldest first.
+        transcript: The thread's messages up to ``seq``, not its notices, as ``message_posted``
+            envelopes, oldest first.
         events: The run's envelopes up to ``seq``, for a turn, a message the agent posted, or an
             artifact version the agent wrote: its tool calls, messages, changes and proposals.
         artifacts: The artifacts the thread followed at ``seq``, each at its version then.
@@ -133,7 +134,9 @@ async def read_context(
         transcript=tuple(
             envelope
             for envelope in upto
-            if isinstance(envelope.event, MessagePosted) and envelope.event.thread_id == thread_id
+            if isinstance(envelope.event, MessagePosted)
+            and envelope.event.thread_id == thread_id
+            and envelope.event.kind == "message"
         ),
         events=events,
         artifacts=await _followed(workspace, upto, thread_id),

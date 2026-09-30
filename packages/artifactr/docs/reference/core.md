@@ -70,6 +70,8 @@ Intents to change a workspace. See [Commands and outcomes](../guides/workspaces.
 
 ::: artifactr.core.PostMessage
 
+::: artifactr.core.MessageKind
+
 ::: artifactr.core.SetFocus
 
 ::: artifactr.core.SetThreadMode
@@ -265,6 +267,8 @@ What others did, told to one viewer. See [Change notes](../guides/workspaces.md#
 ::: artifactr.core.ChangeNote
 
 ::: artifactr.core.ProposalNote
+
+::: artifactr.core.NoticeNote
 
 ## Live events
 

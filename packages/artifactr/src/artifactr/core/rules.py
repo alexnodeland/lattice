@@ -557,6 +557,7 @@ def _post_message(command: PostMessage, state: State, actor: Actor) -> CommitRes
                 message_id=command.message_id,
                 content=command.content,
                 run_id=_run_id(actor),
+                kind=command.kind,
             ),
         ),
         messages=(command.message_id,),

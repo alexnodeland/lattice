@@ -176,6 +176,18 @@ async def test_agents_read_the_log_from_its_end_and_backwards(
         assert both == (True, "Error executing tool read_events: give limit or last, not both")
 
 
+async def test_a_notice_starts_no_run(mcp: ArtifactrMcp, ws: Workspace) -> None:
+    thread = await ws.create_thread("Launch")
+    async with Client(mcp.server) as client:
+        posted = await _call(
+            client, "post_message", thread_id=thread.id, content="Deployed", kind="notice"
+        )
+        _, line = await _call(client, "read_events", after_seq=1)
+    assert posted == (False, "Posted a notice; it starts no run.")
+    assert json.loads(line)["event"]["kind"] == "notice"
+    assert await ws.runs() == []
+
+
 async def test_a_retried_command_is_carried_out_once(mcp: ArtifactrMcp, ws: Workspace) -> None:
     async with Client(mcp.server) as client:
         create = {"kind": "note", "data": {"text": "Ship Friday"}, "command_id": "c1"}

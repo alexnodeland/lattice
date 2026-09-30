@@ -27,6 +27,10 @@ from artifactr.core.patches import Patch
 ThreadMode = Literal["edit", "suggest"]
 """How agents change artifacts in a thread: directly, or always through proposals."""
 
+MessageKind = Literal["message", "notice"]
+"""What a message is for: the thread's agent acts on a ``message``, while a ``notice`` informs
+people and starts or steers no turn (ADR-0051)."""
+
 
 class _Command(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -111,12 +115,13 @@ class CreateThread(_Command):
 
 
 class PostMessage(_Command):
-    """Post a message in a thread, attributed to the actor who commits it."""
+    """Post a message, or a notice, in a thread, attributed to the actor who commits it."""
 
     type: Literal["post_message"] = "post_message"
     thread_id: ThreadId
     message_id: MessageId = Field(default_factory=new_message_id)
     content: str = Field(min_length=1)
+    kind: MessageKind = "message"
 
 
 class SetFocus(_Command):

@@ -34,6 +34,7 @@ from artifactr.core.commands import (
     CreateThread,
     EditArtifact,
     GiveFeedback,
+    MessageKind,
     PostMessage,
     ProposeChange,
     ProposedChange,
@@ -121,7 +122,14 @@ from artifactr.core.live import (
     ThinkingDelta,
     ToolArgsDelta,
 )
-from artifactr.core.notes import ChangeNote, Note, ProposalNote, change_notes, render_notes
+from artifactr.core.notes import (
+    ChangeNote,
+    Note,
+    NoticeNote,
+    ProposalNote,
+    change_notes,
+    render_notes,
+)
 from artifactr.core.patches import (
     JsonPatch,
     Patch,
@@ -220,12 +228,14 @@ __all__ = [
     "LiveFrame",
     "MarkdownArtifact",
     "MessageId",
+    "MessageKind",
     "MessagePosted",
     "MessageTarget",
     "Needs",
     "NotFound",
     "NotLoaded",
     "Note",
+    "NoticeNote",
     "Outcome",
     "PartEnded",
     "PartStarted",

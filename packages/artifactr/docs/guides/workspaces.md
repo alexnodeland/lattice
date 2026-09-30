@@ -40,7 +40,7 @@ Commands are the only way anything changes ([ADR-0002](../adr/0002-single-write-
 | `ProposeChange(change, rationale?)` | Proposes a create, edit or archive for someone else to answer | `Proposed` |
 | `RespondToProposal(proposal_id, decision, changes?, reason?)` | Accepts or rejects a proposal | `Resolved` |
 | `CreateThread(thread_id?, title="")` | Creates a thread (a chat) | `Recorded` |
-| `PostMessage(thread_id, content)` | Posts a message as the handle's actor | `Recorded` |
+| `PostMessage(thread_id, content, kind="message")` | Posts a message, or a notice (`kind="notice"`), as the handle's actor | `Recorded` |
 | `SetFocus(thread_id, artifact_ids)` | Sets the artifacts a thread follows | `Recorded` |
 | `SetThreadMode(thread_id, mode)` | Switches a thread between `"edit"` and `"suggest"` | `Recorded` |
 | `AnswerDeferred(run_id, tool_call_id, answer?, approved?)` | Answers a paused run's question or approval | `Recorded` |
@@ -67,7 +67,7 @@ await ws.commit(plan.archive())  # ArchiveArtifact
 
 !!! tip "Messages that should reach the agent"
 
-    `ws.post_message` only records a message. To post a message that starts, steers or answers the thread's agent, send it through the `Runner` with `runner.send(ws, thread_id, content)`; see [The agent](agent.md#running-the-agent).
+    `ws.post_message` only records a message. To post a message that starts, steers or answers the thread's agent, send it through the `Runner` with `runner.send(ws, thread_id, content)`; see [The agent](agent.md#running-the-agent). A notice, `ws.post_message(thread_id, content, kind="notice")`, is for people instead: the agent is not told of it, even while it runs, unless the application asks; see [Notices](agent.md#notices).
 
 A message id is used once in a workspace, like a thread, artifact or proposal id ([ADR-0045](../adr/0045-a-message-id-is-used-once.md)). Code that retries derives its ids from what it is doing, and treats `InvalidState` as "already done":
 
@@ -220,4 +220,4 @@ print(render_notes(notes))
 - Bob proposed a change to plan_1 (prp_d094e124644e0444): match the tag names
 ```
 
-Notes leave out the viewer's own actions, cover only the artifacts in `focus` (all of them when it is `None`), and combine several changes to one artifact into one note. The viewer defaults to the handle's actor.
+Notes leave out the viewer's own actions, cover only the artifacts in `focus` (all of them when it is `None`), and combine several changes to one artifact into one note. The viewer defaults to the handle's actor. `notices=True` adds the notices others posted in the viewer's thread, when the viewer is a thread's agent.

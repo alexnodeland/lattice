@@ -46,6 +46,7 @@ from artifactr.telemetry.attributes import (
     GEN_AI_CONVERSATION_ID,
     GEN_AI_TOKEN_TYPE,
     GEN_AI_TOOL_NAME,
+    MESSAGE_KIND,
     OUTCOME,
     PATCH_KIND,
     PATCH_SIZE,
@@ -224,6 +225,7 @@ async def test_an_unexpected_failure_is_an_error(
 async def test_what_events_do_is_counted(ws: Workspace, recorder: Recorder) -> None:
     thread = await ws.create_thread()
     await ws.post_message(thread.id, "hello")
+    await ws.post_message(thread.id, "deployed", kind="notice")
     await ws.create(Note(text="a"), artifact_id="n1")
     await ws.commit((await ws.get(Note, "n1")).edit_text("a", "b"))
     await ws.commit((await ws.get(Note, "n1")).archive())
@@ -259,8 +261,9 @@ async def test_what_events_do_is_counted(ws: Workspace, recorder: Recorder) -> N
         RunEnded(run_id="run_2", thread_id=thread.id, status="failed", reason="guardrail_blocked")
     )
 
-    assert recorder.total("artifactr.messages", {ACTOR_KIND: "user"}) == 1
-    assert recorder.total("artifactr.messages", {ACTOR_KIND: "agent"}) == 1
+    for kind, actor_kind in (("message", "user"), ("notice", "user"), ("message", "agent")):
+        where = {MESSAGE_KIND: kind, ACTOR_KIND: actor_kind}
+        assert recorder.total("artifactr.messages", where) == 1
     for change in ("created", "changed", "archived"):
         where = {CHANGE: change, ARTIFACT_KIND: "note", ACTOR_KIND: "user"}
         assert recorder.total("artifactr.artifact.changes", where) == 1

@@ -86,6 +86,12 @@ class Gate:
         await self.release.wait()
 
 
+async def settle() -> None:
+    """Let the tasks that are ready run, such as a run's watcher delivering what was posted."""
+    for _ in range(5):
+        await asyncio.sleep(0)
+
+
 @pytest.fixture
 def gate() -> Gate:
     return Gate()
@@ -124,6 +130,7 @@ def make_agent(
     *,
     tools: Sequence[FunctionToolset[Session[Gate]]] = (),
     ask: bool = False,
+    notices: bool = False,
     output_type: Any = str,
 ) -> Agent[Session[Gate], Any]:
     return Agent(
@@ -131,7 +138,7 @@ def make_agent(
         deps_type=Session[Gate],
         output_type=output_type,
         toolsets=list(tools),
-        capabilities=[ArtifactWorkspace(types=[Note, Checklist], ask=ask)],
+        capabilities=[ArtifactWorkspace(types=[Note, Checklist], ask=ask, notices=notices)],
     )
 
 

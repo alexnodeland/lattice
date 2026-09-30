@@ -21,17 +21,22 @@ from artifactr.core import (
     ToolReturned,
 )
 from artifactr.workspace import Workspace
-from tests.agent.conftest import Gate, Script, call, event_as, make_agent, make_runner, say, types
+from tests.agent.conftest import (
+    Gate,
+    Script,
+    call,
+    event_as,
+    make_agent,
+    make_runner,
+    say,
+    settle,
+    types,
+)
 from tests.artifact_types import Note
 
 
 async def _started(gate: Gate) -> None:
     await asyncio.wait_for(gate.entered.wait(), timeout=2)
-
-
-async def _settle() -> None:
-    for _ in range(5):
-        await asyncio.sleep(0)
 
 
 async def test_a_message_during_a_run_steers_it(
@@ -43,7 +48,7 @@ async def test_a_message_during_a_run_steers_it(
     assert handle is not None
     await _started(gate)
     assert (await runner.send(ws, thread.id, "Actually, make it Monday")).run is None
-    await _settle()
+    await settle()
     gate.release.set()
     await handle.wait()
     assert script.prompt_texts(1)[-1] == "Actually, make it Monday"
@@ -92,7 +97,7 @@ async def test_others_changes_during_a_run_are_delivered(
     await _started(gate)
     await ws.commit((await ws.get(Note, "n1")).edit_text("Friday", "Monday"))
     await ws.create(Note(text="elsewhere"), artifact_id="n2")  # not followed: not delivered
-    await _settle()
+    await settle()
     gate.release.set()
     await handle.wait()
     briefing, during = [t for t in script.prompt_texts(2) if t.startswith("<workspace-changes>")]

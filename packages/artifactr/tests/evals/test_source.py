@@ -133,6 +133,19 @@ async def test_a_message_is_judged_as_it_was_posted(traced: Workspace, recorder:
     assert said(context.transcript) == ["user: Draft a launch note", "agent: Drafted."]
 
 
+async def test_a_transcript_leaves_notices_out(traced: Workspace, recorder: Recorder) -> None:
+    done = await chat(traced, recorder)
+    rule = traced.as_actor(ExternalAgentActor(client_id="reflexr:timeline-entry"))
+    await rule.post_message(done.thread.id, "The rule is live", kind="notice")
+    context = await target_context(traced, ThreadTarget(thread_id=done.thread.id))
+    assert said(context.transcript) == [
+        "user: Draft a launch note",
+        "agent: Drafted.",
+        "user: Thanks, anything else?",
+        "agent: No, that's all.",
+    ], "a rule's notice would read as the agent's turn"
+
+
 async def test_an_artifact_version_is_judged_with_its_revision_and_its_run(
     traced: Workspace, recorder: Recorder
 ) -> None:

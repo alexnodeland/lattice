@@ -54,5 +54,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0048](0048-surfaces-over-the-runner.md) | Surfaces over the runner | Accepted |
 | [0049](0049-scores-on-evalr.md) | Scores on evalr | Accepted |
 | [0050](0050-one-docs-build.md) | One docs build | Accepted |
+| [0051](0051-notices.md) | Notices: messages that start no turn | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above.

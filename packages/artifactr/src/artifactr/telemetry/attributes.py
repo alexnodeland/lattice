@@ -82,6 +82,9 @@ CHANGE: Final = "artifactr.change"
 PROPOSAL_ACTION: Final = "artifactr.proposal.action"
 """What happened to a proposal: ``created``, ``accepted`` or ``rejected``."""
 
+MESSAGE_KIND: Final = "artifactr.message.kind"
+"""What a posted message is: a ``message``, or a ``notice``."""
+
 TURN_TRIGGER: Final = "artifactr.turn.trigger"
 """What started a turn: ``message`` or ``resume``."""
 

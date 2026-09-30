@@ -2,7 +2,7 @@
 
 Each record captures one decision: the context that forced it, the options considered, and the consequences we accepted. Records are immutable once accepted; a changed decision gets a new record that amends or supersedes the old one. Proposals that precede decisions live in [`../rfcs/`](../rfcs/README.md).
 
-ADR-0001 to ADR-0007 record the decisions D1 to D7 of [stackr RFC-0002](https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md), the design relayr implements.
+ADR-0001 to ADR-0007 record the decisions D1 to D7 of [stackr RFC-0002](../../stackr/rfcs/0002-the-combined-system.md), the design relayr implements.
 
 | ADR | Title | Status |
 |---|---|---|

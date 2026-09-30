@@ -25,7 +25,8 @@ async def storage_factory(
     if request.param == "memory":
         yield lambda clock: InMemoryStorage(clock=clock)
         return
-    async with empty_database(request.param, tmp_path) as engine:
+    async with empty_database(request.param, tmp_path) as database:
+        engine = database.engine()
         await create_schema(engine)
         yield lambda clock: SqlStorage(engine, clock=clock)
 

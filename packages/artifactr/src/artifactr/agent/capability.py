@@ -11,8 +11,8 @@ attribution to those spans, and record each attempt's trace id with ``run_starte
 """
 
 import asyncio
-import contextlib
 import json
+import logging
 from collections.abc import Sequence
 from dataclasses import KW_ONLY, dataclass, field
 from typing import Any, override
@@ -59,6 +59,8 @@ from artifactr.telemetry import annotate, attribution, current_trace_id
 from artifactr.telemetry.attributes import ARTIFACT_ID
 
 type Context = RunContext[Session[Any]]
+
+logger = logging.getLogger("artifactr.agent")
 
 
 class RunFailure(Exception):
@@ -183,24 +185,28 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
             raise
         finally:
             watcher.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await watcher
+            await asyncio.gather(watcher, return_exceptions=True)
         await self._finish(session, result)
         return result
 
     async def _watch(self, ctx: Context, after_seq: int, focus: set[ArtifactId]) -> None:
         workspace = ctx.deps.workspace
         thread_id = ctx.deps.thread_id
-        async for envelope in workspace.subscribe(after_seq=after_seq, threads={thread_id}):
-            event = envelope.event
-            if isinstance(event, FocusChanged) and event.thread_id == thread_id:
-                focus = set(event.artifact_ids)
-            elif same_participant(envelope.actor, workspace.actor):
-                continue
-            elif isinstance(event, MessagePosted) and event.thread_id == thread_id:
-                ctx.enqueue(event.content)
-            elif notes := change_notes([envelope], viewer=workspace.actor, focus=focus):
-                ctx.enqueue(_wrap(notes))
+        try:
+            async for envelope in workspace.subscribe(after_seq=after_seq, threads={thread_id}):
+                event = envelope.event
+                if isinstance(event, FocusChanged) and event.thread_id == thread_id:
+                    focus = set(event.artifact_ids)
+                elif same_participant(envelope.actor, workspace.actor):
+                    continue
+                elif isinstance(event, MessagePosted) and event.thread_id == thread_id:
+                    ctx.enqueue(event.content)
+                elif notes := change_notes([envelope], viewer=workspace.actor, focus=focus):
+                    ctx.enqueue(_wrap(notes))
+        except Exception:
+            logger.exception(
+                "watching the workspace for run %s failed; the run goes on", ctx.deps.run_id
+            )
 
     async def _finish(self, session: Session[Any], result: AgentRunResult[Any]) -> None:
         workspace = session.workspace

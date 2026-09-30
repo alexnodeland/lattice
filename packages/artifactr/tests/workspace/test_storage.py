@@ -80,6 +80,28 @@ async def test_a_transaction_that_raises_rolls_back(storage: Storage) -> None:
         assert (await tx.load(Needs(messages=frozenset({"m1"})))).messages == {"m1": False}
 
 
+async def test_a_transaction_cancelled_at_any_await_leaves_the_workspace_usable(
+    storage: Storage,
+) -> None:
+    # Cancelled after each number of yields in turn, until one ends before its cancellation
+    # comes. A hundred at most: a loop that never blocks would starve a driver's thread.
+    for yields in range(100):
+        task = asyncio.create_task(_create_thread(storage, f"t{yields}"))
+        for _ in range(yields):
+            await asyncio.sleep(0)
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        async with asyncio.timeout(1):
+            await _create_thread(storage, f"next{yields}")
+        if not task.cancelled():
+            task.result()
+            break
+    log = await storage.read(SCOPE)
+    assert [e.seq for e in log] == list(range(1, len(log) + 1))
+    threads = {thread.id for thread in await storage.threads(SCOPE)}
+    assert {e.thread_id for e in log} == threads, "all or nothing"
+
+
 async def test_reads_filter_and_page(storage: Storage) -> None:
     for thread_id in ("t1", "t2", "t3"):
         await _create_thread(storage, thread_id)

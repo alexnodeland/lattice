@@ -1,6 +1,8 @@
 """What happens while a run is in progress: steering, others' changes, and rejected tool calls."""
 
 import asyncio
+import logging
+from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
@@ -9,6 +11,7 @@ from pydantic_ai import FunctionToolset, ModelRequest, ModelRetry, RunContext, T
 from artifactr.agent import RunFailure, Session
 from artifactr.core import (
     EditArtifact,
+    Envelope,
     RunEnded,
     SetFocus,
     SetThreadMode,
@@ -44,6 +47,37 @@ async def test_a_message_during_a_run_steers_it(
     gate.release.set()
     await handle.wait()
     assert script.prompt_texts(1)[-1] == "Actually, make it Monday"
+
+
+async def _fail(*args: Any, **kwargs: Any) -> AsyncIterator[Envelope]:
+    raise RuntimeError("the database went away")
+    yield
+
+
+async def _end(*args: Any, **kwargs: Any) -> AsyncIterator[Envelope]:
+    return
+    yield
+
+
+@pytest.mark.parametrize(("subscribe", "logged"), [(_fail, True), (_end, False)])
+async def test_a_run_goes_on_when_its_watcher_stops(
+    ws: Workspace,
+    thread: Thread,
+    gate: Gate,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    subscribe: object,
+    logged: bool,
+) -> None:
+    monkeypatch.setattr(Workspace, "subscribe", subscribe)
+    runner = make_runner(make_agent(Script(say("Done."))), gate)
+    with caplog.at_level(logging.ERROR, logger="artifactr.agent"):
+        handle = (await runner.send(ws, thread.id, "Go")).run
+        assert handle is not None
+        await handle.wait()
+    failure = f"watching the workspace for run {handle.run_id} failed; the run goes on"
+    assert [r.getMessage() for r in caplog.records] == ([failure] if logged else [])
+    assert (await ws.run(handle.run_id)).status == "completed"
 
 
 async def test_others_changes_during_a_run_are_delivered(

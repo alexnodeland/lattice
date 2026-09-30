@@ -116,7 +116,6 @@ def create_app(
                     telemetry.instrument_engine(engine)
                 await migrate(engine)
                 stack.push_async_callback(engine.dispose)
-            await stack.enter_async_context(mcp.lifespan())
             if langfuse is not None:
                 configs = LangfuseScoreConfigs(langfuse)
                 await sync_score_configs(configs, [Rating, EditSize, TaskCompletion])
@@ -125,6 +124,8 @@ def create_app(
                 stack.push_async_callback(_cancel, asyncio.create_task(mirror.follow()))
             if judging is not None:  # finish judging before the database closes
                 stack.push_async_callback(judging.drain)
+            stack.push_async_callback(runner.aclose)  # stop the runs still going, then judge
+            await stack.enter_async_context(mcp.lifespan())  # MCP stops first
             yield
 
     app = FastAPI(title="docplan", lifespan=lifespan)
@@ -178,8 +179,7 @@ def telemetry_from_environment() -> TelemetryHandle | None:
 
 async def _cancel(task: "asyncio.Task[None]") -> None:
     task.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await task
+    await asyncio.gather(task, return_exceptions=True)
 
 
 def main() -> None:

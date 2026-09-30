@@ -233,7 +233,7 @@ As a result:
 
 ## The agent
 
-artifactr plugs into pydantic-ai as one **capability**, `ArtifactWorkspace` ([ADR-0006](adr/0006-agent-integration-as-pydantic-ai-capability.md)). A turn is an ordinary `agent.run(...)`, and the capability composes with any others the application uses. A `Runner` drives runs in threads for the surfaces ([ADR-0020](adr/0020-running-agents-in-threads.md)).
+artifactr plugs into pydantic-ai as one **capability**, `ArtifactWorkspace` ([ADR-0006](adr/0006-agent-integration-as-pydantic-ai-capability.md)). A turn is an ordinary `agent.run(...)`, and the capability composes with any others the application uses. A `Runner` drives runs in threads for the surfaces ([ADR-0020](adr/0020-running-agents-in-threads.md)), and `Runner.aclose()` stops them as the application shuts down, before its storage closes ([ADR-0047](adr/0047-cancel-safe-storage.md)).
 
 ```python
 agent = Agent(
@@ -419,6 +419,7 @@ class Storage(Protocol):
 - **`read` takes a window of the log** (`after_seq < seq < before_seq`), for some threads by `delivered_to`'s rule, and its first `limit` or last `last` envelopes, oldest first. Storage filters, so a tail read of a long log reads only its tail; `Workspace.read` refuses both `limit` and `last`.
 - **`subscribe(after_seq)` replays, then follows live**, on one iterator. Because a subscription starts from a `seq`, there is no gap to manage between history and live events. It is the only read path for replay, live fan-out, hooks, MCP notifications and change notes.
 - **Leases** back `Workspace.claim_thread`: a time-limited, renewed claim that holds across processes and lapses if its holder dies.
+- **A cancelled caller leaves no lock or connection behind**; cancellation may be deferred until the current statement ends ([ADR-0047](adr/0047-cancel-safe-storage.md)). Runs, connections and claims are cancelled wherever they are, so every storage keeps this, and the behaviour suite checks it.
 - **Cursors** record how far a named consumer of the log has got, such as a feedback mirror. A cursor only moves forward, so a consumer running in several processes cannot move it back ([ADR-0046](adr/0046-telemetry-that-composes-across-libraries.md)).
 - **History** is opaque bytes (pydantic-ai `ModelMessage`s serialized by the agent layer), appended in the same transaction as the run fact that ends each run segment.
 
@@ -439,6 +440,7 @@ workspaces = Workspaces(SqlStorage(engine))
 - **Tables.** Every primary key starts with the tenant and the workspace, and every table name with `artifactr_`. Entities are stored as the JSON of their Pydantic models, beside the columns that reads filter on (kind, archived, status, thread, and each event's type and thread). Lists come back oldest first, by a creation position counted on the workspace row. `artifactr_messages` holds the message ids used in each workspace, so checking an id is one key lookup.
 - **Subscriptions** read the log a page at a time. Once caught up, they wait for a commit through the same `SqlStorage`, which wakes them at once, or poll every `poll_interval` (0.5 s by default) for commits from other processes. `Workspace.subscribe` reads untraced, so polls make no traces.
 - **Leases** are rows, taken with a conditional update or an insert, so two processes racing for a lease cannot both win.
+- **Cancellation** waits for the statement in flight. Every database call is awaited to its end, and a cancellation that came meanwhile is raised after it, since SQLAlchemy takes a statement cancelled part-way for a lost connection. A transaction cancelled before it commits rolls back.
 - **Migrations** ship in the package and record their version in `artifactr_alembic_version`, apart from the application's own. `migrate(engine)` upgrades a database; `create_schema(engine)` creates the tables without migrations, for tests and prototypes. A test checks that the migrations build exactly the models' schema.
 
 The workspace behaviour suite in `tests/workspace/` runs against every implementation: in memory, on SQLite, and on PostgreSQL.
@@ -538,7 +540,7 @@ Python 3.12+. Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical wi
 
 - **Core:** conformance fixtures, plus property tests (hypothesis) that patches round-trip: applying `diff(a, b)` to `a` gives `b`.
 - **Workspace:** one suite runs against in-memory storage, SQLite and PostgreSQL. SQLite alone reaches the coverage gate; PostgreSQL runs when `ARTIFACTR_TEST_POSTGRES_URL` is set, and always in CI.
-- **SQL:** concurrent transactions, lease races and cross-process subscriptions on both databases, and a check that the migrations build exactly the models' schema.
+- **SQL:** concurrent transactions, lease races, cross-process subscriptions and calls cancelled at random on both databases, and a check that the migrations build exactly the models' schema.
 - **Agent:** scripted runs with pydantic-ai's `TestModel`, and `FunctionModel`s built by `function_model`, which streams as the `Runner` needs, so no test calls a model API. Assertions are on the events written, including conflicts, steering and deferred pauses.
 - **Adapters:** WebSocket contract tests with FastAPI's `TestClient`, and an MCP client round-trip.
 - **Evaluation:** the feedback source passes evalr's `check_feedback_source` contract, and the Langfuse score adapters its `check_score_sink` and `check_score_config_store`; experiments run through evalr's in-memory tracker, and evaluators are evalr's `FunctionEvaluator`s.
@@ -609,6 +611,7 @@ The phases, their exit criteria and their progress are tracked in [RFC-0001](rfc
 | [0044](adr/0044-the-evalr-adapter.md) | The evalr adapter |
 | [0045](adr/0045-a-message-id-is-used-once.md) | A message id is used once in a workspace |
 | [0046](adr/0046-telemetry-that-composes-across-libraries.md) | Telemetry that composes across libraries, untraced polling and mirror cursors |
+| [0047](adr/0047-cancel-safe-storage.md) | Cancel-safe storage |
 
 ## Open questions
 

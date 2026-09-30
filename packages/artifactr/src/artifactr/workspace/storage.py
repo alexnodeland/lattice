@@ -88,7 +88,16 @@ class Transaction(Protocol):
 
 
 class Storage(Protocol):
-    """Persistence for workspaces. Every method is scoped to one tenant's workspace."""
+    """Persistence for workspaces. Every method is scoped to one tenant's workspace.
+
+    A caller can be cancelled at any await, by a stopped run, a timeout or a closed connection,
+    so every method is cancel-safe: a cancelled caller leaves no lock or connection behind;
+    cancellation may be deferred until the current statement ends. So a cancelled call may still
+    have taken effect: a transaction may have committed, or ``acquire_lease`` taken the lease. A
+    wait for a pooled connection cannot be interrupted either, so a task that holds a
+    transaction must not await a task it cancelled. The event loop's shutdown is not covered: it
+    cancels the storage's own tasks too, so stop runs with ``Runner.aclose`` first.
+    """
 
     def transaction(self, scope: Scope) -> AbstractAsyncContextManager[Transaction]:
         """Begin a transaction that commits when the block exits normally."""

@@ -137,6 +137,7 @@ A message in an idle thread, such as one just created, starts a run unless anoth
 | `answer(workspace, AnswerDeferred(...))` | Answers one request of a paused run, resuming it once all are answered |
 | `resume(workspace, run_id)` | Resumes a paused run whose requests are all answered |
 | `stop(run_id)` | Cancels a run in this process; it ends with status `stopped` |
+| `aclose()` | Stops every run in this process, as the application shuts down; see [Serving](serving.md#adding-the-router) |
 | `watch(run_id)` | Yields the run's live output; see [Live output](live-output.md) |
 | `running(thread_id)` | This process's run in a thread, if any |
 | `execute(workspace, command)` | Carries out any command the way every surface does |

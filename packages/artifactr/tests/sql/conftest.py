@@ -6,11 +6,25 @@ from pathlib import Path
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from tests.databases import SQL_BACKENDS, empty_database
+from artifactr.sql import create_schema
+from tests.databases import SQL_BACKENDS, Database, empty_database
 
 
 @pytest.fixture(params=SQL_BACKENDS)
-async def engine(request: pytest.FixtureRequest, tmp_path: Path) -> AsyncIterator[AsyncEngine]:
-    """An engine on an empty database, with no tables."""
-    async with empty_database(request.param, tmp_path) as engine:
-        yield engine
+async def database(request: pytest.FixtureRequest, tmp_path: Path) -> AsyncIterator[Database]:
+    """An empty database, with no tables."""
+    async with empty_database(request.param, tmp_path) as database:
+        yield database
+
+
+@pytest.fixture
+def engine(database: Database) -> AsyncEngine:
+    """An engine on the empty database."""
+    return database.engine()
+
+
+@pytest.fixture
+async def schema(database: Database) -> Database:
+    """A database with artifactr's tables."""
+    await create_schema(database.engine())
+    return database

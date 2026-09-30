@@ -11,6 +11,7 @@ the W3C trace context of the span it was committed in, and every revision that s
 import asyncio
 import contextlib
 import dataclasses
+import logging
 import time
 from collections.abc import (
     AsyncGenerator,
@@ -95,6 +96,8 @@ from artifactr.telemetry.attributes import (
 from artifactr.telemetry.metrics import COMMANDS, COMMIT_DURATION
 from artifactr.telemetry.traces import untraced
 from artifactr.workspace.storage import HistoryChunk, Scope, Storage
+
+logger = logging.getLogger("artifactr.workspace")
 
 Authorize = Callable[[TenantId, WorkspaceId, Actor], Awaitable[bool]]
 """Decides whether an actor may use a workspace of its tenant.
@@ -546,16 +549,20 @@ class Workspace:
             yield
         finally:
             renewal.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await renewal
-            await self._storage.release_lease(self._scope, key, holder)
+            try:
+                await asyncio.gather(renewal, return_exceptions=True)
+            finally:
+                await self._storage.release_lease(self._scope, key, holder)
 
     async def _renew(self, key: str, holder: str, ttl: timedelta) -> None:
         # Renewing is bookkeeping, not part of the turn that holds the thread.
         with untraced():
-            while True:
-                await asyncio.sleep(ttl.total_seconds() / 3)
-                await self._storage.acquire_lease(self._scope, key, holder, ttl)
+            try:
+                while True:
+                    await asyncio.sleep(ttl.total_seconds() / 3)
+                    await self._storage.acquire_lease(self._scope, key, holder, ttl)
+            except Exception:
+                logger.exception("renewing the claim %s failed; it will lapse", key)
 
 
 def _check_page(

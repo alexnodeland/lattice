@@ -9,7 +9,8 @@ comes from:
   it, approvals are declined with it as the reason, and the run resumes.
 
 Runs are asyncio tasks in this process. Their live frames go to :attr:`Runner.live`, where any
-connection can :meth:`Runner.watch` them.
+connection can :meth:`Runner.watch` them. An application stops them with :meth:`Runner.aclose`
+as it shuts down, before its storage closes.
 
 Surfaces send each command with the id its client chose to :meth:`Runner.execute_once`, which
 remembers results in :class:`~artifactr.agent.CommandResults`, so a retried command is carried
@@ -142,6 +143,7 @@ class Sent:
     - The thread's run is already active, in this process or another, so the message steers it.
     - An answer leaves some of the paused run's requests unanswered, so the run waits for them.
     - Another message or answer resumed the paused run first.
+    - The runner is closed (:meth:`Runner.aclose`), as the application shuts down.
 
     A message in an idle thread, such as one just created, starts a run unless another starts
     one first, so code that owns its thread can assert that ``run`` is set.
@@ -190,6 +192,7 @@ class Runner[AppDepsT]:
         self._agent_name = agent_name
         self._claim_ttl = claim_ttl
         self._runs: dict[RunId, RunHandle] = {}
+        self._closed = False
         self._telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
 
     async def execute(self, workspace: Workspace, command: Command | StopRun) -> Outcome:
@@ -315,9 +318,16 @@ class Runner[AppDepsT]:
         if handle is None:
             return False
         handle.task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await handle.task
+        await asyncio.gather(handle.task, return_exceptions=True)
         return True
+
+    async def aclose(self) -> None:
+        """Stop every run of this process, wait for them to end, and start no more."""
+        self._closed = True
+        tasks = [handle.task for handle in self._runs.values()]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     def watch(self, run_id: RunId) -> AsyncIterator[LiveFrame]:
         """Yield a run's live frames from now until it ends."""
@@ -353,6 +363,8 @@ class Runner[AppDepsT]:
         watch_after: int | None,
         deferred: DeferredToolResults | None = None,
     ) -> RunHandle | None:
+        if self._closed:
+            return None
         claim = contextlib.AsyncExitStack()
         try:
             await claim.enter_async_context(

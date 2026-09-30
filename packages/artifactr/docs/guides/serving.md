@@ -5,6 +5,9 @@
 ## Adding the router
 
 ```python
+import contextlib
+from collections.abc import AsyncGenerator
+
 from fastapi import FastAPI
 from starlette.requests import HTTPConnection
 
@@ -23,11 +26,17 @@ async def resolve_actor(connection: HTTPConnection) -> tuple[TenantId, Actor]:
     return session.tenant_id, UserActor(id=session.user_id, name=session.display_name)
 
 
-app = FastAPI()
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    yield
+    await runner.aclose()
+
+
+app = FastAPI(lifespan=lifespan)
 app.include_router(artifactr_router(workspaces, runner, resolve_actor=resolve_actor), prefix="/v1")
 ```
 
-The router needs no lifespan of its own. Keep one `Workspaces` and one `Runner` per process: the runner owns the process's runs and their live output.
+The router needs no lifespan of its own, but the runner does. Keep one `Workspaces` and one `Runner` per process: the runner owns the process's runs and their live output. Its runs are tasks in the process, and at shutdown `runner.aclose()` stops every run still going and waits for each to record that it stopped. Close the runner before closing storage, such as before `await engine.dispose()` for [SQL storage](storage.md#sql-storage).
 
 ## Authentication and authorization
 
@@ -142,7 +151,7 @@ The log, the proposals and the thread claims live in storage, so several server 
 
 ## Logging and startup output
 
-artifactr logs on its own loggers, `artifactr.fastapi` for a WebSocket command that failed and `artifactr.evals` for an online evaluation that failed. It sets no handlers, levels or environment variables unless the application asks, as `configure_telemetry` does when it adds its OTLP handler to the root logger ([Observability](observability.md#logs)). Logging is the application's, as is what it prints at startup. Two of artifactr's dependencies would otherwise decide for it:
+artifactr logs on its own loggers: `artifactr.fastapi` for a WebSocket command that failed, `artifactr.evals` for an online evaluation that failed, `artifactr.agent` for a run's watcher that failed, and `artifactr.workspace` for a thread claim whose renewal failed. It sets no handlers, levels or environment variables unless the application asks, as `configure_telemetry` does when it adds its OTLP handler to the root logger ([Observability](observability.md#logs)). Logging is the application's, as is what it prints at startup. Two of artifactr's dependencies would otherwise decide for it:
 
 - **The MCP SDK configures logging as its server is built.** `MCPServer` calls `logging.basicConfig`, which, when the root logger has no handlers yet, sends the whole process's logs through a rich handler at INFO. `ArtifactrMcp` puts the root logger's handlers and level back as they were once the server is built, so mounting [MCP](mcp.md) leaves logging as the application set it, or as Python's defaults leave it. An `MCPServer` you build yourself still does it, unless your application configures logging first.
 - **pydantic-ai prints a banner on the first agent run** in a process, to a terminal or to a coding agent. It never prints one for an agent it instruments, such as one given `telemetry.capability()` ([Observability](observability.md)), nor under pytest or in CI. To turn it off, set `PYDANTIC_AI_NO_BANNER=1` in the environment, as in the service's container image or `.env`, or set `pydantic_ai.BANNER_ENABLED = False` in the application before its first agent run. artifactr sets neither, since both belong to the application.

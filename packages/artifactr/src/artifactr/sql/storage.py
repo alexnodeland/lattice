@@ -5,15 +5,21 @@ PostgreSQL and SQLite. A transaction locks its workspace's row before it reads a
 transactions on one workspace run one at a time, across processes; ``seq`` is assigned under
 that lock. Subscriptions poll the log, and wake at once for commits made through the same
 :class:`SqlStorage`.
+
+Every database call is awaited to its end, even when its caller is cancelled, and the
+cancellation is raised after it. SQLAlchemy takes a statement cancelled part-way for a lost
+connection, which on SQLite can keep the database's write lock, or the pool's one connection.
 """
 
 import asyncio
 import contextlib
+import functools
 import uuid
-from collections.abc import AsyncGenerator, Callable, Collection, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Collection, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from typing import Literal
+from types import CoroutineType
+from typing import Any, Literal
 
 from sqlalchemy import ColumnElement, Select, delete, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -69,7 +75,40 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+async def _to_the_end[T](call: Awaitable[T]) -> T:
+    """Await a database call to its end; a cancellation that came meanwhile is raised after."""
+    task = asyncio.ensure_future(call)
+    cancelled: asyncio.CancelledError | None = None
+    while not task.done():
+        try:
+            await asyncio.wait([task])
+        except asyncio.CancelledError as error:
+            cancelled = error
+    if cancelled is not None:
+        if not task.cancelled():
+            task.exception()
+        raise cancelled
+    return task.result()
+
+
+def _awaited_to_the_end[**P, T](
+    method: Callable[P, Awaitable[T]],
+) -> Callable[P, "CoroutineType[Any, Any, T]"]:  # subscriptable at run time from Python 3.13
+    """Await every call of a method to its end, with :func:`_to_the_end`."""
+
+    @functools.wraps(method)
+    async def call(*args: P.args, **kwargs: P.kwargs) -> T:
+        return await _to_the_end(method(*args, **kwargs))
+
+    return call
+
+
 class _Transaction:
+    """Loads and saves one workspace's rows in the session that holds its row's lock.
+
+    Each method is awaited to its end.
+    """
+
     def __init__(
         self, session: AsyncSession, scope: Scope, workspace: WorkspaceRow, clock: Clock
     ) -> None:
@@ -79,6 +118,7 @@ class _Transaction:
         self._clock = clock
         self._history: list[tuple[ThreadId, bytes]] = []
 
+    @_awaited_to_the_end
     async def load(self, needs: Needs) -> State:
         # The session flushes earlier saves before it queries, so later loads see them.
         return State(
@@ -107,6 +147,7 @@ class _Transaction:
         found = {row.id: convert(row) for row in rows}
         return {i: found.get(i) for i in ids}
 
+    @_awaited_to_the_end
     async def save(
         self, result: CommitResult, *, actor: Actor, traceparent: str | None = None
     ) -> list[Envelope]:
@@ -172,6 +213,7 @@ class _Transaction:
         )
         return envelopes
 
+    @_awaited_to_the_end
     async def append_history(self, thread_id: ThreadId, messages: bytes) -> None:
         self._history.append((thread_id, messages))
 
@@ -293,13 +335,19 @@ class SqlStorage:
 
     @asynccontextmanager
     async def transaction(self, scope: Scope) -> AsyncGenerator[_Transaction]:
-        """Begin a transaction; it holds the workspace row's lock until it ends."""
-        async with self._sessions() as session, session.begin():
-            transaction = _Transaction(
-                session, scope, await _lock_workspace(session, scope), self._clock
-            )
+        """Begin a transaction; it holds the workspace row's lock until it ends.
+
+        Closing the session rolls back whatever it did not commit, and returns its connection.
+        """
+        session = self._sessions()
+        try:
+            workspace = await _to_the_end(_lock_workspace(session, scope))
+            transaction = _Transaction(session, scope, workspace, self._clock)
             yield transaction
             head = transaction.finish()
+            await _to_the_end(session.commit())
+        finally:
+            await _to_the_end(session.close())
         async with self._committed:
             self._heads[scope] = max(head, self._heads.get(scope, 0))
             self._committed.notify_all()
@@ -371,6 +419,7 @@ class SqlStorage:
             query = query.where(RunRow.status == status)
         return [_run(row) for row in await self._all(query)]
 
+    @_awaited_to_the_end
     async def head_seq(self, scope: Scope) -> int:
         """Return the log's latest ``seq``, or 0 if it is empty."""
         async with self._sessions() as session:
@@ -443,6 +492,7 @@ class SqlStorage:
         )
         return [HistoryChunk(seq=row.seq, messages=row.messages) for row in await self._all(query)]
 
+    @_awaited_to_the_end
     async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
         """Take or renew an exclusive lease. Return False if another holder has it."""
         # Normalized to UTC, because SQLite compares timestamps as text.
@@ -470,6 +520,7 @@ class SqlStorage:
             return False
         return True
 
+    @_awaited_to_the_end
     async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
         """Release a lease if ``holder`` has it."""
         async with self._engine.begin() as connection:
@@ -477,12 +528,14 @@ class SqlStorage:
                 delete(LeaseRow).where(*_lease(scope, key), LeaseRow.holder == holder)
             )
 
+    @_awaited_to_the_end
     async def cursor(self, scope: Scope, name: str) -> int:
         """Return how far a named consumer of the log has got: the ``seq`` saved, or 0."""
         async with self._sessions() as session:
             cursor = await session.get(CursorRow, (scope.tenant_id, scope.workspace_id, name))
         return 0 if cursor is None else cursor.seq
 
+    @_awaited_to_the_end
     async def save_cursor(self, scope: Scope, name: str, seq: int) -> None:
         """Save how far a named consumer of the log has got; a cursor only moves forward.
 
@@ -497,6 +550,7 @@ class SqlStorage:
             cursor = await _locked(session, CursorRow, key, new)
             cursor.seq = max(cursor.seq, seq)
 
+    @_awaited_to_the_end
     async def _one[R: EntityRow, T](
         self, model: type[R], scope: Scope, entity_id: str, convert: Callable[[R], T]
     ) -> T | None:
@@ -504,6 +558,7 @@ class SqlStorage:
             row = await session.get(model, (scope.tenant_id, scope.workspace_id, entity_id))
         return None if row is None else convert(row)
 
+    @_awaited_to_the_end
     async def _all[R: ScopedRow](self, query: Select[R]) -> Sequence[R]:
         async with self._sessions() as session:
             return (await session.scalars(query)).all()

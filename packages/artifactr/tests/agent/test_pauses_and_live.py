@@ -163,6 +163,19 @@ async def test_a_run_can_be_stopped(
     assert (await ws.run(handle.run_id)).status == "stopped"
 
 
+async def test_closing_a_runner_stops_its_runs(
+    ws: Workspace, thread: Thread, gate: Gate, app_tools: FunctionToolset[Session[Gate]]
+) -> None:
+    runner = make_runner(make_agent(Script(call("hold")), tools=[app_tools]), gate)
+    handle = (await runner.send(ws, thread.id, "Go")).run
+    assert handle is not None
+    await asyncio.wait_for(gate.entered.wait(), timeout=2)
+    await runner.aclose()
+    assert runner.running(thread.id) is None
+    assert (await ws.run(handle.run_id)).status == "stopped"
+    assert (await runner.send(ws, thread.id, "Again")).run is None, "and starts no more"
+
+
 async def test_a_claimed_thread_is_steered_not_started(
     ws: Workspace, thread: Thread, gate: Gate
 ) -> None:

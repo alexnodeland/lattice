@@ -90,8 +90,9 @@ If your application runs Alembic's autogenerate on the same database, exclude th
 - **Reads of the log filter in the database.** Each envelope's event type and thread have columns of their own, so a read for some threads selects only what those threads' subscribers receive, and a read of the last so many reads the log backwards from the end.
 - **Leases are rows**, taken with a conditional update or an insert, so two processes racing for a thread claim cannot both win.
 - **Cursors are rows**, each locked while a save compares it, so the furthest save wins.
+- **A cancelled call finishes its statement first.** SQLAlchemy takes a statement cancelled part-way for a lost connection, which on SQLite could keep the database's write lock or the engine's one connection. So every database call is awaited to its end, and a cancellation that came meanwhile is raised after it. A caller cancelled while its statement waits for a lock waits as long as the statement does: on SQLite, the driver's `timeout`; on PostgreSQL, `lock_timeout` if you set one.
 
-The storage does not own the engine: dispose of it when your application shuts down, with `await engine.dispose()`.
+The storage does not own the engine: dispose of it when your application shuts down, with `await engine.dispose()`, after closing the `Runner` ([Serving](serving.md#adding-the-router)).
 
 ## What a storage guarantees
 
@@ -114,6 +115,12 @@ async with storage.transaction(scope) as transaction:
 
 **`subscribe(scope, after_seq)` replays, then follows.** One iterator yields the stored envelopes after `after_seq` and then each new one as it commits. Replay for reconnecting clients, live fan-out, MCP notifications and the agent's change notes all read the log this way.
 
+**A cancelled caller leaves no lock or connection behind.** Cancellation may be deferred until the current statement ends, but a transaction cancelled before it commits rolls back, and the storage is as usable afterwards as before ([ADR-0047](../adr/0047-cancel-safe-storage.md)). Callers are cancelled wherever they are: a stopped run inside a tool's commit, a WebSocket that disconnects mid-replay, a thread claim's renewal, a timeout, or an anyio cancel scope. Three things follow:
+
+- A cancelled call may still have taken effect: a transaction may have committed, or `acquire_lease` taken the lease.
+- A wait for a pooled connection cannot be interrupted either, so a task that holds a transaction must not await a task it cancelled.
+- The event loop's shutdown is not covered: it cancels the storage's own tasks too, so stop runs with `Runner.aclose` first.
+
 **Leases are exclusive and expire.** `acquire_lease(scope, key, holder, ttl)` takes or renews a lease and returns whether the holder has it; `release_lease` gives it up. `Workspace.claim_thread` uses them to allow one active run per thread, across processes: the claim is renewed while held and lapses by itself if its holder dies.
 
 **Cursors only move forward.** `save_cursor(scope, name, seq)` records how far a named consumer of the log has got, and `cursor(scope, name)` reads it back, 0 if it has none. Saving a `seq` below the saved one leaves it, so a consumer that runs in several processes cannot move it back. A `FeedbackMirror` keeps one, so a restarted mirror carries on where it was ([ADR-0046](../adr/0046-telemetry-that-composes-across-libraries.md)); `Workspace.cursor` and `Workspace.save_cursor` give an application's own consumers the same.
@@ -124,4 +131,4 @@ async with storage.transaction(scope) as transaction:
 
 ## Writing your own
 
-Implement the `Storage` and `Transaction` protocols from `artifactr.workspace`; the [reference](../reference/workspace.md#storage) lists every method. `InMemoryStorage` is the shortest complete example. Run the workspace behaviour suite in [`tests/workspace/`](https://github.com/alexnodeland/artifactr/tree/main/tests/workspace) against your implementation: it states what a storage must do, including rollback, gap-free sequencing, subscriptions that never miss an event, and leases.
+Implement the `Storage` and `Transaction` protocols from `artifactr.workspace`; the [reference](../reference/workspace.md#storage) lists every method. `InMemoryStorage` is the shortest complete example. Run the workspace behaviour suite in [`tests/workspace/`](https://github.com/alexnodeland/artifactr/tree/main/tests/workspace) against your implementation: it states what a storage must do, including rollback, gap-free sequencing, subscriptions that never miss an event, leases, and transactions cancelled at any await.

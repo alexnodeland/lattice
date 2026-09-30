@@ -29,4 +29,4 @@ Two more are planned: grantr, identity and access for artifactr and reflexr, and
 
 lattice's mark is one cell of the lattice that every mark in the family is drawn on. Its [brand page](assets/brand/README.md) has the mark, the colours and the family's brand system, and [ADR-0001](adr/0001-lattices-brand.md) records why.
 
-The source is [alexnodeland/lattice](https://github.com/alexnodeland/lattice). To work on it, see [Contributing](project/contributing.md).
+How the family fits together, in one repository, is in [Architecture](architecture.md), and the decisions about the family as a whole are in [its ADRs](adr/README.md). The source is [alexnodeland/lattice](https://github.com/alexnodeland/lattice). To work on it, see [Contributing](project/contributing.md).

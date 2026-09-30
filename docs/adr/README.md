@@ -6,6 +6,7 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 
 | ADR | Title | Status |
 |---|---|---|
+| [0001](0001-lattices-brand.md) | lattice's brand | Accepted |
 | [0002](0002-ci-runs-every-affected-project-and-its-dependents.md) | CI runs every affected project and its dependents | Accepted |
 | [0003](0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md) | CI on pull requests, Nightly on main, and a required Title check | Accepted |
 | [0004](0004-one-github-app-for-release-please-and-renovate.md) | One GitHub App for release-please and Renovate | Accepted |

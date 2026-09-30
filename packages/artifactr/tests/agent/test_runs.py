@@ -224,6 +224,7 @@ async def test_a_start_cancelled_while_abandoning_releases_the_claim(gate: Gate)
     await asyncio.wait_for(storage.reading.wait(), timeout=2)
     sending.cancel()
     await asyncio.gather(sending, return_exceptions=True)
+    await runner.aclose()  # and with it the hand-over the cancelled start spawned
     async with ws.claim_thread(thread.id, holder="next"):
         pass
 

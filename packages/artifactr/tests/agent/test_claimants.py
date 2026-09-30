@@ -378,9 +378,12 @@ async def test_a_run_that_took_nothing_reads_what_was_asked_after_its_release(
 async def test_a_run_stopped_at_once_releases_its_thread(
     ws: Workspace, thread: Thread, runners: MakeRunner
 ) -> None:
-    runner = runners(make_agent(Script(say("ok"))))
+    script = Script(say("ok"))
+    runner = runners(make_agent(script))
     handle = started(await runner.send(ws, thread.id, "Go"))
     handle.task.cancel()  # before the loop runs anything else: its task started eagerly
     await asyncio.gather(handle.task, return_exceptions=True)
+    await settled(thread.id, runner)  # it hands over what it never started: "Go"
     async with asyncio.timeout(2), ws.claim_thread(thread.id, holder="next"):
         pass
+    assert script.conversation() == ["Go"]

@@ -402,8 +402,11 @@ class Runner[AppDepsT]:
                 handle = await self._start(workspace, thread_id, caller)
             except ThreadBusy:
                 return None  # its holder hands the thread over as it releases it
-            except BaseException:  # cancelled, or storage failed: the claim is released
-                self._hand_over(workspace, thread_id, taken=taken, asked=asked)
+            except asyncio.CancelledError:  # the claim is released
+                self._hand_over(workspace, thread_id, taken=taken, asked=asked, cancelled=True)
+                raise
+            except Exception:  # as when storage fails: the claim is released
+                self._hand_over(workspace, thread_id, taken=taken, asked=asked, cancelled=False)
                 raise
             if handle is not None:
                 return handle
@@ -525,11 +528,21 @@ class Runner[AppDepsT]:
                     await asyncio.gather(stopping, return_exceptions=True)
         finally:
             self._hand_over(
-                session.workspace, session.thread_id, taken=turn.taken, asked=turn.asked
+                session.workspace,
+                session.thread_id,
+                taken=turn.taken,
+                asked=turn.asked,
+                cancelled=run.cancelling() > 0,
             )
 
     def _hand_over(
-        self, workspace: Workspace, thread_id: ThreadId, *, taken: int, asked: int
+        self,
+        workspace: Workspace,
+        thread_id: ThreadId,
+        *,
+        taken: int,
+        asked: int,
+        cancelled: bool,
     ) -> None:
         """Once a claimant has released its thread, take the turn it was asked for meanwhile.
 
@@ -540,24 +553,32 @@ class Runner[AppDepsT]:
         if self._closed:
             return  # the thread's next claimant, in any process, carries it out
         handover = asyncio.create_task(
-            self._take_over(workspace, thread_id, taken=taken, asked=asked),
+            self._take_over(workspace, thread_id, taken=taken, asked=asked, cancelled=cancelled),
             context=contextvars.Context(),
         )
         self._handovers.add(handover)
         handover.add_done_callback(self._handovers.discard)
 
     async def _take_over(
-        self, workspace: Workspace, thread_id: ThreadId, *, taken: int, asked: int
+        self,
+        workspace: Workspace,
+        thread_id: ThreadId,
+        *,
+        taken: int,
+        asked: int,
+        cancelled: bool,
     ) -> None:
-        """Take the thread's next turn, if the claimant took something or was asked for more.
+        """Take the thread's next turn, for what was asked and not taken, read after the release.
 
-        A claimant that took nothing, as a run that failed or stopped before it started, hands
-        over only what was asked meanwhile, so a failure that repeats makes one turn per new
-        command. What it reads is read after the release, so a command it refused is seen.
+        A claimant that was cancelled, or a run that was stopped, hands over whatever was asked
+        and not taken, since a command it refused may have asked before it read. One that
+        failed and took nothing hands over only what was asked after it read, so a failure that
+        persists makes one turn per new command. Neither can spin: only :meth:`aclose` cancels
+        a hand-over, and it closes the runner first.
         """
         try:
             took = await _taken_seq(workspace, thread_id) > taken
-            if took or await workspace.cursor(_asked(thread_id)) > asked:
+            if cancelled or took or await workspace.cursor(_asked(thread_id)) > asked:
                 await self._take(workspace, thread_id, None)
         except Exception:
             logger.exception(

@@ -312,6 +312,122 @@ async def test_i3_a_claimant_that_never_starts_a_run_hands_over_what_it_refused(
     assert script.conversation() == ["Plan the launch", "Also book the big room"]
 
 
+@pytest.mark.parametrize("ends", ["its send is cancelled", "its run is stopped before it starts"])
+async def test_i3_a_command_that_asked_before_its_holder_read_is_handed_over(
+    storages: tuple[Storage, Storage],
+    ws: Workspace,
+    there: Workspace,
+    thread: Thread,
+    runners: MakeRunner,
+    ends: str,
+) -> None:
+    here_storage, there_storage = storages
+    beginning = Gate()
+
+    @contextlib.asynccontextmanager
+    async def begins(session: Session[Any]) -> AsyncIterator[None]:
+        if not beginning.release.is_set():
+            await beginning.wait()
+        yield
+
+    script = Script(*[say("ok")] * 4)
+    runner = runners(make_agent(script), turn_context=begins)
+    other = runners(make_agent(script))
+    stalled = hold(there_storage, "acquire_lease")  # Bob asked, and stalls before he claims
+    bystander = asyncio.create_task(other.send(there.as_actor(BOB), thread.id, "Also book"))
+    await _entered(stalled)
+    planning = hold(here_storage, "runs", status="paused")
+    sending = asyncio.create_task(runner.send(ws, thread.id, "Plan"))
+    await _entered(planning)  # its holder read Bob's ask, and holds the thread
+    if ends == "its run is stopped before it starts":
+        planning.release.set()
+        started(await sending)
+        await _entered(beginning)
+    stalled.release.set()
+    assert (await bystander).run is None, "refused: its holder hands the thread over"
+    if ends == "its send is cancelled":
+        sending.cancel()
+        planning.release.set()
+        with contextlib.suppress(asyncio.CancelledError):
+            await sending
+    else:
+        assert await runner.stop(started(await sending).run_id)
+    beginning.release.set()
+    await settled(thread.id, runner, other)
+    assert script.conversation() == ["Also book", "Plan"], "handed over, not left for a command"
+
+
+async def test_i4_a_claimant_that_fails_after_a_command_asked_leaves_it_to_the_next_command(
+    storages: tuple[Storage, Storage],
+    ws: Workspace,
+    there: Workspace,
+    thread: Thread,
+    runners: MakeRunner,
+) -> None:
+    storage, there_storage = storages
+    script = Script(*[say("ok")] * 4)
+    runner, other = runners(make_agent(script)), runners(make_agent(script))
+    stalled = hold(there_storage, "acquire_lease")  # Bob asked, and stalls before he claims
+    bystander = asyncio.create_task(other.send(there.as_actor(BOB), thread.id, "Also book"))
+    await _entered(stalled)
+    planning = hold(storage, "runs", status="paused", raises=ConnectionError("it blinked"))
+    sending = asyncio.create_task(runner.send(ws, thread.id, "Plan"))
+    await _entered(planning)
+    stalled.release.set()
+    assert (await bystander).run is None
+    planning.release.set()
+    with pytest.raises(ConnectionError):
+        await sending
+    await settled(thread.id, runner, other)
+    assert runner.running(thread.id) is None, "a failure hands over only what was asked after"
+    started(await runner.send(ws, thread.id, "Hello?"))
+    await settled(thread.id, runner, other)
+    assert script.conversation() == ["Also book", "Plan", "Hello?"]
+
+
+async def test_i4_two_processes_whose_plans_fail_now_and_then_consume_each_message_once(
+    storages: tuple[Storage, Storage],
+    ws: Workspace,
+    there: Workspace,
+    thread: Thread,
+    runners: MakeRunner,
+) -> None:
+    here_storage = storages[0]
+    reads, runs = [0], here_storage.runs
+
+    async def blinks(*args: Any, **kwargs: Any) -> Any:
+        found = await runs(*args, **kwargs)
+        if kwargs.get("status") == "paused":
+            reads[0] += 1
+            if reads[0] % 3 == 1:
+                raise ConnectionError("it blinked")
+        return found
+
+    here_storage.runs = blinks
+    recorder = Recorder()
+
+    def agent() -> Agent[Session[Any], str]:
+        return Agent(
+            function_model(recorder.respond),
+            deps_type=Session[Any],
+            capabilities=[ArtifactWorkspace(types=[Note, Checklist])],
+        )
+
+    here_runner, there_runner = runners(agent()), runners(agent())
+
+    async def send(index: int) -> None:
+        runner, handle = (here_runner, ws) if index % 2 else (there_runner, there)
+        with contextlib.suppress(ConnectionError):
+            await runner.send(handle, thread.id, f"m{index}")
+
+    await asyncio.gather(*(send(index) for index in range(12)))
+    await settled(thread.id, here_runner, there_runner)
+    here_storage.runs = runs
+    await there_runner.send(there, thread.id, "last")
+    await settled(thread.id, here_runner, there_runner)
+    assert sorted(recorder.prompts) == sorted([*(f"m{index}" for index in range(12)), "last"])
+
+
 @pytest.mark.parametrize("ends", ["fails", "is stopped"])
 async def test_i3_a_message_left_to_a_holder_that_never_starts_is_handed_over(
     ws: Workspace, there: Workspace, thread: Thread, runners: MakeRunner, ends: str

@@ -350,7 +350,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 
 | Prerequisite | Library | Issue | Needed by | Until then |
 |---|---|---|---|---|
-| Namespaced event types | reflexr | [#45][r-45], decided in [ADR-0039][r-adr-0039] | phase 1 (D6) | phase 1 waits for the implementation |
+| Namespaced event types | reflexr | [#45][r-45], decided in [ADR-0039][r-adr-0039] and implemented (reflexr #83) | phase 1 (D6) | done |
 | Runtime rule management: per-tenant, versioned, installed through the API, not listed to other tenants | reflexr | [#21][r-21] | phase 5 | no rules from chat |
 | Telemetry setup that composes across both libraries, polling without a trace per poll, and mirror cursors | reflexr, artifactr | [reflexr #62][r-62], [artifactr #50][a-50] | phase 4 | links and tags, without the combined setup |
 | `traceparent` on artifactr envelopes | artifactr | [#60][a-60] | phase 4, for links in the artifactr-to-reflexr direction | tags only, in that direction |
@@ -401,7 +401,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 
 - [x] Sign-off on D1 to D7 (2026-09-29)
 - [x] Decide reflexr #45's namespaces ([ADR-0039][r-adr-0039], 2026-09-29)
-- [ ] Implement reflexr #45
+- [x] Implement reflexr #45 (reflexr #83): event types and rule names are `namespace:name`, so relayr's bridged types are `artifactr:<type>` and its rules are qualified too
 - [x] File the prerequisite issues: artifactr [#60][a-60], [#61][a-61], [#62][a-62] and [#63][a-63], and reflexr [#72][r-72]
 - [ ] Phase 1: inbound adapter
 - [ ] Phase 2: outbound adapter and loop control

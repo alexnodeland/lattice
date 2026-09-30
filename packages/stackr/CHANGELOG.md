@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.0 (2026-09-30)
+
+
+### Bug Fixes
+
+* **template:** check the generated application with lattice's uv, and only when stackr changes ([#3](https://github.com/alexnodeland/lattice/issues/3)) ([47c577f](https://github.com/alexnodeland/lattice/commit/47c577fecdb3cc1dc8682874e18dd2bab79fb885))
+
 ## [Before lattice]
 
 ### Features

@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.1.0...artifactr-v0.2.0) (2026-09-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **agent:** the storage protocol's `Transaction` has a new required method, `save_cursor(name, seq)`, which a custom storage must implement: it saves a named cursor in the same transaction as the transaction's other writes. SQL storages also need migration 0005, which records the upgrade point for existing threads.
+
+### Bug Fixes
+
+* **agent:** take each turn from the log, so a message sent as a run ends is carried out once ([#35](https://github.com/alexnodeland/lattice/issues/35)) ([7f4c2ea](https://github.com/alexnodeland/lattice/commit/7f4c2ea53c2ee9e88bb599f11de14ddaa8363bd1))
+
 ## [Before lattice]
 
 ### Features

@@ -224,7 +224,7 @@ wheels = [
 
 [[package]]
 name = "artifactr-ai"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/artifactr" }
 dependencies = [
     { name = "jsonpatch" },
@@ -4358,7 +4358,7 @@ wheels = [
 
 [[package]]
 name = "stackr"
-version = "0.0.0"
+version = "0.1.0"
 source = { virtual = "packages/stackr" }
 
 [package.dev-dependencies]

@@ -18,6 +18,7 @@ from artifactr.telemetry import (
     current_trace_id,
     current_traceparent,
     kept_attributes,
+    parse_traceparent,
 )
 from artifactr.telemetry.attributes import (
     ACTOR_KIND,
@@ -127,6 +128,20 @@ def test_the_current_traceparent_is_the_w3c_trace_context(recorder: Recorder) ->
     assert traceparent == (
         f"00-{context.trace_id:032x}-{context.span_id:016x}-{context.trace_flags:02x}"
     )
+
+
+def test_a_traceparent_names_a_span_context(recorder: Recorder) -> None:
+    with recorder.tracer_provider.get_tracer("test").start_as_current_span("work") as span:
+        traceparent = current_traceparent()
+    parsed, context = parse_traceparent(traceparent), span.get_span_context()
+    assert parsed is not None
+    assert (parsed.trace_id, parsed.span_id, parsed.is_remote) == (
+        context.trace_id,
+        context.span_id,
+        True,
+    )
+    assert parse_traceparent(None) is None
+    assert parse_traceparent("00-not-a-trace-01") is None
 
 
 def test_attribution_names_the_session_the_user_and_the_ids() -> None:

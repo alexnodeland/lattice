@@ -133,11 +133,18 @@ await rule.post_message(thread.id, "The rule is live.", kind="notice")
 |---|---|
 | Idle | starts a run |
 | Running | steers the running agent, which is told at its next request |
+| Ending, or pausing: its run no longer takes messages but still holds the thread | is taken by the next turn, which the run starts as it releases the thread |
 | Paused on questions or approvals | is the reply: it answers the questions, declines the approvals with the message as the reason, and resumes the run |
+
+Behind the table is one rule: the log decides ([ADR-0055](../adr/0055-turns-from-the-log.md)). A thread's messages are taken in the log's order, each by one turn: as a run's prompt, as a paused run's reply, or through the watcher of the run that holds the thread. A message or an answer sent with the runner asks for a turn. Whoever holds the thread next, in any process, starts the turn with the oldest message no turn has taken, and its watcher delivers the rest. So a message sent the moment a client sees `run_ended` is answered, and each message is consumed once: in the same transaction as the run's start it prompts, the answer it replies with, or the end of the run it was delivered to. The one exception is a claim that lapses while its holder lives, as when a process stalls past `claim_ttl`. A message the stalled run was delivered, and could not record, may then be consumed again by the thread's next holder.
+
+A message is a message, however it was committed. One committed without the runner, with `ws.post_message`, asks for nothing, so it starts no turn, but the thread's next turn takes it: as its prompt, or, in a paused thread, as its reply, if it is the oldest. Post anything that should not answer the agent or steer it as a [notice](#notices), which is never a reply and starts nothing.
+
+A thread from before this behaviour starts from where its workspace's log stood at the upgrade, which [`migrate`](storage.md#migrations) records. The agent never suddenly answers messages from before it.
 
 ```python
 sent = await runner.send(ws, thread.id, "Break the launch into tasks.")
-if sent.run is not None:  # None when the message steered a running run
+if sent.run is not None:  # None when the thread's run takes the message, or will hand it over
     result = await sent.run.wait()
 ```
 
@@ -145,9 +152,11 @@ if sent.run is not None:  # None when the message steered a running run
 
 `sent.run` is `None` when the message or answer started no run, which is not a failure:
 
-- the thread's run is already active, in this process or another, so the message steers it
+- the thread's run is already active, in this process or another, so the message steers it; if that run is ending or pausing, it hands the thread over as it releases it, and the next turn takes the message
+- another message or answer took the thread first, and its turn takes this one too
 - an answer leaves some of the paused run's requests unanswered, so the run waits for them
-- another message or answer resumed the paused run first
+
+The run `send` started may take an older message first: the thread's oldest message that no turn has taken.
 
 A message in an idle thread, such as one just created, starts a run unless another starts one first. Code that owns its thread, such as a test or an evaluation, can assert that `sent.run` is set.
 
@@ -157,14 +166,15 @@ A message in an idle thread, such as one just created, starts a run unless anoth
 |---|---|
 | `send(workspace, thread_id, content, message_id=None)` | Posts a message and starts, steers or resumes a run |
 | `answer(workspace, AnswerDeferred(...))` | Answers one request of a paused run, resuming it once all are answered |
-| `resume(workspace, run_id)` | Resumes a paused run whose requests are all answered |
+| `resume(workspace, run_id)` | Asks for the thread's next turn, which resumes a paused run whose requests are answered; the oldest message not yet taken answers any left open |
 | `stop(run_id)` | Cancels a run in this process; it ends with status `stopped` |
+| `drain()` | Waits until no run that has ended is still handing its thread over; `aclose()` cancels them instead |
 | `aclose()` | Stops every run in this process, as the application shuts down; see [Serving](serving.md#adding-the-router) |
 | `watch(run_id)` | Yields the run's live output; see [Live output](live-output.md) |
 | `running(thread_id)` | This process's run in a thread, if any |
 | `execute(workspace, command, command_id=...)` | Carries out any command the way every surface does, the first time its id is seen, and returns its `command_result`; a repeated id returns the first result |
 
-One run is active per thread. The runner claims the thread with a lease in storage, renewed every third of `claim_ttl` while the run lasts, so the rule holds across processes. A renewal that fails is logged and retried, so a run survives one failed renewal, or storage that stalls for about two thirds of `claim_ttl`; keep it above the clock skew between replicas. A message sent while another process holds the claim steers that run instead of starting a second. Runs are asyncio tasks in the process that started them, so `stop` and `watch` reach only local runs.
+One run is active per thread. The runner claims the thread with a lease in storage, renewed every third of `claim_ttl` while the run lasts, so the rule holds across processes. A renewal that fails is logged and retried, so a run survives one failed renewal, or storage that stalls for about two thirds of `claim_ttl`; keep it above the clock skew between replicas. A message sent while another process holds the claim steers that run instead of starting a second, or is taken by the turn that run hands the thread over to. Each claim has a holder of its own, so a run resuming cannot renew the claim its pausing segment still holds. Runs are asyncio tasks in the process that started them, so `stop` and `watch` reach only local runs.
 
 A process that dies mid-run cannot record how its run ended, so the run stays `running`. Its claim lapses after `claim_ttl`, and the next run to claim the thread first records the one left behind as failed, with the error "the run was abandoned: its claim lapsed" and the reason `abandoned`, attributed to `SystemActor(name="runner")`. A run the runner starts holds its claim until it has recorded its end, so holding the claim means the other run's process is gone, or its claim lapsed. The abandoned turn is not resumed.
 

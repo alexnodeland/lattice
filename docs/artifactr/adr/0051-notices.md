@@ -1,6 +1,6 @@
 # ADR-0051: Notices: messages that start no turn
 
-**Status:** Accepted
+**Status:** Accepted; its direct messages amended by [ADR-0055](0055-turns-from-the-log.md)
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 

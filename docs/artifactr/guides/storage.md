@@ -75,7 +75,7 @@ Use a database file. A plain `:memory:` database is a single connection that con
 
 ### Migrations
 
-artifactr's Alembic migrations ship in the package. `migrate(engine)` upgrades the database to the latest schema, creating the tables if they do not exist, and does nothing if it is up to date, so it is safe to run on every start or deploy. The migrations record their version in their own table, `artifactr_alembic_version`, and every table's name starts with `artifactr_`, so they live beside your application's tables and migrations in the same database without interfering.
+artifactr's Alembic migrations ship in the package. `migrate(engine)` upgrades the database to the latest schema, creating the tables if they do not exist, and does nothing if it is up to date, so it is safe to run on every start or deploy. Migration 0005 records where each workspace's log stood when it ran, and the runner starts older threads from there ([ADR-0055](../adr/0055-turns-from-the-log.md)). The migrations record their version in their own table, `artifactr_alembic_version`, and every table's name starts with `artifactr_`, so they live beside your application's tables and migrations in the same database without interfering.
 
 If your application runs Alembic's autogenerate on the same database, exclude the `artifactr_` tables from it (with `include_name`, for example), or it will propose dropping them.
 
@@ -123,7 +123,7 @@ async with storage.transaction(scope) as transaction:
 
 **Leases are exclusive and expire.** `acquire_lease(scope, key, holder, ttl)` takes or renews a lease and returns whether the holder has it; `release_lease` gives it up. `Workspace.claim_thread` uses them to allow one active run per thread, across processes: the claim is renewed while held and lapses by itself if its holder dies.
 
-**Cursors only move forward.** `save_cursor(scope, name, seq)` records how far a named consumer of the log has got, and `cursor(scope, name)` reads it back, 0 if it has none. Saving a `seq` below the saved one leaves it, so a consumer that runs in several processes cannot move it back. A `FeedbackMirror` keeps one, so a restarted mirror carries on where it was ([ADR-0046](../adr/0046-telemetry-that-composes-across-libraries.md)); `Workspace.cursor` and `Workspace.save_cursor` give an application's own consumers the same.
+**Cursors only move forward.** `save_cursor(scope, name, seq)` records how far a named consumer of the log has got, and `cursor(scope, name)` reads it back, 0 if it has none. Saving a `seq` below the saved one leaves it, so a consumer that runs in several processes cannot move it back. A `FeedbackMirror` keeps one, so a restarted mirror carries on where it was ([ADR-0046](../adr/0046-telemetry-that-composes-across-libraries.md)); `Workspace.cursor` and `Workspace.save_cursor` give an application's own consumers the same. `Transaction.save_cursor` saves a cursor with a transaction's writes, if it commits; the runner records how far a thread's messages are consumed that way ([ADR-0055](../adr/0055-turns-from-the-log.md)), and `Workspace.commit` and `Workspace.record` take a `cursor=` for it.
 
 **History is opaque bytes.** A thread's model history (pydantic-ai messages, serialized by the agent layer) is appended with `Transaction.append_history`, in the same transaction as the run fact that ends a run segment. Each chunk records the log's head when it was saved, which is how the agent knows what it has already been told.
 

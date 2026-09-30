@@ -208,6 +208,13 @@ class _Transaction:
     async def append_history(self, thread_id: ThreadId, messages: bytes) -> None:
         self._history.append((thread_id, messages))
 
+    @_awaited_to_the_end
+    async def save_cursor(self, name: str, seq: int) -> None:
+        new = CursorRow(**self._key, name=name, seq=seq)
+        key = (self._scope.tenant_id, self._scope.workspace_id, name)
+        cursor = await _locked(self._session, CursorRow, key, new)
+        cursor.seq = max(cursor.seq, seq)
+
     def finish(self) -> int:
         """Add the history appended in this transaction at the log's final head; return it."""
         head = self._workspace.head_seq

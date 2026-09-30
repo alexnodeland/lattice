@@ -1,6 +1,6 @@
 # ADR-0008: Agent perception: change notes, fresh rendering, steering
 
-**Status:** Accepted
+**Status:** Accepted; its steering amended by [ADR-0055](0055-turns-from-the-log.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

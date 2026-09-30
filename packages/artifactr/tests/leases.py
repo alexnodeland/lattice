@@ -20,6 +20,8 @@ class Partitioned(InMemoryStorage):
         self.cut_off: set[str] = set()
         self.asked = Counter[str]()
         """How many lease calls each holder has made."""
+        self.holders: dict[str, str] = {}
+        """The holder that last asked for each lease key."""
         self.reached = asyncio.Event()
         """Set once a cut-off holder's lease call has reached the partition."""
         self._healed = asyncio.Event()
@@ -31,6 +33,7 @@ class Partitioned(InMemoryStorage):
 
     async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
         self.asked[holder] += 1
+        self.holders[key] = holder
         if holder in self.cut_off:
             self.reached.set()
             if not self.in_flight:

@@ -1,6 +1,6 @@
 """The agent's dependencies for one run, and its thread history."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from pydantic_ai import ModelMessage, ModelMessagesTypeAdapter
@@ -10,6 +10,26 @@ from artifactr.workspace import Workspace
 
 Trigger = Literal["message", "resume", "api"]
 """What started a run: a posted message, answers to a pause, or a direct call."""
+
+
+@dataclass
+class Delivered:
+    """How far a run has taken the log: a handoff between the capability and the Runner.
+
+    The Runner names a cursor for it. The capability then saves it with the run's start, as its
+    input, and with the run's end, as far as its watcher delivered: in the same transaction as
+    each record, so a message is taken exactly when the write that consumes it is made.
+    """
+
+    seq: int = 0
+    """Every envelope up to this ``seq`` was delivered, or was not for the agent."""
+
+    cursor: str | None = None
+    """The cursor that records ``seq``, when the Runner keeps one."""
+
+    def at(self, seq: int) -> tuple[str, int] | None:
+        """The cursor to save as taken through ``seq``, with a record, if there is one."""
+        return None if self.cursor is None else (self.cursor, seq)
 
 
 @dataclass(frozen=True)
@@ -35,6 +55,10 @@ class Session[AppDepsT]:
     requested_by: Actor | None = None
     """Whose message or answer started this run segment, if anyone's. Spans record a person
     here as the user."""
+
+    delivered: Delivered = field(default_factory=Delivered, init=False, repr=False, compare=False)
+    """How far the run has taken the log: to ``watch_after`` once it has started, then as far as
+    its watcher delivers. The capability records it with the run's start and its end."""
 
     @classmethod
     def start(

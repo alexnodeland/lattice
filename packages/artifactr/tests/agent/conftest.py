@@ -1,7 +1,8 @@
 """A scripted model and fixtures for agent tests: no test calls a model API."""
 
 import asyncio
-from collections.abc import Callable, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Collection, Sequence
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -15,12 +16,14 @@ from pydantic_ai import (
     TextPart,
     ToolCallPart,
     ToolReturnPart,
+    UserPromptPart,
 )
+from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from artifactr.agent import ArtifactWorkspace, RunHandle, Runner, Sent, Session, function_model
-from artifactr.core import Envelope, Thread, UserActor
-from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
+from artifactr.core import Envelope, Run, RunStatus, Thread, ThreadId, UserActor
+from artifactr.workspace import HistoryChunk, InMemoryStorage, Scope, Workspace, Workspaces
 from tests.artifact_types import Checklist, Note
 
 ALICE = UserActor(id="alice", name="Alice")
@@ -64,14 +67,50 @@ class Script:
         return [str(p.content) for p in last.parts if isinstance(p, ToolReturnPart)]
 
     def prompt_texts(self, request: int) -> list[str]:
-        """Every user-prompt text in a request's messages."""
+        """Every user-prompt text in a request's messages, each of a prompt's several apart."""
         return [
-            str(part.content)
+            str(text)
             for message in self.requests[request]
             if isinstance(message, ModelRequest)
             for part in message.parts
-            if part.part_kind == "user-prompt"
+            if isinstance(part, UserPromptPart)
+            for text in ([part.content] if isinstance(part.content, str) else part.content)
         ]
+
+    def conversation(self) -> list[str]:
+        """The thread's messages as the model last saw them, in order: prompts and steering."""
+        return self.prompt_texts(len(self.requests) - 1)
+
+    def answers(self) -> list[str]:
+        """The tool results the model last saw, in order: its questions' answers among them."""
+        return [
+            str(part.content)
+            for message in self.requests[-1]
+            if isinstance(message, ModelRequest)
+            for part in message.parts
+            if part.part_kind == "tool-return"
+        ]
+
+
+class Recorder:
+    """One model for two processes' agents: it replies at once, and records each new prompt."""
+
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    def respond(self, messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        answered = max(
+            (i for i, message in enumerate(messages) if isinstance(message, ModelResponse)),
+            default=-1,
+        )
+        self.prompts += [
+            str(part.content)
+            for message in messages[answered + 1 :]
+            if isinstance(message, ModelRequest)
+            for part in message.parts
+            if isinstance(part, UserPromptPart)
+        ]
+        return ModelResponse(parts=[TextPart("ok")])
 
 
 class Gate:
@@ -84,6 +123,110 @@ class Gate:
     async def wait(self) -> None:
         self.entered.set()
         await self.release.wait()
+
+
+class HeldStorage(InMemoryStorage):
+    """Storage that holds calls where a test asks it to, each at a :class:`Gate`.
+
+    ``held`` holds every release of a claim until the gate is released. The others hold the
+    next call of their kind, once: a claim, a read of a cursor, a read of the log's head, a
+    read of a thread's paused runs (as a claimant plans), a read of a thread's history (as a
+    turn begins, before its run starts), a read of a thread (as a run has just started), a
+    subscription (as a run's watcher starts), and a read of a thread's log, once it has
+    returned (as a claimant has read what it plans from). It counts claims, and refuses one past
+    ``MAX_CLAIMS``, so a claimant that never stops fails its test rather than hanging it.
+    """
+
+    MAX_CLAIMS = 50
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.held: Gate | None = None
+        self.held_claim: Gate | None = None
+        self.held_read: Gate | None = None
+        self.held_runs: Gate | None = None
+        self.held_history: Gate | None = None
+        self.held_subscribe: Gate | None = None
+        self.held_head: Gate | None = None
+        self.held_thread: Gate | None = None
+        self.held_log: Gate | None = None
+        self.claims = 0
+
+    async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
+        if self.held is not None:
+            await self.held.wait()
+        await super().release_lease(scope, key, holder)
+
+    async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
+        self.claims += 1
+        if self.claims > self.MAX_CLAIMS:
+            raise RuntimeError(f"claimed {self.claims} times")
+        if (gate := self.held_claim) is not None:
+            self.held_claim = None
+            await gate.wait()
+        return await super().acquire_lease(scope, key, holder, ttl)
+
+    async def cursor(self, scope: Scope, name: str) -> int:
+        if (gate := self.held_read) is not None:
+            self.held_read = None
+            await gate.wait()
+        return await super().cursor(scope, name)
+
+    async def head_seq(self, scope: Scope) -> int:
+        if (gate := self.held_head) is not None:
+            self.held_head = None
+            await gate.wait()
+        return await super().head_seq(scope)
+
+    async def read(
+        self,
+        scope: Scope,
+        *,
+        after_seq: int = 0,
+        before_seq: int | None = None,
+        threads: Collection[ThreadId] | None = None,
+        limit: int | None = None,
+        last: int | None = None,
+    ) -> list[Envelope]:
+        found = await super().read(
+            scope,
+            after_seq=after_seq,
+            before_seq=before_seq,
+            threads=threads,
+            limit=limit,
+            last=last,
+        )
+        if threads and (gate := self.held_log) is not None:
+            self.held_log = None
+            await gate.wait()
+        return found
+
+    async def thread(self, scope: Scope, thread_id: ThreadId) -> Thread | None:
+        if (gate := self.held_thread) is not None:
+            self.held_thread = None
+            await gate.wait()
+        return await super().thread(scope, thread_id)
+
+    async def runs(
+        self, scope: Scope, *, thread_id: ThreadId | None = None, status: RunStatus | None = None
+    ) -> list[Run]:
+        if status == "paused" and (gate := self.held_runs) is not None:
+            self.held_runs = None
+            await gate.wait()
+        return await super().runs(scope, thread_id=thread_id, status=status)
+
+    async def history(self, scope: Scope, thread_id: ThreadId) -> Sequence[HistoryChunk]:
+        if (gate := self.held_history) is not None:
+            self.held_history = None
+            await gate.wait()
+        return await super().history(scope, thread_id)
+
+    async def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncGenerator[Envelope]:
+        if (gate := self.held_subscribe) is not None:
+            self.held_subscribe = None
+            await gate.wait()
+        async for envelope in super().subscribe(scope, after_seq=after_seq):
+            yield envelope
 
 
 async def settle() -> None:
@@ -132,18 +275,52 @@ def make_agent(
     ask: bool = False,
     notices: bool = False,
     output_type: Any = str,
+    capabilities: Sequence[AbstractCapability[Session[Gate]]] = (),
 ) -> Agent[Session[Gate], Any]:
     return Agent(
         script.model,
         deps_type=Session[Gate],
         output_type=output_type,
         toolsets=list(tools),
-        capabilities=[ArtifactWorkspace(types=[Note, Checklist], ask=ask, notices=notices)],
+        capabilities=[
+            ArtifactWorkspace(types=[Note, Checklist], ask=ask, notices=notices),
+            *capabilities,
+        ],
     )
 
 
 def make_runner(agent: Agent[Session[Gate], Any], gate: Gate) -> Runner[Gate]:
     return Runner(agent, app=gate)
+
+
+type MakeRunner = Callable[..., Runner[Gate]]
+"""Makes a runner of an agent, with the runner's other arguments."""
+
+
+@pytest.fixture
+async def runners(gate: Gate) -> AsyncIterator[MakeRunner]:
+    """Make runners that are closed as the test ends, so one that is stuck fails the test."""
+    made: list[Runner[Gate]] = []
+
+    def make(agent: Agent[Session[Gate], Any], **options: Any) -> Runner[Gate]:
+        runner = Runner(agent, app=gate, **options)
+        made.append(runner)
+        return runner
+
+    yield make
+    for runner in made:
+        await runner.aclose()
+
+
+async def settled(thread_id: str, *runners: Runner[Gate]) -> None:
+    """Wait until no runner has a hand-over pending or a run in the thread."""
+    while True:
+        for runner in runners:
+            await runner.drain()
+        runs = [handle.task for runner in runners if (handle := runner.running(thread_id))]
+        if not runs:
+            return
+        await asyncio.gather(*runs, return_exceptions=True)
 
 
 def types(envelopes: Sequence[Envelope]) -> list[str]:

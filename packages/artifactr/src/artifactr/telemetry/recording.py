@@ -10,7 +10,7 @@ from typing import Final
 
 from opentelemetry import metrics, trace
 from opentelemetry.metrics import Counter, Histogram, MeterProvider, UpDownCounter
-from opentelemetry.trace import Span, TracerProvider
+from opentelemetry.trace import Span, SpanContext, TracerProvider
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 from opentelemetry.util.types import AttributeValue
 
@@ -135,6 +135,15 @@ def current_traceparent() -> str | None:
     carrier: dict[str, str] = {}
     _W3C.inject(carrier)
     return carrier.get("traceparent")
+
+
+def parse_traceparent(traceparent: str | None) -> SpanContext | None:
+    """Return the span context a W3C ``traceparent`` names, such as an envelope's, if valid."""
+    if traceparent is None:
+        return None
+    context = trace.get_current_span(_W3C.extract({"traceparent": traceparent}))
+    span = context.get_span_context()
+    return span if span.is_valid else None
 
 
 def annotate(attributes: Attributes, span: Span | None = None) -> None:

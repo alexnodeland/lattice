@@ -149,7 +149,7 @@ Every command gets exactly one result.
 }
 ```
 
-`outcome.type` is `applied` (`artifact_id`, `version`), `proposed` (`proposal_id`), `resolved` (`proposal_id`, `decision`, `version?`) or `recorded` (`run_id?`: the run a `post_message` or `answer_deferred` started or resumed, or `null` when it steered the thread's active run, left a paused run's requests unanswered, or was a notice). `rejection.type` is one of `version_conflict`, `validation_failed`, `patch_failed`, `not_found`, `forbidden` or `invalid_state`; every rejection has a `message` and its typed details.
+`outcome.type` is `applied` (`artifact_id`, `version`), `proposed` (`proposal_id`), `resolved` (`proposal_id`, `decision`, `version?`) or `recorded` (`run_id?`: the run a `post_message` or `answer_deferred` started or resumed, or `null` when it steered the thread's active run, will be taken by the turn that run hands the thread over to as it ends, left a paused run's requests unanswered, or was a notice). `rejection.type` is one of `version_conflict`, `validation_failed`, `patch_failed`, `not_found`, `forbidden` or `invalid_state`; every rejection has a `message` and its typed details.
 
 ### `replay_complete`
 
@@ -182,7 +182,7 @@ The command is one of the `Command` models in `artifactr.core`, or `stop_run` or
 | `type` | Fields | Effect |
 |---|---|---|
 | `create_thread` | `thread_id?`, `title?` | `thread_created` |
-| `post_message` | `thread_id`, `content`, `message_id?`, `kind?` (`message`, the default, or `notice`) | `message_posted`. A message starts a run if the thread is idle, steers the running run if there is one, and answers a paused run's pending requests (declining approvals, with the message as the reason) before resuming it. A notice does none of these, and the thread's agent is told of it only if the application asks ([ADR-0051](adr/0051-notices.md)). A `message_id` already used in the workspace, by a message or a notice, is `invalid_state`. |
+| `post_message` | `thread_id`, `content`, `message_id?`, `kind?` (`message`, the default, or `notice`) | `message_posted`. A message starts a run if the thread is idle, steers the running run if there is one, and answers a paused run's pending requests (declining approvals, with the message as the reason) before resuming it. A message sent as a run ends is taken by the next turn, which that run starts as it releases the thread; the thread's messages are carried out once each, in the log's order ([ADR-0055](adr/0055-turns-from-the-log.md)). A message is a message however it was committed: in a paused thread the oldest one not yet taken is the reply, so post what should not answer as a notice. A notice does none of these, and the thread's agent is told of it only if the application asks ([ADR-0051](adr/0051-notices.md)). A `message_id` already used in the workspace, by a message or a notice, is `invalid_state`. |
 | `set_focus` | `thread_id`, `artifact_ids` | `focus_changed` |
 | `set_thread_mode` | `thread_id`, `mode` (`edit`, `suggest`) | `thread_mode_changed` |
 | `create_artifact` | `kind`, `data`, `artifact_id?`, `thread_id?`, `proposal_id?` | `artifact_created`, or `proposal_created` under the type's write policy |

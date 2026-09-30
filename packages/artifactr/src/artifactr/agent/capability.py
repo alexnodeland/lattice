@@ -33,7 +33,7 @@ from pydantic_ai.capabilities.abstract import (
     WrapRunHandler,
     WrapToolExecuteHandler,
 )
-from pydantic_ai.exceptions import ToolFailedError, ToolRetryError
+from pydantic_ai.exceptions import ToolFailedError, ToolRetryError, UserError
 
 from artifactr.agent.session import Session, last_seen
 from artifactr.agent.tools import artifact_tools
@@ -164,14 +164,18 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         """Record the run, brief the agent, and watch the workspace while it runs."""
         session = ctx.deps
         workspace = session.workspace
+        delivered = session.delivered
         annotate(_attribution(session))
+        # The run's input, up to where its watcher starts, is taken as the run starts.
+        taken = max(delivered.seq, session.watch_after or 0)
         started = await workspace.record(
             RunStarted(
                 run_id=session.run_id,
                 thread_id=session.thread_id,
                 trigger=session.trigger,
                 trace_id=current_trace_id(),
-            )
+            ),
+            cursor=delivered.at(taken),
         )
         watch_after = (started.seq if session.watch_after is None else session.watch_after) or 0
         thread = await workspace.thread(session.thread_id)
@@ -183,39 +187,48 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         )
         if notes:
             ctx.enqueue(_wrap(notes))
+        delivered.seq = max(taken, watch_after)
         watcher = asyncio.create_task(self._watch(ctx, watch_after, set(thread.focus)))
         try:
-            result = await handler()
+            try:
+                result = await handler()
+            finally:  # the watcher stops before the run's end is recorded, however it ends
+                watcher.cancel()
+                await asyncio.gather(watcher, return_exceptions=True)
         except asyncio.CancelledError:
-            await _record(workspace, self._ended(session, "stopped"))
+            stopped = self._ended(session, "stopped")
+            await _record(workspace, stopped, cursor=delivered.at(delivered.seq))
             raise
         except Exception as error:
             reason = error.reason if isinstance(error, RunFailure) else None
             failed = self._ended(session, "failed", error=str(error), reason=reason)
-            await _record(workspace, failed)
+            await _record(workspace, failed, cursor=delivered.at(delivered.seq))
             raise
-        finally:
-            watcher.cancel()
-            await asyncio.gather(watcher, return_exceptions=True)
         await self._finish(session, result)
         return result
 
     async def _watch(self, ctx: Context, after_seq: int, focus: set[ArtifactId]) -> None:
-        workspace = ctx.deps.workspace
-        thread_id = ctx.deps.thread_id
+        """Deliver what others do into the run, and note in the session how far it got."""
+        session = ctx.deps
+        workspace = session.workspace
         try:
-            async for envelope in workspace.subscribe(after_seq=after_seq, threads={thread_id}):
+            async for envelope in workspace.subscribe(
+                after_seq=after_seq, threads={session.thread_id}
+            ):
                 event = envelope.event
                 if isinstance(event, FocusChanged):
                     focus = set(event.artifact_ids)
                 elif same_participant(envelope.actor, workspace.actor):
-                    continue
+                    pass
                 elif isinstance(event, MessagePosted) and event.kind == "message":
                     ctx.enqueue(event.content)
                 elif notes := change_notes(
                     [envelope], viewer=workspace.actor, focus=focus, notices=self.notices
                 ):
                     ctx.enqueue(_wrap(notes))
+                session.delivered.seq = envelope.seq
+        except UserError:
+            return  # the agent's run is over and takes nothing more: the thread's next turn will
         except Exception:
             logger.exception(
                 "watching the workspace for run %s failed; the run goes on", ctx.deps.run_id
@@ -223,6 +236,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
 
     async def _finish(self, session: Session[Any], result: AgentRunResult[Any]) -> None:
         workspace = session.workspace
+        taken = session.delivered.at(session.delivered.seq)
         history = result.new_messages_json()
         output = result.output
         usage = RunUsage(
@@ -241,11 +255,12 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
                 requests=requests,
                 usage=usage,
             )
-            await _record(workspace, paused, history=history)
+            await _record(workspace, paused, history=history, cursor=taken)
             return
         if isinstance(output, str) and output.strip():
             await workspace.post_message(session.thread_id, output)
-        await _record(workspace, self._ended(session, "completed", usage=usage), history=history)
+        ended = self._ended(session, "completed", usage=usage)
+        await _record(workspace, ended, history=history, cursor=taken)
 
     @staticmethod
     def _ended(
@@ -360,7 +375,13 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         )
 
 
-async def _record(workspace: Workspace, fact: RunEvent, *, history: bytes | None = None) -> None:
+async def _record(
+    workspace: Workspace,
+    fact: RunEvent,
+    *,
+    history: bytes | None = None,
+    cursor: tuple[str, int] | None = None,
+) -> None:
     """Record how a tool call or the run ended, unless the run was abandoned meanwhile.
 
     Once a run's claim lapsed, the thread's next claim records it as failed, abandoned, and core
@@ -370,7 +391,7 @@ async def _record(workspace: Workspace, fact: RunEvent, *, history: bytes | None
     runs.
     """
     try:
-        await workspace.record(fact, history=history)
+        await workspace.record(fact, history=history, cursor=cursor)
     except InvalidState as refused:
         if (await workspace.run(fact.run_id)).status != "failed":
             raise

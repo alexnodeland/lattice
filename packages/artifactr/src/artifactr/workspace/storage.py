@@ -89,6 +89,13 @@ class Transaction(Protocol):
         """Append serialized model messages to a thread's history."""
         ...
 
+    async def save_cursor(self, name: str, seq: int) -> None:
+        """Save a named cursor with this transaction: it moves forward, if the transaction commits.
+
+        It is :meth:`Storage.save_cursor`, made atomic with the transaction's writes.
+        """
+        ...
+
 
 class Storage(Protocol):
     """Persistence for workspaces. Every method is scoped to one tenant's workspace.

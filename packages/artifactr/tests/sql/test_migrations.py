@@ -23,7 +23,7 @@ from artifactr.core import (
 from artifactr.sql import SqlStorage, create_schema, migrate
 from artifactr.sql.schema import _alembic_config
 from artifactr.sql.tables import VERSION_TABLE, EventRow, MessageRow, metadata
-from artifactr.workspace import Scope
+from artifactr.workspace import Scope, Workspaces
 
 
 def _differences(connection: Connection) -> list[Any]:
@@ -170,3 +170,21 @@ async def test_upgrading_keeps_the_ids_of_the_messages_already_posted(
         await connection.run_sync(lambda c: command.downgrade(_alembic_config(c), "0002"))
         assert "artifactr_messages" not in await connection.run_sync(_tables)
         assert await connection.scalar(select(func.count()).select_from(events)) == 5
+
+
+async def test_upgrading_records_where_each_workspace_stood(engine: AsyncEngine) -> None:
+    upgraded = "artifactr.runner/upgraded"
+    storage = SqlStorage(engine)
+    async with engine.begin() as connection:
+        await connection.run_sync(lambda c: command.upgrade(_alembic_config(c), "0004"))
+    existing = await Workspaces(storage).open("tenant_a", "ws_1", actor=UserActor(id="alice"))
+    for title in ("one", "two"):
+        await existing.create_thread(title)
+    await migrate(engine)
+    assert await storage.cursor(Scope("tenant_a", "ws_1"), upgraded) == 2
+    later = await Workspaces(storage).open("tenant_a", "ws_2", actor=UserActor(id="alice"))
+    await later.create_thread("three")
+    assert await storage.cursor(Scope("tenant_a", "ws_2"), upgraded) == 0, "it is new"
+    async with engine.begin() as connection:
+        await connection.run_sync(lambda c: command.downgrade(_alembic_config(c), "0004"))
+    assert await storage.cursor(Scope("tenant_a", "ws_1"), upgraded) == 0

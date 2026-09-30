@@ -66,11 +66,16 @@ INSTRUCTIONS = (
 _CommandId = Annotated[
     str | None,
     Field(
+        min_length=1,
         description="An id of your choosing for this change. A retry with the same id returns "
-        "the first result instead of making the change again."
+        "the first result instead of making the change again.",
     ),
 ]
-"""A command tool's optional ``command_id``: the idempotency key of REST's command frames."""
+"""A command tool's optional ``command_id``: the idempotency key of REST's command frames.
+
+An empty one is refused, as REST refuses it: a model that fills optional strings with ``""``
+would otherwise get its first change's result back for every change.
+"""
 
 
 _READ_LIMIT = 50
@@ -230,8 +235,9 @@ class ArtifactrMcp:
         if command_id is None:
             command_id = new_id("cmd")
         result = await self._runner.execute(workspace, command, command_id=command_id)
-        if result.outcome is None:
-            raise ToolError(str((result.rejection or {}).get("message")))
+        if result.rejection is not None:
+            raise ToolError(str(result.rejection["message"]))
+        assert result.outcome is not None, "a result has an outcome or a rejection"
         return result.outcome
 
     async def _check_subscriptions(

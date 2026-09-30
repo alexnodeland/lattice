@@ -193,6 +193,9 @@ async def test_a_retried_command_is_carried_out_once(mcp: ArtifactrMcp, ws: Work
         create = {"kind": "note", "data": {"text": "Ship Friday"}, "command_id": "c1"}
         created = await _call(client, "create_artifact", **create)
         assert await _call(client, "create_artifact", **create) == created, "the first result"
+        empty = await _call(client, "create_artifact", **{**create, "command_id": ""})
+        assert empty[0], "an empty id is refused, not remembered"
+        assert "String should have at least 1 character" in empty[1]
     assert len(await ws.artifacts()) == 1
 
 

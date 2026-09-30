@@ -538,6 +538,7 @@ reflexr, the sibling library for event-driven agents, is released on its own, an
 | pydantic-ai | A capability plus a deps type (`ArtifactWorkspace`, `Session`) | A capability plus a deps type (`EventContext`, `Reaction`) |
 | WebSocket | `hello`, replay, `replay_complete`, close codes | The same shape |
 | MCP | Tenant in resource URIs | The same |
+| Commands | `Runner.execute(workspace, command, command_id=)` returns the `command_result`, remembered in a `CommandResults` port by tenant, workspace, participant and id; every MCP tool that changes something takes `command_id` | The same, as `Workspaces.execute` |
 
 Some code is shared verbatim, at the same path under `src/reflexr/`, and each copy's docstring says so. A change to one is made to both:
 

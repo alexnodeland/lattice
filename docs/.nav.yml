@@ -4,6 +4,7 @@ nav:
   - Architecture: architecture.md
   - Decisions:
       - adr/README.md
+      - adr/0001-lattices-brand.md
       - adr/0002-ci-runs-every-affected-project-and-its-dependents.md
       - adr/0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md
       - adr/0004-one-github-app-for-release-please-and-renovate.md
@@ -13,6 +14,7 @@ nav:
       - adr/0008-one-resolution-litellm-held-at-1-83-0.md
       - adr/0009-one-dev-container-at-the-root.md
       - adr/template.md
+  - Brand: assets/brand/README.md
   - artifactr: artifactr
   - reflexr: reflexr
   - evalr: evalr

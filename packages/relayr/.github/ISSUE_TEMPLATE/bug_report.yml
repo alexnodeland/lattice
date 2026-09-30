@@ -1,0 +1,34 @@
+name: Bug report
+description: Something in relayr behaves differently from its documentation.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: The smallest code that shows the problem.
+      render: python
+    validations:
+      required: true
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options: [events, inbound, outbound, ledger, sql, telemetry, rules, evals, docs]
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: relayr, artifactr, reflexr and Python versions, or the commits the libraries are pinned at.
+      placeholder: "relayr 0.1.0, artifactr-ai 0.1.0, reflexr 0.1.0, Python 3.13.2"
+    validations:
+      required: true

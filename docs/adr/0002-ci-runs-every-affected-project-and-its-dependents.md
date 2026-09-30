@@ -37,5 +37,5 @@ Running everything on every pull request would be correct and simple, but a chan
 
 - Easier: a change to a package, or to the lock or configuration that every package reads, runs the checks of every project it can break, and no others.
 - Harder: CI's selection is a script of lattice's own, which a moon upgrade could break. `nightly.yml` runs every project's `check` on `main`, whatever changed, so a gap in the selection shows there.
-- Harder: moon counts a variable listed as a task's input as changed whenever it is set, so CI's PostgreSQL URLs make artifactr's and reflexr's tests, and their dependents', run on every pull request ([#18](https://github.com/alexnodeland/lattice/issues/18)).
+- Harder: moon counts a variable listed as a task's input as changed whenever it is set, so a variable CI always sets can't be an input without running its task on every pull request. The PostgreSQL URLs aren't inputs of the libraries' `test` tasks for that reason ([#23](https://github.com/alexnodeland/lattice/pull/23)); moon's cache then can't tell a run with PostgreSQL from one without it, so locally `moon run <library>:test --force` reruns the tests past a cached run.
 - Revisit: if moon's `--downstream` comes to follow the project graph, and its affected projects to include their tasks' root inputs, the script can go.

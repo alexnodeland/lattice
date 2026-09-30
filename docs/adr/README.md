@@ -7,7 +7,7 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | ADR | Title | Status |
 |---|---|---|
 | [0002](0002-ci-runs-every-affected-project-and-its-dependents.md) | CI runs every affected project and its dependents | Accepted |
-| [0003](0003-two-required-checks-ci-and-title.md) | Two required checks, CI and Title | Accepted |
+| [0003](0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md) | CI on pull requests, Nightly on main, and a required Title check | Accepted |
 | [0004](0004-one-github-app-for-release-please-and-renovate.md) | One GitHub App for release-please and Renovate | Accepted |
 | [0005](0005-renovate-runs-in-lattices-own-actions.md) | Renovate runs in lattice's own Actions | Accepted |
 | [0006](0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md) | release-please: first versions, pre-1.0 bumps, and what releases | Accepted |

@@ -396,7 +396,7 @@ In lattice, this list becomes a tracking issue with a sub-issue per phase (phase
 
 ### What the rehearsal settled
 
-Phase 1 rehearsed the move from fresh clones, and an independent review checked the result. The design above stands as accepted. Where the rehearsal found it wrong or silent, lattice does what follows instead, and phase 3's ADRs record each decision.
+Phase 1 rehearsed the move from fresh clones, and an independent review checked the result. The design above stands as accepted. Where the rehearsal found it wrong or silent, lattice does what follows instead. Phase 3's [family ADRs](../../adr/README.md) record the decisions, as each item links, and [`docs/architecture.md`](../../architecture.md) describes the smaller details.
 
 - **The import.**
   - The first message rule starts with `(?<![\w/])`, not `\b`. Two messages already said `alexnodeland/evalr#17`, which `\b` would have rewritten a second time.
@@ -405,33 +405,33 @@ Phase 1 rehearsed the move from fresh clones, and an independent review checked 
   - The setup is a series of commits, one concern each. One of them is a `style:` commit that only sorts the imports naming a sibling, and `.git-blame-ignore-revs` names it.
   - One artifactr test was added: artifactr's MCP app was covered only by docplan's tests.
   - grantr's and portalr's READMEs live in lattice's README until their code arrives.
-- **One resolution.** evalr's DSPy runs on litellm 1.83.0, because every later litellm pins `openai<3`, which `pydantic-ai-slim[openai]` can't share. `osv-scanner.toml` records litellm's 13 advisories (all in its proxy server, which lattice never runs), diskcache's unfixed one, and a name collision with an unrelated PyPI package called `oncall`.
+- **One resolution.** evalr's DSPy runs on litellm 1.83.0, because every later litellm pins `openai<3`, which `pydantic-ai-slim[openai]` can't share. `osv-scanner.toml` records litellm's 13 advisories (all in its proxy server, which lattice never runs), diskcache's unfixed one, and a name collision with an unrelated PyPI package called `oncall` ([lattice ADR-0008](../../adr/0008-one-resolution-litellm-held-at-1-83-0.md)).
 - **Declared imports.** Each package declares the modules deptry found it importing without declaring them: jsonpointer, pydantic-core, annotated-types, huggingface-hub, starlette and httpx2. Each floor narrows no install. deptry is part of `check`.
 - **Tool configuration.** Each package keeps its whole pytest and coverage configuration, since neither tool reads a parent directory's.
 - **moon.**
-  - `moon ci --downstream deep` doesn't reach dependents' tasks, and `moon query projects --affected` misses root files such as `uv.lock`. So CI runs `scripts/affected.py`, which adds every dependent from the project graph.
+  - `moon ci --downstream deep` doesn't reach dependents' tasks, and `moon query projects --affected` misses root files such as `uv.lock`. So CI runs `scripts/affected.py`, which adds every dependent from the project graph ([lattice ADR-0002](../../adr/0002-ci-runs-every-affected-project-and-its-dependents.md)).
   - docplan depends on evalr too.
   - stackr is `language: bash`, `layer: tool`.
   - There is no `.moon/toolchains.yml` until portalr brings Bun.
   - `.prototools` sets `detect-strategy = "only-prototools"`, so uv alone installs Python.
   - `build` runs from each package's directory with `--out-dir dist`.
 - **CI.**
-  - `ci.yml` runs on pull requests only, with an Images job; `nightly.yml` covers `main`.
-  - Title is its own workflow and a second required check, since CI never reruns when a title is edited. It checks the Conventional Commits types, not the scopes.
+  - `ci.yml` runs on pull requests only, with an Images job; `nightly.yml` covers `main` ([lattice ADR-0003](../../adr/0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md)).
+  - Title is its own workflow and a second required check, since CI never reruns when a title is edited. It checks the Conventional Commits types, not the scopes ([lattice ADR-0003](../../adr/0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md)).
   - A `.prekignore` keeps prek from running the template's own hook configuration.
-  - The repository's dependency graph is on, since dependency review needs it.
-  - Phase 6's timeouts landed on the day ([#4](https://github.com/alexnodeland/lattice/pull/4)): every test fails after a minute, and every job at a limit. docplan's tests hung in CI's Check job three times in five runs, and never locally.
-  - The Template task runs the generated application with the checkout's `uv`, since proto's shim chooses no version outside lattice, and only when stackr changes ([#3](https://github.com/alexnodeland/lattice/pull/3)). [#18](https://github.com/alexnodeland/lattice/issues/18) tracks the PostgreSQL variables that still make every pull request run artifactr's and reflexr's tests.
-- **Renovate** runs from lattice's own Actions (`renovate.yml`), not as Mend's hosted app, and its `pre-commit` manager is on.
+  - The repository's dependency graph is on, since dependency review needs it ([lattice ADR-0005](../../adr/0005-renovate-runs-in-lattices-own-actions.md)).
+  - Phase 6's timeouts landed on the day ([#4](https://github.com/alexnodeland/lattice/pull/4)): every test fails after a minute, and every job at a limit. docplan's tests hung in CI's Check job three times in five runs, and never locally ([lattice ADR-0007](../../adr/0007-a-timeout-on-every-test-and-every-job.md)).
+  - The Template task runs the generated application with the checkout's `uv`, since proto's shim chooses no version outside lattice, and only when stackr changes ([#3](https://github.com/alexnodeland/lattice/pull/3)). [#18](https://github.com/alexnodeland/lattice/issues/18) tracked the PostgreSQL variables that made every pull request run artifactr's and reflexr's tests, which [#23](https://github.com/alexnodeland/lattice/pull/23) took out of the tasks' inputs ([lattice ADR-0002](../../adr/0002-ci-runs-every-affected-project-and-its-dependents.md)).
+- **Renovate** runs from lattice's own Actions (`renovate.yml`), not as Mend's hosted app, and its `pre-commit` manager is on ([lattice ADR-0005](../../adr/0005-renovate-runs-in-lattices-own-actions.md)).
 - **Docs.**
   - Each folder's `.nav.yml` applies only with `awesome-nav` listed under `plugins`.
   - Each package's README uses absolute links, since it is also the package's PyPI page.
   - relayr's section starts at its decisions until relayr writes a landing page.
 - **Images.** Each `Dockerfile.dockerignore` also lets in every member's `pyproject.toml`, and the installed members' `README.md` and `LICENSE`.
 - **Releases.**
-  - The manifest holds each package's last tagged version, or `0.0.0`, so a first release is 0.1.0. `bump-minor-pre-major` is on.
-  - Each changelog keeps the history before the import under "Before lattice". release-please inserts releases above it, and never reads that far back.
-  - release-please and Renovate act as one GitHub App, `alexnodeland-lattice`, with a token narrowed for each workflow.
+  - The manifest holds each package's last tagged version, or `0.0.0`, so a first release is 0.1.0. `bump-minor-pre-major` is on ([lattice ADR-0006](../../adr/0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md)).
+  - Each changelog keeps the history before the import under "Before lattice". release-please inserts releases above it, and never reads that far back ([lattice ADR-0006](../../adr/0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md)).
+  - release-please and Renovate act as one GitHub App, `alexnodeland-lattice`, with a token narrowed for each workflow ([lattice ADR-0004](../../adr/0004-one-github-app-for-release-please-and-renovate.md)).
 
 [a-23]: https://github.com/alexnodeland/artifactr/issues/23
 [a-43]: https://github.com/alexnodeland/artifactr/pull/43

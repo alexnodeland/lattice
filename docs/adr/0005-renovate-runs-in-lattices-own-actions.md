@@ -11,7 +11,7 @@
 ## Decision
 
 - **Renovate's open-source CLI runs from `renovate.yml`,** through `renovatebot/github-action`, every day at 05:17 UTC and by hand, one run at a time.
-- **It acts as lattice's App** ([ADR-0004](0004-one-github-app-for-release-please-and-renovate.md)), with a token minted for each run and narrowed to what Renovate needs, so its pull requests run CI and Title.
+- **It acts as lattice's App,** as [ADR-0004](0004-one-github-app-for-release-please-and-renovate.md) records.
 - **It commits through GitHub's API** (`RENOVATE_PLATFORM_COMMIT`), so its commits are signed.
 - **`renovate.json` is required, and there is no onboarding.** The configuration is RFC-0003's, with Renovate's `pre-commit` manager, which is off by default, turned on, so the hooks' revisions in `.pre-commit-config.yaml` move too.
 - **Dependabot's security updates stay off.** The dependency graph and its alerts are on, since the dependency review action needs the graph; what they report that doesn't apply is recorded as [ADR-0008](0008-one-resolution-litellm-held-at-1-83-0.md) says.

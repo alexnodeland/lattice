@@ -1,4 +1,4 @@
-# ADR-0003: Two required checks, CI and Title
+# ADR-0003: CI on pull requests, Nightly on main, and a required Title check
 
 **Status:** Accepted
 **Date:** 2026-09-30
@@ -21,6 +21,15 @@ The setup found two problems with that:
 - **`nightly.yml` checks `main`,** on every push and every night: every project's `check`, the reference implementations' images, osv-scanner over `uv.lock`, and a link check.
 
 ## Options considered
+
+### Where `main` is checked
+
+| Option | Each push to `main` | CI's `allowed-skips` |
+|---|---|---|
+| **CI on pull requests, Nightly on `main` (chosen)** | Checked once, in full | None |
+| CI on pull requests and on `main` (RFC-0003) | Checked twice: CI's affected projects, then Nightly's every project | Every job that runs only on pull requests |
+
+### The title's check
 
 | Option | A title edited after CI passed | What an edit costs |
 |---|---|---|

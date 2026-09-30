@@ -82,7 +82,7 @@ graph TD
     reflexr --> evalr
 ```
 
-- **An edge is a requirement.** The dependent names its dependency in `[project]` with a range, and takes it from the workspace ([The uv workspace](#the-uv-workspace)). docplan depends on evalr through its `[dspy]` extra.
+- **An edge is a requirement.** The dependent names its dependency in `[project]` and takes it from the workspace ([The uv workspace](#the-uv-workspace)). The libraries name their siblings with a range, which their wheels carry; docplan and oncall ship no wheel, and name theirs without one. docplan depends on evalr through its `[dspy]` extra.
 - **stackr's edges are its template's:** it generates applications on the three libraries, and no `pyproject.toml` records that.
 - **Each `moon.yml` states its `dependsOn`,** since moon infers no edge from a requirement with a range. [`tests/test_moon.py`](https://github.com/alexnodeland/lattice/blob/main/tests/test_moon.py) holds it to the siblings the project's `pyproject.toml` requires, and checks that each comes from the workspace.
 - **Independence is checked, not assumed.** In one environment every member is importable, so an undeclared import that would once have failed passes silently. artifactr's and reflexr's layering tests list what each layer may import, evalr's forbid artifactr and reflexr, and deptry fails on an import that a package's shipped code doesn't declare.
@@ -126,7 +126,7 @@ moon runs every task, and only those a change affects; uv manages the dependenci
 | `.prototools` | The versions of moon and uv, which CI's `moonrepo/setup-toolchain` installs, and proto anywhere else. `detect-strategy = "only-prototools"` leaves Python to uv, from `.python-version` |
 
 - **`check` is one task per project** that runs nothing itself and depends on the project's checks, so the list lives in one place. `make check` runs `moon run :check`, and CI and Nightly run the same tasks.
-- **The libraries' old Makefile targets are tasks** that CI doesn't run and moon doesn't cache (RFC-0003, D2): `schema`, `dashboards`, `pg-up`, `pg-down`, `app-up` and `test-pg`. stackr keeps its Makefile for the stack, and its checks are tasks: `validate`, `reference`, `template`, `smoke` and `smoke-app`.
+- **artifactr's and reflexr's contributor tasks,** `schema`, `dashboards`, `pg-up`, `pg-down`, `app-up` and `test-pg`, are ones CI doesn't run and moon doesn't cache (RFC-0003, D2). stackr keeps its Makefile for the stack, and its checks are tasks: `validate`, `reference`, `template`, `smoke` and `smoke-app`.
 - **The reference implementations' `image` tasks** build each image from lattice's root, since it installs from the root's lock. The image's own `Dockerfile.dockerignore` lets in only the workspace's manifests, the lock, and the packages it installs, with the README and license their metadata names. Each starts its image on its library's PostgreSQL, and a mutex runs them one at a time.
 
 ### What a change affects
@@ -150,7 +150,7 @@ A change to evalr runs the checks of evalr and of every project above it; a chan
 | `release.yml` | On every push to `main` | release-please; then each released package's wheel, built, attested and attached |
 | `renovate.yml` | Every day, and by hand | Renovate |
 
-- **Two checks are required,** `CI` and `Title`, on branches up to date with `main`. The ruleset is the one `main` shares with the siblings' repositories: no deletion, no force push, linear history, and squash-only pull requests ([ADR-0003](adr/0003-two-required-checks-ci-and-title.md)).
+- **Two checks are required,** `CI` and `Title`, on branches up to date with `main`. The ruleset is the one `main` shares with the siblings' repositories: no deletion, no force push, linear history, and squash-only pull requests ([ADR-0003](adr/0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md)).
 - **`main` is Nightly's.** CI runs on pull requests only, and `nightly.yml` runs everything on each push to `main`.
 - **Every workflow is hardened the same way:** each action pinned to a commit, with its version beside it; `permissions: {}` at the top, and each job granted what it needs; and no checkout keeps its credentials. actionlint and zizmor check the workflows, in the hooks and in the root's `workflows` task.
 - **Every test and every job has a timeout:** a test fails after a minute, printing every thread's stack, and each job has a limit of a few times its usual length ([ADR-0007](adr/0007-a-timeout-on-every-test-and-every-job.md)).
@@ -184,12 +184,11 @@ prek runs the hooks in `.pre-commit-config.yaml`, and `make install` installs th
 
 **One site, one build, one `mkdocs.yml`,** at [lattice.alexnodeland.com](https://lattice.alexnodeland.com).
 
-- **Zensical builds it** from `docs/`. The family's pages are at its root, and each package's at `docs/<package>/`. The `awesome-nav` plugin orders each folder by its `.nav.yml`, so each package's section keeps its own order.
+- **Zensical builds it** from `docs/`. The family's pages are at its root, and each package's at `docs/<package>/`. The `awesome-nav` plugin orders each folder by its `.nav.yml`, so each package's section keeps its own order. Each section starts at its package's home page, but for relayr's, which starts at its decisions until relayr has one.
 - **`moon run lattice:docs` is the build:** strict, so a broken link or anchor fails it, then [`scripts/check_site.py`](https://github.com/alexnodeland/lattice/blob/main/scripts/check_site.py), which fails on a list that rendered as text. CI runs it on a pull request that changes the site's inputs, as the root project's `docs` task, and `docs.yml` deploys it from `main`, one run at a time, never cancelled.
 - **One build resolves the references between packages.** mkdocstrings reads every package from the workspace's one environment, so no package needs another's inventory. [`scripts/griffe_sphinx_roles.py`](https://github.com/alexnodeland/lattice/blob/main/scripts/griffe_sphinx_roles.py) turns artifactr's and reflexr's Sphinx roles into cross-references; evalr's and relayr's docstrings are Markdown.
 - **Pages include files instead of copying them,** by their path from the root: the family's `CONTRIBUTING.md`, code of conduct, security policy and license under `docs/project/`, each package's `CHANGELOG.md` and schemas, and the files stackr's reference pages describe, which `stackr:reference` checks the pages against.
 - **Each package's README is also its PyPI page,** so its links are absolute: the site's pages, and files on GitHub.
-- **The brand.** The site's styling is lattice's, and each section's home opens with its package's lockup.
 - **The old sites,** at `artifactr.`, `reflexr.`, `evalr.` and `stackr.alexnodeland.com`, keep serving the old pages until they are retired separately (RFC-0003, D1).
 
 ## The dev container
@@ -198,26 +197,8 @@ One dev container, at the root, for every package ([ADR-0009](adr/0009-one-dev-c
 
 ## Decisions
 
-| ADR | Decision |
-|---|---|
-| [0002](adr/0002-ci-runs-every-affected-project-and-its-dependents.md) | CI runs every affected project and its dependents |
-| [0003](adr/0003-two-required-checks-ci-and-title.md) | Two required checks, CI and Title |
-| [0004](adr/0004-one-github-app-for-release-please-and-renovate.md) | One GitHub App for release-please and Renovate |
-| [0005](adr/0005-renovate-runs-in-lattices-own-actions.md) | Renovate runs in lattice's own Actions |
-| [0006](adr/0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md) | release-please: first versions, pre-1.0 bumps, and what releases |
-| [0007](adr/0007-a-timeout-on-every-test-and-every-job.md) | A timeout on every test and every job |
-| [0008](adr/0008-one-resolution-litellm-held-at-1-83-0.md) | One resolution, with litellm held at 1.83.0 |
-| [0009](adr/0009-one-dev-container-at-the-root.md) | One dev container, at the root |
-
-RFC-0003's own decisions, D1 to D5 and the rest, are in its [Decisions](stackr/rfcs/0003-one-repository-lattice.md#decisions) section.
+Every family decision is an ADR in [`adr/`](adr/README.md), whose index lists them with their status, and RFC-0003's own are in its [Decisions](stackr/rfcs/0003-one-repository-lattice.md#decisions) section.
 
 ## What comes next
 
-RFC-0003's remaining [phases](stackr/rfcs/0003-one-repository-lattice.md#phases), tracked in [#22](https://github.com/alexnodeland/lattice/issues/22):
-
-- **Phase 4, the template in lattice:** a generated application pins the libraries at the commit it was rendered from, and CI renders the template on the checkout's packages, so a library's change and the template's adaptation are tested together.
-- **Phase 5, acceptance tests:** the OpenAPI documents and their drift tests, the Bruno collections, and an Acceptance job against a started stack.
-- **Phase 6, test signal and hardening:** ty, pytest-randomly, Schemathesis, CodeQL, `griffe check` and Scorecard, each in its own pull request. Its timeouts are done.
-- **Phase 7, agents and process:** `AGENTS.md`, the `lattice` plugin, the issue forms, labels and board, and the dev container's firewall, prebuilt image and Codespaces.
-
-Open meanwhile: the PostgreSQL variables that make every pull request run artifactr's and reflexr's tests ([#18](https://github.com/alexnodeland/lattice/issues/18)), and the advisory ignores, which lapse on 2026-12-31 ([#17](https://github.com/alexnodeland/lattice/issues/17)).
+What remains of the move is RFC-0003's [phases](stackr/rfcs/0003-one-repository-lattice.md#phases) 4 to 7, which [#22](https://github.com/alexnodeland/lattice/issues/22) tracks.

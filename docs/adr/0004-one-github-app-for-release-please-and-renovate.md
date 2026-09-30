@@ -6,7 +6,7 @@
 
 ## Context
 
-Two tools open pull requests in lattice: release-please, its release pull request ([ADR-0006](0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md)), and Renovate, its dependency updates ([ADR-0005](0005-renovate-runs-in-lattices-own-actions.md)). A pull request opened, or a commit pushed, with a workflow's own `GITHUB_TOKEN` starts no workflow runs. CI and Title would never report on those pull requests, and the ruleset requires both ([ADR-0003](0003-two-required-checks-ci-and-title.md)), so none of them could merge.
+Two tools open pull requests in lattice: release-please, its release pull request ([ADR-0006](0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md)), and Renovate, its dependency updates ([ADR-0005](0005-renovate-runs-in-lattices-own-actions.md)). A pull request opened, or a commit pushed, with a workflow's own `GITHUB_TOKEN` starts no workflow runs. CI and Title would never report on those pull requests, and the ruleset requires both ([ADR-0003](0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md)), so none of them could merge.
 
 [RFC-0003](../stackr/rfcs/0003-one-repository-lattice.md#ci-and-tooling) was silent on release-please's token, and assumed Renovate would run as Mend's hosted app, with an identity of its own. On the day, Renovate moved into lattice's own Actions, so both needed an identity that isn't the workflow's.
 

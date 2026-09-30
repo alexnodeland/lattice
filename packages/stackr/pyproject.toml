@@ -39,7 +39,6 @@ src = [".", "scripts"]
 # The scripts are Python without a `.py` suffix, so they read as commands.
 extend-include = [
   "scripts/setup-env",
-  "scripts/fetch-dashboards",
   "scripts/check-config",
   "scripts/create-tenant",
   "scripts/bump-libraries",

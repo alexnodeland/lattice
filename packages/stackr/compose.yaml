@@ -174,7 +174,10 @@ services:
     volumes:
       - ./deploy/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./deploy/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      # Each directory is a folder: stackr's, and the libraries', from the checkout.
+      - ./deploy/grafana/dashboards/stackr:/var/lib/grafana/dashboards/stackr:ro
+      - ../artifactr/deploy/grafana/dashboards:/var/lib/grafana/dashboards/artifactr:ro
+      - ../reflexr/deploy/grafana/dashboards:/var/lib/grafana/dashboards/reflexr:ro
       - grafana-data:/var/lib/grafana
     ports:
       - ${STACKR_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000

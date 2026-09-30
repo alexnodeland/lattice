@@ -1,3 +1,0 @@
-# stackr: the libraries' dashboards, downloaded by scripts/fetch-dashboards
-/deploy/grafana/dashboards/*
-!/deploy/grafana/dashboards/stackr/

@@ -19,10 +19,6 @@ Dependabot doesn't read this file. To bump a pin, change it here, then run `make
 | Pin | Value |
 |---|---|
 | `SUPABASE_CLI_VERSION` | `2.118.0` |
-| `ARTIFACTR_DASHBOARDS_VERSION` | not pinned |
-| `ARTIFACTR_DASHBOARDS_SHA256` | not pinned |
-| `REFLEXR_DASHBOARDS_VERSION` | not pinned |
-| `REFLEXR_DASHBOARDS_SHA256` | not pinned |
 
 <!-- end generated -->
 

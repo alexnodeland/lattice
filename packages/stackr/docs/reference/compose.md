@@ -150,7 +150,7 @@ Dashboards and exploration, over the four backends.
 | Image | `grafana/grafana`, pinned by tag in `compose.yaml` |
 | Published ports | 3000 (`GRAFANA_PORT`) → 3000 |
 | Networks | `stackr` |
-| Volumes | `./deploy/grafana/provisioning/datasources` → `/etc/grafana/provisioning/datasources` (read-only), `./deploy/grafana/provisioning/dashboards` → `/etc/grafana/provisioning/dashboards` (read-only), `./deploy/grafana/dashboards` → `/var/lib/grafana/dashboards` (read-only), `grafana-data` → `/var/lib/grafana` |
+| Volumes | `./deploy/grafana/provisioning/datasources` → `/etc/grafana/provisioning/datasources` (read-only), `./deploy/grafana/provisioning/dashboards` → `/etc/grafana/provisioning/dashboards` (read-only), `./deploy/grafana/dashboards/stackr` → `/var/lib/grafana/dashboards/stackr` (read-only), `../artifactr/deploy/grafana/dashboards` → `/var/lib/grafana/dashboards/artifactr` (read-only), `../reflexr/deploy/grafana/dashboards` → `/var/lib/grafana/dashboards/reflexr` (read-only), `grafana-data` → `/var/lib/grafana` |
 | Depends on | `prometheus`, `tempo`, `loki`, `pyroscope` |
 | Health check | `wget -q -O /dev/null http://127.0.0.1:3000/api/health`, every 5s |
 | Restart | `unless-stopped` |

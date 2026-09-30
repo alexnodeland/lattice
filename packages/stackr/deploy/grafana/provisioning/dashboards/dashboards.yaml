@@ -1,6 +1,6 @@
-# Dashboards from files: each directory under deploy/grafana/dashboards is a
-# folder. `stackr/` is committed; the libraries' folders are downloaded by
-# scripts/fetch-dashboards at the versions pinned in versions.env.
+# Dashboards from files: each directory under /var/lib/grafana/dashboards is a
+# folder. compose.yaml mounts stackr's, and the libraries', from lattice's
+# packages/<library>/deploy/grafana/dashboards.
 apiVersion: 1
 
 providers:

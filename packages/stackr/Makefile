@@ -63,7 +63,7 @@ COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEM
 # scripts/smoke runs Compose as `make up` does, and the Supabase CLI as make runs it.
 SMOKE = $(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) SUPABASE="$(SUPABASE)" scripts/smoke
 
-.PHONY: help env up down reset ps logs dashboards tenant bump-libraries validate smoke smoke-app docs docs-serve docs-reference changelog clean
+.PHONY: help env up down reset ps logs tenant bump-libraries validate smoke smoke-app docs docs-serve docs-reference changelog clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -74,7 +74,7 @@ env: ## Create or update .env, generating local secrets
 .env: .env.example
 	$(UV) run scripts/setup-env
 
-up: .env dashboards ## Start the chosen PROFILES (default: all of them), with the database adapter they need
+up: .env ## Start the chosen PROFILES (default: all of them), with the database adapter they need
 	@docker network inspect $(SUPABASE_NETWORK) >/dev/null 2>&1 || docker network create $(SUPABASE_NETWORK) >/dev/null
 ifneq ($(strip $(START_SUPABASE)),)
 	$(SUPABASE) start $(SUPABASE_START_FLAGS)
@@ -95,9 +95,6 @@ ps: ## Show the stack's containers
 
 logs: ## Follow the logs of the running services
 	$(COMPOSE) --profile '*' logs --follow --tail=100
-
-dashboards: ## Download the libraries' Grafana dashboards pinned in versions.env
-	$(UV) run scripts/fetch-dashboards
 
 tenant: ## Create a tenant's team and key on the gateway: make tenant NAME=acme [TENANT_FLAGS="--max-budget 20"]
 	@if [ -z "$(NAME)" ]; then echo "usage: make tenant NAME=<tenant> [TENANT_FLAGS=...]"; exit 2; fi

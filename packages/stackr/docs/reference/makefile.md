@@ -15,7 +15,6 @@ Every command is a `make` target; `make` on its own lists them. The tools run th
 | `make reset` | Stop the stack and delete its data volumes, local Supabase's included |
 | `make ps` | Show the stack's containers |
 | `make logs` | Follow the logs of the running services |
-| `make dashboards` | Download the libraries' Grafana dashboards pinned in versions.env |
 | `make tenant` | Create a tenant's team and key on the gateway: make tenant NAME=acme [TENANT_FLAGS="--max-budget 20"] |
 | `make bump-libraries` | Pin the template's libraries to their main commits: make bump-libraries [BUMP_FLAGS="--check" or "artifactr=REV"] |
 | `make validate` | Validate every configuration without starting containers, as CI does |

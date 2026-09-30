@@ -94,7 +94,7 @@ def _seen(script: Script) -> list[str]:
 
 def _spin_guard(monkeypatch: pytest.MonkeyPatch, limit: int = 50) -> list[int]:
     plans = [0]
-    original = Runner._plan  # pyright: ignore[reportPrivateUsage]
+    original = Runner._plan
 
     async def counting(self: Runner[Any], workspace: Workspace, thread_id: str) -> Any:
         plans[0] += 1

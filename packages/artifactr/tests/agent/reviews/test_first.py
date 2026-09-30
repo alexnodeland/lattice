@@ -77,7 +77,7 @@ async def test_probe_a_persistent_failure_before_wrap_run_spawns_runs_forever(
         if count >= 25:
             entered.set()
         raise RuntimeError("the tracing backend is down")
-        yield  # pragma: no cover
+        yield
 
     runner = Runner(make_agent(Script()), app=gate, turn_context=broken)
     await runner.send(ws, thread.id, "Plan the launch")

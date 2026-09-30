@@ -19,7 +19,6 @@ from pydantic_ai.models.function import AgentInfo
 from artifactr.agent import function_model
 from artifactr.core import AnswerDeferred
 from artifactr.sql import SqlStorage, create_schema
-from artifactr.sql.storage import _awaited_to_the_end  # pyright: ignore[reportPrivateUsage]
 from artifactr.workspace import Scope, Workspace, Workspaces
 from tests.agent.conftest import (
     ALICE,
@@ -41,20 +40,11 @@ ASKING = [str, DeferredToolRequests]
 
 class Held(SqlStorage):
     held: Gate | None = None
-    held_taken: Gate | None = None
 
     async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
         if self.held is not None:
             await self.held.wait()
         await super().release_lease(scope, key, holder)
-
-    @_awaited_to_the_end
-    async def save_cursor(self, scope: Scope, name: str, seq: int) -> None:
-        # Inside the to-the-end wrapper: a cancellation while held is raised after the save.
-        if name.endswith("/taken") and (gate := self.held_taken) is not None:
-            self.held_taken = None
-            await gate.wait()
-        await SqlStorage.save_cursor.__wrapped__(self, scope, name, seq)  # type: ignore[attr-defined]
 
 
 @pytest.fixture

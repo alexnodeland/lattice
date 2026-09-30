@@ -58,11 +58,11 @@ litellm = [
 evals = ["evalr>=0.1.0.dev0"]
 
 [project.urls]
-Homepage = "https://artifactr.alexnodeland.com"
-Documentation = "https://artifactr.alexnodeland.com"
-Repository = "https://github.com/alexnodeland/artifactr"
-Issues = "https://github.com/alexnodeland/artifactr/issues"
-Changelog = "https://github.com/alexnodeland/artifactr/blob/main/CHANGELOG.md"
+Homepage = "https://lattice.alexnodeland.com/artifactr/"
+Documentation = "https://lattice.alexnodeland.com/artifactr/"
+Repository = "https://github.com/alexnodeland/lattice"
+Issues = "https://github.com/alexnodeland/lattice/issues"
+Changelog = "https://github.com/alexnodeland/lattice/blob/main/packages/artifactr/CHANGELOG.md"
 
 [dependency-groups]
 test = [

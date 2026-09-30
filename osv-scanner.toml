@@ -1,6 +1,8 @@
 # osv-scanner reads this file beside uv.lock, in CI's OSV job and in the nightly scan. Each
 # ignore says why it holds and lapses at its date, when it is reviewed again. A GHSA's ignore
 # covers the PYSEC and CVE ids that alias it.
+#
+# Lifting litellm's and diskcache's ignores is tracked in alexnodeland/lattice#17.
 
 [[IgnoredVulns]]
 id = "GHSA-4g5m-c9r5-49xf"

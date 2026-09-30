@@ -36,11 +36,11 @@ hf = ["datasets>=5.0", "huggingface-hub>=0.25.0"]
 all = ["evalr[dspy,jev,langfuse,hf]"]
 
 [project.urls]
-Homepage = "https://evalr.alexnodeland.com"
-Documentation = "https://evalr.alexnodeland.com"
-Repository = "https://github.com/alexnodeland/evalr"
-Issues = "https://github.com/alexnodeland/evalr/issues"
-Changelog = "https://github.com/alexnodeland/evalr/blob/main/CHANGELOG.md"
+Homepage = "https://lattice.alexnodeland.com/evalr/"
+Documentation = "https://lattice.alexnodeland.com/evalr/"
+Repository = "https://github.com/alexnodeland/lattice"
+Issues = "https://github.com/alexnodeland/lattice/issues"
+Changelog = "https://github.com/alexnodeland/lattice/blob/main/packages/evalr/CHANGELOG.md"
 
 [dependency-groups]
 test = [

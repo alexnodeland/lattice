@@ -1,0 +1,583 @@
+"""The MCP server: external agents feed and operate workspaces (ADR-0044)."""
+
+import asyncio
+import contextlib
+import json
+import logging
+import re
+from collections.abc import AsyncGenerator, Awaitable, Callable, Generator, Mapping, Sequence
+from typing import Annotated, Any, Literal
+
+from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
+from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import ResourceError, ToolError
+from mcp.server.subscriptions import InMemorySubscriptionBus, ResourceUpdated, SubscriptionBus
+from mcp.shared.exceptions import MCPError
+from mcp.types import INVALID_PARAMS, SubscriptionsListenRequestParams
+from opentelemetry import trace
+from pydantic import Field, JsonValue
+from starlette.applications import Starlette
+from starlette.requests import Request
+
+from reflexr.core import (
+    SYSTEM_EVENTS,
+    ArchiveRule,
+    CancelRun,
+    Command,
+    ExternalAgentActor,
+    FeedbackTarget,
+    Forbidden,
+    GiveFeedback,
+    InstallRule,
+    Publish,
+    Rejection,
+    ReplayRule,
+    RetryRun,
+    Rule,
+    RunStatus,
+    SkipRun,
+    TenantId,
+    UpdateRule,
+    WorkspaceId,
+    load_event,
+    new_id,
+)
+from reflexr.core import scope_key as key_of
+from reflexr.telemetry import actor_attributes, workspace_attributes
+from reflexr.workspace import (
+    Authorize,
+    RuleStatus,
+    ScheduleStatus,
+    Workspace,
+    Workspaces,
+)
+
+type McpContext = Context[Any, Request]
+"""The context a :data:`ResolveClient` receives: the MCP SDK's ``Context`` of one request.
+
+Over HTTP, ``ctx.request_context.request`` is the Starlette ``Request`` the call arrived in, so
+an authenticator written for the router's ``HTTPConnection`` can take it once it is checked
+for ``None``, which it is in process, as in tests. ``ctx.headers`` holds its headers.
+"""
+
+ResolveClient = Callable[[McpContext], Awaitable[tuple[TenantId, ExternalAgentActor]]]
+"""Authenticates an MCP request: returns the client's tenant and actor."""
+
+INSTRUCTIONS = (
+    "This server is a set of event logs, one per workspace, watched by rules that run agents "
+    "and workflows. Publish events to trigger them, read the log to see what happened, and "
+    "operate runs and rules. Events you publish are attributed to you. Give each change a "
+    "command_id of your own, and the same one if you retry it, so that it is made once."
+)
+
+_CommandId = Annotated[
+    str | None,
+    Field(
+        min_length=1,
+        description="An id of your choosing for this change. A retry with the same id returns "
+        "the first result instead of making the change again.",
+    ),
+]
+"""A command tool's optional ``command_id``: the idempotency key of REST's command frames.
+
+An empty one is refused, as REST refuses it: a model that fills optional strings with ``""``
+would otherwise get its first change's result back for every change.
+"""
+
+_RUN_FACTS = frozenset(
+    t.event_type for t in SYSTEM_EVENTS if t.event_type.startswith("reflexr:run_")
+)
+
+_READ_LIMIT = 50
+"""How many envelopes ``read_events`` returns when it is given neither ``limit`` nor ``last``."""
+
+_RUN_URI = re.compile(r"reflexr://(?P<tenant>[^/]+)/(?P<workspace>.+)/runs/[^/]+")
+"""A run's URI as :func:`run_uri` writes it, which is what notifications name."""
+
+
+def run_uri(tenant_id: TenantId, workspace_id: WorkspaceId, run_id: str) -> str:
+    """Return a run's resource URI."""
+    return f"reflexr://{tenant_id}/{workspace_id}/runs/{run_id}"
+
+
+@contextlib.contextmanager
+def _logging_left_alone() -> Generator[None]:
+    """Put the root logger's handlers and level back as they were when the block ends.
+
+    The MCP SDK's ``MCPServer`` calls ``logging.basicConfig`` as it is built, which has no
+    option to skip it: if the root logger has no handlers yet, the whole process then logs at
+    INFO through a rich handler. Logging is the application's to configure, so the handlers the
+    block added are removed and closed, and the level restored.
+
+    Shared verbatim with artifactr's ``src/artifactr/mcp/server.py``; change both.
+    """
+    root = logging.getLogger()
+    handlers, level = list(root.handlers), root.level
+    try:
+        yield
+    finally:
+        for added in [handler for handler in root.handlers if handler not in handlers]:
+            root.removeHandler(added)
+            added.close()
+        root.setLevel(level)
+
+
+class ReflexrMcp:
+    """An MCP server over reflexr workspaces.
+
+    Mount :meth:`http_app` in the application, and run :meth:`lifespan` in the application's
+    lifespan. Every tool that changes something goes through :meth:`Workspaces.execute`, as REST
+    and the WebSocket do, attributed to the client's :class:`~reflexr.core.ExternalAgentActor`.
+
+    The MCP SDK traces each request itself; the server adds the tenant, workspace and actor to
+    those spans. Building the SDK's server configures logging for the whole process; this
+    server undoes that, so logging stays the application's.
+
+    Args:
+        workspaces: Opens tenant-scoped workspaces, holds the rules, and carries out every
+            tool's command, once per ``command_id``, so a retry is safe, as on REST. The tools
+            that install, update and archive stored rules are served only if it has
+            ``stored_rules``.
+        resolve: Authenticates each request.
+        authorize: Whether a client may use a workspace of its tenant, asked on every tool call,
+            resource read and resource subscription that names a workspace; allows everything
+            if omitted. A refusal is a tool error, or a failed resource read or subscription,
+            carrying the ``forbidden`` rejection's message.
+        name: The server's name.
+        bus: Where resource-change notifications go; in-process by default.
+    """
+
+    def __init__(
+        self,
+        workspaces: Workspaces,
+        *,
+        resolve: ResolveClient,
+        authorize: Authorize | None = None,
+        name: str = "reflexr",
+        bus: SubscriptionBus | None = None,
+    ) -> None:
+        self._workspaces = workspaces
+        self._resolve = resolve
+        self._authorize = authorize
+        self._bus = bus or InMemorySubscriptionBus()
+        self._watchers: dict[tuple[TenantId, WorkspaceId], asyncio.Task[None]] = {}
+        with _logging_left_alone():
+            self.server = MCPServer(
+                name=name,
+                instructions=INSTRUCTIONS,
+                subscriptions=self._bus,
+                middleware=[self._check_subscriptions],
+            )
+        self._register()
+
+    def http_app(self, **options: Any) -> Starlette:
+        """Return the Streamable HTTP app to mount, e.g. at ``/mcp``."""
+        return self.server.streamable_http_app(**options)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(self) -> AsyncGenerator[None]:
+        """Run the HTTP session manager; stop watching workspaces afterwards."""
+        async with self.server.session_manager.run():
+            try:
+                yield
+            finally:
+                await self.aclose()
+
+    async def aclose(self) -> None:
+        """Stop the tasks that turn run facts into resource notifications."""
+        for task in self._watchers.values():
+            task.cancel()
+        await asyncio.gather(*self._watchers.values(), return_exceptions=True)
+        self._watchers.clear()
+
+    async def _open(
+        self,
+        ctx: Context,
+        workspace_id: WorkspaceId,
+        client: tuple[TenantId, ExternalAgentActor] | None = None,
+    ) -> Workspace:
+        """Open a workspace for the request's client, resolving it unless it is given.
+
+        Raises:
+            Forbidden: If ``authorize`` refuses the client this workspace.
+        """
+        tenant_id, actor = client or await self._resolve(ctx)
+        trace.get_current_span().set_attributes(
+            {**workspace_attributes(tenant_id, workspace_id), **actor_attributes(actor)}
+        )
+        workspace = await self._workspaces.open(
+            tenant_id, workspace_id, actor=actor, authorize=self._authorize
+        )
+        key = (tenant_id, workspace_id)
+        if key not in self._watchers:
+            self._watchers[key] = asyncio.create_task(self._notify(tenant_id, workspace))
+        return workspace
+
+    async def _check_subscriptions(
+        self, ctx: ServerRequestContext[Any, Any], call_next: CallNext
+    ) -> HandlerResult:
+        """Check a subscription to runs as a read of them is checked.
+
+        The MCP SDK serves ``subscriptions/listen`` itself, so this middleware asks, when a
+        stream opens, what reading each run it names would: its tenant, and ``authorize``.
+        A refusal fails the request with ``INVALID_PARAMS`` and the read's message.
+        """
+        if ctx.method == "subscriptions/listen":
+            params = SubscriptionsListenRequestParams.model_validate(ctx.params, by_name=False)
+            await self._check_uris(ctx, params.notifications.resource_subscriptions or ())
+        return await call_next(ctx)
+
+    async def _check_uris(self, ctx: ServerRequestContext[Any, Any], uris: Sequence[str]) -> None:
+        named: dict[tuple[str, str], str] = {}
+        for uri in uris:
+            if (match := _RUN_URI.fullmatch(uri)) is not None:
+                named.setdefault((match["tenant"], match["workspace"]), uri)
+        if not named:
+            return  # no run, so nothing of a workspace's to refuse
+        context = Context(request_context=ctx, mcp_server=self.server, subscriptions=self._bus)
+        tenant_id, actor = await self._resolve(context)
+        for (tenant, workspace_id), uri in named.items():
+            if tenant != tenant_id:
+                raise _refused(uri, Forbidden(_unavailable(tenant)))
+            try:
+                await self._workspaces.open(
+                    tenant_id, workspace_id, actor=actor, authorize=self._authorize
+                )
+            except Forbidden as refused:
+                raise _refused(uri, refused) from refused
+
+    async def _notify(self, tenant_id: TenantId, workspace: Workspace) -> None:
+        head = await workspace.head_seq()
+        async for envelope in workspace.subscribe(after_seq=head):
+            if envelope.event_type in _RUN_FACTS:
+                run_id = str(envelope.data["run_id"])
+                await self._bus.publish(
+                    ResourceUpdated(uri=run_uri(tenant_id, workspace.workspace_id, run_id))
+                )
+
+    async def _workspace(self, ctx: Context, workspace_id: WorkspaceId) -> Workspace:
+        """Open a workspace for a tool, whose refusal is a tool error."""
+        return await _tool(self._open(ctx, workspace_id))
+
+    async def _execute(
+        self, ctx: Context, workspace_id: WorkspaceId, command: Command, command_id: str | None
+    ) -> str:
+        """Carry out a tool's command, once per ``command_id``, and return its outcome as JSON.
+
+        A command without one gets a new id, so it is carried out, and remembered, like any.
+
+        Raises:
+            ToolError: If the command is rejected, now or when it was first carried out.
+        """
+        workspace = await self._workspace(ctx, workspace_id)
+        if command_id is None:
+            command_id = new_id("cmd")
+        result = await self._workspaces.execute(workspace, command, command_id=command_id)
+        if result.rejection is not None:
+            raise _tool_error(result.rejection)
+        assert result.outcome is not None, "a result has an outcome or a rejection"
+        return result.outcome.model_dump_json()
+
+    def _register(self) -> None:
+        server = self.server
+
+        @server.tool()
+        async def publish_event(
+            workspace_id: str,
+            event: dict[str, Any],
+            ctx: Context,
+            id: str | None = None,
+            correlation_id: str | None = None,
+            command_id: _CommandId = None,
+        ) -> str:
+            """Publish an event, an object with its ``type`` and fields.
+
+            Publishing an ``id`` that is already in the log adds nothing. ``correlation_id``
+            joins the causal chain that event started; a later event of a chain is refused.
+            """
+            try:
+                loaded = load_event(event)
+            except Rejection as rejection:
+                raise _tool_error(rejection.payload()) from rejection
+            command = Publish(event=loaded, id=id, correlation_id=correlation_id)
+            return await self._execute(ctx, workspace_id, command, command_id)
+
+        @server.tool()
+        async def read_events(
+            workspace_id: str,
+            ctx: Context,
+            after_seq: int = 0,
+            before_seq: int | None = None,
+            types: list[str] | None = None,
+            limit: int | None = None,
+            last: int | None = None,
+        ) -> str:
+            """Read envelopes from a workspace's log, oldest first, as JSON lines.
+
+            The window is ``after_seq < seq < before_seq``. ``limit`` reads its first
+            envelopes and ``last`` its last ones; without either, the first 50. To read back
+            through the log, give ``last``, then ``before_seq`` the oldest ``seq`` returned.
+            """
+            workspace = await self._workspace(ctx, workspace_id)
+            if limit is None and last is None:
+                limit = _READ_LIMIT
+            found = await _tool(
+                workspace.read(
+                    after_seq=after_seq, before_seq=before_seq, types=types, limit=limit, last=last
+                )
+            )
+            return "\n".join(e.model_dump_json() for e in found) or "No events."
+
+        @server.tool()
+        async def list_rules(ctx: Context) -> str:
+            """List the rules registered in code, which every workspace evaluates, as JSON.
+
+            A workspace's stored rules, installed at runtime, are in ``rule_status`` and
+            ``get_rule``.
+            """
+            await self._resolve(ctx)
+            rules = [r.model_dump(mode="json") for r in self._workspaces.rules.values()]
+            return json.dumps(rules)
+
+        @server.tool()
+        async def rule_status(workspace_id: str, ctx: Context) -> str:
+            """Show each of a workspace's rules: code or stored, enabled or not, and its progress.
+
+            A stored rule shows its version. The progress is the rule's cursor, how far it is
+            behind the log, its generation and its dead letters.
+            """
+            workspace = await self._workspace(ctx, workspace_id)
+            statuses = await workspace.rule_statuses()
+            return "\n".join(map(_rule_line, statuses)) or "No rules are registered."
+
+        @server.tool()
+        async def get_rule(workspace_id: str, rule: str, ctx: Context) -> str:
+            """Return a workspace's rule as JSON, with a stored rule's version and provenance."""
+            workspace = await self._workspace(ctx, workspace_id)
+            return (await _tool(workspace.get_rule(rule))).model_dump_json()
+
+        @server.tool()
+        async def schedule_status(workspace_id: str, ctx: Context) -> str:
+            """Show each schedule that ticks in a workspace: when it last ticked and ticks next."""
+            workspace = await self._workspace(ctx, workspace_id)
+            statuses = await workspace.schedule_statuses()
+            return "\n".join(map(_schedule_line, statuses)) or "No schedule targets this workspace."
+
+        @server.tool()
+        async def replay_rule(
+            workspace_id: str,
+            rule: str,
+            ctx: Context,
+            from_seq: int = 0,
+            mode: Literal["rebuild", "refire"] = "rebuild",
+            command_id: _CommandId = None,
+        ) -> str:
+            """Evaluate a rule again from ``from_seq``: rebuild its state quietly, or refire."""
+            command = ReplayRule(rule=rule, from_seq=from_seq, mode=mode)
+            return await self._execute(ctx, workspace_id, command, command_id)
+
+        # Only where stored rules are on: elsewhere these tools could only refuse, yet two of
+        # them would put the rules schema in every client's list of tools.
+        if self._workspaces.stored_rules is not None:
+
+            @server.tool()
+            async def install_rule(
+                workspace_id: str,
+                rule: Rule,
+                ctx: Context,
+                provenance: dict[str, Any] | None = None,
+                command_id: _CommandId = None,
+            ) -> str:
+                """Install a stored rule in a workspace: version 1, or the next of an archived rule.
+
+                It acts on events logged after it. ``provenance`` says where the rule came from,
+                such as the artifact a person accepted: JSON kept with the rule, and not read.
+                A change retried after it succeeded changes nothing, and answers as a
+                ``duplicate``.
+                """
+                command = InstallRule(rule=rule, provenance=provenance or {})
+                return await self._execute(ctx, workspace_id, command, command_id)
+
+            @server.tool()
+            async def update_rule(
+                workspace_id: str,
+                rule: Rule,
+                ctx: Context,
+                expected_version: int | None = None,
+                provenance: dict[str, Any] | None = None,
+                command_id: _CommandId = None,
+            ) -> str:
+                """Replace an active stored rule, named by ``rule``'s name, with a new version.
+
+                A new condition or scope resets it. Give ``expected_version``, the version you
+                last saw, so a change someone else made first is refused rather than overwritten.
+                A change retried after it succeeded changes nothing, and answers as a
+                ``duplicate``.
+                """
+                command = UpdateRule(
+                    rule=rule, expected_version=expected_version, provenance=provenance or {}
+                )
+                return await self._execute(ctx, workspace_id, command, command_id)
+
+            @server.tool()
+            async def archive_rule(
+                workspace_id: str,
+                rule: str,
+                ctx: Context,
+                expected_version: int | None = None,
+                reason: str | None = None,
+                command_id: _CommandId = None,
+            ) -> str:
+                """Archive a stored rule, so it stops, and cancel its unfinished runs.
+
+                A change retried after it succeeded changes nothing, and answers as a
+                ``duplicate``.
+                """
+                command = ArchiveRule(rule=rule, expected_version=expected_version, reason=reason)
+                return await self._execute(ctx, workspace_id, command, command_id)
+
+        @server.tool()
+        async def list_runs(
+            workspace_id: str,
+            ctx: Context,
+            rule: str | None = None,
+            scope_key: list[JsonValue] | None = None,
+            status: RunStatus | None = None,
+            limit: int = 20,
+        ) -> str:
+            """List runs, newest first, as JSON lines, optionally of one rule, scope or status.
+
+            ``scope_key`` holds the scope's values, as a run's ``scope_key`` does: ``["auth"]``.
+            """
+            workspace = await self._workspace(ctx, workspace_id)
+            key = None if scope_key is None else key_of(scope_key)
+            runs = await workspace.runs(rule=rule, scope_key=key, status=status, limit=limit)
+            return "\n".join(run.model_dump_json() for run in runs) or "No runs."
+
+        @server.tool()
+        async def get_run(workspace_id: str, run_id: str, ctx: Context) -> str:
+            """Return a run as JSON: its status, attempts, error, output and checkpoint."""
+            workspace = await self._workspace(ctx, workspace_id)
+            return (await _tool(workspace.run(run_id))).model_dump_json()
+
+        @server.tool()
+        async def retry_run(
+            workspace_id: str, run_id: str, ctx: Context, command_id: _CommandId = None
+        ) -> str:
+            """Make a run runnable now, with a fresh retry budget if it had finished."""
+            return await self._execute(ctx, workspace_id, RetryRun(run_id=run_id), command_id)
+
+        @server.tool()
+        async def skip_run(
+            workspace_id: str,
+            run_id: str,
+            ctx: Context,
+            reason: str | None = None,
+            command_id: _CommandId = None,
+        ) -> str:
+            """Give up on a waiting or dead-lettered run, unblocking its scope."""
+            command = SkipRun(run_id=run_id, reason=reason)
+            return await self._execute(ctx, workspace_id, command, command_id)
+
+        @server.tool()
+        async def cancel_run(
+            workspace_id: str,
+            run_id: str,
+            ctx: Context,
+            reason: str | None = None,
+            command_id: _CommandId = None,
+        ) -> str:
+            """Cancel a run that has not finished, stopping it if it is running."""
+            command = CancelRun(run_id=run_id, reason=reason)
+            return await self._execute(ctx, workspace_id, command, command_id)
+
+        @server.tool()
+        async def list_dead_letters(
+            workspace_id: str, ctx: Context, rule: str | None = None
+        ) -> str:
+            """List the envelopes rules could not evaluate, as JSON lines."""
+            workspace = await self._workspace(ctx, workspace_id)
+            letters = await workspace.dead_letters(rule=rule)
+            return "\n".join(letter.model_dump_json() for letter in letters) or "None."
+
+        @server.tool()
+        async def give_feedback(
+            workspace_id: str,
+            feedback_type: str,
+            target: FeedbackTarget,
+            ctx: Context,
+            value: dict[str, Any] | None = None,
+            command_id: _CommandId = None,
+        ) -> str:
+            """Give feedback of an application-defined type on a run, a firing or a chain.
+
+            ``value`` holds the feedback type's fields.
+            """
+            command = GiveFeedback(feedback_type=feedback_type, target=target, value=value or {})
+            return await self._execute(ctx, workspace_id, command, command_id)
+
+        @server.resource(
+            "reflexr://{tenant_id}/{workspace_id}/runs/{run_id}",
+            mime_type="application/json",
+            description="A run's current state, as JSON.",
+        )
+        async def run_resource(tenant_id: str, workspace_id: str, run_id: str, ctx: Context) -> str:
+            resolved, actor = await self._resolve(ctx)
+            if resolved != tenant_id:
+                raise ResourceError(_unavailable(tenant_id))
+            try:
+                workspace = await self._open(ctx, workspace_id, (resolved, actor))
+                run = await workspace.run(run_id)
+            except Rejection as rejection:
+                raise ResourceError(rejection.message) from rejection
+            return run.model_dump_json()
+
+
+def _unavailable(tenant_id: TenantId) -> str:
+    return f"runs of tenant {tenant_id} are not available"
+
+
+def _refused(uri: str, rejection: Rejection) -> MCPError:
+    """A subscription the server refuses, as the protocol error to raise.
+
+    It is ``INVALID_PARAMS``, as the SDK reports a missing resource, so clients can tell a
+    refusal from a failure of the server (``INTERNAL_ERROR``). Its data carries the URI and
+    the rejection, as REST's error body does.
+    """
+    data = {"uri": uri, "rejection": rejection.payload()}
+    return MCPError(INVALID_PARAMS, rejection.message, data=data)
+
+
+def _rule_line(status: RuleStatus) -> str:
+    origin = f"stored, version {status.version}" if status.origin == "stored" else "code"
+    letters = "1 dead letter" if status.dead_letters == 1 else f"{status.dead_letters} dead letters"
+    return (
+        f"- {status.rule}: {origin}, {'enabled' if status.enabled else 'disabled'}, "
+        f"cursor {status.cursor}, {status.lag} behind, generation {status.generation}, {letters}"
+    )
+
+
+def _schedule_line(status: ScheduleStatus) -> str:
+    if status.last_tick is None:
+        return f"- {status.schedule}: not started in this workspace yet"
+    ticks = status.model_dump(mode="json")  # the times as REST writes them
+    return f"- {status.schedule}: last tick {ticks['last_tick']}, next tick {ticks['next_tick']}"
+
+
+async def _tool[T](awaitable: Awaitable[T]) -> T:
+    try:
+        return await awaitable
+    except Rejection as rejection:
+        raise _tool_error(rejection.payload()) from rejection
+
+
+def _tool_error(rejection: Mapping[str, JsonValue]) -> ToolError:
+    """A rejection's payload as the tool error to raise: its message, and every problem it lists.
+
+    A tool error is text, so the ``errors`` a validation failure lists, which REST's body
+    carries beside the message, follow the message as JSON.
+    """
+    message = str(rejection["message"])
+    if errors := rejection.get("errors"):
+        return ToolError(f"{message}: {json.dumps(errors)}")
+    return ToolError(message)

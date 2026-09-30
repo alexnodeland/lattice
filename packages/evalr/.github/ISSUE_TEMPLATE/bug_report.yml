@@ -1,0 +1,34 @@
+name: Bug report
+description: Something in evalr behaves differently from its documentation.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: The smallest code that shows the problem.
+      render: python
+    validations:
+      required: true
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options: [core, memory, contracts, jsonl, dspy, decision, langfuse, hf, measures, online, docs]
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: evalr, Python, and the versions of the extras involved (dspy, pydantic-ai, langfuse, datasets).
+      placeholder: "evalr 0.1.0, Python 3.13.2, dspy 3.4.0"
+    validations:
+      required: true

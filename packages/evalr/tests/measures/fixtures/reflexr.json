@@ -1,0 +1,278 @@
+{
+  "library": "reflexr",
+  "recorded_until": "2026-09-20T11:00:00Z",
+  "events": [
+    {
+      "seq": 1,
+      "id": "x1",
+      "ts": "2026-09-20T09:00:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "source",
+        "source": "monitoring"
+      },
+      "correlation_id": "c1",
+      "event": {
+        "type": "service.error",
+        "service": "billing",
+        "severity": 8
+      }
+    },
+    {
+      "seq": 2,
+      "id": "x2",
+      "ts": "2026-09-20T09:01:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "system",
+        "component": "reactor"
+      },
+      "correlation_id": "c1",
+      "event": {
+        "type": "rule_fired",
+        "rule": "error-spike",
+        "scope": {
+          "service": "billing"
+        },
+        "scope_key": "billing",
+        "firing_id": "f-c1"
+      }
+    },
+    {
+      "seq": 3,
+      "id": "x3",
+      "ts": "2026-09-20T09:01:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "system",
+        "component": "reactor"
+      },
+      "correlation_id": "c1",
+      "event": {
+        "type": "run_started",
+        "run_id": "run-c1",
+        "rule": "error-spike",
+        "scope_key": "billing",
+        "attempt": 1
+      }
+    },
+    {
+      "seq": 4,
+      "id": "x4",
+      "ts": "2026-09-20T09:03:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "agent",
+        "agent": "planner",
+        "run_id": "run-c1"
+      },
+      "correlation_id": "c1",
+      "event": {
+        "type": "incident.report",
+        "summary": "Billing errors after the 9:00 deploy; rolled back."
+      }
+    },
+    {
+      "seq": 5,
+      "id": "x5",
+      "ts": "2026-09-20T09:03:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "system",
+        "component": "reactor"
+      },
+      "correlation_id": "c1",
+      "event": {
+        "type": "run_succeeded",
+        "run_id": "run-c1",
+        "rule": "error-spike",
+        "output": {
+          "rolled_back": true
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "id": "x6",
+      "ts": "2026-09-20T09:08:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "user",
+        "user_id": "u-oncall"
+      },
+      "correlation_id": "c1",
+      "event": {
+        "type": "incident.acknowledged",
+        "note": "Confirmed, thanks."
+      }
+    },
+    {
+      "seq": 7,
+      "id": "x7",
+      "ts": "2026-09-20T09:30:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "source",
+        "source": "monitoring"
+      },
+      "correlation_id": "c2",
+      "event": {
+        "type": "service.error",
+        "service": "billing",
+        "severity": 8
+      }
+    },
+    {
+      "seq": 8,
+      "id": "x8",
+      "ts": "2026-09-20T09:31:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "system",
+        "component": "reactor"
+      },
+      "correlation_id": "c2",
+      "event": {
+        "type": "rule_fired",
+        "rule": "error-spike",
+        "scope": {
+          "service": "billing"
+        },
+        "scope_key": "billing",
+        "firing_id": "f-c2"
+      }
+    },
+    {
+      "seq": 9,
+      "id": "x9",
+      "ts": "2026-09-20T09:31:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "system",
+        "component": "reactor"
+      },
+      "correlation_id": "c2",
+      "event": {
+        "type": "run_started",
+        "run_id": "run-c2",
+        "rule": "error-spike",
+        "scope_key": "billing",
+        "attempt": 1
+      }
+    },
+    {
+      "seq": 10,
+      "id": "x10",
+      "ts": "2026-09-20T09:33:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "agent",
+        "agent": "planner",
+        "run_id": "run-c2"
+      },
+      "correlation_id": "c2",
+      "event": {
+        "type": "incident.report",
+        "summary": "Billing errors after the 9:00 deploy; rolled back."
+      }
+    },
+    {
+      "seq": 11,
+      "id": "x11",
+      "ts": "2026-09-20T09:33:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "system",
+        "component": "reactor"
+      },
+      "correlation_id": "c2",
+      "event": {
+        "type": "run_succeeded",
+        "run_id": "run-c2",
+        "rule": "error-spike",
+        "output": {
+          "rolled_back": true
+        }
+      }
+    },
+    {
+      "seq": 12,
+      "id": "x12",
+      "ts": "2026-09-20T10:00:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "source",
+        "source": "monitoring"
+      },
+      "correlation_id": "c3",
+      "event": {
+        "type": "service.error",
+        "service": "search",
+        "severity": 9
+      }
+    },
+    {
+      "seq": 13,
+      "id": "x13",
+      "ts": "2026-09-20T10:02:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "agent",
+        "agent": "planner",
+        "run_id": "run-c3"
+      },
+      "correlation_id": "c3",
+      "event": {
+        "type": "action.proposed",
+        "proposal_id": "restart-search",
+        "action": "restart search cluster"
+      }
+    },
+    {
+      "seq": 14,
+      "id": "x14",
+      "ts": "2026-09-20T10:06:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "user",
+        "user_id": "u-oncall"
+      },
+      "correlation_id": "c3",
+      "event": {
+        "type": "action.approved",
+        "proposal_id": "restart-search"
+      }
+    },
+    {
+      "seq": 15,
+      "id": "x15",
+      "ts": "2026-09-20T10:07:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "agent",
+        "agent": "planner",
+        "run_id": "run-c3"
+      },
+      "correlation_id": "c3",
+      "event": {
+        "type": "incident.report",
+        "summary": "Search restarted and healthy."
+      }
+    },
+    {
+      "seq": 16,
+      "id": "x16",
+      "ts": "2026-09-20T10:10:00Z",
+      "workspace_id": "oncall",
+      "actor": {
+        "kind": "user",
+        "user_id": "u-oncall"
+      },
+      "correlation_id": "c3",
+      "event": {
+        "type": "incident.acknowledged",
+        "note": "Good."
+      }
+    }
+  ]
+}

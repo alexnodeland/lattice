@@ -1,0 +1,91 @@
+{
+  "helpfulness": {
+    "configs": [
+      {"name": "helpfulness.rating", "type_name": "helpfulness", "field": "rating", "data_type": "NUMERIC", "description": null, "minimum": 1.0, "maximum": 5.0, "categories": []},
+      {"name": "helpfulness.reason", "type_name": "helpfulness", "field": "reason", "data_type": "TEXT", "description": null, "minimum": null, "maximum": null, "categories": []}
+    ],
+    "values": [
+      {
+        "value": {"rating": 4, "reason": null},
+        "scores": [["helpfulness.rating", 4.0]]
+      },
+      {
+        "value": {"rating": 1, "reason": ""},
+        "scores": [["helpfulness.rating", 1.0]]
+      },
+      {
+        "value": {"rating": 2, "reason": "It refunded the charge"},
+        "scores": [["helpfulness.rating", 2.0], ["helpfulness.reason", "It refunded the charge"]]
+      }
+    ]
+  },
+  "accuracy": {
+    "configs": [
+      {"name": "accuracy.correct", "type_name": "accuracy", "field": "correct", "data_type": "BOOLEAN", "description": null, "minimum": null, "maximum": null, "categories": []},
+      {"name": "accuracy.verdict", "type_name": "accuracy", "field": "verdict", "data_type": "CATEGORICAL", "description": null, "minimum": null, "maximum": null, "categories": ["right", "wrong"]},
+      {"name": "accuracy.tone", "type_name": "accuracy", "field": "tone", "data_type": "CATEGORICAL", "description": null, "minimum": null, "maximum": null, "categories": ["formal", "casual"]},
+      {"name": "accuracy.confidence", "type_name": "accuracy", "field": "confidence", "data_type": "NUMERIC", "description": null, "minimum": 0.0, "maximum": 1.0, "categories": []}
+    ],
+    "values": [
+      {
+        "value": {"correct": false, "verdict": "wrong", "tone": "casual", "confidence": 0.5},
+        "scores": [["accuracy.correct", 0.0], ["accuracy.verdict", "wrong"], ["accuracy.tone", "casual"], ["accuracy.confidence", 0.5]]
+      },
+      {
+        "value": {"correct": true, "verdict": "right", "tone": "formal", "confidence": 1.0},
+        "scores": [["accuracy.correct", 1.0], ["accuracy.verdict", "right"], ["accuracy.tone", "formal"], ["accuracy.confidence", 1.0]]
+      }
+    ]
+  },
+  "review_for_scores": {
+    "configs": [
+      {"name": "review_for_scores.effort", "type_name": "review_for_scores", "field": "effort", "data_type": "NUMERIC", "description": "How hard it was", "minimum": 0.0, "maximum": 10.0, "categories": []},
+      {"name": "review_for_scores.unbounded", "type_name": "review_for_scores", "field": "unbounded", "data_type": "NUMERIC", "description": null, "minimum": null, "maximum": null, "categories": []}
+    ],
+    "values": [
+      {
+        "value": {"effort": 3, "tags": ["a"], "either": "x", "unbounded": -2.5},
+        "scores": [["review_for_scores.effort", 3.0], ["review_for_scores.unbounded", -2.5]]
+      },
+      {
+        "value": {"effort": null, "tags": [], "either": 1, "unbounded": 0.0},
+        "scores": [["review_for_scores.unbounded", 0.0]]
+      }
+    ]
+  },
+  "everything": {
+    "configs": [
+      {"name": "everything.resolved", "type_name": "everything", "field": "resolved", "data_type": "BOOLEAN", "description": "The request was fully addressed", "minimum": null, "maximum": null, "categories": []},
+      {"name": "everything.maybe", "type_name": "everything", "field": "maybe", "data_type": "BOOLEAN", "description": null, "minimum": null, "maximum": null, "categories": []},
+      {"name": "everything.rating", "type_name": "everything", "field": "rating", "data_type": "NUMERIC", "description": "How much it helped", "minimum": 1.0, "maximum": 5.0, "categories": []},
+      {"name": "everything.count", "type_name": "everything", "field": "count", "data_type": "NUMERIC", "description": null, "minimum": null, "maximum": null, "categories": []},
+      {"name": "everything.at_least", "type_name": "everything", "field": "at_least", "data_type": "NUMERIC", "description": null, "minimum": 0.0, "maximum": null, "categories": []},
+      {"name": "everything.at_most", "type_name": "everything", "field": "at_most", "data_type": "NUMERIC", "description": null, "minimum": null, "maximum": 10.0, "categories": []},
+      {"name": "everything.positive", "type_name": "everything", "field": "positive", "data_type": "NUMERIC", "description": null, "minimum": 0.0, "maximum": null, "categories": []},
+      {"name": "everything.share", "type_name": "everything", "field": "share", "data_type": "NUMERIC", "description": null, "minimum": 0.0, "maximum": 1.0, "categories": []},
+      {"name": "everything.ratio", "type_name": "everything", "field": "ratio", "data_type": "NUMERIC", "description": null, "minimum": 0.0, "maximum": 2.5, "categories": []},
+      {"name": "everything.interval", "type_name": "everything", "field": "interval", "data_type": "NUMERIC", "description": null, "minimum": 1.0, "maximum": 7.0, "categories": []},
+      {"name": "everything.grouped", "type_name": "everything", "field": "grouped", "data_type": "NUMERIC", "description": null, "minimum": 0.0, "maximum": 100.0, "categories": []},
+      {"name": "everything.level", "type_name": "everything", "field": "level", "data_type": "CATEGORICAL", "description": null, "minimum": null, "maximum": null, "categories": ["1", "2", "3"]},
+      {"name": "everything.category", "type_name": "everything", "field": "category", "data_type": "CATEGORICAL", "description": null, "minimum": null, "maximum": null, "categories": ["billing", "bug", "other"]},
+      {"name": "everything.maybe_category", "type_name": "everything", "field": "maybe_category", "data_type": "CATEGORICAL", "description": null, "minimum": null, "maximum": null, "categories": ["a", "b"]},
+      {"name": "everything.colour", "type_name": "everything", "field": "colour", "data_type": "CATEGORICAL", "description": null, "minimum": null, "maximum": null, "categories": ["red", "green"]},
+      {"name": "everything.priority", "type_name": "everything", "field": "priority", "data_type": "CATEGORICAL", "description": null, "minimum": null, "maximum": null, "categories": ["1", "2"]},
+      {"name": "everything.verdict", "type_name": "everything", "field": "verdict", "data_type": "CATEGORICAL", "description": null, "minimum": null, "maximum": null, "categories": ["right", "wrong"]},
+      {"name": "everything.note", "type_name": "everything", "field": "note", "data_type": "TEXT", "description": "A short note", "minimum": null, "maximum": null, "categories": []},
+      {"name": "everything.inner", "type_name": "everything", "field": "inner", "data_type": "TEXT", "description": "Described inside the optional", "minimum": null, "maximum": null, "categories": []},
+      {"name": "everything.outer", "type_name": "everything", "field": "outer", "data_type": "TEXT", "description": "Described outside", "minimum": null, "maximum": null, "categories": []},
+      {"name": "everything.both", "type_name": "everything", "field": "both", "data_type": "NUMERIC", "description": "outer", "minimum": 0.0, "maximum": null, "categories": []}
+    ],
+    "values": [
+      {
+        "value": {"resolved": true, "maybe": false, "rating": 5, "count": 7, "at_least": 0, "at_most": 9.5, "positive": 3, "share": 0.25, "ratio": 2.0, "interval": 7, "grouped": 100, "level": 2, "category": "bug", "maybe_category": "b", "colour": "green", "priority": 2, "verdict": "right", "note": "a note", "inner": "in", "outer": "out", "both": 0, "items": ["i"], "nested": null, "mapping": {"k": 1}, "number": 1.5},
+        "scores": [["everything.resolved", 1.0], ["everything.maybe", 0.0], ["everything.rating", 5.0], ["everything.count", 7.0], ["everything.at_least", 0.0], ["everything.at_most", 9.5], ["everything.positive", 3.0], ["everything.share", 0.25], ["everything.ratio", 2.0], ["everything.interval", 7.0], ["everything.grouped", 100.0], ["everything.level", "2"], ["everything.category", "bug"], ["everything.maybe_category", "b"], ["everything.colour", "green"], ["everything.priority", "2"], ["everything.verdict", "right"], ["everything.note", "a note"], ["everything.inner", "in"], ["everything.outer", "out"], ["everything.both", 0.0]]
+      },
+      {
+        "value": {"resolved": false, "maybe": null, "rating": 1, "count": 0, "at_least": 0, "at_most": 0.0, "positive": 1, "share": 0.5, "ratio": 1.0, "interval": null, "grouped": 0, "level": 1, "category": "other", "maybe_category": null, "colour": "red", "priority": 1, "verdict": null, "note": "", "inner": null, "outer": null, "both": null, "items": [], "nested": null, "mapping": {}, "number": 0},
+        "scores": [["everything.resolved", 0.0], ["everything.rating", 1.0], ["everything.count", 0.0], ["everything.at_least", 0.0], ["everything.at_most", 0.0], ["everything.positive", 1.0], ["everything.share", 0.5], ["everything.ratio", 1.0], ["everything.grouped", 0.0], ["everything.level", "1"], ["everything.category", "other"], ["everything.colour", "red"], ["everything.priority", "1"]]
+      }
+    ]
+  }
+}

@@ -1,0 +1,385 @@
+# Architecture
+
+Decisions are recorded in [`adr/`](adr/README.md), and proposals in [`rfcs/`](rfcs/README.md).
+
+## What evalr is
+
+evalr is a Python library for **typed evaluation of agent systems**. An evaluator judges an input (a chat thread, a workflow run, an artifact version) and returns a verdict: an instance of a Pydantic type, typically one of the feedback types people also give. Because people and evaluators produce the same types, evaluators can be trained on people's feedback and measured against it.
+
+It serves [artifactr](https://github.com/alexnodeland/artifactr) and [reflexr](https://github.com/alexnodeland/reflexr), which record typed feedback from people and depend on evalr through their `[evals]` extras. evalr imports neither ([ADR-0001](adr/0001-typed-verdicts-over-any-pydantic-model.md)).
+
+### Goals
+
+- Verdicts are typed. A verdict type is any Pydantic model, and its field types decide how each field is judged and scored.
+- Two kinds of evaluator are equals ([ADR-0002](adr/0002-dspy-judges-and-decision-models-as-equals.md)): DSPy judges optimized with GEPA, and decision models (TypeSafe's Jev) with a language-model fallback. Both implement one protocol and are measured with the same metrics.
+- Evaluators are versioned, and the version is recorded on every verdict, so scores from different evaluators never mix.
+- Datasets and experiments are reproducible: deterministic splits, deterministic dataset item ids, pinned revisions ([ADR-0003](adr/0003-datasets-and-experiments-in-langfuse-and-hugging-face.md)).
+- The core is small and pure. Every integration is an adapter behind one of its ports, and behind an extra.
+
+### Non-goals (for now)
+
+- A hosted evaluation service or a UI. Langfuse shows experiments and scores; Hugging Face hosts published datasets.
+- Evaluators for every modality. Inputs are Pydantic models turned into text.
+
+## Ports and adapters
+
+evalr is built as ports and adapters ([ADR-0006](adr/0006-ports-and-adapters.md)). `evalr.core` is the hexagon: the values (verdicts, examples, datasets, scores, experiment results), the pure functions over them, and the **ports**, small protocols for what the core needs from outside. **Adapters** implement the ports, each in its own package, and depend inward only.
+
+```mermaid
+graph LR
+    subgraph adapters["Adapters"]
+        dspy["evalr.dspy<br/>DspyJudge, GEPA"]
+        decision["evalr.decision<br/>DecisionEvaluator, calibration"]
+        langfuse["evalr.langfuse<br/>datasets, scores, score configs,<br/>experiments"]
+        hf["evalr.hf<br/>Hugging Face datasets"]
+        jsonl["evalr.jsonl<br/>JSON Lines datasets"]
+        memory["evalr.memory<br/>in-memory, every port"]
+        libs["artifactr, reflexr<br/>[evals] extras"]
+    end
+    subgraph core["evalr.core"]
+        ports["Evaluator, Optimizer, DatasetStore,<br/>ScoreSink, ScoreConfigStore,<br/>ExperimentTracker, FeedbackSource,<br/>Formatter"]
+        values["verdicts, datasets, splits,<br/>formatters, metrics, scores"]
+    end
+    dspy --> ports
+    decision --> ports
+    langfuse --> ports
+    hf --> ports
+    jsonl --> ports
+    memory --> ports
+    libs --> ports
+```
+
+| Port | What it does | Adapters |
+|---|---|---|
+| `Evaluator[InputT, VerdictT]` | Judges an input and returns a typed verdict | `FunctionEvaluator` (core), `DspyJudge` (`evalr.dspy`), `DecisionEvaluator` (`evalr.decision`); composed by `Fallback` (core) and run online by `OnlineEvaluation` (`evalr.online`) |
+| `Optimizer[InputT, VerdictT, EvaluatorT]` | Fits an evaluator to people's verdicts | GEPA (`evalr.dspy`), threshold calibration (`evalr.decision`), in-memory (`evalr.memory`) |
+| `DatasetStore` | Saves a dataset and returns its revision; loads one by name and revision | `evalr.memory`, `evalr.jsonl`, `evalr.langfuse`, `evalr.hf` |
+| `ScoreSink` | Records verdicts and feedback as scores, idempotently | `evalr.memory`, `evalr.langfuse`, OpenTelemetry evaluation events (`evalr.online`) |
+| `ScoreConfigStore` | Keeps score configs by name, so a backend knows each score's type, range and choices | `evalr.memory`, `evalr.langfuse` |
+| `ExperimentTracker` | Runs a task over a dataset and judges each output | `evalr.memory`, `evalr.langfuse` |
+| `FeedbackSource[InputT, VerdictT]` | Yields examples from people's typed feedback | `evalr.memory`; artifactr's and reflexr's `[evals]` extras |
+| `Formatter[InputT]` | Renders an input as text within a token budget | `InputFormatter` (core) |
+
+- **Compositions, not special cases.** A decision evaluator that hands unsure inputs to a language-model judge is `Fallback(DecisionEvaluator(...), DspyJudge(...))`.
+- **I/O ports are async.** Adapters over synchronous SDKs run them in a worker thread.
+- **Every port has an in-memory adapter** in `evalr.memory`, and a contract suite in `evalr.contracts` that the in-memory adapter and every other adapter pass. The libraries run the `FeedbackSource` suite against their own adapters.
+- **The libraries share the score ports, mapping and adapters** ([ADR-0011](adr/0011-scores-shared-with-the-libraries.md), [ADR-0012](adr/0012-langfuse-score-adapters-in-evalr.md)). artifactr and reflexr mirror people's feedback to a `ScoreSink` with evalr's mapping, and record it in Langfuse with evalr's adapters; their mirrors, which know their logs, stay in their own `[langfuse]` extras. Their cores never import evalr.
+
+| Package | Extra | May import |
+|---|---|---|
+| `evalr.core` | | pydantic, opentelemetry-api |
+| `evalr.memory`, `evalr.contracts`, `evalr.jsonl` | | core |
+| `evalr.dspy` | `[dspy]` | core, dspy |
+| `evalr.decision` | `[jev]` | core, pydantic-ai-slim with the typesafe extra |
+| `evalr.langfuse` | `[langfuse]` | core, langfuse |
+| `evalr.hf` | `[hf]` | core, datasets, huggingface_hub |
+| `evalr.measures`, `evalr.online` | | core |
+
+Every package may also use the core's own dependencies, pydantic and the OpenTelemetry API. A test enforces the table: what each package imports, that no adapter package imports another, and that nothing imports artifactr or reflexr. The `[all]` extra installs every integration.
+
+The top-level package, `evalr`, re-exports every type in `evalr.core`, which a test enforces, and the functions most applications call. The individual metrics, the tracing helpers, the parts of the score mapping, `split_bucket` and the constants are imported from `evalr.core`.
+
+## Verdicts
+
+A verdict type is any Pydantic model: an application's feedback type, a library's `Feedback` subclass, or an ad-hoc model. evalr needs nothing from the libraries ([ADR-0001](adr/0001-typed-verdicts-over-any-pydantic-model.md)).
+
+```python
+class Helpfulness(BaseModel):
+    rating: Annotated[int, Field(ge=1, le=5, description="How much the reply helped")]
+    resolved: bool = Field(description="The request was fully addressed")
+    category: Literal["billing", "bug", "other"]
+    reason: str | None = None
+```
+
+`verdict_fields(Helpfulness)` describes how each field is judged and scored. It is the one place that reads field types, and every evaluator kind, metric and integration builds on it:
+
+| Field type | Kind | Filled by | Agreement |
+|---|---|---|---|
+| `bool` | binary | any evaluator | accuracy, Cohen's kappa |
+| `Literal`, `Enum` | categorical | any evaluator | accuracy, Cohen's kappa |
+| `int` bounded on both sides | ordinal | any evaluator | mean absolute error, Spearman |
+| any other `int` or `float` | numeric | any evaluator | mean absolute error, Spearman |
+| `str` | text | language-model judges only | not compared |
+
+- `X | None` is judged as `X` and may be left empty. Bounds are read from `Field(ge=, le=, gt=, lt=)` and `annotated_types` constraints at any level of `Annotated`, including inside an optional. An integer's exclusive bounds become inclusive (`gt=0` is 1).
+- A field's description is the instruction judges read for it.
+- Any other type (a list, a nested model, a union of several types) raises `UnsupportedField` when an evaluator is built, rather than failing later.
+
+An evaluator returns a `Verdict[V]`, an immutable Pydantic model:
+
+| Field | Meaning |
+|---|---|
+| `value` | The verdict type's instance |
+| `confidence` | The probability that each field's value is right, from 0 to 1, for the fields the evaluator has one for. Decision models report them; most judges do not. Keys must be fields of the verdict type. |
+| `evaluator`, `version` | Who judged. A changed evaluator changes its version, so verdicts from before and after never mix. |
+| `latency` | Wall-clock seconds the evaluation took |
+| `cost` | US dollars, when known |
+| `trace_id` | The OpenTelemetry trace the evaluation ran in, as 32 hex digits, when there was one |
+
+## Evaluators
+
+`Evaluator[InputT, VerdictT]` is a protocol: a `name`, a `version`, a `verdict_type`, and `async evaluate(input) -> Verdict[VerdictT]`. Inputs are Pydantic models too. The protocol is contravariant in the input and covariant in the verdict, so evaluators of different verdict types fit one `list[Evaluator[Thread, BaseModel]]`.
+
+| Kind | How | Version |
+|---|---|---|
+| `FunctionEvaluator` | A sync or async function of the input: a deterministic measure | Given; bump it when the function changes |
+| `DspyJudge` | A DSPy program whose signature comes from the input and verdict types | A hash of the program and the types |
+| `DecisionEvaluator` | A pydantic-ai agent on a decision model, answering the verdict's decision-only view | A hash of the model's name, the types, the instructions and the thresholds |
+| `Fallback(primary, fallback, min_confidence=)` | A composition: the primary judges, and hands off to the fallback | A hash of both evaluators' names and versions, and the threshold |
+
+An evaluator that declines an input raises `HandOff`. `Fallback` hands off when the primary raises it, or, with `min_confidence`, when any field of the primary's verdict is less confident than that. So a decision model backed by a language-model judge is `Fallback(DecisionEvaluator(...), DspyJudge(...), min_confidence=0.7)`: two adapters of one port, neither aware of the other. Each verdict records the evaluator that actually gave it, so the two are measured apart; the composition's span, `evalr.fallback {name}`, records whether and why it handed off. Any other failure propagates.
+
+### DSPy judges
+
+`DspyJudge(verdict_type, inputs=...)` (`evalr.dspy`, the `[dspy]` extra) is a language-model judge: a DSPy program whose signature is derived from the two types by `judge_signature`.
+
+- **Inputs:** one text input per field of the input type, rendered by an `InputFormatter` within its token budget, described by the field's description.
+- **Outputs:** one per field of the verdict type, typed as the field is (`int`, `bool`, a `Literal` or `Enum`, `float`, `str`, optionally `None`). The field's description is its instruction, with its bounds spelled out ("a whole number from 1 to 5"), since DSPy reads only the type. Input and verdict fields need distinct names, and `reasoning` is DSPy's.
+- **Instructions:** "Read the {input} and judge it, giving a {verdict}", followed by the verdict type's docstring, unless given. GEPA rewrites them.
+- **Program:** `dspy.Predict`, or `dspy.ChainOfThought` with `reasoning=True`. It runs with the judge's `lm`, or DSPy's configured one.
+- **Validation:** the outputs are validated as the verdict type, so an out-of-range rating fails rather than passing through. An optional text field answered with "None", "null" or nothing is empty.
+- **Version:** a hash of the program's state (instructions, demonstrations, fields) and of how each field of the two types is judged, described so that it is the same on every Python and pydantic version. Training changes it.
+- **Cost:** DSPy reports no per-call cost, so a DSPy verdict's `cost` is unknown.
+
+DSPy ships no type information, so `typings/dspy/` holds minimal stubs for the parts evalr uses; pyright reads them in place of the package.
+
+### Decision evaluators
+
+`DecisionEvaluator(verdict_type, inputs=...)` (`evalr.decision`, the `[jev]` extra) is a pydantic-ai `Agent` on a decision model, TypeSafe's Jev (`typesafe:jev-latest`) by default ([ADR-0008](adr/0008-decision-only-views-and-hand-off-by-composition.md)). A decision model answers typed questions quickly and cheaply, with probabilities, but no free text.
+
+- **The view.** The agent's output type is `decision_view(verdict_type)`: the fields a decision model can fill, each a question with the field's description as its text and the verdict type's docstring as its goal. A required `bool` is a yes-or-no question; a `Literal` or `Enum` of 2 to 255 strings or whole numbers is a choice; an ordinal rating becomes a `Literal` of every value, a choice; a required `float` from 0 to an upper bound is a scaled yes-or-no. Anything else, text included, is left out and keeps its default in the verdict; a required field that would be left out is refused when the evaluator is built.
+- **The state** is the input rendered by a formatter, within 30,000 estimated tokens by default, under Jev's 32K limit.
+- **Confidence** is the probability that each value is right: a choice's probability, and for a yes-or-no field the probability of the answer given, recovered from pydantic-ai's threshold-relative report. `decide(input)` also returns each yes-or-no field's raw probability of yes.
+- **Thresholds.** `boolean_threshold` is pydantic-ai's `decision_boolean_threshold` (0.5 by default): a yes-or-no field is yes at or above it. `min_confidence` makes the evaluator hand off.
+- **Hand-off.** It raises `HandOff` when pydantic-ai hands off (`DecisionHandOff`, with routes or tools), and when any field's confidence is below `min_confidence`; the evaluation span records the reason, as an attribute rather than an error. Service failures propagate. The language-model fallback is a separate evaluator: `Fallback(DecisionEvaluator(...), DspyJudge(...))`, which fills the whole verdict, text included.
+- **Cost** is pydantic-ai's, from the model's price. The model that answered (`jev-1.13.0`) is the span's `gen_ai.response.model`; since `jev-latest` can change under a fixed version, calibrated evaluators should name a pinned model.
+- Credentials are needed only when it first runs, so evaluators can be built at import time.
+
+### Measuring and optimizing
+
+`measure(evaluator, dataset)` judges every labelled example and returns a `Measurement`: the verdicts and errors by example id, agreement with people, calibration, and latency and cost per evaluator version. An example the evaluator fails on, or hands off, counts as a missing prediction.
+
+An `Optimizer[InputT, VerdictT, EvaluatorT]` fits an evaluator to people's verdicts: `optimize(evaluator, train=, validate=)` returns the fitted evaluator, with a new version if it changed, and leaves the one given alone. `optimize(evaluator, train=, validate=, optimizer=)` in the core uses only the labelled examples and refuses sets that share an example, so the validation score is honest.
+
+| Optimizer | Fits | Package |
+|---|---|---|
+| `BestOf(candidates)` | Any evaluator: picks, from it and the candidates, the one that agrees best with people on `train`, and measures the choice on `validate`. A tie keeps the evaluator given. | `evalr.memory` |
+| `Gepa(reflection_lm=, auto=)` | A DSPy judge's instructions, from people's verdicts and their reasons | `evalr.dspy` |
+| `ThresholdCalibration(target_agreement=)` | A decision evaluator's boolean and hand-off thresholds | `evalr.decision` |
+
+A fitted evaluator carries a `Training` record (core), so its version can be explained: the optimizer and its settings, the version it started from, the training and validation data (`DatasetRef`: name, content hash, size), its agreement with people on the validation data before and after, and what the optimizer found (`results`), such as calibrated thresholds.
+
+### Training judges with GEPA
+
+`Gepa` adapts DSPy's GEPA to the `Optimizer` port. GEPA runs the judge on training examples, shows a reflection model where it disagreed with people and why, and rewrites the judge's instructions; a rewrite is kept only if it agrees better with people on the validation examples.
+
+- **The metric** (`feedback_metric(judge)`) is per-field agreement, the mean of `field_agreement`. An answer that is not a valid verdict scores 0.
+- **The feedback** names each field the judge got wrong, with both answers ("rating: you said 2, people said 4."), and quotes people's text fields, their reasons ("People's reason: the refund took a week"), so the reflection model learns why people judged as they did.
+- **Budget:** one of `auto` (`"light"` by default), `max_metric_calls` or `max_full_evals`. `reflection_minibatch_size`, `use_merge` and `seed` pass through.
+- **Threads:** DSPy runs single-threaded (`num_threads=1`), so evaluation spans keep their trace context and a seed reproduces a run. The compile runs in a worker thread, off the event loop.
+- **The result** is a new judge (the one given is unchanged) with the trained program, a new version, and a `Training` record whose scores are GEPA's validation scores for the starting program and the chosen one.
+
+### Calibrating decision evaluators
+
+A decision model is not trained; its thresholds are. `ThresholdCalibration` adapts that to the `Optimizer` port. pydantic-ai applies the thresholds on the client, after the one request, so calibration asks the model once per example and re-reads the answers under every candidate threshold (0.05 to 0.95 by default):
+
+1. **The boolean threshold** (`decision_boolean_threshold`) is the one at which the yes-or-no fields agree best with people on the training examples; ties go to the one nearest the current threshold. A verdict with no yes-or-no fields keeps its threshold.
+2. **The hand-off threshold** (`min_confidence`) is the lowest at which the evaluator agrees with people on at least `target_agreement` (0.9 by default) of the training examples it keeps, handing off the rest; with no threshold at all first. If none reaches the target, the one that agrees best.
+
+Examples pydantic-ai hands off whatever the thresholds are left out. The calibrated evaluator is a copy with the new thresholds and version, and a `Training` record. Its scores are the agreement on the validation examples each keeps, before and after, so their denominators differ: `results` records the thresholds and the share of validation examples kept before and after (`coverage_before`, `coverage_after`). The fallback judges what the evaluator hands off.
+
+### Saved judges
+
+A trained judge is one JSON file ([ADR-0007](adr/0007-trained-judges-saved-as-json-files.md)), kept in the application's repository and reviewed like code:
+
+```python
+trained.save("judges/helpfulness.json")
+judge = DspyJudge.load("judges/helpfulness.json", Helpfulness, inputs=Thread, lm=lm)
+```
+
+- The file (`evalr.dspy.judge/1`) holds the name and version, the types' names, whether it reasons, DSPy's JSON state of the program, the `Training` record, and the DSPy and evalr versions. `snapshot()` and `DspyJudge.restore(...)` give the same document without a file, for other stores.
+- Loading derives the signature from the types given, loads the program's state and recomputes the version. If the types have changed since the judge was saved, the version differs and loading raises `JudgeMismatch`: the judge must be retrained rather than run against a signature it was not trained for.
+- Nothing in the file can run code or choose a model: the state is JSON (never a pickle), and any language-model configuration in it is dropped, so the judge uses the `lm` given, or DSPy's.
+
+## Datasets
+
+An `Example[InputT, VerdictT]` is one input with what is known about it:
+
+- `id`: stable for life, derived from the feedback or item it came from. Splits are hashed from it, and syncing uses it.
+- `input`: what an evaluator judges.
+- `verdict`: the verdict people gave, when there is one. Judges are trained and measured against it.
+- `reference`: a reference output for the system being evaluated, as JSON, for evaluators that compare against one.
+- `trace_id`: the trace the input came from, so datasets and experiments link back to it.
+- `metadata`: anything else, as JSON.
+
+A `Dataset[InputT, VerdictT]` is an immutable, named collection of examples with unique ids, and the input and verdict types they share.
+
+- `version` is a hash of the examples' content, independent of their order. A trained judge records the version it was trained on.
+- `split(validate=0.2, salt="")` sends an example to validation when `split_bucket(id, salt) < validate`, where the bucket is the first eight bytes of `sha256(salt, id)` as a fraction. So an example never moves between training and validation as others are added or removed, and raising the fraction only moves examples into validation. A different salt gives an independent split.
+- `labelled()` and `filter(predicate)` select examples. `records()` and `Dataset.from_records(...)` convert to and from JSON records, which the Langfuse and Hugging Face integrations build on.
+
+### Stores and sources
+
+A `DatasetStore` saves a dataset under its name and returns the revision it made; `load(name, input_type=, verdict_type=, revision=None)` loads the latest revision or the one given, validating the examples as the types given, and raises `DatasetNotFound` for an unknown name or revision. Every revision stays loadable after later saves, so an experiment or a trained judge can name the exact data it used, and saving the same content again changes nothing a load can see.
+
+| Adapter | Revision | Notes |
+|---|---|---|
+| `InMemoryDatasetStore` (`evalr.memory`) | The content hash | JSON records in memory, validated again on load |
+| `JsonlDatasetStore(root)` (`evalr.jsonl`) | The content hash | A directory per dataset: `dataset.json` names the latest revision and holds the description; each revision is `{hash}.jsonl`, one example to a line, written whole. Names are `/`-separated segments of letters, digits, `.`, `_` and `-`, so they stay under the root. |
+| `LangfuseDatasetStore(client)` (`evalr.langfuse`) | A time at which Langfuse held the dataset as saved, the same for the same content | A Langfuse dataset of the same name, an item per example. Item ids are UUID 5s of the dataset's name and the example's id (Langfuse's ids are unique across a project), so syncing again updates items, and only changed items are written. An item holds the input, `{"verdict": ..., "reference": ...}` as its expected output, the metadata with the example's id under `evalr`, and the source trace. Removed examples are archived; an example that loses its trace has its item deleted and written anew, since Langfuse keeps a source trace written as empty. Langfuse versions items by time, so loading a revision reads the items as they were then. Items made in Langfuse itself load with their expected output as the verdict. |
+| `HfDatasetStore(api=HfApi(), private=True)` (`evalr.hf`) | The commit's hash | A dataset repository of the same name on the Hugging Face Hub. Each save is one commit of the examples as JSON Lines (`data/train.jsonl`) and a dataset card (`README.md`), so a revision names the data exactly, forever. Loading takes a commit hash, a branch or a tag. |
+
+### The Hugging Face Hub
+
+The Hub holds published and pinned datasets ([ADR-0003](adr/0003-datasets-and-experiments-in-langfuse-and-hugging-face.md)):
+
+- **Export:** `HfDatasetStore.save` creates the repository if needed (private by default) and commits the examples and a dataset card together. The card's front matter points the Hub's viewer and `datasets.load_dataset` at the examples, and records under `evalr` the types, the description and the content hash; its body describes the dataset, its size and its verdict fields. The front matter is written as JSON, which is YAML.
+- **Import at a pinned revision:** only a full commit hash names the same data every time. `resolve_revision(repo_id, "v1")` pins a branch or tag to its commit, and `import_dataset(path, revision=commit, input_type=, verdict_type=, to_example=)` loads any dataset on the Hub (or a local directory) with `datasets`, as evalr's records or through a function from a row to an example; it refuses anything but a commit hash.
+- The store reaches the Hub through a narrow protocol, `HubApi`, which `huggingface_hub.HfApi` satisfies; the tests use a fake of it. `datasets` ships no type information, so `typings/datasets/` holds minimal stubs.
+
+A `FeedbackSource[InputT, VerdictT]` yields examples from people's feedback: every example has a verdict, ids are stable, and iterating again yields the same examples. artifactr's and reflexr's `[evals]` extras implement it over their logs; `InMemoryFeedbackSource` holds a fixed list. `collect(name, source)` gathers one into a dataset.
+
+### Contract suites
+
+`evalr.contracts` holds a check per port, which raises `ContractViolation` where an adapter differs from the port's contract. The checks need no test framework, so the libraries run `check_feedback_source` against their own adapters.
+
+- `check_dataset_store(store)`: an unknown name is not found; a saved dataset loads back exactly (name, examples, description); saving again changes nothing; a changed dataset makes a new revision and the earlier one still loads; an unknown revision is not found; loading as a type the examples do not satisfy fails validation.
+- `check_feedback_source(source)`: ids are unique, inputs and verdicts are of the source's types, every example has a verdict, and iterating again yields the same examples.
+- `check_score_sink(sink, recorded)`: recording a score again replaces it, every score recorded is kept, and the latest value wins, with everything the score holds: its type, trace, span, session, time and metadata (a score without a time may be given the time it was recorded). A sink has no reads, so the caller says how to see what it holds.
+- `check_score_config_store(store)`: a new store lists no configs, and every config created is listed by its name.
+- `check_evaluator(evaluator, inputs)`: each verdict is of the verdict type, names the evaluator that gave it and its version, and records the trace it was judged in (the check judges inside a trace of its own, through the OpenTelemetry API); an evaluator may hand off some inputs but must judge one; judging does not change its name or version.
+- `check_optimizer(optimizer, evaluator, train=, validate=)`: the evaluator given is left alone, and the fitted one gives the same verdict type and passes `check_evaluator`.
+- `check_experiment_tracker(tracker)`: one item per example in the dataset's order; a failed task leaves no output and records its error; a failed evaluator records its error while the others still judge; verdicts record the item's trace; names and the dataset version are kept.
+
+## Scores
+
+Every field of a verdict, or of a piece of people's feedback, becomes one score named `{type}.{field}`. evalr owns the mapping, and artifactr and reflexr build their feedback mirrors on it, so an evaluator's scores and people's for the same field are the same score ([ADR-0011](adr/0011-scores-shared-with-the-libraries.md)). The type name is the type's class name in snake case (`TaskCompletion` is `task_completion`) unless one is given, such as a library's registered feedback name.
+
+| Field kind | Score type | Value |
+|---|---|---|
+| binary | `BOOLEAN` | `bool` |
+| ordinal, numeric | `NUMERIC` | `float` |
+| categorical | `CATEGORICAL` | the choice as a string (an `Enum`'s value) |
+| text | `TEXT` | the text |
+
+- `score_configs(type, type_name=)` describes each field as a `ScoreConfig`: name, data type, description, bounds as declared (`gt=0` is a minimum of 0, even for an `int`) and a categorical field's choices as strings. It reads fields with `verdict_fields`, but skips a field it cannot score where `verdict_fields` raises, since a library's feedback type may have one.
+- `score_values(type, value, type_name=)` pairs each field of a validated value (a model's fields, or its JSON as the libraries keep feedback) with its config and score value. `None`, `""` and missing fields give no score; a choice or text is cut at `MAX_TEXT`, 500 characters.
+- `scores(verdict)` builds a `Score` from each pair. A score's id is a UUID derived from its subject (a given key, else the verdict's trace, else a hash of the verdict), the evaluator, its version and the score's name. So recording a verdict again replaces its scores, and a new evaluator version adds new ones rather than overwriting.
+- A `Score` is attached to a trace (and may name the span it judges, `span_id`) or to a session (`session_id`), and may carry the time it was given (`timestamp`). A verdict's score names its evaluator, version and confidence; a library's feedback score has none, and says where it came from in `source`. Its `metadata` is the source, then the evaluator, version and confidence.
+- A `Score` holds together: its value is of its data type (a `bool` for `BOOLEAN`, a `float` that is not a `bool` for `NUMERIC`, a `str` for `CATEGORICAL` and `TEXT`), its source has no `evaluator`, `version` or `confidence` key for its metadata to clash with, and a span comes with a trace. Sinks rely on it rather than checking values themselves.
+- A `ScoreSink` records scores, idempotently by id. `InMemoryScoreSink` keeps them by id.
+- `LangfuseScoreSink(client)` (`evalr.langfuse`) records them with `create_score`, in a worker thread as every synchronous SDK is called, for evaluators' scores and the libraries' feedback mirrors alike. It keeps each score's id as Langfuse's `score_id`, so recording a verdict again replaces its scores, with the score's span (as Langfuse's observation), session, timestamp and metadata; a yes or no is 1 or 0. Langfuse attaches scores to traces or sessions, so a batch with a score that has neither is refused whole. Langfuse sends in the background; `flush()` waits. Evalr's online scores attach to the judged span as a Langfuse observation; if the Langfuse exporter filters that span out (v4's default keeps only LLM spans), the score names an observation Langfuse lacks. Both Langfuse adapters pass the contract suites against a fake of Langfuse's API.
+- A `ScoreConfigStore` keeps score configs by name (`names()`, `create(config)`). `sync_score_configs(store, configs)` creates the ones whose names a store lacks and never changes one it has, since scores in a backend link to their config by name. `InMemoryScoreConfigStore` keeps them by name. `LangfuseScoreConfigStore(client)` (`evalr.langfuse`) keeps them as Langfuse's score configs, with their bounds, categories and description, reading every page of them in a worker thread; it refuses a name Langfuse would, one longer than 35 characters or with other characters than letters, digits, spaces and `_.()-`.
+- A fixture (`tests/core/score_configs.json`) pins the mapping to the configs and values the libraries have always created, so the configs in their users' Langfuse projects do not change.
+
+## Experiments
+
+An experiment runs a **task** (the system being evaluated) on every example of a dataset and judges each output with every evaluator:
+
+```python
+async def reply(example: Example[Thread, Helpfulness]) -> Thread:
+    return await agent_under_test.continue_thread(example.input)
+
+
+result = await tracker.run_experiment(
+    "prompt-v2",
+    dataset=dataset,
+    task=reply,
+    evaluators=[judge, decider],
+    metadata={"prompt": "v2"},
+)
+result.verdicts("helpfulness-judge", verdict_type=Helpfulness)  # by example id
+```
+
+- The task receives the whole example (input, people's verdict, reference) and returns what the evaluators judge. A task that returns the example's input unchanged measures the evaluators themselves against people's verdicts.
+- The result has one `ItemResult` per example in the dataset's order: the output, one verdict per evaluator that succeeded, the errors, and the item's trace. A failing task or evaluator fails only its own item.
+- `result.verdicts(evaluator)` gives one evaluator's verdicts by example id, typed as `BaseModel`, since an experiment's evaluators can give different verdict types. With `verdict_type=`, they are typed as that type, and a verdict of another type raises `TypeError`.
+- `InMemoryExperimentTracker` runs in the process, at most `max_concurrency` examples at once, each in a span named `evalr.experiment.item {name}`, so verdicts record the item's trace. Runs are named `{name} #{n}` unless named, and kept in `runs`.
+- `LangfuseExperimentTracker(client, type_names=)` (`evalr.langfuse`) runs through Langfuse's experiment API, so results show beside each item's trace. Each example is a local item (its input, `{"verdict", "reference"}` as the expected output, and its id in the metadata) with a trace of its own; the task runs in the item's task span, and each evaluator in a span named after it, so everything they call nests under the item, and the verdicts record its trace. Every verdict becomes the item's scores, named `{type}.{field}`, with `type_names` naming a verdict type as a library registers its feedback, as online evaluation does. Langfuse's evaluations hold no text, so the verdict's text scores become the comment of its other scores, one `field: text` line each, as they become an OpenTelemetry event's explanation. The SDK runs an experiment on an event loop of its own, in a worker thread; evalr runs the task and evaluators back on the caller's loop, where their clients live, carrying the trace context across. Runs are named by Langfuse (`{name} - {time}`) unless named.
+
+## Formatters
+
+A formatter renders an input as the text a judge reads. A decision model's state is limited (Jev's to 32K tokens), and a language model's context costs money, so formatters work within a budget.
+
+- `InputFormatter(max_tokens=30_000, count_tokens=estimate_tokens)` renders each field as a section headed by its name and description: strings as they are, lists one item to a line, anything else as JSON. `fields(input)` renders the fields separately, for judges that read them one by one.
+- Over budget, the longest list loses its oldest items, after the first (usually the request), with a marker saying how many were omitted. Only if that is not enough is the longest remaining text shortened in the middle, so a list that windowing alone can fit is never also cut. The result always fits.
+- `estimate_tokens` counts one token per three bytes of UTF-8, which overestimates English and is close for scripts of three bytes a character, so a budget measured with it is rarely exceeded. Where the limit is exact, pass the model's tokenizer as `count_tokens`.
+- Summarizing, rather than windowing, is a formatter too: any callable from the input to text fits the `Formatter` protocol.
+
+## End-to-end measures
+
+`evalr.measures` defines the family's end-to-end measures generically; each library's `[evals]` extra supplies the data, by putting its log into these inputs:
+
+| Input | Holds | artifactr | reflexr |
+|---|---|---|---|
+| `Session` | A timeline of `Activity`: when, who (`person`, `agent` or `system`), what (`message`, `proposal`, `resolution`, ...), and a `ref` pairing a proposal with its resolution | A thread | A causal chain |
+| `History` | An artifact's `Revision`s: when, who, and its whole text | An artifact | A report people edit |
+| `Transcript` | The request, the turns, and the result | A thread and its artifacts | A chain's events and reports |
+
+| Measure | Verdict | How |
+|---|---|---|
+| Task completion | `TaskCompletion`: `completed`, `quality` from 1 to 5, `reason` | Judged: any evaluator over a `Transcript`, such as `DspyJudge(TaskCompletion, inputs=Transcript)`, or given by people. `completion_rate` is the share completed. |
+| Drop-off | `DropOff`: `outcome` (`continued`, `dropped`, `pending`) and `cause` (`no_reply`, `unresolved_proposal`) | Computed by `measure_drop_off(session, window=, now=)`: dropped when the agent acted last and no person acted within the window, or a proposal stayed unresolved longer than it; pending until the window has passed. `drop_off_rate` counts decided sessions only. |
+| Rewrites | `Rewrites`: `agent_revisions`, `rewritten`, `rate` | Computed by `measure_rewrites(history, window=, threshold=0.2)`: an agent's revision is rewritten when a person's revision within the window, before the agent writes again, changes at least the threshold's share of its text, by `share_changed` (the last such revision counts). `rewrite_rate` pools revisions across artifacts. |
+
+- **Rates read verdicts or values.** `completion_rate`, `drop_off_rate` and `rewrite_rate` take, one per session or artifact, an evaluator's `Verdict` or the verdict type's value itself, such as people's feedback or a measure computed directly. There is no `people()` evaluator: it would pass people's feedback off as an evaluator's. A library's feedback type that subclasses the measure's type, such as artifactr's `TaskCompletion`, counts as one.
+- **`share_changed(before, after)`** is the share of a text an edit changed. It aligns lines, then compares characters within the lines that changed, with `difflib`'s autojunk heuristic off.
+- `drop_off_evaluator(window=, now=)` and `rewrite_evaluator(window=, threshold=)` wrap the computed measures as function evaluators, versioned by their settings (`drop-off` at `1:3600s`, `rewrites` at `2:3600s:0.2`), so they run in experiments and online like any evaluator. The leading number is the measure's own version, bumped when its computation changes.
+- The tests compute all three on logs recorded in artifactr's and reflexr's shapes, read without importing either library.
+
+## Metrics
+
+Agreement compares an evaluator's verdicts with people's, field by field, with the measures that suit each kind. Calibration asks whether its confidence means what it says. Every measure that is undefined for its data (no pairs; kappa when both sides always give one label; Spearman when a side never varies) is `None`, not NaN, so results compare and serialize cleanly.
+
+| Function | Measures |
+|---|---|
+| `accuracy`, `cohen_kappa` | Binary and categorical fields. Kappa is agreement beyond what the two sides' label frequencies give by chance. |
+| `mean_absolute_error`, `spearman` | Ordinal and numeric fields. Spearman ranks tied values by their average rank. |
+| `brier_score`, `expected_calibration_error` | Confidence against correctness. A verdict's confidence is one probability per field, that its value is right, so both are top-label measures. Calibration error uses equal-width bins, closed below, the last including 1. |
+| `field_agreement(expected, predicted)`, `agreement_score` | One pair of verdicts, per field and overall, from 0 to 1: binary and categorical fields agree fully or not at all; bounded numbers lose agreement in proportion to the distance over their range; unbounded ones as `1 / (1 + distance)`; a missing prediction agrees not at all. Only fields people gave a value count. This is the metric optimizers fit judges to. |
+| `agreement(expected, predicted, verdict_type=)` | Per field over many pairs: `n`, `missing`, the mean per-pair `score`, and accuracy and kappa or mean absolute error and Spearman. A missing prediction counts as a wrong label for accuracy and kappa, and is left out of the error and correlation. |
+| `calibration(expected, verdicts, verdict_type=)` | Per field with confidence: accuracy, mean confidence, calibration error and Brier score. |
+| `evaluator_stats(verdicts)` | Per evaluator version: count, mean, median and 95th-percentile latency (nearest rank), and total and mean cost over the verdicts that report one. |
+
+The measures over pairs are property-tested against scikit-learn and SciPy, and calibration error against a NumPy computation.
+
+## Online evaluation
+
+`evalr.online` runs evaluators on live traffic ([ADR-0009](adr/0009-online-evaluation.md)):
+
+```python
+online = OnlineEvaluation(
+    [Fallback(decider, judge)],
+    sample_rate=0.1,
+    budget=Budget(max_cost=5.0),
+    sinks=[LangfuseScoreSink(langfuse), OtelEventSink()],
+)
+online.submit(transcript, key=turn_id)  # in the background, on the current span
+await online.drain()  # at shutdown
+```
+
+- **Sampling by key.** An input is judged when `split_bucket(key, salt)` is below `sample_rate`, so a given turn or run is judged in every process and replay, or never.
+- **Budgets.** `Budget(max_evaluations=, max_cost=, period=timedelta(days=1))` is checked before each evaluation and spent after it, so it is a soft limit; hand-offs and failures count as evaluations.
+- **The judged span.** `judge(input, key=, span=)` evaluates in the trace of the span it judges: the current span, or one given, even one that has ended. Evaluation spans nest under it, and scores record its trace and span. `submit` takes the current span when called, and judges in the background, at most `max_concurrency` at once.
+- **Sinks** receive every verdict's scores, keyed by the input's key, named by `type_names` where a library registers its feedback under another name.
+- **Nothing is raised.** An `OnlineResult` records the verdicts, the evaluators skipped for budget, those that handed off, and every evaluator or sink failure.
+
+`OtelEventSink(logger_provider=None)` is a `ScoreSink` that emits each score as a `gen_ai.evaluation.result` event through the OpenTelemetry logs API, with the judged trace and span as its context, so it can emit after that span has ended. It sets `gen_ai.evaluation.name` (`{type}.{field}`), `gen_ai.evaluation.score.value` (a number, or 1 or 0 for a yes or no) or `gen_ai.evaluation.score.label` (a choice, or `true` or `false`), and `gen_ai.evaluation.explanation` (the verdict's text scores, one `field: text` line each; a text field's own event has its text alone), with the evaluator, its version, the score's id, the confidence, `session.id` and each entry of the source as `evalr.source.{key}`, where the score has them. An event's time is the score's timestamp, when it has one. Events are append-only; a reader keyed by the score's id keeps the latest.
+
+## Observability
+
+evalr uses the OpenTelemetry API only, under the `evalr` scope, and never configures the SDK. Evaluators take an optional `tracer_provider`, defaulting to the global one.
+
+- Every evaluation runs in a span named `evalr.evaluate {evaluator}`, with the attributes `evalr.evaluator.name`, `evalr.evaluator.version` and `evalr.verdict.type`. The span is current while the evaluator works, so the spans of the language models or agents it calls nest under it. A failure is recorded on the span.
+- The verdict's `trace_id` is that span's trace, so a verdict made inside an experiment item's trace, or on the trace of the run it judges, links back to it. With no SDK configured, and no enclosing trace, it is `None`.
+- `judging(tracer, evaluator=, version=, verdict_type=)` is the context manager every evaluator kind uses; application evaluators can use it too.
+- evalr instruments nothing else. pydantic-ai traces decision evaluators' agent runs itself, once the application turns its instrumentation on. DSPy is traced by OpenInference's `DSPyInstrumentor` (`openinference-instrumentation-dspy`), which the application installs and enables; GEPA runs DSPy single-threaded so the trace context survives. DSPy's default `engine="auto"` may use its bundled `lm15` engine, which bypasses HTTP and LiteLLM hooks, so applications that route through a LiteLLM gateway should choose its engine.
+- Online evaluations can also be emitted as `gen_ai.evaluation.result` events on the spans they judge (`OtelEventSink`, above).
+
+## Quality
+
+The gates are those of artifactr and reflexr ([ADR-0005](adr/0005-quality-gates-and-license.md)): pyright strict with no suppressions, 100% line and branch coverage, warnings as errors, and no network in tests. Jev is tested through the TypeSafe SDK's transport, DSPy with its dummy language model, Langfuse with fakes and an in-memory span exporter, and Hugging Face with local datasets.
+
+## Documentation
+
+The documentation site is built from `docs/` with Zensical by `make docs`, in strict mode and with the changelog regenerated, on every pull request, and published from `main` on every push at <https://evalr.alexnodeland.com> ([ADR-0010](adr/0010-documentation-site.md), [ADR-0013](adr/0013-docstrings-in-markdown-and-one-docs-build.md)). The API reference is generated from the docstrings of each package's `__all__`, which are Markdown, and the guides' examples are run offline, against the in-memory adapters and fakes, before they are published.

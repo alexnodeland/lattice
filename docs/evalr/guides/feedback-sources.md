@@ -85,11 +85,11 @@ triage = await collect("triage-quality", source)
 - **Metadata** records the tenant, the workspace, the kind of target, who gave the feedback and its position in the log.
 - `targets=` limits the source to feedback on some kinds of target (`run`, `firing`, `chain`); every kind by default.
 
-The same extra runs evalr evaluators as rules (`EvaluatorAction`), replays examples against a candidate agent, graph or model as an [experiment](experiments.md) task (`replay_task`), and computes rule-level measures from the log. See [reflexr's architecture](https://github.com/alexnodeland/reflexr/blob/main/docs/architecture.md) and its [ADR-0020](https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0020-evalr-shared-eval-kit.md).
+The same extra runs evalr evaluators as rules (`EvaluatorAction`), replays examples against a candidate agent, graph or model as an [experiment](experiments.md) task (`replay_task`), and computes rule-level measures from the log. See [reflexr's architecture](../../reflexr/architecture.md) and its [ADR-0020](../../reflexr/adr/0020-evalr-shared-eval-kit.md).
 
 ## artifactr
 
-artifactr records typed feedback from people and evaluators on artifact versions, threads, turns and messages ([artifactr's evaluation guide](https://artifactr.alexnodeland.com/guides/evaluation/)). Its `[evals]` extra, planned in [artifactr's RFC-0002](https://github.com/alexnodeland/artifactr/blob/main/docs/rfcs/0002-observability-feedback-and-evaluation.md), will provide the same pieces: datasets from the log, with each piece of feedback's target as context, experiment tasks that replay a turn, online evaluators and the end-to-end measures. Until it ships, an artifactr application can write a source of its own that reads the `feedback_given` events in a workspace's log, the way the next section reads a table of ratings.
+artifactr records typed feedback from people and evaluators on artifact versions, threads, turns and messages ([artifactr's evaluation guide](../../artifactr/guides/evaluation.md)). Its `[evals]` extra, from [artifactr's RFC-0002](../../artifactr/rfcs/0002-observability-feedback-and-evaluation.md), provides the same pieces: `LogFeedbackSource`, datasets from a workspace's log, with each piece of feedback's target as context; `replay_task`, an experiment task that replays a turn; `OnlineEvaluator`, which judges turns as they end; and the end-to-end measures, `TaskCompletion`, `thread_sessions` and `artifact_histories`. See [Evaluating with evalr](../../artifactr/guides/evaluation.md#evaluating-with-evalr) in artifactr's guide.
 
 ## A source of your own
 

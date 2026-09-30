@@ -114,9 +114,10 @@ The core depends on pydantic and the OpenTelemetry API only. Each integration is
 
 ## The family
 
-evalr is one of four projects that share their conventions: typed feedback as Pydantic models, scores named `{type}.{field}`, OpenTelemetry through the API only, ports with in-memory adapters, and the same quality gates.
+evalr is one of the packages in [lattice](https://github.com/alexnodeland/lattice), the family's repository. They share their conventions: typed feedback as Pydantic models, scores named `{type}.{field}`, OpenTelemetry through the API only, ports with in-memory adapters, and the same quality gates.
 
-- [artifactr](https://artifactr.alexnodeland.com): chat applications where people and agents collaborate on shared, versioned artifacts. It records people's feedback on threads, turns, messages and artifact versions.
-- [reflexr](https://github.com/alexnodeland/reflexr): rules over event streams that run agents, graphs and functions. It records feedback on runs, firings and causal chains.
+- [artifactr](../artifactr/index.md): chat applications where people and agents collaborate on shared, versioned artifacts. It records people's feedback on threads, turns, messages and artifact versions.
+- [reflexr](../reflexr/index.md): rules over event streams that run agents, graphs and functions. It records feedback on runs, firings and causal chains.
 - **evalr**: evaluators trained on that feedback and measured against it. The libraries depend on evalr through their `[evals]` extras; evalr imports neither.
-- [stackr](https://github.com/alexnodeland/stackr): the infrastructure they run on: LiteLLM, OpenTelemetry, Langfuse and Supabase.
+- [relayr](../relayr/adr/README.md): the bridge planned between artifactr and reflexr, so that events from chats and artifacts become events for rules, and runs act back in the chat.
+- [stackr](../stackr/index.md): the infrastructure they run on: LiteLLM, OpenTelemetry, Langfuse and Supabase.

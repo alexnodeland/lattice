@@ -4,18 +4,18 @@ This page builds an evaluator for a support agent's replies, the way you would f
 
 ## Install
 
-evalr needs Python 3.12 or newer. Until it is published to PyPI, install it from GitHub:
+evalr needs Python 3.12 or newer. Until it is published to PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the family's repository:
 
 === "uv"
 
     ```bash
-    uv add "evalr[all] @ git+https://github.com/alexnodeland/evalr"
+    uv add "evalr[all] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr"
     ```
 
 === "pip"
 
     ```bash
-    pip install "evalr[all] @ git+https://github.com/alexnodeland/evalr"
+    pip install "evalr[all] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr"
     ```
 
 The core install covers verdicts, function evaluators, datasets, metrics, in-memory adapters, JSON Lines files, workflow measures and online evaluation, with pydantic and the OpenTelemetry API as its only dependencies. The integrations are extras:

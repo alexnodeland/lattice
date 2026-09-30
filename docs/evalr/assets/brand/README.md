@@ -1,6 +1,6 @@
 # Brand
 
-evalr is one of a family of four projects: [artifactr](https://github.com/alexnodeland/artifactr), [reflexr](https://github.com/alexnodeland/reflexr), evalr and [stackr](https://github.com/alexnodeland/stackr). Their marks are drawn on one 64-unit grid, with one stroke and one diagonal, their wordmarks are set in one typeface, and each has a hue of its own. The family's identity comes from print proofing: a mark is drawn in two inks, and where both land on the same spot they overprint into a third colour. artifactr's are magenta and cyan, overprinting into indigo.
+evalr is one of the five packages in [lattice](https://github.com/alexnodeland/lattice), which is drawn in their brand system too: [artifactr](../../../artifactr/index.md), [reflexr](../../../reflexr/index.md), evalr, [relayr](../../../relayr/adr/README.md) and [stackr](../../../stackr/index.md). Their marks are drawn on one 64-unit grid with one stroke, their wordmarks are set in one typeface, and each has a colour of its own. The family's identity comes from print proofing: artifactr, reflexr and evalr are each drawn in two of the three process inks, cyan, magenta and yellow, and where both land on the same spot they overprint into a third colour, the library's working colour (artifactr's magenta and cyan overprint into indigo); relayr and lattice each print on one plate, magenta and cyan, and stackr prints in key. [lattice's brand page](../../../assets/brand/README.md#the-family) states the system in full, with the inks it reserves for portalr and grantr.
 
 evalr's hue is **green**. Its mark is a tick, the family's proofreader's caret turned over with one arm cut short. Its two inks are two judgements of the same thing: **yellow**, for people's, and **cyan**, for the evaluator's. Where they meet, at the point of the tick, they overprint into green: agreement, the verdict both give. Cyan is the ink evalr shares with artifactr.
 
@@ -24,7 +24,7 @@ Every file is a hand-authored SVG with no embedded images or fonts. Text is outl
 | [`favicon.svg`](favicon.svg) | The mark, switching to the dark colours when the system prefers a dark scheme | Browser tabs |
 | [`tokens.json`](tokens.json) | The colours below, and the site's, as data | Tools and new material |
 
-lattice's site applies one palette to every section, from its `docs/assets/stylesheets/lattice.css`, until lattice's brand ADR.
+lattice's site takes lattice's palette in every section ([lattice ADR-0001](../../../adr/0001-lattices-brand.md)), and opens evalr's section with evalr's lockup. Where the table below names a role on the site, it is the role evalr's own palette gives that colour.
 
 ## Colours
 
@@ -54,4 +54,4 @@ Both are open-source (SIL Open Font License) and served by Google Fonts. The wor
 - The mark stays legible down to 16 pixels. Below 24 pixels, use it without the wordmark.
 - Yellow and cyan stand for the two judgements, so don't use them as decoration. Outside the mark, cyan only marks interaction on the site (a hovered link, the current page) and yellow only highlights code; the overprint green is the working colour for everything else.
 - Don't stretch, rotate, outline or add effects to the mark, and don't set the wordmark in another typeface.
-- In a README, switch between the light and dark banners with a `<picture>` element, as the repository's README does.
+- In a README, switch between the light and dark banners with a `<picture>` element, as [evalr's README](https://github.com/alexnodeland/lattice/blob/main/packages/evalr/README.md) does.

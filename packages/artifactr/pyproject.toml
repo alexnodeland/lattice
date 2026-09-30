@@ -24,6 +24,7 @@ classifiers = [
 dependencies = [
     "pydantic>=2.13",
     "jsonpatch>=1.33",
+    "jsonpointer>=1.9",
     "pydantic-ai-slim>=2.51",
     "opentelemetry-api>=1.28",
 ]
@@ -32,8 +33,8 @@ dependencies = [
 sql = ["sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
 sqlite = ["artifactr-ai[sql]", "aiosqlite>=0.22"]
 postgres = ["artifactr-ai[sql]", "asyncpg>=0.31"]
-fastapi = ["fastapi>=0.141"]
-mcp = ["mcp>=2.2"]
+fastapi = ["fastapi>=0.141", "starlette>=0.46.0"]
+mcp = ["mcp>=2.2", "starlette>=0.27"]
 otel = [
     "opentelemetry-exporter-otlp-proto-http>=1.45",
     "opentelemetry-instrumentation-asyncpg>=0.66b0",
@@ -52,6 +53,7 @@ langfuse = [
 ]
 litellm = [
     "pydantic-ai-slim[openai]>=2.51",
+    "httpx2>=2.7",
 ]
 evals = ["evalr>=0.1.0.dev0"]
 

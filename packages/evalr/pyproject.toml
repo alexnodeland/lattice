@@ -24,6 +24,7 @@ classifiers = [
 ]
 dependencies = [
     "pydantic>=2.13",
+    "annotated-types>=0.6.0",
     "opentelemetry-api>=1.30",
 ]
 
@@ -31,7 +32,7 @@ dependencies = [
 dspy = ["dspy>=3.4"]
 jev = ["pydantic-ai-slim[typesafe]>=2.51"]
 langfuse = ["langfuse>=4.15"]
-hf = ["datasets>=5.0"]
+hf = ["datasets>=5.0", "huggingface-hub>=0.25.0"]
 all = ["evalr[dspy,jev,langfuse,hf]"]
 
 [project.urls]

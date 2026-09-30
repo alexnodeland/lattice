@@ -10,7 +10,8 @@ comes from:
 
 Runs are asyncio tasks in this process. Their live frames go to :attr:`Runner.live`, where any
 connection can :meth:`Runner.watch` them. An application stops them with :meth:`Runner.aclose`
-as it shuts down, before its storage closes.
+as it shuts down, before its storage closes. A run whose process dies instead stays ``running``
+until its thread is next claimed, and is then recorded as failed, with the reason ``abandoned``.
 
 Surfaces send each command with the id its client chose to :meth:`Runner.execute`, which
 remembers results in :class:`~artifactr.agent.CommandResults`, so a retried command is carried
@@ -47,6 +48,7 @@ from artifactr.core import (
     AnswerDeferred,
     Command,
     CommandResult,
+    InvalidState,
     LiveFrame,
     MessageId,
     NotFound,
@@ -55,8 +57,10 @@ from artifactr.core import (
     Recorded,
     Rejection,
     Run,
+    RunEnded,
     RunId,
     StopRun,
+    SystemActor,
     ThreadId,
     new_message_id,
     new_run_id,
@@ -85,6 +89,9 @@ propagated trace attributes, implements it, and the Runner stays free of the bac
 
 type TurnOutcome = Literal["completed", "paused", "failed", "stopped"]
 """How a turn ended: the agent finished, paused on questions, raised, or was stopped."""
+
+_ABANDONED = "the run was abandoned: its process stopped"
+"""The error recorded for a run whose process stopped before it ended."""
 
 
 @dataclass(frozen=True)
@@ -159,7 +166,8 @@ class Runner[AppDepsT]:
         app: The application's dependencies, passed to every run as ``ctx.deps.app``.
         live: Where runs' live frames go. Defaults to an in-process fan-out.
         agent_name: How the agent is named in the workspace.
-        claim_ttl: How long a thread claim lasts without renewal, should this process die.
+        claim_ttl: How long a thread claim lasts without renewal, should this process die. Once
+            it lapses, the thread's next run records the run left behind as abandoned.
         tracer_provider: Where turn spans go. Defaults to the global tracer provider.
         meter_provider: Where turn metrics go. Defaults to the global meter provider.
         turn_context: Entered around each turn, inside its span.
@@ -356,15 +364,17 @@ class Runner[AppDepsT]:
         watch_after: int | None,
         deferred: DeferredToolResults | None = None,
     ) -> RunHandle | None:
-        if self._closed:
-            return None
-        claim = contextlib.AsyncExitStack()
-        try:
-            await claim.enter_async_context(
-                workspace.claim_thread(thread_id, holder=run_id, ttl=self._claim_ttl)
-            )
-        except ThreadBusy:
-            return None
+        async with contextlib.AsyncExitStack() as stack:
+            try:
+                await stack.enter_async_context(
+                    workspace.claim_thread(thread_id, holder=run_id, ttl=self._claim_ttl)
+                )
+            except ThreadBusy:
+                return None
+            await _abandon(workspace, thread_id)
+            if self._closed:
+                return None
+            claim = stack.pop_all()  # the run's task holds the claim from here
         session = Session[AppDepsT].start(
             workspace,
             thread_id,
@@ -474,6 +484,25 @@ class Runner[AppDepsT]:
         self._runs.pop(run_id, None)
         if not task.cancelled():
             task.exception()  # the capability recorded any failure; mark it retrieved
+
+
+async def _abandon(workspace: Workspace, thread_id: ThreadId) -> None:
+    """Record each run still ``running`` in a thread just claimed as failed, ``abandoned``.
+
+    A run the Runner starts holds its thread's claim until it records its end, so a run still
+    ``running`` when the thread is claimed again was left by a process that stopped.
+    """
+    system = workspace.as_actor(SystemActor(name="runner"))
+    for run in await workspace.runs(thread_id=thread_id, status="running"):
+        abandoned = RunEnded(
+            run_id=run.id,
+            thread_id=thread_id,
+            status="failed",
+            error=_ABANDONED,
+            reason="abandoned",
+        )
+        with contextlib.suppress(InvalidState):  # it ended meanwhile
+            await system.record(abandoned)
 
 
 def _sent(recorded: Recorded, run: RunHandle | None) -> Sent:

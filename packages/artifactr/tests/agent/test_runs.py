@@ -1,13 +1,25 @@
 """A run's life in the workspace: what is recorded, what the agent is told, and history."""
 
+import asyncio
+
 import pytest
 from pydantic import BaseModel
 from pydantic_ai import ModelMessage, ModelRequest, ModelResponse
 
 from artifactr.agent import Session, last_seen, load_history
-from artifactr.core import AgentActor, RunEnded, Thread
-from artifactr.workspace import Workspace
+from artifactr.core import (
+    AgentActor,
+    Run,
+    RunEnded,
+    RunStarted,
+    RunStatus,
+    SystemActor,
+    Thread,
+    ThreadId,
+)
+from artifactr.workspace import InMemoryStorage, Scope, Workspace, Workspaces
 from tests.agent.conftest import (
+    ALICE,
     Gate,
     Script,
     call,
@@ -147,6 +159,104 @@ async def test_a_failed_run_is_recorded(ws: Workspace, thread: Thread, gate: Gat
         await handle.wait()
     ended = event_as((await ws.read())[-1], RunEnded)
     assert (ended.status, ended.error) == ("failed", "model unavailable")
+
+
+async def test_a_run_left_running_is_abandoned_when_its_thread_is_next_claimed(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
+    await left.record(RunStarted(run_id="run_left", thread_id=thread.id))  # then its process died
+    runner = make_runner(make_agent(Script(say("On it."))), gate)
+    handle = started(await runner.send(ws, thread.id, "Are you there?"))
+    await handle.wait()
+    log = await ws.read()
+    assert types(log[3:5]) == ["run_ended", "run_started"], "abandoned before the next run starts"
+    assert event_as(log[3], RunEnded) == RunEnded(
+        run_id="run_left",
+        thread_id=thread.id,
+        status="failed",
+        error="the run was abandoned: its process stopped",
+        reason="abandoned",
+    )
+    assert log[3].actor == SystemActor(name="runner")
+    assert await ws.runs(status="running") == [], "so no client is told it is active"
+    assert (await ws.run(handle.run_id)).status == "completed"
+
+
+async def test_a_run_whose_claim_is_held_is_not_abandoned(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    running = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_live"))
+    runner = make_runner(make_agent(Script()), gate)
+    async with ws.claim_thread(thread.id, holder="run_live"):
+        await running.record(RunStarted(run_id="run_live", thread_id=thread.id))
+        assert (await runner.send(ws, thread.id, "Also this")).run is None, "it steers the run"
+    assert (await ws.run("run_live")).status == "running"
+
+
+class SlowRunningReads(InMemoryStorage):
+    """Storage whose reads of running runs wait until the test lets them go."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.reading = asyncio.Event()
+        self.go = asyncio.Event()
+
+    async def runs(
+        self, scope: Scope, *, thread_id: ThreadId | None = None, status: RunStatus | None = None
+    ) -> list[Run]:
+        if status == "running":
+            self.reading.set()
+            await self.go.wait()
+        return await super().runs(scope, thread_id=thread_id, status=status)
+
+
+async def test_a_start_cancelled_while_abandoning_releases_the_claim(gate: Gate) -> None:
+    storage = SlowRunningReads()
+    ws = await Workspaces(storage).open("tenant", "ws", actor=ALICE)
+    thread = await ws.create_thread()
+    runner = make_runner(make_agent(Script()), gate)
+    sending = asyncio.create_task(runner.send(ws, thread.id, "hi"))
+    await asyncio.wait_for(storage.reading.wait(), timeout=2)
+    sending.cancel()
+    await asyncio.gather(sending, return_exceptions=True)
+    async with ws.claim_thread(thread.id, holder="next"):
+        pass
+
+
+async def test_a_runner_closed_while_abandoning_starts_no_run(gate: Gate) -> None:
+    storage = SlowRunningReads()
+    ws = await Workspaces(storage).open("tenant", "ws", actor=ALICE)
+    thread = await ws.create_thread()
+    runner = make_runner(make_agent(Script()), gate)
+    sending = asyncio.create_task(runner.send(ws, thread.id, "hi"))
+    await asyncio.wait_for(storage.reading.wait(), timeout=2)
+    await runner.aclose()
+    storage.go.set()
+    assert (await sending).run is None
+    async with ws.claim_thread(thread.id, holder="next"):
+        pass
+
+
+class StaleRunningReads(InMemoryStorage):
+    """Storage whose reads of running runs are stale: they list runs that have since ended."""
+
+    async def runs(
+        self, scope: Scope, *, thread_id: ThreadId | None = None, status: RunStatus | None = None
+    ) -> list[Run]:
+        stale = status == "running"
+        return await super().runs(scope, thread_id=thread_id, status=None if stale else status)
+
+
+async def test_a_run_that_ended_meanwhile_is_left_as_it_ended(gate: Gate) -> None:
+    ws = await Workspaces(StaleRunningReads()).open("tenant", "ws", actor=ALICE)
+    thread = await ws.create_thread()
+    agent = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_done"))
+    await agent.record(RunStarted(run_id="run_done", thread_id=thread.id))
+    await agent.record(RunEnded(run_id="run_done", thread_id=thread.id, status="completed"))
+    runner = make_runner(make_agent(Script(say("On it."))), gate)
+    await started(await runner.send(ws, thread.id, "Are you there?")).wait()
+    assert (await ws.run("run_done")).status == "completed"
 
 
 async def test_an_unwatched_failure_does_not_warn(

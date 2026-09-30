@@ -332,29 +332,36 @@ async def test_a_claim_is_renewed_while_held(ws: Workspace) -> None:
 
 
 class RenewalFails(InMemoryStorage):
-    """Storage that fails to renew a claim's lease, as a database that blinks."""
+    """Storage that fails a claim's first renewal, as a database that blinks."""
 
     def __init__(self) -> None:
         super().__init__()
-        self.taken: set[str] = set()
+        self.acquired = 0
         self.failed = asyncio.Event()
 
     async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
-        if key in self.taken:
+        self.acquired += 1
+        if self.acquired == 2:
             self.failed.set()
             raise RuntimeError("the database blinked")
-        self.taken.add(key)
         return await super().acquire_lease(scope, key, holder, ttl)
 
 
-async def test_a_claim_renewal_that_fails_is_logged(caplog: pytest.LogCaptureFixture) -> None:
+async def test_a_claim_renewal_that_fails_is_logged_and_retried(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     storage = RenewalFails()
     ws = await Workspaces(storage).open("tenant_a", "ws_1", actor=ALICE)
     thread = await ws.create_thread()
-    async with ws.claim_thread(thread.id, holder="run_1", ttl=timedelta(milliseconds=30)):
+    ttl = timedelta(milliseconds=300)
+    async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl):
         async with asyncio.timeout(5):
             await storage.failed.wait()
-    assert f"renewing the claim thread:{thread.id} failed; it will lapse" in caplog.text
+        await asyncio.sleep(0.5)  # longer than the ttl: only a later renewal keeps the claim
+        with pytest.raises(ThreadBusy):
+            async with ws.claim_thread(thread.id, holder="run_2", ttl=ttl):
+                pass
+    assert f"renewing the claim thread:{thread.id} failed; retrying" in caplog.text
 
 
 def test_subclassing_artifact_is_all_it_takes() -> None:

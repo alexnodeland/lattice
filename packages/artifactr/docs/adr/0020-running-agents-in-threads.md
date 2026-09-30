@@ -64,6 +64,18 @@ A new problem appeared as well: if a person replies in the chat while a run is p
 - Harder: stopping or watching a run started by another process needs a shared channel (future work, listed in the architecture's open questions).
 - A chat reply to a paused run cannot be told apart from an unrelated message. That is acceptable, because the agent sees the text either way.
 
+## Amendment (2026-09-30): a run whose process stopped is recorded as abandoned
+
+`wrap_run` records a run's end, so when the process running it died, nothing did: the run stayed `running` in every read, and never ended in the metrics or measures ([#68](https://github.com/alexnodeland/artifactr/issues/68)). Its thread claim lapsed, so the thread took new runs.
+
+- **The thread's next claim records it.** Once the `Runner` holds a thread's claim, and before it starts the run, it records each run of the thread still `running` as `run_ended`, `failed`, with the error "the run was abandoned: its process stopped" and the reason `abandoned` ([ADR-0042](0042-typed-run-failures.md)). A run the `Runner` starts holds its thread's claim until it has recorded its end, so a run still `running` when the thread is claimed again was left by a process that stopped. There is no sweeper, since only the claim knows its holder is gone. A run that ended between the read and the record is left as it ended.
+- **The system records it,** as `SystemActor(name="runner")`, through `Workspace.record` like any run fact; core lets the system record a thread's runs. reflexr records an attempt whose executor stopped with the same reason when its lease is next claimed ([reflexr ADR-0027](https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0027-executing-runs.md)).
+- **The claim passes to the run only after that.** A caller cancelled while the abandoned runs are being recorded, a storage that fails, or a `Runner` closed meanwhile releases the claim, and no run starts.
+- **A failed renewal is retried.** A claim's renewal that fails is logged and tried again a third of `claim_ttl` later. Until now one failure ended renewal for the rest of the run, so a database that blinked let the claim lapse under a live run, and the next message would have recorded that run as abandoned.
+- **Only the `Runner`'s runs hold claims.** A run started with `agent.run` directly takes none, so a `Runner` that claims its thread records it as abandoned even while it runs, unless its caller holds `Workspace.claim_thread` around it.
+
+A thread no one uses again keeps its abandoned run `running`, and `artifactr.turns` never counts the run, since its turn's process died. A run whose claim lapsed while its process lives on, every renewal failing for a whole `claim_ttl`, is recorded as abandoned too, and what it records afterwards is refused as `invalid_state` ([#73](https://github.com/alexnodeland/artifactr/issues/73)).
+
 ## Action items
 
 1. [x] Implement `Session`, `ArtifactWorkspace`, the generic tools, live forwarding and `Runner` (RFC-0001 phase 3).

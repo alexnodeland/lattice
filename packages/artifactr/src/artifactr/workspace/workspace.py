@@ -592,12 +592,12 @@ class Workspace:
     async def _renew(self, key: str, holder: str, ttl: timedelta) -> None:
         # Renewing is bookkeeping, not part of the turn that holds the thread.
         with untraced():
-            try:
-                while True:
-                    await asyncio.sleep(ttl.total_seconds() / 3)
+            while True:
+                await asyncio.sleep(ttl.total_seconds() / 3)
+                try:
                     await self._storage.acquire_lease(self._scope, key, holder, ttl)
-            except Exception:
-                logger.exception("renewing the claim %s failed; it will lapse", key)
+                except Exception:
+                    logger.exception("renewing the claim %s failed; retrying", key)
 
 
 def _check_page(

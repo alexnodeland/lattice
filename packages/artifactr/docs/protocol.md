@@ -99,7 +99,7 @@ Every durable event arrives in the same envelope. The stored envelope and the wi
 | `tool_returned` | run | `run_id`, `thread_id`, `tool_call_id`, `tool_name`, `status` (`ok`, `error`, `retry`), `summary` |
 | `run_paused` | run | `run_id`, `thread_id`, `requests`: list of `{tool_call_id, tool_name, kind: question \| approval, args}`, `usage?` |
 | `deferred_answered` | run | `run_id`, `thread_id`, `tool_call_id`, `answer?`, `approved?` |
-| `run_ended` | run | `run_id`, `thread_id`, `status` (`completed`, `stopped`, `failed`), `usage?`, `error?`, `reason?`: a failure's typed reason, such as `guardrail_blocked` |
+| `run_ended` | run | `run_id`, `thread_id`, `status` (`completed`, `stopped`, `failed`), `usage?`, `error?`, `reason?`: a failure's typed reason, such as `guardrail_blocked`, or `abandoned` for a run whose process stopped, recorded by the system when its thread is next claimed |
 | `feedback_given` | thread, or workspace for an artifact | `feedback_type`, `target` (`{kind: artifact, artifact_id, version}`, `{kind: thread, thread_id}`, `{kind: turn, run_id}` or `{kind: message, message_id, thread_id, run_id?}`), `value` (the feedback type's fields, validated), `thread_id?`, `run_id?`. The judge is the envelope's actor. |
 | `app_event` | any | `name`, `data`, `thread_id?`, `run_id?` |
 

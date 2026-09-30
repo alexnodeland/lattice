@@ -36,7 +36,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(artifactr_router(workspaces, runner, resolve_actor=resolve_actor), prefix="/v1")
 ```
 
-The router needs no lifespan of its own, but the runner does. Keep one `Workspaces` and one `Runner` per process: the runner owns the process's runs and their live output. Its runs are tasks in the process, and at shutdown `runner.aclose()` stops every run still going and waits for each to record that it stopped. Close the runner before closing storage, such as before `await engine.dispose()` for [SQL storage](storage.md#sql-storage).
+The router needs no lifespan of its own, but the runner does. Keep one `Workspaces` and one `Runner` per process: the runner owns the process's runs and their live output. Its runs are tasks in the process, and at shutdown `runner.aclose()` stops every run still going and waits for each to record that it stopped. Close the runner before closing storage, such as before `await engine.dispose()` for [SQL storage](storage.md#sql-storage). A process that dies without closing it leaves its runs `running` until their threads are next claimed, when they are recorded as abandoned ([Running the agent](agent.md#running-the-agent)).
 
 ## Authentication and authorization
 

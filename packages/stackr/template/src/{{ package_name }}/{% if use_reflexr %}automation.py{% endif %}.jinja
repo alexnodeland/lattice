@@ -18,7 +18,7 @@ from pydantic_ai.models import Model
 from starlette.requests import HTTPConnection
 
 from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
-from reflexr import Actor, ExternalAgentActor, SystemActor, UserActor
+from reflexr import Actor, {% if use_relayr %}Event, {% endif %}ExternalAgentActor, SystemActor, UserActor
 from reflexr.core import {% if access == 'grantr' %}Forbidden, {% endif %}TenantId
 from reflexr.fastapi import Unauthorized, reflexr_router
 {% if not use_relayr -%}
@@ -44,12 +44,16 @@ from reflexr.workspace import (
 {%- if use_relayr %}
 from relayr.events import BRIDGED
 from relayr.inbound import SOURCE
+from relayr.rules import RULES as CHAT_RULES
 {%- endif %}
 
 {% if access == 'grantr' -%}
 from {{ package_name }}.access import Refused
 {% endif -%}
 from {{ package_name }}.auth import Authenticate, RequireToken, Unauthenticated
+{%- if use_relayr %}
+from {{ package_name }}.chat_rules import STORED_RULES
+{%- endif %}
 from {{ package_name }}.database import Database
 from {{ package_name }}.gateway import Guardrails, TenantKeys
 {%- if use_relayr %}
@@ -91,8 +95,8 @@ class Automation:
 {%- if use_relayr %}
         on_open: Called each time a workspace is opened, after the mirrors': relayr's followers.
         run_context: Entered around each run: relayr's Langfuse context, when Langfuse is on.
-        actions: The bridge's example rules' actions, which act in artifactr; without them, the
-            example's rules are left out.
+        actions: The bridge's rules' actions, which act in artifactr; without them, the bridge's
+            rules, and rules from chat, are left out.
 {%- endif %}
     """
 
@@ -130,6 +134,11 @@ class Automation:
                 await FeedbackMirror(workspace, sink, cursor="langfuse").follow()
 
             self._mirrors = Mirrors(follow)
+{%- if use_relayr %}
+        events = [*EVENTS, *BRIDGED, *INCIDENT_EVENTS]
+        self.events: Mapping[str, type[Event]] = {t.event_type: t for t in events}
+        """The event types the workspaces accept, by name, as rules from chat are checked."""
+{%- endif %}
         self.workspaces = Workspaces(
             SqlStorage(
                 database.engine,
@@ -138,11 +147,12 @@ class Automation:
             )
             if database
             else InMemoryStorage(),
-            events={% if use_relayr %}[*EVENTS, *BRIDGED, *INCIDENT_EVENTS]{% else %}EVENTS{% endif %},
-            rules={% if use_relayr %}[*RULES, *(INCIDENT_RULES if actions else [])]{% else %}RULES{% endif %},
+            events={% if use_relayr %}events{% else %}EVENTS{% endif %},
+            rules={% if use_relayr %}[*RULES, *([*INCIDENT_RULES, *CHAT_RULES] if actions else [])]{% else %}RULES{% endif %},
             authorize=authorize,
 {%- if use_relayr %}
             publishers={"artifactr": [SOURCE]},
+            stored_rules=STORED_RULES if actions else None,
 {%- endif %}
             on_open=opened(self._mirrors.watch if self._mirrors else None{% if use_relayr %}, on_open{% endif %}),
             tracer_provider=telemetry.tracer_provider if telemetry else None,

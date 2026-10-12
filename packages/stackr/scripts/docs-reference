@@ -79,7 +79,15 @@ ROLES = {
         "migrations on start."
     ),
     "litellm": "The LLM gateway port: the LiteLLM proxy's OpenAI-compatible API.",
+    "gotrue": (
+        "GoTrue, Supabase's auth server alone: the identity port on the `postgres` adapter, "
+        "signing tokens with an ES256 key set (RFC-0004)."
+    ),
     "telemetrygen": "Sends test telemetry for scripts/smoke; not a service that stays up.",
+    "probe": (
+        "curl, for scripts/smoke's requests from inside the stack's networks; not a service that "
+        "stays up."
+    ),
 }
 
 GENERATED_SECRETS = {
@@ -319,6 +327,10 @@ LISTED = re.compile(r"^\s{2,}(?P<term>\S+)\s{2,}(?P<text>.+)$")
 
 def describe_value(value: str) -> str:
     """What `make env` writes for a value of .env.example."""
+    if value == "generate:auth-keys":
+        return "Generated: an ES256 key set, as JSON"
+    if value.startswith("generate:auth-service-role:"):
+        return f"Generated: a JWT signed with `{value.rsplit(':', 1)[1]}`'s key"
     if value.startswith("generate:"):
         _, kind, *prefix = value.split(":", 2)
         secret = GENERATED_SECRETS[kind]

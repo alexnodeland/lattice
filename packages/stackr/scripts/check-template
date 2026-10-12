@@ -4,7 +4,7 @@
 Usage: scripts/check-template [--keep DIR]
 
 Renders every variant of the template (artifactr, reflexr or both, with and without evals, with
-grantr or no access control, and both without relayr's bridge) from
+grantr or no access control, both without relayr's bridge, and both hosted on a single host) from
 this checkout, working tree included, under the name in NAME, and checks each one:
 
 - every Jinja expression was rendered: nothing is left of `{{ ... }}` or `{% ... %}`, apart
@@ -13,7 +13,7 @@ this checkout, working tree included, under the name in NAME, and checks each on
   lattice's packages/, at the commit the variant was rendered from (ADR-0018)
 - the Python is formatted and passes lint, with the generated project's own ruff settings
 - the YAML passes yamllint, and the shell scripts shellcheck
-- the Compose file is valid for the app profile
+- the Compose file is valid for the app profile, with the single host's overlay when it has one
 
 The generated applications' types and tests need their dependencies installed: CI's template
 job runs `make check` in each variant for that.
@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import itertools
+import os
 import re
 import subprocess
 import sys
@@ -37,12 +38,13 @@ ROOT = Path(__file__).resolve().parent.parent
 LATTICE = ROOT.parent.parent
 """lattice's root, whose copier.yml points Copier at the template."""
 VARIANTS = [
-    (libraries, evals, access, libraries == "both")
+    (libraries, evals, access, libraries == "both", "none")
     for libraries, evals, access in itertools.product(
         ["artifactr", "reflexr", "both"], [True, False], ["grantr", "none"]
     )
-] + [("both", True, "grantr", False)]
-"""Every variant: its libraries, evals, access, and whether relayr bridges both libraries."""
+] + [("both", True, "grantr", False, "none"), ("both", True, "grantr", True, "host")]
+"""Every variant: its libraries, evals, access, whether relayr bridges both libraries, and where
+it is hosted."""
 LEFTOVER = re.compile(r"(?<!\$)\{\{|\{%|%\}")
 TEXT = {".py", ".toml", ".yaml", ".yml", ".md", ".json", ".sh", ".example", ""}
 ANSWERS = ".copier-answers.yml"
@@ -61,7 +63,9 @@ accepts, and its package sorts before `conftest`, so line lengths and import ord
 checked at their limits."""
 
 
-def render(libraries: str, evals: bool, access: str, bridge: bool, destination: Path) -> str:
+def render(
+    libraries: str, evals: bool, access: str, bridge: bool, hosting: str, destination: Path
+) -> str:
     """Render one variant, as `copier copy --defaults --vcs-ref HEAD` does; return its commit."""
     with warnings.catch_warnings():
         # A checkout with uncommitted changes renders them, from a commit Copier makes, with a
@@ -76,6 +80,7 @@ def render(libraries: str, evals: bool, access: str, bridge: bool, destination: 
                 "evals": evals,
                 "access": access,
                 "bridge": bridge,
+                "hosting": hosting,
             },
             defaults=True,
             vcs_ref="HEAD",
@@ -111,9 +116,13 @@ def check_sources(app: Path, expected: dict[str, dict[str, str]]) -> list[str]:
     return [f"pyproject.toml: [tool.uv.sources] is {sources}, not {expected}"]
 
 
-def run(label: str, command: list[str], cwd: Path) -> list[str]:
-    """Run a check; return its output as a problem if it fails."""
-    done = subprocess.run(command, cwd=cwd, capture_output=True, text=True, check=False)
+def run(label: str, command: list[str], cwd: Path, env: dict[str, str] | None = None) -> list[str]:
+    """Run a check, with these variables added to the environment; return its output as a problem
+    if it fails."""
+    environment = {**os.environ, **(env or {})}
+    done = subprocess.run(
+        command, cwd=cwd, capture_output=True, text=True, check=False, env=environment
+    )
     if done.returncode == 0:
         return []
     return [f"{label}:\n{done.stdout}{done.stderr}".rstrip()]
@@ -139,6 +148,10 @@ def check(app: Path, sources: dict[str, dict[str, str]]) -> list[str]:
     problems += run("shellcheck", ["shellcheck", *scripts], app)
     compose = ["docker", "compose", "--profile", "app", "config", "--quiet"]
     problems += run("compose", compose, app)
+    host = app / "deploy" / "host" / "compose.prod.yaml"
+    if host.exists():
+        overlay = ["docker", "compose", "-f", "compose.yaml", "-f", str(host), *compose[2:]]
+        problems += run("compose, on a single host", overlay, app, {"APP_IMAGE": "app:checked"})
     return problems
 
 
@@ -149,13 +162,14 @@ def main() -> int:
     failures = 0
     with tempfile.TemporaryDirectory() as scratch:
         base = args.keep or Path(scratch)
-        for libraries, evals, access, bridge in VARIANTS:
+        for libraries, evals, access, bridge, hosting in VARIANTS:
             name = (
                 f"{libraries}{'-evals' if evals else ''}{'' if access == 'grantr' else '-open'}"
                 f"{'-unbridged' if libraries == 'both' and not bridge else ''}"
+                f"{'' if hosting == 'none' else f'-{hosting}'}"
             )
             app = base / name
-            commit = render(libraries, evals, access, bridge, app)
+            commit = render(libraries, evals, access, bridge, hosting, app)
             problems = check(app, expected_sources(libraries, evals, access, bridge, commit))
             for problem in problems:
                 print(f"FAIL: {name}: {problem}", file=sys.stderr)

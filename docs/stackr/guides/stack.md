@@ -12,7 +12,8 @@ Each profile is an **adapter set**: the services behind one or more of the ports
 | `langfuse` | Langfuse's web server and worker, ClickHouse, MinIO, Valkey and `db-init` | Evaluation data, and object storage (S3) |
 | `gateway` | The LiteLLM proxy, Valkey and `db-init` | The LLM gateway |
 | `postgres` | Plain PostgreSQL | The database, when `STACKR_DATABASE=postgres` |
-| `smoke` | `telemetrygen`, which the smoke test runs once per signal | None: a tool |
+| `auth` | GoTrue, Supabase's auth server alone, and `db-init` | Identity, on the `postgres` adapter |
+| `smoke` | `telemetrygen`, which the smoke test runs once per signal, and `probe`, the curl its requests run in | None: a tool |
 
 `make up` starts `observability`, `langfuse` and `gateway` unless you choose:
 
@@ -25,6 +26,7 @@ make up PROFILES="observability gateway"  # telemetry and the gateway, with loca
 - **Langfuse receives traces only through the Collector,** so `langfuse` without `observability` starts Langfuse with nothing sending to it. Choose both.
 - **The gateway sends telemetry only when the Collector runs.** `make up` turns the gateway's OpenTelemetry integration off without `observability`, and leaves Langfuse out of the Collector's trace exporters without `langfuse`, so neither logs export errors to a service that isn't there.
 - **`db-init` and Valkey belong to both `langfuse` and `gateway`,** and run once when both are chosen.
+- **`auth` is only started when chosen,** and only on the `postgres` adapter: local Supabase runs its own Auth, so `make up` refuses `auth` beside it. GoTrue signs tokens with the ES256 key set `make env` generates (`AUTH_JWT_KEYS`), serves it at `/.well-known/jwks.json`, and takes `AUTH_SERVICE_ROLE_KEY`, a JWT signed with the same key, on its admin API ([ADR-0026](../adr/0026-the-single-host.md)).
 
 The application template adds a sixth profile, `app`, in the generated application's own `compose.yaml` rather than stackr's ([ADR-0011](../adr/0011-the-application-template-in-detail.md)). [The application template](template.md) covers it.
 
@@ -39,7 +41,7 @@ Langfuse and the gateway keep their data in PostgreSQL, through the database por
 | `supabase` (the default) | Local Supabase's PostgreSQL | `make up`, through the Supabase CLI | `supabase_db_stackr-supabase` | `postgres`, Supabase's fixed local password | 54322 |
 | `postgres` | Plain PostgreSQL, the `postgres` profile | `make up`, through Compose | `postgres` | `POSTGRES_ADMIN_PASSWORD` from `.env` | 55432 |
 
-Either way, `db-init` runs `deploy/postgres/init.sql` on every start, before the services that need it. For Langfuse and the gateway it creates a login role with the password from `.env` (resetting it, so the two stay in step) and a database owned by that role, in UTC. It is idempotent, so a `make up` after `supabase db reset` recreates the databases, empty.
+Either way, `db-init` runs `deploy/postgres/init.sql` on every start, before the services that need it. For Langfuse, the gateway and GoTrue it creates a login role with the password from `.env` (resetting it, so the two stay in step) and a database owned by that role, in UTC. It is idempotent, so a `make up` after `supabase db reset` recreates the databases, empty.
 
 A database only starts with a profile that keeps data in it: `make up PROFILES=observability` starts neither Supabase nor the `postgres` profile. [Local Supabase](supabase.md) covers the default adapter in depth.
 
@@ -80,7 +82,7 @@ Every port the stack publishes binds to `STACKR_BIND`, `127.0.0.1` by default, s
 | `LITELLM_PORT` | 4400 | The gateway |
 | `POSTGRES_PORT` | 55432 | Plain PostgreSQL, with the `postgres` adapter |
 
-ClickHouse, Valkey and the Collector's own metrics aren't published: nothing outside the stack uses them. Local Supabase's ports (54321 to 54324 and 54327) are the CLI's to publish, on every interface; see [Security](security.md).
+ClickHouse, Valkey and the Collector's own metrics aren't published: nothing outside the stack uses them. Local Supabase's ports (54321 to 54324 and 54327) are the CLI's to publish, at `STACKR_BIND` too, through the network `make up` creates for it; see [Security](security.md).
 
 ## Everyday commands
 

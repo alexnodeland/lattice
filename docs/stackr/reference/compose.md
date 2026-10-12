@@ -12,7 +12,8 @@
 | `postgres` | `postgres` | no |
 | `langfuse` | `db-init`, `redis`, `minio`, `clickhouse`, `langfuse-worker`, `langfuse-web` | yes |
 | `gateway` | `db-init`, `redis`, `litellm` | yes |
-| `smoke` | `telemetrygen` | no |
+| `auth` | `db-init`, `gotrue` | no |
+| `smoke` | `telemetrygen`, `probe` | no |
 
 <!-- end generated -->
 
@@ -24,8 +25,8 @@
 
 | Network | Created | Joined by |
 |---|---|---|
-| `stackr` | by Compose | `otel-collector`, `tempo`, `prometheus`, `prom-label-proxy`, `loki`, `pyroscope`, `grafana`, `postgres`, `db-init`, `redis`, `minio`, `clickhouse`, `langfuse-worker`, `langfuse-web`, `litellm`, `telemetrygen` |
-| `supabase_network_stackr-supabase` | by `make up`, if missing | `db-init`, `langfuse-worker`, `langfuse-web`, `litellm` |
+| `stackr` | by Compose | `otel-collector`, `tempo`, `prometheus`, `prom-label-proxy`, `loki`, `pyroscope`, `grafana`, `postgres`, `db-init`, `gotrue`, `redis`, `minio`, `clickhouse`, `langfuse-worker`, `langfuse-web`, `litellm`, `telemetrygen`, `probe` |
+| `supabase_network_stackr-supabase` | by `make up`, if missing | `db-init`, `langfuse-worker`, `langfuse-web`, `litellm`, `probe` |
 
 <!-- end generated -->
 
@@ -212,7 +213,7 @@ Creates each service's role and database on the database adapter, on every start
 
 | Property | Value |
 |---|---|
-| Profiles | `langfuse`, `gateway` |
+| Profiles | `langfuse`, `gateway`, `auth` |
 | Image | `postgres`, pinned by tag and digest in `compose.yaml` |
 | Published ports | none |
 | Networks | `stackr`, `supabase_network_stackr-supabase` |
@@ -233,6 +234,47 @@ Creates each service's role and database on the database adapter, on every start
     | `PGCONNECT_TIMEOUT` | `10` |
     | `LANGFUSE_DB_PASSWORD` | `${LANGFUSE_DB_PASSWORD:?run make env}` |
     | `LITELLM_DB_PASSWORD` | `${LITELLM_DB_PASSWORD:?run make env}` |
+    | `AUTH_DB_PASSWORD` | `${AUTH_DB_PASSWORD:?run make env}` |
+
+### `gotrue`
+
+GoTrue, Supabase's auth server alone: the identity port on the `postgres` adapter, signing tokens with an ES256 key set (RFC-0004).
+
+| Property | Value |
+|---|---|
+| Profiles | `auth` |
+| Image | `supabase/gotrue`, pinned by tag and digest in `compose.yaml` |
+| Published ports | 9999 (`AUTH_PORT`) → 9999 |
+| Networks | `stackr` |
+| Volumes | none |
+| Depends on | `db-init` (completed) |
+| Health check | `wget -q -O /dev/null http://127.0.0.1:9999/health`, every 3s |
+| Restart | `unless-stopped` |
+
+??? note "Environment"
+
+    | Variable | Value |
+    |---|---|
+    | `GOTRUE_API_HOST` | `0.0.0.0` |
+    | `PORT` | `9999` |
+    | `API_EXTERNAL_URL` | `${AUTH_PUBLIC_URL:-http://localhost:9999}` |
+    | `GOTRUE_SITE_URL` | `${AUTH_SITE_URL:-http://localhost:8800}` |
+    | `GOTRUE_DB_DRIVER` | `postgres` |
+    | `GOTRUE_DB_DATABASE_URL` | `postgres://gotrue:${AUTH_DB_PASSWORD:?run make env}@${STACKR_DB_HOST:-postgres}:5432/auth` |
+    | `GOTRUE_JWT_ISSUER` | `${AUTH_PUBLIC_URL:-http://localhost:9999}` |
+    | `GOTRUE_JWT_KEYS` | `${AUTH_JWT_KEYS:?run make env}` |
+    | `GOTRUE_JWT_SECRET` | `${AUTH_JWT_SECRET:?run make env}` |
+    | `GOTRUE_JWT_AUD` | `authenticated` |
+    | `GOTRUE_JWT_DEFAULT_GROUP_NAME` | `authenticated` |
+    | `GOTRUE_JWT_ADMIN_ROLES` | `service_role` |
+    | `GOTRUE_JWT_EXP` | `3600` |
+    | `GOTRUE_EXTERNAL_EMAIL_ENABLED` | `true` |
+    | `GOTRUE_DISABLE_SIGNUP` | `${AUTH_DISABLE_SIGNUP:-true}` |
+    | `GOTRUE_SMTP_HOST` | `${AUTH_SMTP_HOST:-}` |
+    | `GOTRUE_SMTP_PORT` | `${AUTH_SMTP_PORT:-587}` |
+    | `GOTRUE_SMTP_USER` | `${AUTH_SMTP_USER:-}` |
+    | `GOTRUE_SMTP_PASS` | `${AUTH_SMTP_PASSWORD:-}` |
+    | `GOTRUE_SMTP_ADMIN_EMAIL` | `${AUTH_SMTP_SENDER:-}` |
 
 ### `redis`
 
@@ -456,6 +498,19 @@ Sends test telemetry for scripts/smoke; not a service that stays up.
 | Image | `ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen`, pinned by tag and digest in `compose.yaml` |
 | Published ports | none |
 | Networks | `stackr` |
+| Volumes | none |
+| Depends on | none |
+
+### `probe`
+
+curl, for scripts/smoke's requests from inside the stack's networks; not a service that stays up.
+
+| Property | Value |
+|---|---|
+| Profiles | `smoke` |
+| Image | `curlimages/curl`, pinned by tag and digest in `compose.yaml` |
+| Published ports | none |
+| Networks | `stackr`, `supabase_network_stackr-supabase` |
 | Volumes | none |
 | Depends on | none |
 

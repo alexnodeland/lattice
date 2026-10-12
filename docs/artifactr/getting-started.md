@@ -4,7 +4,7 @@ This page builds a small application: a launch plan that a person and an agent w
 
 ## Install
 
-artifactr needs Python 3.12 or newer. It is distributed as `artifactr-ai` and imported as `artifactr`. Until it is published to PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the family's repository:
+artifactr needs Python 3.12 or newer. It is distributed as `artifactr-ai` and imported as `artifactr`. Until it is published to PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the repository every package lives in:
 
 === "uv"
 

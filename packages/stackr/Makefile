@@ -17,6 +17,8 @@ unexport DOCKER_DEFAULT_PLATFORM
 
 # The profiles `make up` starts: all of them unless you choose, for example
 #   make up PROFILES=observability
+# `auth`, GoTrue alone, is the identity port on the postgres adapter, and is
+# only started when chosen: local Supabase runs its own.
 ALL_PROFILES := observability langfuse gateway
 PROFILES ?= $(ALL_PROFILES)
 
@@ -24,7 +26,7 @@ PROFILES ?= $(ALL_PROFILES)
 # STACKR_DATABASE in .env chooses it: supabase (default) or postgres. Profiles
 # that keep data in PostgreSQL bring it up with them.
 STACKR_DATABASE ?= $(or $(shell sed -n 's/^STACKR_DATABASE=//p' .env 2>/dev/null),supabase)
-DATABASE_USERS := langfuse gateway
+DATABASE_USERS := langfuse gateway auth
 NEEDS_DATABASE = $(filter $(DATABASE_USERS),$(PROFILES))
 
 # Local Supabase, run by its CLI: an installed `supabase`, or the pinned
@@ -35,6 +37,10 @@ SUPABASE_NETWORK := supabase_network_$(SUPABASE_PROJECT)
 SUPABASE ?= $(shell command -v supabase 2>/dev/null || echo npx --yes supabase@$(SUPABASE_CLI_VERSION))
 SUPABASE_START_FLAGS ?=
 SUPABASE_RUNNING = $(shell docker ps -q --filter label=com.supabase.cli.project=$(SUPABASE_PROJECT))
+# The CLI publishes Supabase's ports with no address of their own, so they bind where its network
+# says: STACKR_BIND, as every other port does (127.0.0.1 unless you choose).
+STACKR_BIND ?= $(or $(shell sed -n 's/^STACKR_BIND=//p' .env 2>/dev/null),127.0.0.1)
+BINDING := com.docker.network.bridge.host_binding_ipv4
 
 ifeq ($(STACKR_DATABASE),supabase)
 DATABASE_PROFILES :=
@@ -53,6 +59,21 @@ endif
 
 PROFILE_FLAGS = $(foreach profile,$(PROFILES) $(DATABASE_PROFILES),--profile $(profile))
 
+# --- the recipe (RFC-0004) ---------------------------------------------------
+# STACKR_RECIPE in .env: local (default), or host, a single host behind Caddy,
+# whose overlay deploy/host/compose.prod.yaml publishes only Caddy's 80 and 443.
+STACKR_RECIPE ?= $(or $(shell sed -n 's/^STACKR_RECIPE=//p' .env 2>/dev/null),local)
+ifeq ($(STACKR_RECIPE),local)
+COMPOSE_FILES :=
+else ifeq ($(STACKR_RECIPE),host)
+COMPOSE_FILES := -f compose.yaml -f deploy/host/compose.prod.yaml
+# A host's identity is GoTrue: the auth profile starts with the rest.
+ALL_PROFILES += auth
+else
+$(error STACKR_RECIPE must be local or host, not '$(STACKR_RECIPE)')
+endif
+STACK = $(COMPOSE) $(COMPOSE_FILES)
+
 # The Collector sends traces to Langfuse only when the langfuse profile runs,
 # and the gateway sends telemetry only when the Collector runs.
 comma := ,
@@ -61,7 +82,8 @@ GATEWAY_TELEMETRY = $(if $(filter observability,$(PROFILES)),true,false)
 COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEMETRY=$(GATEWAY_TELEMETRY) $(DATABASE_ENV)
 
 # scripts/smoke runs Compose as `make up` does, and the Supabase CLI as make runs it.
-SMOKE = $(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) SUPABASE="$(SUPABASE)" scripts/smoke
+SMOKE = $(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) STACKR_RECIPE=$(STACKR_RECIPE) \
+	STACKR_COMPOSE_FILES="$(COMPOSE_FILES)" SUPABASE="$(SUPABASE)" scripts/smoke
 
 .PHONY: help env up down reset ps logs tenant validate smoke smoke-app docs-reference clean
 
@@ -75,26 +97,40 @@ env: ## Create or update .env, generating local secrets
 	$(UV) run scripts/setup-env
 
 up: .env ## Start the chosen PROFILES (default: all of them), with the database adapter they need
-	@docker network inspect $(SUPABASE_NETWORK) >/dev/null 2>&1 || docker network create $(SUPABASE_NETWORK) >/dev/null
+ifeq ($(STACKR_DATABASE)$(filter auth,$(PROFILES)),supabaseauth)
+	$(error the auth profile is GoTrue for the postgres adapter: local Supabase runs its own Auth)
+endif
+ifeq ($(STACKR_RECIPE)$(STACKR_DATABASE),hostsupabase)
+	$(error a single host runs on the postgres adapter, with the auth profile)
+endif
+ifeq ($(STACKR_RECIPE)$(filter auth,$(PROFILES)),host)
+	$(error a single host needs the auth profile: make up PROFILES="observability langfuse gateway auth")
+endif
+	@bound=$$(docker network inspect -f '{{index .Options "$(BINDING)"}}' $(SUPABASE_NETWORK) 2>/dev/null) || \
+	  { docker network create -o $(BINDING)=$(STACKR_BIND) $(SUPABASE_NETWORK) >/dev/null && bound=$(STACKR_BIND); }; \
+	if [ "$$bound" != "$(STACKR_BIND)" ]; then \
+	  echo "$(SUPABASE_NETWORK) publishes at '$$bound', not STACKR_BIND ($(STACKR_BIND)): make down, then docker network rm $(SUPABASE_NETWORK), then make up" >&2; \
+	  exit 1; \
+	fi
 ifneq ($(strip $(START_SUPABASE)),)
 	$(SUPABASE) start $(SUPABASE_START_FLAGS)
 endif
-	$(COMPOSE_ENV) $(COMPOSE) $(PROFILE_FLAGS) up --detach --wait
+	$(COMPOSE_ENV) $(STACK) $(PROFILE_FLAGS) up --detach --wait
 
 down: ## Stop the stack, keeping its data
-	$(COMPOSE) --profile '*' down
+	$(STACK) --profile '*' down
 	$(if $(SUPABASE_RUNNING),$(SUPABASE) stop)
 
 reset: ## Stop the stack and delete its data volumes, local Supabase's included
-	$(COMPOSE) --profile '*' down --volumes
+	$(STACK) --profile '*' down --volumes
 	$(if $(or $(SUPABASE_RUNNING),$(shell docker volume ls -q --filter label=com.supabase.cli.project=$(SUPABASE_PROJECT))),$(SUPABASE) stop --no-backup)
 	@docker network rm $(SUPABASE_NETWORK) >/dev/null 2>&1 || true
 
 ps: ## Show the stack's containers
-	$(COMPOSE) --profile '*' ps
+	$(STACK) --profile '*' ps
 
 logs: ## Follow the logs of the running services
-	$(COMPOSE) --profile '*' logs --follow --tail=100
+	$(STACK) --profile '*' logs --follow --tail=100
 
 tenant: ## Create a tenant's team and key on the gateway: make tenant NAME=acme [TENANT_FLAGS="--max-budget 20"]
 	@if [ -z "$(NAME)" ]; then echo "usage: make tenant NAME=<tenant> [TENANT_FLAGS=...]"; exit 2; fi
@@ -104,7 +140,7 @@ validate: .env ## Validate every configuration without starting containers, as C
 	scripts/validate
 
 smoke: ## Send test telemetry through the running stack and find it (PROFILES as for up)
-	$(SMOKE) $(PROFILES) $(if $(NEEDS_DATABASE),database)
+	$(SMOKE) $(PROFILES) $(if $(NEEDS_DATABASE),database) $(if $(COMPOSE_FILES),edge)
 
 smoke-app: ## Run an application from the template beside the running stack, and trace its agents
 	$(SMOKE) app

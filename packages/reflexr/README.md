@@ -24,7 +24,7 @@ Most LLM applications start with a person typing. Many useful workflows start wi
 
 ## Install
 
-Python 3.12 or newer. Until reflexr is on PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the family's repository:
+Python 3.12 or newer. Until reflexr is on PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the repository every package lives in:
 
 ```bash
 uv add "reflexr[fastapi] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"
@@ -120,7 +120,7 @@ The documentation is reflexr's section of lattice's site, at **<https://lattice.
 - [Stream protocol v1](https://lattice.alexnodeland.com/reflexr/protocol/): the REST, WebSocket and MCP contracts, with generated JSON Schemas for [the protocol](https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/schemas/reflexr.v1.json) and [rules](https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/schemas/reflexr.rules.v1.json).
 - [Architecture decision records](https://lattice.alexnodeland.com/reflexr/adr/): why each part is the way it is.
 - [RFCs](https://lattice.alexnodeland.com/reflexr/rfcs/): proposals and the v0.1 build plan.
-- [Brand](https://lattice.alexnodeland.com/reflexr/assets/brand/): the mark, colours and type, and how reflexr sits in the family's brand system.
+- [Brand](https://lattice.alexnodeland.com/reflexr/assets/brand/): the mark, colours and type, and how reflexr sits in lattice's brand system.
 
 ## Built on
 

@@ -14,13 +14,23 @@ stackr's defaults are for local development and single hosts: secrets generated 
 
 Every port the stack publishes binds to `STACKR_BIND`, `127.0.0.1` by default, so no service is reachable from another machine unless you choose it ([ADR-0006](../adr/0006-networks-and-published-ports.md)). Services that nothing outside the stack uses (ClickHouse, Valkey, the Collector's own metrics) aren't published at all, and the stack's services reach each other on the `stackr` network by name.
 
-Setting `STACKR_BIND=0.0.0.0` publishes every port on every interface. Before you do, change what is only safe on one machine: put the stack behind a reverse proxy with TLS, and consider which services should be published at all.
+Setting `STACKR_BIND=0.0.0.0` publishes every port on every interface. Don't: to serve users from a machine others can reach, use the [single host](single-host.md) recipe instead.
 
-### The exception: local Supabase
+### On a single host
 
-The Supabase CLI publishes local Supabase's ports (54321 to 54324, and 54327) on every interface, with no setting to bind them to `127.0.0.1` ([ADR-0009](../adr/0009-local-supabase-as-the-database-adapter.md)). Its keys are Supabase's well-known local development keys, and its database password is the fixed `postgres`, so on a machine another computer can reach, anyone who can reach those ports can read and write its database.
+The host recipe ([RFC-0004](../rfcs/0004-hosting-recipes.md), [ADR-0026](../adr/0026-the-single-host.md)) keeps `STACKR_BIND` at `127.0.0.1` and puts Caddy in front:
 
-On a network you don't trust, either block ports 54320 to 54329 with a firewall, or use the plain PostgreSQL adapter (`STACKR_DATABASE=postgres`), whose port binds to `STACKR_BIND` and whose password is generated.
+- **Only Caddy publishes on a public interface,** on 80 and 443, at `STACKR_EDGE_BIND`, with certificates from Let's Encrypt. It is `127.0.0.1` unless chosen, as `STACKR_BIND` is, so a run of the recipe on a workstation opens nothing; `bootstrap` sets `0.0.0.0` on the host users reach. The overlay removes the ports nothing outside the host needs, and pins Grafana's, Langfuse's, LiteLLM's and MinIO's to `127.0.0.1`, for SSH tunnels, whatever `STACKR_BIND` says. `make smoke` checks both.
+- **Docker 28.0 or later.** Before it, machines on the same link could reach ports published on `127.0.0.1`; `bootstrap` refuses an older one.
+- **ufw lets in only SSH, HTTP and HTTPS,** SSH on the ports `sshd` listens on. Docker writes its own iptables rules for published ports, which ufw doesn't see, so a port published on every interface would bypass it: that is why nothing but Caddy may bind one.
+- **GoTrue's admin API isn't public.** Caddy refuses `/admin/*` at `auth.<domain>`; the application's admin commands reach GoTrue on the stack's network, at `AUTH_ADMIN_URL`.
+- **No local Supabase,** whose keys are well known: the host runs on the `postgres` adapter, with GoTrue and generated secrets.
+
+### Local Supabase
+
+The Supabase CLI publishes local Supabase's ports (54321 to 54324, and 54327) with no address of their own, so Docker binds them where their network says. `make up` creates that network to publish at `STACKR_BIND`, so they stay on `127.0.0.1` unless you choose otherwise ([ADR-0028](../adr/0028-local-supabase-on-the-loopback.md)), and `make smoke` checks it. That matters: its keys are Supabase's well-known local development keys, and its database password is the fixed `postgres`.
+
+A network made before this, or for another address, is refused: `make down`, then `docker network rm supabase_network_stackr-supabase`, then `make up`.
 
 ## Who can do what
 

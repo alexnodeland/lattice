@@ -22,7 +22,7 @@ People judge an agent's work in feedback, but only a fraction of it, and only af
 
 ## Install
 
-Python 3.12 or newer. Until evalr is on PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the family's repository:
+Python 3.12 or newer. Until evalr is on PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the repository every package lives in:
 
 ```bash
 uv add "evalr[all] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr"
@@ -108,7 +108,7 @@ The documentation is evalr's section of lattice's site, at **<https://lattice.al
 - [RFCs](https://lattice.alexnodeland.com/evalr/rfcs/): proposals and the v0.1 build plan.
 - [Brand](https://lattice.alexnodeland.com/evalr/assets/brand/): the mark, colours and type.
 
-## The family
+## lattice
 
 evalr is part of a family of packages in [lattice](https://github.com/alexnodeland/lattice): [artifactr](https://lattice.alexnodeland.com/artifactr/) and [reflexr](https://lattice.alexnodeland.com/reflexr/), which record typed feedback from people and depend on evalr through their `[evals]` extras; [relayr](https://lattice.alexnodeland.com/relayr/), the bridge planned between them; and [stackr](https://lattice.alexnodeland.com/stackr/), the infrastructure they run on. evalr imports none of them.
 

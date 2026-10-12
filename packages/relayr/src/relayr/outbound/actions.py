@@ -68,8 +68,12 @@ def rule_actor(rule: RuleName) -> a.ExternalAgentActor:
 
 
 def is_rule_actor(actor: a.Actor) -> bool:
-    """Whether an artifactr actor is a rule's: the actor a rule's runs act as."""
-    return isinstance(actor, a.ExternalAgentActor) and actor.client_id.startswith(RULES)
+    """Whether an artifactr actor is a rule's: the actor a rule's runs act as, for no person."""
+    return (
+        isinstance(actor, a.ExternalAgentActor)
+        and actor.client_id.startswith(RULES)
+        and actor.on_behalf_of is None
+    )
 
 
 class Outbound:

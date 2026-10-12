@@ -290,7 +290,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/grantr/v1/tenants/{tenant}/members/{kind}/{member_id}": {
+    "/grantr/v1/tenants/{tenant}/members/service_principal/{member_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -301,10 +301,30 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Remove Member
-         * @description Remove a member, with its grants, its places in groups and its keys.
+         * Remove Principal
+         * @description Remove a service principal, with its grants, its places in groups and its keys.
          */
-        delete: operations["remove_member_grantr_v1_tenants__tenant__members__kind___member_id__delete"];
+        delete: operations["remove_principal_grantr_v1_tenants__tenant__members_service_principal__member_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/grantr/v1/tenants/{tenant}/members/user/{member_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove User
+         * @description Remove a user, with their grants and their places in groups.
+         */
+        delete: operations["remove_user_grantr_v1_tenants__tenant__members_user__member_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -632,8 +652,7 @@ export interface components {
          * @description The service principal a key is issued to.
          */
         NewKey: {
-            /** Principal */
-            principal: string;
+            principal: components["schemas"]["PrincipalId"];
         };
         /**
          * NewMember
@@ -650,6 +669,7 @@ export interface components {
             owner: components["schemas"]["UserId"];
             tenant: components["schemas"]["TenantId"];
         };
+        PrincipalId: string;
         /**
          * Resource
          * @description A resource, by its kind, its workspace if it is in one, and its id if it is an item.
@@ -760,8 +780,7 @@ export interface components {
          * @description A tenant's non-human principal: an integration, an MCP client or the application.
          */
         ServicePrincipal: {
-            /** Id */
-            id: string;
+            id: components["schemas"]["PrincipalId"];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -1452,13 +1471,44 @@ export interface operations {
             };
         };
     };
-    remove_member_grantr_v1_tenants__tenant__members__kind___member_id__delete: {
+    remove_principal_grantr_v1_tenants__tenant__members_service_principal__member_id__delete: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 tenant: string;
-                kind: "user" | "service_principal";
+                member_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_user_grantr_v1_tenants__tenant__members_user__member_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
                 member_id: string;
             };
             cookie?: never;

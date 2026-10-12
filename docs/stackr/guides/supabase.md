@@ -75,6 +75,19 @@ DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:54322/postgres
 DATABASE_SCHEMA=my_app
 ```
 
+### Row-level security
+
+PostgreSQL can keep tenants apart itself, under the libraries' own scoping ([ADR-0022](../adr/0022-row-level-security-in-the-template.md)). Set `DATABASE_ADMIN_URL` to the tables' owner, and `DATABASE_URL` to a role that owns nothing, which `make db-roles` creates, as the owner, before the application first starts:
+
+```bash
+DATABASE_URL=postgresql+asyncpg://my_app_app:<a password>@127.0.0.1:54322/postgres
+DATABASE_ADMIN_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:54322/postgres
+```
+
+The application then migrates as the owner, granting the role its tables, and works as the role, which sees only the tenant each transaction names. It refuses to start as a role that owns the tables or bypasses row-level security.
+
+In the app profile, `stackr.env` sets `DATABASE_URL` and `DATABASE_ADMIN_URL` from `STACK_DATABASE_URL` and `STACK_DATABASE_ADMIN_URL`, which override `.env`: set those two in `.env` for the application on the stack's network.
+
 ## Sign-in: tokens and keys
 
 Supabase Auth issues each signed-in user an access token, a JWT. The CLI pinned in `versions.env` signs them with an asymmetric key (ES256), and publishes the public key at its JWKS URL; the legacy JWT secret (HS256) signs only the API keys. An application verifies a token against the published keys:

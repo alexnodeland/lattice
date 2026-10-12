@@ -33,5 +33,6 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0025](0025-the-application-lists-tenants-and-workspaces-and-writes-for-code-rules.md) | The application lists tenants and workspaces, and writes for its code rules | Accepted, amended by 0027 |
 | [0026](0026-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted |
 | [0027](0027-the-application-installs-the-rules-people-accept.md) | The application installs the rules people accept | Accepted |
+| [0028](0028-a-principals-id-cant-pass-for-the-libraries-actors.md) | A principal's id can't pass for the libraries' actors | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

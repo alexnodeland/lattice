@@ -192,3 +192,14 @@ async def test_an_owner_restricts_a_thread(client: httpx.AsyncClient) -> None:
         headers=AS_ALICE,
     )
     assert lifted.json()["event"]["type"] == "unrestricted"
+
+
+async def test_a_principal_cant_take_the_libraries_actors_ids(client: httpx.AsyncClient) -> None:
+    spoof = "reflexr:app:triage"
+    member = {"member": {"kind": "service_principal", "id": spoof}}
+    refusals = [
+        await client.post("/tenants/acme/members", json=member, headers=AS_ALICE),
+        await client.post("/tenants/acme/keys", json={"principal": spoof}, headers=AS_ALICE),
+        await client.delete(f"/tenants/acme/members/service_principal/{spoof}", headers=AS_ALICE),
+    ]
+    assert [refused.status_code for refused in refusals] == [422, 422, 422]

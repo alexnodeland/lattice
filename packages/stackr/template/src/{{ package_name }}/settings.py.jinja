@@ -82,6 +82,9 @@ class Settings:
             memory and are gone when the process stops.
         database_schema: The PostgreSQL schema the libraries' tables live in. A schema of its
             own keeps them out of ``public``, which Supabase's Data API serves.
+        database_admin_url: The tables' owner, on the same database: with it, PostgreSQL keeps
+            tenants apart itself, and ``database_url`` connects as a role that owns nothing,
+            which ``make db-roles`` creates.
         auth: How access tokens are verified.
         gateway: How agents reach models.
         telemetry: Whether to export OpenTelemetry, to ``OTEL_EXPORTER_OTLP_ENDPOINT``.
@@ -95,12 +98,15 @@ class Settings:
     port: int = {{ app_port }}
     database_url: str | None = None
     database_schema: str = "{{ package_name }}"
+    database_admin_url: str | None = None
     auth: AuthSettings = field(default_factory=AuthSettings)
     gateway: GatewaySettings = field(default_factory=GatewaySettings)
     telemetry: bool = False
     langfuse: bool = False
 
     def __post_init__(self) -> None:
+        if self.database_admin_url and not self.database_url:
+            raise ValueError("DATABASE_ADMIN_URL needs DATABASE_URL: the role the app works as")
         if not SCHEMA_NAME.match(self.database_schema):
             raise ValueError(
                 f"DATABASE_SCHEMA must be a lowercase identifier, not {self.database_schema!r}"
@@ -137,6 +143,7 @@ class Settings:
             port=int(env.get("APP_PORT", cls.port)),
             database_url=env.get("DATABASE_URL"),
             database_schema=env.get("DATABASE_SCHEMA", cls.database_schema),
+            database_admin_url=env.get("DATABASE_ADMIN_URL"),
             auth=auth,
             gateway=gateway,
             telemetry="OTEL_EXPORTER_OTLP_ENDPOINT" in env,

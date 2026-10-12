@@ -1,16 +1,28 @@
 """The deployment's own commands, on a SQLite database, with Supabase Auth's admin API faked."""
 
+import base64
+import hashlib
+import hmac
 import json
 import threading
 from collections.abc import Iterator
+from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+from sqlalchemy import Connection
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import create_async_engine
 
-from {{ package_name }}.admin import Users, main, run
+from grantr import Invalid
+
+import {{ package_name }}.admin as admin
+from {{ package_name }}.admin import Users, create_role, main, run, scram_verifier
 from {{ package_name }}.settings import AuthSettings, Settings
 
 from conftest import SECRET
@@ -120,6 +132,61 @@ async def test_the_commands_need_a_database() -> None:
         await run(["migrate-tenants"], Settings())
 
 
+async def test_the_commands_work_with_the_two_engines(config: Settings) -> None:
+    owned = replace(config, database_admin_url=config.database_url)
+    assert await run(["tenant", "acme", "u-bob"], owned) == "created acme, owned by u-bob"
+
+
+APP = "postgresql+asyncpg://my_app:secret@db/postgres"
+OWNER = "postgresql+asyncpg://postgres:postgres@db/postgres"
+
+
+@pytest.mark.parametrize(
+    "unready",
+    [
+        Settings(database_url=APP),
+        Settings(database_url=APP, database_admin_url="sqlite+aiosqlite:///app.db"),
+        Settings(database_url="postgresql+asyncpg://db/postgres", database_admin_url=OWNER),
+        Settings(database_url=OWNER, database_admin_url=OWNER),
+    ],
+    ids=["no owner", "not postgresql", "no role", "the owner itself"],
+)
+async def test_db_roles_needs_postgresql_and_a_role_of_its_own(unready: Settings) -> None:
+    with pytest.raises(SystemExit):
+        await run(["db-roles"], unready)
+
+
+async def test_db_roles_creates_the_role_as_the_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    created: list[tuple[str, str, str]] = []
+    sqlite = f"sqlite+aiosqlite:///{tmp_path / 'app.db'}"
+    monkeypatch.setattr(admin, "create_async_engine", lambda url: create_async_engine(sqlite))
+    monkeypatch.setattr(admin, "create_role", lambda _, *arguments: created.append(arguments))
+    done = await run(["db-roles"], Settings(database_url=APP, database_admin_url=OWNER))
+    assert done == "my_app can connect: start the application to grant it the tables"
+    assert created == [("my_app", "secret", "{{ package_name }}")]
+
+
+async def test_db_roles_says_what_failed_and_not_what_it_sent() -> None:
+    unreachable = "postgresql+asyncpg://postgres:postgres@127.0.0.1:1/postgres"
+    with pytest.raises(Invalid, match="PostgreSQL couldn't be reached") as refused:
+        await run(["db-roles"], Settings(database_url=APP, database_admin_url=unreachable))
+    assert "secret" not in str(refused.value)
+
+
+async def test_db_roles_says_what_postgresql_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(*arguments: object) -> None:
+        raise DBAPIError("ALTER ROLE my_app PASSWORD 'SCRAM-SHA-256$...'", None, ValueError("no"))
+
+    sqlite = "sqlite+aiosqlite://"
+    monkeypatch.setattr(admin, "create_async_engine", lambda url: create_async_engine(sqlite))
+    monkeypatch.setattr(admin, "create_role", refuse)
+    with pytest.raises(Invalid, match="PostgreSQL refused the role: ValueError") as refused:
+        await run(["db-roles"], Settings(database_url=APP, database_admin_url=OWNER))
+    assert "SCRAM" not in str(refused.value)
+
+
 def test_main_prints_the_outcome_or_why_it_failed(
     config: Settings,
     monkeypatch: pytest.MonkeyPatch,
@@ -133,3 +200,80 @@ def test_main_prints_the_outcome_or_why_it_failed(
     assert capsys.readouterr().out == "u-alice is the deployment's operator\n"
     with pytest.raises(SystemExit, match="has an operator already"):
         main()
+
+
+class Recorder:
+    """Stands in for a connection to PostgreSQL: it records what it is asked to run."""
+
+    dialect = postgresql.dialect()
+
+    def __init__(self, *, found: bool = False, exempt: bool = False) -> None:
+        self.answers = iter([1 if found else None, exempt])
+        self.executed: list[str] = []
+
+    def scalar(self, statement: object, parameters: dict[str, str]) -> object:
+        assert parameters["role"] == "my app"
+        return next(self.answers)
+
+    def exec_driver_sql(self, statement: str) -> None:
+        self.executed.append(statement)
+
+
+@pytest.mark.parametrize(("found", "verb"), [(False, "CREATE"), (True, "ALTER")])
+def test_the_role_is_created_or_its_password_set(found: bool, verb: str) -> None:
+    recorder = Recorder(found=found)
+    create_role(cast(Connection, recorder), "my app", "it's secret", "app")
+    [statement] = recorder.executed
+    assert statement.startswith(f'{verb} ROLE "my app" LOGIN PASSWORD \'SCRAM-SHA-256$4096:')
+    assert "secret" not in statement, "only the password's verifier is sent"
+
+
+def test_a_role_that_row_level_security_doesnt_hold_is_refused() -> None:
+    with pytest.raises(Invalid, match="bypasses row-level security"):
+        create_role(cast(Connection, Recorder(exempt=True)), "my app", "secret", "app")
+
+
+RFC_7677 = SimpleNamespace(
+    salt="W22ZaJ0SNY7soEsUEjb6gQ==",
+    auth=(
+        "n=user,r=rOprNGfwEbeRWgbNEkqO,"
+        "r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096,"
+        "c=biws,r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0"
+    ),
+    proof="dHzbZapWIk4jUhN+Ute9ytag9zjfMHgsqmmiz7AndVQ=",
+    signature="6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4=",
+)
+"""RFC 7677's exchange: the password "pencil", the client's proof and the server's signature."""
+
+
+def test_the_verifier_checks_rfc_7677s_exchange() -> None:
+    verifier = scram_verifier("pencil", salt=base64.b64decode(RFC_7677.salt))
+    method, rest = verifier.split("$", 1)
+    iterations_salt, keys = rest.split("$")
+    assert (method, iterations_salt) == ("SCRAM-SHA-256", f"4096:{RFC_7677.salt}")
+    stored, server = (base64.b64decode(key) for key in keys.split(":"))
+    auth = RFC_7677.auth.encode()
+    assert hmac.digest(server, auth, "sha256") == base64.b64decode(RFC_7677.signature)
+    signature = hmac.digest(stored, auth, "sha256")
+    client = bytes(a ^ b for a, b in zip(base64.b64decode(RFC_7677.proof), signature, strict=True))
+    assert hashlib.sha256(client).digest() == stored, "the client's proof verifies"
+    assert scram_verifier("pencil") != scram_verifier("pencil"), "each has a salt of its own"
+
+
+@pytest.mark.parametrize("password", ["pässword", "tab\there"])
+def test_a_password_saslprep_would_change_is_refused(password: str) -> None:
+    with pytest.raises(Invalid, match="printable ASCII"):
+        scram_verifier(password)
+
+
+def test_main_says_what_the_database_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def refused(arguments: object, settings: object) -> str:
+        raise DBAPIError("ALTER ROLE app PASSWORD 'secret'", None, ValueError("denied"))
+
+    monkeypatch.setattr(admin, "run", refused)
+    monkeypatch.setattr("sys.argv", ["admin", "db-roles"])
+    with pytest.raises(SystemExit, match="the database refused: ValueError") as exited:
+        main()
+    assert "secret" not in str(exited.value)

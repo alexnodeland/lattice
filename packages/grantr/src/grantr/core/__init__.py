@@ -23,7 +23,7 @@ from grantr.core.audit import (
 )
 from grantr.core.errors import Forbidden, GrantrError, Invalid
 from grantr.core.grants import Grant, Membership, Visibility, memberships
-from grantr.core.ids import TENANT_ID, TenantId, UserId, WorkspaceId
+from grantr.core.ids import PRINCIPAL_ID, TENANT_ID, PrincipalId, TenantId, UserId, WorkspaceId
 from grantr.core.keys import Key, issue, key_id, verify
 from grantr.core.resources import (
     DEPLOYMENT,
@@ -62,6 +62,7 @@ __all__ = [
     "ITEMS",
     "MEMBER",
     "OPERATOR",
+    "PRINCIPAL_ID",
     "TENANT",
     "TENANT_ID",
     "Agent",
@@ -86,6 +87,7 @@ __all__ = [
     "MemberAdded",
     "MemberRemoved",
     "Membership",
+    "PrincipalId",
     "Resource",
     "ResourceKind",
     "Restricted",

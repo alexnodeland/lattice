@@ -82,7 +82,7 @@ jobs:
   links:
     name: Links
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:

@@ -26,6 +26,7 @@ make check          # lint, types and tests, as its CI runs them
 | `evals` | Yes | An `evals/` directory with starter evalr experiments |
 | `bridge` | Yes | With both libraries: relayr's bridge between them, and its incident timeline example |
 | `access` | `grantr` | `grantr`: tenants, members, roles and keys, and every command and read checked; or `none`: the tenant from the token, and every user of a tenant may do anything in it |
+| `hosting` | `none` | `none`, or `host`: an overlay, `deploy/host/compose.prod.yaml`, that runs the application's published image behind stackr's edge on a [single host](single-host.md) |
 | `python_version` | 3.12 | 3.12, 3.13 or 3.14 |
 | `app_port` | 8800 | The port the application is published on, on this machine |
 
@@ -67,7 +68,7 @@ The application reads the stack's ports from its environment ([`settings.py`](ht
 |---|---|
 | Telemetry | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_METRIC_EXPORT_INTERVAL` |
 | Database | `DATABASE_URL`, `DATABASE_SCHEMA`, `DATABASE_ADMIN_URL` for row-level security |
-| Identity | `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWT_SECRET`; `AUTH_SERVICE_ROLE_KEY` with grantr, for its commands to find users by email; `AUTH_TENANT_CLAIM` without |
+| Identity | `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWT_SECRET`; `AUTH_SERVICE_ROLE_KEY` with grantr, for its commands to find users by email, at `AUTH_ADMIN_URL` when the admin API isn't at the issuer; `AUTH_TENANT_CLAIM` without |
 | LLM gateway | `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `LITELLM_TENANT_KEYS`, `LITELLM_MODEL`, `LITELLM_GUARDRAILS` |
 | Evaluation data | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` |
 

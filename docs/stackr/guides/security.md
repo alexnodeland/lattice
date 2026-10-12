@@ -14,7 +14,16 @@ stackr's defaults are for local development and single hosts: secrets generated 
 
 Every port the stack publishes binds to `STACKR_BIND`, `127.0.0.1` by default, so no service is reachable from another machine unless you choose it ([ADR-0006](../adr/0006-networks-and-published-ports.md)). Services that nothing outside the stack uses (ClickHouse, Valkey, the Collector's own metrics) aren't published at all, and the stack's services reach each other on the `stackr` network by name.
 
-Setting `STACKR_BIND=0.0.0.0` publishes every port on every interface. Before you do, change what is only safe on one machine: put the stack behind a reverse proxy with TLS, and consider which services should be published at all.
+Setting `STACKR_BIND=0.0.0.0` publishes every port on every interface. Don't: to serve users from a machine others can reach, use the [single host](single-host.md) recipe instead.
+
+### On a single host
+
+The host recipe ([RFC-0004](../rfcs/0004-hosting-recipes.md), [ADR-0026](../adr/0026-the-single-host.md)) keeps `STACKR_BIND` at `127.0.0.1` and puts Caddy in front:
+
+- **Only Caddy publishes on a public interface,** on 80 and 443, with certificates from Let's Encrypt. Its overlay removes the ports nothing outside the host needs, and keeps Grafana's, Langfuse's, LiteLLM's and MinIO's on `127.0.0.1`, for SSH tunnels. `make smoke` checks that no other service publishes outside the loopback.
+- **ufw lets in only SSH, HTTP and HTTPS.** Docker writes its own iptables rules for published ports, which ufw doesn't see, so a port published on every interface would bypass it: that is why nothing but Caddy may bind one.
+- **GoTrue's admin API isn't public.** Caddy refuses `/admin/*` at `auth.<domain>`; the application's admin commands reach GoTrue on the stack's network, at `AUTH_ADMIN_URL`.
+- **No local Supabase,** whose keys are well known: the host runs on the `postgres` adapter, with GoTrue and generated secrets.
 
 ### The exception: local Supabase
 

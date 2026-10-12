@@ -222,9 +222,22 @@ jobs:
           - name: everything on PostgreSQL
             profiles: observability langfuse gateway
             database: postgres
+          # stackr RFC-0004's single host: behind Caddy, with its own CA, on PostgreSQL with
+          # GoTrue, and an application from the template's hosting: host.
+          - name: a single host, behind Caddy, and an application
+            profiles: observability langfuse gateway auth
+            database: postgres
+            recipe: host
+            app: true
     env:
       PROFILES: ${{ matrix.profiles }}
       STACKR_DATABASE: ${{ matrix.database }}
+      STACKR_RECIPE: ${{ matrix.recipe || 'local' }}
+      # The single host's settings, which its bootstrap would write to .env; empty elsewhere.
+      STACKR_DOMAIN: ${{ matrix.recipe == 'host' && 'stackr.test' || '' }}
+      CADDY_TLS: ${{ matrix.recipe == 'host' && 'tls internal' || '' }}
+      AUTH_PUBLIC_URL: ${{ matrix.recipe == 'host' && 'https://auth.stackr.test' || '' }}
+      AUTH_SITE_URL: ${{ matrix.recipe == 'host' && 'https://app.stackr.test' || '' }}
       # Local Supabase without the services the smoke test doesn't use.
       SUPABASE_START_FLAGS: >-
         -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta,storage-api,postgrest
@@ -252,7 +265,9 @@ jobs:
         working-directory: packages/stackr
         run: |
           docker ps -a
-          docker compose --profile '*' logs --no-color --tail=200
+          files=()
+          if [[ $STACKR_RECIPE == host ]]; then files=(-f compose.yaml -f deploy/host/compose.prod.yaml); fi
+          docker compose "${files[@]}" --profile '*' logs --no-color --tail=200
       - name: Stop the stack
         if: always() && hashFiles('packages/stackr/.env') != ''
         working-directory: packages/stackr

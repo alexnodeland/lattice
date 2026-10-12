@@ -50,11 +50,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# A setting from .env, or from .env.example where .env leaves it unset or empty, as
-# scripts/_env.py reads them.
+# A setting as Compose reads it: from the environment, then .env, then .env.example, each where
+# the one before leaves it unset or empty.
 setting() {
-  local value
-  value=$(sed -n "s/^$1=//p" .env 2>/dev/null | tail -n 1)
+  local value=${!1:-}
+  [[ -n $value ]] || value=$(sed -n "s/^$1=//p" .env 2>/dev/null | tail -n 1)
   [[ -n $value ]] || value=$(sed -n "s/^$1=//p" .env.example | tail -n 1)
   printf '%s' "$value"
 }

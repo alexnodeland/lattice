@@ -18,6 +18,7 @@ import artifactr.agent
 import artifactr.core as a
 import artifactr.workspace
 import reflexr
+import reflexr.core
 import reflexr.workspace as r
 from relayr.events import BRIDGED, MessagePosted, Projections
 from relayr.inbound import Followers
@@ -101,6 +102,8 @@ class Stack:
         artifactr_authorize: artifactr.workspace.Authorize | None = None,
         rules: Sequence[reflexr.Rule] = (GREET,),
         actions: Actions | None = None,
+        more_actions: Callable[[Outbound, artifactr.Workspaces], Actions] | None = None,
+        stored_rules: reflexr.core.StoredRules | None = None,
         allowlists: Mapping[str, Allowlist] | None = None,
         runner: artifactr.agent.Runner[None] | None = None,
         max_depth: int = 8,
@@ -128,6 +131,7 @@ class Stack:
             rules=rules,
             authorize=authorize,
             max_depth=max_depth,
+            stored_rules=stored_rules,
             on_open=on_open,
             tracer_provider=tracer_provider,
         )
@@ -146,7 +150,10 @@ class Stack:
         outbound = Outbound(collaboration, ledger, allowlists=allowlists, runner=runner)
         reactor = r.Reactor(
             automation,
-            actions=actions or {"greet": greet},
+            actions={
+                **(actions or {"greet": greet}),
+                **(more_actions(outbound, collaboration) if more_actions else {}),
+            },
             deps=outbound,
             run_context=run_context,
         )

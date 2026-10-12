@@ -37,6 +37,10 @@ SUPABASE_NETWORK := supabase_network_$(SUPABASE_PROJECT)
 SUPABASE ?= $(shell command -v supabase 2>/dev/null || echo npx --yes supabase@$(SUPABASE_CLI_VERSION))
 SUPABASE_START_FLAGS ?=
 SUPABASE_RUNNING = $(shell docker ps -q --filter label=com.supabase.cli.project=$(SUPABASE_PROJECT))
+# The CLI publishes Supabase's ports with no address of their own, so they bind where its network
+# says: STACKR_BIND, as every other port does (127.0.0.1 unless you choose).
+STACKR_BIND ?= $(or $(shell sed -n 's/^STACKR_BIND=//p' .env 2>/dev/null),127.0.0.1)
+BINDING := com.docker.network.bridge.host_binding_ipv4
 
 ifeq ($(STACKR_DATABASE),supabase)
 DATABASE_PROFILES :=
@@ -102,7 +106,12 @@ endif
 ifeq ($(STACKR_RECIPE)$(filter auth,$(PROFILES)),host)
 	$(error a single host needs the auth profile: make up PROFILES="observability langfuse gateway auth")
 endif
-	@docker network inspect $(SUPABASE_NETWORK) >/dev/null 2>&1 || docker network create $(SUPABASE_NETWORK) >/dev/null
+	@bound=$$(docker network inspect -f '{{index .Options "$(BINDING)"}}' $(SUPABASE_NETWORK) 2>/dev/null) || \
+	  { docker network create -o $(BINDING)=$(STACKR_BIND) $(SUPABASE_NETWORK) >/dev/null && bound=$(STACKR_BIND); }; \
+	if [ "$$bound" != "$(STACKR_BIND)" ]; then \
+	  echo "$(SUPABASE_NETWORK) publishes at '$$bound', not STACKR_BIND ($(STACKR_BIND)): make down, then docker network rm $(SUPABASE_NETWORK), then make up" >&2; \
+	  exit 1; \
+	fi
 ifneq ($(strip $(START_SUPABASE)),)
 	$(SUPABASE) start $(SUPABASE_START_FLAGS)
 endif

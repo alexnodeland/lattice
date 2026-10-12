@@ -53,6 +53,7 @@ nav:
     - adr/0023-opentofu-for-aws-now.md
     - adr/0025-what-the-floci-spike-found.md
     - adr/0026-the-single-host.md
+    - adr/0028-local-supabase-on-the-loopback.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

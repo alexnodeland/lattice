@@ -33,6 +33,7 @@ sql = ["sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
 sqlite = ["relayr-ai[sql]", "aiosqlite>=0.22"]
 postgres = ["relayr-ai[sql]", "asyncpg>=0.31"]
 otel = ["opentelemetry-sdk>=1.45"]
+evals = ["evalr>=0.1.0.dev0"]
 langfuse = [
     "langfuse>=4.15,<5",
     "artifactr-ai[langfuse]>=0.1.0",

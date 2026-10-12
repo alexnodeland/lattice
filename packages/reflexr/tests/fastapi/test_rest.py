@@ -509,3 +509,11 @@ async def test_without_stored_rules_every_change_is_forbidden(app: App) -> None:
         403,
         {"type": "forbidden", "message": "stored rules are off in these workspaces"},
     )
+
+
+@pytest.mark.parametrize("path", ["/rules", "/schedules", "/workspaces/w1/runs"])
+async def test_a_caller_the_resolver_refuses_is_answered_403_not_500(
+    client: httpx.AsyncClient, path: str
+) -> None:
+    refused = await client.get(path, headers={"x-token": "stranger"})
+    assert (refused.status_code, refused.json()["detail"]["type"]) == (403, "forbidden")

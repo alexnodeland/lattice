@@ -40,7 +40,7 @@ The router needs no lifespan of its own, but the runner does. Keep one `Workspac
 
 ## Authentication and authorization
 
-Authentication is your application's. `resolve_actor` receives the `HTTPConnection` of each REST request, and of each WebSocket before it is accepted, and returns the tenant and the actor. It can read headers, cookies or query parameters; browsers cannot set headers on a WebSocket, so a cookie or a short-lived token in the query string is usual there. Raise `Unauthorized` to refuse: REST answers 401, and the WebSocket is closed with code 4401.
+Authentication is your application's. `resolve_actor` receives the `HTTPConnection` of each REST request, and of each WebSocket before it is accepted, and returns the tenant and the actor. It can read headers, cookies or query parameters; browsers cannot set headers on a WebSocket, so a cookie or a short-lived token in the query string is usual there. Raise `Unauthorized` to refuse: REST answers 401, and the WebSocket is closed with code 4401. Raise `Forbidden` for a caller who is signed in but may not be served, such as one outside the tenant it names: 403, and 4403. An `HTTPException` it raises answers with its status, and closes the WebSocket with 4000 and the status.
 
 The actor always comes from `resolve_actor`, never from the client's frames, so a client cannot act as someone else.
 

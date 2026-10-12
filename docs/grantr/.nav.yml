@@ -33,6 +33,7 @@ nav:
   - adr/0026-row-level-security-under-the-scoping.md
   - adr/0027-the-application-installs-the-rules-people-accept.md
   - adr/0028-a-principals-id-cant-pass-for-the-libraries-actors.md
+  - adr/0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

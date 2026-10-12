@@ -10,7 +10,7 @@ same result.
 """
 
 import secrets
-from typing import Annotated
+from typing import Annotated, Final
 
 from pydantic import StringConstraints
 
@@ -74,3 +74,7 @@ def new_proposal_id() -> ProposalId:
 def new_message_id() -> MessageId:
     """Return a new message identifier."""
     return new_id("msg")
+
+
+SCRATCH_TAG: Final = "scratch"
+"""Scratch: a name only this commit adds, for the template to use (dropped before merge)."""

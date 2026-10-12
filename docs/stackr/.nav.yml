@@ -50,6 +50,7 @@ nav:
     - adr/0021-the-bridge-in-the-template.md
     - adr/0022-row-level-security-in-the-template.md
     - adr/0023-opentofu-for-aws-now.md
+    - adr/0025-what-the-floci-spike-found.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

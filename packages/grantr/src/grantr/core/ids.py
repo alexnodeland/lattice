@@ -16,6 +16,14 @@ type TenantId = Annotated[str, StringConstraints(pattern=TENANT_ID.pattern)]
 """The isolation boundary, as the libraries name it: not empty, and with no ``~``, which
 grantr's storage keeps for the deployment."""
 
+PRINCIPAL_ID: Final = re.compile(r"^[^:~\s]+$")
+"""A service principal's id's form."""
+
+type PrincipalId = Annotated[str, StringConstraints(pattern=PRINCIPAL_ID.pattern)]
+"""A service principal: not empty, and with no ``:``, ``~`` or whitespace. The ids the
+libraries' own actors take hold a ``:``, as relayr's code rules' do (``reflexr:<rule>``), so no
+principal a tenant makes, and no key it issues, can pass for one (grantr ADR-0028)."""
+
 type WorkspaceId = str
 """A workspace in a tenant, as the libraries name it."""
 

@@ -9,7 +9,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from grantr.core.ids import UserId, WorkspaceId
+from grantr.core.ids import PrincipalId, UserId, WorkspaceId
 
 
 class User(BaseModel):
@@ -27,7 +27,7 @@ class ServicePrincipal(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     kind: Literal["service_principal"] = "service_principal"
-    id: str
+    id: PrincipalId
 
 
 class RulePrincipal(BaseModel):

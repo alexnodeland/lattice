@@ -32,6 +32,7 @@ nav:
   - adr/0025-the-application-lists-tenants-and-workspaces-and-writes-for-code-rules.md
   - adr/0026-row-level-security-under-the-scoping.md
   - adr/0027-the-application-installs-the-rules-people-accept.md
+  - adr/0028-a-principals-id-cant-pass-for-the-libraries-actors.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

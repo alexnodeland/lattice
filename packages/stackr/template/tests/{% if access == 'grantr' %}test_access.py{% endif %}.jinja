@@ -18,6 +18,9 @@ import pytest
 from fastapi.testclient import TestClient
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
+{%- if use_relayr %}
+from pydantic import ValidationError
+{%- endif %}
 {%- if use_artifactr %}
 from pydantic_ai import RetryPromptPart, ToolReturnPart
 {%- endif %}
@@ -35,6 +38,9 @@ from grantr import Agent, Grants, Resource, {% if use_reflexr %}RulePrincipal, {
 from grantr.testing import matrix
 {% if use_reflexr -%}
 from reflexr import core as reflexr
+{% endif -%}
+{% if use_relayr -%}
+from relayr.outbound import rule_actor
 {% endif %}
 from {{ package_name }}.access import CATALOGS, Access, Refused
 from {{ package_name }}.auth import Principal, TokenVerifier, Unauthenticated
@@ -168,6 +174,15 @@ async def test_a_key_is_its_tenants_and_no_others() -> None:
         ),
         (artifactr.SystemActor(), APPLICATION),
         (artifactr.EvaluatorActor(name="judge", version="1"), APPLICATION),
+{%- if use_relayr %}
+        (rule_actor(TRIAGE), APPLICATION),
+        (rule_actor("ops:stored"), RulePrincipal(workspace="main", rule="ops:stored")),
+        (
+            rule_actor(TRIAGE).model_copy(update={"on_behalf_of": artifactr.UserActor(id="bob")}),
+            User(id="bob"),
+        ),
+{%- endif %}
+        (artifactr.ExternalAgentActor(client_id="a:b"), Agent()),
         (User(id="not-an-actor"), Agent()),
     ],
 )
@@ -175,6 +190,40 @@ def test_artifactrs_actors_are_checked_as_who_they_act_for(
     actor: artifactr.Actor, subject: Any
 ) -> None:
     assert access(seeded()).artifactr_subject(TENANT, "main", actor) == subject
+{%- if use_relayr %}
+
+
+def test_a_stored_rules_actor_outside_a_workspace_holds_nothing() -> None:
+    assert access(seeded()).artifactr_subject(TENANT, None, rule_actor("ops:stored")) == Agent()
+{%- endif %}
+
+
+{%- if use_relayr %}
+
+
+def test_a_key_cant_pass_for_a_code_rule() -> None:
+    """No principal can take a code rule's id, so no key acts as one (grantr ADR-0028)."""
+    with pytest.raises(ValidationError):
+        ServicePrincipal(id=rule_actor(TRIAGE).client_id)
+
+
+async def test_a_key_issued_over_the_api_acts_as_its_principal_not_the_application() -> None:
+    grants = seeded()
+    await grants.add_member(TENANT, ServicePrincipal(id="ci"), by=User(id="alice"))
+    async with (
+        serving(app(Script(), grants=grants)) as server,
+        httpx.AsyncClient(base_url=server) as client,
+    ):
+        keys = f"/grantr/v1/tenants/{TENANT}/keys"
+        spoof = {"principal": rule_actor(TRIAGE).client_id}
+        assert (await client.post(keys, json=spoof, headers=signed())).status_code == 422
+        issued = await client.post(keys, json={"principal": "ci"}, headers=signed())
+        key = issued.json()["key"]
+        threads = await client.get(
+            f"{WORKSPACE}/threads", headers={"Authorization": f"Bearer {key}"}
+        )
+        assert threads.status_code == 403, "ci, a member with no role, isn't the application"
+{%- endif %}
 
 
 async def test_a_restricted_thread_is_absent_from_every_surface_for_a_non_member() -> None:
@@ -293,6 +342,7 @@ async def post(client: httpx.AsyncClient, headers: dict[str, str], **command: An
             RulePrincipal(workspace="main", rule="ops:stored"),
         ),
         (reflexr.EvaluatorActor(name="judge", version="1"), APPLICATION),
+        (reflexr.ExternalAgentActor(client_id="a:b"), Agent()),
         (User(id="not-an-actor"), Agent()),
     ],
 )

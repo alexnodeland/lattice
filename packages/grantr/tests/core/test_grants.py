@@ -10,6 +10,7 @@ from grantr.core import (
     Membership,
     Resource,
     Role,
+    ServicePrincipal,
     User,
     memberships,
 )
@@ -58,3 +59,9 @@ def test_memberships_are_a_users_own_tenant_grants_by_tenant() -> None:
         Membership(tenant="acme", user="bob", roles=("member", "owner")),
         Membership(tenant="globex", user="bob", roles=("member",)),
     ]
+
+
+@pytest.mark.parametrize("id", ["reflexr:app:triage", "a:b", "~deployment", "with space", ""])
+def test_a_service_principal_cant_pass_for_the_libraries_own_actors(id: str) -> None:
+    with pytest.raises(ValidationError):
+        ServicePrincipal(id=id)

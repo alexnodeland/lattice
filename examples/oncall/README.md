@@ -200,7 +200,7 @@ Every command takes `--url` (default `http://127.0.0.1:8000`), `--workspace` (de
   curl -H 'x-user: alice' -H 'content-type: application/json' \
     localhost:8000/v1/workspaces/prod/commands -d '{
     "type": "command", "command_id": "install-checkout-deploys",
-    "command": {"type": "install_rule", "rule": {
+    "command": {"type": "install_rule", "provenance": {"requested_by": "alice"}, "rule": {
       "name": "team:checkout-deploys",
       "description": "Tell the person on call for checkout whenever it is deployed.",
       "when": {

@@ -40,6 +40,7 @@ async def command(client: httpx.AsyncClient, command_id: str, **body: Any) -> di
     """Send one command over REST and return its result."""
     frame = {"type": "command", "command_id": command_id, "command": body}
     response = await client.post(f"{BASE}/commands", json=frame)
+    assert response.status_code == 200, response.text
     return response.json()
 
 

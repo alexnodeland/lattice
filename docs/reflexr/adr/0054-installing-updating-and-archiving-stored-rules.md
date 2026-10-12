@@ -30,7 +30,7 @@ reflexr already has what a change needs: core's `begin` and `reset`, generations
 - **A run executes the current version,** read when it is claimed, as for code rules.
 - **Duplicates and conflicts.** A change whose result equals the current version appends nothing and answers `duplicate: true`. That is checked before `expected_version`, so a retry of a change that succeeded is a duplicate, not a conflict. `expected_version` is optimistic concurrency: a rule at another version is `invalid_state`, naming its version.
 - **Provenance is an opaque JSON map,** at most 4 KiB, kept on the row and on each fact. reflexr doesn't read it. Who made the change is the envelope's actor.
-- **Archiving is the only way to stop.** Stored rules are always enabled, unordered and never block on a dead letter, so `due_runs`, `RunPolicy` and their schema stay as they are: a rule the policy doesn't name has all its due runs returned, which is right for an unordered, enabled rule. Archiving cancels the rule's unfinished runs with core's `cancel` and clears its scope states, in its own transaction. Its progress row stays.
+- **Archiving is the only way to stop.** Stored rules are always enabled, unordered and never block on a dead letter, so `due_runs`, `RunPolicy` and their schema stay as they are: a rule the policy doesn't name has all its due runs returned, which is right for an unordered, enabled rule. Archiving cancels the rule's unfinished runs with core's `cancel` and clears its scope states, in the same transaction as its fact. Its progress row stays.
 
 ## Options considered
 

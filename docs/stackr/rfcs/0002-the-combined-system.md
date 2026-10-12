@@ -356,7 +356,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 | `traceparent` on artifactr envelopes | artifactr | [#60][a-60] | phase 4, for links in the artifactr-to-reflexr direction | tags only, in that direction |
 | Durable message idempotency: core checks `message_id` | artifactr | [#61][a-61] | phase 2 | the ledger's read-back |
 | Reserved publishers: a type only one source (or runs) may publish | reflexr | [#72][r-72] | phase 5 | bridge rules check the envelope's actor, and re-read artifactr |
-| Workspace discovery: list a tenant's workspaces | artifactr | [#62][a-62] | phase 3 | followers start on first use, and resume from the ledger |
+| Workspace discovery: list a tenant's workspaces | artifactr | [lattice #5](https://github.com/alexnodeland/lattice/issues/5), was [#62][a-62] | phase 3 | followers start on first use, and resume from the ledger |
 | Notices that don't start or steer a turn, marked as notices | artifactr | [#63][a-63] | phase 2 | direct commits, which start no turn but still reach a running one |
 
 ## Phases

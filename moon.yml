@@ -1,4 +1,4 @@
-# lattice, the root-level project: the family's own tests, lint and types for the root's Python,
+# lattice, the root-level project: lattice's own tests, lint and types for the root's Python,
 # the site, and knip over the Bun workspace. It inherits none of the projects' tasks, which would
 # check every package again.
 workspace:
@@ -30,7 +30,7 @@ tasks:
   # The quality test reads every package's Python and portalr's TypeScript, and the edges test
   # every project's configuration.
   test:
-    description: "Run the family's tests"
+    description: "Run lattice's tests"
     command: 'uv run pytest'
     inputs:
       - '**/*.py'

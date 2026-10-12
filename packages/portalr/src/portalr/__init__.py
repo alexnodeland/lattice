@@ -1,4 +1,4 @@
-"""portalr: the portal into an application built on the family.
+"""portalr: the portal into an application built on lattice.
 
 An `app` UI for the people who use the application, to chat with its agents and see their
 artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and

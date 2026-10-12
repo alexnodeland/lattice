@@ -4,7 +4,7 @@ This page builds a small incident-response application: a monitoring system publ
 
 ## Install
 
-reflexr needs Python 3.12 or newer. Until it is published to PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the family's repository:
+reflexr needs Python 3.12 or newer. Until it is published to PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the repository every package lives in:
 
 === "uv"
 

@@ -53,7 +53,7 @@ make env && make check
 make up             # runs it beside the stack, at http://localhost:8800
 ```
 
-It generates an application on artifactr, reflexr or both: FastAPI with each library's REST, WebSocket and MCP surfaces, Supabase sign-in and PostgreSQL, agents on the gateway, OpenTelemetry, feedback as Langfuse scores, evalr experiments, and the family's quality gates. `uvx copier update` brings in the template's later improvements.
+It generates an application on artifactr, reflexr or both: FastAPI with each library's REST, WebSocket and MCP surfaces, Supabase sign-in and PostgreSQL, agents on the gateway, OpenTelemetry, feedback as Langfuse scores, evalr experiments, and lattice's quality gates. `uvx copier update` brings in the template's later improvements.
 
 ## What you get
 
@@ -74,9 +74,9 @@ The documentation is stackr's section of lattice's site, at **<https://lattice.a
 - [RFCs](https://lattice.alexnodeland.com/stackr/rfcs/): proposals and the v0.1 build plan.
 - [Brand](https://lattice.alexnodeland.com/stackr/assets/brand/): the mark, colours and type.
 
-## The family
+## lattice
 
-stackr is the infrastructure of the family of packages in [lattice](https://github.com/alexnodeland/lattice): [artifactr](https://lattice.alexnodeland.com/artifactr/), for chats in which people and agents edit shared artifacts; [reflexr](https://lattice.alexnodeland.com/reflexr/), for workflows that events start; [evalr](https://lattice.alexnodeland.com/evalr/), which evaluates both against people's feedback; and [relayr](https://lattice.alexnodeland.com/relayr/), the bridge planned between artifactr and reflexr. The libraries' reference implementations join its network, and its template generates applications on artifactr and reflexr.
+stackr is the infrastructure of the packages in [lattice](https://github.com/alexnodeland/lattice): [artifactr](https://lattice.alexnodeland.com/artifactr/), for chats in which people and agents edit shared artifacts; [reflexr](https://lattice.alexnodeland.com/reflexr/), for workflows that events start; [evalr](https://lattice.alexnodeland.com/evalr/), which evaluates both against people's feedback; and [relayr](https://lattice.alexnodeland.com/relayr/), the bridge planned between artifactr and reflexr. The libraries' reference implementations join its network, and its template generates applications on artifactr and reflexr.
 
 ## Contributing
 

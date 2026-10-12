@@ -66,50 +66,48 @@ async def turn_for(
     said: list[str],
     *,
     impostor: bool = False,
-    read_back: int = 100,
-    taken: bool = False,
+    carried: bool = True,
 ) -> list[reflexr.Envelope]:
-    """Start a turn for a rule's actor, after it said `said`, and bridge the turn's end."""
-    app = stack.process(ledger, rules=[], read_back=read_back)
+    """Start a turn for a rule's actor, after it said `said`, and bridge the turn's end.
+
+    The turn carries out what the rule said, unless an earlier turn took it (`carried=False`).
+    """
+    app = stack.process(ledger, rules=[])
     alice = await app.collaboration.open(*KEY, actor=ALICE)
     thread = await alice.create_thread()
     rule = alice.as_actor(ACTOR)
-    for content in said:
-        message_id = f"msg_{content}"
+    message_ids = tuple(f"msg_{content}" for content in said)
+    for content, message_id in zip(said, message_ids, strict=True):
         if not impostor:
             cause = Cause(correlation_id="evt_c", firing_id="fir_c", run_id="fir_c", depth=2)
             await ledger.record_cause(KEY, "message", message_id, cause)
         await rule.post_message(thread.id, content, message_id=message_id)
-    await alice.post_message(thread.id, "between")
-    if taken:  # an earlier turn for the rule took what it said
-        earlier = alice.as_actor(
-            a.AgentActor(thread_id=thread.id, run_id="run_e", on_behalf_of=ACTOR)
-        )
-        await earlier.record(a.RunStarted(run_id="run_e", thread_id=thread.id))
-        await earlier.record(a.RunEnded(run_id="run_e", thread_id=thread.id, status="completed"))
     agent = alice.as_actor(a.AgentActor(thread_id=thread.id, run_id="run_t", on_behalf_of=ACTOR))
-    await agent.record(a.RunStarted(run_id="run_t", thread_id=thread.id))
+    started = a.RunStarted(
+        run_id="run_t", thread_id=thread.id, message_ids=message_ids if carried else ()
+    )
+    await agent.record(started)
     await agent.record(a.RunEnded(run_id="run_t", thread_id=thread.id, status="completed"))
-    await bridged(stack, len(said) + 2 + taken)
+    await bridged(stack, len(said) + 1)
     return [e for e in await stack.bridged() if e.event_type == "artifactr:turn_ended"][-1:]
 
 
 async def test_a_turn_for_a_rule_continues_the_chain_of_its_last_message(
     ledger: Ledger, stack: Stack
 ) -> None:
-    [ended] = await turn_for(stack, ledger, ["hello", "again"], read_back=1)
+    [ended] = await turn_for(stack, ledger, ["hello", "again"])
     assert ended.depth == 2
 
 
 @pytest.mark.parametrize(
-    ("said", "impostor", "taken"),
-    [([], False, False), (["hello"], True, False), (["hello"], False, True)],
+    ("said", "impostor", "carried"),
+    [([], False, True), (["hello"], True, True), (["hello"], False, False)],
     ids=["nothing said", "an impostor", "taken by an earlier turn"],
 )
 async def test_a_turn_for_a_rule_without_a_traced_message_starts_a_chain(
-    ledger: Ledger, stack: Stack, said: list[str], impostor: bool, taken: bool
+    ledger: Ledger, stack: Stack, said: list[str], impostor: bool, carried: bool
 ) -> None:
-    [ended] = await turn_for(stack, ledger, said, impostor=impostor, taken=taken)
+    [ended] = await turn_for(stack, ledger, said, impostor=impostor, carried=carried)
     assert ended.depth == 0
 
 

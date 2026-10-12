@@ -23,7 +23,7 @@ from artifactr.langfuse import turn_attributes
 from reflexr.langfuse import run_attributes
 from reflexr.workspace import Reaction
 from relayr.events import ArtifactrEvent
-from relayr.ledger import Ledger
+from relayr.ledger import Ledger, WorkspaceKey
 from relayr.outbound import RULES, is_rule_actor, turn_cause
 
 MAX_ATTRIBUTE = 200
@@ -46,24 +46,23 @@ async def bridged_run(reaction: Reaction[Any]) -> AsyncGenerator[None]:
         yield
 
 
-def bridged_turns(ledger: Ledger, *, read_back: int = 100) -> TurnContext:
+def bridged_turns(ledger: Ledger) -> TurnContext:
     """Return a `TurnContext` that propagates a turn's attributes, with its rule and chain.
 
     Give it to artifactr's `Runner(turn_context=...)` in place of `langfuse_turn`.
 
     Args:
         ledger: The ledger relayr's adapters share, which holds the run behind each message.
-        read_back: How many envelopes to read back at a time, looking for the rule's message.
     """
 
     def turn(session: Session[Any]) -> AbstractAsyncContextManager[object]:
-        return _turn(ledger, session, read_back)
+        return _turn(ledger, session)
 
     return turn
 
 
 @contextlib.asynccontextmanager
-async def _turn(ledger: Ledger, session: Session[Any], read_back: int) -> AsyncGenerator[None]:
+async def _turn(ledger: Ledger, session: Session[Any]) -> AsyncGenerator[None]:
     attributes = await turn_attributes(session)
     agent = session.workspace.actor
     match agent:
@@ -71,7 +70,8 @@ async def _turn(ledger: Ledger, session: Session[Any], read_back: int) -> AsyncG
             is_rule_actor(rule)
         ):
             tags = [_limit(f"rule:{client.removeprefix(RULES)}")]
-            cause = await turn_cause(ledger, session.workspace, agent, read_back=read_back)
+            workspace = WorkspaceKey(session.workspace.tenant_id, session.workspace.workspace_id)
+            cause = await turn_cause(ledger, workspace, session.message_ids)
             if cause is not None:
                 tags.append(_limit(f"chain:{cause.correlation_id}"))
             attributes["tags"] = [*attributes["tags"], *tags]

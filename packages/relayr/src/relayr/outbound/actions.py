@@ -260,9 +260,11 @@ class RunActions:
     ) -> None:
         """Archive an artifact, by proposal unless the allowlist lets the rule edit its kind.
 
-        It is skipped when the artifact is archived already.
+        It is skipped when the artifact is archived already, and re-read and made again, within
+        the attempt, when the artifact changed meanwhile, as `edit` is.
 
         Raises:
+            RunFailure: If the artifact kept changing, so the attempt is retried.
             Refused: If the artifact is missing.
         """
         thread = self._where(thread_id)
@@ -271,17 +273,24 @@ class RunActions:
         async def done(workspace: artifactr.Workspace) -> bool:
             return await _exists(workspace.proposal(proposal_id))
 
-        current = await self._read(artifact_id)
-        if current.archived:
-            return
-        archive = a.ArchiveArtifact(
-            artifact_id=artifact_id,
-            base_version=current.version,
-            thread_id=thread,
-            proposal_id=proposal_id,
-        )
         await self._caused(("proposal", proposal_id))
-        await self._write(self._proposed(archive, current.data.kind, proposal_id, rationale), done)
+        for _ in range(_TRIES):
+            current = await self._read(artifact_id)
+            if current.archived:
+                return
+            archive = a.ArchiveArtifact(
+                artifact_id=artifact_id,
+                base_version=current.version,
+                thread_id=thread,
+                proposal_id=proposal_id,
+            )
+            command = self._proposed(archive, current.data.kind, proposal_id, rationale)
+            try:
+                await self._write(command, done)
+            except a.VersionConflict:
+                continue
+            return
+        raise RunFailure(f"artifact {artifact_id} kept changing", reason="version_conflict")
 
     async def notice(self, content: str, *, thread_id: a.ThreadId | None = None) -> a.MessageId:
         """Post a notice: for people, starting and steering no turn.

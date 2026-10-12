@@ -21,10 +21,11 @@ A rule drafted in chat has two records: its artifact, which people reviewed, and
   - It also passes over a rule no draft installed, and one whose artifact is archived.
   - **An update** is proposed as an edit of the artifact's `/rule` to the new version, unless the artifact holds it already.
   - **An archive** is proposed as archiving the artifact.
-  - Its rationale says the rule was changed in reflexr, outside its artifact.
+  - Its rationale names who changed the rule in reflexr, and says it was outside its artifact.
 - **The proposal goes to the thread the rule was drafted in:** that of the proposal relayr installed it from. relayr's allowlists give `relayr:rule-drift` any thread (`ALLOWLISTS`), and the application merges them into its own.
 - **Accepting puts the two in step again.** An accepted edit updates the rule from the artifact, through `relayr:rules-from-chat`, as any accepted change does. An accepted archive archives the artifact, and its rule is archived already. Rejecting leaves reflexr's version running, and the artifact as people reviewed it.
-- **The outbound adapter can archive.** `RunActions.archive(artifact_id)` proposes archiving an artifact, unless the allowlist lets the rule edit its kind directly. Its proposal id is derived, as for every write ([ADR-0019](0019-runs-act-once-through-derived-ids-and-keyed-edits.md)), and an archived artifact is skipped.
+- **The outbound adapter can archive.** `RunActions.archive(artifact_id)` proposes archiving an artifact, unless the allowlist lets the rule edit its kind directly. Its proposal id is derived, as for every write ([ADR-0019](0019-runs-act-once-through-derived-ids-and-keyed-edits.md)), an archived artifact is skipped, and a version conflict re-reads the artifact and tries again, as `edit` does.
+- **The drift rule acts as the application,** like relayr's other code rules, so it can propose into a thread the operator who changed the rule can't see: a restricted thread the rule was drafted in. The operator chooses no thread and reads nothing back, and the proposal says no more than the change they made.
 
 ## Options considered
 
@@ -39,3 +40,4 @@ A rule drafted in chat has two records: its artifact, which people reviewed, and
 
 - Easier: a rule changed or stopped by an operator shows up in the thread it came from, as a proposal people can accept or reject.
 - Harder: until someone accepts or rejects it, the artifact and the running rule differ.
+- Harder: every drift run and every install reads reflexr's latest 1,000 `rule_installed` facts, since reflexr can't read one rule's facts alone ([lattice #137](https://github.com/alexnodeland/lattice/issues/137)). A workspace has at most 50 stored rules live, so that reaches back far, but an install older than those facts is invisible to relayr: its rule drifts unproposed, and a replay of its acceptance installs it again.

@@ -146,14 +146,16 @@ async def test_a_keyed_edit_is_a_proposal_by_default(ledger: Ledger, stack: Stac
     assert proposal.rationale == "why"
 
 
-def changing(storage: artifactr.InMemoryStorage, times: int) -> artifactr.workspace.Authorize:
-    """A hook that has Alice change the note just before each of the rule's edits."""
+def changing(
+    storage: artifactr.InMemoryStorage, times: int, action: str = "artifactr:edit_artifact"
+) -> artifactr.workspace.Authorize:
+    """A hook that has Alice change the note just before each of the rule's edits, or archives."""
     changes = iter(range(times))
 
     async def authorize(
         tenant_id: str, workspace_id: str | None, actor: a.Actor, access: Access
     ) -> bool:
-        if actor == ACTOR and access.action == "artifactr:edit_artifact":
+        if actor == ACTOR and access.action == action:
             for n in changes:
                 alice = await artifactr.Workspaces(storage).open(*KEY, actor=ALICE)
                 current = await alice.get(Note, "art_alice")
@@ -184,6 +186,30 @@ async def test_an_edit_is_made_again_after_a_version_conflict(ledger: Ledger, st
     )
     assert acted.errors == []
     assert (await (await people(stack)).get(Note, "art_alice")).data.text == "mine"
+
+
+@pytest.mark.parametrize(("times", "archived"), [(1, True), (5, False)], ids=["once", "always"])
+async def test_an_archive_is_made_again_after_a_version_conflict(
+    ledger: Ledger, stack: Stack, times: int, archived: bool
+) -> None:
+    async def body(acting: RunActions, reaction: r.Reaction[Outbound]) -> object:
+        await acting.archive("art_alice")
+        return None
+
+    acted = await act(
+        stack,
+        ledger,
+        body,
+        allowlists={"app:act": DIRECT},
+        artifactr_authorize=changing(stack.artifactr_storage, times, "artifactr:archive_artifact"),
+        on=ArtifactCreated,
+        trigger=created_by_alice,
+    )
+    assert (await (await people(stack)).artifact("art_alice")).archived == archived
+    if not archived:
+        [error] = acted.errors
+        assert isinstance(error, r.RunFailure)
+        assert (error.reason, error.permanent) == ("version_conflict", False)
 
 
 async def test_an_edit_whose_artifact_keeps_changing_fails_the_attempt(

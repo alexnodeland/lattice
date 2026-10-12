@@ -13,7 +13,7 @@ import reflexr.core
 import reflexr.workspace as r
 from relayr.events import BRIDGED, ArtifactArchived, ProposalResolved
 from relayr.ledger import Ledger
-from relayr.outbound import Outbound
+from relayr.outbound import Outbound, rule_actor
 from relayr.rules import (
     ALLOWLISTS,
     RULE_DRIFT,
@@ -437,8 +437,7 @@ async def proposals(chat_: Chat) -> list[a.Proposal]:
     return [
         p
         for p in await chat_.alice.proposals(status=None)
-        if p.proposed_by
-        == a.ExternalAgentActor(client_id=f"reflexr:{RULE_DRIFT.name}", name=RULE_DRIFT.name)
+        if p.proposed_by == rule_actor(RULE_DRIFT.name)
     ]
 
 
@@ -460,7 +459,9 @@ async def test_a_change_made_in_reflexr_is_proposed_to_its_artifact(
     [drift] = await proposals(chat_)
     assert drift.thread_id == chat_.thread, "in the thread the rule was drafted in"
     assert drift.rationale is not None
-    assert drift.rationale.startswith("chat:deploys was changed in reflexr, outside its artifact")
+    assert drift.rationale.startswith(
+        "chat:deploys was changed in reflexr by system:reflexr, outside its artifact"
+    ), drift.rationale
 
     await chat_.resolve(drift.id)
     assert (await chat_.alice.get(RuleDraft, artifact_id)).data.rule == changed
@@ -483,6 +484,24 @@ async def test_an_archive_in_reflexr_is_proposed_to_its_artifact(
     assert "it was archived" in drift.rationale
     await chat_.resolve(drift.id)
     assert (await chat_.alice.artifact(artifact_id)).archived
+    await settled(chat_)
+    assert len(await proposals(chat_)) == 1, "archiving the artifact proposes nothing more"
+    with pytest.raises(reflexr.core.NotFound):
+        await chat_.stored()
+
+
+async def test_forged_provenance_proposes_nothing_and_blocks_nothing(
+    ledger: Ledger, stack: Stack
+) -> None:
+    chat_ = await chat(stack, ledger)
+    artifact_id, proposal_id = await chat_.drafted()
+    operator = await chat_.automation()
+    forged = {"artifact": artifact_id, "proposal": proposal_id}
+    await operator.install_rule(draft("chat:forged").rule, provenance=forged)
+    await settled(chat_)
+    assert await proposals(chat_) == [], "only relayr's own installs name an artifact"
+    await chat_.resolve(proposal_id)
+    assert (await chat_.stored()).version == 1, "the forged install blocks no real one"
 
 
 async def test_a_change_in_step_with_its_artifact_proposes_nothing(

@@ -342,13 +342,16 @@ smoke_langfuse() {
 
 # portalr's readers for the tools its Acceptance job doesn't run, as the stackr-smoke tenant.
 smoke_portalr() {
-  # The keys go to the script in its environment, never in its arguments.
+  # The keys go to the script in its environment, never in its arguments, read from stackr's
+  # settings before it leaves stackr's directory.
+  local public secret master
+  public=$(setting LANGFUSE_PUBLIC_KEY)
+  secret=$(setting LANGFUSE_SECRET_KEY)
+  master=$(master_key)
   if (
     cd ../portalr &&
       PORTALR_LANGFUSE_URL=$langfuse PORTALR_LITELLM_URL=$gateway \
-      LANGFUSE_PUBLIC_KEY=$(setting LANGFUSE_PUBLIC_KEY) \
-      LANGFUSE_SECRET_KEY=$(setting LANGFUSE_SECRET_KEY) \
-      LITELLM_MASTER_KEY=$(master_key) \
+      LANGFUSE_PUBLIC_KEY=$public LANGFUSE_SECRET_KEY=$secret LITELLM_MASTER_KEY=$master \
       uv run --locked scripts/smoke_readers.py stackr-smoke
   ); then
     return 0

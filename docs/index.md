@@ -14,8 +14,8 @@ Libraries for applications in which people and agents work together, and the sta
 
 </div>
 
-![The marks of artifactr, reflexr, evalr, relayr, stackr, portalr and grantr, over their names](assets/brand/family-light.svg#gh-light-mode-only)
-![The marks of artifactr, reflexr, evalr, relayr, stackr, portalr and grantr, over their names](assets/brand/family-dark.svg#gh-dark-mode-only)
+![The marks of artifactr, reflexr, evalr, relayr, stackr, portalr, grantr and lattice, over their names](assets/brand/family-light.svg#gh-light-mode-only)
+![The marks of artifactr, reflexr, evalr, relayr, stackr, portalr, grantr and lattice, over their names](assets/brand/family-dark.svg#gh-dark-mode-only)
 
 | Package | What it is |
 |---|---|

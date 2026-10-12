@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+# PostgreSQL's own entrypoint, archiving its WAL with pgBackRest once a bucket is set: without
+# one, nothing would take the WAL, and it would fill the disk.
+set -eu
+if [ -n "${BACKUP_S3_BUCKET:-}" ] && [ "${1:-}" = postgres ]; then
+  pgbackrest-conf
+  set -- "$@" -c archive_mode=on -c "archive_command=pgbackrest --stanza=stackr archive-push %p"
+fi
+exec docker-entrypoint.sh "$@"

@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# The restore drill, on a single host (RFC-0004): restore the latest backups beside the running
+# stack, check them against it, and report the result as a metric.
+#
+# PostgreSQL's latest backup is restored by pgBackRest into a new container, with the WAL archived
+# since, and must have every table the live databases have. ClickHouse's latest backup is
+# restored as the database restore_drill, beside Langfuse's, and must have every table with rows
+# where the live one has rows; it is dropped after. The result goes to the Collector as
+# stackr.restore_drill.success, 1 or 0, where Grafana's alert reads it. stackr-restore-drill.timer
+# runs it weekly; `make restore-drill` runs it now. Run it from packages/stackr.
+
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+
+host() { docker compose -f compose.yaml -f deploy/host/compose.prod.yaml "$@"; }
+log() { printf '%s\n' "$*" >&2; }
+status=0
+
+# --- PostgreSQL ------------------------------------------------------------------------------
+
+databases="postgres langfuse litellm auth"
+tables="SELECT schemaname || '.' || tablename FROM pg_tables
+  WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY 1"
+
+live_tables() {
+  local database
+  for database in $databases; do
+    host exec -T -u postgres postgres psql -d "$database" -Atc "$tables" | sed "s/^/$database /"
+  done
+}
+
+# In a new container from the same image, with its own data directory: the live volume is
+# mounted there too, but nothing touches it.
+restored_tables() {
+  host run --rm --no-deps -T --entrypoint sh postgres -s <<SH
+set -eu
+pgbackrest-conf
+mkdir -p /tmp/drill && chown postgres /tmp/drill && chmod 700 /tmp/drill
+su-exec postgres pgbackrest --stanza=stackr --log-level-console=warn --pg1-path=/tmp/drill restore
+su-exec postgres pg_ctl -D /tmp/drill -o "-c archive_mode=off -c listen_addresses=''" -w -t 300 start >/dev/null
+until su-exec postgres psql -Atc 'SELECT NOT pg_is_in_recovery()' 2>/dev/null | grep -q t; do sleep 1; done
+for database in $databases; do
+  su-exec postgres psql -d "\$database" -Atc "$tables" | sed "s/^/\$database /"
+done
+SH
+}
+
+live=$(live_tables)
+if restored=$(restored_tables) &&
+  missing=$(comm -23 <(sort <<<"$live") <(sort <<<"$restored")) && [[ -z $missing ]]; then
+  log "ok: PostgreSQL's latest backup restores, with every table the live databases have"
+else
+  log "FAIL: PostgreSQL's restore, or tables it lacks: ${missing:-}"
+  status=1
+fi
+
+# --- ClickHouse ------------------------------------------------------------------------------
+
+clickhouse() { host exec -T clickhouse clickhouse-client --query "$1"; }
+tables_with_rows() {
+  clickhouse "SELECT name FROM system.tables WHERE database = '$1' AND total_rows > 0 ORDER BY name"
+}
+trap 'clickhouse "DROP DATABASE IF EXISTS restore_drill SYNC" >/dev/null 2>&1 || true' EXIT
+
+latest=$(clickhouse "SELECT max(extract(_path, '([^/]+)/\\\\.backup\$'))
+  FROM s3(backups, filename = '*/.backup', format = 'RawBLOB')")
+if [[ -n $latest ]] &&
+  clickhouse "RESTORE DATABASE default AS restore_drill FROM S3(backups, '$latest') FORMAT Null" &&
+  missing=$(comm -23 <(tables_with_rows default | sort) <(tables_with_rows restore_drill | sort)) &&
+  [[ -z $missing ]]; then
+  log "ok: ClickHouse's latest backup, $latest, restores, with rows in every table the live one has"
+else
+  log "FAIL: ClickHouse's restore of ${latest:-no backup}, or tables it has no rows in: ${missing:-}"
+  status=1
+fi
+
+# --- the result ------------------------------------------------------------------------------
+
+now=$(date +%s)
+host --profile smoke run --rm --no-deps -T probe -fsS -o /dev/null \
+  -H 'Content-Type: application/json' --data @- http://otel-collector:4318/v1/metrics <<JSON
+{"resourceMetrics": [{
+  "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "stackr-restore-drill"}}]},
+  "scopeMetrics": [{"scope": {"name": "stackr.restore_drill"}, "metrics": [{
+    "name": "stackr.restore_drill.success",
+    "gauge": {"dataPoints": [{"asInt": "$((1 - status))", "timeUnixNano": "${now}000000000"}]}
+  }]}]
+}]}
+JSON
+log "restore-drill: reported $((1 - status)) to the Collector"
+exit $status

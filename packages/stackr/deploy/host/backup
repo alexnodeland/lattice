@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Back up a single host (RFC-0004) to the BACKUP_S3_* settings' bucket: PostgreSQL with pgBackRest
+# (full the first time, incremental after, its WAL archived as it is written), then ClickHouse
+# with its own BACKUP, as clickhouse/<UTC time>. stackr-backup.timer runs it nightly; `make
+# backup` runs it now. Run it from packages/stackr. Keep clickhouse/ in the bucket for as long as
+# you need, with the bucket's own lifecycle rule: each of its backups is whole.
+
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+
+host() { docker compose -f compose.yaml -f deploy/host/compose.prod.yaml "$@"; }
+
+# The bucket, as the container's environment has it.
+if ! host exec -T postgres sh -c "test -n \"\$BACKUP_S3_BUCKET\""; then
+  echo "backup: set BACKUP_S3_* in .env, then make up, so PostgreSQL archives to the bucket" >&2
+  exit 1
+fi
+
+host exec -T -u postgres postgres pgbackrest --stanza=stackr --log-level-console=warn stanza-create
+host exec -T -u postgres postgres pgbackrest --stanza=stackr --log-level-console=warn --type=incr backup
+echo "backup: PostgreSQL, with pgBackRest"
+
+# The client reads its user and password from the container's environment.
+name=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+host exec -T clickhouse clickhouse-client \
+  --query "BACKUP DATABASE default TO S3(backups, '$name') FORMAT Null"
+echo "backup: ClickHouse, as clickhouse/$name"

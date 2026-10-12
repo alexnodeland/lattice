@@ -1,0 +1,10 @@
+# A single host's backup (RFC-0004). deploy/host/bootstrap installs it with the checkout's path.
+[Unit]
+Description=Back up stackr's PostgreSQL and ClickHouse to the backups' bucket
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=@STACKR_DIR@
+ExecStart=@STACKR_DIR@/deploy/host/backup

@@ -1,0 +1,40 @@
+# The restore drill's alert, on a single host (RFC-0004): it fires when the drill hasn't passed
+# in eight days. deploy/host/restore-drill sends stackr.restore_drill.success, 1 or 0, each run.
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: backups
+    folder: stackr
+    interval: 1h
+    rules:
+      - uid: stackr-restore-drill
+        title: The restore drill hasn't passed in eight days
+        condition: passed
+        data:
+          - refId: drill
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: drill
+              expr: max_over_time(stackr_restore_drill_success[8d])
+              instant: true
+          - refId: passed
+            datasourceUid: __expr__
+            model:
+              refId: passed
+              type: threshold
+              expression: drill
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+        # No result at all means the drill never ran.
+        noDataState: Alerting
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: >-
+            The restore drill hasn't passed in eight days: run deploy/host/restore-drill, and
+            read its output.

@@ -4,5 +4,19 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "openapi-fetch": "0.17.0"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.104.1"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "5.104.1",
+    "@types/bun": "1.4.2",
+    "json-schema-to-typescript": "15.0.4",
+    "openapi-typescript": "7.13.0",
+    "react": "19.3.0",
+    "typescript": "npm:typescript@6.0.3"
   }
 }

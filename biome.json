@@ -11,7 +11,8 @@
       "package.json",
       "biome.json",
       "knip.json",
-      "tsconfig.base.json"
+      "tsconfig.base.json",
+      "!packages/portalr/web/client/src/generated"
     ]
   },
   "formatter": {

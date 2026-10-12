@@ -33,7 +33,7 @@ Every web package has these, each run by Bun from `bun.lock`:
 |---|---|
 | `lint` | Check formatting and lint rules with Biome |
 | `typecheck` | Type-check with TypeScript 7, strict |
-| `test` | Run the tests with Vitest (`client`, and `ui` in Chromium, light and dark) |
+| `test` | Run the tests with Vitest (`client`'s unit tests, and `ui`'s in Chromium, light and dark) |
 | `build` | Build the app with Vite (`app` and `admin`) |
 | `format` | Format the code and apply safe lint fixes with Biome |
 | `check` | Everything CI runs for the project |
@@ -53,6 +53,8 @@ The packages' own tasks:
 | `artifactr:pg-down`, `reflexr:pg-down`, `grantr:pg-down`, `relayr:pg-down` | Stop the package's contributor stack |
 | `artifactr:api`, `reflexr:api` | Start the reference implementation on PostgreSQL, run the package's Bruno collection and Schemathesis against it, and stop it, as CI's Acceptance job does. It needs Docker |
 | `docplan:image`, `oncall:image` | Build the reference implementation's image from the root, start it on PostgreSQL and stop it, as CI's Images job does |
+| `client:api` | Start docplan and oncall, and run portalr's client against them, as CI's Acceptance job does. It needs Docker |
+| `client:types` | Regenerate the client's types from the packages' committed documents (a test fails if they drift) |
 | `lattice:knip` | Find unused files, exports and dependencies in the web packages |
 | `lattice:breaks` | Find the breaks the branch adds to the packages' public APIs, against their last releases |
 | `lattice:docs` | Build the documentation site in strict mode, and check that its lists rendered |

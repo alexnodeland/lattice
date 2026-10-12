@@ -17,6 +17,15 @@ const reduceMotion: BrowserCommand<[reduce: boolean]> = async ({ page }, reduce)
   await page.emulateMedia({ reducedMotion: reduce ? "reduce" : "no-preference" });
 };
 
+/**
+ * Move the pointer to the page's far corner, off whatever a test renders at the top left, so the
+ * last test's click doesn't leave the next one's first control hovered.
+ */
+const pointerAway: BrowserCommand<[]> = async ({ page }) => {
+  const size = page.viewportSize() ?? { width: 414, height: 896 };
+  await page.mouse.move(size.width - 1, size.height - 1);
+};
+
 // The screenshots' baselines are Linux's, made in CI (portalr ADR-0019): they run where CI is.
 const screenshots = "src/**/*.screenshot.test.tsx";
 
@@ -30,7 +39,7 @@ export default defineConfig({
       headless: true,
       provider: playwright(),
       instances: [scheme("light"), scheme("dark")],
-      commands: { reduceMotion },
+      commands: { pointerAway, reduceMotion },
     },
   },
 });

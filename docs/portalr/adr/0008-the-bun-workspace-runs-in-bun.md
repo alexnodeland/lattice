@@ -24,7 +24,7 @@ The tools' executables start with `#!/usr/bin/env node`, and moon runs them that
 |---|---|---|
 | **Bun's runtime for every tool, through `bun x --bun --no-install` (chosen)** | One runtime, at the version `.prototools` pins, in CI, the dev container and locally | Vitest and Vite support Bun's runtime less widely than Node.js's |
 | Node.js in `.prototools` | Every tool's documented runtime | A fourth tool to pin and update, for what Bun already runs |
-| `bunfig.toml`'s `[run] bun = true` with `bun run <tool>` | Shorter commands | knip reads `bun run biome` as the file `biome.json`, and reports Biome unused |
+| `bunfig.toml`'s `[run] bun = true` with `bun run <tool>` | Shorter commands | With `bun run biome`, knip didn't count Biome as used |
 | The runner's preinstalled Node.js | Nothing to add | Unpinned, and absent elsewhere |
 
 ## Consequences

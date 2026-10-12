@@ -50,6 +50,7 @@ from grantr.core import (
     Role,
     RoleDefined,
     RoleDeleted,
+    RulePrincipal,
     ServicePrincipal,
     Subject,
     TenantCreated,
@@ -66,7 +67,7 @@ from grantr.core import (
     verify,
 )
 from grantr.core.grants import held
-from grantr.core.roles import RESTRICT
+from grantr.core.roles import RESTRICT, RULE_ROLE
 from grantr.grants.storage import Reads, Storage, Transaction
 from grantr.telemetry import SLOW_CHECK, Reason, Telemetry
 
@@ -194,7 +195,7 @@ class Grants:
             return Visibility()
         hidden = list(items)
         if not isinstance(subject, Agent):
-            grants = await self._storage.grants(tenant, subject)
+            grants = _implied(tenant, subject, await self._storage.grants(tenant, subject))
             custom = await self._custom(self._storage, tenant, grants)
             hidden = [
                 item
@@ -225,7 +226,7 @@ class Grants:
         if action not in self._catalog.actions or isinstance(subject, Agent):
             return []
         candidates = await self._storage.resources(tenant, kind)
-        grants = await self._storage.grants(tenant, subject)
+        grants = _implied(tenant, subject, await self._storage.grants(tenant, subject))
         custom = await self._custom(self._storage, tenant, grants)
         restricted = (
             frozenset(await self._storage.restricted(tenant)) if kind in RESTRICTABLE else ()
@@ -758,7 +759,7 @@ class Grants:
         if isinstance(subject, Agent):
             return frozenset()
         scope = None if on.kind == "deployment" else tenant
-        grants = await reads.grants(scope, subject, on=on.chain())
+        grants = _implied(scope, subject, await reads.grants(scope, subject, on=on.chain()))
         # The flag matters only to a grant around the item, so it is read only if there is one.
         restricted = (
             tenant is not None
@@ -817,6 +818,8 @@ class Grants:
         """
         if self._catalog.role(grant.role, grant.on.kind, await tx.roles(tenant)) is None:
             raise Invalid(f"{grant.role} can't be granted on a {grant.on.kind}")
+        if isinstance(grant.to, RulePrincipal) and grant.on.workspace != grant.to.workspace:
+            raise Invalid(f"{grant.to} acts in its own workspace only")
         if isinstance(grant.to, Group):
             if await tx.group(tenant, grant.to) is None:
                 raise Invalid(f"there is no group {grant.to.id}")
@@ -879,3 +882,14 @@ def _application(principal: ServicePrincipal) -> Grant:
 def _tenant_id(tenant: TenantId) -> None:
     if not TENANT_ID.fullmatch(tenant):
         raise Invalid("a tenant's id isn't empty, and has no ~")
+
+
+def _implied(tenant: TenantId | None, subject: Subject, grants: list[Grant]) -> list[Grant]:
+    """A subject's grants, with the one it holds without a grant: a stored rule's ``rule`` role.
+
+    A stored rule's principal holds ``rule`` in its own workspace and nowhere else (ADR-0029).
+    """
+    if tenant is None or not isinstance(subject, RulePrincipal):
+        return grants
+    own = Resource(kind="workspace", workspace=subject.workspace)
+    return [*grants, Grant(tenant=tenant, role=RULE_ROLE, on=own, to=subject)]

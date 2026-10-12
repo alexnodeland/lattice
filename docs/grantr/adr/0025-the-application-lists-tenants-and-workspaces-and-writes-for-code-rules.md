@@ -1,6 +1,6 @@
 # ADR-0025: The application lists tenants and workspaces, and writes for its code rules
 
-**Status:** Accepted, amended by [ADR-0027](0027-the-application-installs-the-rules-people-accept.md) and [ADR-0029](0029-a-stored-rule-posts-notices-as-itself.md)
+**Status:** Accepted, amended by [ADR-0027](0027-the-application-installs-the-rules-people-accept.md) and [ADR-0029](0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0019](0019-runtime-actions-and-the-application-role.md), the `application` role's actions, and [ADR-0021](0021-the-deployments-own-tools.md), the deployment's own tools

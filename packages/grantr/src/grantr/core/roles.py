@@ -170,6 +170,9 @@ APPLICATION: Final = "application"
 """The role of the application's own service principal: granted on the deployment, and the one
 deployment role that holds in every tenant."""
 
+RULE_ROLE: Final = "rule"
+"""The role a stored rule's principal holds in its own workspace, with no grant (ADR-0029)."""
+
 
 LEVELS: Final[Mapping[ResourceKind, Level]] = {
     "deployment": "deployment",
@@ -222,6 +225,9 @@ class Catalog:
         viewer = (FEEDBACK & libraries | reads) - BOOKKEEPING - ABOVE_WORKSPACES
         editor = viewer | EDITOR_COMMANDS & libraries
         owner = actions - OPERATOR - BOOKKEEPING - DEPLOYMENT_READS
+        # Stored rules are reflexr's: without its catalog, no principal can hold ``rule``.
+        stored = any(action.startswith("reflexr:") for action in libraries)
+        rule = RULE & libraries if stored else frozenset[str]()
         return cls(
             actions=actions,
             built_in={
@@ -236,7 +242,7 @@ class Catalog:
                 | WORKSPACE_GRANTS,
                 ("workspace", "editor"): editor,
                 ("workspace", "viewer"): viewer,
-                ("workspace", "rule"): RULE & libraries,
+                ("workspace", "rule"): rule,
                 ("item", "editor"): editor,
                 ("item", "viewer"): viewer,
             },

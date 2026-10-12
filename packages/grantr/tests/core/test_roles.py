@@ -150,6 +150,7 @@ def test_a_rule_publishes_checkpoints_reads_its_workspace_and_posts_notices() ->
         "artifactr:post_message",
     }
     assert CATALOG.role("rule", "rule", {}) is None, "granted on a workspace only"
+    assert Catalog.of(ARTIFACTR).role("rule", "workspace", {}) == frozenset(), "reflexr's rules"
     assert _role("rule") <= _role("admin"), "so a workspace's admin may grant it"
 
 

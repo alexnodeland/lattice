@@ -25,7 +25,7 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0017](0017-the-admin-api.md) | The admin API | Accepted |
 | [0018](0018-telemetry-through-the-api.md) | Telemetry through the OpenTelemetry API | Accepted |
 | [0019](0019-runtime-actions-and-the-application-role.md) | Runtime actions, and the application role | Accepted, amended by 0022 and 0025 |
-| [0020](0020-the-rule-role.md) | The rule role | Accepted |
+| [0020](0020-the-rule-role.md) | The rule role | Accepted, amended by 0029 |
 | [0021](0021-the-deployments-own-tools.md) | The deployment's own tools | Accepted, amended by 0025 |
 | [0022](0022-a-tenants-members-list-its-workspaces.md) | A tenant's members list its workspaces | Accepted |
 | [0023](0023-portalrs-admin-reads.md) | portalr's admin reads | Accepted |
@@ -34,6 +34,6 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0026](0026-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted |
 | [0027](0027-the-application-installs-the-rules-people-accept.md) | The application installs the rules people accept | Accepted |
 | [0028](0028-a-principals-id-cant-pass-for-the-libraries-actors.md) | A principal's id can't pass for the libraries' actors | Accepted |
-| [0029](0029-a-stored-rule-posts-notices-as-itself.md) | A stored rule posts notices as itself | Accepted |
+| [0029](0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md) | A stored rule acts as itself, in its own workspace | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

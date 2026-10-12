@@ -51,7 +51,6 @@ nav:
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md
-    - rfcs/template.md
 - Project:
   - Changelog: project/changelog.md
   - Brand: assets/brand/README.md

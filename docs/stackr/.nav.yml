@@ -49,7 +49,6 @@ nav:
     - rfcs/0001-v0.1-implementation-plan.md
     - rfcs/0002-the-combined-system.md
     - rfcs/0003-one-repository-lattice.md
-    - rfcs/template.md
 - Project:
   - Changelog: project/changelog.md
   - Brand: assets/brand/README.md

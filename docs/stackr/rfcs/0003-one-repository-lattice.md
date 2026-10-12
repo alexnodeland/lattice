@@ -394,6 +394,7 @@ In lattice, this list becomes a tracking issue with a sub-issue per phase (phase
   - Pinning by the rendered commit, path sources in the Template job, Template and Smoke run on a library's change, and `bump-libraries` retired ([#51](https://github.com/alexnodeland/lattice/pull/51), [ADR-0018](../adr/0018-the-template-pins-the-libraries-at-its-own-commit.md)). Path sources are editable, since the libraries' own evalr source is. The Smoke job's application builds in Docker, where a path to the checkout doesn't exist, so it installs from GitHub at the pull request's merge commit instead.
 - [ ] Phase 5: acceptance tests
 - [ ] Phase 6: test signal and hardening
+  - ty replaces pyright ([#58](https://github.com/alexnodeland/lattice/pull/58), [lattice ADR-0013](../../adr/0013-ty-replaces-pyright.md)): its stopgaps, and what pyright strict catches that ty doesn't, are in the ADR.
 - [ ] Phase 7: agents and process
 
 ### What the rehearsal settled

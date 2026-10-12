@@ -13,7 +13,7 @@ Until now, each project had its own `[tool.pyright]`: strict for `src/` and `scr
 ty 0.0.86 with every rule an error, over every project's Python, found 406 diagnostics on code that pyright passed. Three things decide what to do with them:
 
 - **One configuration can't give each project its own `tests` package.** Every package's tests import their helpers as `tests`, and run from the root, ty named each file from the repository's root (`packages.evalr.src.evalr`), so one class was two.
-- **`all = "error"` turns on ty's opinions.** Two families made 151 of the 406: a truth test of an optional value (`if os.environ.get("X")`, where an empty value means unset too), and an assignment, return or yield of an `Any`, which SQLAlchemy's `Mapped[str] = mapped_column()` makes on every column.
+- **`all = "error"` turns on ty's opinions.** Two families made 152 of the 406: a truth test of an optional value (`if os.environ.get("X")`, where an empty value means unset too), and an assignment, return or yield of an `Any`, which SQLAlchemy's `Mapped[str] = mapped_column()` makes on every column.
 - **ty is beta.** On a probe, a frozen dataclass's type parameter is covariant and a frozen Pydantic model's is invariant, and a set literal is inferred from its parameter's type in a call but not in a class keyword argument. pyright accepts both, and so does Python.
 
 ## Decision

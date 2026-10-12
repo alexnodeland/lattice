@@ -1,8 +1,8 @@
 # Brand
 
-stackr is one of the seven packages in [lattice](https://github.com/alexnodeland/lattice), which is drawn in their brand system too: [artifactr](../../../artifactr/index.md), [reflexr](../../../reflexr/index.md), [evalr](../../../evalr/index.md), [relayr](../../../relayr/index.md), stackr, [portalr](../../../portalr/index.md) and [grantr](../../../grantr/index.md). Their marks are drawn on one 64-unit grid with one stroke, their wordmarks are set in one typeface, and each has a colour of its own. The family's identity comes from print proofing: artifactr, reflexr and evalr are each drawn in two of the three process inks, cyan, magenta and yellow, and where both land on the same spot they overprint into a third colour, the library's working colour; relayr and lattice each print on one plate, magenta and cyan, and overprint where it prints twice; portalr prints in all three process inks, and grantr in yellow and key. [lattice's brand page](../../../assets/brand/README.md#the-family) states the system in full.
+stackr is one of the seven packages in [lattice](https://github.com/alexnodeland/lattice), which is drawn in their brand system too: [artifactr](../../../artifactr/index.md), [reflexr](../../../reflexr/index.md), [evalr](../../../evalr/index.md), [relayr](../../../relayr/index.md), stackr, [portalr](../../../portalr/index.md) and [grantr](../../../grantr/index.md). Their marks are drawn on one 64-unit grid with one stroke, their wordmarks are set in one typeface, and each has a colour of its own. lattice's identity comes from print proofing: artifactr, reflexr and evalr are each drawn in two of the three process inks, cyan, magenta and yellow, and where both land on the same spot they overprint into a third colour, the library's working colour; relayr and lattice each print on one plate, magenta and cyan, and overprint where it prints twice; portalr prints in all three process inks, and grantr in yellow and key. [lattice's brand page](../../../assets/brand/README.md#the-marks) states the system in full.
 
-stackr prints in **key**, the fourth plate: the black that the colour plates are printed in register to, and the quiet layer they sit on. Its mark is **three slabs**, stacked along the family's diagonal, with their ends cut at its angle: the layers the libraries run on. The slabs are one tint of key, and where two layers overlap they print in full key, the family's overprint drawn without a hue.
+stackr prints in **key**, the fourth plate: the black that the colour plates are printed in register to, and the quiet layer they sit on. Its mark is **three slabs**, stacked along lattice's diagonal, with their ends cut at its angle: the layers the libraries run on. The slabs are one tint of key, and where two layers overlap they print in full key, lattice's overprint drawn without a hue.
 
 <p>
   <img src="mark-light.svg#gh-light-mode-only" width="96" alt="The stackr mark">
@@ -26,7 +26,7 @@ Every file is a hand-authored SVG with no embedded images or fonts. Text is outl
 
 lattice's site takes lattice's palette in every section ([lattice ADR-0001](../../../adr/0001-lattices-brand.md)), and opens stackr's section with stackr's lockup. Where the table below names a role on the site, it is the role stackr's own palette gives that colour.
 
-The banners place the mark three grid units (21.6) left of the family's banner origin, at (824, 0.8) rather than (845.6, 0.8). At the family's placement, the top slab's right end ran past the panel's edge and its cut was lost; now all three slabs are whole, with the same room on either side of them. Nothing else about the banner differs from the family's layout.
+The banners place the mark three grid units (21.6) left of lattice's banner origin, at (824, 0.8) rather than (845.6, 0.8). At lattice's placement, the top slab's right end ran past the panel's edge and its cut was lost; now all three slabs are whole, with the same room on either side of them. Nothing else about the banner differs from lattice's layout.
 
 ## Colours
 
@@ -43,7 +43,7 @@ On paper, key printed over its own tint makes a darker colour, so the light over
 
 | Typeface | Role | Why |
 |---|---|---|
-| [Schibsted Grotesk](https://fonts.google.com/specimen/Schibsted+Grotesk) | The wordmark (Bold, outlined, tracked −1.2%), headings and body text on the site | The family's typeface: a plain, readable grotesque with an editorial voice |
+| [Schibsted Grotesk](https://fonts.google.com/specimen/Schibsted+Grotesk) | The wordmark (Bold, outlined, tracked −1.2%), headings and body text on the site | lattice's typeface: a plain, readable grotesque with an editorial voice |
 | [Fragment Mono](https://fonts.google.com/specimen/Fragment+Mono) | Code on the site | A monospace in the Helvetica tradition, so code sits comfortably beside the grotesque |
 
 Both are open-source (SIL Open Font License) and served by Google Fonts. The wordmark is always lowercase: **stackr**.
@@ -60,9 +60,9 @@ Both are open-source (SIL Open Font License) and served by Google Fonts. The wor
 
 ## The alternative set aside
 
-stackr's alternative mark, drawn and set aside, stacks the three process inks instead: cyan, magenta and yellow slabs, overprinting into artifactr's indigo and reflexr's red where they meet. It says "the family's stack" more literally and gives stackr colour, but it reads as a flag, and it borrows its siblings' overprints instead of having one of its own. The key version is preferred: infrastructure should be the quiet plate under the colour.
+stackr's alternative mark, drawn and set aside, stacks the three process inks instead: cyan, magenta and yellow slabs, overprinting into artifactr's indigo and reflexr's red where they meet. It says "lattice's stack" more literally and gives stackr colour, but it reads as a flag, and it borrows its siblings' overprints instead of having one of its own. The key version is preferred: infrastructure should be the quiet plate under the colour.
 
 ## Known weaknesses
 
-- **Three horizontal bars can read as a menu icon.** The slant and the overlaps set it apart at the size of the lockup; at 16 pixels, in a tab strip, it is the family's least distinctive mark.
+- **Three horizontal bars can read as a menu icon.** The slant and the overlaps set it apart at the size of the lockup; at 16 pixels, in a tab strip, it is lattice's least distinctive mark.
 - **Without a hue, the site's links rely on their underline**, and its accent on weight and position more than colour.

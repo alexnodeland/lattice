@@ -112,9 +112,9 @@ The core depends on pydantic and the OpenTelemetry API only. Each integration is
 | `evalr.langfuse` | `langfuse` | Langfuse datasets, scores and experiments |
 | `evalr.hf` | `hf` | Hugging Face datasets |
 
-## The family
+## lattice
 
-evalr is one of the packages in [lattice](https://github.com/alexnodeland/lattice), the family's repository. They share their conventions: typed feedback as Pydantic models, scores named `{type}.{field}`, OpenTelemetry through the API only, ports with in-memory adapters, and the same quality gates.
+evalr is one of the packages in [lattice](https://github.com/alexnodeland/lattice), the repository every package lives in. They share their conventions: typed feedback as Pydantic models, scores named `{type}.{field}`, OpenTelemetry through the API only, ports with in-memory adapters, and the same quality gates.
 
 - [artifactr](../artifactr/index.md): chat applications where people and agents collaborate on shared, versioned artifacts. It records people's feedback on threads, turns, messages and artifact versions.
 - [reflexr](../reflexr/index.md): rules over event streams that run agents, graphs and functions. It records feedback on runs, firings and causal chains.

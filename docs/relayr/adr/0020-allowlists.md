@@ -1,6 +1,6 @@
 # ADR-0020: Allowlists
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0029](0029-an-allowlist-for-a-whole-rule-namespace.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

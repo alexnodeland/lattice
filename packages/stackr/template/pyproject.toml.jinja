@@ -97,7 +97,7 @@ known-first-party = ["{{ package_name }}"{% if evals %}, "evals"{% endif %}]
 known-local-folder = ["conftest"]
 # The libraries' adapters share their names with the libraries they adapt.
 known-third-party = ["fastapi", "mcp", "langfuse"]
-# The family's libraries get a section of their own, after the other third-party ones.
+# lattice's libraries get a section of their own, after the other third-party ones.
 section-order = ["future", "standard-library", "third-party", "family", "first-party", "local-folder"]
 
 [tool.ruff.lint.isort.sections]

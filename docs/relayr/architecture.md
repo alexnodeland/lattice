@@ -26,6 +26,7 @@ graph LR
 | `relayr.sql` | `SqlLedger`, its tables and Alembic migrations, and `create_sqlite_engine`. The `sql`, `sqlite` and `postgres` extras | `relayr.ledger`, SQLAlchemy, Alembic |
 | `relayr.inbound` | `Followers`, and the two actors a follower acts as | `relayr.events`, `relayr.ledger`, artifactr, reflexr |
 | `relayr.outbound` | `Outbound` and its per-attempt `RunActions`, `Allowlist`, `NotAllowed`, `Refused`, the rule's actor, `turn_cause`, and `ArtifactrCapability` with its tools | `relayr.events`, `relayr.ledger`, artifactr, reflexr, pydantic, pydantic-ai |
+| `relayr.rules` | `RuleDraft`, the `rule` artifact type; `check_draft` and `preview`; `RuleDrafting`, the chat agent's `draft_rule`; and relayr's rule from chat, `RULES_FROM_CHAT`, with `Installer`'s action and `anyone` | `relayr.events`, `relayr.outbound`, artifactr, reflexr, pydantic, pydantic-ai |
 | `relayr.telemetry` | The `relayr` scope's attributes, the counters' registry, and `Telemetry`, through the OpenTelemetry API | the OpenTelemetry API |
 | `relayr.otel` | `telemetry()`, relayr's contribution to the libraries' `configure_telemetry`, and `metric_views`. The `otel` extra | `relayr.telemetry`, the OpenTelemetry SDK |
 | `relayr.langfuse` | `bridged_run` and `bridged_turns`, the libraries' Langfuse contexts with relayr's tags. The `langfuse` extra | `relayr.events`, `relayr.ledger`, `relayr.outbound`, artifactr, reflexr, Langfuse |
@@ -79,6 +80,10 @@ A rule's run acts in artifactr through `Outbound.acting(reaction)`: a function a
 
 Before each write, `RunActions` records the run behind it in the ledger, by the ids the follower will read off its envelope. The follower publishes a rule's write back into reflexr through `caused_by(...)`, in the run's chain, as deep as the run's own events; a turn acting for a rule continues the chain of the last of the messages its `run_started` names that a run posted ([ADR-0026](adr/0026-a-retried-send-asks-again-and-turns-traced-by-their-messages.md)). reflexr refuses a firing past its depth limit, so two rules that answer each other stop there. A person's answer to a rule's proposal joins the proposal's chain without going deeper ([ADR-0021](adr/0021-chains-continue-across-the-bridge.md)). `tests/outbound/test_loops.py` checks both of phase 2's exit criteria, on every ledger.
 
+## Rules from chat
+
+The chat agent drafts a reflexr rule as a `rule` artifact, through `RuleDrafting`'s `draft_rule`. That tool checks the draft, previews it against the recent log and proposes it. When a person who may install rules accepts the proposal, relayr's `relayr:rules-from-chat` re-reads artifactr and installs the rule in reflexr's stored rules, with its provenance. Archiving the artifact archives the rule. The rule is scoped by the artifact, so one artifact's changes happen in order, and it never trusts the bridged event ([ADR-0028](adr/0028-rules-from-chat.md)). `tests/rules/test_installer.py` checks phase 5's exit criterion.
+
 ## Telemetry
 
 relayr records through the OpenTelemetry API, under the scope `relayr`, with attributes named as the libraries name theirs (`relayr.tenant.id`, `relayr.workspace.id`).
@@ -98,4 +103,4 @@ One contract test, `tests/ledger/test_contract.py`, runs against memory, SQLite 
 
 ## What isn't built yet
 
-Rules from chat (phase 5) and evaluation (phase 6). stackr's template wires relayr in with its `bridge` question ([stackr ADR-0021](../stackr/adr/0021-the-bridge-in-the-template.md)). LiteLLM's metadata doesn't carry relayr's tags yet ([lattice #86](https://github.com/alexnodeland/lattice/issues/86)).
+Drift proposed back to a rule's artifact (phase 5's follow-up), and evaluation (phase 6). stackr's template wires relayr in with its `bridge` question ([stackr ADR-0021](../stackr/adr/0021-the-bridge-in-the-template.md)). LiteLLM's metadata doesn't carry relayr's tags yet ([lattice #86](https://github.com/alexnodeland/lattice/issues/86)).

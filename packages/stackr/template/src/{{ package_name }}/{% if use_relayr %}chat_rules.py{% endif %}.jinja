@@ -1,0 +1,51 @@
+"""Rules from chat: what a rule drafted in a thread may do once a person accepts it.
+
+The notes agent drafts a rule with relayr's `draft_rule` tool, and it goes live, as a stored rule
+in reflexr, once a person who may install rules accepts the proposal (relayr's
+``relayr:rules-from-chat``). A stored rule is data, named in the ``chat`` namespace. It runs only
+the actions listed here, within reflexr's limits: a throttle, a timeout, and no code.
+
+- ``notify`` posts a notice in the thread the rule names, as the rule's own participant: a
+  stored rule's runs act as themselves, never as the application.
+"""
+
+from collections.abc import Awaitable, Callable, Mapping
+from typing import Any
+
+from pydantic import BaseModel
+
+from reflexr.core import StoredRules
+from reflexr.workspace import Reaction
+from relayr.outbound import Allowlist, Outbound
+
+
+class NotifyParams(BaseModel):
+    """Where ``notify`` posts."""
+
+    thread_id: str
+
+
+STORED_RULES = StoredRules(actions={"notify": NotifyParams}, namespaces={"chat"})
+"""What rules from chat may run, and the namespace they are named in."""
+
+ALLOWLISTS: Mapping[str, Allowlist] = {"chat:*": Allowlist(threads="any", turns=False)}
+"""Rules from chat post notices, in whichever thread they name, and nothing more: never a
+message that starts a turn, which would act for the rule (grantr ADR-0029)."""
+
+type StoredAction = Callable[[Reaction[None], Any], Awaitable[None]]
+"""An action rules from chat run: the reaction, and its params, as ``STORED_RULES`` declares."""
+
+
+def chat_rule_actions(outbound: Outbound) -> dict[str, StoredAction]:
+    """The actions rules from chat may run, by name, which act in artifactr through relayr.
+
+    Args:
+        outbound: What the runs do in artifactr.
+    """
+
+    async def notify(reaction: Reaction[None], params: NotifyParams) -> None:
+        rule = reaction.rule
+        said = f"{rule.name}: {rule.description}" if rule.description else rule.name
+        await outbound.acting(reaction).notice(said, thread_id=params.thread_id)
+
+    return {"notify": notify}

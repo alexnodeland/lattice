@@ -308,7 +308,7 @@ A formatter renders an input as the text a judge reads. A decision model's state
 
 ## End-to-end measures
 
-`evalr.measures` defines the family's end-to-end measures generically; each library's `[evals]` extra supplies the data, by putting its log into these inputs:
+`evalr.measures` defines lattice's end-to-end measures generically; each library's `[evals]` extra supplies the data, by putting its log into these inputs:
 
 | Input | Holds | artifactr | reflexr |
 |---|---|---|---|

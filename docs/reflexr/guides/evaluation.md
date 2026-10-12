@@ -185,7 +185,7 @@ Score configs give Langfuse each score's type, range and categories, so its UI o
 
 ## Evaluators and datasets with evalr
 
-[evalr](../../evalr/index.md) is the family's evaluation library: evaluators that return typed verdicts (DSPy judges, decision models, plain functions), datasets, experiments and agreement metrics ([ADR-0020](../adr/0020-evalr-shared-eval-kit.md)). The `evals` extra connects reflexr to it. evalr is not on PyPI yet, so an application installs both from lattice: uv brings evalr from the same commit as reflexr, and pip, which reads only the version ranges, needs evalr named as well:
+[evalr](../../evalr/index.md) is lattice's evaluation library: evaluators that return typed verdicts (DSPy judges, decision models, plain functions), datasets, experiments and agreement metrics ([ADR-0020](../adr/0020-evalr-shared-eval-kit.md)). The `evals` extra connects reflexr to it. evalr is not on PyPI yet, so an application installs both from lattice: uv brings evalr from the same commit as reflexr, and pip, which reads only the version ranges, needs evalr named as well:
 
 === "uv"
 

@@ -12,6 +12,7 @@ nav:
   - The smoke tests: guides/smoke-tests.md
   - Validation and CI: guides/validation.md
   - Security: guides/security.md
+  - A single host: guides/single-host.md
   - Troubleshooting: guides/troubleshooting.md
 - Reference:
   - reference/index.md
@@ -50,6 +51,9 @@ nav:
     - adr/0021-the-bridge-in-the-template.md
     - adr/0022-row-level-security-in-the-template.md
     - adr/0023-opentofu-for-aws-now.md
+    - adr/0024-rules-from-chat-in-the-template.md
+    - adr/0025-what-the-floci-spike-found.md
+    - adr/0026-the-single-host.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

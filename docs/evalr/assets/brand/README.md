@@ -1,8 +1,8 @@
 # Brand
 
-evalr is one of the seven packages in [lattice](https://github.com/alexnodeland/lattice), which is drawn in their brand system too: [artifactr](../../../artifactr/index.md), [reflexr](../../../reflexr/index.md), evalr, [relayr](../../../relayr/index.md), [stackr](../../../stackr/index.md), [portalr](../../../portalr/index.md) and [grantr](../../../grantr/index.md). Their marks are drawn on one 64-unit grid with one stroke, their wordmarks are set in one typeface, and each has a colour of its own. The family's identity comes from print proofing: artifactr, reflexr and evalr are each drawn in two of the three process inks, cyan, magenta and yellow, and where both land on the same spot they overprint into a third colour, the library's working colour (artifactr's magenta and cyan overprint into indigo); relayr and lattice each print on one plate, magenta and cyan, stackr prints in key, portalr in all three process inks, and grantr in yellow and key. [lattice's brand page](../../../assets/brand/README.md#the-family) states the system in full.
+evalr is one of the seven packages in [lattice](https://github.com/alexnodeland/lattice), which is drawn in their brand system too: [artifactr](../../../artifactr/index.md), [reflexr](../../../reflexr/index.md), evalr, [relayr](../../../relayr/index.md), [stackr](../../../stackr/index.md), [portalr](../../../portalr/index.md) and [grantr](../../../grantr/index.md). Their marks are drawn on one 64-unit grid with one stroke, their wordmarks are set in one typeface, and each has a colour of its own. lattice's identity comes from print proofing: artifactr, reflexr and evalr are each drawn in two of the three process inks, cyan, magenta and yellow, and where both land on the same spot they overprint into a third colour, the library's working colour (artifactr's magenta and cyan overprint into indigo); relayr and lattice each print on one plate, magenta and cyan, stackr prints in key, portalr in all three process inks, and grantr in yellow and key. [lattice's brand page](../../../assets/brand/README.md#the-marks) states the system in full.
 
-evalr's hue is **green**. Its mark is a tick, the family's proofreader's caret turned over with one arm cut short. Its two inks are two judgements of the same thing: **yellow**, for people's, and **cyan**, for the evaluator's. Where they meet, at the point of the tick, they overprint into green: agreement, the verdict both give. Cyan is the ink evalr shares with artifactr.
+evalr's hue is **green**. Its mark is a tick, lattice's proofreader's caret turned over with one arm cut short. Its two inks are two judgements of the same thing: **yellow**, for people's, and **cyan**, for the evaluator's. Where they meet, at the point of the tick, they overprint into green: agreement, the verdict both give. Cyan is the ink evalr shares with artifactr.
 
 <p>
   <img src="mark-light.svg#gh-light-mode-only" width="96" alt="The evalr mark">
@@ -42,7 +42,7 @@ On paper, yellow printed over cyan makes a green darker than either, so the ligh
 
 | Typeface | Role | Why |
 |---|---|---|
-| [Schibsted Grotesk](https://fonts.google.com/specimen/Schibsted+Grotesk) | The wordmark (Bold, outlined, tracked −1.2%), headings and body text on the site | The family's typeface: a plain, readable grotesque with an editorial voice |
+| [Schibsted Grotesk](https://fonts.google.com/specimen/Schibsted+Grotesk) | The wordmark (Bold, outlined, tracked −1.2%), headings and body text on the site | lattice's typeface: a plain, readable grotesque with an editorial voice |
 | [Fragment Mono](https://fonts.google.com/specimen/Fragment+Mono) | Code on the site | A monospace in the Helvetica tradition, so code sits comfortably beside the grotesque |
 
 Both are open-source (SIL Open Font License) and served by Google Fonts. The wordmark is always lowercase: **evalr**.

@@ -22,7 +22,7 @@ Applications talk only to **ports**: a stable protocol at a stable address, conf
 | LLM gateway | OpenAI-compatible HTTP API, with models named by alias or group | `LITELLM_BASE_URL`, `LITELLM_API_KEY`; `OPENAI_BASE_URL`, `OPENAI_API_KEY` for OpenAI SDKs | The LiteLLM proxy |
 | Database | A PostgreSQL connection string | `DATABASE_URL` | Local Supabase's PostgreSQL; plain PostgreSQL as the alternative |
 | Object storage | The S3 API | `S3_ENDPOINT_URL`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | MinIO |
-| Identity | JWTs, verified against the issuer's key set (or a shared secret, for HS256) | `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`; `AUTH_JWT_SECRET`; `AUTH_SERVICE_ROLE_KEY` with grantr, `AUTH_TENANT_CLAIM` without | Supabase Auth |
+| Identity | JWTs, verified against the issuer's key set (or a shared secret, for HS256) | `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`; `AUTH_JWT_SECRET`; `AUTH_SERVICE_ROLE_KEY` and `AUTH_ADMIN_URL` with grantr, `AUTH_TENANT_CLAIM` without | Supabase Auth; GoTrue alone, the `auth` profile, on the `postgres` adapter |
 | Evaluation data | Langfuse's public API, for scores and datasets | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | Self-hosted Langfuse |
 
 The settings are a contract with the libraries' extras and the application template, which generates applications wired to these ports only, and reads the settings of the ports it uses: every port but profiles and object storage, which nothing in a generated application uses yet ([ADR-0005's amendment](adr/0005-ports-and-adapters-for-the-stack.md#amendment-2026-09-29-the-template-reads-the-settings-of-the-ports-it-uses)). The stack's own services use the same ports: Langfuse and the gateway reach PostgreSQL, S3 and the Redis protocol through settings in `.env`, and the gateway sends its telemetry to the Collector, so their adapters can change as well. Profiles and evaluation data are the two narrow ports: profiles go to Pyroscope directly until OTLP profiles are stable in the Collector, and Langfuse's API carries scores and datasets, never traces.
@@ -38,6 +38,8 @@ template/           the application template (Copier): an application on artifac
 .env.example        settings and placeholders; `make env` turns it into .env
 versions.env        versions pinned outside compose.yaml: the Supabase CLI
 deploy/<service>/   each service's configuration, mounted read-only
+deploy/host/        the single host (RFC-0004): the overlay that puts Caddy in front, its Caddyfile,
+                    and bootstrap, which prepares a VM
 deploy/postgres/    init.sql: each service's role and database, created by db-init
 supabase/           the Supabase CLI project: config.toml (project id stackr-supabase) and seed.sql
 scripts/            setup-env, validate, smoke, create-tenant, check-config, check-template, check-app
@@ -158,6 +160,10 @@ The LiteLLM proxy is the LLM gateway port: an OpenAI-compatible API at <http://l
 
 - **Telemetry:** the proxy continues the caller's trace from its `traceparent` header, so one trace runs from the application through the proxy to the model call, in Tempo and Langfuse. Prompts and responses are not put on spans. Its metrics carry the tenant's team, not per-key ids. Both are on when the `observability` profile runs.
 - **State:** its database `litellm` on the database adapter, created by `db-init`; routing state and a 10-minute response cache in database 1 of the shared Valkey.
+
+## A single host
+
+With `STACKR_RECIPE=host`, `make` adds `deploy/host/compose.prod.yaml` to the stack: Caddy publishes 80 and 443 and serves `app.<domain>` and `auth.<domain>`, the admin UIs keep their ports on `127.0.0.1` for SSH tunnels, and the rest publish nothing. It runs on the `postgres` adapter with the `auth` profile, GoTrue alone ([RFC-0004](rfcs/0004-hosting-recipes.md), [ADR-0026](adr/0026-the-single-host.md)). [A single host](guides/single-host.md) covers it.
 
 ## The database
 

@@ -41,3 +41,28 @@ GRANT litellm TO CURRENT_USER;
 \endif
 SELECT 'CREATE DATABASE litellm OWNER litellm'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'litellm') \gexec
+
+-- GoTrue (the auth profile): its own database, whose `auth` schema it owns and
+-- migrates. Its migrations grant to a `postgres` role, which plain PostgreSQL
+-- and local Supabase have, and which RDS has when its master is named so
+-- (stackr ADR-0025).
+\getenv auth_password AUTH_DB_PASSWORD
+SELECT 'CREATE ROLE gotrue LOGIN'
+WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'gotrue') \gexec
+ALTER ROLE gotrue WITH LOGIN PASSWORD :'auth_password';
+ALTER ROLE gotrue SET search_path TO auth;
+SELECT CASE
+  WHEN current_setting('server_version_num')::int >= 160000
+    THEN NOT pg_has_role(current_user, 'gotrue', 'SET')
+  ELSE NOT pg_has_role(current_user, 'gotrue', 'MEMBER')
+END AS needs_grant \gset
+\if :needs_grant
+GRANT gotrue TO CURRENT_USER;
+\endif
+SELECT 'CREATE DATABASE auth OWNER gotrue'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'auth') \gexec
+ALTER DATABASE auth SET timezone TO 'UTC';
+-- Only GoTrue, its owner, connects to it.
+REVOKE CONNECT ON DATABASE auth FROM PUBLIC;
+\connect auth
+CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION gotrue;

@@ -7,6 +7,7 @@ reflexr's; grantr reads them by their fields' names.
 from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime
+from typing import override
 
 import pytest
 
@@ -108,6 +109,7 @@ async def test_hidden_hides_nothing_yet(grants: Grants) -> None:
 class Unreadable(InMemoryStorage):
     """A store that can't be read."""
 
+    @override
     async def grants(
         self, tenant: str | None, to: Grantee, *, on: Collection[Resource] | None = None
     ) -> list[Grant]:

@@ -24,12 +24,13 @@ ADR-0001 to ADR-0007 record the decisions D1 to D7 of [stackr RFC-0002](../../st
 | [0016](0016-followers-start-on-open.md) | Followers start on open | Accepted |
 | [0017](0017-the-follower-acts-as-the-application.md) | The follower acts as the application | Accepted |
 | [0018](0018-bridged-events-their-fields-ids-and-projections.md) | Bridged events, their fields, ids and projections | Accepted |
-| [0019](0019-runs-act-once-through-derived-ids-and-keyed-edits.md) | Runs act once, through derived ids and keyed edits | Accepted |
+| [0019](0019-runs-act-once-through-derived-ids-and-keyed-edits.md) | Runs act once, through derived ids and keyed edits | Accepted, amended by 0026 |
 | [0020](0020-allowlists.md) | Allowlists | Accepted |
-| [0021](0021-chains-continue-across-the-bridge.md) | Chains continue across the bridge | Accepted, amended by 0025 |
+| [0021](0021-chains-continue-across-the-bridge.md) | Chains continue across the bridge | Accepted, amended by 0025 and 0026 |
 | [0022](0022-what-a-rules-actor-needs-in-artifactr.md) | What a rule's actor needs in artifactr | Accepted |
 | [0023](0023-traces-linked-across-the-bridge.md) | Traces linked across the bridge | Accepted |
-| [0024](0024-langfuse-sessions-tagged-with-each-other.md) | Langfuse sessions tagged with each other | Accepted |
+| [0024](0024-langfuse-sessions-tagged-with-each-other.md) | Langfuse sessions tagged with each other | Accepted, amended by 0026 |
 | [0025](0025-counters-and-how-long-causes-are-kept.md) | Counters, and how long causes are kept | Accepted |
+| [0026](0026-a-retried-send-asks-again-and-turns-traced-by-their-messages.md) | A retried send asks again, and turns are traced by their messages | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

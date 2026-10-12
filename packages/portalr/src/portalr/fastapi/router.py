@@ -26,7 +26,7 @@ from grantr.core import (
 from grantr.fastapi import STATUS_CODES, Caller, ResolveActor, Unauthorized
 from grantr.grants import Grants
 from portalr.actions import READ_DEPLOYMENT, READ_SPEND, READ_TELEMETRY
-from portalr.fastapi.site import Site
+from portalr.fastapi.site import Site, Surfaces
 from portalr.fastapi.ui import ui_router
 from portalr.invites import Invite, InviteFailed
 from portalr.readers import (
@@ -54,13 +54,24 @@ UI: Final = Path(str(files("portalr") / "static"))
 """Where portalr's wheel carries the built UIs: ``static/app`` and ``static/admin``."""
 
 
+class Supabase(BaseModel):
+    """The Supabase project the UIs sign in to."""
+
+    model_config = ConfigDict(frozen=True)
+
+    url: str
+    """Its URL, or a path on the application's own origin."""
+    key: str
+    """Its publishable key."""
+
+
 class Config(BaseModel):
     """``config.json``: what the UIs need of the deployment they run in."""
 
     model_config = ConfigDict(frozen=True)
 
-    supabase: dict[str, str]
-    surfaces: dict[str, str]
+    supabase: Supabase
+    surfaces: Surfaces
     readers: dict[str, bool]
 
 
@@ -209,8 +220,8 @@ def portalr_router(
     async def config() -> Config:
         """What the UIs need of this deployment: Supabase, the surfaces, and the tools it runs."""
         return Config(
-            supabase={"url": site.supabase_url, "key": site.supabase_key},
-            surfaces=site.surfaces.model_dump(),
+            supabase=Supabase(url=site.supabase_url, key=site.supabase_key),
+            surfaces=site.surfaces,
             readers=readers.configured(),
         )
 

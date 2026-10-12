@@ -28,6 +28,16 @@
       "minimumReleaseAge": "3 days"
     },
     {
+      "description": "TanStack Router's runtime, its Vite plugin and its generator write and read one route tree: they move together.",
+      "matchPackageNames": ["@tanstack/react-router", "@tanstack/router-plugin", "@tanstack/router-generator"],
+      "groupName": "TanStack Router"
+    },
+    {
+      "description": "ui's Playwright and app's @playwright/test drive one Chromium: they move together.",
+      "matchPackageNames": ["playwright", "@playwright/test"],
+      "groupName": "Playwright"
+    },
+    {
       "description": "json-schema-to-typescript 16 needs js-yaml 5, and the root's overrides hold js-yaml at 4.3.2 for the Bruno CLI (portalr ADR-0010).",
       "matchPackageNames": ["json-schema-to-typescript"],
       "allowedVersions": "<16"

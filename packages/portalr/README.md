@@ -14,7 +14,7 @@
 
 **portalr** is the planned portal into an application built on the family: an `app` UI for the people who use it, to chat with its agents and see their artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and see feedback, evaluations, usage and spend. Both will be static single-page apps in React, sharing a typed `client` and a `ui` kit, and served by a router the application mounts beside the libraries'.
 
-> **Status:** in progress, not yet usable. Built so far: its decisions and [v0.1 plan](https://lattice.alexnodeland.com/portalr/rfcs/0001-v0.1-implementation-plan/), the Bun workspace, its mark with `ui`'s tokens and first primitives, the typed `client`, and the router with its readers, tested against the stack's tools for two tenants ([architecture](https://lattice.alexnodeland.com/portalr/architecture/)). The two UIs come with the plan's later phases.
+> **Status:** in progress, not yet usable. Built so far: its decisions and [v0.1 plan](https://lattice.alexnodeland.com/portalr/rfcs/0001-v0.1-implementation-plan/), the Bun workspace, its mark with `ui`'s tokens and first primitives, the typed `client`, and the router with its readers, tested against the stack's tools for two tenants, and the app's sign-in and its tenant and workspace pickers ([architecture](https://lattice.alexnodeland.com/portalr/architecture/)). The app's areas and the admin UI come with the plan's later phases.
 
 ## Why
 

@@ -1,0 +1,5 @@
+# grantr: identity and access for artifactr and reflexr. It imports neither, nor any sibling.
+language: 'python'
+layer: 'library'
+tags: ['distribution']
+dependsOn: []

@@ -8,6 +8,7 @@ projects:
   reflexr: 'packages/reflexr'
   evalr: 'packages/evalr'
   relayr: 'packages/relayr'
+  grantr: 'packages/grantr'
   stackr: 'packages/stackr'
   docplan: 'examples/docplan'
   oncall: 'examples/oncall'

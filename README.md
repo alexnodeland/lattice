@@ -27,9 +27,10 @@
 | [reflexr](packages/reflexr) | Rules over event streams that run LLM workflows: pydantic-ai agents, pydantic-graph graphs and functions | [reflexr](https://lattice.alexnodeland.com/reflexr/) | `reflexr` |
 | [evalr](packages/evalr) | Typed evaluation of agent systems: judges that give typed verdicts, trained on people's feedback and measured against it | [evalr](https://lattice.alexnodeland.com/evalr/) | `evalr` |
 | [relayr](packages/relayr) | The bridge between artifactr and reflexr: events from chats and artifacts become events for rules, and runs act back in the chat | [relayr](https://lattice.alexnodeland.com/relayr/) | `relayr-ai` |
+| [grantr](packages/grantr) | Identity and access for artifactr and reflexr: tenants, members, groups, roles and service principals, checked before every command and read | [grantr](https://lattice.alexnodeland.com/grantr/) | `grantr` |
 | [stackr](packages/stackr) | The infrastructure the libraries run on (local Supabase, the LiteLLM gateway, OpenTelemetry, Grafana and Langfuse), and an application template | [stackr](https://lattice.alexnodeland.com/stackr/) | none: it ships no wheel |
 
-Two more are planned. **grantr** is identity and access for artifactr and reflexr: users, groups, roles and permissions, bound to tenants and workspaces and checked by their authorize hooks. **portalr** is the portal into the system: chat with your agents, see artifacts, rules and runs, and manage access, traces, feedback, evals and analytics.
+grantr holds only its version so far, and [its plan](docs/grantr/rfcs/0001-v0.1-implementation-plan.md) builds it. One more package is planned: **portalr**, the portal into the system: chat with your agents, see artifacts, rules and runs, and manage access, traces, feedback, evals and analytics.
 
 > **Status:** alpha. artifactr's [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) is the family's first release; the other packages haven't had one. APIs may still change before 1.0.
 

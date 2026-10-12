@@ -1,0 +1,87 @@
+[project]
+name = "grantr"
+version = "0.1.0.dev0"
+description = "Identity and access for artifactr and reflexr: tenants, members, groups, roles, service principals and grants, checked before every command and read."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Alex Nodeland", email = "alex@ournature.studio" }]
+requires-python = ">=3.12"
+keywords = ["authorization", "access-control", "rbac", "multi-tenant", "agents", "pydantic"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Framework :: Pydantic :: 2",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://lattice.alexnodeland.com/grantr/"
+Documentation = "https://lattice.alexnodeland.com/grantr/"
+Repository = "https://github.com/alexnodeland/lattice"
+Issues = "https://github.com/alexnodeland/lattice/issues"
+Changelog = "https://github.com/alexnodeland/lattice/blob/main/packages/grantr/CHANGELOG.md"
+
+[dependency-groups]
+test = [
+    "pytest>=9.1",
+    "pytest-asyncio>=1.4",
+    "pytest-cov>=7.1",
+    "pytest-timeout>=2.4",
+]
+lint = ["ruff>=0.16", "pyright>=1.1.414"]
+dev = [
+    { include-group = "test" },
+    { include-group = "lint" },
+]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+# ─── types ────────────────────────────────────────────────────────────────────
+
+[tool.pyright]
+include = ["src", "tests"]
+strict = ["src"]
+typeCheckingMode = "standard"
+pythonVersion = "3.12"
+venvPath = "../.."
+venv = ".venv"
+
+# ─── tests and coverage ───────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config", "-ra"]
+# A test that runs for a minute is stuck: fail it, with every thread's stack.
+timeout = 60
+timeout_method = "thread"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = ["src/grantr"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "@overload",
+    "assert_never\\(",
+    "raise NotImplementedError",
+    "^\\s*\\.\\.\\.$",
+    "class .*\\(Protocol.*\\):",
+]

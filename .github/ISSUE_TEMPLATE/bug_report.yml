@@ -6,7 +6,7 @@ body:
     id: package
     attributes:
       label: Package
-      options: [artifactr, reflexr, evalr, relayr, stackr, docplan, oncall, docs]
+      options: [artifactr, reflexr, evalr, relayr, grantr, stackr, docplan, oncall, docs]
     validations:
       required: true
   - type: textarea

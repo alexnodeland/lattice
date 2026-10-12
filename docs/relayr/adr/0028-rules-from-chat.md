@@ -1,6 +1,6 @@
 # ADR-0028: Rules from chat
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0030](0030-drift-proposed-back-to-a-rules-artifact.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

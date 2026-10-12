@@ -43,6 +43,16 @@ Then it installs the rule, with provenance naming the artifact, its version, the
 
 Archiving the artifact archives the rule, once the rule has checked the same way that the person may archive rules. A forged `artifactr:proposal_resolved` finds no accepted proposal, and installs nothing. An acceptance replayed after it was installed changes nothing, even if an operator has archived its rule in reflexr since.
 
+## Changes made in reflexr
+
+An operator can update or archive a rule from chat in reflexr directly. relayr's `relayr:rule-drift` proposes the same change to the rule's artifact, in the thread it was drafted in ([ADR-0030](../adr/0030-drift-proposed-back-to-a-rules-artifact.md)):
+
+- **An update** is proposed as an edit of the artifact's rule. Accepting it updates the rule from the artifact again.
+- **An archive** is proposed as archiving the artifact.
+- **Rejecting** leaves reflexr's version running.
+
+Give the outbound adapter relayr's `ALLOWLISTS` with your own, so the drift rule may propose in that thread.
+
 ## Who may put a rule live
 
 `may_change(tenant_id, workspace_id, person, change)` decides, and `Installer` requires it. `change` is `install_rule`, `update_rule` or `archive_rule`, reflexr's actions for each. Only a person, a `UserActor`, can put a rule live, never an agent.
@@ -58,6 +68,6 @@ Archiving the artifact archives the rule, once the rule has checked the same way
 
 - An artifact installs one rule. A change of the rule's name is refused: archive it, and draft the new rule apart.
 - Only an accepted proposal installs. A person who writes to a `rule` artifact directly installs nothing.
-- Provenance is a claim: anyone allowed to install rules directly in reflexr can name any artifact in `provenance.artifact`, and relayr then treats that rule as the artifact's.
+- relayr knows which rule an artifact installed from its own installs, in reflexr's log, never from a stored rule's provenance, which anyone allowed to install can claim.
 - A name another artifact installed, and anything reflexr's checks refuse, are reported in a notice, with reflexr's problems.
 - Stored rules keep to reflexr's limits: a throttle and a timeout, only the actions `StoredRules` allows, and no predicates ([reflexr RFC-0003](../../reflexr/rfcs/0003-managing-rules-at-runtime.md)).

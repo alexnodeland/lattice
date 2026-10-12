@@ -39,6 +39,7 @@ nav:
   - adr/0027-row-level-security-under-the-scoping.md
   - adr/0028-rules-from-chat.md
   - adr/0029-an-allowlist-for-a-whole-rule-namespace.md
+  - adr/0030-drift-proposed-back-to-a-rules-artifact.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

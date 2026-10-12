@@ -9,6 +9,8 @@ rules accepts it, relayr's `relayr:rules-from-chat` rule installs it in reflexr,
 from relayr.rules.drafting import RuleDrafting
 from relayr.rules.drafts import RuleDraft, check_draft
 from relayr.rules.installer import (
+    ALLOWLISTS,
+    RULE_DRIFT,
     RULES,
     RULES_FROM_CHAT,
     Installer,
@@ -19,8 +21,10 @@ from relayr.rules.installer import (
 from relayr.rules.preview import Preview, preview
 
 __all__ = [
+    "ALLOWLISTS",
     "RULES",
     "RULES_FROM_CHAT",
+    "RULE_DRIFT",
     "Installer",
     "MayChange",
     "Preview",

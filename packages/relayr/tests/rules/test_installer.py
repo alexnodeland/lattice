@@ -14,7 +14,17 @@ import reflexr.workspace as r
 from relayr.events import BRIDGED, ArtifactArchived, ProposalResolved
 from relayr.ledger import Ledger
 from relayr.outbound import Outbound
-from relayr.rules import RULES, RULES_FROM_CHAT, Installer, MayChange, RuleChange, RuleDraft, anyone
+from relayr.rules import (
+    ALLOWLISTS,
+    RULE_DRIFT,
+    RULES,
+    RULES_FROM_CHAT,
+    Installer,
+    MayChange,
+    RuleChange,
+    RuleDraft,
+    anyone,
+)
 from tests.app_types import Deployed, Note
 from tests.rules.drafts import STORED, NotifyParams, draft
 from tests.stack import ALICE, KEY, Actions, Process, Stack, notices, until
@@ -120,6 +130,7 @@ async def chat(
         rules=RULES,
         actions={"notify": r.with_params(notify, NotifyParams)},
         more_actions=installing,
+        allowlists=ALLOWLISTS,
         stored_rules=STORED,
         authorize=authorize,
     )
@@ -419,3 +430,79 @@ async def test_an_artifact_archived_as_it_is_accepted_puts_nothing_live(
     with pytest.raises(reflexr.core.NotFound):
         await chat_.stored()
     assert await chat_.ran() == ["succeeded", "succeeded"]
+
+
+async def proposals(chat_: Chat) -> list[a.Proposal]:
+    """The drift rule's proposals: those its own participant made."""
+    return [
+        p
+        for p in await chat_.alice.proposals(status=None)
+        if p.proposed_by
+        == a.ExternalAgentActor(client_id=f"reflexr:{RULE_DRIFT.name}", name=RULE_DRIFT.name)
+    ]
+
+
+async def settled(chat_: Chat) -> None:
+    """Let the drift rule act on reflexr's facts, which reach it without the bridge."""
+    await chat_.app.reactor.settle()
+
+
+async def test_a_change_made_in_reflexr_is_proposed_to_its_artifact(
+    ledger: Ledger, stack: Stack
+) -> None:
+    chat_ = await chat(stack, ledger)
+    artifact_id, proposal_id = await chat_.drafted()
+    await chat_.resolve(proposal_id)
+    operator = await chat_.automation()
+    changed = draft(service="billing").rule
+    await operator.update_rule(changed, expected_version=1, provenance={"by": "an operator"})
+    await settled(chat_)
+    [drift] = await proposals(chat_)
+    assert drift.thread_id == chat_.thread, "in the thread the rule was drafted in"
+    assert drift.rationale is not None
+    assert drift.rationale.startswith("chat:deploys was changed in reflexr, outside its artifact")
+
+    await chat_.resolve(drift.id)
+    assert (await chat_.alice.get(RuleDraft, artifact_id)).data.rule == changed
+    stored = await chat_.stored()
+    assert (stored.version, stored.rule) == (3, changed), "relayr installs it from the artifact"
+    await settled(chat_)
+    assert len(await proposals(chat_)) == 1, "relayr's own install is in step"
+
+
+async def test_an_archive_in_reflexr_is_proposed_to_its_artifact(
+    ledger: Ledger, stack: Stack
+) -> None:
+    chat_ = await chat(stack, ledger)
+    artifact_id, proposal_id = await chat_.drafted()
+    await chat_.resolve(proposal_id)
+    await (await chat_.automation()).archive_rule("chat:deploys", reason="an operator stopped it")
+    await settled(chat_)
+    [drift] = await proposals(chat_)
+    assert drift.rationale is not None
+    assert "it was archived" in drift.rationale
+    await chat_.resolve(drift.id)
+    assert (await chat_.alice.artifact(artifact_id)).archived
+
+
+async def test_a_change_in_step_with_its_artifact_proposes_nothing(
+    ledger: Ledger, stack: Stack
+) -> None:
+    chat_ = await chat(stack, ledger)
+    _, proposal_id = await chat_.drafted()
+    await chat_.resolve(proposal_id)
+    operator = await chat_.automation()
+    await operator.update_rule(draft().rule, expected_version=1, provenance={"by": "an operator"})
+    await operator.install_rule(draft("chat:other").rule)  # no draft installed it
+    await settled(chat_)
+    assert await proposals(chat_) == []
+
+
+async def test_a_rule_whose_artifact_is_archived_drifts_alone(ledger: Ledger, stack: Stack) -> None:
+    chat_ = await chat(stack, ledger)
+    artifact_id, proposal_id = await chat_.drafted()
+    await chat_.resolve(proposal_id)
+    await chat_.archive(artifact_id)
+    await (await chat_.automation()).install_rule(draft(service="x").rule)
+    await settled(chat_)
+    assert await proposals(chat_) == []

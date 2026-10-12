@@ -26,7 +26,7 @@ graph LR
 | `relayr.sql` | `SqlLedger`, its tables and Alembic migrations, and `create_sqlite_engine`. The `sql`, `sqlite` and `postgres` extras | `relayr.ledger`, SQLAlchemy, Alembic |
 | `relayr.inbound` | `Followers`, and the two actors a follower acts as | `relayr.events`, `relayr.ledger`, artifactr, reflexr |
 | `relayr.outbound` | `Outbound` and its per-attempt `RunActions`, `Allowlist`, `NotAllowed`, `Refused`, the rule's actor, `turn_cause`, and `ArtifactrCapability` with its tools | `relayr.events`, `relayr.ledger`, artifactr, reflexr, pydantic, pydantic-ai |
-| `relayr.rules` | `RuleDraft`, the `rule` artifact type; `check_draft` and `preview`; `RuleDrafting`, the chat agent's `draft_rule`; and relayr's rule from chat, `RULES_FROM_CHAT`, with `Installer`'s action and `anyone` | `relayr.events`, `relayr.outbound`, artifactr, reflexr, pydantic, pydantic-ai |
+| `relayr.rules` | `RuleDraft`, the `rule` artifact type; `check_draft` and `preview`; `RuleDrafting`, the chat agent's `draft_rule`; and relayr's rules from chat, `RULES_FROM_CHAT` and `RULE_DRIFT`, with `Installer`'s actions, `ALLOWLISTS` and `anyone` | `relayr.events`, `relayr.outbound`, artifactr, reflexr, pydantic, pydantic-ai |
 | `relayr.telemetry` | The `relayr` scope's attributes, the counters' registry, and `Telemetry`, through the OpenTelemetry API | the OpenTelemetry API |
 | `relayr.otel` | `telemetry()`, relayr's contribution to the libraries' `configure_telemetry`, and `metric_views`. The `otel` extra | `relayr.telemetry`, the OpenTelemetry SDK |
 | `relayr.langfuse` | `bridged_run` and `bridged_turns`, the libraries' Langfuse contexts with relayr's tags. The `langfuse` extra | `relayr.events`, `relayr.ledger`, `relayr.outbound`, artifactr, reflexr, Langfuse |
@@ -82,7 +82,7 @@ Before each write, `RunActions` records the run behind it in the ledger, by the 
 
 ## Rules from chat
 
-The chat agent drafts a reflexr rule as a `rule` artifact, through `RuleDrafting`'s `draft_rule`. That tool checks the draft, previews it against the recent log and proposes it. When a person who may install rules accepts the proposal, relayr's `relayr:rules-from-chat` re-reads artifactr and installs the rule in reflexr's stored rules, with its provenance. Archiving the artifact archives the rule. The rule is scoped by the artifact, so one artifact's changes happen in order, and it never trusts the bridged event ([ADR-0028](adr/0028-rules-from-chat.md)). `tests/rules/test_installer.py` checks phase 5's exit criterion.
+The chat agent drafts a reflexr rule as a `rule` artifact, through `RuleDrafting`'s `draft_rule`. That tool checks the draft, previews it against the recent log and proposes it. When a person who may install rules accepts the proposal, relayr's `relayr:rules-from-chat` re-reads artifactr and installs the rule in reflexr's stored rules, with its provenance. Archiving the artifact archives the rule. The rule is scoped by the artifact, so one artifact's changes happen in order, and it never trusts the bridged event ([ADR-0028](adr/0028-rules-from-chat.md)). A rule changed in reflexr directly is proposed back to its artifact by `relayr:rule-drift`, which finds the artifact from relayr's own install facts ([ADR-0030](adr/0030-drift-proposed-back-to-a-rules-artifact.md)). `tests/rules/test_installer.py` checks phase 5's exit criterion.
 
 ## Telemetry
 
@@ -103,4 +103,4 @@ One contract test, `tests/ledger/test_contract.py`, runs against memory, SQLite 
 
 ## What isn't built yet
 
-Drift proposed back to a rule's artifact (phase 5's follow-up), and evaluation (phase 6). stackr's template wires relayr in with its `bridge` question ([stackr ADR-0021](../stackr/adr/0021-the-bridge-in-the-template.md)). LiteLLM's metadata doesn't carry relayr's tags yet ([lattice #86](https://github.com/alexnodeland/lattice/issues/86)).
+Evaluation (phase 6). stackr's template wires relayr in with its `bridge` question ([stackr ADR-0021](../stackr/adr/0021-the-bridge-in-the-template.md)). LiteLLM's metadata doesn't carry relayr's tags yet ([lattice #86](https://github.com/alexnodeland/lattice/issues/86)).

@@ -570,6 +570,7 @@ async def test_a_retried_runs_writes_are_each_made_once(ledger: Ledger, stack: S
     async def body(acting: RunActions, reaction: r.Reaction[Outbound]) -> object:
         thread = await acting.create_thread("incident")
         await acting.edit("art_alice", "/text", "proposed")
+        await acting.archive("art_alice", rationale="done with it")
         await acting.create(Note(text="new"))
         await acting.notice("noted")
         if reaction.attempt == 1:
@@ -594,9 +595,22 @@ async def test_a_retried_runs_writes_are_each_made_once(ledger: Ledger, stack: S
     await stack.processes[-1].reactor.settle()
     [thread] = acted.results
     workspace = await people(stack)
-    assert len(await workspace.proposals()) == 2, "the edit's and the create's, once each"
+    assert len(await workspace.proposals()) == 3, "the edit's, the archive's and the create's"
     assert [t.id for t in await workspace.threads()] == [thread]
     assert notices(await stack.log()) == [(ACTOR, "noted")]
+
+
+async def test_an_archived_artifact_is_archived_no_further(ledger: Ledger, stack: Stack) -> None:
+    async def archived_by_alice(workspace: artifactr.Workspace) -> object:
+        await workspace.create(Note(text=""), artifact_id="art_alice")
+        return await workspace.commit(a.ArchiveArtifact(artifact_id="art_alice", base_version=1))
+
+    async def body(acting: RunActions, reaction: r.Reaction[Outbound]) -> object:
+        return await acting.archive("art_alice")
+
+    acted = await act(stack, ledger, body, on=ArtifactCreated, trigger=archived_by_alice)
+    assert (acted.results, acted.errors) == ([None], [])
+    assert await (await people(stack)).proposals() == []
 
 
 def archiving(storage: artifactr.InMemoryStorage) -> artifactr.workspace.Authorize:

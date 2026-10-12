@@ -26,7 +26,7 @@ The family's packages, in one repository: libraries for applications in which pe
 | [grantr](grantr/index.md) | Identity and access for artifactr and reflexr: tenants, members, groups, roles and service principals, checked before every command and read |
 | [stackr](stackr/index.md) | The infrastructure the libraries run on, and an application template |
 
-grantr holds only its version so far, and [its plan](grantr/rfcs/0001-v0.1-implementation-plan.md) builds it. One more package is planned: portalr, the portal into the system.
+grantr's core is built, and [its plan](grantr/rfcs/0001-v0.1-implementation-plan.md) wires it into the libraries and the template. One more package is planned: portalr, the portal into the system.
 
 lattice's mark is one cell of the lattice that every mark in the family is drawn on. Its [brand page](assets/brand/README.md) has the mark, the colours and the family's brand system, and [ADR-0001](adr/0001-lattices-brand.md) records why.
 

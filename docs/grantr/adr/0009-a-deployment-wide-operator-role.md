@@ -1,6 +1,6 @@
 # ADR-0009: A deployment-wide operator role
 
-**Status:** Accepted
+**Status:** Accepted; amended by [ADR-0014](0014-an-operator-enters-a-tenant-by-granting-themselves.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

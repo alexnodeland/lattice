@@ -30,7 +30,7 @@
 | [grantr](packages/grantr) | Identity and access for artifactr and reflexr: tenants, members, groups, roles and service principals, checked before every command and read | [grantr](https://lattice.alexnodeland.com/grantr/) | `grantr` |
 | [stackr](packages/stackr) | The infrastructure the libraries run on (local Supabase, the LiteLLM gateway, OpenTelemetry, Grafana and Langfuse), and an application template | [stackr](https://lattice.alexnodeland.com/stackr/) | none: it ships no wheel |
 
-grantr holds only its version so far, and [its plan](docs/grantr/rfcs/0001-v0.1-implementation-plan.md) builds it. One more package is planned: **portalr**, the portal into the system: chat with your agents, see artifacts, rules and runs, and manage access, traces, feedback, evals and analytics.
+grantr's core is built, and [its plan](docs/grantr/rfcs/0001-v0.1-implementation-plan.md) wires it into the libraries and the template. One more package is planned: **portalr**, the portal into the system: chat with your agents, see artifacts, rules and runs, and manage access, traces, feedback, evals and analytics.
 
 > **Status:** alpha. artifactr's [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) is the family's first release; the other packages haven't had one. APIs may still change before 1.0.
 

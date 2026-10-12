@@ -416,6 +416,13 @@ async def test_a_tenants_workspaces_are_listed_by_those_the_actor_may_open(
     ]
 
 
+async def test_listing_reads_storage_a_page_at_a_time_whatever_the_limit(storage: Storage) -> None:
+    workspaces = Workspaces(storage)
+    for workspace_id in ("a", "b"):
+        await (await workspaces.open("tenant_a", workspace_id, actor=ALICE)).create_thread()
+    assert await workspaces.list("tenant_a", actor=ALICE, limit=2**110) == ["a", "b"]
+
+
 async def test_listing_workspaces_is_asked_with_no_workspace(storage: Storage) -> None:
     async def authorize(
         tenant_id: str, workspace_id: str | None, actor: Actor, access: Access

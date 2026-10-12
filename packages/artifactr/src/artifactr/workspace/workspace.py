@@ -183,6 +183,10 @@ a permission check has no side effects.
 
 _OPEN: Final = Access(action="artifactr:open")
 
+_WORKSPACES_PAGE: Final = 500
+"""How many workspace ids :meth:`Workspaces.list` reads from storage at a time, whatever its
+``limit``: a database can't take any number as a page's size."""
+
 
 class ThreadBusy(InvalidState):
     """Another run holds the thread."""
@@ -265,7 +269,7 @@ class Workspaces:
             raise ValidationFailed("limit must be at least 1", [])
         found: list[WorkspaceId] = []
         while len(found) < limit:
-            wanted = limit - len(found)
+            wanted = min(limit - len(found), _WORKSPACES_PAGE)
             page = await context.storage.workspaces(tenant_id, after=after, limit=wanted)
             found += [w for w in page if await context.allows(tenant_id, w, actor, _OPEN)]
             if len(page) < wanted:

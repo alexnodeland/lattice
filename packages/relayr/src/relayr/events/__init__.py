@@ -10,7 +10,7 @@ projections = Projections(app_events={"deploy": deployed}, artifacts={"timeline"
 ```
 """
 
-from relayr.events.projections import Projection, Projections, bridged
+from relayr.events.projections import Projection, Projections
 from relayr.events.types import (
     BRIDGED,
     ArtifactArchived,
@@ -37,5 +37,4 @@ __all__ = [
     "ProposalCreated",
     "ProposalResolved",
     "TurnEnded",
-    "bridged",
 ]

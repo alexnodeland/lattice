@@ -11,6 +11,6 @@ The followers start from the libraries' `on_open` hook, `followers.watch`, which
 application composes with its other ones, such as the feedback mirrors'.
 """
 
-from relayr.inbound.followers import FOLLOWER, SAVE_EVERY, SOURCE, Followers
+from relayr.inbound.followers import FOLLOWER, SOURCE, Followers
 
-__all__ = ["FOLLOWER", "SAVE_EVERY", "SOURCE", "Followers"]
+__all__ = ["FOLLOWER", "SOURCE", "Followers"]

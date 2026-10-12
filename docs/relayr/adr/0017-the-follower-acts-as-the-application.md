@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
+**Amends:** [lattice RFC-0001](../../rfcs/0001-grantr-identity-and-access.md#the-ports)'s `subject_of` table, its `SourceActor` row: the source `artifactr` is the application's own principal, not a service principal of that source's
 
 ## Context
 

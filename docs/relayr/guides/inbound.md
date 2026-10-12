@@ -40,7 +40,7 @@ await followers.resume()  # at startup: every workspace the ledger knows
 await followers.aclose()  # at shutdown: each follower releases its lease
 ```
 
-- **`events` must include `BRIDGED`.** reflexr refuses a type its `Workspaces` doesn't accept, and the follower dead-letters the envelope.
+- **`events` must include `BRIDGED`.** reflexr refuses a type its `Workspaces` doesn't accept, and the follower stops, logging an error, until the workspace is next opened. Nothing is skipped meanwhile.
 - **Give each process its own `holder`,** or leave it to its random default. One process at a time follows a workspace; the others wait for its lease.
 - **A workspace is followed from its first open**, and from startup once the ledger knows it.
 
@@ -91,7 +91,7 @@ projections = Projections(app_events={"deploy": deployed})
 
 ## Dead letters
 
-An envelope whose projection raises, or whose event reflexr refuses as invalid or of a type it doesn't accept, is dead-lettered, and its follower moves on:
+An envelope whose projection raises, an invalid event included, or returns one of reflexr's own events is dead-lettered, and its follower moves on:
 
 ```python
 from relayr.ledger import WorkspaceKey
@@ -100,7 +100,7 @@ for letter in await ledger.dead_letters(WorkspaceKey("acme", "prod")):
     print(letter.seq, letter.event_type, letter.error)
 ```
 
-Any other error stops the follower and logs a warning on `relayr.inbound`. It starts again, at its cursor, the next time the workspace is opened.
+Any other error, a type reflexr doesn't accept included, stops the follower and logs an error on `relayr.inbound`. It starts again, at its cursor, the next time the workspace is opened.
 
 ## Access
 

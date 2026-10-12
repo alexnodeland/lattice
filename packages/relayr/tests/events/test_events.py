@@ -20,7 +20,6 @@ from relayr.events import (
     ProposalCreated,
     ProposalResolved,
     TurnEnded,
-    bridged,
 )
 from tests.app_types import Deployed, TimelineChanged
 
@@ -183,7 +182,6 @@ DEFAULT_SET = [
 
 @pytest.mark.parametrize(("given", "expected"), DEFAULT_SET)
 def test_the_default_set_bridges_each_of_its_events(given: a.Envelope, expected: Any) -> None:
-    assert bridged(given) == expected
     assert Projections().project(given) == expected
 
 
@@ -203,7 +201,7 @@ def test_a_bridged_event_round_trips_as_reflexr_stores_it(given: a.Envelope, exp
     ],
 )
 def test_the_default_set_leaves_the_rest_in_artifactr(event: Any) -> None:
-    assert bridged(envelope(event)) is None
+    assert Projections().project(envelope(event)) is None
 
 
 def deployed(given: a.Envelope) -> Deployed:

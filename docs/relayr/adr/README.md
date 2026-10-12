@@ -6,7 +6,7 @@ ADR-0001 to ADR-0007 record the decisions D1 to D7 of [stackr RFC-0002](../../st
 
 | ADR | Title | Status |
 |---|---|---|
-| [0001](0001-relayr-its-own-repository-and-package.md) | relayr, its own repository and package | Accepted; partly superseded by 0013 |
+| [0001](0001-relayr-its-own-repository-and-package.md) | relayr, its own repository and package | Accepted, partly superseded by 0013 |
 | [0002](0002-the-outbound-actor-an-external-agent-per-rule.md) | The outbound actor, an `ExternalAgentActor` per rule | Accepted |
 | [0003](0003-a-thread-is-never-a-chain.md) | A thread is never a chain | Accepted |
 | [0004](0004-sessions-linked-not-continued.md) | Sessions linked, not continued | Accepted |

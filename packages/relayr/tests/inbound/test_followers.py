@@ -17,11 +17,12 @@ import artifactr.core as a
 import artifactr.workspace
 import reflexr
 import reflexr.workspace as r
-from relayr.events import BRIDGED, MessagePosted, Projections, TurnEnded
-from relayr.inbound import FOLLOWER, SOURCE, Followers, followers
-from relayr.ledger import DeadLetter, Ledger, WorkspaceKey
+from reflexr.core import Tick
+from relayr.events import BRIDGED, ArtifactCreated, MessagePosted, Projections
+from relayr.inbound import FOLLOWER, SOURCE, Followers
+from relayr.ledger import DeadLetter, InMemoryLedger, Ledger, WorkspaceKey
 from tests.app_types import Note
-from tests.clock import FakeClock
+from tests.clock import START, FakeClock
 
 type Access = artifactr.workspace.Access | r.Access
 
@@ -91,6 +92,7 @@ class Stack:
         holder: str = "p1",
         projections: Projections | None = None,
         events: tuple[type[reflexr.Event], ...] = BRIDGED,
+        save_every: int = 500,
         authorize: r.Authorize | None = None,
         artifactr_authorize: artifactr.workspace.Authorize | None = None,
     ) -> Process:
@@ -118,6 +120,7 @@ class Stack:
             projections=projections,
             holder=holder,
             lease_ttl=TTL,
+            save_every=save_every,
         )
         reactor = r.Reactor(automation, actions={"greet": greet})
         process = Process(collaboration, automation, bridge, reactor)
@@ -218,29 +221,27 @@ def refuse_notes(envelope: a.Envelope) -> reflexr.Event | None:
     raise ValueError("no notes")
 
 
+def tick(envelope: a.Envelope) -> reflexr.Event:
+    return Tick(schedule="forged", at=START)
+
+
 async def test_an_envelope_that_cannot_be_bridged_is_dead_lettered(
     ledger: Ledger, stack: Stack
 ) -> None:
     app = stack.process(
         ledger,
-        projections=Projections(artifacts={"note": refuse_notes}),
-        events=tuple(t for t in BRIDGED if t is not TurnEnded),
+        projections=Projections(app_events={"tick": tick}, artifacts={"note": refuse_notes}),
     )
     workspace = await app.collaboration.open(TENANT, WORKSPACE, actor=ALICE)
     thread = await workspace.create_thread()
-    agent = workspace.as_actor(a.AgentActor(thread_id=thread.id, run_id="run_1"))
     created = at(await workspace.create(Note(text="notes")))
-    await agent.record(a.RunStarted(run_id="run_1", thread_id=thread.id))
-    ended = at(
-        await agent.record(a.RunEnded(run_id="run_1", thread_id=thread.id, status="completed"))
-    )
+    forged = at(await workspace.record(a.AppEvent(name="tick")))
     posted = at(await workspace.post_message(thread.id, "after"))
 
     async def caught_up() -> bool:
         return await ledger.cursor(KEY) == posted
 
     await until(caught_up)
-    await app.followers.aclose()
     log = {e.seq: e for e in await stack.log()}
     assert await ledger.dead_letters(KEY) == [
         DeadLetter(
@@ -250,20 +251,73 @@ async def test_an_envelope_that_cannot_be_bridged_is_dead_lettered(
             error="ValueError: no notes",
         ),
         DeadLetter(
-            seq=ended,
-            envelope_id=log[ended].id,
-            event_type="run_ended",
-            error="NotFound: event type artifactr:turn_ended does not exist",
+            seq=forged,
+            envelope_id=log[forged].id,
+            event_type="app_event",
+            error="Forbidden: reflexr:tick events are recorded by reflexr, not published",
         ),
     ]
     assert [e.event_type for e in await stack.bridged()] == ["artifactr:message_posted"]
 
 
-async def test_a_cursor_is_saved_every_so_many_envelopes_that_bridge_nothing(
-    ledger: Ledger, stack: Stack, monkeypatch: pytest.MonkeyPatch
+async def test_a_type_reflexr_does_not_accept_stops_the_follower_at_it(
+    ledger: Ledger, stack: Stack, caplog: pytest.LogCaptureFixture
 ) -> None:
-    monkeypatch.setattr(followers, "SAVE_EVERY", 3)
+    app = stack.process(ledger, events=tuple(t for t in BRIDGED if t is not ArtifactCreated))
+    with caplog.at_level(logging.ERROR, logger="relayr.inbound"):
+        workspace = await app.collaboration.open(TENANT, WORKSPACE, actor=ALICE)
+        await workspace.create(Note(text="notes"))
+
+        async def stopped() -> bool:
+            return "following acme/prod stopped" in caplog.text
+
+        await until(stopped)
+    assert "NotFound: event type artifactr:artifact_created does not exist" in caplog.text
+    assert "ExceptionGroup" not in caplog.text
+    assert await ledger.dead_letters(KEY) == []
+    assert await ledger.cursor(KEY) == 0, "the message is read again once reflexr accepts it"
+
+
+async def test_closed_followers_follow_nothing_more(ledger: Ledger, stack: Stack) -> None:
     app = stack.process(ledger)
+    await app.followers.aclose()
+    await app.post("hello")
+    await asyncio.sleep(0.05)
+    assert await ledger.followed() == []
+
+
+class Failing(InMemoryLedger):
+    """A ledger that can't renew a lease: it fails every acquisition after the first."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.acquired = 0
+
+    async def acquire_lease(self, workspace: WorkspaceKey, holder: str, ttl: timedelta) -> bool:
+        self.acquired += 1
+        if self.acquired > 1:
+            raise ConnectionError("the ledger is down")
+        return await super().acquire_lease(workspace, holder, ttl)
+
+
+async def test_a_failed_renewal_stops_the_follower(
+    stack: Stack, caplog: pytest.LogCaptureFixture
+) -> None:
+    app = stack.process(Failing())
+    with caplog.at_level(logging.ERROR, logger="relayr.inbound"):
+        await app.post("hello")
+
+        async def stopped() -> bool:
+            return "following acme/prod stopped" in caplog.text
+
+        await until(stopped)
+    assert "ConnectionError: the ledger is down" in caplog.text
+
+
+async def test_a_cursor_is_saved_every_so_many_envelopes_that_bridge_nothing(
+    ledger: Ledger, stack: Stack
+) -> None:
+    app = stack.process(ledger, save_every=3)
     workspace = await app.collaboration.open(TENANT, WORKSPACE, actor=ALICE)
     for _ in range(4):
         await workspace.create_thread()

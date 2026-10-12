@@ -7,9 +7,11 @@ event with the envelope's id, and only then moves its cursor. reflexr's `publish
 once, so an envelope delivered again, after a restart or by another process, publishes nothing
 new: delivery is at least once, and the effect exactly once.
 
-An envelope whose projection raises, or whose event reflexr refuses as invalid or not accepted,
-is dead-lettered in the ledger, and the follower moves on. Anything else stops the follower,
-which starts again, at its cursor, the next time its workspace is opened.
+An envelope is dead-lettered in the ledger, and the follower moves on, when its projection raises,
+an invalid event included, or returns one of reflexr's own events. Anything else
+stops the follower, a type reflexr doesn't accept included, since that is the application's
+configuration and every later envelope would meet it too. A stopped follower starts again, at its
+cursor, the next time its workspace is opened.
 """
 
 import asyncio
@@ -21,7 +23,7 @@ import artifactr
 import artifactr.core
 import reflexr.workspace
 from reflexr import SourceActor, new_id
-from reflexr.core import NotFound, ValidationFailed
+from reflexr.core import Forbidden
 from relayr.events import Projections
 from relayr.ledger import DeadLetter, Ledger, WorkspaceKey
 
@@ -32,10 +34,6 @@ FOLLOWER: Final = artifactr.SystemActor(name="relayr")
 
 SOURCE: Final = SourceActor(name="artifactr")
 """Who a follower publishes into reflexr as: the actor on every bridged envelope."""
-
-SAVE_EVERY: Final = 500
-"""How many envelopes that bridge nothing a follower reads before it saves its cursor anyway, so
-a restarted follower reads at most this many again."""
 
 
 class Followers:
@@ -48,13 +46,16 @@ class Followers:
     Args:
         artifactr: The workspaces whose logs are followed.
         reflexr: The workspaces the events are published into. Their `events` must include
-            [`BRIDGED`][relayr.events.BRIDGED], and the types the projections publish.
+            [`BRIDGED`][relayr.events.BRIDGED], and the types the projections publish: a type
+            they refuse stops the follower.
         ledger: Where each follower keeps its lease, cursor and dead letters.
         projections: What each envelope becomes. Defaults to the default set alone.
         holder: This process's name in leases. Defaults to a new random id; give each process
             its own.
         lease_ttl: How long a lease lasts unless renewed. A follower renews it every third of
             that, and a process that dies holding one lets another take it once it lapses.
+        save_every: How many envelopes that bridge nothing a follower reads before it saves its
+            cursor anyway, so a restarted follower reads at most this many again.
     """
 
     def __init__(
@@ -66,6 +67,7 @@ class Followers:
         projections: Projections | None = None,
         holder: str | None = None,
         lease_ttl: timedelta = timedelta(seconds=30),
+        save_every: int = 500,
     ) -> None:
         self._artifactr = artifactr
         self._reflexr = reflexr
@@ -73,16 +75,18 @@ class Followers:
         self._projections = projections or Projections()
         self._holder = holder or new_id("relayr")
         self._ttl = lease_ttl
+        self._save_every = save_every
         self._tasks: dict[WorkspaceKey, asyncio.Task[None]] = {}
+        self._closed = False
 
     async def watch(self, tenant_id: str, workspace_id: str) -> None:
         """Follow a workspace, unless it is followed already: the libraries' `on_open` hook.
 
         It is called each time a workspace is opened, its follower's own openings included, so
-        it does nothing for a workspace it follows already.
+        it does nothing for a workspace it follows already, nor once the followers are closed.
         """
         workspace = WorkspaceKey(tenant_id, workspace_id)
-        if workspace in self._tasks:
+        if self._closed or workspace in self._tasks:
             return
         task = asyncio.create_task(self._follow(workspace))
         self._tasks[workspace] = task
@@ -94,7 +98,8 @@ class Followers:
             await self.watch(*workspace)
 
     async def aclose(self) -> None:
-        """Stop every follower, releasing its lease."""
+        """Stop every follower, releasing its lease, and start no more."""
+        self._closed = True
         tasks = list(self._tasks.values())
         for task in tasks:
             task.cancel()
@@ -104,7 +109,7 @@ class Followers:
         # A follower that stopped starts again the next time its workspace is opened.
         self._tasks.pop(workspace, None)
         if not task.cancelled() and (error := task.exception()) is not None:
-            logger.warning("following %s/%s stopped: %r", *workspace, error)
+            logger.error("following %s/%s stopped", *workspace, exc_info=error)
 
     async def _follow(self, workspace: WorkspaceKey) -> None:
         """Follow a workspace whenever this process holds its lease, until cancelled."""
@@ -124,18 +129,36 @@ class Followers:
         source: artifactr.Workspace,
         target: reflexr.workspace.Workspace,
     ) -> None:
-        """Relay the workspace's envelopes while the lease holds; return once it is lost."""
-        async with asyncio.TaskGroup() as group:
-            relaying = group.create_task(self._relay(workspace, source, target))
-            group.create_task(self._renew(workspace, relaying))
+        """Relay the workspace's envelopes while the lease holds; return once it is lost.
+
+        The renewal cancels the relaying when it loses the lease, or fails, so the lease is never
+        held with nothing relayed.
+        """
+        relaying = asyncio.current_task()
+        assert relaying is not None, "a follower runs as a task"
+        renewal = asyncio.create_task(self._renew(workspace, relaying))
+        try:
+            await self._relay(workspace, source, target)
+        except asyncio.CancelledError:
+            if not renewal.done() or relaying.uncancel():
+                raise  # cancelled from outside
+            renewal.result()  # the renewal's error, if it failed; else the lease is lost
+        finally:
+            renewal.cancel()
+            await asyncio.gather(renewal, return_exceptions=True)
 
     async def _renew(self, workspace: WorkspaceKey, relaying: asyncio.Task[None]) -> None:
-        while True:
-            await asyncio.sleep(self._ttl.total_seconds() / 3)
-            if not await self._ledger.acquire_lease(workspace, self._holder, self._ttl):
-                logger.info("the lease on %s/%s went to another holder", *workspace)
-                relaying.cancel()
-                return
+        """Renew the lease every third of its life; cancel the relaying once it is lost or fails."""
+        try:
+            while True:
+                await asyncio.sleep(self._ttl.total_seconds() / 3)
+                if not await self._ledger.acquire_lease(workspace, self._holder, self._ttl):
+                    break
+        except Exception:
+            relaying.cancel()
+            raise
+        logger.info("the lease on %s/%s went to another holder", *workspace)
+        relaying.cancel()
 
     async def _relay(
         self,
@@ -146,7 +169,7 @@ class Followers:
         saved = await self._ledger.cursor(workspace)
         async for envelope in source.subscribe(after_seq=saved):
             bridged = await self._bridge(workspace, target, envelope)
-            if bridged or envelope.seq - saved >= SAVE_EVERY:
+            if bridged or envelope.seq - saved >= self._save_every:
                 await self._ledger.save_cursor(workspace, envelope.seq)
                 saved = envelope.seq
 
@@ -164,26 +187,24 @@ class Followers:
             return True
         if event is None:
             return False
-        try:
-            await target.publish(event, id=envelope.id)
-        except (NotFound, ValidationFailed) as rejection:
-            await self._dead_letter(workspace, envelope, rejection)
+        if event.event_namespace == "reflexr":
+            refused = Forbidden(f"{event.event_type} events are recorded by reflexr, not published")
+            await self._dead_letter(workspace, envelope, refused)
+            return True
+        await target.publish(event, id=envelope.id)
         return True
 
     async def _dead_letter(
         self, workspace: WorkspaceKey, envelope: artifactr.core.Envelope, error: Exception
     ) -> None:
+        kind = envelope.event.type
         logger.warning(
-            "could not bridge %s at seq %d in %s/%s: %r",
-            envelope.event.type,
-            envelope.seq,
-            *workspace,
-            error,
+            "could not bridge %s at seq %d in %s/%s: %r", kind, envelope.seq, *workspace, error
         )
         letter = DeadLetter(
             seq=envelope.seq,
             envelope_id=envelope.id,
-            event_type=envelope.event.type,
+            event_type=kind,
             error=f"{type(error).__name__}: {error}",
         )
         await self._ledger.dead_letter(workspace, letter)

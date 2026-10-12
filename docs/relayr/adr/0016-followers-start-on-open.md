@@ -3,8 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
-
-Amends [stackr RFC-0002][rfc-0002-inbound]: its followers start through the libraries' `on_open` hook, not their `authorize` hook.
+**Amends:** [stackr RFC-0002][rfc-0002-inbound]'s start of a workspace's follower, and its template's: followers start through the libraries' `on_open` hook, not their `authorize` hook.
 
 ## Context
 

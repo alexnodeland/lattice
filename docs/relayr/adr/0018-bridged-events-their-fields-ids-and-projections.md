@@ -15,7 +15,7 @@
 - **An envelope becomes at most one event, whose id is the envelope's id**, unchanged.
 - **`Projections` holds the application's mappings:** one per `app_event` name, and one per artifact kind, which takes the place of the default set's `artifact_created`, `artifact_changed` and `artifact_archived` for that kind. Proposals on the kind are bridged as the default set's. An `app_event` with no mapping stays in artifactr. A mapping returns its own event, in the application's namespace, or None.
 - **`thread_created` isn't in the default set,** which RFC-0002 leaves as an open question.
-- **`BRIDGED` lists the bridged types,** for reflexr's `Workspaces(events=...)`; a type it doesn't accept is dead-lettered ([ADR-0015](0015-cursors-leases-and-dead-letters-in-the-ledger.md)).
+- **`BRIDGED` lists the bridged types,** for reflexr's `Workspaces(events=...)`; a type it doesn't accept stops the follower ([ADR-0015](0015-cursors-leases-and-dead-letters-in-the-ledger.md)).
 
 ## Options considered
 
@@ -29,6 +29,7 @@
 ## Consequences
 
 - Easier: a bridged event names its artifactr envelope, and a rule can filter on who acted, in which thread and turn.
+- Harder: a redelivered envelope whose projection now gives a different event publishes nothing: reflexr keeps the id's first event. A changed projection applies to envelopes it hasn't bridged yet.
 - Harder: an application that wants both its typed event and the default set's for an artifact kind can't have both; its mapping's event has to carry what its rules need.
 
 [rfc-0002-inbound]: ../../stackr/rfcs/0002-the-combined-system.md#inbound-artifactr-to-reflexr

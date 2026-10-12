@@ -1,10 +1,10 @@
 """Projections: which artifactr envelopes become reflexr events, and as what.
 
-[`bridged`][relayr.events.bridged] maps the default set, RFC-0002's: messages, artifacts,
-proposals, ended turns and feedback. Everything else stays in artifactr: thread and focus
-changes, run starts and pauses, tool calls and deferred answers. An application adds its own
-with [`Projections`][relayr.events.Projections]: a function per `app_event` name, and per
-artifact kind, which publishes the application's types, in its own namespace.
+The default set is RFC-0002's: messages, artifacts, proposals, ended turns and feedback.
+Everything else stays in artifactr: thread and focus changes, run starts and pauses, tool calls
+and deferred answers. An application adds its own with
+[`Projections`][relayr.events.Projections]: a function per `app_event` name, and per artifact
+kind, which publishes the application's types, in its own namespace.
 
 An envelope becomes at most one event, so the event's id can be the envelope's.
 """
@@ -42,7 +42,7 @@ class _Origin(TypedDict):
     turn_id: a.RunId | None
 
 
-def bridged(envelope: a.Envelope) -> ArtifactrEvent | None:
+def _default_set(envelope: a.Envelope) -> ArtifactrEvent | None:
     """Return the default set's event for an envelope, or None for an event it leaves out."""
     origin = _Origin(author=envelope.actor, thread_id=envelope.thread_id, turn_id=envelope.run_id)
     match envelope.event:
@@ -151,5 +151,5 @@ class Projections:
             ) if kind in self._artifacts:
                 projection = self._artifacts[kind]
             case _:
-                projection = bridged
+                projection = _default_set
         return None if projection is None else projection(envelope)

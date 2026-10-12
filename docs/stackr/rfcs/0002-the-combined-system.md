@@ -4,6 +4,7 @@
 **Author:** Alex Nodeland
 **Created:** 2026-09-29
 **Discussion:** [#30](https://github.com/alexnodeland/stackr/pull/30), from [issue #8](https://github.com/alexnodeland/stackr/issues/8); accepted on 2026-09-29, with the decisions in [Decision points](#decision-points)
+**Amended by:** [relayr ADR-0016](../../relayr/adr/0016-followers-start-on-open.md): followers start through the libraries' `on_open` hook, not `authorize`
 **Siblings:**
 
 - [reflexr ADR-0003][r-adr-0003] keeps the libraries independent and leaves the adapters between them to this system. [artifactr ADR-0032][a-adr-0032] makes it an application built from stackr's template.

@@ -14,9 +14,9 @@ A follower reads one artifactr workspace's log in `seq` order and publishes what
 
 - **The ledger holds each followed workspace's cursor and lease, in one row** (`relayr_followers`), and its dead letters (`relayr_dead_letters`). `Ledger.followed()` lists the workspaces with a row, which the followers resume at startup.
 - **Exactly once comes from ids, not from the lease.** A bridged event's id is its envelope's, and reflexr's `publish` appends an id once, so two followers, or one that reads an envelope again, publish nothing twice. The lease only keeps a second process from doing the same work.
-- **A lease lasts 30 seconds by default, renewed every third of that.** A follower that can't take it tries again every third of that, so a workspace whose follower died is followed again once its lease lapses. A follower whose renewal finds another holder stops relaying, and waits.
+- **A lease lasts 30 seconds by default, renewed every third of that.** A follower that can't take it tries again every third of that, so a workspace whose follower died is followed again once its lease lapses. A follower relays only while its renewal runs: a renewal that finds another holder, or fails, stops the relaying, so a lease is never held with nothing relayed. A follower that lost its lease waits for it.
 - **The cursor moves after the publish.** A follower saves it after each envelope it published or dead-lettered, and after every 500 that bridge nothing, so a restart reads at most that many again. It only moves forward.
-- **Dead letters, once per `seq`.** An envelope is dead-lettered, and the follower moves on, when its projection raises (an invalid event included) or reflexr refuses its event as invalid or of a type it doesn't accept (`ValidationFailed`, `NotFound`). Anything else, such as a refused `publish` or a storage failure, stops the follower, which starts again at its cursor the next time the workspace is opened ([ADR-0016](0016-followers-start-on-open.md)).
+- **Dead letters, once per `seq`.** An envelope is dead-lettered, and the follower moves on, when its projection raises, an invalid event included, or returns one of reflexr's own events, which reflexr refuses to anyone. Anything else stops the follower, which starts again at its cursor the next time the workspace is opened ([ADR-0016](0016-followers-start-on-open.md)): a refused `publish`, a storage failure, and a type reflexr's `Workspaces` doesn't accept (`NotFound`). That last is the application's configuration, not the envelope's fault: dead-lettering it would skip every later envelope of the type, where stopping keeps them until the configuration is fixed.
 
 ## Options considered
 
@@ -31,6 +31,7 @@ A follower reads one artifactr workspace's log in `seq` order and publishes what
 
 - Easier: one store answers everything a follower needs, and the followers resume without lattice #5.
 - Easier: a follower's guarantees don't rest on its lease, so a lease that lapses under a slow follower costs duplicate work, never a duplicate event.
+- Harder: a stopped follower and a dead letter are only logged, a stop as an error. Phase 4's telemetry needs a counter for each, so an operator sees them without reading logs.
 - Harder: the ledger is one more schema in the application's database, with its own migrations.
 - Revisit dead letters when phase 2 adds chain continuation: a continued chain that would pass the depth limit is recorded the same way, by RFC-0002.
 

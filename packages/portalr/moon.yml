@@ -1,0 +1,4 @@
+# portalr: the portal. Its Python side, the router that serves the two UIs.
+language: 'python'
+layer: 'library'
+tags: ['distribution']

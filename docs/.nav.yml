@@ -26,6 +26,7 @@ nav:
   - relayr: relayr
   - grantr: grantr
   - stackr: stackr
+  - portalr: portalr
   - Project:
       - Contributing: project/contributing.md
       - Code of conduct: project/code-of-conduct.md

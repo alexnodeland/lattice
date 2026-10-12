@@ -15,7 +15,7 @@ make check          # every project's checks, as CI runs them
 
 ## Commands
 
-moon runs every task, from any directory: `moon run <project>:<task>`, or `moon run :<task>` for every project that has it. It runs only what a change affects, and caches the rest. `moon project <project>` lists a project's tasks. The projects are the packages (`artifactr`, `reflexr`, `evalr`, `relayr`, `grantr`, `stackr`), the reference implementations (`docplan`, `oncall`), and `lattice`, the root.
+moon runs every task, from any directory: `moon run <project>:<task>`, or `moon run :<task>` for every project that has it. It runs only what a change affects, and caches the rest. `moon project <project>` lists a project's tasks. The projects are the packages (`artifactr`, `reflexr`, `evalr`, `relayr`, `grantr`, `stackr`, `portalr`), the reference implementations (`docplan`, `oncall`), and `lattice`, the root.
 
 Every Python project has these:
 

@@ -3,7 +3,7 @@
 [project]
 name = "lattice"
 version = "0.0.0"
-description = "The family's packages: artifactr, reflexr, evalr, relayr, grantr and stackr."
+description = "The family's packages: artifactr, reflexr, evalr, relayr, grantr, stackr and portalr."
 requires-python = ">=3.12"
 dependencies = []
 

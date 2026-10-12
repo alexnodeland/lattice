@@ -10,6 +10,7 @@ projects:
   relayr: 'packages/relayr'
   grantr: 'packages/grantr'
   stackr: 'packages/stackr'
+  portalr: 'packages/portalr'
   docplan: 'examples/docplan'
   oncall: 'examples/oncall'
 

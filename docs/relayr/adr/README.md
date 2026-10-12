@@ -32,5 +32,6 @@ ADR-0001 to ADR-0007 record the decisions D1 to D7 of [stackr RFC-0002](../../st
 | [0024](0024-langfuse-sessions-tagged-with-each-other.md) | Langfuse sessions tagged with each other | Accepted, amended by 0026 |
 | [0025](0025-counters-and-how-long-causes-are-kept.md) | Counters, and how long causes are kept | Accepted |
 | [0026](0026-a-retried-send-asks-again-and-turns-traced-by-their-messages.md) | A retried send asks again, and turns are traced by their messages | Accepted |
+| [0027](0027-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

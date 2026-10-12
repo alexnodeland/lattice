@@ -1,6 +1,6 @@
 # ADR-0001: Docker Compose first, with profiles
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0023](0023-opentofu-for-aws-now.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

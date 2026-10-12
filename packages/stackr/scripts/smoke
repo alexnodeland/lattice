@@ -438,7 +438,6 @@ app_sql() {
 app_rows_kept_apart() {
   local unguarded="SELECT count(*) FROM pg_class c WHERE c.relnamespace = '$app_package'::regnamespace
     AND c.relkind = 'r' AND c.relname NOT LIKE '%alembic_version'
-    AND c.relname NOT LIKE 'relayr\_%' -- the bridge's ledger is the owner's, without the option
     AND (NOT c.relrowsecurity OR NOT EXISTS (SELECT 1 FROM pg_policies p
       WHERE p.schemaname = '$app_package' AND p.tablename = c.relname))"
   [[ $(app_sql owner "$unguarded") == 0 ]] ||
@@ -463,6 +462,9 @@ app_rows_kept_apart() {
   fi
   [[ $refused == *"row-level security"* ]] ||
     { log "FAIL: the other tenant's write failed, but not for row-level security: $refused"; return 1; }
+  local followers="SELECT count(*) FROM $app_package.relayr_followers"
+  [[ $(app_sql owner "$followers") -gt 0 && $(app_sql app "$followers") == 0 ]] ||
+    { log "FAIL: relayr's ledger isn't kept to each tenant"; return 1; }
   log "ok: PostgreSQL keeps each tenant's rows to that tenant, past the libraries' scoping"
 }
 

@@ -44,8 +44,7 @@ class Bridge:
     to the reactor, and then :meth:`connect` s the parts.
 
     Args:
-        database: The database; without one, the ledger lives in memory. The ledger is the
-            tables' owner's until relayr's SQL storage has row-level security.
+        database: The database; without one, the ledger lives in memory.
         telemetry: OpenTelemetry, and Langfuse when it has a client.
 {%- if access == 'grantr' %}
         grants: grantr, which lists the tenants whose workspaces are followed at startup.
@@ -61,7 +60,15 @@ class Bridge:
         grants: Grants,
 {%- endif %}
     ) -> None:
-        self.ledger: Ledger = SqlLedger(database.owner) if database else InMemoryLedger()
+        self.ledger: Ledger = (
+            SqlLedger(
+                database.engine,
+                row_level_security=database.row_level_security,
+                across_tenants=database.owner,
+            )
+            if database
+            else InMemoryLedger()
+        )
         self._telemetry = telemetry
         langfuse = telemetry.langfuse if telemetry else None
         self.turn_context: TurnContext | None = bridged_turns(self.ledger) if langfuse else None
@@ -105,8 +112,8 @@ class Bridge:
         await self._followers.watch(tenant_id, workspace_id)
 
     async def migrate(self, database: Database) -> None:
-        """Upgrade the database to relayr's schema: the ledger, as its owner."""
-        await migrate(database.owner)
+        """Upgrade the database to relayr's schema, as its owner, granting the app's role it."""
+        await migrate(database.owner, application_role=database.role)
 
     @contextlib.asynccontextmanager
     async def lifespan(self) -> AsyncGenerator[None]:

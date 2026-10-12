@@ -213,6 +213,54 @@ async def test_a_rule_holds_what_it_is_granted(grants: Grants) -> None:
     assert await grants.check("acme", rule, "reflexr:cancel_run", WS)
 
 
+async def test_a_stored_rule_holds_its_role_in_its_own_workspace_only(grants: Grants) -> None:
+    rule = RulePrincipal(workspace="w1", rule="chat:deploys")
+    for workspace in (WS, OTHER):  # grantr knows a workspace once a grant names it
+        await grants.grant("acme", "viewer", on=workspace, to=ALICE, by=ALICE)
+    assert await grants.check("acme", rule, "reflexr:publish", WS), "with no grant"
+    assert await grants.check("acme", rule, "artifactr:post_message", THREAD)
+    assert not await grants.check("acme", rule, "artifactr:post_message", OTHER)
+    elsewhere = Resource(kind="thread", workspace="w2", id="t9")
+    assert not await grants.check("acme", rule, "artifactr:post_message", elsewhere)
+    assert not await grants.check("acme", rule, "reflexr:read_events", TENANT)
+    assert not await grants.check("acme", rule, "artifactr:edit_artifact", WS), "notices only"
+    assert not await grants.check("acme", rule, "artifactr:read_threads", WS)
+    assert await grants.resources("acme", rule, "artifactr:open", "workspace") == [WS]
+    await grants.restrict("acme", THREAD, by=ALICE)
+    assert not await grants.check("acme", rule, "artifactr:post_message", THREAD)
+    assert (await grants.hidden("acme", rule, "w1")).threads == {"t1"}
+
+
+async def test_a_rule_is_granted_nothing_beyond_its_own_workspace(grants: Grants) -> None:
+    rule = RulePrincipal(workspace="w2", rule="chat:deploys")
+    with pytest.raises(Invalid, match="its own workspace only"):
+        await grants.grant("acme", "viewer", on=WS, to=rule, by=ALICE)
+    with pytest.raises(Invalid, match="its own workspace only"):
+        await grants.grant("acme", "admin", on=TENANT, to=rule, by=ALICE)
+
+
+async def test_a_rule_is_granted_no_role_that_manages_access(grants: Grants) -> None:
+    rule = RulePrincipal(workspace="w1", rule="chat:deploys")
+    keeper = Role(name="keeper", actions=frozenset({"artifactr:open", "grantr:restrict"}))
+    await grants.define_role("acme", keeper, by=ALICE)
+    for role in ("admin", "keeper"):
+        with pytest.raises(Invalid, match="a rule manages no access"):
+            await grants.grant("acme", role, on=WS, to=rule, by=ALICE)
+    await grants.grant("acme", "editor", on=THREAD, to=rule, by=ALICE)
+    assert await grants.check("acme", rule, "artifactr:edit_artifact", THREAD)
+
+
+async def test_a_stray_grant_to_a_rule_beyond_its_workspace_counts_for_nothing(
+    grants: Grants, storage: Storage
+) -> None:
+    rule = RulePrincipal(workspace="w2", rule="chat:deploys")
+    async with storage.transaction("acme") as tx:  # a row from before grants were refused
+        await tx.add_grant(Grant(tenant="acme", role="editor", on=WS, to=rule))
+    await grants.grant("acme", "viewer", on=OTHER, to=ALICE, by=ALICE)
+    assert not await grants.check("acme", rule, "artifactr:edit_artifact", WS)
+    assert await grants.resources("acme", rule, "artifactr:open", "workspace") == [OTHER]
+
+
 async def test_tenant_roles_reach_every_workspace_and_every_catalog(grants: Grants) -> None:
     assert await grants.check("acme", ALICE, "reflexr:install_rule", RULE)
     assert await grants.check("acme", ALICE, "portalr:read_telemetry", TENANT)

@@ -69,7 +69,7 @@ Its tools are `read_artifact`, `create_artifact`, `edit_artifact`, `post_notice`
 
 artifactr's write policy and the thread's mode still apply: a direct edit to a kind whose policy is `propose` is still a proposal.
 
-A key may also name a whole namespace, as `"chat:*"`, for rules installed at runtime whose names aren't known in advance. A rule's own name comes first, and any other wildcard is refused ([ADR-0020](../adr/0020-allowlists.md)).
+A key may also name a whole namespace, as `"chat:*"`, for rules installed at runtime whose names aren't known in advance. A rule's own name comes first, and any other wildcard is refused ([ADR-0029](../adr/0029-an-allowlist-for-a-whole-rule-namespace.md)).
 
 ## Retries and failures
 

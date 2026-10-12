@@ -38,6 +38,7 @@ nav:
   - adr/0026-a-retried-send-asks-again-and-turns-traced-by-their-messages.md
   - adr/0027-row-level-security-under-the-scoping.md
   - adr/0028-rules-from-chat.md
+  - adr/0029-an-allowlist-for-a-whole-rule-namespace.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

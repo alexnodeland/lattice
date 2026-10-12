@@ -115,9 +115,16 @@ CODE_RULE_WRITES: Final = frozenset(
 """What the application's code rules write in artifactr, through relayr's outbound adapter:
 proposals and notices, and the artifacts, keyed edits and threads their allowlists grant."""
 
+RULE_INSTALLS: Final = frozenset(
+    {"reflexr:install_rule", "reflexr:update_rule", "reflexr:archive_rule"}
+)
+"""What relayr's ``install-rule`` code rule does in reflexr: install, update and archive the
+stored rules people accepted in chat, once relayr has checked that the person may."""
+
 RUNTIME: Final = (
     BOOKKEEPING
     | CODE_RULE_WRITES
+    | RULE_INSTALLS
     | {
         "artifactr:record",
         "reflexr:publish",
@@ -125,8 +132,8 @@ RUNTIME: Final = (
     }
 )
 """The commands the application's ``application`` role holds, beside every ``open``, every read
-and its evaluators' feedback: its bookkeeping, the runner's records, and its code rules' runs,
-in reflexr and, through relayr, in artifactr."""
+and its evaluators' feedback: its bookkeeping, the runner's records, its code rules' runs, in
+reflexr and, through relayr, in artifactr, and the stored rules relayr installs."""
 
 RULE: Final = frozenset(
     {

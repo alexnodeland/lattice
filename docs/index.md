@@ -23,10 +23,11 @@ The family's packages, in one repository: libraries for applications in which pe
 | [reflexr](reflexr/index.md) | Rules over event streams that run LLM workflows: pydantic-ai agents, pydantic-graph graphs and functions |
 | [evalr](evalr/index.md) | Typed evaluation of agent systems: judges that give typed verdicts, trained on people's feedback and measured against it |
 | [relayr](relayr/index.md) | The bridge between artifactr and reflexr: events from chats and artifacts become events for rules, and runs act back in the chat |
+| [grantr](grantr/index.md) | Identity and access for artifactr and reflexr: tenants, members, groups, roles and service principals, checked before every command and read |
 | [stackr](stackr/index.md) | The infrastructure the libraries run on, and an application template |
 | [portalr](portalr/index.md) | The portal into an application: an app UI to chat with its agents and see their work, and an admin UI to run it. Planned: it holds only its version so far |
 
-One more is planned: grantr, identity and access for artifactr and reflexr.
+grantr and portalr hold only their versions so far, and their plans build them: [grantr's](grantr/rfcs/0001-v0.1-implementation-plan.md) and [portalr's](portalr/rfcs/0001-v0.1-implementation-plan.md).
 
 lattice's mark is one cell of the lattice that every mark in the family is drawn on. Its [brand page](assets/brand/README.md) has the mark, the colours and the family's brand system, and [ADR-0001](adr/0001-lattices-brand.md) records why.
 

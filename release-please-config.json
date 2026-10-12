@@ -111,6 +111,17 @@
         }
       ]
     },
+    "packages/grantr": {
+      "release-type": "python",
+      "package-name": "grantr",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "/uv.lock",
+          "jsonpath": "$.package[?(@.name.value=='grantr')].version"
+          }
+        ]
+      },
     "packages/portalr": {
       "release-type": "python",
       "package-name": "portalr",

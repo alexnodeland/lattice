@@ -87,7 +87,7 @@ artifactr, reflexr, evalr, relayr and stackr share one brand system, and lattice
 | **portalr** | Not yet drawn | Cyan, magenta and yellow together: the full-colour proof | Not yet drawn | Reserved: one window onto every library, in two versions, for its `app` and `admin` UIs |
 | **grantr** | Not yet drawn | Yellow and key: a nod to the key plate, since grants are keys | Not yet drawn | Reserved: identity and access for artifactr and reflexr |
 
-portalr's and grantr's inks are reserved; portalr's package is in lattice, and grantr's isn't yet. Their marks, their tokens (which become the UIs' CSS variables), and the two versions of portalr's mark are drawn in a later design, with their packages, from what the apps need.
+portalr's and grantr's inks are reserved; both packages are in lattice. Their marks, their tokens (which become the UIs' CSS variables), and the two versions of portalr's mark are drawn in a later design, with their packages, from what the apps need.
 
 ### Known weaknesses
 

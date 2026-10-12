@@ -4,7 +4,7 @@
 
 ## What lattice is
 
-lattice is the family's one repository: six packages, two reference implementations, and one set of tools that checks, releases and documents them. It holds the packages, and changes nothing about what they are downstream. Each keeps its name, `pyproject.toml`, version, dependencies, extras, tests, 100% coverage gate, ADRs, RFCs, changelog and releases, and each installs on its own.
+lattice is the family's one repository: seven packages, two reference implementations, and one set of tools that checks, releases and documents them. It holds the packages, and changes nothing about what they are downstream. Each keeps its name, `pyproject.toml`, version, dependencies, extras, tests, 100% coverage gate, ADRs, RFCs, changelog and releases, and each installs on its own.
 
 ### Goals
 
@@ -27,6 +27,7 @@ lattice/
 │   ├── reflexr/         the same shape
 │   ├── evalr/
 │   ├── relayr/          relayr-ai
+│   ├── grantr/          planned: its version, tooling and plan so far
 │   ├── stackr/          the stack and the application template: compose.yaml, supabase/, deploy/, scripts/, template/, copier.yml, versions.env, Makefile
 │   └── portalr/         the portal: its Python package, and web/ (client, ui, app, admin), the Bun workspace's packages
 ├── examples/
@@ -59,7 +60,7 @@ lattice/
 
 ## The projects
 
-moon knows thirteen projects: the twelve below, and `lattice`, the root, which holds the site and the family's own tests and scripts.
+moon knows fourteen projects: the thirteen below, and `lattice`, the root, which holds the site and the family's own tests and scripts.
 
 | Project | Path | What it is | Kind | Depends on |
 |---|---|---|---|---|
@@ -67,6 +68,7 @@ moon knows thirteen projects: the twelve below, and `lattice`, the root, which h
 | artifactr | `packages/artifactr` | Chat applications where people and agents share versioned artifacts; distributed as `artifactr-ai` | Library | evalr |
 | reflexr | `packages/reflexr` | Rules over event streams that run LLM workflows | Library | evalr |
 | relayr | `packages/relayr` | The bridge between artifactr and reflexr; distributed as `relayr-ai` | Library | artifactr, reflexr |
+| grantr | `packages/grantr` | Identity and access for artifactr and reflexr; planned ([its plan](grantr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
 | stackr | `packages/stackr` | The stack the libraries run on, and the application template | Tool (shell), ships no wheel | artifactr, reflexr, evalr |
 | portalr | `packages/portalr` | The portal: the router that serves the app and admin UIs. Planned: it holds only its version ([RFC-0001](portalr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
 | client | `packages/portalr/web/client` | `@portalr/client`, the only code in the UIs that talks to the server | Library (TypeScript) | |
@@ -88,6 +90,7 @@ graph TD
     stackr --> evalr
     artifactr --> evalr
     reflexr --> evalr
+    grantr
     app --> ui
     admin --> ui
 ```
@@ -144,7 +147,7 @@ moon runs every task, and only those a change affects; uv and Bun manage the dep
 
 | File | Holds |
 |---|---|
-| `.moon/workspace.yml` | The thirteen projects, by path; `main` as the default branch; moon's version constraint |
+| `.moon/workspace.yml` | The fourteen projects, by path; `main` as the default branch; moon's version constraint |
 | `.moon/tasks/python.yml` | For every Python project: `lint`, `typecheck`, `test`, `format` and `check`. The root's `pyproject.toml` and `uv.lock` are inputs of every task |
 | `.moon/tasks/distribution.yml` | For every project tagged `distribution`: `build`, `standalone` and `deptry` |
 | `.moon/toolchains.yml` | JavaScript, with Bun as its package manager, Bun, and TypeScript. Every setting that would install dependencies or rewrite a `package.json` or `tsconfig.json` is off, and moon installs no Bun of its own: proto does, from `.prototools` |

@@ -1,17 +1,20 @@
 # Architecture
 
-Decisions are recorded in [`adr/`](adr/README.md), and the plan that builds relayr in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). The design is [stackr RFC-0002](../stackr/rfcs/0002-the-combined-system.md). This page describes what exists: the inbound adapter, which is phase 1 of the plan.
+Decisions are recorded in [`adr/`](adr/README.md), and the plan that builds relayr in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). The design is [stackr RFC-0002](../stackr/rfcs/0002-the-combined-system.md). This page describes what exists: the inbound adapter and the outbound adapter with its loop control, phases 1 and 2 of the plan.
 
 ## What relayr is
 
-relayr bridges artifactr and reflexr in one application's process. Its inbound adapter turns selected artifactr events into reflexr events, so rules can react to what people and agents do in a workspace. It uses only the two libraries' public APIs, and neither library imports it or the other. The same tenant and workspace ids name the same context in both.
+relayr bridges artifactr and reflexr in one application's process. Its inbound adapter turns selected artifactr events into reflexr events, so rules can react to what people and agents do in a workspace. Its outbound adapter lets a rule's run act back in artifactr, as the rule's own participant, mostly by proposals and notices. It uses only the two libraries' public APIs, and neither library imports it or the other. The same tenant and workspace ids name the same context in both.
 
 ```mermaid
 graph LR
     alog["artifactr workspace log"] -- "envelopes, in seq order" --> follower["a follower per workspace"]
     follower -- "artifactr:* events,<br/>ids from envelope ids" --> rlog["reflexr workspace log"]
-    follower <--> ledger[("the ledger:<br/>lease, cursor, dead letters")]
+    follower <--> ledger[("the ledger:<br/>lease, cursor, dead letters,<br/>the run behind each write")]
     rlog --> rules["rules and runs"]
+    rules -- "proposals, keyed edits, notices<br/>(ids from run ids)" --> outbound["outbound adapter"]
+    outbound -- "as the rule's own participant" --> alog
+    outbound --> ledger
 ```
 
 ## Layers
@@ -19,9 +22,10 @@ graph LR
 | Package | Holds | May import |
 |---|---|---|
 | `relayr.events` | The bridged types, under `ArtifactrEvent` (`event_namespace="artifactr"`); `BRIDGED`; and `Projections`, the default set with the application's own mappings | artifactr, reflexr, pydantic |
-| `relayr.ledger` | The `Ledger` port, `DeadLetter`, `WorkspaceKey`, and `InMemoryLedger` | pydantic |
+| `relayr.ledger` | The `Ledger` port, `DeadLetter`, `Cause`, `WorkspaceKey`, and `InMemoryLedger` | pydantic |
 | `relayr.sql` | `SqlLedger`, its tables and Alembic migrations, and `create_sqlite_engine`. The `sql`, `sqlite` and `postgres` extras | `relayr.ledger`, SQLAlchemy, Alembic |
 | `relayr.inbound` | `Followers`, and the two actors a follower acts as | `relayr.events`, `relayr.ledger`, artifactr, reflexr |
+| `relayr.outbound` | `Outbound` and its per-attempt `RunActions`, `Allowlist`, `NotAllowed`, `rule_actor`, and `ArtifactrCapability` with its tools | `relayr.events`, `relayr.ledger`, artifactr, reflexr, pydantic, pydantic-ai |
 
 `tests/test_layering.py` holds each package to its column, and checks that every name relayr imports from artifactr or reflexr is in its module's `__all__`.
 
@@ -51,7 +55,7 @@ Thread, mode and focus changes, run starts and pauses, tool calls and returns, a
 2. **It opens the workspace in both libraries,** as `SystemActor("relayr")` in artifactr and `SourceActor("artifactr")` in reflexr, the actor on every bridged envelope ([ADR-0017](adr/0017-the-follower-acts-as-the-application.md)).
 3. **It takes the workspace's lease** in the ledger, renews it every third of its 30 seconds, and waits while another process holds it. It relays only while the renewal runs: a lost or failed renewal stops the relaying.
 4. **It reads the artifactr log after its cursor,** projects each envelope, and publishes the event into reflexr with the envelope's id. Then it saves its cursor: after each envelope it published or dead-lettered, and after every 500 that bridge nothing.
-5. **It dead-letters what it can't bridge:** an envelope whose projection raises, an invalid event included, or returns one of reflexr's own events. Anything else stops the follower, a type reflexr doesn't accept included, and logs it as an error; it starts again at its cursor the next time the workspace is opened ([ADR-0015](adr/0015-cursors-leases-and-dead-letters-in-the-ledger.md)).
+5. **It dead-letters what it can't bridge:** an envelope whose projection raises, an invalid event included, or returns one of reflexr's own events, or whose chain would pass the depth limit. Anything else stops the follower, a type reflexr doesn't accept included, and logs it as an error; it starts again at its cursor the next time the workspace is opened ([ADR-0015](adr/0015-cursors-leases-and-dead-letters-in-the-ledger.md)).
 
 ### Delivery
 
@@ -59,15 +63,28 @@ Delivery is at least once, and the effect exactly once. A follower that stops be
 
 Order is kept per lease holder: one follower publishes a workspace's envelopes in `seq` order. Across an overlap, when a slow holder's lease lapses and another process takes it, the stale holder may publish one envelope late, after the new holder has published later ones.
 
+## Outbound
+
+A rule's run acts in artifactr through `Outbound.acting(reaction)`: a function action directly, an agent through `ArtifactrCapability`'s tools. Both reach the attempt's one `RunActions`.
+
+- **As the rule's own participant,** `ExternalAgentActor(client_id="reflexr:<rule>")`, acting for no person ([ADR-0002](adr/0002-the-outbound-actor-an-external-agent-per-rule.md), [ADR-0022](adr/0022-what-a-rules-actor-needs-in-artifactr.md)). artifactr's own rules apply to it, and relayr has no way to resolve a proposal.
+- **Proposals and notices by default.** `create` and `edit` propose, unless the rule's allowlist names the kind in `direct`; `notice` posts a notice, which starts no turn; `create_thread` and `send`, which starts a turn through artifactr's `Runner`, need the allowlist's permission ([ADR-0007](adr/0007-notices-by-default.md), [ADR-0020](adr/0020-allowlists.md)).
+- **In the chain's threads:** those of the events that made the rule fire, in order, and those its run created, unless the allowlist allows any. A write with no thread named goes to the first.
+- **Once, however often the run is retried.** Every write's ids are derived from the run, its last checkpoint and what the write is, so artifactr refuses a repeat, in any order, as already done. An edit sets one value at one path, and is skipped when it is in place. A version conflict is retried within the attempt; a missing artifact, an invalid one or a patch that doesn't apply is `Refused`, which an agent's model may retry; any other refusal fails the run for good ([ADR-0019](adr/0019-runs-act-once-through-derived-ids-and-keyed-edits.md)).
+
+### Loop control
+
+Before each write, `RunActions` records the run behind it in the ledger, by the ids the follower will read off its envelope. The follower publishes a rule's write back into reflexr through `caused_by(...)`, in the run's chain, as deep as the run's own events; a turn acting for a rule continues the chain of the rule's last message in its thread. reflexr refuses a firing past its depth limit, so two rules that answer each other stop there. A person's answer to a rule's proposal joins the proposal's chain without going deeper ([ADR-0021](adr/0021-chains-continue-across-the-bridge.md)). `tests/outbound/test_loops.py` checks both of phase 2's exit criteria, on every ledger.
+
 ## The ledger
 
-The `Ledger` port keeps, per workspace, the follower's cursor and lease, and its dead letters, once per `seq`. `followed()` lists the workspaces with a cursor or a lease. Its adapters:
+The `Ledger` port keeps, per workspace, the follower's cursor and lease, and its dead letters, once per `seq`; and, for the outbound adapter, the `Cause` of each write, once per key. `followed()` lists the workspaces with a cursor or a lease. Its adapters:
 
 - **`InMemoryLedger`,** for tests, and for applications whose followers may start over.
-- **`SqlLedger`,** on PostgreSQL or SQLite through SQLAlchemy's asyncio extension, in two tables in the application's schema: `relayr_followers` (a workspace's cursor and lease, one row, locked while it changes) and `relayr_dead_letters`. Its migrations record their version in `relayr_alembic_version`. On SQLite, its engine comes from `create_sqlite_engine`, shared verbatim with the libraries' and grantr's, and every call is awaited to its end even when its caller is cancelled, as theirs are.
+- **`SqlLedger`,** on PostgreSQL or SQLite through SQLAlchemy's asyncio extension, in three tables in the application's schema: `relayr_followers` (a workspace's cursor and lease, one row, locked while it changes), `relayr_dead_letters` and `relayr_causes`. Its migrations record their version in `relayr_alembic_version`. On SQLite, its engine comes from `create_sqlite_engine`, shared verbatim with the libraries' and grantr's, and every call is awaited to its end even when its caller is cancelled, as theirs are.
 
 One contract test, `tests/ledger/test_contract.py`, runs against memory, SQLite and, when `RELAYR_TEST_POSTGRES_URL` is set, as CI sets it, PostgreSQL. `moon run relayr:pg-up` starts a database.
 
 ## What isn't built yet
 
-The outbound adapter, loop control and chain continuation (phase 2), the template's `bridge` question (phase 3), telemetry links and tags (phase 4), rules from chat (phase 5) and evaluation (phase 6). A bridged event starts a chain of its own: until phase 2, nothing carries a run's causation across.
+The template's `bridge` question (phase 3), telemetry links and tags (phase 4), rules from chat (phase 5) and evaluation (phase 6).

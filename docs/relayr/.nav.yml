@@ -4,6 +4,7 @@ nav:
 - Architecture: architecture.md
 - Guides:
   - Bridging artifactr into reflexr: guides/inbound.md
+  - Acting in artifactr from rules: guides/outbound.md
 - Reference: reference.md
 - Decisions:
   - adr/README.md
@@ -25,6 +26,10 @@ nav:
   - adr/0016-followers-start-on-open.md
   - adr/0017-the-follower-acts-as-the-application.md
   - adr/0018-bridged-events-their-fields-ids-and-projections.md
+  - adr/0019-runs-act-once-through-derived-ids-and-keyed-edits.md
+  - adr/0020-allowlists.md
+  - adr/0021-chains-continue-across-the-bridge.md
+  - adr/0022-what-a-rules-actor-needs-in-artifactr.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

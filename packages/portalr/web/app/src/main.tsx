@@ -34,6 +34,7 @@ function start(root: Root, config: Config) {
     routeTree,
     basepath: import.meta.env.BASE_URL,
     context: {
+      config,
       signed,
       queries: createQueries(createApi(config.surfaces, () => signed.session())),
       queryClient,

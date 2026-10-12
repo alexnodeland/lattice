@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -19,36 +20,80 @@ import { TextField } from "./text-field";
 
 const card = "flex flex-col gap-2 rounded-md border border-line bg-surface p-3 text-sm";
 
+/** How a command a part handed its caller ended, as `client`'s stream settles it. */
+export type Sent = Promise<{ readonly outcome: "done" | "refused" | "closed" }>;
+
+const UNSENT = {
+  refused: "That wasn't done: the server refused it.",
+  closed: "That wasn't sent: the connection closed.",
+} as const;
+
+/** A command in flight: whether it is, and why the last one wasn't done. */
+function useSending() {
+  const [pending, setPending] = useState(false);
+  const [unsent, setUnsent] = useState<string | null>(null);
+  async function send(command: () => Sent): Promise<boolean> {
+    setPending(true);
+    setUnsent(null);
+    const { outcome } = await command();
+    setPending(false);
+    if (outcome !== "done") {
+      setUnsent(UNSENT[outcome]);
+    }
+    return outcome === "done";
+  }
+  return { pending, unsent, send };
+}
+
+/** Why a command wasn't done, announced. */
+function Unsent({ reason }: { reason: string | null }) {
+  return reason && <p role="alert">{reason}</p>;
+}
+
 type MessageProps = {
   message: Artifactr.Message;
-  /** How to name who posted it. */
+  /** How to name who posted it, which names the message too. */
   author: string;
   /** The reader's thumbs on it, as `client`'s `thumbs` reads them: up, down, or none. */
   thumbs?: boolean | null;
   /** Give thumbs up or down; without it, there are no buttons. */
-  onThumbs?: (up: boolean) => void;
+  onThumbs?: (up: boolean) => Sent;
 };
 
-/** One message: who posted it, its Markdown, and the reader's thumbs on it. */
+/** One message, named for who posted it: their name, its Markdown, and the reader's thumbs. */
 export function Message({ message, author, thumbs = null, onThumbs }: MessageProps) {
+  const name = useId();
+  const { pending, unsent, send } = useSending();
   return (
-    <li className={cn("flex flex-col gap-1", message.kind === "notice" && "text-muted italic")}>
-      <span className="font-semibold text-xs">{author}</span>
+    <li
+      aria-labelledby={name}
+      className={cn("flex flex-col gap-1", message.kind === "notice" && "text-muted italic")}
+    >
+      <span id={name} className="font-semibold text-xs">
+        {author}
+      </span>
       <Markdown>{message.content}</Markdown>
       {onThumbs && (
         <span className="flex gap-1">
-          <Button variant="secondary" aria-pressed={thumbs === true} onClick={() => onThumbs(true)}>
+          <Button
+            variant="secondary"
+            aria-pressed={thumbs === true}
+            disabled={pending}
+            onClick={() => send(() => onThumbs(true))}
+          >
             Helpful
           </Button>
           <Button
             variant="secondary"
             aria-pressed={thumbs === false}
-            onClick={() => onThumbs(false)}
+            disabled={pending}
+            onClick={() => send(() => onThumbs(false))}
           >
             Not helpful
           </Button>
         </span>
       )}
+      <Unsent reason={unsent} />
     </li>
   );
 }
@@ -77,30 +122,31 @@ export function Composer({
   onSend,
   disabled = false,
 }: {
-  onSend: (text: string) => void;
+  /** Post the message; the text stays until the post is done. */
+  onSend: (text: string) => Sent;
   disabled?: boolean;
 }) {
   const [text, setText] = useState("");
-  function send() {
+  const { pending, unsent, send: sending } = useSending();
+  async function send() {
     const message = text.trim();
-    if (message) {
-      onSend(message);
+    if (message && !pending && (await sending(() => onSend(message)))) {
       setText("");
     }
   }
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    send();
+    void send();
   }
   function key(event: KeyboardEvent<HTMLElement>) {
     // An input method's Enter chooses its candidate; it doesn't send.
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
-      send();
+      void send();
     }
   }
   return (
-    <form className="flex items-end gap-2" onSubmit={submit}>
+    <form className="flex flex-wrap items-end gap-2" onSubmit={submit}>
       <TextField
         label="Message"
         className="flex-1"
@@ -110,9 +156,10 @@ export function Composer({
         onValueChange={(value) => setText(String(value))}
         onKeyDown={key}
       />
-      <Button type="submit" disabled={disabled || !text.trim()}>
+      <Button type="submit" disabled={disabled || pending || !text.trim()}>
         Send
       </Button>
+      <Unsent reason={unsent} />
     </form>
   );
 }
@@ -138,17 +185,18 @@ export function Request({
   onAnswer,
 }: {
   request: ArtifactrV1.DeferredRequest;
-  onAnswer: (answer: Answer) => void;
+  onAnswer: (answer: Answer) => Sent;
 }) {
   const [answered, setAnswered] = useState(false);
+  const { pending, unsent, send } = useSending();
   const first = useRef<HTMLButtonElement & HTMLInputElement>(null);
   useEffect(() => {
     first.current?.focus();
   }, []);
-  function answer(given: Answer) {
-    setAnswered(true);
-    onAnswer(given);
+  async function answer(given: Answer) {
+    setAnswered(await send(() => onAnswer(given)));
   }
+  const closed = answered || pending;
   if (request.kind === "approval") {
     const args = Object.keys(request.args ?? {}).length > 0;
     return (
@@ -162,32 +210,34 @@ export function Request({
           </pre>
         )}
         <span className="flex gap-2">
-          <Button ref={first} disabled={answered} onClick={() => answer({ approved: true })}>
+          <Button ref={first} disabled={closed} onClick={() => void answer({ approved: true })}>
             Approve
           </Button>
           <Button
             variant="secondary"
-            disabled={answered}
-            onClick={() => answer({ approved: false })}
+            disabled={closed}
+            onClick={() => void answer({ approved: false })}
           >
             Deny
           </Button>
         </span>
+        <Unsent reason={unsent} />
       </section>
     );
   }
   const asked = request.args?.question;
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    answer({ answer: String(new FormData(event.currentTarget).get("answer")) });
+    void answer({ answer: String(new FormData(event.currentTarget).get("answer")) });
   }
   return (
     <form className={card} aria-label="The agent asks" onSubmit={submit}>
       <p>{typeof asked === "string" ? asked : `The agent asks, through ${request.tool_name}.`}</p>
-      <TextField label="Answer" name="answer" ref={first} disabled={answered} required />
-      <Button type="submit" disabled={answered}>
+      <TextField label="Answer" name="answer" ref={first} disabled={closed} required />
+      <Button type="submit" disabled={closed}>
         Answer
       </Button>
+      <Unsent reason={unsent} />
     </form>
   );
 }
@@ -212,9 +262,10 @@ export function ProposalCard({
   onRespond,
 }: {
   proposal: Artifactr.Proposal;
-  onRespond?: (decision: "accept" | "reject") => void;
+  onRespond?: (decision: "accept" | "reject") => Sent;
 }) {
   const what = proposal.change ? describe(proposal.change) : "A change";
+  const { pending, unsent, send } = useSending();
   return (
     <section className={card} aria-label={`Proposal: ${what}`}>
       <p className="font-semibold">{what}</p>
@@ -222,8 +273,14 @@ export function ProposalCard({
       {proposal.status === "open" ? (
         onRespond && (
           <span className="flex gap-2">
-            <Button onClick={() => onRespond("accept")}>Accept</Button>
-            <Button variant="secondary" onClick={() => onRespond("reject")}>
+            <Button disabled={pending} onClick={() => send(() => onRespond("accept"))}>
+              Accept
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={pending}
+              onClick={() => send(() => onRespond("reject"))}
+            >
               Reject
             </Button>
           </span>
@@ -231,6 +288,7 @@ export function ProposalCard({
       ) : (
         <p>{proposal.status === "accept" ? "Accepted" : "Rejected"}</p>
       )}
+      <Unsent reason={unsent} />
     </section>
   );
 }

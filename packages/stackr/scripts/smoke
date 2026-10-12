@@ -369,6 +369,11 @@ app_name=stackr-smoke-app
 app_package=${app_name//-/_}
 app_port=${SMOKE_APP_PORT:-8800}
 app_url="http://127.0.0.1:$app_port"
+# The role the application works as, which owns nothing: row-level security holds it.
+app_role=${app_package}_app
+# The database's host and owner, as db-init has them: local Supabase's by default.
+app_db_host=${STACKR_DB_HOST:-supabase_db_stackr-supabase}
+app_db_admin_password=${STACKR_DB_ADMIN_PASSWORD:-postgres}
 
 # The application's API as the signed-in user, in a tenant (APP_TENANT, or the one they own);
 # the token goes to curl on stdin.
@@ -406,9 +411,59 @@ cleanup_app() {
   if [[ -n ${app_user:-} ]]; then
     supabase_auth "$supabase_secret" "/admin/users/$app_user" -X DELETE -o /dev/null || true
   fi
-  # The application's tables, in its own schema on local Supabase's PostgreSQL.
-  docker compose run --rm --no-deps -T db-init psql --no-psqlrc -qc \
-    "DROP SCHEMA IF EXISTS $app_package CASCADE" >/dev/null 2>&1 || true
+  # The application's tables, in its own schema on local Supabase's PostgreSQL, and its role:
+  # two statements, so a schema that can't be dropped still lets the role go.
+  local statement
+  for statement in "DROP SCHEMA IF EXISTS $app_package CASCADE" "DROP ROLE IF EXISTS $app_role"; do
+    docker compose run --rm --no-deps -T db-init psql --no-psqlrc -qc "$statement" >/dev/null 2>&1 || true
+  done
+}
+
+# A query of the application's tables, straight from PostgreSQL, past the libraries' scoping:
+# as the application's role, in the tenant TENANT names (none if unset), or as their owner. The
+# password reaches psql in the environment, never on a command line.
+app_sql() {
+  local who=$1 query=$2 setting=""
+  [[ -n ${TENANT:-} ]] && setting="SET lattice.tenant_id = '$TENANT';"
+  if [[ $who == owner ]]; then
+    docker compose run --rm --no-deps -T db-init psql --no-psqlrc -tAqc "$setting $query"
+  else
+    PGPASSWORD=$app_password docker compose run --rm --no-deps -T -e PGUSER="$app_role" \
+      -e PGPASSWORD db-init psql --no-psqlrc -tAqc "$setting $query"
+  fi
+}
+
+# Row-level security: with the libraries' scoping bypassed, PostgreSQL itself keeps each
+# tenant's rows to that tenant (lattice RFC-0001's phase 6).
+app_rows_kept_apart() {
+  local unguarded="SELECT count(*) FROM pg_class c WHERE c.relnamespace = '$app_package'::regnamespace
+    AND c.relkind = 'r' AND c.relname NOT LIKE '%alembic_version'
+    AND c.relname NOT LIKE 'relayr\_%' -- the bridge's ledger is the owner's, without the option
+    AND (NOT c.relrowsecurity OR NOT EXISTS (SELECT 1 FROM pg_policies p
+      WHERE p.schemaname = '$app_package' AND p.tablename = c.relname))"
+  [[ $(app_sql owner "$unguarded") == 0 ]] ||
+    { log "FAIL: a table of the application's has no row-level security"; return 1; }
+  [[ $(app_sql owner "SELECT count(*) FROM pg_stat_activity WHERE usename = '$app_role'") -gt 0 ]] ||
+    { log "FAIL: the application doesn't work as $app_role"; return 1; }
+  local events="SELECT count(*) FROM $app_package.artifactr_events"
+  local own="$events WHERE tenant_id = 'stackr-smoke'"
+  [[ $(app_sql owner "$own") -gt 0 ]] || { log "FAIL: the owner sees no events"; return 1; }
+  [[ $(app_sql app "$events") == 0 ]] ||
+    { log "FAIL: the application's role sees events in no tenant"; return 1; }
+  [[ $(TENANT=stackr-smoke-other app_sql app "$own") == 0 ]] ||
+    { log "FAIL: another tenant's transaction sees stackr-smoke's events"; return 1; }
+  [[ $(TENANT=stackr-smoke app_sql app "$own") -gt 0 ]] ||
+    { log "FAIL: the tenant's own transaction doesn't see its events"; return 1; }
+  local plant="INSERT INTO $app_package.artifactr_cursors (tenant_id, workspace_id, name, seq)
+    VALUES ('stackr-smoke', '$run_id', 'planted', 1)"
+  local refused
+  if refused=$(TENANT=stackr-smoke-other app_sql app "$plant" 2>&1); then
+    log "FAIL: another tenant's transaction wrote stackr-smoke's row"
+    return 1
+  fi
+  [[ $refused == *"row-level security"* ]] ||
+    { log "FAIL: the other tenant's write failed, but not for row-level security: $refused"; return 1; }
+  log "ok: PostgreSQL keeps each tenant's rows to that tenant, past the libraries' scoping"
 }
 
 artifactr_turn_trace() {
@@ -477,9 +532,12 @@ smoke_app() {
 
   app_key=$(uv run scripts/create-tenant stackr-smoke --max-budget 1 --allow-mock-responses \
     --key-alias "$run_id-app" --quiet) || { log "FAIL: app: creating its gateway key"; return 1; }
+  app_password=$(random_hex 16)
   (
     umask 077
     cat >"$app_dir/.env" <<ENV
+STACK_DATABASE_URL=postgresql+asyncpg://$app_role:$app_password@$app_db_host:5432/postgres
+STACK_DATABASE_ADMIN_URL=postgresql+asyncpg://postgres:$app_db_admin_password@$app_db_host:5432/postgres
 APP_PORT=$app_port
 OTEL_METRIC_EXPORT_INTERVAL=2000
 LANGFUSE_PUBLIC_KEY=$(setting LANGFUSE_PUBLIC_KEY)
@@ -489,6 +547,11 @@ LITELLM_API_KEY=$app_key
 LITELLM_MOCK_RESPONSE="stackr smoke ok"
 ENV
   )
+  # Row-level security: the role the application works as, made before it first starts.
+  if ! app_compose run --rm --build --no-deps -T app "$app_name-admin" db-roles >/dev/null; then
+    log "FAIL: app: creating the role it works as"
+    return 1
+  fi
   if ! app_compose up --detach --build --wait --wait-timeout 300 >/dev/null; then
     log "FAIL: app: starting it in the app profile"
     app_compose logs --no-color --tail=100 >&2 || true
@@ -556,6 +619,7 @@ ENV
     eventually "the $agent agent's trace, through the gateway, is in Tempo" app_trace_in_tempo
     eventually "the $agent agent's trace is in Langfuse" langfuse_has_trace
   done
+  app_rows_kept_apart || status=1
   eventually "the application's completed turn is counted in Prometheus" prometheus_has \
     "artifactr_turns_total{job=\"$app_name\", artifactr_workspace_id=\"$run_id\", artifactr_turn_outcome=\"completed\"}"
   eventually "the application's succeeded run is counted in Prometheus" prometheus_has \

@@ -24,6 +24,7 @@ grantr decides who may do what in a tenant. artifactr and reflexr ask it, throug
 | Concept | What it is |
 |---|---|
 | **Subject** | Who a check is about: a `User`, a `ServicePrincipal`, a `RulePrincipal` (a reflexr rule, by its workspace and name) or the `Agent`, which holds nothing. Frozen models, discriminated by `kind` |
+| **Service principal's id** | Not empty, and with no `:`, `~` or whitespace, so it can't pass for the libraries' own actors, such as relayr's code rules, `reflexr:<rule>` ([ADR-0028](adr/0028-a-principals-id-cant-pass-for-the-libraries-actors.md)) |
 | **Grantee** | Who a grant names: any subject but the agent, or a `Group` |
 | **Resource** | The deployment, a tenant, a workspace, or a thread, artifact or rule in a workspace. It names no tenant: the tenant is the check's |
 | **Role** | A named set of actions: built in, or a tenant's own (`Role`) |

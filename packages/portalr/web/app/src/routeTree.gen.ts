@@ -9,6 +9,8 @@ import { Route as SignedIndexRouteImport } from './routes/_signed/index'
 import { Route as SignedTTenantRouteImport } from './routes/_signed/t/$tenant'
 import { Route as SignedTTenantIndexRouteImport } from './routes/_signed/t/$tenant/index'
 import { Route as SignedTTenantWWorkspaceRouteImport } from './routes/_signed/t/$tenant/w/$workspace'
+import { Route as SignedTTenantWWorkspaceIndexRouteImport } from './routes/_signed/t/$tenant/w/$workspace/index'
+import { Route as SignedTTenantWWorkspaceThreadsThreadRouteImport } from './routes/_signed/t/$tenant/w/$workspace/threads/$thread'
 
 const SignedRoute = SignedRouteImport.update({
   id: '/_signed',
@@ -39,19 +41,34 @@ const SignedTTenantWWorkspaceRoute = SignedTTenantWWorkspaceRouteImport.update({
   path: '/w/$workspace',
   getParentRoute: () => SignedTTenantRoute,
 } as any)
+const SignedTTenantWWorkspaceIndexRoute =
+  SignedTTenantWWorkspaceIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => SignedTTenantWWorkspaceRoute,
+  } as any)
+const SignedTTenantWWorkspaceThreadsThreadRoute =
+  SignedTTenantWWorkspaceThreadsThreadRouteImport.update({
+    id: '/threads/$thread',
+    path: '/threads/$thread',
+    getParentRoute: () => SignedTTenantWWorkspaceRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof SignedIndexRoute
   '/sign-in': typeof SignInRoute
   '/t/$tenant': typeof SignedTTenantRouteWithChildren
   '/t/$tenant/': typeof SignedTTenantIndexRoute
-  '/t/$tenant/w/$workspace': typeof SignedTTenantWWorkspaceRoute
+  '/t/$tenant/w/$workspace': typeof SignedTTenantWWorkspaceRouteWithChildren
+  '/t/$tenant/w/$workspace/': typeof SignedTTenantWWorkspaceIndexRoute
+  '/t/$tenant/w/$workspace/threads/$thread': typeof SignedTTenantWWorkspaceThreadsThreadRoute
 }
 export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/': typeof SignedIndexRoute
   '/t/$tenant': typeof SignedTTenantIndexRoute
-  '/t/$tenant/w/$workspace': typeof SignedTTenantWWorkspaceRoute
+  '/t/$tenant/w/$workspace': typeof SignedTTenantWWorkspaceIndexRoute
+  '/t/$tenant/w/$workspace/threads/$thread': typeof SignedTTenantWWorkspaceThreadsThreadRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -60,14 +77,27 @@ export interface FileRoutesById {
   '/_signed/': typeof SignedIndexRoute
   '/_signed/t/$tenant': typeof SignedTTenantRouteWithChildren
   '/_signed/t/$tenant/': typeof SignedTTenantIndexRoute
-  '/_signed/t/$tenant/w/$workspace': typeof SignedTTenantWWorkspaceRoute
+  '/_signed/t/$tenant/w/$workspace': typeof SignedTTenantWWorkspaceRouteWithChildren
+  '/_signed/t/$tenant/w/$workspace/': typeof SignedTTenantWWorkspaceIndexRoute
+  '/_signed/t/$tenant/w/$workspace/threads/$thread': typeof SignedTTenantWWorkspaceThreadsThreadRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/sign-in' | '/t/$tenant' | '/t/$tenant/' | '/t/$tenant/w/$workspace'
+    | '/'
+    | '/sign-in'
+    | '/t/$tenant'
+    | '/t/$tenant/'
+    | '/t/$tenant/w/$workspace'
+    | '/t/$tenant/w/$workspace/'
+    | '/t/$tenant/w/$workspace/threads/$thread'
   fileRoutesByTo: FileRoutesByTo
-  to: '/sign-in' | '/' | '/t/$tenant' | '/t/$tenant/w/$workspace'
+  to:
+    | '/sign-in'
+    | '/'
+    | '/t/$tenant'
+    | '/t/$tenant/w/$workspace'
+    | '/t/$tenant/w/$workspace/threads/$thread'
   id:
     | '__root__'
     | '/_signed'
@@ -76,6 +106,8 @@ export interface FileRouteTypes {
     | '/_signed/t/$tenant'
     | '/_signed/t/$tenant/'
     | '/_signed/t/$tenant/w/$workspace'
+    | '/_signed/t/$tenant/w/$workspace/'
+    | '/_signed/t/$tenant/w/$workspace/threads/$thread'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -127,17 +159,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedTTenantWWorkspaceRouteImport
       parentRoute: typeof SignedTTenantRoute
     }
+    '/_signed/t/$tenant/w/$workspace/': {
+      id: '/_signed/t/$tenant/w/$workspace/'
+      path: '/'
+      fullPath: '/t/$tenant/w/$workspace/'
+      preLoaderRoute: typeof SignedTTenantWWorkspaceIndexRouteImport
+      parentRoute: typeof SignedTTenantWWorkspaceRoute
+    }
+    '/_signed/t/$tenant/w/$workspace/threads/$thread': {
+      id: '/_signed/t/$tenant/w/$workspace/threads/$thread'
+      path: '/threads/$thread'
+      fullPath: '/t/$tenant/w/$workspace/threads/$thread'
+      preLoaderRoute: typeof SignedTTenantWWorkspaceThreadsThreadRouteImport
+      parentRoute: typeof SignedTTenantWWorkspaceRoute
+    }
   }
 }
 
+interface SignedTTenantWWorkspaceRouteChildren {
+  SignedTTenantWWorkspaceIndexRoute: typeof SignedTTenantWWorkspaceIndexRoute
+  SignedTTenantWWorkspaceThreadsThreadRoute: typeof SignedTTenantWWorkspaceThreadsThreadRoute
+}
+
+const SignedTTenantWWorkspaceRouteChildren: SignedTTenantWWorkspaceRouteChildren =
+  {
+    SignedTTenantWWorkspaceIndexRoute: SignedTTenantWWorkspaceIndexRoute,
+    SignedTTenantWWorkspaceThreadsThreadRoute:
+      SignedTTenantWWorkspaceThreadsThreadRoute,
+  }
+
+const SignedTTenantWWorkspaceRouteWithChildren =
+  SignedTTenantWWorkspaceRoute._addFileChildren(
+    SignedTTenantWWorkspaceRouteChildren,
+  )
+
 interface SignedTTenantRouteChildren {
   SignedTTenantIndexRoute: typeof SignedTTenantIndexRoute
-  SignedTTenantWWorkspaceRoute: typeof SignedTTenantWWorkspaceRoute
+  SignedTTenantWWorkspaceRoute: typeof SignedTTenantWWorkspaceRouteWithChildren
 }
 
 const SignedTTenantRouteChildren: SignedTTenantRouteChildren = {
   SignedTTenantIndexRoute: SignedTTenantIndexRoute,
-  SignedTTenantWWorkspaceRoute: SignedTTenantWWorkspaceRoute,
+  SignedTTenantWWorkspaceRoute: SignedTTenantWWorkspaceRouteWithChildren,
 }
 
 const SignedTTenantRouteWithChildren = SignedTTenantRoute._addFileChildren(

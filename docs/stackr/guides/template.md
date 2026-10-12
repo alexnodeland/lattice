@@ -66,7 +66,7 @@ The application reads the stack's ports from its environment ([`settings.py`](ht
 | Port | Settings |
 |---|---|
 | Telemetry | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_METRIC_EXPORT_INTERVAL` |
-| Database | `DATABASE_URL`, `DATABASE_SCHEMA` |
+| Database | `DATABASE_URL`, `DATABASE_SCHEMA`, `DATABASE_ADMIN_URL` for row-level security |
 | Identity | `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWT_SECRET`; `AUTH_SERVICE_ROLE_KEY` with grantr, for its commands to find users by email; `AUTH_TENANT_CLAIM` without |
 | LLM gateway | `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `LITELLM_TENANT_KEYS`, `LITELLM_MODEL`, `LITELLM_GUARDRAILS` |
 | Evaluation data | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` |

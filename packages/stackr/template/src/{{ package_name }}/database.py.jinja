@@ -1,11 +1,18 @@
-"""The database port: one engine for every library, on ``DATABASE_URL``.
+"""The database port: the libraries' engines, on ``DATABASE_URL`` and ``DATABASE_ADMIN_URL``.
 
 On PostgreSQL (local Supabase's, by default) the libraries' tables live in a schema of the
 application's own, ``DATABASE_SCHEMA``. Supabase's Data API serves the ``public`` schema, and
 Supabase grants its anonymous role access to every table created there, so tables in ``public``
 would be readable with the project's public key. SQLite, for tests and prototypes, has no
 schemas.
+
+With ``DATABASE_ADMIN_URL`` as well, PostgreSQL keeps tenants apart itself, under the libraries'
+own scoping (lattice RFC-0001): the application works as ``DATABASE_URL``'s role, which owns
+nothing and which the libraries' row-level security policies hold, and migrates, and reads
+across tenants, as ``DATABASE_ADMIN_URL``'s, the tables' owner.
 """
+
+from dataclasses import dataclass
 
 from sqlalchemy import make_url, text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
@@ -13,14 +20,95 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from {% if use_reflexr %}reflexr{% else %}artifactr{% endif %}.sql import create_sqlite_engine
 
 
-def open_database(url: str, *, schema: str) -> AsyncEngine:
-    """Create the engine for a database URL with an async driver.
+@dataclass(frozen=True)
+class Database:
+    """The application's database, through one engine, or two with row-level security.
+
+    Attributes:
+        engine: What every request does, as ``DATABASE_URL``'s role.
+        owner: The tables' owner, which migrates them and reads across tenants:
+            ``DATABASE_ADMIN_URL``'s role, or ``engine`` itself without one.
+    """
+
+    engine: AsyncEngine
+    owner: AsyncEngine
+
+    @property
+    def row_level_security(self) -> bool:
+        """Whether each transaction names its tenant to PostgreSQL: with two engines."""
+        return self.owner is not self.engine
+
+    @property
+    def role(self) -> str | None:
+        """The role ``engine`` works as, with row-level security on PostgreSQL.
+
+        The migrations grant it the tables. None without row-level security, and on SQLite,
+        which has no roles.
+        """
+        if not self.row_level_security or self.engine.dialect.name != "postgresql":
+            return None
+        return self.engine.url.username
+
+    async def dispose(self) -> None:
+        """Close the engines' connections."""
+        await self.engine.dispose()
+        if self.row_level_security:
+            await self.owner.dispose()
+
+    async def check(self, schema: str) -> None:
+        """Refuse to work as a role the policies don't hold, with row-level security.
+
+        A superuser, a role that bypasses them, and the schema's owner, or a member of the
+        owner's role, which inherits its ownership, aren't held by them.
+
+        Raises:
+            RuntimeError: If ``engine``'s role is one of them.
+        """
+        if self.role is None:
+            return
+        async with self.engine.connect() as connection:
+            exempt = await connection.scalar(text(EXEMPT), {"schema": schema})
+        if exempt:
+            raise RuntimeError(
+                f"{self.role} owns the tables, or bypasses row-level security: DATABASE_URL"
+                " must name a role that owns nothing"
+            )
+
+
+EXEMPT = (
+    "SELECT rolsuper OR rolbypassrls OR EXISTS (SELECT 1 FROM pg_namespace"
+    " WHERE nspname = :schema AND pg_has_role(r.oid, nspowner, 'USAGE'))"
+    " FROM pg_roles r WHERE rolname = current_user"
+)
+"""Whether the connection's role isn't held by row-level security."""
+
+
+def open_database(url: str, *, schema: str, admin_url: str | None = None) -> Database:
+    """Open the database for URLs with an async driver.
 
     Args:
         url: Such as ``postgresql+asyncpg://user:password@host:5432/postgres`` or
             ``sqlite+aiosqlite:///app.db``.
         schema: The PostgreSQL schema the tables live in: every connection's ``search_path``.
+        admin_url: The tables' owner, for row-level security; ``url``'s role then owns
+            nothing, and is named by its user.
+
+    Raises:
+        ValueError: If ``admin_url`` is given, and a PostgreSQL ``url`` names no user, or the
+            same user as ``admin_url``, which owns the tables.
     """
+    engine = _engine(url, schema)
+    if admin_url is None:
+        return Database(engine, engine)
+    user, owner = make_url(url).username, make_url(admin_url).username
+    if engine.dialect.name == "postgresql" and (not user or user == owner):
+        raise ValueError(
+            "with DATABASE_ADMIN_URL, DATABASE_URL must name a role of its own, which owns nothing"
+        )
+    return Database(engine, _engine(admin_url, schema))
+
+
+def _engine(url: str, schema: str) -> AsyncEngine:
     if make_url(url).get_backend_name() == "sqlite":
         # The libraries' SQLite engines serialize transactions, as their storage needs.
         return create_sqlite_engine(url)

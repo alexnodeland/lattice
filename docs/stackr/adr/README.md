@@ -25,5 +25,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0019](0019-access-with-grantr-in-the-template.md) | Access with grantr in the template | Accepted |
 | [0020](0020-one-tenant-attribute-and-prom-label-proxy.md) | One tenant attribute, and prom-label-proxy | Accepted |
 | [0021](0021-the-bridge-in-the-template.md) | The bridge in the template | Accepted |
+| [0022](0022-row-level-security-in-the-template.md) | Row-level security in the template | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

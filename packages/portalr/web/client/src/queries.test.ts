@@ -56,7 +56,7 @@ beforeAll(() => {
   origin = `http://127.0.0.1:${server.port}`;
   const api = createApi(
     { artifactr: `${origin}/artifactr/v1`, reflexr: `${origin}/reflexr/v1`, grantr: origin },
-    () => ({ token: "t0k3n", tenant: "acme" }),
+    () => ({ token: "t0k3n" }),
   );
   queries = createQueries(api);
 });
@@ -112,10 +112,7 @@ test("an answer for the wrong question throws", async () => {
   // The stand-in answers a tenant named `confused` for every tenant, and `wrong`'s token for one.
   await expect(client.fetchQuery(queries.grantr.me("confused"))).rejects.toThrow(/every tenant/);
   const wrong = createQueries(
-    createApi({ artifactr: "", reflexr: "", grantr: origin }, () => ({
-      token: "wrong",
-      tenant: null,
-    })),
+    createApi({ artifactr: "", reflexr: "", grantr: origin }, () => ({ token: "wrong" })),
   );
   await expect(client.fetchQuery(wrong.grantr.memberships("alice"))).rejects.toThrow(/one tenant/);
 });

@@ -32,4 +32,5 @@ lattice RFC-0002 gives `ui` the chat: the message list, streaming Markdown, the 
 
 - Easier: what an agent streams reads as Markdown at once, and nothing it writes runs in the page.
 - Harder: an image an agent links from another origin shows as blocked.
+- Harder: Streamdown's core is 508 kB, 155 kB compressed, past Vite's warning. The chat's route loads it, and no other; phase 7 sets the size budgets.
 - Harder: a change to `client`'s store's shapes is a change to `ui`'s components.

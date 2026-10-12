@@ -9,6 +9,8 @@ rules:
   line-length:
     max: 120
     level: warning
+    # An image pinned by tag and digest is one word too long to break.
+    allow-non-breakable-inline-mappings: true
   truthy:
     allowed-values: ["true", "false", "on"]
   comments:

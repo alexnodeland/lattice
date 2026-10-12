@@ -18,7 +18,15 @@ import reflexr
 import reflexr.workspace as r
 from relayr.events import ArtifactCreated, MessagePosted
 from relayr.ledger import Ledger
-from relayr.outbound import Allowlist, NotAllowed, Outbound, Refused, RunActions, rule_actor
+from relayr.outbound import (
+    Allowlist,
+    NotAllowed,
+    Outbound,
+    Refused,
+    RunActions,
+    is_rule_actor,
+    rule_actor,
+)
 from tests.app_types import Note
 from tests.stack import ALICE, KEY, Access, Stack, bridged, notices, until
 
@@ -593,3 +601,10 @@ async def test_an_edit_of_an_artifact_archived_meanwhile_fails_for_good(
     ).errors
     assert isinstance(error, r.RunFailure)
     assert (error.reason, error.permanent) == ("invalid_state", True)
+
+
+def test_a_rules_actor_acts_for_no_person() -> None:
+    person = a.UserActor(id="bob")
+    assert is_rule_actor(rule_actor("app:triage"))
+    assert not is_rule_actor(rule_actor("app:triage").model_copy(update={"on_behalf_of": person}))
+    assert not is_rule_actor(a.ExternalAgentActor(client_id="ci"))

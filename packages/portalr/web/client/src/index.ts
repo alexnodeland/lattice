@@ -19,7 +19,7 @@ export { createQueries, keys, Refused, stale } from "./queries";
 export type * as Reflexr from "./reflexr";
 export { type ReflexrStream, reflexr } from "./reflexr";
 export { type Api, type Config, createApi, readConfig, type Surfaces } from "./rest";
-export { type Session, sessionHeaders, streamUrl } from "./session";
+export { type Session, type StreamSession, sessionHeaders, streamUrl } from "./session";
 export {
   type Classified,
   type Envelope,

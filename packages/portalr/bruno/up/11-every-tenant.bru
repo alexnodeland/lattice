@@ -1,0 +1,23 @@
+meta {
+  name: The operator's tenants
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/portalr/v1/deployment/tenants
+  body: none
+  auth: none
+}
+
+headers {
+  x-user: ops
+}
+
+tests {
+  test("every tenant from grantr, with LiteLLM's spend unavailable", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.tenants).to.eql(["acme", "globex"]);
+    expect(res.body.spend.status).to.equal("unavailable");
+  });
+}

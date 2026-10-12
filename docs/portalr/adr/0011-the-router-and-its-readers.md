@@ -1,6 +1,6 @@
 # ADR-0011: The router and its readers
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0012](0012-acceptance-against-a-two-tenant-stack.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

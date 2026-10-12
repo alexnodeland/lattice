@@ -20,7 +20,6 @@ from portalr.actions import ACTIONS
 from portalr.fastapi import Site, portalr_router
 from portalr.invites import Invite
 from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
-from tests.access import Intended
 from tests.tools import Tool
 
 OPS, ALICE, BOB, CAROL = (User(id=name) for name in ("ops", "alice", "bob", "carol"))
@@ -48,14 +47,19 @@ class Stack:
         )
 
 
-@pytest.fixture
-async def grants() -> Grants:
-    grants = Grants(InMemoryStorage(), catalogs=[ACTIONS])
+async def seeded[G: Grants](kind: type[G]) -> G:
+    """grantr's grants, in memory, with portalr's catalog, the two tenants and their people."""
+    grants = kind(InMemoryStorage(), catalogs=[ACTIONS])
     await grants.first_operator(OPS.id)
     await grants.create_tenant("acme", owner=ALICE.id, by=OPS)
     await grants.create_tenant("globex", owner=CAROL.id, by=OPS)
     await grants.add_member("acme", BOB, by=ALICE)
     return grants
+
+
+@pytest.fixture
+async def grants() -> Grants:
+    return await seeded(Grants)
 
 
 @pytest.fixture
@@ -97,7 +101,7 @@ def app_for(grants: Grants, readers: Readers, invite: Invite | None, ui: Path) -
     app = FastAPI()
     router = portalr_router(
         resolve_actor=resolve_actor,
-        grants=Intended(grants),
+        grants=grants,
         readers=readers,
         invite=invite,
         site=SITE,

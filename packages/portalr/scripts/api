@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# portalr's acceptance tests (portalr ADR-0012, lattice ADR-0015). It starts the test
+# application (tests/app/) beside Tempo, Loki, Prometheus and prom-label-proxy, from compose.yaml,
+# as a compose project of its own on ports the system picks. Then:
+#   1. the two-tenant test (tests/acceptance/) seeds two tenants' telemetry and reads as each;
+#   2. the Bruno collection's up/ runs with every tool up;
+#   3. Tempo, Loki and the proxy stop, and its down/ runs;
+#   4. Schemathesis runs over schemas/portalr.openapi.json.
+# It stops everything however they end.
+#
+# Usage, from portalr's directory, as its `api` task, after the UIs are built: scripts/api
+set -euo pipefail
+root=$(cd ../.. && pwd)
+report="$root/.api-reports/portalr"
+export COMPOSE_PROFILES=app COMPOSE_PROJECT_NAME=portalr-api
+
+stop() {
+  local status=$?
+  if ((status != 0)); then
+    docker compose logs --no-color --tail=200 app
+  fi
+  docker compose down --volumes
+}
+trap stop EXIT
+docker compose down --volumes  # anything a run that was killed left behind
+docker compose up --detach --build --wait --quiet-pull
+at() { printf 'http://%s' "$(docker compose port "$1" "$2")"; }
+base=$(at app 8000)
+
+PORTALR_TEMPO_URL=$(at tempo 3200) \
+PORTALR_TEMPO_OTLP=$(at tempo 4318) \
+PORTALR_LOKI_URL=$(at loki 3100) \
+PORTALR_PROMETHEUS_URL=$(at prometheus 9090) \
+PORTALR_PROXY_URL=$(at prom-label-proxy 8080) \
+  uv run --locked pytest tests/acceptance
+
+(cd bruno && bun x --bun --no-install bru run up --env app --env-var "baseUrl=$base")
+docker compose stop tempo loki prom-label-proxy
+(cd bruno && bun x --bun --no-install bru run down --env app --env-var "baseUrl=$base")
+
+# As acme's owner, in acme: schemathesis.toml names the tenant for portalr's reads.
+uv run --locked --group acceptance schemathesis --config-file "$root/schemathesis.toml" run \
+  schemas/portalr.openapi.json \
+  --url "$base" \
+  --header 'x-user: alice' \
+  --report junit \
+  --report-dir "$report"

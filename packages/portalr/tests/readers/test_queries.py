@@ -1,5 +1,6 @@
 """Every query a reader can send names the tenant: the filters are tested where they are built."""
 
+import json
 import re
 from datetime import UTC, datetime, timedelta
 from itertools import product
@@ -8,8 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from portalr.readers import LogQuery, MetricQuery, TraceQuery, Window
-from portalr.readers.langfuse import parameters as langfuse_parameters
-from portalr.readers.langfuse import tenant_tag
+from portalr.readers.langfuse import tenant_tag, trace_parameters
 from portalr.readers.litellm import team
 from portalr.readers.loki import logs_query
 from portalr.readers.prometheus import QUERIES, TENANT_LABEL
@@ -56,8 +56,14 @@ def test_every_metric_goes_through_the_proxy_with_the_tenant() -> None:
 
 def test_every_score_read_filters_on_the_tenants_tag() -> None:
     assert tenant_tag(ACME) == "tenant:acme"
-    sent = langfuse_parameters(ACME, Window(start=START, end=END, limit=10))
-    assert sent["traceTags"] == "tenant:acme"
+    sent = trace_parameters(ACME, Window(start=START, end=END, limit=10))
+    conditions = json.loads(str(sent["filter"]))
+    assert {
+        "type": "arrayOptions",
+        "column": "traceTags",
+        "operator": "all of",
+        "value": ["tenant:acme"],
+    } in conditions
     assert sent["limit"] == 10
 
 

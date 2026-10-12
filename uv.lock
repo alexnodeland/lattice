@@ -3214,6 +3214,9 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+app = [
+    { name = "uvicorn" },
+]
 dev = [
     { name = "pyright" },
     { name = "pytest" },
@@ -3221,6 +3224,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
     { name = "ruff" },
+    { name = "uvicorn" },
 ]
 lint = [
     { name = "pyright" },
@@ -3243,6 +3247,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+app = [{ name = "uvicorn", specifier = ">=0.54" }]
 dev = [
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1" },
@@ -3250,6 +3255,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=7.1" },
     { name = "pytest-timeout", specifier = ">=2.4" },
     { name = "ruff", specifier = ">=0.16" },
+    { name = "uvicorn", specifier = ">=0.54" },
 ]
 lint = [
     { name = "pyright", specifier = ">=1.1.414" },

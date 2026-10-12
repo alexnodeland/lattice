@@ -1,0 +1,20 @@
+meta {
+  name: The app, at a client-side route
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/portalr/app/threads/thr_1
+  body: none
+  auth: none
+}
+
+tests {
+  test("the app's index, never cached, under a strict policy", function () {
+    expect(res.status).to.equal(200);
+    expect(res.headers["cache-control"]).to.equal("no-cache");
+    expect(res.headers["content-security-policy"]).to.contain("default-src 'self'");
+    expect(res.body).to.contain("/portalr/app/assets/");
+  });
+}

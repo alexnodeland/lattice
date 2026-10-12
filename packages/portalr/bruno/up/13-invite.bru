@@ -1,0 +1,27 @@
+meta {
+  name: An owner invites someone
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/portalr/v1/invites
+  body: json
+  auth: none
+}
+
+headers {
+  x-user: alice
+  x-tenant: acme
+}
+
+body:json {
+  {"email": "dan@acme.com"}
+}
+
+tests {
+  test("dan is a member of acme", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body).to.eql({"tenant": "acme", "user": "dan"});
+  });
+}

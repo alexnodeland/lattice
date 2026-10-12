@@ -6,23 +6,16 @@ grantr has checked already, and is quoted.
 """
 
 import json
-import re
 from datetime import datetime
 from typing import Annotated, Final
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-ID: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}")
-"""What an id in a query may be: a thread, run, session or trace id."""
-
-
-def _id(value: str) -> str:
-    if not ID.fullmatch(value):
-        raise ValueError("not an id")
-    return value
+ID: Final = r"^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$"
+"""What an id in a query may be: a thread, run, session or trace id, as the document says."""
 
 
-type Id = Annotated[str, AfterValidator(_id)]
+type Id = Annotated[str, StringConstraints(pattern=ID)]
 """An id a query may name."""
 
 

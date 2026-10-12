@@ -1,0 +1,24 @@
+meta {
+  name: An owner's failed runs
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/portalr/v1/metrics?metric=failed_runs&start={{start}}&end={{end}}&step=60
+  body: none
+  auth: none
+}
+
+headers {
+  x-user: alice
+  x-tenant: acme
+}
+
+tests {
+  test("acme's failures, read through prom-label-proxy", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal("ok");
+    expect(res.body.data.some((point) => point.value > 0)).to.equal(true);
+  });
+}

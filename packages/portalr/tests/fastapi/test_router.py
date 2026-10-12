@@ -4,13 +4,12 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
-from grantr.core import AuditEntry, Forbidden, Invalid, Member, Subject
+from grantr.core import AuditEntry, Forbidden, Invalid, Member, Subject, User
 from grantr.grants import Grants
 from portalr.fastapi import portalr_router
 from portalr.invites import Invite, InviteFailed
 from portalr.readers import Readers
-from tests.access import Intended
-from tests.fastapi.conftest import ALICE, SITE, Stack, app_for, resolve_actor
+from tests.fastapi.conftest import ALICE, SITE, Stack, app_for, resolve_actor, seeded
 from tests.tools import fails, json
 
 WINDOW = {"start": "2026-10-12T00:00:00Z", "end": "2026-10-12T01:00:00Z"}
@@ -82,7 +81,7 @@ async def test_each_tools_read(client: httpx.AsyncClient, stack: Stack) -> None:
     stack.tempo.paths["/api/v2/traces/t1"] = json({"trace": {"resourceSpans": []}})
     stack.loki.paths["/loki/api/v1/query_range"] = json({"data": {"result": []}})
     stack.prometheus.paths["/api/v1/query_range"] = json({"data": {"result": []}})
-    stack.langfuse.paths["/api/public/scores"] = json({"data": []})
+    stack.langfuse.paths["/api/public/v2/observations"] = json({"data": []})
     stack.litellm.paths["/team/info"] = json({"team_info": {"team_id": "tenant-acme", "spend": 2}})
     alice = headers("alice")
     assert (await client.get("/v1/traces/t1", headers=alice)).json() == {
@@ -112,7 +111,7 @@ async def test_a_tool_that_is_down_fails_only_its_own_read(
     client: httpx.AsyncClient, stack: Stack
 ) -> None:
     stack.loki.paths["/loki/api/v1/query_range"] = fails()
-    stack.langfuse.paths["/api/public/scores"] = json({"data": []})
+    stack.langfuse.paths["/api/public/v2/observations"] = json({"data": []})
     alice = headers("alice")
     assert (await client.get("/v1/logs", params=WINDOW, headers=alice)).json() == {
         "status": "unavailable",
@@ -233,16 +232,20 @@ async def test_a_caller_bound_to_another_tenant_invites_no_one(
 
 @pytest.mark.parametrize(("error", "status"), [(Forbidden("no"), 403), (Invalid("no"), 422)])
 async def test_grantr_refusing_the_member_refuses_the_invitation(
-    grants: Grants, stack: Stack, invite: Invite, ui: Path, error: Exception, status: int
+    stack: Stack, invite: Invite, ui: Path, error: Exception, status: int
 ) -> None:
-    class Refusing(Intended):
+    class Refusing(Grants):
+        """grantr, refusing dan, whom the invitation is for."""
+
         async def add_member(self, tenant: str, member: Member, *, by: Subject) -> AuditEntry:
-            raise error
+            if member == User(id="dan"):
+                raise error
+            return await super().add_member(tenant, member, by=by)
 
     app = FastAPI()
     router = portalr_router(
         resolve_actor=resolve_actor,
-        grants=Refusing(grants),
+        grants=await seeded(Refusing),
         readers=stack.readers(),
         invite=invite,
         site=SITE,

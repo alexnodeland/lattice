@@ -1,0 +1,96 @@
+# portalr's acceptance stack (lattice ADR-0015): its test application, and the tools its readers
+# read, as stackr runs them, with stackr's own configurations. Langfuse and LiteLLM aren't here:
+# their reads are unavailable (portalr ADR-0011). `moon run portalr:api` runs it.
+#
+# Ports are the system's to pick, which scripts/api reads back.
+
+name: portalr
+
+services:
+  app:
+    profiles: [app]
+    build:
+      # lattice's root, which holds the one uv.lock.
+      context: ../..
+      dockerfile: packages/portalr/tests/app/Dockerfile
+    ports:
+      - "127.0.0.1::8000"
+    # Loki's image has no shell or probe of its own, so the application's check waits for it too.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import urllib.request
+          for url in ("http://127.0.0.1:8000/portalr/config.json", "http://loki:3100/ready"):
+              urllib.request.urlopen(url)
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    depends_on:
+      tempo:
+        condition: service_healthy
+      loki:
+        condition: service_started
+      prom-label-proxy:
+        condition: service_healthy
+
+  tempo:
+    image: grafana/tempo:3.0.3
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ../stackr/deploy/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+    ports:
+      - "127.0.0.1::3200"
+      - "127.0.0.1::4318"
+    healthcheck:
+      test: ["CMD", "/tempo", "-health"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-otlp-receiver
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ../stackr/deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1::9090"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  prom-label-proxy:
+    image: quay.io/prometheuscommunity/prom-label-proxy:v0.15.1
+    command:
+      - -label=tenant_id
+      - -upstream=http://prometheus:9090
+      - -insecure-listen-address=0.0.0.0:8080
+      - -internal-listen-address=127.0.0.1:8081
+    ports:
+      - "127.0.0.1::8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/metrics"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+  loki:
+    image: grafana/loki:3.7.8
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - ../stackr/deploy/loki/loki.yaml:/etc/loki/loki.yaml:ro
+    ports:
+      - "127.0.0.1::3100"

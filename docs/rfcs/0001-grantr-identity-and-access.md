@@ -4,6 +4,7 @@
 **Author:** Alex Nodeland
 **Created:** 2026-10-12
 **Discussion:** [#43](https://github.com/alexnodeland/lattice/pull/43); accepted on 2026-10-12, with the decisions in [Decisions](#decisions) (D9 taken with lattice RFC-0002's)
+**Amended by:** [grantr ADR-0015](../grantr/adr/0015-a-check-writes-nothing.md): a check writes nothing, so grantr knows a workspace from its grants
 **Siblings:**
 
 - [artifactr ADR-0012][a-adr-0012] and [ADR-0048][a-adr-0048] put authorization within a tenant behind one hook, asked in one place. This RFC widens that hook, and amends both.
@@ -117,7 +118,7 @@ This makes the work codebase's bug impossible by construction: the actor a check
 | Concept | What it is |
 |---|---|
 | **Tenant** | The isolation boundary, keyed by the same `TenantId` the libraries use. grantr is the registry of tenants |
-| **Workspace** | Registered in grantr when it is first granted or checked, with the same `WorkspaceId` as the libraries |
+| **Workspace** | Known to grantr once a grant names it or an item in it (phase 5's restricted flag also makes an item known), with the same `WorkspaceId` as the libraries |
 | **User** | A Supabase Auth `sub`. grantr stores no passwords or profiles, only the id, and a display name and email cached from the token for its admin UI |
 | **Service principal** | A tenant's non-human principal, with an id, a name and any number of keys. Integrations, MCP clients and rules are service principals |
 | **Group** | A tenant's named set of users and service principals |
@@ -320,7 +321,7 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
 - **Who may restrict a thread?** Its creator, and workspace admins, is the proposal. Whether an editor may restrict a thread someone else started is open.
 - **A stored rule's grants at install:** the installer's role on the workspace, or a narrower set the installer picks in the review. Phase 5 of stackr RFC-0002 settles it with relayr.
 - **Ending a live connection on revocation,** rather than only refusing its next command. It needs a channel from grantr to the libraries' connections, which the template could provide.
-- **Workspaces without a library behind them:** grantr registers a workspace when it is first granted or checked. Whether artifactr #62's listing should come from grantr in applications that use it is for that issue.
+- **Workspaces without a library behind them:** grantr knows a workspace once a grant names it or an item in it. Whether artifactr #62's listing should come from grantr in applications that use it is for that issue.
 
 ## Tracking
 
@@ -328,7 +329,7 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
 
 - [x] Sign-off on D1 to D9 (2026-10-12)
 - [ ] Phase 1: the hook
-- [ ] Phase 2: grantr's core
+- [x] Phase 2: grantr's core
 - [ ] Phase 3: storage and API
 - [ ] Phase 4: the template
 - [ ] Phase 5: threads and artifacts

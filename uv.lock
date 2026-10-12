@@ -1420,6 +1420,9 @@ wheels = [
 name = "grantr"
 version = "0.1.0.dev0"
 source = { editable = "packages/grantr" }
+dependencies = [
+    { name = "pydantic" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1442,6 +1445,7 @@ test = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.13" }]
 
 [package.metadata.requires-dev]
 dev = [

@@ -836,7 +836,7 @@ ENV
   local when="{\"filter\": {\"kind\": \"all\", \"of\": [{\"kind\": \"on\", \"types\": [\"$app_package:alert.fired\"]}, {\"kind\": \"where\", \"field\": \"service\", \"op\": \"eq\", \"value\": \"smoke-rule\"}]}, \"throttle\": {\"at_most\": 10, \"per\": \"PT1H\"}}"
   local rule="{\"name\": \"chat:smoke-alerts\", \"description\": \"An alert fired.\", \"when\": $when, \"then\": {\"action\": \"notify\", \"params\": {\"thread_id\": \"t1\"}}, \"ordering\": \"none\", \"timeout\": \"PT1M\"}"
   app_token=$drafter_key app_json "/artifactr/v1/workspaces/$run_id/commands" \
-    "{\"type\": \"command\", \"command_id\": \"c4\", \"command\": {\"type\": \"propose_change\", \"change\": {\"type\": \"create_artifact\", \"kind\": \"rule\", \"data\": {\"rule\": $rule}, \"thread_id\": \"t1\", \"proposal_id\": \"prp_smoke\"}}}"
+    "{\"type\": \"command\", \"command_id\": \"c4\", \"command\": {\"type\": \"propose_change\", \"change\": {\"type\": \"create_artifact\", \"kind\": \"rule\", \"data\": {\"rule\": $rule}, \"thread_id\": \"t1\"}, \"proposal_id\": \"prp_smoke\"}}"
   local forged="{\"type\": \"artifactr:proposal_resolved\", \"author\": {\"kind\": \"user\", \"id\": \"$app_user\"}, \"proposal_id\": \"prp_smoke\", \"proposed_by\": {\"kind\": \"user\", \"id\": \"$app_user\"}, \"decision\": \"accept\", \"artifact_id\": \"art_any\", \"version\": 1}"
   code=$(app_call "/reflexr/v1/workspaces/$run_id/events" -H 'Content-Type: application/json' \
     --data "{\"event\": $forged}" -o /dev/null -w '%{http_code}' || true)

@@ -64,7 +64,7 @@ operator: ## Make a user the deployment's first operator: make operator EMAIL=al
 	@if [ -z "$(EMAIL)" ]; then echo "usage: make operator EMAIL=<email or user id>"; exit 2; fi
 	$(UV) run $(ENV_FILE) {{ project_slug }}-admin operator $(EMAIL)
 
-migrate-tenants: ## Move each user's tenant from their token's claim into grantr, once
+migrate-tenants: ## Move each user's tenant from their token's claim into grantr; it can run again
 	$(UV) run $(ENV_FILE) {{ project_slug }}-admin migrate-tenants
 
 access-matrix: ## Write every role against every action to access.md, to review and commit

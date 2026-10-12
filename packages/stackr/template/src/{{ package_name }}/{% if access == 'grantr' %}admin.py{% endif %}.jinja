@@ -20,6 +20,7 @@ from itertools import groupby
 from typing import Any, cast
 
 from grantr import Grants, Invalid
+from grantr.core import MemberAdded, TenantCreated
 from grantr.sql import SqlStorage, migrate
 
 from {{ package_name }}.access import build_grants
@@ -119,23 +120,32 @@ async def tenant(grants: Grants, users: Users, name: str, owner: str) -> str:
 
 
 async def migrate_tenants(grants: Grants, users: Users) -> str:
-    """Move each user's tenant from their token's claim into grantr.
+    """Move each user's tenant from their token's claim into grantr, and say who got what.
 
-    Each tenant's earliest user becomes its owner, and the rest its admins, so no one loses what
-    they could do; the owners narrow it afterwards. A tenant grantr has is left as it is.
+    A new tenant's earliest user becomes its owner, and the rest its admins, so no one loses
+    what they could do; the owners narrow it afterwards. A tenant grantr holds already gains, as
+    admins, the users who claim it and aren't its members yet.
     """
     lines: list[str] = []
     claimed = sorted(
         (account for account in await users.accounts() if account.tenant),
         key=lambda account: (account.tenant or "", account.created_at),
     )
-    for name, accounts in groupby(claimed, key=lambda account: account.tenant or ""):
-        owner, *admins = list(accounts)
-        if await grants.provision_tenant(name, owner=owner.id, admins=[a.id for a in admins]):
-            emails = ", ".join(admin.email for admin in admins) or "no one"
-            lines.append(f"{name}: owner {owner.email}; admins {emails}")
+    for name, group in groupby(claimed, key=lambda account: account.tenant or ""):
+        accounts = list(group)
+        emails = {account.id: account.email for account in accounts}
+        entries = await grants.provision_tenant(
+            name, owner=accounts[0].id, admins=[account.id for account in accounts]
+        )
+        added = ", ".join(
+            emails[entry.event.member.id]
+            for entry in entries
+            if isinstance(entry.event, MemberAdded)
+        )
+        if any(isinstance(entry.event, TenantCreated) for entry in entries):
+            lines.append(f"{name}: owner {accounts[0].email}; admins {added or 'no one'}")
         else:
-            lines.append(f"{name}: exists, and is unchanged")
+            lines.append(f"{name}: exists; admins added: {added or 'no one'}")
     return "\n".join(lines) or "no user names a tenant"
 
 

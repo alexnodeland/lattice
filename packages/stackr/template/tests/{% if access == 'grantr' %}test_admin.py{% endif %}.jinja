@@ -96,7 +96,15 @@ async def test_migrating_keeps_what_each_user_could_do(config: Settings) -> None
         "initech: owner carol@example.com; admins no one"
     )
     assert await run(["migrate-tenants"], config) == (
-        "acme: exists, and is unchanged\ninitech: exists, and is unchanged"
+        "acme: exists; admins added: no one\ninitech: exists; admins added: no one"
+    )
+
+
+async def test_migrating_adds_a_tenants_new_users_as_admins(config: Settings) -> None:
+    assert await run(["tenant", "acme", "u-carol"], config) == "created acme, owned by u-carol"
+    assert await run(["migrate-tenants"], config) == (
+        "acme: exists; admins added: alice@example.com, bob@example.com\n"
+        "initech: owner carol@example.com; admins no one"
     )
 
 

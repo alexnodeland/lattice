@@ -18,7 +18,7 @@ from starlette.requests import HTTPConnection
 import artifactr.core as artifactr
 {% endif -%}
 from grantr import TENANT as ON_TENANT
-from grantr import {% if use_artifactr %}Agent, {% endif %}Grants, Resource, ServicePrincipal, User
+from grantr import Agent, Grants, Resource, {% if use_reflexr %}RulePrincipal, {% endif %}ServicePrincipal, User
 from grantr.testing import matrix
 {% if use_reflexr -%}
 from reflexr import core as reflexr
@@ -27,7 +27,7 @@ from {{ package_name }}.access import CATALOGS, Access, Refused
 from {{ package_name }}.auth import Principal, TokenVerifier, Unauthenticated
 from {{ package_name }}.settings import Settings
 
-from conftest import OTHER, SECRET, TENANT, Script, app, seeded, serving, token
+from conftest import OTHER, SECRET, TENANT, {% if use_reflexr %}TRIAGE, {% endif %}Script, app, seeded, serving, token
 
 ROOT = Path(__file__).parent.parent
 APPLICATION = ServicePrincipal(id=Settings().service_name)
@@ -74,14 +74,23 @@ async def test_a_users_only_tenant_needs_no_naming() -> None:
     assert principal == Principal(tenant_id=TENANT, user_id="alice", name="alice@example.com")
 
 
+async def test_a_blank_tenant_is_no_tenant() -> None:
+    blank = request(Authorization=f"Bearer {token()}", **{"X-Tenant": ""})
+    assert (await access(seeded()).authenticate(blank)).tenant_id == TENANT
+
+
 async def test_a_user_in_several_tenants_names_one() -> None:
-    grants = seeded()
-    await grants.provision_tenant("globex", owner="alice")
     with pytest.raises(Refused, match="X-Tenant") as refused:
-        await access(grants).authenticate(request(Authorization=f"Bearer {token()}"))
+        await access(seeded()).authenticate(request(Authorization=f"Bearer {token('carol')}"))
     assert refused.value.status == 400
-    named = request(Authorization=f"Bearer {token()}", **{"X-Tenant": "globex"})
-    assert (await access(grants).authenticate(named)).tenant_id == "globex"
+    named = request(Authorization=f"Bearer {token('carol')}", **{"X-Tenant": "globex"})
+    assert (await access(seeded()).authenticate(named)).tenant_id == "globex"
+
+
+async def test_a_user_in_no_tenant_is_refused() -> None:
+    with pytest.raises(Refused, match="isn't a member of any tenant") as refused:
+        await access(seeded()).authenticate(request(Authorization=f"Bearer {token('dave')}"))
+    assert refused.value.status == 403
 
 
 async def test_a_tenant_its_user_isnt_in_is_refused() -> None:
@@ -113,6 +122,11 @@ async def test_a_key_is_its_tenants_and_no_others() -> None:
     forged = key[:-1] + ("1" if key.endswith("0") else "0")
     with pytest.raises(Unauthenticated, match="key is not valid"):
         await access(grants).identify(request(Authorization=f"Bearer {forged}"))
+    in_the_url = HTTPConnection(
+        {"type": "websocket", "headers": [], "query_string": f"access_token={key}".encode()}
+    )
+    with pytest.raises(Unauthenticated, match="Authorization header"):
+        await access(grants).identify(in_the_url)
 {%- if use_artifactr %}
 
 
@@ -137,6 +151,7 @@ async def test_a_key_is_its_tenants_and_no_others() -> None:
         ),
         (artifactr.SystemActor(), APPLICATION),
         (artifactr.EvaluatorActor(name="judge", version="1"), APPLICATION),
+        (User(id="not-an-actor"), Agent()),
     ],
 )
 def test_artifactrs_actors_are_checked_as_who_they_act_for(
@@ -157,15 +172,25 @@ def test_artifactrs_actors_are_checked_as_who_they_act_for(
             User(id="bob"),
         ),
         (reflexr.SourceActor(name="artifactr"), APPLICATION),
-        (reflexr.AgentActor(rule="app:triage", run_id="r1", name="triage"), APPLICATION),
-        (reflexr.SystemActor(), APPLICATION),
+        (reflexr.SystemActor(name="relayr"), APPLICATION),
+        (reflexr.AgentActor(rule=TRIAGE, run_id="r1", name="triage"), APPLICATION),
+        (
+            reflexr.AgentActor(rule="ops:stored", run_id="r1", name="stored"),
+            RulePrincipal(workspace="main", rule="ops:stored"),
+        ),
         (reflexr.EvaluatorActor(name="judge", version="1"), APPLICATION),
+        (User(id="not-an-actor"), Agent()),
     ],
 )
 def test_reflexrs_actors_are_checked_as_who_they_act_for(
     actor: reflexr.Actor, subject: Any
 ) -> None:
     assert access(seeded()).reflexr_subject(TENANT, "main", actor) == subject
+
+
+def test_a_stored_rule_outside_a_workspace_holds_nothing() -> None:
+    stored = reflexr.AgentActor(rule="ops:stored", run_id="r1", name="stored")
+    assert access(seeded()).reflexr_subject(TENANT, None, stored) == Agent()
 {%- endif %}
 
 
@@ -173,11 +198,22 @@ def test_reflexrs_actors_are_checked_as_who_they_act_for(
 def test_the_libraries_answer_refusals_over_rest(read: str, mcp: str, tool: str) -> None:
     with TestClient(app(Script())) as client:
         assert client.get(read, headers=signed()).status_code == 200
-        assert client.get(read, headers=signed("dave")).status_code == 400
+        assert client.get(read, headers=signed("carol")).status_code == 400
+        assert client.get(read, headers=signed("dave")).status_code == 403
         refused = client.get(read, headers=signed("alice", **{"X-Tenant": OTHER}))
         assert (refused.status_code, refused.json()["detail"]["type"]) == (403, "forbidden")
 
 
+{% if use_reflexr -%}
+@pytest.mark.parametrize("read", ["/reflexr/v1/rules", "/reflexr/v1/schedules"])
+def test_reflexrs_tenant_wide_reads_refuse_another_tenant(read: str) -> None:
+    with TestClient(app(Script())) as client:
+        assert client.get(read, headers=signed()).status_code == 200
+        refused = client.get(read, headers=signed("alice", **{"X-Tenant": OTHER}))
+        assert (refused.status_code, refused.json()["detail"]["type"]) == (403, "forbidden")
+
+
+{% endif -%}
 @pytest.mark.parametrize(("read", "mcp", "tool"), PARTS)
 async def test_a_key_reads_over_rest_and_mcp(read: str, mcp: str, tool: str) -> None:
     grants = seeded()

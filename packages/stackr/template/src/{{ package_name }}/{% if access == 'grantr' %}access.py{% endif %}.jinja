@@ -25,7 +25,18 @@ from starlette.requests import HTTPConnection
 import artifactr.core as artifactr
 from artifactr.workspace import ACTIONS as ARTIFACTR_ACTIONS
 {% endif -%}
-from grantr import {% if use_artifactr %}Agent, {% endif %}Grants, InMemoryStorage, ServicePrincipal, Storage, Subject, User
+from grantr import (
+    Agent,
+    Grants,
+    InMemoryStorage,
+{%- if use_reflexr %}
+    RulePrincipal,
+{%- endif %}
+    ServicePrincipal,
+    Storage,
+    Subject,
+    User,
+)
 from grantr.fastapi import Caller, Unauthorized, grantr_router
 from grantr.sql import SqlStorage, migrate
 from grantr.testing import matrix
@@ -42,12 +53,20 @@ from {{ package_name }}.auth import (
     bearer_token,
 )
 from {{ package_name }}.telemetry import TelemetryHandle
+{%- if use_reflexr %}
+from {{ package_name }}.tickets import RULES
+{%- endif %}
 
 PREFIX = "/grantr"
 
 KEY_PREFIX: Final = "grantr_sk_"
 """How a service principal's key begins, where a token would be."""
 
+{% if use_reflexr -%}
+CODE_RULES: Final = frozenset(rule.name for rule in RULES)
+"""The rules defined here, in code, whose runs act as the application."""
+
+{% endif -%}
 CATALOGS: Final = [{% if use_artifactr %}ARTIFACTR_ACTIONS{% endif %}{% if libraries == 'both' %}, {% endif %}{% if use_reflexr %}REFLEXR_ACTIONS{% endif %}]
 """The libraries' catalogs, which grantr's roles are made of."""
 
@@ -128,11 +147,15 @@ class Access:
         """Who a request comes from: a person, by their token; or a key's tenant and principal.
 
         Raises:
-            Unauthenticated: If it carries neither a valid token nor a valid key.
+            Unauthenticated: If it carries neither a valid token nor a valid key, or a key
+                anywhere but its ``Authorization`` header.
         """
         credential = bearer_token(connection)
         if not credential.startswith(KEY_PREFIX):
             return await self._verifier.verify(credential)
+        if not connection.headers.get("authorization", "").strip().endswith(credential):
+            # A URL ends up in logs: a key, which lasts, goes in its header only.
+            raise Unauthenticated("a key goes in the Authorization header")
         found = await self.grants.authenticate(credential)
         if found is None:
             raise Unauthenticated("the key is not valid")
@@ -143,13 +166,13 @@ class Access:
 
         Raises:
             Unauthenticated: If it carries neither a valid token nor a valid key.
-            Refused: If it names no tenant and its user is in several, or none (400); or names
-                a tenant its caller isn't in (403).
+            Refused: If it names no tenant and its user is in several (400); or its user is in
+                none, or it names a tenant its caller isn't in (403).
         """
         who = await self.identify(connection)
-        named = connection.headers.get("x-tenant")
+        named = connection.headers.get("x-tenant") or None
         if connection.scope["type"] == "websocket":
-            named = named or connection.query_params.get("tenant")
+            named = named or connection.query_params.get("tenant") or None
         if isinstance(who, tuple):
             tenant, principal = who
             if named and named != tenant:
@@ -159,7 +182,9 @@ class Access:
             )
         if named is None:
             memberships = await self.grants.memberships(who.user_id)
-            if len(memberships) != 1:
+            if not memberships:
+                raise Refused(403, f"{who.name} isn't a member of any tenant")
+            if len(memberships) > 1:
                 raise Refused(400, "name the tenant with X-Tenant")
             named = memberships[0].tenant
         if await self.grants.member(named, who.user_id) is None:
@@ -182,8 +207,10 @@ class Access:
                 if acting is None:
                     return Agent()
                 return self.artifactr_subject(_tenant, _workspace, acting)
-            case _:  # the system, and evaluators
+            case artifactr.SystemActor() | artifactr.EvaluatorActor():
                 return self.application
+            case _:  # an actor this application doesn't know holds nothing
+                return Agent()
 {%- endif %}
 {%- if use_reflexr %}
 
@@ -193,8 +220,10 @@ class Access:
         """Who grantr checks for a reflexr actor.
 
         A person, and a client acting for one, is checked as them; a client with a key as its
-        principal. Everything else runs in the application, and is checked as its principal: its
-        code rules, its system and evaluators, and a source it runs, which publishes in process.
+        principal; a stored rule's run as the rule. The rest runs in the application, and is
+        checked as its principal: its code rules, its system and evaluators, and the sources it
+        runs, which publish in process, such as relayr's bridge from artifactr. An actor it
+        doesn't know holds nothing.
         """
         match actor:
             case reflexr.UserActor():
@@ -203,10 +232,14 @@ class Access:
                 return (
                     ServicePrincipal(id=actor.client_id) if person is None else User(id=person.id)
                 )
-            case _:
-                # The application's code rules, its system and evaluators, and the sources it
-                # runs in process, such as relayr's bridge from artifactr.
+            case reflexr.AgentActor(rule=rule) if rule in CODE_RULES:
                 return self.application
+            case reflexr.AgentActor(rule=rule) if _workspace is not None:
+                return RulePrincipal(workspace=_workspace, rule=rule)
+            case reflexr.SystemActor() | reflexr.EvaluatorActor() | reflexr.SourceActor():
+                return self.application
+            case _:  # an actor this application doesn't know holds nothing
+                return Agent()
 {%- endif %}
 
     async def _caller(self, connection: HTTPConnection) -> Caller:

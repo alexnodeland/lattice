@@ -21,7 +21,7 @@ make up             # build the image and run it beside the stack, at http://loc
 ## What it serves
 
 {% if access == 'grantr' -%}
-Every surface needs a Supabase access token, or a service principal's key in its place: in the `Authorization: Bearer` header, or, for a WebSocket, in the `access_token` query parameter. The token's `sub` is the user. The request names its tenant, in the `X-Tenant` header or a WebSocket's `tenant` query parameter, and may leave it out when its user is a member of one tenant only; a key names its own. Without a valid token or key it is 401; a tenant its caller isn't in is 403. Then grantr decides each command and read ([Access](#access)).
+Every surface needs a Supabase access token, or a service principal's key in its place: in the `Authorization: Bearer` header, or, for a WebSocket, a token in the `access_token` query parameter (a key goes in the header only). The token's `sub` is the user. The request names its tenant, in the `X-Tenant` header or a WebSocket's `tenant` query parameter, and may leave it out when its user is a member of one tenant only; a key names its own. Without a valid token or key it is 401. A tenant its caller isn't in, or a user in no tenant, is 403; a user in several tenants who names none is 400. Then grantr decides each command and read ([Access](#access)).
 {%- else -%}
 Every surface needs a Supabase access token: in the `Authorization: Bearer` header, or, for a WebSocket, in the `access_token` query parameter. The token's `sub` is the user, and its `app_metadata.tenant_id` is the tenant, whose workspaces the user can use. Anything else is 401.
 {%- endif %}
@@ -110,7 +110,7 @@ The agent's trace, through the gateway to the model, is in Grafana (Tempo) and L
 |---|---|
 | `make operator EMAIL=...` | Make a user the deployment's first operator, who may create tenants |
 | `make tenant NAME=... OWNER=...` | Create a tenant, with its owner; once |
-| `make migrate-tenants` | Move each user's tenant from their token's `app_metadata.tenant_id` into grantr, once: each tenant's earliest user becomes its owner, and the rest its admins |
+| `make migrate-tenants` | Move each user's tenant from their token's `app_metadata.tenant_id` into grantr: a new tenant's earliest user becomes its owner, and the rest its admins; a tenant grantr holds gains its claimed users who aren't members, as admins. It prints who got what, and can run again |
 
 People are added, given roles and issued keys through grantr's API at `/grantr/v1`.
 

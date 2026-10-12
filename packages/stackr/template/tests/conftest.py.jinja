@@ -3,7 +3,7 @@
 No test needs the stack or the network. Tokens are signed in the test with a secret (or a key)
 the verifier is given; the agents' model is a :class:`Script` that answers each request with its
 next step; workspaces live in memory, or in SQLite.{% if access == 'grantr' %} grantr lives in memory too, with acme, owned by
-alice, with bob its admin, and initech, owned by carol.{% endif %}
+alice, with bob its admin, and initech and globex, owned by carol.{% endif %}
 """
 
 import asyncio
@@ -148,10 +148,11 @@ def settings(**gateway: Any) -> Settings:
 async def _seed(grants: Grants) -> None:
     await grants.provision_tenant(TENANT, owner="alice", admins=["bob"])
     await grants.provision_tenant(OTHER, owner="carol")
+    await grants.provision_tenant("globex", owner="carol")
 
 
 def seeded() -> Grants:
-    """grantr in memory, with acme and initech; seeded in a thread, from any test."""
+    """grantr in memory, with acme, initech and globex; seeded in a thread, from any test."""
     grants = build_grants(InMemoryStorage(), name=Settings().service_name)
     with ThreadPoolExecutor(1) as thread:
         thread.submit(asyncio.run, _seed(grants)).result()

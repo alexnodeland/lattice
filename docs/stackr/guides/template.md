@@ -87,7 +87,7 @@ With `access=grantr`, the application's own commands set up its tenants, in proc
 |---|---|
 | `make operator EMAIL=...` | Makes a user the deployment's first operator, who may create tenants through grantr's API |
 | `make tenant NAME=... OWNER=...` | Creates a tenant, with its owner, once |
-| `make migrate-tenants` | Moves each user's tenant from their token's `app_metadata.tenant_id` into grantr, once: each tenant's earliest user becomes its owner, and the rest its admins, and it prints who got what |
+| `make migrate-tenants` | Moves each user's tenant from their token's `app_metadata.tenant_id` into grantr: a new tenant's earliest user becomes its owner, and the rest its admins; a tenant grantr holds gains its claimed users who aren't members, as admins. It prints who got what, and can run again |
 | `make access-matrix` | Rewrites `access.md`, every role against every action, to review and commit |
 
 `make tenant` here is grantr's; stackr's own `make tenant` creates a tenant's team and key on the gateway.

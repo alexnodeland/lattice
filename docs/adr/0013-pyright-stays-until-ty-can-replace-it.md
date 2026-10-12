@@ -20,7 +20,7 @@ That pull request, [#58](https://github.com/alexnodeland/lattice/pull/58), ran t
 ## Decision
 
 - **pyright strict stays the gate,** per project as today: strict for `src/` and `scripts/`, standard for `tests/`. ty is not adopted.
-- **ty's real findings are kept,** fixed in code that pyright also accepts ([#62](https://github.com/alexnodeland/lattice/pull/62)): `@override` on every override, the stubs included; context managers' generators typed as generators; evalr's `FunctionEvaluator` names a callable without a `__name__` for its type, with a test; a method replaced on a protocol's instance in a test is now replaced with `monkeypatch`; a dictionary unpacked into keyword parameters is passed as keywords; a redundant cast is gone; and the DSPy stub's `Example(base, /, **kwargs)` is positional, as DSPy's own calls use it.
+- **ty's real findings are kept,** fixed in code that pyright also accepts ([#62](https://github.com/alexnodeland/lattice/pull/62)): `@override` on every override, the stubs included; context managers' generators typed as generators; evalr's `FunctionEvaluator` names a callable without a `__name__` for its type, with a test; a method replaced on a protocol's instance in a test is now replaced with `monkeypatch`; a dictionary unpacked into keyword parameters is passed as keywords; a redundant cast is gone; and the DSPy stub's `Example(base, /, **kwargs)` is positional-only, as DSPy's own calls use it.
 - **ty is tried again when it has a strict mode and catches what pyright strict does on this code:** the same run, both checkers over every project, with no rule off and no override for a gap in ty.
 
 This amends RFC-0003's Types row and answers its "What ty misses".

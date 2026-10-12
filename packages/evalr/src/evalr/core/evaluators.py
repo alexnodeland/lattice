@@ -54,7 +54,8 @@ class FunctionEvaluator[InputT: BaseModel, VerdictT: BaseModel]:
         Args:
             function: Computes the verdict's value from the input.
             verdict_type: The Pydantic model the function returns.
-            name: The evaluator's name; the function's name by default.
+            name: The evaluator's name; the function's name, or its type's if it has none, by
+                default.
             version: The evaluator's version; bump it when the function changes.
             tracer_provider: Where evaluation spans go; the global provider by default.
 

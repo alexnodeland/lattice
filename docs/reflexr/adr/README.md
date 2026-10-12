@@ -19,7 +19,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0013](0013-quality-gates.md) | Quality gates | Accepted, amended by 0048 |
 | [0014](0014-mit-license.md) | MIT license | Accepted |
 | [0015](0015-reference-implementation-oncall.md) | Reference implementation: incident response | Accepted, amended by 0031 and 0048 |
-| [0016](0016-tenants-and-workspaces-like-artifactr.md) | Tenants and workspaces, like artifactr | Accepted, amended by 0053 |
+| [0016](0016-tenants-and-workspaces-like-artifactr.md) | Tenants and workspaces, like artifactr | Accepted, amended by 0053 and 0056 |
 | [0017](0017-the-cores-evaluation-contract.md) | The core's evaluation contract | Accepted |
 | [0018](0018-opentelemetry-observability-with-langfuse.md) | OpenTelemetry-native observability, with Langfuse primary | Accepted, amended by 0055 |
 | [0019](0019-typed-feedback-as-events.md) | Typed feedback as events, mirrored to Langfuse | Accepted |
@@ -45,7 +45,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0041](0041-executing-runs.md) | Executing runs | Accepted |
 | [0042](0042-cancel-safe-storage.md) | Cancel-safe storage | Accepted |
 | [0043](0043-graph-checkpoints.md) | Graph checkpoints | Accepted |
-| [0044](0044-surfaces.md) | Surfaces | Accepted; partly superseded by 0047 |
+| [0044](0044-surfaces.md) | Surfaces | Accepted; partly superseded by 0047, its authorization amended by 0056 |
 | [0045](0045-scores-on-evalr.md) | Scores on evalr | Accepted |
 | [0046](0046-one-docs-build.md) | One docs build | Accepted, amended by 0049 |
 | [0047](0047-commands-carried-out-once-per-id.md) | Commands carried out once per id | Accepted |
@@ -54,8 +54,9 @@ Each record captures one decision: the context that forced it, the options consi
 | [0050](0050-dashboards-from-the-checkout.md) | Dashboards from the checkout | Accepted |
 | [0051](0051-qualified-rule-names.md) | Qualified rule names | Accepted |
 | [0052](0052-typed-action-parameters.md) | Typed action parameters | Accepted |
-| [0053](0053-stored-rules-one-fixed-configuration.md) | Stored rules, under one fixed configuration | Accepted |
+| [0053](0053-stored-rules-one-fixed-configuration.md) | Stored rules, under one fixed configuration | Accepted; its `allow` folded into `authorize` by 0056 |
 | [0054](0054-installing-updating-and-archiving-stored-rules.md) | Installing, updating and archiving stored rules | Accepted |
 | [0055](0055-reading-stored-rules.md) | Reading stored rules: every pass, in their workspace, by namespace in metrics | Accepted |
+| [0056](0056-access-asked-in-every-workspace-method.md) | Access asked in every workspace method | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

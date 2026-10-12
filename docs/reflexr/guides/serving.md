@@ -71,20 +71,25 @@ async def resolve_actor(connection: HTTPConnection) -> tuple[TenantId, Actor]:
 
 Browsers cannot set headers on a WebSocket, so a cookie, or a short-lived token in the query string, is usual there.
 
-To decide which workspaces of its tenant an actor may use, pass `authorize`. A refusal answers 403, with the `forbidden` rejection as the body's `detail`, as every rejection has, or closes the WebSocket with 4403:
+To decide what an actor may do, give `Workspaces` an `authorize` hook. It hears the tenant, the workspace, the actor and an `Access`, which names the action (one of `reflexr.workspace.ACTIONS`) and the rule it is about, when it names one:
 
 ```python
 from reflexr.core import WorkspaceId
+from reflexr.workspace import Access
 
 
-async def authorize(tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor) -> bool:
-    return await memberships.allows(tenant_id, workspace_id, actor)  # your access control
+async def authorize(
+    tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
+) -> bool:
+    return await roles.allows(tenant_id, workspace_id, actor, access.action)  # your access control
 
 
-router = reflexr_router(workspaces, resolve_actor=resolve_actor, authorize=authorize)
+workspaces = Workspaces(storage, events=EVENTS, rules=RULES, authorize=authorize)
 ```
 
-Without `authorize`, any authenticated actor may use every workspace of its own tenant. `ReflexrMcp` takes the same hook, so one function decides for every surface ([External agents over MCP](mcp.md#mounting-the-server)).
+Every `Workspace` method asks it first, as the handle's actor ([ADR-0056](../adr/0056-access-asked-in-every-workspace-method.md)): opening the workspace is `reflexr:open`, a command is its type (`reflexr:retry_run`), and a read is `read_` and what it reads (`reflexr:read_runs`). So every REST request, every command on a WebSocket, every MCP tool call and every in-process call is asked, and no surface takes a hook of its own. `GET /v1/rules` and `GET /v1/schedules` read across the tenant, so they ask with no workspace. A refusal answers 403, with the `forbidden` rejection as the body's `detail`, as every rejection has, closes a WebSocket that may not open the workspace or read its log with 4403, and answers a command on an open WebSocket with a `forbidden` result. Without `authorize`, any authenticated actor may do anything in every workspace of its own tenant.
+
+`Workspaces` also takes `on_open(tenant_id, workspace_id)`, called each time a workspace is opened and allowed. Start a workspace's background work there, such as a feedback mirror; it is called often, so make it idempotent.
 
 ## Publishing over HTTP
 
@@ -229,7 +234,7 @@ When the application turns [stored rules](rules.md#stored-rules) on, a client in
 {"type": "command_result", "command_id": "install-prp_12", "ok": true, "outcome": {"type": "rule_version", "rule": "chat:prod-deploy-failures", "version": 1, "seq": 812, "duplicate": false}, "rejection": null}
 ```
 
-A change the configuration's `allow` hook refuses, or one to a code rule, is 403, a rule the fixed limits refuse is 422 with every problem in `errors`, a rule changed since the `expected_version` given is 409, and a name no stored rule has is 404. A change retried after it succeeded, even with a new `command_id`, changes nothing and answers `"duplicate": true`. Give `expected_version` so a retry after someone else's change is refused rather than applied.
+A change `authorize` refuses, or one to a code rule, is 403, a rule the fixed limits refuse is 422 with every problem in `errors`, a rule changed since the `expected_version` given is 409, and a name no stored rule has is 404. A change retried after it succeeded, even with a new `command_id`, changes nothing and answers `"duplicate": true`. Give `expected_version` so a retry after someone else's change is refused rather than applied.
 
 A stored rule belongs to the workspace it is installed in, and is read there beside the code rules: `GET /v1/workspaces/prod/rules` lists it after them, and `GET /v1/workspaces/prod/rules/chat:prod-deploy-failures` returns it with its version and provenance:
 
@@ -267,7 +272,7 @@ The server closes a connection with a code that says what to do next:
 |---|---|---|
 | 4400 | The first frame was not a valid `hello`, asked for another protocol, or asked both to start at the head and to resume | Fix it and reconnect |
 | 4401 | `resolve_actor` raised `Unauthorized` | Authenticate again |
-| 4403 | `authorize` refused the workspace | Stop |
+| 4403 | `authorize` refused the workspace, or reading its log | Stop |
 | 4408 | No `hello` arrived within `hello_timeout` | Reconnect |
 | 4429 | The client did not read frames fast enough | Reconnect and resume from its last `seq` |
 
@@ -277,7 +282,6 @@ Every outgoing frame goes through one bounded outbox per connection. A client to
 
 | `reflexr_router` option | Default | Meaning |
 |---|---|---|
-| `authorize` | `None` | Whether an actor may use a workspace of its tenant; `None` allows every one |
 | `hello_timeout` | 10 seconds | How long a new connection has to send `hello` before it is closed (4408) |
 | `outbox_size` | 1,000 frames | How far a connection may fall behind before it is closed (4429) |
 

@@ -13,7 +13,7 @@ from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.trace import StatusCode
 from pydantic import BaseModel
 
-from reflexr import AgentActor, F, RetryPolicy, Rule, SourceActor, by, on, run
+from reflexr import Actor, AgentActor, F, RetryPolicy, Rule, SourceActor, by, on, run
 from reflexr.core import (
     InvalidRule,
     InvalidState,
@@ -34,6 +34,7 @@ from reflexr.workspace import (
     EVALUATION_LEASE,
     REACTOR,
     RUN_LEASE_PREFIX,
+    Access,
     InMemoryStorage,
     Reaction,
     Reactor,
@@ -896,3 +897,54 @@ async def test_a_stopped_reactor_stops_waiting_for_its_next_pass(build: Build) -
         await asyncio.sleep(0.01)
         stop.set()
         await served
+
+
+async def test_a_rule_authorize_refuses_fails_for_good_and_the_others_still_run(
+    build: Build,
+) -> None:
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: Actor, access: Access
+    ) -> bool:
+        rule_name = actor.rule if isinstance(actor, AgentActor) else None
+        if rule_name == "app:refused":
+            return False  # it may not even open the workspace
+        return rule_name != "app:muted" or access.action != "reflexr:publish"
+
+    async def emit(reaction: Reaction[None]) -> None:
+        await reaction.workspace.publish(Deploy(service="echo"))
+
+    rules = [
+        rule(name="app:refused"),
+        rule(name="app:muted", then=run("emit")),
+        rule(name="app:paged", when=on(Deploy).where(service="auth")),
+    ]
+    workspaces = build(rules, authorize=authorize)
+    workspace = await open_(workspaces)
+    await workspace.publish(Deploy(service="auth"))
+    actions = {"respond": respond, "emit": emit}
+    await Reactor(workspaces, actions=actions, deps=Deps()).settle()
+    runs = {r.rule: r for r in await workspace.runs()}
+    assert runs["app:paged"].status == "succeeded", "a refused rule spoils no one else's batch"
+    for refused, action in (("app:refused", "open"), ("app:muted", "publish")):
+        assert (runs[refused].status, runs[refused].attempts, runs[refused].reason) == (
+            "dead",
+            1,
+            "forbidden",
+        )
+        assert runs[refused].error == f"reflexr:{action} is refused in this workspace"
+
+
+async def test_an_on_open_that_fails_fails_the_attempt_to_retry(storage: Storage) -> None:
+    opened: list[str] = []
+
+    async def on_open(tenant_id: str, workspace_id: str) -> None:
+        opened.append(workspace_id)
+        if len(opened) > 1:  # the source's open goes through; the run's fails
+            raise RuntimeError("the mirror is down")
+
+    workspaces = Workspaces(storage, events=[Deploy], rules=[rule()], on_open=on_open)
+    workspace = await open_(workspaces)
+    await workspace.publish(Deploy(service="auth"))
+    await reactor(workspaces, Deps()).settle()
+    [waiting] = await workspace.runs()
+    assert (waiting.status, waiting.error) == ("retrying", "RuntimeError: the mirror is down")

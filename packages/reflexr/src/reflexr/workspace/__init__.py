@@ -1,8 +1,9 @@
 """Workspaces: tenant-scoped event logs, the storage protocol, and in-memory storage.
 
 Open a :class:`Workspace` handle with :meth:`Workspaces.open`, and publish, read and operate
-through it. Every surface hands commands to :meth:`Workspaces.execute`, which carries each out
-through a handle, once per id. Rules are evaluated and runs executed by the ``Reactor``.
+through it; each of its methods asks the application's ``authorize`` hook. Every surface hands
+commands to :meth:`Workspaces.execute`, which carries each out through a handle, once per id.
+Rules are evaluated and runs executed by the ``Reactor``.
 """
 
 from reflexr.workspace.actions import Action, Reaction, RunContext, RunFailure, with_params
@@ -22,7 +23,10 @@ from reflexr.workspace.storage import (
     utc_now,
 )
 from reflexr.workspace.workspace import (
+    ACTIONS,
+    Access,
     Authorize,
+    OnOpen,
     Published,
     RuleStatus,
     RuleVersion,
@@ -33,10 +37,12 @@ from reflexr.workspace.workspace import (
 )
 
 __all__ = [
+    "ACTIONS",
     "EVALUATION_LEASE",
     "REACTOR",
     "RUN_LEASE_PREFIX",
     "SCHEDULER",
+    "Access",
     "Action",
     "Authorize",
     "Clock",
@@ -45,6 +51,7 @@ __all__ = [
     "Entry",
     "InMemoryCommandResults",
     "InMemoryStorage",
+    "OnOpen",
     "Published",
     "Reaction",
     "Reactor",

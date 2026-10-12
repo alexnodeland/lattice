@@ -1,6 +1,6 @@
 # ADR-0016: Tenants and workspaces, like artifactr
 
-**Status:** Accepted, amended by [ADR-0053](0053-stored-rules-one-fixed-configuration.md)
+**Status:** Accepted, amended by [ADR-0053](0053-stored-rules-one-fixed-configuration.md) and [ADR-0056](0056-access-asked-in-every-workspace-method.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 
@@ -37,3 +37,7 @@
 
 1. [x] Update the architecture, protocol, RFC-0001, contributing and security documents.
 2. [x] Build the workspace layer as `reflexr.workspace` (RFC-0001 phase 2).
+
+## Amendment (2026-10-12): the reads across a tenant ask `authorize`
+
+[ADR-0056](0056-access-asked-in-every-workspace-method.md) amends the amendment above. Rule and schedule definitions are still the application's, shared by every tenant, but reading them is an action like any other: `GET /rules`, `GET /schedules` and `list_rules` go through `Workspaces.rules_for` and `Workspaces.schedules_for`, which ask `authorize` for `reflexr:read_rules` or `reflexr:read_schedules` with no workspace. An application can keep them from some members without unmounting the routes.

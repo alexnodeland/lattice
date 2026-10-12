@@ -8,6 +8,7 @@ import pytest
 from opentelemetry.trace import SpanKind
 
 from reflexr import (
+    Actor,
     AgentActor,
     Event,
     Feedback,
@@ -46,6 +47,7 @@ from reflexr.core import (
 )
 from reflexr.telemetry import attributes as a
 from reflexr.workspace import (
+    Access,
     InMemoryStorage,
     Storage,
     Workspace,
@@ -178,6 +180,24 @@ async def test_without_an_allowlist_every_registered_type_is_accepted(
     assert (await workspace.publish(Deploy(service="auth"))).envelope.seq == 1
     with pytest.raises(Forbidden):
         await workspace.publish(Tick(schedule="clock", at=START))
+
+
+async def test_a_workspace_opens_only_if_authorize_allows_it(storage: Storage) -> None:
+    opened: list[tuple[str, str]] = []
+
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: Actor, access: Access
+    ) -> bool:
+        return workspace_id != "secret"
+
+    async def on_open(tenant_id: str, workspace_id: str) -> None:
+        opened.append((tenant_id, workspace_id))
+
+    workspaces = Workspaces(storage, authorize=authorize, on_open=on_open)
+    assert await workspaces.open("acme", "prod", actor=UserActor(id="ada"))
+    with pytest.raises(Forbidden, match="reflexr:open is refused in this workspace"):
+        await workspaces.open("acme", "secret", actor=UserActor(id="ada"))
+    assert opened == [("acme", "prod")], "on_open is called on every allowed open only"
 
 
 async def test_a_registry_scopes_the_types_workspaces_accept(storage: Storage) -> None:

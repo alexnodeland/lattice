@@ -8,9 +8,10 @@ from fastapi import FastAPI
 from starlette.requests import HTTPConnection
 
 from reflexr import Actor, F, Feedback, Rule, UserActor, by, on, run
-from reflexr.core import Predicates, RuleChange, StoredRules, TenantId, WorkspaceId
+from reflexr.core import Predicates, StoredRules, TenantId, WorkspaceId
 from reflexr.fastapi import Unauthorized, reflexr_router
 from reflexr.workspace import (
+    Access,
     Clock,
     InMemoryStorage,
     Reaction,
@@ -46,17 +47,22 @@ async def resolve_actor(connection: HTTPConnection) -> tuple[TenantId, Actor]:
     return headers.get("x-tenant", "acme"), user
 
 
-async def authorize(tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor) -> bool:
-    return workspace_id != "secret"
+RULE_COMMANDS = {"reflexr:install_rule", "reflexr:update_rule", "reflexr:archive_rule"}
 
 
-async def ada_only(
-    tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor, change: RuleChange
+async def authorize(
+    tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
 ) -> bool:
-    return actor.participant == "user:ada"
+    """Refuse every action in ``secret``, all but opening ``sealed``, everything to Eve, and
+    changing a rule to all but Ada."""
+    if workspace_id == "secret" or actor.participant == "user:eve":
+        return False
+    if workspace_id == "sealed":
+        return access.action == "reflexr:open"
+    return access.action not in RULE_COMMANDS or actor.participant == "user:ada"
 
 
-STORED_RULES = StoredRules(allow=ada_only, actions={"page": None}, namespaces={"chat"})
+STORED_RULES = StoredRules(actions={"page": None}, namespaces={"chat"})
 """Stored rules in the ``chat`` namespace, which only Ada may change."""
 
 
@@ -94,8 +100,9 @@ def build(
         stored_rules=stored_rules,
         schedules=schedules,
         clock=clock,
+        authorize=authorize,
     )
     app = FastAPI()
-    router = reflexr_router(workspaces, resolve_actor=resolve_actor, authorize=authorize, **options)
+    router = reflexr_router(workspaces, resolve_actor=resolve_actor, **options)
     app.include_router(router, prefix="/v1")
     return app, workspaces, Reactor(workspaces, actions={"page": page})

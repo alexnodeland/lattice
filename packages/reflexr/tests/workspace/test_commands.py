@@ -5,7 +5,6 @@ from typing import Literal
 
 from reflexr import Feedback, Rule, SourceActor, UserActor, on, run
 from reflexr.core import (
-    Actor,
     ArchiveRule,
     CancelRun,
     ChainTarget,
@@ -18,15 +17,12 @@ from reflexr.core import (
     RecordedOutcome,
     ReplayRule,
     RetryRun,
-    RuleChange,
     RuleOutcome,
     RuleVersionOutcome,
     RunOutcome,
     SkipRun,
     StoredRules,
-    TenantId,
     UpdateRule,
-    WorkspaceId,
     load_event,
     new_id,
 )
@@ -120,14 +116,8 @@ async def test_a_rejection_is_the_result_not_raised(storage: Storage) -> None:
     ]
 
 
-async def anyone(
-    tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor, change: RuleChange
-) -> bool:
-    return True
-
-
 async def test_stored_rules_are_changed_through_the_workspace(storage: Storage) -> None:
-    config = StoredRules(allow=anyone, actions={"note": None}, namespaces={"chat"})
+    config = StoredRules(actions={"note": None}, namespaces={"chat"})
     workspaces = Workspaces(storage, stored_rules=config)
     workspace = await workspaces.open("acme", "prod", actor=SourceActor(name="relayr"))
     rule = Rule(

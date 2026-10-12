@@ -40,13 +40,13 @@ from oncall.events import EVENTS
 from oncall.rules import RULES, SCHEDULES
 from oncall.services import OncallDeps
 from reflexr import Actor, ExternalAgentActor, UserActor
-from reflexr.core import RuleChange, StoredRules, TenantId, WorkspaceId
+from reflexr.core import StoredRules, TenantId, WorkspaceId
 from reflexr.fastapi import reflexr_router
 from reflexr.langfuse import langfuse_run
 from reflexr.mcp import ReflexrMcp
 from reflexr.otel import LangfuseMode, TelemetryHandle, configure_telemetry
 from reflexr.sql import SqlStorage, create_sqlite_engine, migrate
-from reflexr.workspace import Clock, InMemoryStorage, Reactor, Storage, Workspaces, utc_now
+from reflexr.workspace import Access, Clock, InMemoryStorage, Reactor, Storage, Workspaces, utc_now
 
 TENANT: TenantId = "demo"
 
@@ -62,16 +62,18 @@ async def resolve_client(_ctx: object) -> tuple[TenantId, ExternalAgentActor]:
     return TENANT, ExternalAgentActor(client_id="mcp", name="MCP client")
 
 
-async def allow_people(
-    _tenant_id: TenantId, _workspace_id: WorkspaceId, actor: Actor, _change: RuleChange
+RULE_CHANGES = frozenset({"reflexr:install_rule", "reflexr:update_rule", "reflexr:archive_rule"})
+"""The commands that change a rule installed at runtime."""
+
+
+async def authorize(
+    _tenant_id: TenantId, _workspace_id: WorkspaceId | None, actor: Actor, access: Access
 ) -> bool:
-    """Demo policy for rules installed at runtime: people may change them, MCP clients may not."""
-    return isinstance(actor, UserActor)
+    """Demo policy: anyone may do anything, but only people may change the stored rules."""
+    return access.action not in RULE_CHANGES or isinstance(actor, UserActor)
 
 
-STORED_RULES = StoredRules(
-    allow=allow_people, actions={"notify": NotifyParams}, namespaces={"team"}
-)
+STORED_RULES = StoredRules(actions={"notify": NotifyParams}, namespaces={"team"})
 """Rules installed at runtime: named ``team:...``, by people, and only paging through ``notify``.
 
 The code rules are ``oncall:...``, so a stored rule can never take one's name.
@@ -126,6 +128,7 @@ class Oncall:
             schedules=SCHEDULES,
             stored_rules=STORED_RULES,
             clock=clock,
+            authorize=authorize,
             **providers,
         )
         self.reactor = Reactor(

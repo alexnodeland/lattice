@@ -10,13 +10,9 @@ from pydantic import BaseModel, JsonValue
 
 from reflexr import Rule, SourceActor, on, run
 from reflexr.core import (
-    Actor,
     InvalidRule,
-    RuleChange,
     RunDeadLettered,
     StoredRules,
-    TenantId,
-    WorkspaceId,
 )
 from reflexr.workspace import (
     Action,
@@ -104,14 +100,8 @@ class Renamed(BaseModel):
 async def post(reaction: Reaction[Notices], params: Renamed) -> None: ...
 
 
-async def anyone(
-    tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor, change: RuleChange
-) -> bool:
-    return True
-
-
 def stored(actions: Mapping[str, type[BaseModel] | None]) -> StoredRules:
-    return StoredRules(allow=anyone, actions=actions, namespaces={"chat"})
+    return StoredRules(actions=actions, namespaces={"chat"})
 
 
 @pytest.mark.parametrize(

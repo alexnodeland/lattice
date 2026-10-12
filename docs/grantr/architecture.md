@@ -1,6 +1,6 @@
 # Architecture
 
-Decisions are recorded in [`adr/`](adr/README.md), and the plan that builds grantr in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). The design is [lattice RFC-0001](../rfcs/0001-grantr-identity-and-access.md). This page describes what exists: grantr's core, its storage port and in-memory adapter, and the hooks, which are phase 2 of the plan.
+Decisions are recorded in [`adr/`](adr/README.md), and the plan that builds grantr in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). The design is [lattice RFC-0001](../rfcs/0001-grantr-identity-and-access.md). This page describes what exists: grantr's core, its storage port with in-memory and SQL adapters, the hooks, the admin API and telemetry, which are phases 2 and 3 of the plan.
 
 ## What grantr is
 
@@ -11,7 +11,10 @@ grantr decides who may do what in a tenant. artifactr and reflexr ask it, throug
 | Package | Holds | May import |
 |---|---|---|
 | `grantr.core` | The model and its types, grantr's catalog, the built-in roles, the rule every check follows, the audit events, and service principal keys. No I/O and no async | pydantic |
-| `grantr.grants` | `Grants`, with its checks, the hooks and the commands that change access; the storage port, `Storage`; and `InMemoryStorage` | `grantr.core` |
+| `grantr.telemetry` | The check counter, slow checks' spans and the audit log's copy, through the OpenTelemetry API | `grantr.core`, the OpenTelemetry API |
+| `grantr.grants` | `Grants`, with its checks, the hooks, the commands that change access and the lists an admin reads; the storage port, `Storage`; and `InMemoryStorage` | `grantr.core`, `grantr.telemetry`, the OpenTelemetry API |
+| `grantr.sql` | `SqlStorage`, its tables and Alembic migrations, and `create_sqlite_engine`. The `sql`, `sqlite` and `postgres` extras | `grantr.core`, pydantic, SQLAlchemy, Alembic |
+| `grantr.fastapi` | `grantr_router`, the admin API, and its OpenAPI document. The `fastapi` extra | `grantr.core`, `grantr.grants`, FastAPI |
 
 `tests/test_layering.py` holds each package to its column, and keeps I/O out of the core.
 
@@ -70,6 +73,10 @@ A custom role is a tenant's own set of actions, granted wherever `editor` can be
 - **Each command is one transaction:** its checks, its change, and one audit entry. A command that raises changes nothing.
 - **A refusal comes first,** before anything is looked up, so it says nothing about what exists.
 
+## Lists
+
+An admin reads each list with the action of the command that changes it ([ADR-0017](adr/0017-the-admin-api.md)): `members` with `grantr:add_member`, `groups` with `grantr:manage_groups`, `roles` with `grantr:define_role`, `grants_in` with `grantr:grant` on the tenant or a workspace, `keys` with `grantr:issue_key`, and `tenants` with `grantr:create_tenant`.
+
 ## Keys
 
 A service principal's key is `grantr_sk_<id>_<secret>`: an 8-byte public id and 32 random bytes, in hex. `issue_key` returns it once; grantr stores the id, the tenant, the principal and a SHA-256 digest of the secret. `authenticate` finds a key by its id and compares digests in constant time, and answers with the key's tenant and principal, so a key reaches only its own tenant.
@@ -92,11 +99,42 @@ Every command appends one typed event, such as `Granted` or `MemberRemoved`, to 
 
 ## Storage
 
-`Storage` is the port ([ADR-0013](adr/0013-transactions-by-tenant-and-one-audit-log.md)), and `InMemoryStorage` its first adapter; phase 3 adds the SQL one.
+`Storage` is the port ([ADR-0013](adr/0013-transactions-by-tenant-and-one-audit-log.md)), with two adapters: `InMemoryStorage`, and `SqlStorage`, below.
 
 - **A transaction is in one tenant,** or on the deployment, and serialized with every other there. The in-memory adapter runs one at a time, on a copy it keeps only if the block exits normally.
-- **Every read is in one tenant, but two:** `tenant_grants` and `key` span tenants, since they are asked before the tenant is known.
+- **Every read is in one tenant, but three:** `tenant_grants` and `key` span tenants, since they are asked before the tenant is known, and `tenants` lists them for operators.
 - **`grants` answers for a grantee and its groups,** optionally on some resources: the one query a check makes. `has` looks up one grant, for membership and duplicates.
 - **grantr knows a workspace, thread, artifact or rule once a grant names it,** or something in it, and `resources` lists those. A check writes nothing ([ADR-0015](adr/0015-a-check-writes-nothing.md)).
 
-The contract test, `tests/grants/test_contract.py`, runs every behaviour on this page against each adapter that `tests/grants/conftest.py` lists.
+The contract test, `tests/grants/test_contract.py`, runs every behaviour on this page against memory, SQLite and PostgreSQL. The PostgreSQL tests run when `GRANTR_TEST_POSTGRES_URL` is set, as CI sets it, and `moon run grantr:pg-up` starts a database.
+
+### SQL
+
+`SqlStorage` keeps grantr in the application's database, in seven `grantr_`-prefixed tables, with Alembic migrations that record their version in `grantr_alembic_version` ([ADR-0016](adr/0016-the-sql-adapter.md)).
+
+- **A subject and a resource are stored in typed columns,** their kind, workspace and id, with an empty string for a part they don't have. A grant's primary key, its tenant, resource, subject and role, is the index a check reads, and every other query has an index that leads with its filter.
+- **A check is one query, and one more when a grant names a custom role;** the subject's groups are a subquery of the first.
+- **The deployment is the tenant `~deployment`,** which no tenant id can be: a tenant id is not empty and has no `~`.
+- **A transaction locks its tenant's row** in `grantr_tenants`, inserting it first if needed; the row's `live` flag says whether the tenant exists.
+- **The audit log's sequence numbers are the database's.** A tenant's transactions run one at a time, so its entries are numbered in the order they commit.
+- **Every database call is awaited to its end,** even when its caller is cancelled, as in the libraries' SQL storage.
+
+## The admin API
+
+`grantr_router(grants, resolve_actor=...)` is the admin API, mounted at `/grantr/v1` ([ADR-0017](adr/0017-the-admin-api.md)). `resolve_actor` returns a `Caller`: the subject, and, for a key, its one tenant, which the router holds every request to.
+
+| Path | What it does |
+|---|---|
+| `GET /me` | With `X-Tenant`, the caller's roles there and the workspaces they can open; without, their memberships |
+| `POST /checks` | A batch of up to 100 `{action, resource}` questions, answered in order |
+| `GET`, `POST /tenants`; `DELETE /tenants/{tenant}` | List, create and delete tenants |
+| `PUT`, `DELETE /operators/{user}` | Grant and revoke the operator role |
+| `GET /audit`, `GET /tenants/{tenant}/audit` | The deployment's and a tenant's audit log, paged by `after_seq` |
+| `/tenants/{tenant}/members`, `/groups`, `/roles`, `/grants`, `/revocations`, `/keys` | The lists and commands above |
+
+Refusals keep the libraries' shapes, `{"type", "message"}`: 401 `unauthorized` without a caller, 403 `forbidden`, 422 `invalid`, and 400 `tenant_required` when a caller in several tenants names none. Its OpenAPI document is committed in `packages/grantr/schemas/grantr.openapi.json`; `moon run grantr:schema` regenerates it, and a test fails when it drifts.
+
+## Telemetry
+
+grantr records through the OpenTelemetry API only ([ADR-0018](adr/0018-telemetry-through-the-api.md)): the `grantr.checks` counter, by action (`unknown` for one in no catalog), outcome and reason; a `grantr.check` span for each check slower than `slow_check`; and each audit entry, logged as JSON on the `grantr.audit` logger once its change commits.
+

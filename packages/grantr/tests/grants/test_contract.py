@@ -482,3 +482,66 @@ async def test_a_storage_knows_the_resources_its_grants_name(storage: Storage) -
     assert await storage.resources("acme", "workspace") == [WS, OTHER]
     assert await storage.resources("acme", "thread") == [THREAD]
     assert await storage.resources("acme", "artifact") == []
+
+
+async def test_a_storage_reads_what_its_transactions_committed(storage: Storage) -> None:
+    viewer = Grant(tenant="acme", role="viewer", on=WS, to=TEAM)
+    async with storage.transaction("acme") as tx:
+        await tx.create_tenant("acme")
+        await tx.add_grant(viewer)
+        await tx.put_group("acme", TEAM, frozenset((BOB,)))
+        await tx.put_role("acme", TRIAGE)
+    assert await storage.tenant("acme")
+    assert await storage.has(viewer)
+    assert await storage.grants("acme", BOB, on=[WS]) == [viewer]
+    assert await storage.grants("acme", CAROL) == []
+    assert await storage.group("acme", TEAM) == frozenset((BOB,))
+    assert await storage.groups("acme") == {"team": frozenset((BOB,))}
+    assert await storage.roles("acme") == {"triage": TRIAGE}
+    assert await storage.grants_in("acme", workspace="w1") == [viewer]
+    assert await storage.grants_in("acme", workspace="w2") == []
+    assert await storage.tenants() == ["acme"]
+
+
+# ─── what an admin lists ─────────────────────────────────────────────────────
+
+
+async def test_an_admin_lists_what_they_manage(grants: Grants) -> None:
+    await _members(grants, BOB, CI)
+    await grants.define_group("acme", TEAM, frozenset((BOB,)), by=ALICE)
+    await grants.define_group("acme", Group(id="empty"), frozenset(), by=ALICE)
+    await grants.define_role("acme", TRIAGE, by=ALICE)
+    await grants.grant("acme", "admin", on=WS, to=BOB, by=ALICE)
+    await grants.grant("acme", "viewer", on=THREAD, to=CI, by=ALICE)
+    key, _ = await grants.issue_key("acme", CI, by=ALICE)
+
+    assert sorted(m.id for m in await grants.members("acme", by=ALICE)) == ["alice", "bob", "ci"]
+    assert await grants.groups("acme", by=ALICE) == {
+        "team": frozenset((BOB,)),
+        "empty": frozenset(),
+    }
+    assert await grants.roles("acme", by=ALICE) == [TRIAGE]
+    assert len(await grants.grants_in("acme", by=ALICE)) == 6
+    in_w1 = await grants.grants_in("acme", by=BOB, workspace="w1")
+    assert sorted((g.role, g.on.kind) for g in in_w1) == [
+        ("admin", "workspace"),
+        ("viewer", "thread"),
+    ]
+    assert [(k.id, k.principal) for k in await grants.keys("acme", by=ALICE)] == [(_id(key), CI)]
+
+    for listing in (grants.members, grants.groups, grants.roles, grants.keys, grants.grants_in):
+        with pytest.raises(Forbidden):
+            await listing("acme", by=BOB)
+    with pytest.raises(Forbidden, match="grantr:grant on the workspace"):
+        await grants.grants_in("acme", by=BOB, workspace="w2")
+
+
+async def test_an_operator_lists_the_tenants(grants: Grants) -> None:
+    await grants.create_tenant("globex", owner=CAROL.id, by=ROOT)
+    await grants.delete_tenant("globex", by=CAROL)
+    await grants.create_tenant("initech", owner=CAROL.id, by=ROOT)
+    assert await grants.tenants(by=ROOT) == ["acme", "initech"]
+    with pytest.raises(Forbidden, match="grantr:create_tenant"):
+        await grants.tenants(by=ALICE)
+    with pytest.raises(Invalid, match="isn't empty"):
+        await grants.create_tenant("", owner=CAROL.id, by=ROOT)

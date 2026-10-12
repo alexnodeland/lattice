@@ -1421,11 +1421,36 @@ name = "grantr"
 version = "0.1.0.dev0"
 source = { editable = "packages/grantr" }
 dependencies = [
+    { name = "opentelemetry-api" },
     { name = "pydantic" },
+]
+
+[package.optional-dependencies]
+fastapi = [
+    { name = "fastapi" },
+    { name = "starlette" },
+]
+postgres = [
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
+sql = [
+    { name = "alembic" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
+sqlite = [
+    { name = "aiosqlite" },
+    { name = "alembic" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "aiosqlite" },
+    { name = "asyncpg" },
+    { name = "httpx" },
+    { name = "opentelemetry-sdk" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1438,6 +1463,10 @@ lint = [
     { name = "ruff" },
 ]
 test = [
+    { name = "aiosqlite" },
+    { name = "asyncpg" },
+    { name = "httpx" },
+    { name = "opentelemetry-sdk" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -1445,10 +1474,26 @@ test = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2.13" }]
+requires-dist = [
+    { name = "aiosqlite", marker = "extra == 'sqlite'", specifier = ">=0.22" },
+    { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.20" },
+    { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31" },
+    { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.141" },
+    { name = "grantr", extras = ["sql"], marker = "extra == 'postgres'" },
+    { name = "grantr", extras = ["sql"], marker = "extra == 'sqlite'" },
+    { name = "opentelemetry-api", specifier = ">=1.28" },
+    { name = "pydantic", specifier = ">=2.13" },
+    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
+    { name = "starlette", marker = "extra == 'fastapi'", specifier = ">=0.46.0" },
+]
+provides-extras = ["sql", "sqlite", "postgres", "fastapi"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "aiosqlite", specifier = ">=0.22" },
+    { name = "asyncpg", specifier = ">=0.31" },
+    { name = "httpx", specifier = ">=0.28" },
+    { name = "opentelemetry-sdk", specifier = ">=1.28" },
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "pytest-asyncio", specifier = ">=1.4" },
@@ -1461,6 +1506,10 @@ lint = [
     { name = "ruff", specifier = ">=0.16" },
 ]
 test = [
+    { name = "aiosqlite", specifier = ">=0.22" },
+    { name = "asyncpg", specifier = ">=0.31" },
+    { name = "httpx", specifier = ">=0.28" },
+    { name = "opentelemetry-sdk", specifier = ">=1.28" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "pytest-cov", specifier = ">=7.1" },

@@ -330,7 +330,7 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
 - [x] Sign-off on D1 to D9 (2026-10-12)
 - [ ] Phase 1: the hook
 - [x] Phase 2: grantr's core
-- [ ] Phase 3: storage and API
+- [x] Phase 3: storage and API
 - [ ] Phase 4: the template
 - [ ] Phase 5: threads and artifacts
 - [ ] Phase 6: row-level security

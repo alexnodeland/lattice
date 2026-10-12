@@ -4,8 +4,9 @@ grantr ships an in-memory implementation, :class:`~grantr.grants.InMemoryStorage
 comes with grantr's ``sql`` extra. The contract test in the test tree shows what an
 implementation must do.
 
-Every read but two is in one tenant, or on the deployment. :meth:`Storage.tenant_grants` and
-:meth:`Storage.key` span tenants: they are asked before the tenant is known.
+Every read but three is in one tenant, or on the deployment. :meth:`Storage.tenant_grants`,
+:meth:`Storage.key` and :meth:`Storage.tenants` span tenants: the first two are asked before the
+tenant is known, and the last lists them for operators.
 """
 
 from collections.abc import Collection
@@ -26,6 +27,7 @@ from grantr.core import (
     Subject,
     TenantId,
     UserId,
+    WorkspaceId,
 )
 
 
@@ -58,12 +60,26 @@ class Reads(Protocol):
         """Every grant on a resource, to anyone, as it was made; only of one role, if given."""
         ...
 
+    async def grants_in(
+        self, tenant: TenantId, *, workspace: WorkspaceId | None = None
+    ) -> list[Grant]:
+        """Every grant in a tenant, or only those on a workspace and the items in it."""
+        ...
+
     async def roles(self, tenant: TenantId) -> dict[str, Role]:
         """A tenant's custom roles, by name."""
         ...
 
     async def group(self, tenant: TenantId, group: Group) -> frozenset[Member] | None:
         """A group's members, or None if there is no such group."""
+        ...
+
+    async def groups(self, tenant: TenantId) -> dict[str, frozenset[Member]]:
+        """A tenant's groups, by id, with their members."""
+        ...
+
+    async def keys(self, tenant: TenantId) -> list[Key]:
+        """A tenant's keys."""
         ...
 
     async def resources(self, tenant: TenantId, kind: ListableKind) -> list[Resource]:
@@ -141,6 +157,10 @@ class Storage(Reads, Protocol):
 
     async def key(self, key_id: str) -> Key | None:
         """A key, by its public id, in any tenant."""
+        ...
+
+    async def tenants(self) -> list[TenantId]:
+        """Every tenant, in order."""
         ...
 
     async def audit(

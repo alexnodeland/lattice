@@ -83,7 +83,8 @@ _CHUNK = 500
 """How many keys one ``IN`` clause lists, well within every driver's parameter limit."""
 
 
-# Shared verbatim with artifactr's src/artifactr/sql/storage.py; change both.
+# Shared verbatim with artifactr's src/artifactr/sql/storage.py and grantr's
+# src/grantr/sql/storage.py; change all three.
 async def _to_the_end[T](call: Awaitable[T]) -> T:
     """Await a database call to its end; a cancellation that came meanwhile is raised after."""
     task = asyncio.ensure_future(call)
@@ -100,7 +101,8 @@ async def _to_the_end[T](call: Awaitable[T]) -> T:
     return task.result()
 
 
-# Shared verbatim with artifactr's src/artifactr/sql/storage.py; change both.
+# Shared verbatim with artifactr's src/artifactr/sql/storage.py and grantr's
+# src/grantr/sql/storage.py; change all three.
 def _awaited_to_the_end[**P, T](
     method: Callable[P, Awaitable[T]],
 ) -> Callable[P, "CoroutineType[Any, Any, T]"]:  # subscriptable at run time from Python 3.13

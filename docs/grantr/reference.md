@@ -15,3 +15,24 @@ The reference is generated from grantr's docstrings and type annotations. It doc
     options:
       show_root_heading: false
       show_root_toc_entry: false
+
+## grantr.sql
+
+::: grantr.sql
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## grantr.fastapi
+
+::: grantr.fastapi
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## grantr.telemetry
+
+::: grantr.telemetry
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false

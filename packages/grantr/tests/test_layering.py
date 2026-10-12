@@ -12,10 +12,19 @@ import pytest
 
 SRC = Path(__file__).parent.parent / "src" / "grantr"
 
+OTEL_API = {"opentelemetry.metrics", "opentelemetry.trace"}
+"""The OpenTelemetry API: the port grantr records through."""
+
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (grantr packages it may import, third-party modules it may import)
     "core": ({"grantr.core"}, {"pydantic"}),
-    "grants": ({"grantr.core", "grantr.grants"}, set()),
+    "grants": ({"grantr.core", "grantr.grants", "grantr.telemetry"}, OTEL_API),
+    "telemetry": ({"grantr.core", "grantr.telemetry"}, {"opentelemetry", *OTEL_API}),
+    "fastapi": (
+        {"grantr.core", "grantr.grants", "grantr.fastapi"},
+        {"fastapi", "starlette", "pydantic"},
+    ),
+    "sql": ({"grantr.core", "grantr.sql"}, {"pydantic", "sqlalchemy", "alembic"}),
 }
 
 IO = {"asyncio", "socket", "os", "pathlib", "subprocess", "io", "logging", "sqlite3"}

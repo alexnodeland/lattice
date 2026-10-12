@@ -27,6 +27,7 @@ from grantr.core import (
     TenantId,
     User,
     UserId,
+    WorkspaceId,
 )
 from grantr.grants.storage import Transaction
 
@@ -86,11 +87,28 @@ class _Reads:
             if grant.tenant == tenant and grant.on == on and role in (None, grant.role)
         ]
 
+    async def grants_in(
+        self, tenant: TenantId, *, workspace: WorkspaceId | None = None
+    ) -> list[Grant]:
+        return [
+            grant
+            for grant in self._data.grants
+            if grant.tenant == tenant and workspace in (None, grant.on.workspace)
+        ]
+
     async def roles(self, tenant: TenantId) -> dict[str, Role]:
         return {name: role for (t, name), role in self._data.roles.items() if t == tenant}
 
     async def group(self, tenant: TenantId, group: Group) -> frozenset[Member] | None:
         return self._data.groups.get((tenant, group))
+
+    async def groups(self, tenant: TenantId) -> dict[str, frozenset[Member]]:
+        return {
+            group.id: members for (t, group), members in self._data.groups.items() if t == tenant
+        }
+
+    async def keys(self, tenant: TenantId) -> list[Key]:
+        return [key for key in self._data.keys.values() if key.tenant == tenant]
 
     async def resources(self, tenant: TenantId, kind: ListableKind) -> list[Resource]:
         named = frozenset(
@@ -222,6 +240,10 @@ class InMemoryStorage(_Reads):
     async def key(self, key_id: str) -> Key | None:
         """A key, by its public id, in any tenant."""
         return self._data.keys.get(key_id)
+
+    async def tenants(self) -> list[TenantId]:
+        """Every tenant, in order."""
+        return sorted(self._data.tenants)
 
     async def audit(
         self, tenant: TenantId | None, *, after_seq: int = 0, limit: int = 100

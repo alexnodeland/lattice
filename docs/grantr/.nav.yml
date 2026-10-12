@@ -20,6 +20,9 @@ nav:
   - adr/0013-transactions-by-tenant-and-one-audit-log.md
   - adr/0014-an-operator-enters-a-tenant-by-granting-themselves.md
   - adr/0015-a-check-writes-nothing.md
+  - adr/0016-the-sql-adapter.md
+  - adr/0017-the-admin-api.md
+  - adr/0018-telemetry-through-the-api.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

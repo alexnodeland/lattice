@@ -5,8 +5,8 @@
 
 site_name: lattice
 site_description: >-
-  The family's packages: artifactr, reflexr, evalr, relayr and stackr, for applications in which
-  people and agents work together.
+  The family's packages: artifactr, reflexr, evalr, relayr, grantr and stackr, for applications in
+  which people and agents work together.
 site_author: Alex Nodeland
 site_url: https://lattice.alexnodeland.com/
 repo_url: https://github.com/alexnodeland/lattice

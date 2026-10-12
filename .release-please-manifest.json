@@ -4,5 +4,6 @@
   "packages/evalr": "0.0.0",
   "packages/stackr": "0.0.0",
   "packages/relayr": "0.0.0",
+  "packages/grantr": "0.0.0",
   "packages/portalr": "0.0.0"
 }

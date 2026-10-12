@@ -14,7 +14,8 @@
       "datasourceTemplate": "github-releases",
       "packageNameTemplate": "{{#if (equals depName 'tofu')}}opentofu/opentofu{{else}}terraform-linters/tflint{{/if}}",
       "extractVersionTemplate": "^v(?<version>.+)$"
-    }  ],
+    }
+  ],
   "packageRules": [
     {
       "description": "Python ranges stay as written: the lockfile moves, and the packages' floors move by hand, with the code that needs them.",

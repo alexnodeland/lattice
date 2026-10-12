@@ -4,6 +4,6 @@ grantr's RFCs: an RFC proposes a substantial change to grantr before it is built
 
 | RFC | Status |
 |---|---|
-| [RFC-0001: v0.1 implementation plan](0001-v0.1-implementation-plan.md) | Accepted |
+| [RFC-0001: v0.1 implementation plan](0001-v0.1-implementation-plan.md) | Implemented |
 
 A new RFC starts from lattice's [RFC template](../../rfcs/template.md).

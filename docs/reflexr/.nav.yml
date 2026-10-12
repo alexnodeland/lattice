@@ -92,6 +92,9 @@ nav:
     - adr/0053-stored-rules-one-fixed-configuration.md
     - adr/0054-installing-updating-and-archiving-stored-rules.md
     - adr/0055-reading-stored-rules.md
+    - adr/0056-access-asked-in-every-workspace-method.md
+    - adr/0057-reserved-publishers.md
+    - adr/0058-an-mcp-client-acts-for-its-person.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

@@ -43,9 +43,9 @@ test = [
 ]
 lint = ["ruff>=0.16", "pyright>=1.1.414"]
 # The acceptance tests' application (tests/app/), which its image serves: it verifies Supabase
-# Auth's tokens, serves artifactr's streams, and names artifactr's actions to grantr, so that it
-# lists workspaces.
-app = ["uvicorn>=0.54", "websockets>=15", "pyjwt>=2.15", "artifactr-ai"]
+# Auth's tokens, serves artifactr's and reflexr's streams, and names their actions to grantr, so
+# that it lists workspaces and checks every command.
+app = ["uvicorn>=0.54", "websockets>=15", "pyjwt>=2.15", "artifactr-ai", "reflexr"]
 dev = [
     { include-group = "test" },
     { include-group = "lint" },
@@ -56,6 +56,7 @@ dev = [
 [tool.uv.sources]
 grantr = { workspace = true }
 artifactr-ai = { workspace = true }
+reflexr = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]

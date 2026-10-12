@@ -50,10 +50,11 @@ class Note(MarkdownArtifact):
     """A Markdown note."""
 
 
-class Thumbs(Feedback, name="thumbs", targets={"message"}):
-    """Whether a message helped."""
+class Thumbs(Feedback, name="thumbs", targets={"message", "artifact", "turn"}):
+    """Whether a message, an artifact or a turn helped, and why."""
 
     up: bool
+    comment: str | None = None
 
 
 def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:

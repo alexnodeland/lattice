@@ -5,7 +5,8 @@ layer: 'library'
 tags: ['distribution', 'api']
 dependsOn:
   - 'grantr'
-  - 'artifactr' # its test application names artifactr's actions to grantr
+  - 'artifactr' # its test application mounts artifactr's router and reflexr's
+  - 'reflexr'
 
 fileGroups:
   python:

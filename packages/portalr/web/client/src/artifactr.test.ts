@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { apply, artifactr, thumbs, type Workspace } from "./artifactr";
+import { apply, artifactr, type Workspace } from "./artifactr";
 import type * as v1 from "./generated/artifactr.v1";
 
 function envelope(event: Record<string, unknown>, seq: number): v1.EventFrame {
@@ -107,6 +107,8 @@ test("a run streams its text until its message is posted, and keeps its status",
     tools: { t1: { name: "edit", status: "ok" } },
     text: "",
     requests: [],
+    started: 1,
+    feedback: [],
   });
 });
 
@@ -160,6 +162,7 @@ test("artifacts keep their kind, latest version and whether they are archived", 
     kind: "plan",
     version: 3,
     archived: true,
+    feedback: [],
   });
 });
 
@@ -307,26 +310,28 @@ test("feedback on a message the store hasn't read has nowhere to go", () => {
   }
 });
 
-test("a person's thumbs are their latest, and nobody else's", () => {
-  const given = (id: string, value: Record<string, unknown>, type = "thumbs") => ({
-    actor: { kind: "user", id } as v1.Actor,
-    type,
-    value,
+test("feedback on an artifact, and on a turn, is kept with it", () => {
+  const thumbs = (target: Record<string, unknown>) => ({
+    type: "feedback_given",
+    feedback_type: "thumbs",
+    target,
+    value: { up: true, comment: "Clear" },
   });
-  const message = (...feedback: ReturnType<typeof given>[]) => ({
-    id: "msg_1",
-    seq: 1,
-    actor: { kind: "user", id: "alice" } as v1.Actor,
-    content: "Hi",
-    kind: "message" as const,
-    runId: null,
-    feedback,
-  });
-  expect(
-    thumbs(message(given("alice", { up: true }), given("alice", { up: false })), "alice"),
-  ).toBe(false);
-  expect(thumbs(message(given("bob", { up: true })), "alice")).toBeNull();
-  expect(thumbs(message(given("alice", { up: "yes" })), "alice")).toBeNull();
-  expect(thumbs(message(given("alice", { stars: 5 }, "rating")), "alice")).toBeNull();
-  expect(thumbs(message(), "alice")).toBeNull();
+  const state = replay(
+    { type: "artifact_created", artifact_id: "plan_1", kind: "plan", version: 1 },
+    { type: "run_started", run_id: "run_1", thread_id: "thr_1" },
+    thumbs({ kind: "artifact", artifact_id: "plan_1", version: 1 }),
+    thumbs({ kind: "turn", run_id: "run_1" }),
+    thumbs({ kind: "artifact", artifact_id: "plan_9", version: 1 }),
+    thumbs({ kind: "turn", run_id: "run_9" }),
+    { type: "artifact_changed", artifact_id: "plan_1", kind: "plan", version: 2 },
+  );
+  const given = [
+    { actor: { kind: "user", id: "alice" }, type: "thumbs", value: { up: true, comment: "Clear" } },
+  ];
+  // An artifact's feedback outlasts its changes; feedback on what the store hasn't read goes.
+  expect(state.artifacts.plan_1?.feedback).toEqual(given);
+  expect(state.runs.run_1?.feedback).toEqual(given);
+  expect(state.artifacts.plan_9).toBeUndefined();
+  expect(state.runs.run_9).toBeUndefined();
 });

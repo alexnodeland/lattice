@@ -18,6 +18,7 @@ export {
 export { Button } from "./button";
 export {
   Composer,
+  type GiveThumbs,
   Message,
   Messages,
   ProposalCard,
@@ -26,6 +27,7 @@ export {
   RunStatus,
   type Sent,
   Streaming,
+  Thumbs,
   ToolCall,
 } from "./chat";
 export { Markdown } from "./markdown";

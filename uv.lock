@@ -3217,6 +3217,7 @@ dependencies = [
 app = [
     { name = "artifactr-ai" },
     { name = "pyjwt" },
+    { name = "reflexr" },
     { name = "uvicorn" },
     { name = "websockets" },
 ]
@@ -3228,6 +3229,7 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
+    { name = "reflexr" },
     { name = "ruff" },
     { name = "uvicorn" },
     { name = "websockets" },
@@ -3256,6 +3258,7 @@ requires-dist = [
 app = [
     { name = "artifactr-ai", editable = "packages/artifactr" },
     { name = "pyjwt", specifier = ">=2.15" },
+    { name = "reflexr", editable = "packages/reflexr" },
     { name = "uvicorn", specifier = ">=0.54" },
     { name = "websockets", specifier = ">=15" },
 ]
@@ -3267,6 +3270,7 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "pytest-cov", specifier = ">=7.1" },
     { name = "pytest-timeout", specifier = ">=2.4" },
+    { name = "reflexr", editable = "packages/reflexr" },
     { name = "ruff", specifier = ">=0.16" },
     { name = "uvicorn", specifier = ">=0.54" },
     { name = "websockets", specifier = ">=15" },

@@ -11,6 +11,7 @@ import {
   Request,
   RunStatus,
   Streaming,
+  Thumbs,
   ToolCall,
 } from "./chat";
 import { token } from "./test/colours";
@@ -46,7 +47,12 @@ test("thumbs show the reader's, and send theirs", async () => {
   const onThumbs = sent();
   const screen = await render(
     <Messages>
-      <Message message={message()} author="Agent" thumbs={true} onThumbs={onThumbs} />
+      <Message
+        message={message()}
+        author="Agent"
+        thumbs={{ up: true, comment: null }}
+        onThumbs={onThumbs}
+      />
     </Messages>,
   );
   const up = screen.getByRole("button", { name: "Helpful", exact: true });
@@ -54,7 +60,7 @@ test("thumbs show the reader's, and send theirs", async () => {
   await expect.element(up).toHaveAttribute("aria-pressed", "true");
   await expect.element(down).toHaveAttribute("aria-pressed", "false");
   await down.click();
-  expect(onThumbs).toHaveBeenCalledWith(false);
+  expect(onThumbs).toHaveBeenCalledWith(false, null);
 });
 
 test("without thumbs given, neither is pressed; without a handler, there are none", async () => {
@@ -384,4 +390,41 @@ test("a proposal names the artifact it would change, unless it makes a new one",
     proposedOn(proposal({ change: { type: "create_artifact", kind: "plan", data: {} } })),
   ).toBeNull();
   expect(proposedOn(proposal({ change: null }))).toBeNull();
+});
+
+test("thumbs, then why: each is sent as it is given", async () => {
+  const onThumbs = sent();
+  const screen = await render(<Thumbs given={null} onThumbs={onThumbs} />);
+  const feedback = screen.getByRole("group", { name: "Feedback" });
+  await feedback.getByRole("button", { name: "Not helpful" }).click();
+  expect(onThumbs).toHaveBeenLastCalledWith(false, null);
+  await feedback.getByRole("textbox", { name: "Why? (optional)" }).fill("It missed the date");
+  await feedback.getByRole("button", { name: "Add" }).click();
+  expect(onThumbs).toHaveBeenLastCalledWith(false, "It missed the date");
+  await expect.element(feedback.getByRole("button", { name: "Add" })).not.toBeInTheDocument();
+});
+
+test("a comment left blank adds none", async () => {
+  const onThumbs = sent();
+  const screen = await render(<Thumbs given={null} onThumbs={onThumbs} />);
+  await screen.getByRole("button", { name: "Helpful", exact: true }).click();
+  await screen.getByRole("button", { name: "Add" }).click();
+  expect(onThumbs).toHaveBeenLastCalledWith(true, null);
+});
+
+test("the reader's comment shows with their thumbs", async () => {
+  const screen = await render(
+    <Thumbs given={{ up: false, comment: "It missed the date" }} onThumbs={sent()} />,
+  );
+  await expect.element(screen.getByText("You said: It missed the date")).toBeVisible();
+  await expect
+    .element(screen.getByRole("button", { name: "Not helpful" }))
+    .toHaveAttribute("aria-pressed", "true");
+});
+
+test("thumbs that weren't sent ask for no comment", async () => {
+  const screen = await render(<Thumbs given={null} onThumbs={sent("refused")} />);
+  await screen.getByRole("button", { name: "Helpful", exact: true }).click();
+  await expect.element(screen.getByRole("alert")).toBeVisible();
+  await expect.element(screen.getByRole("textbox")).not.toBeInTheDocument();
 });

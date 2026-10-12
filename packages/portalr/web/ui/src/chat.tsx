@@ -3,7 +3,7 @@
  * handed to the caller. The components know nothing of the transport (lattice RFC-0002).
  */
 
-import type { Artifactr, ArtifactrV1 } from "@portalr/client";
+import type { Artifactr, ArtifactrV1, Thumb } from "@portalr/client";
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -50,20 +50,75 @@ function Unsent({ reason }: { reason: string | null }) {
   return reason && <p role="alert">{reason}</p>;
 }
 
+/** Give thumbs up or down, and why, if the person says. */
+export type GiveThumbs = (up: boolean, comment: string | null) => Sent;
+
+/**
+ * Thumbs on something: up or down, then why, if the person wants to say. Each is sent as it is
+ * given, and the latest is what shows.
+ */
+export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: GiveThumbs }) {
+  const { pending, unsent, send } = useSending();
+  const [chosen, setChosen] = useState<boolean | null>(null);
+  async function thumb(up: boolean) {
+    if (await send(() => onThumbs(up, null))) {
+      setChosen(up);
+    }
+  }
+  async function explain(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const comment = String(new FormData(event.currentTarget).get("comment")).trim();
+    if (chosen !== null && (await send(() => onThumbs(chosen, comment || null)))) {
+      setChosen(null);
+    }
+  }
+  return (
+    <div role="group" aria-label="Feedback" className="flex flex-col gap-1">
+      <span className="flex gap-1">
+        <Button
+          variant="secondary"
+          aria-pressed={given?.up === true}
+          disabled={pending}
+          onClick={() => thumb(true)}
+        >
+          Helpful
+        </Button>
+        <Button
+          variant="secondary"
+          aria-pressed={given?.up === false}
+          disabled={pending}
+          onClick={() => thumb(false)}
+        >
+          Not helpful
+        </Button>
+      </span>
+      {given?.comment && <p className="text-muted text-xs">You said: {given.comment}</p>}
+      {chosen !== null && (
+        <form className="flex items-end gap-2" onSubmit={explain}>
+          <TextField label="Why? (optional)" name="comment" className="flex-1" />
+          <Button type="submit" variant="secondary" disabled={pending}>
+            Add
+          </Button>
+        </form>
+      )}
+      <Unsent reason={unsent} />
+    </div>
+  );
+}
+
 type MessageProps = {
   message: Artifactr.Message;
   /** How to name who posted it, which names the message too. */
   author: string;
-  /** The reader's thumbs on it, as `client`'s `thumbs` reads them: up, down, or none. */
-  thumbs?: boolean | null;
-  /** Give thumbs up or down; without it, there are no buttons. */
-  onThumbs?: (up: boolean) => Sent;
+  /** The reader's thumbs on it, as `client`'s `thumbs` reads them. */
+  thumbs?: Thumb | null;
+  /** Give thumbs; without it, there are none. */
+  onThumbs?: GiveThumbs;
 };
 
 /** One message, named for who posted it: their name, its Markdown, and the reader's thumbs. */
 export function Message({ message, author, thumbs = null, onThumbs }: MessageProps) {
   const name = useId();
-  const { pending, unsent, send } = useSending();
   return (
     <li
       aria-labelledby={name}
@@ -73,27 +128,7 @@ export function Message({ message, author, thumbs = null, onThumbs }: MessagePro
         {author}
       </span>
       <Markdown>{message.content}</Markdown>
-      {onThumbs && (
-        <span className="flex gap-1">
-          <Button
-            variant="secondary"
-            aria-pressed={thumbs === true}
-            disabled={pending}
-            onClick={() => send(() => onThumbs(true))}
-          >
-            Helpful
-          </Button>
-          <Button
-            variant="secondary"
-            aria-pressed={thumbs === false}
-            disabled={pending}
-            onClick={() => send(() => onThumbs(false))}
-          >
-            Not helpful
-          </Button>
-        </span>
-      )}
-      <Unsent reason={unsent} />
+      {onThumbs && <Thumbs given={thumbs} onThumbs={onThumbs} />}
     </li>
   );
 }

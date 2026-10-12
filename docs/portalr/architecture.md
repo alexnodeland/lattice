@@ -57,6 +57,19 @@ Each reader takes a `Tenant` and typed parameters, and builds its query with the
 
 Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` there; contract tests cover them, and stackr's Smoke job reads both up through `scripts/smoke_readers.py`.
 
+## The app
+
+`web/app` is the people's UI, at `/portalr/app/`. It reads `config.json` first, signs in through Supabase Auth's client, `@supabase/auth-js`, and asks the server through `client`'s queries, each carrying the current token and the tenant its route names ([ADR-0014](adr/0014-the-apps-shell.md)).
+
+| Route | Shows |
+|---|---|
+| `/sign-in` | An email and a password |
+| `/` | The person's tenants, from grantr's `/me`: none is no access, and one goes straight to it |
+| `/t/$tenant` | The workspaces grantr says they can open there |
+| `/t/$tenant/w/$workspace` | A workspace, which the app's areas open into |
+
+TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test holds it to `src/routes/`. `moon run app:bdd` runs one feature per area through playwright-bdd, in Bun, against the test application with Supabase Auth (GoTrue, alone) in compose's `bdd` profile, served at `/auth/v1` on its origin ([ADR-0013](adr/0013-the-apps-scenarios-against-the-test-application.md)).
+
 ## The wheel
 
 Vite builds `app` and `admin` into `src/portalr/static/`, which git ignores and the wheel carries. portalr's `build` depends on theirs, and `ui-in-wheel`, in `check` and the release workflow, fails unless this version's wheel holds both.

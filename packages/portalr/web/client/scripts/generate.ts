@@ -21,6 +21,7 @@ const OPENAPI = {
   "artifactr.openapi.ts": "packages/artifactr/schemas/artifactr.openapi.json",
   "reflexr.openapi.ts": "packages/reflexr/schemas/reflexr.openapi.json",
   "grantr.openapi.ts": "packages/grantr/schemas/grantr.openapi.json",
+  "portalr.openapi.ts": "packages/portalr/schemas/portalr.openapi.json",
 } as const;
 
 const SCHEMAS = {

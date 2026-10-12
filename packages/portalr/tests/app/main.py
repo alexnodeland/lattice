@@ -1,10 +1,19 @@
 """portalr's test application, for its acceptance tests only: the router over the stack's tools.
 
-It mounts ``portalr_router`` with grantr's ``Grants`` in memory, trusts the ``x-user`` header as
-docplan does, and invites without Supabase. acme's owner is alice, and bob is its member with no
-role; globex's owner is carol; ops is the deployment's operator. Each tool is read at the URL its
-environment variable names; Langfuse and LiteLLM aren't in its compose, so their reads are
-unavailable (portalr ADR-0011).
+It mounts ``portalr_router``, and grantr's own router for the UIs' ``/me`` and ``/checks``, over
+grantr's ``Grants`` in memory, and invites without Supabase. acme's owner is alice, and bob is its
+member with no tenant role, an editor of its workspaces ``notes`` and ``plans``; globex's owner is
+carol; erin is a member of both, and edits acme's ``notes``; ops is the deployment's operator.
+
+A caller is named by a Supabase Auth access token, verified as the template verifies one, or by
+the ``x-user`` header, which the API tests send. Signed in, a person's user id here is their
+email's local part, so the seed needn't know the ids Supabase Auth gives them. Supabase Auth
+itself (GoTrue, alone) answers at ``/auth/v1`` on this origin, as it does behind Supabase's
+gateway, so ``config.json`` names this origin for it (portalr ADR-0013).
+
+Each tool is read at the URL its environment variable names; Langfuse and LiteLLM aren't in its
+compose, so their reads are unavailable (portalr ADR-0011). Phase 7 moves the UIs' scenarios to an
+application the template generates, and this application's wiring of grantr goes then.
 """
 
 import os
@@ -12,29 +21,74 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+import httpx
+import jwt
+from fastapi import FastAPI, Request, Response
 from starlette.requests import HTTPConnection
 
-from grantr.core import User
-from grantr.fastapi import Caller, Unauthorized
+from artifactr.workspace import ACTIONS as ARTIFACTR_ACTIONS
+from grantr.core import Resource, User
+from grantr.fastapi import Caller, Unauthorized, grantr_router
 from grantr.grants import Grants, InMemoryStorage
 from portalr.actions import ACTIONS
 from portalr.fastapi import UI, Site, portalr_router
 from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
 
-OPS, ALICE, BOB, CAROL = (User(id=name) for name in ("ops", "alice", "bob", "carol"))
+OPS, ALICE, BOB, CAROL, ERIN = (User(id=name) for name in ("ops", "alice", "bob", "carol", "erin"))
+
+PEOPLE = "portalr.test"
+"""The domain of the people the scenarios sign up: no one else's email names a user here."""
+
+FORWARDED: tuple[str, ...] = ("content-type", "cache-control")
+"""The headers of Supabase Auth's answers the application passes on."""
+
+
+def workspace(name: str) -> Resource:
+    """A workspace, as grantr names one."""
+    return Resource(kind="workspace", workspace=name)
 
 
 async def seed(grants: Grants) -> None:
-    """Two tenants, their owners, a member with no role, and the operator."""
+    """Two tenants, their owners, members with and without workspaces, and the operator."""
     await grants.first_operator(OPS.id)
     await grants.create_tenant("acme", owner=ALICE.id, by=OPS)
     await grants.create_tenant("globex", owner=CAROL.id, by=OPS)
-    await grants.add_member("acme", BOB, by=ALICE)
+    for member in (BOB, ERIN):
+        await grants.add_member("acme", member, by=ALICE)
+    await grants.add_member("globex", ERIN, by=CAROL)
+    for name in ("notes", "plans"):
+        await grants.grant("acme", "editor", on=workspace(name), to=BOB, by=ALICE)
+    await grants.grant("acme", "editor", on=workspace("notes"), to=ERIN, by=ALICE)
+
+
+def signed_in(token: str) -> User:
+    """The user a Supabase Auth access token names, by its email's local part.
+
+    Raises:
+        Unauthorized: If the token isn't signed with the project's secret, has expired, is for
+            another audience, or names someone outside the scenarios' domain.
+    """
+    try:
+        claims = jwt.decode(
+            token,
+            os.environ["PORTALR_JWT_SECRET"],
+            algorithms=["HS256"],
+            audience="authenticated",
+            options={"require": ["exp", "sub", "aud", "email"]},
+        )
+    except (KeyError, jwt.InvalidTokenError) as error:
+        raise Unauthorized("the access token is not valid") from error
+    user, _, domain = str(claims["email"]).partition("@")
+    if domain != PEOPLE:
+        raise Unauthorized(f"only the scenarios' people sign in here, at {PEOPLE}")
+    return User(id=user)
 
 
 async def resolve_actor(connection: HTTPConnection) -> Caller:
-    """The caller the ``x-user`` header names: a test application's trust, as docplan's."""
+    """The caller a bearer token names, or else the ``x-user`` header, as docplan trusts it."""
+    scheme, _, token = connection.headers.get("authorization", "").partition(" ")
+    if scheme.lower() == "bearer" and token:
+        return Caller(signed_in(token))
     if user := connection.headers.get("x-user"):
         return Caller(User(id=user))
     raise Unauthorized
@@ -60,25 +114,46 @@ def readers() -> Readers:
 
 def create_app(ui: Path = UI) -> FastAPI:
     """The test application."""
-    grants = Grants(InMemoryStorage(), catalogs=[ACTIONS])
+    grants = Grants(InMemoryStorage(), catalogs=[ACTIONS, ARTIFACTR_ACTIONS])
+    gotrue = os.environ.get("PORTALR_GOTRUE_URL", "http://gotrue:9999")
 
     @asynccontextmanager
-    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await seed(grants)
-        yield
+        async with httpx.AsyncClient(base_url=gotrue) as auth:
+            app.state.auth = auth
+            yield
 
     app = FastAPI(title="portalr's test application", lifespan=lifespan)
+    app.include_router(grantr_router(grants, resolve_actor=resolve_actor), prefix="/grantr/v1")
     app.include_router(
         portalr_router(
             resolve_actor=resolve_actor,
             grants=grants,
             readers=readers(),
             invite=invite,
-            site=Site(supabase_url="http://localhost:54321", supabase_key="sb_publishable_test"),
+            site=Site(supabase_url="/", supabase_key="sb_publishable_test"),
             ui=ui,
         ),
         prefix="/portalr",
     )
+
+    @app.api_route(
+        "/auth/v1/{path:path}", methods=["GET", "POST", "PUT", "DELETE"], include_in_schema=False
+    )
+    async def supabase_auth(path: str, request: Request) -> Response:
+        """Supabase Auth, as Supabase's gateway serves it: GoTrue, at ``/auth/v1``."""
+        auth: httpx.AsyncClient = request.app.state.auth
+        answer = await auth.request(
+            request.method,
+            f"/{path}",
+            params=request.query_params,
+            headers={k: v for k, v in request.headers.items() if k.lower() != "host"},
+            content=await request.body(),
+        )
+        kept = {k: v for k, v in answer.headers.items() if k.lower() in FORWARDED}
+        return Response(answer.content, status_code=answer.status_code, headers=kept)
+
     return app
 
 

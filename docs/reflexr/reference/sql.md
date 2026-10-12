@@ -19,3 +19,7 @@ The `sql`, `postgres` and `sqlite` extras. See [SQL storage](../guides/storage.m
 ::: reflexr.sql.migrate
 
 ::: reflexr.sql.create_schema
+
+## Row-level security
+
+::: reflexr.sql.tenancy

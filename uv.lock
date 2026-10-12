@@ -3215,9 +3215,13 @@ dependencies = [
 
 [package.dev-dependencies]
 app = [
+    { name = "artifactr-ai" },
+    { name = "pyjwt" },
     { name = "uvicorn" },
 ]
 dev = [
+    { name = "artifactr-ai" },
+    { name = "pyjwt" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -3247,8 +3251,14 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-app = [{ name = "uvicorn", specifier = ">=0.54" }]
+app = [
+    { name = "artifactr-ai", editable = "packages/artifactr" },
+    { name = "pyjwt", specifier = ">=2.15" },
+    { name = "uvicorn", specifier = ">=0.54" },
+]
 dev = [
+    { name = "artifactr-ai", editable = "packages/artifactr" },
+    { name = "pyjwt", specifier = ">=2.15" },
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "pytest-asyncio", specifier = ">=1.4" },

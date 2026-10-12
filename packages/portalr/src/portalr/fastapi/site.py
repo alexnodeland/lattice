@@ -26,6 +26,7 @@ class Site(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     supabase_url: str
+    """The project's URL, or a path on the application's own origin that leads to it."""
     supabase_key: str
     """The project's publishable key, which the browser sends with every Supabase Auth call."""
     surfaces: Surfaces = Surfaces()

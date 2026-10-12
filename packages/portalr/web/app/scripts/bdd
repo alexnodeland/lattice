@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# The app's scenarios (portalr ADR-0013). It starts portalr's test application, with Supabase Auth
+# (GoTrue, alone) and its database, from portalr's compose.yaml, as a compose project of its own
+# on ports the system picks; signs up the people the scenarios sign in as; and runs the features
+# through playwright-bdd. It stops everything however they end.
+#
+# Usage, from the app's directory, as its `bdd` task, after the UIs are built: scripts/bdd
+set -euo pipefail
+export COMPOSE_FILE=../../compose.yaml COMPOSE_PROFILES=app,bdd COMPOSE_PROJECT_NAME=portalr-bdd
+
+stop() {
+  local status=$?
+  if ((status != 0)); then
+    docker compose logs --no-color --tail=200 app gotrue
+  fi
+  docker compose down --volumes
+}
+trap stop EXIT
+docker compose down --volumes # anything a run that was killed left behind
+docker compose up --detach --build --wait --quiet-pull
+at() { printf 'http://%s' "$(docker compose port "$1" "$2")"; }
+app=$(at app 8000)
+
+# Each person the scenarios sign in as, with their password; Supabase Auth confirms them at once.
+for person in alice bob erin frank; do
+  curl -fsS -o /dev/null -H 'Content-Type: application/json' \
+    --data "{\"email\": \"$person@portalr.test\", \"password\": \"$person-password\"}" \
+    "$app/auth/v1/signup"
+done
+
+bun x --bun --no-install bddgen
+PORTALR_APP_URL=$app bun x --bun --no-install playwright test

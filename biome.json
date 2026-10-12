@@ -12,7 +12,8 @@
       "biome.json",
       "knip.json",
       "tsconfig.base.json",
-      "!packages/portalr/web/client/src/generated"
+      "!packages/portalr/web/client/src/generated",
+      "!packages/portalr/web/app/src/routeTree.gen.ts"
     ]
   },
   "formatter": {

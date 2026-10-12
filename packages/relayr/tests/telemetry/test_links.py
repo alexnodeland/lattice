@@ -67,6 +67,22 @@ def named(spans: Sequence[ReadableSpan], name: str) -> ReadableSpan:
     return span
 
 
+async def finished(exporter: InMemorySpanExporter, *names: str) -> list[ReadableSpan]:
+    """Each named span, once every one of them has ended: a bounded poll.
+
+    A span ends after what it committed is bridged, so the log alone doesn't say it has.
+    """
+    spans: Sequence[ReadableSpan] = ()
+
+    async def ended() -> bool:
+        nonlocal spans
+        spans = exporter.get_finished_spans()
+        return all(any(s.name == name for s in spans) for name in names)
+
+    await until(ended)
+    return [named(spans, name) for name in names]
+
+
 async def act(reaction: r.Reaction[Outbound]) -> None:
     await reaction.deps.acting(reaction).send("please look")
 
@@ -93,16 +109,14 @@ async def test_traces_link_across_the_bridge(
     await bridged(stack, 1)
     await app.reactor.settle()
 
-    async def ended() -> bool:
-        return any(e.event_type == "artifactr:turn_ended" for e in await stack.bridged())
-
-    await until(ended)
-    spans = exporter.get_finished_spans()
-    created = named(spans, "artifactr.commit create_artifact")
-    bridge = named(spans, "relayr.bridge artifact_created")
-    publish = named(spans, "reflexr.publish artifactr:artifact_created")
-    run = named(spans, "invoke_workflow app:act")
-    turn = named(spans, "invoke_workflow turn")
+    created, bridge, publish, run, turn = await finished(
+        exporter,
+        "artifactr.commit create_artifact",
+        "relayr.bridge artifact_created",
+        "reflexr.publish artifactr:artifact_created",
+        "invoke_workflow app:act",
+        "invoke_workflow turn",
+    )
 
     # Tempo: each side's trace links to the other's.
     assert linked(turn) == [ids(run)], "the turn links to the run"
@@ -157,7 +171,7 @@ async def test_a_run_on_an_agents_write_has_no_user(
     await client.create(Note(text=""))
     await bridged(stack, 1)
     await app.reactor.settle()
-    run = named(exporter.get_finished_spans(), "invoke_workflow app:any")
+    [run] = await finished(exporter, "invoke_workflow app:any")
     assert "user.id" not in (run.attributes or {})
     assert not any(tag.startswith("thread:") for tag in tags(run))
 
@@ -179,7 +193,7 @@ async def test_a_turn_not_started_by_a_rules_run_has_no_chain(
     sent = await runner.send(workspace, thread.id, "hello")
     assert sent.run is not None
     await sent.run.wait()
-    turn = named(exporter.get_finished_spans(), "invoke_workflow turn")
+    [turn] = await finished(exporter, "invoke_workflow turn")
     expected = ["tenant:acme", "workspace:prod", *([f"rule:{rule}"] if rule else [])]
     assert list(tags(turn)) == expected
 
@@ -197,7 +211,7 @@ async def test_a_follower_traces_nothing_of_what_first_opened_its_workspace(
         thread = await alice.create_thread()
         await alice.post_message(thread.id, "hello")
     await bridged(stack, 1)
-    bridge = named(exporter.get_finished_spans(), "relayr.bridge message_posted")
+    [bridge] = await finished(exporter, "relayr.bridge message_posted")
     assert bridge.parent is None, "a trace of its own"
     assert not any(key.startswith("langfuse.") for key in bridge.attributes or {})
     assert "user.id" not in (bridge.attributes or {})

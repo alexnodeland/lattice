@@ -1,6 +1,6 @@
 # ADR-0019: Runs act once, through derived ids and keyed edits
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0026](0026-a-retried-send-asks-again-and-turns-traced-by-their-messages.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

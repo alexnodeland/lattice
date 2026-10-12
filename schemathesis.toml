@@ -23,5 +23,5 @@ checks.positive_data_acceptance.enabled = false
 # such as `true`, is a valid string id.
 [[operations]]
 include-method = "GET"
-include-path-regex = "/(artifacts|events|runs|dead-letters)$"
+include-path-regex = "/(workspaces|artifacts|events|runs|dead-letters)$"
 checks.negative_data_rejection.enabled = false

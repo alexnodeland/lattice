@@ -234,7 +234,7 @@ REST mirrors the commands and exposes reads; `artifactr.fastapi.artifactr_router
 
 | Method and path | Purpose |
 |---|---|
-| `GET /v1/workspaces?after=&limit=` | A page of the caller's tenant's workspaces that it may open: an array of ids ordered by id, after `after`. A page shorter than `limit` (100 by default) is the last. A `limit` below 1 is `validation_failed`. |
+| `GET /v1/workspaces?after=&limit=` | A page of the caller's tenant's workspaces that it may open: an array of ids ordered by id, after `after`. A page shorter than `limit` (100 by default) is the last. The document gives `limit` a minimum of 1, and a lower one is 422. |
 | `POST /v1/workspaces/{workspace_id}/commands` | Submit one command frame; the response body is its `command_result`. |
 | `GET /v1/workspaces/{workspace_id}/artifacts?kind=&include_archived=` | List artifacts. |
 | `GET /v1/workspaces/{workspace_id}/artifacts/{artifact_id}` | The current `Versioned` artifact: `id`, `kind`, `version`, `data`, `updated_by`, `archived`. |

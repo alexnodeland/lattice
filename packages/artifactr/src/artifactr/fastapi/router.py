@@ -110,7 +110,7 @@ def artifactr_router(
 
     @router.get("/workspaces")
     async def list_workspaces(
-        request: Request, after: str | None = None, limit: int = 100
+        request: Request, after: str | None = None, limit: Annotated[int, Query(ge=1)] = 100
     ) -> list[WorkspaceId]:
         """Return a page of the caller's tenant's workspaces that the caller may open, by id.
 

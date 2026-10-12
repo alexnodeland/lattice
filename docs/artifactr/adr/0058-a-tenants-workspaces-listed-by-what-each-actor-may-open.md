@@ -23,7 +23,7 @@ artifactr has no registry of workspaces. No command creates a workspace; `SqlSto
 - **A page is full unless the list has ended.** `list` reads storage until it has `limit` workspaces the actor may open, or storage has none left. The last id is the next page's `after`, and a short page is the last.
 - **Paging is by key, so it doesn't see behind its cursor.** A workspace created mid-scan with an id before the cursor is missed by that scan; relayr's start on first use picks it up.
 - **`artifactr:read_workspaces` joins `ACTIONS`.** It is the one action artifactr asks with no workspace; `Authorize` keeps its signature.
-- **REST and MCP list through it:** `GET /workspaces?after=&limit=` returns the ids as a JSON array, and the `list_workspaces` tool returns one per line. Both take the tenant from the caller's credentials. A refusal is 403 or a tool error, and a `limit` below 1 is 422 or a tool error, as other reads report a `validation_failed` rejection.
+- **REST and MCP list through it:** `GET /workspaces?after=&limit=` returns the ids as a JSON array, and the `list_workspaces` tool returns one per line. Both take the tenant from the caller's credentials. A refusal is 403 or a tool error, and a `limit` below 1 is 422, which the OpenAPI document states as a minimum, or a tool error.
 
 ## Options considered
 

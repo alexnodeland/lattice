@@ -11,6 +11,9 @@
 # database: the database adapter (STACKR_DATABASE: supabase or postgres) has
 # the databases db-init creates, checked over db-init's own connection; with
 # local Supabase, its API gateway answers too.
+# auth: GoTrue's database exists; it serves an ES256 key set; its admin API
+# takes the service role's key and refuses a request without one; a user it
+# creates signs in, with a token signed by that key, from AUTH_PUBLIC_URL.
 # langfuse (with observability): a trace with a known id, sent to the
 # Collector, is found in Langfuse through its public API, and in Tempo.
 # gateway: its guardrails and model groups are loaded; a request through a
@@ -22,7 +25,8 @@
 # trace tagged for the stackr-smoke tenant, and its LiteLLM reader reads that
 # tenant's team, which the gateway's check created (portalr's
 # scripts/smoke_readers.py; portalr ADR-0011).
-# app (with every profile, on local Supabase): an application generated from
+# app (with every profile, on local Supabase, or on PostgreSQL with GoTrue in
+# the auth profile): an application generated from
 # the template (both libraries, bridged by relayr, with evals) runs in its app
 # profile beside the stack. Its image installs the libraries from GitHub at the commit it was
 # rendered from, HEAD, as an application generated from lattice does, so HEAD
@@ -30,7 +34,7 @@
 # changes from a commit of its own, which GitHub doesn't have. In CI, HEAD is
 # the pull request's merge commit. A request without a token is refused. The
 # application's own command creates two tenants in grantr: a user signed in
-# with local Supabase Auth owns one, and is refused the other. In theirs, they
+# with local Supabase's Auth, or GoTrue's, owns one, and is refused the other. In theirs, they
 # send a message (artifactr) and
 # opens a ticket (reflexr); each starts an agent whose model request goes
 # through the gateway on a stackr-smoke key, mocked so no provider is called.
@@ -61,6 +65,7 @@ grafana="http://$host:$(setting GRAFANA_PORT)"
 collector_http="http://$host:$(setting OTLP_HTTP_PORT)"
 langfuse="http://$host:$(setting LANGFUSE_PORT)"
 gateway="http://$host:$(setting LITELLM_PORT)"
+gotrue="http://$host:$(setting AUTH_PORT)"
 
 run_id="smoke-$(date +%s)-$RANDOM"
 # The tenant the smoke test's telemetry names, as artifactr does; the Collector
@@ -327,6 +332,9 @@ smoke_database() {
   if has_profile gateway; then
     eventually "db-init created the gateway's database on $adapter" database_has litellm
   fi
+  if has_profile auth; then
+    eventually "db-init created GoTrue's database on $adapter" database_has auth
+  fi
   if [[ $adapter == supabase ]]; then
     supabase_status || { log "FAIL: local Supabase's status"; return 1; }
     eventually "local Supabase's API answers" supabase_api_ok
@@ -340,6 +348,60 @@ smoke_langfuse() {
   send_trace
   eventually "the trace is in Langfuse" langfuse_has_trace
   eventually "the same trace is in Tempo" tempo_has_trace_id
+}
+
+# GoTrue's admin API with the service role's key, passed to curl on stdin.
+gotrue_admin() {
+  local path=$1
+  shift
+  printf 'header = "Authorization: Bearer %s"\nurl = "%s"\n' \
+    "$(setting AUTH_SERVICE_ROLE_KEY)" "$gotrue$path" |
+    curl -fsS --config - -H 'Content-Type: application/json' "$@"
+}
+gotrue_ready() { curl -fsS -o /dev/null "$gotrue/health"; }
+gotrue_serves_its_key() {
+  local kid
+  kid=$(setting AUTH_JWT_KEYS | jq -r '.[0].kid')
+  curl -fsS "$gotrue/.well-known/jwks.json" |
+    jq -e --arg kid "$kid" 'any(.keys[]; .kid == $kid and .alg == "ES256" and (has("d") | not))' >/dev/null
+}
+# A JWT's header or claims (1 or 2), decoded.
+jwt_part() {
+  local part
+  part=$(cut -d. -f"$2" <<<"$1" | tr '_-' '/+')
+  while ((${#part} % 4)); do part+="="; done
+  base64 -d <<<"$part" 2>/dev/null
+}
+
+smoke_auth() {
+  eventually "GoTrue is ready" gotrue_ready || return 1
+  eventually "GoTrue serves its ES256 key, without the private part" gotrue_serves_its_key
+  local code
+  code=$(curl -s -o /dev/null -w '%{http_code}' "$gotrue/admin/users")
+  if [[ $code == 401 ]]; then
+    log "ok: GoTrue's admin API refuses a request without the service role's key"
+  else
+    log "FAIL: GoTrue's admin API answered $code without a key, not 401"
+    status=1
+  fi
+  local password user id token
+  password=$(random_hex 16)
+  user="{\"email\": \"$run_id@stackr.local\", \"password\": \"$password\""
+  if ! id=$(gotrue_admin /admin/users --data "$user, \"email_confirm\": true}" | jq -er .id); then
+    log "FAIL: GoTrue's admin API didn't create a user with the service role's key"
+    return 1
+  fi
+  log "ok: GoTrue's admin API creates a user with the service role's key"
+  if token=$(curl -fsS -H 'Content-Type: application/json' --data "$user}" \
+    "$gotrue/token?grant_type=password" | jq -er .access_token) &&
+    jwt_part "$token" 1 | jq -e '.alg == "ES256"' >/dev/null &&
+    jwt_part "$token" 2 | jq -e --arg iss "$(setting AUTH_PUBLIC_URL)" '.iss == $iss' >/dev/null; then
+    log "ok: the user signs in, with an ES256 token from $(setting AUTH_PUBLIC_URL)"
+  else
+    log "FAIL: the user's sign-in, or their token's algorithm or issuer"
+    status=1
+  fi
+  gotrue_admin "/admin/users/$id" -X DELETE -o /dev/null || true
 }
 
 # portalr's readers for the tools its Acceptance job doesn't run, as the stackr-smoke tenant.
@@ -386,6 +448,30 @@ app_call() {
 }
 app_json() { app_call "$1" -H 'Content-Type: application/json' --data "$2" -o /dev/null; }
 
+# The adapter's identity: local Supabase's Auth, or GoTrue on PostgreSQL. Each creates a confirmed
+# user (USER is their JSON, open at the end), signs them in, and deletes them.
+auth_create_user() {
+  if [[ $auth == supabase ]]; then
+    supabase_auth "$supabase_secret" /admin/users --data "$1, \"email_confirm\": true}" | jq -er .id
+  else
+    gotrue_admin /admin/users --data "$1, \"email_confirm\": true}" | jq -er .id
+  fi
+}
+auth_sign_in() {
+  if [[ $auth == supabase ]]; then
+    supabase_auth "$supabase_publishable" "/token?grant_type=password" --data "$1}"
+  else
+    curl -fsS -H 'Content-Type: application/json' --data "$1}" "$gotrue/token?grant_type=password"
+  fi | jq -er .access_token
+}
+auth_delete_user() {
+  if [[ $auth == supabase ]]; then
+    supabase_auth "$supabase_secret" "/admin/users/$1" -X DELETE -o /dev/null
+  else
+    gotrue_admin "/admin/users/$1" -X DELETE -o /dev/null
+  fi
+}
+
 # Local Supabase's Auth, with its local keys: the secret key administers users.
 supabase_auth() {
   local key=$1 path=$2
@@ -409,7 +495,7 @@ cleanup_app() {
       --data "{\"keys\": [\"$app_key\"]}" || true
   fi
   if [[ -n ${app_user:-} ]]; then
-    supabase_auth "$supabase_secret" "/admin/users/$app_user" -X DELETE -o /dev/null || true
+    auth_delete_user "$app_user" || true
   fi
   # The application's tables, in its own schema on local Supabase's PostgreSQL, and its role:
   # two statements, so a schema that can't be dropped still lets the role go.
@@ -512,12 +598,18 @@ timeline_has() {
 app_trace_in_tempo() { tempo_trace_has_service "$app_name" && tempo_trace_has_service litellm; }
 
 smoke_app() {
-  local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE)}
-  if [[ $adapter != supabase ]]; then
-    log "FAIL: app: needs local Supabase, whose Auth signs its users in (STACKR_DATABASE=$adapter)"
-    return 1
+  local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE)} issuer jwks
+  if [[ $adapter == supabase ]]; then
+    auth=supabase
+    supabase_status || { log "FAIL: app: local Supabase's status"; return 1; }
+    issuer=$supabase_api/auth/v1
+    jwks=""
+  else
+    auth=gotrue
+    gotrue_ready || { log "FAIL: app: on $adapter, it needs GoTrue, the auth profile"; return 1; }
+    issuer=$(setting AUTH_PUBLIC_URL)
+    jwks=http://gotrue:9999/.well-known/jwks.json
   fi
-  supabase_status || { log "FAIL: app: local Supabase's status"; return 1; }
   unset DOCKER_DEFAULT_PLATFORM
 
   app_dir="$(mktemp -d)/$app_name"
@@ -544,7 +636,8 @@ APP_PORT=$app_port
 OTEL_METRIC_EXPORT_INTERVAL=2000
 LANGFUSE_PUBLIC_KEY=$(setting LANGFUSE_PUBLIC_KEY)
 LANGFUSE_SECRET_KEY=$(setting LANGFUSE_SECRET_KEY)
-AUTH_ISSUER=$supabase_api/auth/v1
+AUTH_ISSUER=$issuer
+STACK_AUTH_JWKS_URL=$jwks
 LITELLM_API_KEY=$app_key
 LITELLM_MOCK_RESPONSE="stackr smoke ok"
 ENV
@@ -573,14 +666,11 @@ ENV
   local password
   password=$(random_hex 16)
   local user="{\"email\": \"$run_id@stackr.local\", \"password\": \"$password\""
-  if ! app_user=$(supabase_auth "$supabase_secret" /admin/users --data "$user, \"email_confirm\": true}" |
-    jq -er .id) ||
-    ! app_token=$(supabase_auth "$supabase_publishable" "/token?grant_type=password" --data "$user}" |
-      jq -er .access_token); then
-    log "FAIL: app: local Supabase didn't sign a user in"
+  if ! app_user=$(auth_create_user "$user") || ! app_token=$(auth_sign_in "$user"); then
+    log "FAIL: app: $auth didn't sign a user in"
     return 1
   fi
-  log "ok: local Supabase signed a user in"
+  log "ok: $auth signed a user in"
 
   # grantr holds the tenants: one the user owns, and one they aren't in.
   if ! app_admin tenant stackr-smoke "$app_user" ||
@@ -646,6 +736,7 @@ for profile in "${profiles[@]}"; do
     database) smoke_database || status=1 ;;
     langfuse) smoke_langfuse || status=1 ;;
     gateway) smoke_gateway || status=1 ;;
+    auth) smoke_auth || status=1 ;;
     app) smoke_app || status=1 ;;
     *)
       log "smoke: no checks for profile '$profile'"

@@ -9,7 +9,9 @@ Usage: scripts/setup-env [--example PATH] [--env-file PATH]
   and picks up keys added to `.env.example` since the last run.
 - `generate:KIND` or `generate:KIND:PREFIX` becomes a fresh random secret:
   `hex` (64 hex characters), `token` (43 URL-safe characters) or `uuid`,
-  after the optional prefix (`generate:token:sk-`).
+  after the optional prefix (`generate:token:sk-`). `generate:auth-keys` is
+  GoTrue's ES256 key set, and `generate:auth-service-role:KEYS_KEY` the service
+  role's key, signed with the key set an earlier key holds.
 - `basic-auth:USER_KEY:PASSWORD_KEY` is derived as base64("user:password"),
   the credentials of an HTTP Basic header. Derived values are recomputed on
   every run, so they always follow the keys they come from.
@@ -29,15 +31,22 @@ import sys
 import uuid
 from pathlib import Path
 
+from _auth_keys import key_set, service_role_key
 from _env import LINE, read_env
 
 LOCAL_HEADER = "# Local additions: keys that are not in .env.example."
 
 
-def generate(spec: str) -> str:
-    """Make a secret from a `generate:KIND[:PREFIX]` spec."""
+def generate(spec: str, values: dict[str, str]) -> str:
+    """Make a secret from a `generate:KIND[:PREFIX]` spec, with the values resolved so far."""
     _, kind, *rest = spec.split(":", 2)
     prefix = rest[0] if rest else ""
+    if kind == "auth-keys":
+        return key_set()
+    if kind == "auth-service-role":
+        if prefix not in values:
+            raise SystemExit(f"setup-env: {spec!r} needs {prefix} earlier in the file")
+        return service_role_key(values[prefix])
     if kind == "hex":
         return prefix + secrets.token_hex(32)
     if kind == "token":
@@ -82,7 +91,7 @@ def main() -> int:
         elif key in existing:
             value = existing[key]
         elif template.startswith("generate:"):
-            value = generate(template)
+            value = generate(template, resolved)
             generated.append(key)
         else:
             value = template

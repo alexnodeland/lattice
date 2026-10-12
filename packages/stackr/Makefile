@@ -17,6 +17,8 @@ unexport DOCKER_DEFAULT_PLATFORM
 
 # The profiles `make up` starts: all of them unless you choose, for example
 #   make up PROFILES=observability
+# `auth`, GoTrue alone, is the identity port on the postgres adapter, and is
+# only started when chosen: local Supabase runs its own.
 ALL_PROFILES := observability langfuse gateway
 PROFILES ?= $(ALL_PROFILES)
 
@@ -24,7 +26,7 @@ PROFILES ?= $(ALL_PROFILES)
 # STACKR_DATABASE in .env chooses it: supabase (default) or postgres. Profiles
 # that keep data in PostgreSQL bring it up with them.
 STACKR_DATABASE ?= $(or $(shell sed -n 's/^STACKR_DATABASE=//p' .env 2>/dev/null),supabase)
-DATABASE_USERS := langfuse gateway
+DATABASE_USERS := langfuse gateway auth
 NEEDS_DATABASE = $(filter $(DATABASE_USERS),$(PROFILES))
 
 # Local Supabase, run by its CLI: an installed `supabase`, or the pinned
@@ -75,6 +77,9 @@ env: ## Create or update .env, generating local secrets
 	$(UV) run scripts/setup-env
 
 up: .env ## Start the chosen PROFILES (default: all of them), with the database adapter they need
+ifeq ($(STACKR_DATABASE)$(filter auth,$(PROFILES)),supabaseauth)
+	$(error the auth profile is GoTrue for the postgres adapter: local Supabase runs its own Auth)
+endif
 	@docker network inspect $(SUPABASE_NETWORK) >/dev/null 2>&1 || docker network create $(SUPABASE_NETWORK) >/dev/null
 ifneq ($(strip $(START_SUPABASE)),)
 	$(SUPABASE) start $(SUPABASE_START_FLAGS)

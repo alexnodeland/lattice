@@ -31,6 +31,7 @@ from artifactr.core import (
     Recorded,
     RunEnded,
     RunPaused,
+    RunStarted,
     StopRun,
     TextDelta,
     ThinkingDelta,
@@ -359,3 +360,36 @@ async def test_old_closed_runs_are_forgotten() -> None:
     watcher = channel.watch("run_1")
     assert (await watcher.__anext__()).event == TextDelta(part=0, delta="again")
     channel.close("run_1")
+
+
+async def _starts(ws: Workspace) -> list[tuple[str, tuple[str, ...]]]:
+    return [
+        (e.event.trigger, e.event.message_ids)
+        for e in await ws.read()
+        if isinstance(e.event, RunStarted)
+    ]
+
+
+async def test_run_started_names_the_messages_its_start_carries_out(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    script = Script(call("ask_user", call_id="q1", question="Which day?"), say("Monday then."))
+    runner = make_runner(make_agent(script, ask=True, output_type=ASKING), gate)
+    await started(await runner.send(ws, thread.id, "Plan it", message_id="m1")).wait()
+    await started(await runner.send(ws, thread.id, "Monday", message_id="m2")).wait()
+    assert await _starts(ws) == [("message", ("m1",)), ("resume", ("m2",))], "the reply too"
+
+
+async def test_a_resumed_run_names_the_messages_it_takes_as_its_prompt(
+    ws: Workspace, thread: Thread, gate: Gate
+) -> None:
+    script = Script(call("ask_user", call_id="q1", question="Which day?"), say("Monday then."))
+    runner = make_runner(make_agent(script, ask=True, output_type=ASKING), gate)
+    handle = started(await runner.send(ws, thread.id, "Plan it", message_id="m1"))
+    await handle.wait()
+    await ws.commit(AnswerDeferred(run_id=handle.run_id, tool_call_id="q1", answer="Monday"))
+    await ws.post_message(thread.id, "And at noon", message_id="m2")
+    resumed = await runner.resume(ws, handle.run_id)
+    assert resumed is not None
+    await resumed.wait()
+    assert await _starts(ws) == [("message", ("m1",)), ("resume", ("m2",))]

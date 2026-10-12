@@ -180,6 +180,7 @@ export type ProposedBy = UserActor | AgentActor | ExternalAgentActor | SystemAct
 export type Reason1 = string | null;
 export type Type24 = "proposal_resolved";
 export type Version5 = number | null;
+export type MessageIds = MessageId[];
 /**
  * This interface was referenced by `ArtifactrV1`'s JSON-Schema
  * via the `definition` "TraceId".
@@ -806,6 +807,7 @@ export interface ProposalResolved {
  * via the `definition` "RunStarted".
  */
 export interface RunStarted {
+  message_ids?: MessageIds;
   run_id: RunId;
   thread_id: ThreadId;
   trace_id?: TraceId | null;

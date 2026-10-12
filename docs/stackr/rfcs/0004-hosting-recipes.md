@@ -9,7 +9,7 @@
 - [ADR-0001](../adr/0001-compose-first-with-profiles.md) made Compose the first deployment format, and said Kubernetes (Helm) and Terraform come later. [ADR-0023](../adr/0023-opentofu-for-aws-now.md) amends it for this RFC: OpenTofu, Terraform's open fork, comes now, for AWS. Helm still comes later.
 - [ADR-0005](../adr/0005-ports-and-adapters-for-the-stack.md) puts every service behind a port. Each recipe is a set of adapters behind the same ports, so an application changes only its settings.
 - [ADR-0002](../adr/0002-local-supabase-through-its-cli.md) and [ADR-0009](../adr/0009-local-supabase-as-the-database-adapter.md) make local Supabase the development adapter. It stays that. The recipes use plain PostgreSQL and Supabase's auth server alone.
-- [lattice RFC-0001](../../rfcs/0001-grantr-identity-and-access.md#row-level-security)'s phase 6, and stackr ADR-0022 ([#105](https://github.com/alexnodeland/lattice/pull/105)), give the template row-level security: the application migrates as the tables' owner, works as a role that owns nothing, and `db-roles` creates that role. Both recipes run it.
+- [lattice RFC-0001](../../rfcs/0001-grantr-identity-and-access.md#row-level-security)'s phase 6, and [ADR-0022](../adr/0022-row-level-security-in-the-template.md), give the template row-level security: the application migrates as the tables' owner, works as a role that owns nothing, and `db-roles` creates that role. Both recipes run it.
 
 ## Summary
 
@@ -29,7 +29,7 @@ An application generated from the template runs beside the stack on a laptop. No
 - **The stack's defaults are local.** Ports bind to `127.0.0.1`, local Supabase's keys are well known, and its ports listen on every interface ([Security](../guides/security.md)). The security guide says what to change "before the stack faces a network you don't trust", but no recipe makes the change.
 - **State has no backups.** PostgreSQL, ClickHouse and Prometheus keep their data in Docker volumes, with nothing that copies them anywhere.
 - **Configuration is mounted from the checkout.** Every service reads its files from `deploy/<service>/`, and Grafana reads the libraries' dashboards from `packages/<library>/`. A container platform has no checkout to mount.
-- **Row-level security needs two roles.** An application with it migrates as the owner and works as a role that owns nothing, which `db-roles` creates before it first starts (ADR-0022).
+- **Row-level security needs two roles.** An application with it migrates as the owner and works as a role that owns nothing, which `db-roles` creates before it first starts ([ADR-0022](../adr/0022-row-level-security-in-the-template.md)).
 
 The applications built on the family are ready to be used by people other than their authors. They need somewhere to run that the maintainer can stand behind, on a VM with an S3-compatible bucket off the host for its backups, or in one AWS account, with no other hosted service to sign up for.
 
@@ -207,7 +207,7 @@ Fargate can't mount a checkout, so each service on Fargate whose configuration s
 - **No admin UI faces the internet.** Grafana, Langfuse, LiteLLM's admin UI, and MinIO's console on the host, are reached by an SSH tunnel on the host, and by SSM through the state host on AWS. The edge refuses GoTrue's `/admin/*`, and the admin commands reach it on the private network through `AUTH_ADMIN_URL`.
 - **A firewall on the host,** ufw, allows 22, 80 and 443. Docker writes its own iptables rules for published ports, which ufw doesn't see, so a port published on every interface would bypass it. That is why the overlay publishes nothing but Caddy's ports, and binds the rest to `127.0.0.1`.
 - **Security groups on AWS:** the ALB takes 443 and 80 from anywhere, and each task takes traffic only from the services that call it. RDS, ElastiCache and the state host take nothing from outside the VPC.
-- **Row-level security** (ADR-0022). With access by grantr, the application gets `DATABASE_URL`, a role that owns nothing, and `DATABASE_ADMIN_URL`, the tables' owner: it migrates at startup as the owner, and keeps the owner's engine for the reads that span tenants. `db-roles` creates the first role before the application first starts. With `access=none`, there is no `db-roles`, and the application gets one URL. ADR-0022 lets such an application turn row-level security on and create its role itself; the recipes don't wire that.
+- **Row-level security** ([ADR-0022](../adr/0022-row-level-security-in-the-template.md)). With access by grantr, the application gets `DATABASE_URL`, a role that owns nothing, and `DATABASE_ADMIN_URL`, the tables' owner: it migrates at startup as the owner, and keeps the owner's engine for the reads that span tenants. `db-roles` creates the first role before the application first starts. With `access=none`, there is no `db-roles`, and the application gets one URL. ADR-0022 lets such an application turn row-level security on and create its role itself; the recipes don't wire that.
 - **Images** are pinned by digest, and Renovate moves them.
 
 ### Operations

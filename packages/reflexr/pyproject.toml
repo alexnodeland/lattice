@@ -124,6 +124,8 @@ branch = true
 # By path, not package name, so that modules loaded under other names (such as Alembic
 # migrations) are still measured.
 source = ["src/reflexr"]
+# SQLAlchemy runs run_sync callables in a greenlet, which coverage follows only when told.
+concurrency = ["greenlet", "thread"]
 
 [tool.coverage.report]
 fail_under = 100

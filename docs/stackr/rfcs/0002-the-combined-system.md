@@ -4,7 +4,7 @@
 **Author:** Alex Nodeland
 **Created:** 2026-09-29
 **Discussion:** [#30](https://github.com/alexnodeland/stackr/pull/30), from [issue #8](https://github.com/alexnodeland/stackr/issues/8); accepted on 2026-09-29, with the decisions in [Decision points](#decision-points)
-**Amended by:** [relayr ADR-0016](../../relayr/adr/0016-followers-start-on-open.md): followers start through the libraries' `on_open` hook, not `authorize`; [relayr ADR-0021](../../relayr/adr/0021-chains-continue-across-the-bridge.md): the run behind each write is recorded before it, by ids on its envelope, and a rule's turn is traced from its start
+**Amended by:** [relayr ADR-0016](../../relayr/adr/0016-followers-start-on-open.md): followers start through the libraries' `on_open` hook, not `authorize`; [relayr ADR-0019](../../relayr/adr/0019-runs-act-once-through-derived-ids-and-keyed-edits.md): no read-back, since artifactr refuses a used message id; [relayr ADR-0021](../../relayr/adr/0021-chains-continue-across-the-bridge.md): the run behind each write is recorded before it, by ids on its envelope, and a rule's turn is traced from its start
 **Siblings:**
 
 - [reflexr ADR-0003][r-adr-0003] keeps the libraries independent and leaves the adapters between them to this system. [artifactr ADR-0032][a-adr-0032] makes it an application built from stackr's template.

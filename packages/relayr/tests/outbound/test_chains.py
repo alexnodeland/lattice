@@ -7,7 +7,7 @@ import artifactr.core as a
 import reflexr
 import reflexr.workspace as r
 from relayr.ledger import Cause, Ledger
-from relayr.outbound import Outbound, RunActions, rule_actor
+from relayr.outbound import Allowlist, Outbound, RunActions, rule_actor
 from tests.app_types import Note
 from tests.outbound.test_actions import ACTOR, act, people
 from tests.stack import ALICE, KEY, Stack, bridged
@@ -61,7 +61,13 @@ async def test_a_chain_continued_past_the_depth_limit_is_dead_lettered(
 
 
 async def turn_for(
-    stack: Stack, ledger: Ledger, said: list[str], *, impostor: bool = False, read_back: int = 100
+    stack: Stack,
+    ledger: Ledger,
+    said: list[str],
+    *,
+    impostor: bool = False,
+    read_back: int = 100,
+    taken: bool = False,
 ) -> list[reflexr.Envelope]:
     """Start a turn for a rule's actor, after it said `said`, and bridge the turn's end."""
     app = stack.process(ledger, rules=[], read_back=read_back)
@@ -75,11 +81,17 @@ async def turn_for(
             await ledger.record_cause(KEY, "message", message_id, cause)
         await rule.post_message(thread.id, content, message_id=message_id)
     await alice.post_message(thread.id, "between")
+    if taken:  # an earlier turn for the rule took what it said
+        earlier = alice.as_actor(
+            a.AgentActor(thread_id=thread.id, run_id="run_e", on_behalf_of=ACTOR)
+        )
+        await earlier.record(a.RunStarted(run_id="run_e", thread_id=thread.id))
+        await earlier.record(a.RunEnded(run_id="run_e", thread_id=thread.id, status="completed"))
     agent = alice.as_actor(a.AgentActor(thread_id=thread.id, run_id="run_t", on_behalf_of=ACTOR))
     await agent.record(a.RunStarted(run_id="run_t", thread_id=thread.id))
     await agent.record(a.RunEnded(run_id="run_t", thread_id=thread.id, status="completed"))
-    await bridged(stack, len(said) + 2)
-    return [e for e in await stack.bridged() if e.event_type == "artifactr:turn_ended"]
+    await bridged(stack, len(said) + 2 + taken)
+    return [e for e in await stack.bridged() if e.event_type == "artifactr:turn_ended"][-1:]
 
 
 async def test_a_turn_for_a_rule_continues_the_chain_of_its_last_message(
@@ -89,15 +101,35 @@ async def test_a_turn_for_a_rule_continues_the_chain_of_its_last_message(
     assert ended.depth == 2
 
 
-@pytest.mark.parametrize(("said", "impostor"), [([], False), (["hello"], True)])
+@pytest.mark.parametrize(
+    ("said", "impostor", "taken"),
+    [([], False, False), (["hello"], True, False), (["hello"], False, True)],
+    ids=["nothing said", "an impostor", "taken by an earlier turn"],
+)
 async def test_a_turn_for_a_rule_without_a_traced_message_starts_a_chain(
-    ledger: Ledger, stack: Stack, said: list[str], impostor: bool
+    ledger: Ledger, stack: Stack, said: list[str], impostor: bool, taken: bool
 ) -> None:
-    [ended] = await turn_for(stack, ledger, said, impostor=impostor)
+    [ended] = await turn_for(stack, ledger, said, impostor=impostor, taken=taken)
     assert ended.depth == 0
 
 
 def test_the_rule_actor_is_an_external_agent_for_no_one() -> None:
     assert rule_actor("ops:triage") == artifactr.ExternalAgentActor(
         client_id="reflexr:ops:triage", name="ops:triage"
+    )
+
+
+async def test_a_rules_direct_create_continues_its_chain(ledger: Ledger, stack: Stack) -> None:
+    async def body(acting: RunActions, reaction: r.Reaction[Outbound]) -> object:
+        await acting.create(Note(text="kept"))
+        return reaction.run.correlation_id
+
+    direct = {"app:act": Allowlist(direct=frozenset({"note"}))}
+    [chain] = (await act(stack, ledger, body, allowlists=direct)).results
+    await bridged(stack, 2)
+    _, created = await stack.bridged()
+    assert (created.event_type, created.correlation_id, created.depth) == (
+        "artifactr:artifact_created",
+        chain,
+        1,
     )

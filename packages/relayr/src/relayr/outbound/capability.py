@@ -3,8 +3,8 @@
 Add it beside reflexr's `EventContext` to an agent whose `deps_type` is reflexr's `Reaction`. Its
 tools are the [`RunActions`][relayr.outbound.RunActions] of the run's attempt, so an agent's
 writes are made once however often the run is retried, as a function action's are. A tool the
-rule's allowlist refuses, or artifactr refuses as invalid, is retried by the model; a write
-artifactr refuses for good fails the run.
+rule's allowlist refuses (`NotAllowed`), or artifactr refuses as invalid or about something
+missing (`Refused`), goes back to the model, which may retry; any other refusal fails the run.
 """
 
 from dataclasses import dataclass, field

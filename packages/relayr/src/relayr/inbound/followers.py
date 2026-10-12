@@ -31,6 +31,7 @@ from reflexr import SourceActor, new_id
 from reflexr.core import Causation, DepthExceeded, Forbidden
 from relayr.events import Projections
 from relayr.ledger import CauseKind, DeadLetter, Ledger, WorkspaceKey
+from relayr.outbound import is_rule_actor
 
 logger = logging.getLogger("relayr.inbound")
 
@@ -192,30 +193,35 @@ class Followers:
     ) -> None:
         """Record the run behind an agent turn that a rule's message started, as it starts.
 
-        A turn acts for the author of the messages it carries out, one author per turn, so a
-        turn that acts for a rule carries out that rule's latest messages in its thread: it
-        continues the chain of the run that posted the last of them.
+        A turn acts for the author of the messages it carries out, one author per turn, and
+        carries out the oldest messages no turn has taken. So a turn that acts for a rule carries
+        out the rule's messages since the rule's last turn in the thread, whatever turns for
+        others came between: it continues the chain of the run that posted the last of them.
+        Notices start no turn, and are passed over.
         """
         match envelope:
             case artifactr.core.Envelope(
                 event=artifactr.core.RunStarted(run_id=turn, thread_id=thread),
-                actor=artifactr.core.AgentActor(
-                    on_behalf_of=artifactr.core.ExternalAgentActor() as rule
-                ),
-            ) if _by_a_rule(rule):
+                actor=artifactr.core.AgentActor(on_behalf_of=rule),
+            ) if rule is not None and is_rule_actor(rule):
                 pass
             case _:
                 return
         before = envelope.seq
         while page := await source.read(before_seq=before, threads={thread}, last=self._read_back):
             for earlier in reversed(page):
-                if earlier.actor == rule and isinstance(
-                    earlier.event, artifactr.core.MessagePosted
-                ):
-                    cause = await self._ledger.cause(workspace, "message", earlier.event.message_id)
-                    if cause is not None:
-                        await self._ledger.record_cause(workspace, "turn", turn, cause)
-                    return
+                match earlier.event:
+                    case artifactr.core.MessagePosted(kind="message", message_id=message_id) if (
+                        earlier.actor == rule
+                    ):
+                        cause = await self._ledger.cause(workspace, "message", message_id)
+                        if cause is not None:
+                            await self._ledger.record_cause(workspace, "turn", turn, cause)
+                        return
+                    case artifactr.core.RunStarted() if _acts_for(earlier.actor, rule):
+                        return  # an earlier turn for the rule took what came before it
+                    case _:
+                        pass
             before = page[0].seq
 
     async def _bridge(
@@ -303,17 +309,15 @@ def _written(envelope: artifactr.core.Envelope) -> tuple[CauseKind, str] | None:
                 proposal_id=None, artifact_id=artifact_id, version=version
             ),
             actor=artifactr.core.ExternalAgentActor(client_id=client_id) as actor,
-        ) if _by_a_rule(actor):
+        ) if is_rule_actor(actor):
             return "edit", f"{client_id}/{artifact_id}@{version}"
         case _:
             return None
 
 
-def _by_a_rule(actor: artifactr.core.Actor) -> bool:
-    """Whether a rule's run acted: an external agent of a rule's."""
-    return isinstance(actor, artifactr.core.ExternalAgentActor) and actor.client_id.startswith(
-        "reflexr:"
-    )
+def _acts_for(actor: artifactr.core.Actor, rule: artifactr.core.Actor) -> bool:
+    """Whether an actor is an agent's turn acting for a rule's actor."""
+    return isinstance(actor, artifactr.core.AgentActor) and actor.on_behalf_of == rule
 
 
 def _answered(event: artifactr.core.Event) -> str | None:

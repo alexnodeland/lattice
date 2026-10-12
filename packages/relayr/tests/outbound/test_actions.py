@@ -18,9 +18,9 @@ import reflexr
 import reflexr.workspace as r
 from relayr.events import ArtifactCreated, MessagePosted
 from relayr.ledger import Ledger
-from relayr.outbound import Allowlist, NotAllowed, Outbound, RunActions, rule_actor
+from relayr.outbound import Allowlist, NotAllowed, Outbound, Refused, RunActions, rule_actor
 from tests.app_types import Note
-from tests.stack import ALICE, KEY, Access, Stack, bridged, until
+from tests.stack import ALICE, KEY, Access, Stack, bridged, notices, until
 
 ACTOR = rule_actor("app:act")
 DIRECT = Allowlist(direct=frozenset({"note"}))
@@ -204,27 +204,35 @@ async def archived_by_alice(workspace: artifactr.Workspace) -> object:
 
 
 @pytest.mark.parametrize(
-    ("body", "reason"),
+    ("body", "reason", "permanent"),
     [
-        (lambda acting: acting.read("art_missing"), "not_found"),
-        (lambda acting: acting.edit("art_alice", "/text", "x"), "invalid_state"),
-        (lambda acting: acting.edit("art_alice", "/nowhere/deep", "x"), "patch_failed"),
+        (lambda acting: acting.read("art_missing"), "not_found", False),
+        (lambda acting: acting.edit("art_alice", "/nowhere/deep", "x"), "patch_failed", False),
+        (lambda acting: acting.edit("art_alice", "/text", "x"), "invalid_state", True),
     ],
 )
-async def test_what_artifactr_refuses_fails_the_run_for_good(
-    ledger: Ledger, stack: Stack, body: Callable[[RunActions], Awaitable[object]], reason: str
+@pytest.mark.parametrize("allowlist", [DIRECT, Allowlist()], ids=["direct", "proposed"])
+async def test_what_artifactr_refuses_fails_the_run(
+    ledger: Ledger,
+    stack: Stack,
+    body: Callable[[RunActions], Awaitable[object]],
+    reason: str,
+    permanent: bool,
+    allowlist: Allowlist,
 ) -> None:
     acted = await act(
         stack,
         ledger,
         lambda acting, reaction: body(acting),
-        allowlists={"app:act": DIRECT},
+        allowlists={"app:act": allowlist},
         on=ArtifactCreated,
         trigger=archived_by_alice if reason == "invalid_state" else created_by_alice,
     )
     [error] = acted.errors
     assert isinstance(error, r.RunFailure)
-    assert (error.reason, error.permanent) == (reason, True)
+    assert isinstance(error, Refused) is not permanent
+    assert (error.reason, error.permanent) == (reason, permanent)
+    assert await (await people(stack)).proposals() == [], "nothing was proposed"
 
 
 async def test_a_refused_write_fails_the_run_for_good(ledger: Ledger, stack: Stack) -> None:
@@ -250,11 +258,13 @@ async def test_a_run_acts_only_in_its_chains_threads_unless_allowed(
             await acting.notice("there", thread_id="thr_other")
         with pytest.raises(NotAllowed, match="may not create threads"):
             await acting.create_thread("mine")
-        return acting.threads
+        return reaction.events[0].event.model_dump()["thread_id"]
 
-    [threads] = (await act(stack, ledger, body)).results
-    assert isinstance(threads, frozenset)
-    assert len(threads) == 1
+    acted = await act(stack, ledger, body)
+    [thread] = acted.results
+    assert acted.errors == []
+    assert notices(await stack.log()) == [(ACTOR, "here")]
+    assert thread
 
 
 async def test_a_run_allowed_threads_creates_and_acts_in_them(ledger: Ledger, stack: Stack) -> None:
@@ -448,3 +458,70 @@ async def test_a_retried_run_sends_its_message_once(
     assert acted.results == [2]
     sent = [e for e in await stack.log() if e.actor == ACTOR]
     assert len(sent) == 1
+
+
+async def test_a_retried_runs_writes_are_each_made_once(ledger: Ledger, stack: Stack) -> None:
+    async def body(acting: RunActions, reaction: r.Reaction[Outbound]) -> object:
+        thread = await acting.create_thread("incident")
+        await acting.edit("art_alice", "/text", "proposed")
+        await acting.create(Note(text="new"))
+        await acting.notice("noted")
+        if reaction.attempt == 1:
+            raise RuntimeError("the attempt fails after acting")
+        return thread
+
+    retried = reflexr.Rule(
+        name="app:act",
+        when=reflexr.on(ArtifactCreated).where(reflexr.F.author.kind.eq("user")),
+        then=reflexr.run("act"),
+        retry=reflexr.RetryPolicy(max_attempts=2, backoff=timedelta(milliseconds=1)),
+    )
+    acted = await act(
+        stack,
+        ledger,
+        body,
+        allowlists={"app:act": Allowlist(create_threads=True)},
+        rules=[retried],
+        trigger=created_by_alice,
+    )
+    await asyncio.sleep(0.01)
+    await stack.processes[-1].reactor.settle()
+    [thread] = acted.results
+    workspace = await people(stack)
+    assert len(await workspace.proposals()) == 2, "the edit's and the create's, once each"
+    assert [t.id for t in await workspace.threads()] == [thread]
+    assert notices(await stack.log()) == [(ACTOR, "noted")]
+
+
+def archiving(storage: artifactr.InMemoryStorage) -> artifactr.workspace.Authorize:
+    """A hook that has Alice archive the note just before the rule proposes its edit."""
+
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: a.Actor, access: Access
+    ) -> bool:
+        if actor == ACTOR and access.action == "artifactr:propose_change":
+            alice = await artifactr.Workspaces(storage).open(*KEY, actor=ALICE)
+            await alice.commit(a.ArchiveArtifact(artifact_id="art_alice", base_version=1))
+        return True
+
+    return authorize
+
+
+async def test_an_edit_of_an_artifact_archived_meanwhile_fails_for_good(
+    ledger: Ledger, stack: Stack
+) -> None:
+    async def body(acting: RunActions, reaction: r.Reaction[Outbound]) -> object:
+        return await acting.edit("art_alice", "/text", "x")
+
+    [error] = (
+        await act(
+            stack,
+            ledger,
+            body,
+            artifactr_authorize=archiving(stack.artifactr_storage),
+            on=ArtifactCreated,
+            trigger=created_by_alice,
+        )
+    ).errors
+    assert isinstance(error, r.RunFailure)
+    assert (error.reason, error.permanent) == ("invalid_state", True)

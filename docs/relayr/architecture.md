@@ -69,8 +69,8 @@ A rule's run acts in artifactr through `Outbound.acting(reaction)`: a function a
 
 - **As the rule's own participant,** `ExternalAgentActor(client_id="reflexr:<rule>")`, acting for no person ([ADR-0002](adr/0002-the-outbound-actor-an-external-agent-per-rule.md), [ADR-0022](adr/0022-what-a-rules-actor-needs-in-artifactr.md)). artifactr's own rules apply to it, and relayr has no way to resolve a proposal.
 - **Proposals and notices by default.** `create` and `edit` propose, unless the rule's allowlist names the kind in `direct`; `notice` posts a notice, which starts no turn; `create_thread` and `send`, which starts a turn through artifactr's `Runner`, need the allowlist's permission ([ADR-0007](adr/0007-notices-by-default.md), [ADR-0020](adr/0020-allowlists.md)).
-- **In the chain's threads:** those of the events that made the rule fire, and those its run created, unless the allowlist allows any.
-- **Once, however often the run is retried.** Every write's ids are derived from the run, its last checkpoint and its position, so artifactr refuses a repeat as already done. An edit sets one value at one path, and is skipped when it is in place. A version conflict is retried within the attempt; any other refusal fails the run for good, with the refusal's code as its reason ([ADR-0019](adr/0019-runs-act-once-through-derived-ids-and-keyed-edits.md)).
+- **In the chain's threads:** those of the events that made the rule fire, in order, and those its run created, unless the allowlist allows any. A write with no thread named goes to the first.
+- **Once, however often the run is retried.** Every write's ids are derived from the run, its last checkpoint and what the write is, so artifactr refuses a repeat, in any order, as already done. An edit sets one value at one path, and is skipped when it is in place. A version conflict is retried within the attempt; a missing artifact, an invalid one or a patch that doesn't apply is `Refused`, which an agent's model may retry; any other refusal fails the run for good ([ADR-0019](adr/0019-runs-act-once-through-derived-ids-and-keyed-edits.md)).
 
 ### Loop control
 

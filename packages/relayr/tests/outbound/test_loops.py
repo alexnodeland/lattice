@@ -18,7 +18,7 @@ from relayr.events import MessagePosted
 from relayr.ledger import Ledger
 from relayr.outbound import Outbound, rule_actor
 from tests.app_types import Note
-from tests.stack import KEY, Process, Stack, until
+from tests.stack import KEY, Process, Stack, notices, until
 
 FLAKY = reflexr.Rule(
     name="app:review",
@@ -26,18 +26,6 @@ FLAKY = reflexr.Rule(
     then=reflexr.run("review"),
     retry=reflexr.RetryPolicy(max_attempts=3, backoff=timedelta(milliseconds=1)),
 )
-
-
-def notices(log: list[a.Envelope]) -> list[tuple[a.Actor, str]]:
-    """Who posted each notice in a log, and what it says."""
-    found: list[tuple[a.Actor, str]] = []
-    for envelope in log:
-        match envelope.event:
-            case a.MessagePosted(kind="notice", content=content):
-                found.append((envelope.actor, content))
-            case _:
-                pass
-    return found
 
 
 async def caught_up(ledger: Ledger, head: int) -> bool:

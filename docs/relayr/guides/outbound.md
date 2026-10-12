@@ -40,7 +40,7 @@ async def log_deploy(reaction: Reaction[Outbound]) -> None:
 | `send(content)` | Posts a message that starts the assistant's next turn | Refused |
 | `read(artifact_id)` | Reads an artifact's current version | Allowed |
 
-Each write goes to the thread named, or to the first thread of the events that made the rule fire.
+Each write goes to the thread named, or to the chain's first thread: that of the first event that made the rule fire with one, or else the first the run created.
 
 ## From an agent
 
@@ -56,7 +56,7 @@ agent = Agent(model, deps_type=Reaction[Outbound], capabilities=[
 actions = {"runbook": AgentAction(agent)}
 ```
 
-Its tools are `read_artifact`, `create_artifact`, `edit_artifact`, `post_notice`, `create_thread` and `send_message`. What the allowlist refuses comes back to the model as a retry, so it can post a notice instead.
+Its tools are `read_artifact`, `create_artifact`, `edit_artifact`, `post_notice`, `create_thread` and `send_message`. What the allowlist refuses, or artifactr refuses as invalid or missing, comes back to the model as a retry, so it can do otherwise.
 
 ## Allowlists
 
@@ -71,10 +71,11 @@ artifactr's write policy and the thread's mode still apply: a direct edit to a k
 
 ## Retries and failures
 
-Write as if every attempt were the first. Each write's ids are derived from the run, so a retried attempt that makes the same writes in the same order makes nothing twice. Make them in the same order on every attempt.
+Write as if every attempt were the first. Each write's ids are derived from the run and what the write is (the artifact and path of an edit, the kind and data of a create, the thread and text of a notice), so a retried attempt that makes the same writes, in any order, makes nothing twice. A notice worded differently, or an artifact with other data, is another write.
 
 - **A version conflict** re-reads the artifact and edits again, up to three times, then fails the attempt to be retried.
-- **Anything else artifactr refuses** fails the run for good, with the refusal's code as its reason, such as `forbidden` or `not_found`.
+- **A missing artifact, invalid data or a patch that doesn't apply** is `Refused`, with artifactr's code as its reason. An agent's tools hand it back to the model; from a function action it fails the attempt, which is retried.
+- **Anything else artifactr refuses**, such as `forbidden`, or an edit of an archived artifact, fails the run for good.
 - **What the allowlist refuses** is `NotAllowed`, which fails the run for good too, with the reason `not_allowed`.
 
 ## Loops

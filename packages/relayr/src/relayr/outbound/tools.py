@@ -8,7 +8,7 @@ from pydantic_ai import FunctionToolset, ModelRetry, RunContext
 
 import artifactr.core as a
 from reflexr.workspace import Reaction
-from relayr.outbound.actions import NotAllowed, Outbound
+from relayr.outbound.actions import NotAllowed, Outbound, Refused
 
 # Tools annotate their context as RunContext[...] literally: pydantic-ai detects context-taking
 # tools by that annotation, and a type alias would hide it.
@@ -25,7 +25,10 @@ def artifactr_tools(outbound: Outbound) -> FunctionToolset[Reaction[Any]]:
         Args:
             artifact_id: The artifact.
         """
-        current = await outbound.acting(ctx.deps).read(artifact_id)
+        try:
+            current = await outbound.acting(ctx.deps).read(artifact_id)
+        except Refused as refused:
+            raise ModelRetry(str(refused)) from refused
         data = current.data.to_json()
         return json.dumps({"kind": current.data.kind, "version": current.version, "data": data})
 
@@ -49,7 +52,7 @@ def artifactr_tools(outbound: Outbound) -> FunctionToolset[Reaction[Any]]:
             artifact = a.load_artifact(kind, data)
             acting = outbound.acting(ctx.deps)
             return await acting.create(artifact, thread_id=thread_id, rationale=rationale)
-        except (NotAllowed, a.Rejection) as refused:
+        except (NotAllowed, Refused, a.Rejection) as refused:
             raise ModelRetry(str(refused)) from refused
 
     @toolset.tool
@@ -82,7 +85,7 @@ def artifactr_tools(outbound: Outbound) -> FunctionToolset[Reaction[Any]]:
                 thread_id=thread_id,
                 rationale=rationale,
             )
-        except NotAllowed as refused:
+        except (NotAllowed, Refused) as refused:
             raise ModelRetry(str(refused)) from refused
         return "Done."
 
@@ -98,7 +101,7 @@ def artifactr_tools(outbound: Outbound) -> FunctionToolset[Reaction[Any]]:
         """
         try:
             return await outbound.acting(ctx.deps).notice(content, thread_id=thread_id)
-        except NotAllowed as refused:
+        except (NotAllowed, Refused) as refused:
             raise ModelRetry(str(refused)) from refused
 
     @toolset.tool
@@ -110,7 +113,7 @@ def artifactr_tools(outbound: Outbound) -> FunctionToolset[Reaction[Any]]:
         """
         try:
             return await outbound.acting(ctx.deps).create_thread(title)
-        except NotAllowed as refused:
+        except (NotAllowed, Refused) as refused:
             raise ModelRetry(str(refused)) from refused
 
     @toolset.tool
@@ -125,7 +128,7 @@ def artifactr_tools(outbound: Outbound) -> FunctionToolset[Reaction[Any]]:
         """
         try:
             return await outbound.acting(ctx.deps).send(content, thread_id=thread_id)
-        except NotAllowed as refused:
+        except (NotAllowed, Refused) as refused:
             raise ModelRetry(str(refused)) from refused
 
     return toolset

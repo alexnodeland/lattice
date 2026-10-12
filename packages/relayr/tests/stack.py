@@ -152,3 +152,15 @@ async def bridged(stack: Stack, count: int) -> None:
         return len(await stack.bridged()) >= count
 
     await until(done)
+
+
+def notices(log: list[a.Envelope]) -> list[tuple[a.Actor, str]]:
+    """Who posted each notice in a log, and what it says."""
+    found: list[tuple[a.Actor, str]] = []
+    for envelope in log:
+        match envelope.event:
+            case a.MessagePosted(kind="notice", content=content):
+                found.append((envelope.actor, content))
+            case _:
+                pass
+    return found

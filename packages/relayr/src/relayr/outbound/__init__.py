@@ -17,8 +17,26 @@ Writes are proposals and notices by default, in the threads of the events that m
 fire; a rule's [`Allowlist`][relayr.outbound.Allowlist] grants more.
 """
 
-from relayr.outbound.actions import NotAllowed, Outbound, RunActions, rule_actor
+from relayr.outbound.actions import (
+    RULES,
+    NotAllowed,
+    Outbound,
+    Refused,
+    RunActions,
+    is_rule_actor,
+    rule_actor,
+)
 from relayr.outbound.allowlist import Allowlist
 from relayr.outbound.capability import ArtifactrCapability
 
-__all__ = ["Allowlist", "ArtifactrCapability", "NotAllowed", "Outbound", "RunActions", "rule_actor"]
+__all__ = [
+    "RULES",
+    "Allowlist",
+    "ArtifactrCapability",
+    "NotAllowed",
+    "Outbound",
+    "Refused",
+    "RunActions",
+    "is_rule_actor",
+    "rule_actor",
+]

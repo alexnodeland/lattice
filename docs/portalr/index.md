@@ -5,13 +5,20 @@ hide:
   - navigation
 ---
 
-# portalr
+<div class="portalr-hero" markdown>
+
+<h1 class="portalr-visually-hidden">portalr</h1>
+
+![portalr](assets/brand/lockup-light.svg#gh-light-mode-only)
+![portalr](assets/brand/lockup-dark.svg#gh-dark-mode-only)
 
 The planned portal into an application built on the family: an `app` UI for the people who use it, to chat with its agents and see their artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and see feedback, evaluations, usage and spend.
 
+</div>
+
 !!! note "Planned, not yet usable"
 
-    portalr's foundation and its workspace are done: the package, its decisions, its [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md), and the Bun workspace of its four web packages, which build but hold almost nothing yet. Everything below describes what the plan's phases build. Its mark is drawn in the plan's phase 2.
+    portalr's foundation and its workspace are done: the package, its decisions, its [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md), the Bun workspace of its four web packages, and its brand, with `ui`'s tokens and first primitives. Everything below describes what the plan's later phases build.
 
 ## Why: the family has no face
 
@@ -37,5 +44,6 @@ Every surface in the family is an API, a WebSocket or an MCP server, so an appli
 | Understand why each part will be the way it is | The [decision records](adr/README.md) |
 | See the plan, its phases and what each waits on | [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and the [RFCs](rfcs/README.md) |
 | Read the design portalr builds | [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md) |
+| Use the marks and their colours | The [brand page](assets/brand/README.md) |
 | See what has changed | The [changelog](project/changelog.md) |
 | Contribute | [Contributing](../project/contributing.md) |

@@ -1,0 +1,35 @@
+/*
+ * portalr's tokens (lattice ADR-0014), as CSS custom properties. The brand's inks keep their
+ * package's name; the roles the components use are brand-neutral, so a screen can re-skin them,
+ * as in `[data-brand="grantr"] { --accent: var(--grantr-gold) }`. Each token is one light-dark()
+ * pair: the system's scheme chooses, unless the page sets data-theme="light" or "dark".
+ * styles.css hands the roles to Tailwind's @theme.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* The inks: the mark's three plates, and the overprint where they cross. */
+  --portalr-cyan: light-dark(#009fe3, #38c6f4);
+  --portalr-magenta: light-dark(#e4007c, #ff4da6);
+  --portalr-yellow: light-dark(#ffc400, #ffd54a);
+  --portalr-violet: light-dark(#6b2fa0, #e2ccf5);
+
+  /* The roles. */
+  --paper: light-dark(#f7f4fb, #17111f);
+  --surface: light-dark(#ffffff, #0d1920);
+  --fg: light-dark(#1c1d26, #f1eef6);
+  --muted: light-dark(#5e5470, #bdb2cc);
+  --line: light-dark(#dcd5e6, #3a3247);
+  --accent: var(--portalr-violet);
+  --on-accent: light-dark(#ffffff, #17111f);
+  --focus: light-dark(#6b2fa0, #38c6f4);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}

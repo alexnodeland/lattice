@@ -5,13 +5,20 @@ hide:
   - navigation
 ---
 
-# grantr
+<div class="grantr-hero" markdown>
+
+<h1 class="grantr-visually-hidden">grantr</h1>
+
+![grantr](assets/brand/lockup-light.svg#gh-light-mode-only)
+![grantr](assets/brand/lockup-dark.svg#gh-dark-mode-only)
 
 Identity and access for the family: tenants, their members, groups, roles and service principals, and the grants that bind them to tenants, workspaces, threads, artifacts and rules.
 
+</div>
+
 !!! note "In progress, not yet wired in"
 
-    grantr's core, storage and admin API are built: its model, built-in and custom roles, groups, service principals and keys, checks, the libraries' hooks, the audit log, in-memory and SQL storage, the admin router and telemetry, as its [architecture](architecture.md) describes. The libraries don't ask it yet; the rest of this page describes what the [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)'s phases build. Its mark is drawn later, in [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md)'s phase 2.
+    grantr's core, storage and admin API are built: its model, built-in and custom roles, groups, service principals and keys, checks, the libraries' hooks, the audit log, in-memory and SQL storage, the admin router and telemetry, as its [architecture](architecture.md) describes. The libraries don't ask it yet; the rest of this page describes what the [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)'s phases build.
 
 ## Why: one model of who may do what
 
@@ -40,5 +47,6 @@ Today, any user of a tenant may do anything in every workspace of that tenant. a
 | Understand why each part is the way it is | The [decision records](adr/README.md) |
 | See the plan, its phases and what each waits on | [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and the [RFCs](rfcs/README.md) |
 | Read the design grantr builds | [lattice RFC-0001](../rfcs/0001-grantr-identity-and-access.md) |
+| Use the mark and its colours | The [brand page](assets/brand/README.md) |
 | See what has changed | The [changelog](project/changelog.md) |
 | Contribute | [Contributing](../project/contributing.md) |

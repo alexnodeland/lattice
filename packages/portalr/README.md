@@ -1,17 +1,20 @@
-# portalr
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alexnodeland/lattice/main/docs/portalr/assets/brand/banner-dark.svg">
+  <img alt="portalr: the portal into an application built on the family." src="https://raw.githubusercontent.com/alexnodeland/lattice/main/docs/portalr/assets/brand/banner-light.svg" width="100%">
+</picture>
 
 <p>
-  <a href="https://lattice.alexnodeland.com/portalr/"><img alt="Docs" src="https://img.shields.io/badge/docs-lattice.alexnodeland.com%2Fportalr-005A87"></a>
+  <a href="https://lattice.alexnodeland.com/portalr/"><img alt="Docs" src="https://img.shields.io/badge/docs-lattice.alexnodeland.com%2Fportalr-6B2FA0"></a>
   <a href="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml"><img alt="Nightly" src="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml/badge.svg?branch=main"></a>
-  <img alt="Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-005A87">
-  <img alt="Coverage: 100%" src="https://img.shields.io/badge/coverage-100%25-005A87">
-  <img alt="Typed: pyright strict" src="https://img.shields.io/badge/typed-pyright%20strict-005A87">
-  <a href="https://github.com/alexnodeland/lattice/blob/main/packages/portalr/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-005A87"></a>
+  <img alt="Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-6B2FA0">
+  <img alt="Coverage: 100%" src="https://img.shields.io/badge/coverage-100%25-6B2FA0">
+  <img alt="Typed: pyright strict" src="https://img.shields.io/badge/typed-pyright%20strict-6B2FA0">
+  <a href="https://github.com/alexnodeland/lattice/blob/main/packages/portalr/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-6B2FA0"></a>
 </p>
 
 **portalr** is the planned portal into an application built on the family: an `app` UI for the people who use it, to chat with its agents and see their artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and see feedback, evaluations, usage and spend. Both will be static single-page apps in React, sharing a typed `client` and a `ui` kit, and served by a router the application mounts beside the libraries'.
 
-> **Status:** planned, not yet usable. Its foundation and its workspace are done: the package, its decisions, its [v0.1 plan](https://lattice.alexnodeland.com/portalr/rfcs/0001-v0.1-implementation-plan/), and the Bun workspace of its four web packages, which build but hold almost nothing yet. Everything below describes what the plan's phases build. Its mark is drawn in the plan's phase 2.
+> **Status:** planned, not yet usable. Its foundation, its workspace and its brand are done: the package, its decisions, its [v0.1 plan](https://lattice.alexnodeland.com/portalr/rfcs/0001-v0.1-implementation-plan/), the Bun workspace of its four web packages, its mark, and `ui`'s tokens and first primitives. Everything below describes what the plan's later phases build.
 
 ## Why
 
@@ -33,6 +36,7 @@ portalr's documentation is its section of lattice's site, at **<https://lattice.
 - [Architecture decision records](https://lattice.alexnodeland.com/portalr/adr/): why each part will be the way it is.
 - [RFCs](https://lattice.alexnodeland.com/portalr/rfcs/): the v0.1 plan, its phases and what each waits on.
 - [lattice RFC-0002](https://lattice.alexnodeland.com/rfcs/0002-portalr-the-portal/): the design portalr builds.
+- [Brand](https://lattice.alexnodeland.com/portalr/assets/brand/): the marks and their colours.
 
 ## Contributing
 

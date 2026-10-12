@@ -1,6 +1,6 @@
 # ADR-0001: lattice's brand
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0014](0014-portalrs-and-grantrs-marks.md)
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 

@@ -1,7 +1,10 @@
 /**
  * @portalr/ui: the kit app and admin build from.
  *
- * Its tokens and primitives come with portalr's mark, in phase 2 of portalr's RFC-0001.
+ * Its primitives are Base UI's, styled with portalr's tokens through Tailwind; `styles.css` holds
+ * both.
  */
 
+export { Button } from "./button";
 export { Page } from "./page";
+export { Switch } from "./switch";

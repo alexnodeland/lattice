@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+<title id="title">portalr admin</title>
+<style>.c{fill:#009FE3}.m{fill:#E4007C}.y{fill:#FFC400}.o{fill:#6B2FA0}@media (prefers-color-scheme:dark){.c{fill:#38C6F4}.m{fill:#FF4DA6}.y{fill:#FFD54A}.o{fill:#E2CCF5}}</style>
+<polygon class="c" points="6,40.23 17.03,45.95 34.8,11.73 23.77,6"/>
+<polygon class="m" points="18.05,17.03 52.27,34.8 58,23.77 23.77,6"/>
+<polygon class="y" points="29.2,52.27 40.23,58 58,23.77 46.97,18.05"/>
+<polygon class="o" points="18.05,17.03 29.07,22.76 34.8,11.73 23.77,6"/>
+<polygon class="o" points="41.24,29.07 52.27,34.8 58,23.77 46.97,18.05"/>
+</svg>

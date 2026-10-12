@@ -12,9 +12,10 @@ MOON ?= moon
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-8s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-install: ## Install every package, dependency group and extra, the web packages, and the git hooks
+install: ## Install every package, group and extra, the web packages and their test browser, and the hooks
 	$(UV) sync --all-packages --all-groups --all-extras
 	$(BUN) install
+	cd packages/portalr/web/ui && $(BUN) x --bun --no-install playwright install --only-shell chromium
 	$(UV) run prek install
 	git config blame.ignoreRevsFile .git-blame-ignore-revs
 

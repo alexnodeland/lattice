@@ -175,7 +175,7 @@ jobs:
         with:
           auto-install: true
       # OpenTofu's and TFLint's plugins are lattice's own, which proto loads from a trusted file.
-      - run: proto trust .prototools && proto install tofu tflint
+      - run: proto trust .prototools && proto install tofu && proto install tflint
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.terraform.d/plugin-cache

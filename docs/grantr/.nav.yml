@@ -27,6 +27,7 @@ nav:
   - adr/0020-the-rule-role.md
   - adr/0021-the-deployments-own-tools.md
   - adr/0022-a-tenants-members-list-its-workspaces.md
+  - adr/0023-portalrs-admin-reads.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

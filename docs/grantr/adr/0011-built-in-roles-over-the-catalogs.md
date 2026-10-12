@@ -1,6 +1,6 @@
 # ADR-0011: Built-in roles over the catalogs
 
-**Status:** Accepted, amended by [ADR-0019](0019-runtime-actions-and-the-application-role.md) and [ADR-0022](0022-a-tenants-members-list-its-workspaces.md)
+**Status:** Accepted, amended by [ADR-0019](0019-runtime-actions-and-the-application-role.md) [ADR-0022](0022-a-tenants-members-list-its-workspaces.md) and [ADR-0023](0023-portalrs-admin-reads.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

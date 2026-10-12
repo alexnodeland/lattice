@@ -41,7 +41,7 @@ GRANTR_ACTIONS: Final = frozenset(
 """grantr's own catalog: the actions that change access, and read its audit log."""
 
 OPERATOR: Final = frozenset({"grantr:create_tenant", "grantr:grant_operator"})
-"""What the deployment's operators hold, and no one else."""
+"""grantr's actions the deployment's operators hold, and no one else."""
 
 WORKSPACE_GRANTS: Final = frozenset({"grantr:grant", "grantr:revoke", "grantr:restrict"})
 """grantr's actions a workspace's admins hold within it."""
@@ -88,6 +88,16 @@ keeping the log's consumers' cursors."""
 MEMBERS_READS: Final = frozenset({"artifactr:read_workspaces"})
 """The tenant-wide reads every member of a tenant may ask: listings whose results the library
 filters by what the caller may open."""
+
+TENANT_ADMIN_READS: Final = frozenset({"portalr:read_telemetry", "portalr:read_spend"})
+"""A tenant's telemetry and spend, in portalr's admin: its owners' and admins' to read."""
+
+DEPLOYMENT_READS: Final = frozenset({"portalr:read_deployment"})
+"""The whole deployment's telemetry, in portalr's admin: its operators' to read."""
+
+ABOVE_WORKSPACES: Final = MEMBERS_READS | TENANT_ADMIN_READS | DEPLOYMENT_READS
+"""The reads asked of a tenant or of the deployment, where no workspace role reaches: no
+workspace role, nor the application, holds them, whatever their prefix."""
 
 RUNTIME: Final = BOOKKEEPING | {
     "artifactr:record",
@@ -177,19 +187,21 @@ class Catalog:
             for action in libraries
             if action.partition(":")[2].startswith("read_") or action.endswith(":open")
         }
-        # A tenant-wide listing is asked of the tenant, where a workspace's roles don't reach.
-        viewer = (FEEDBACK & libraries | reads) - BOOKKEEPING - MEMBERS_READS
+        viewer = (FEEDBACK & libraries | reads) - BOOKKEEPING - ABOVE_WORKSPACES
         editor = viewer | EDITOR_COMMANDS & libraries
-        owner = actions - OPERATOR - BOOKKEEPING
+        owner = actions - OPERATOR - BOOKKEEPING - DEPLOYMENT_READS
         return cls(
             actions=actions,
             built_in={
-                ("deployment", "operator"): OPERATOR,
-                ("deployment", APPLICATION): frozenset(reads | (RUNTIME | FEEDBACK) & libraries),
+                ("deployment", "operator"): OPERATOR | DEPLOYMENT_READS & actions,
+                ("deployment", APPLICATION): frozenset(
+                    reads - TENANT_ADMIN_READS - DEPLOYMENT_READS | (RUNTIME | FEEDBACK) & libraries
+                ),
                 ("tenant", "owner"): owner,
                 ("tenant", "admin"): owner - {"grantr:delete_tenant"},
                 ("tenant", MEMBER): MEMBERS_READS & libraries,
-                ("workspace", "admin"): libraries - BOOKKEEPING - MEMBERS_READS | WORKSPACE_GRANTS,
+                ("workspace", "admin"): libraries - BOOKKEEPING - ABOVE_WORKSPACES
+                | WORKSPACE_GRANTS,
                 ("workspace", "editor"): editor,
                 ("workspace", "viewer"): viewer,
                 ("workspace", "rule"): RULE & libraries,

@@ -16,7 +16,7 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0008](0008-grantrs-own-model-with-openfga-shaped-ports.md) | grantr's own model, with OpenFGA-shaped ports | Accepted |
 | [0009](0009-a-deployment-wide-operator-role.md) | A deployment-wide operator role | Accepted, amended by 0014 and 0019 |
 | [0010](0010-commands-bounded-by-what-their-maker-holds.md) | Commands bounded by what their maker holds | Accepted |
-| [0011](0011-built-in-roles-over-the-catalogs.md) | Built-in roles over the catalogs | Accepted, amended by 0019 and 0022 |
+| [0011](0011-built-in-roles-over-the-catalogs.md) | Built-in roles over the catalogs | Accepted, amended by 0019, 0022 and 0023 |
 | [0012](0012-every-item-an-access-names-and-hooks-typed-by-actor.md) | Every item an access names, and hooks typed by their actor | Accepted |
 | [0013](0013-transactions-by-tenant-and-one-audit-log.md) | Transactions by tenant, and one audit log | Accepted, amended by 0016 |
 | [0014](0014-an-operator-enters-a-tenant-by-granting-themselves.md) | An operator enters a tenant by granting themselves | Accepted |
@@ -28,5 +28,6 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0020](0020-the-rule-role.md) | The rule role | Accepted |
 | [0021](0021-the-deployments-own-tools.md) | The deployment's own tools | Accepted |
 | [0022](0022-a-tenants-members-list-its-workspaces.md) | A tenant's members list its workspaces | Accepted |
+| [0023](0023-portalrs-admin-reads.md) | portalr's admin reads | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

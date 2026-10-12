@@ -138,28 +138,6 @@ def create_app(
 {%- if use_relayr %}
     bridge = Bridge(database=database, telemetry=telemetry{% if access == 'grantr' %}, grants=access.grants{% endif %})
 {%- endif %}
-{%- if use_artifactr %}
-    collaboration = Collaboration(
-        name=settings.service_name,
-{%- if access == 'grantr' %}
-        authenticate=access.authenticate,
-        identify=access.identify,
-        authorize=artifactr_hooks.authorize,
-        hidden=artifactr_hooks.hidden,
-{%- else %}
-        authenticate=verifier.authenticate,
-        identify=verifier.authenticate,
-{%- endif %}
-        model=model,
-        gateway=settings.gateway,
-        database=database,
-        telemetry=telemetry,
-{%- if use_relayr %}
-        on_open=bridge.watch,
-        turn_context=bridge.turn_context,
-{%- endif %}
-    )
-{%- endif %}
 {%- if use_reflexr %}
     automation = Automation(
         name=settings.service_name,
@@ -180,7 +158,30 @@ def create_app(
 {%- if use_relayr %}
         on_open=bridge.watch,
         run_context=bridge.run_context,
-        actions=bridge.actions(collaboration),
+        actions=bridge.actions(),
+{%- endif %}
+    )
+{%- endif %}
+{%- if use_artifactr %}
+    collaboration = Collaboration(
+        name=settings.service_name,
+{%- if access == 'grantr' %}
+        authenticate=access.authenticate,
+        identify=access.identify,
+        authorize=artifactr_hooks.authorize,
+        hidden=artifactr_hooks.hidden,
+{%- else %}
+        authenticate=verifier.authenticate,
+        identify=verifier.authenticate,
+{%- endif %}
+        model=model,
+        gateway=settings.gateway,
+        database=database,
+        telemetry=telemetry,
+{%- if use_relayr %}
+        on_open=bridge.watch,
+        turn_context=bridge.turn_context,
+        drafting=bridge.drafting(automation),
 {%- endif %}
     )
 {%- endif %}

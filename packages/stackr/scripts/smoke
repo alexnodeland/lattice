@@ -46,7 +46,10 @@
 # Each agent's trace, with the gateway's spans in it, is in Tempo and
 # Langfuse, and the application's metrics are in Prometheus. An alert crosses
 # into artifactr through relayr, as an incident thread with its timeline, and
-# the user's message in that thread crosses back, onto the timeline.
+# the user's message in that thread crosses back, onto the timeline. A rule
+# drafted in a thread, by a service principal's key, goes live once the user
+# accepts it, and tells the thread of the alert it watches; a forged
+# acceptance, published into reflexr, is refused.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -655,6 +658,16 @@ incident_timeline() {
     jq -er 'first(.[] | select(.kind == "timeline") | .data.thread_id)')
 }
 
+# The stored rule a rule artifact installed, as reflexr reads it.
+rule_is_live() { app_call "/reflexr/v1/workspaces/$run_id/rules/chat:smoke-alerts" -o /dev/null; }
+
+# A notice in thread t1 that says this.
+t1_has_notice() {
+  app_call "/artifactr/v1/workspaces/$run_id/events" |
+    jq -e --arg said "$1" 'any(.[]; .thread_id == "t1" and .event.kind? == "notice" and .event.content == $said)' \
+      >/dev/null
+}
+
 # The timeline has this many entries.
 timeline_has() {
   app_call "/artifactr/v1/workspaces/$run_id/artifacts" |
@@ -812,6 +825,33 @@ ENV
     "{\"type\": \"command\", \"command_id\": \"c3\", \"command\": {\"type\": \"post_message\", \"thread_id\": \"$incident_thread\", \"content\": \"Rolled back.\"}}"
   eventually "the person's message reached reflexr, and its rule added it to the timeline" \
     timeline_has 2
+
+  log "app: a rule drafted in a thread goes live once the user accepts it"
+  local tenant=/grantr/v1/tenants/stackr-smoke drafter_key
+  app_json "$tenant/members" '{"member": {"kind": "service_principal", "id": "drafter"}}'
+  app_json "$tenant/grants" \
+    "{\"role\": \"editor\", \"on\": {\"kind\": \"workspace\", \"workspace\": \"$run_id\"}, \"to\": {\"kind\": \"service_principal\", \"id\": \"drafter\"}}"
+  drafter_key=$(app_call "$tenant/keys" -H 'Content-Type: application/json' \
+    --data '{"principal": "drafter"}' | jq -er .key)
+  local when="{\"filter\": {\"kind\": \"all\", \"of\": [{\"kind\": \"on\", \"types\": [\"$app_package:alert.fired\"]}, {\"kind\": \"where\", \"field\": \"service\", \"op\": \"eq\", \"value\": \"smoke-rule\"}]}, \"throttle\": {\"at_most\": 10, \"per\": \"PT1H\"}}"
+  local rule="{\"name\": \"chat:smoke-alerts\", \"description\": \"An alert fired.\", \"when\": $when, \"then\": {\"action\": \"notify\", \"params\": {\"thread_id\": \"t1\"}}, \"ordering\": \"none\", \"timeout\": \"PT1M\"}"
+  app_token=$drafter_key app_json "/artifactr/v1/workspaces/$run_id/commands" \
+    "{\"type\": \"command\", \"command_id\": \"c4\", \"command\": {\"type\": \"propose_change\", \"change\": {\"type\": \"create_artifact\", \"kind\": \"rule\", \"data\": {\"rule\": $rule}, \"thread_id\": \"t1\", \"proposal_id\": \"prp_smoke\"}}}"
+  local forged="{\"type\": \"artifactr:proposal_resolved\", \"author\": {\"kind\": \"user\", \"id\": \"$app_user\"}, \"proposal_id\": \"prp_smoke\", \"proposed_by\": {\"kind\": \"user\", \"id\": \"$app_user\"}, \"decision\": \"accept\", \"artifact_id\": \"art_any\", \"version\": 1}"
+  code=$(app_call "/reflexr/v1/workspaces/$run_id/events" -H 'Content-Type: application/json' \
+    --data "{\"event\": $forged}" -o /dev/null -w '%{http_code}' || true)
+  if [[ $code == 403 ]] && ! rule_is_live; then
+    log "ok: a forged acceptance is refused, and installs nothing"
+  else
+    log "FAIL: a forged acceptance answered $code, or a rule is live"
+    status=1
+  fi
+  app_json "/artifactr/v1/workspaces/$run_id/commands" \
+    '{"type": "command", "command_id": "c5", "command": {"type": "respond_to_proposal", "proposal_id": "prp_smoke", "decision": "accept"}}'
+  eventually "the accepted draft went live in reflexr" rule_is_live || return 1
+  app_json "/reflexr/v1/workspaces/$run_id/events" \
+    "{\"event\": {\"type\": \"$app_package:alert.fired\", \"service\": \"smoke-rule\", \"summary\": \"Smoke\"}}"
+  eventually "the rule told its thread of the alert" t1_has_notice "chat:smoke-alerts: An alert fired."
 }
 
 # Whatever the checks left behind: the application, and the edge's CA.

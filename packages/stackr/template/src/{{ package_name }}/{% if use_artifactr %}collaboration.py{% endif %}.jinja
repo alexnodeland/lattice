@@ -31,6 +31,9 @@ from artifactr.scores import FeedbackMirror, sync_score_configs
 from artifactr.sql import SqlStorage, migrate
 from artifactr.workspace import Authorize, Hidden
 from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
+{%- if use_relayr %}
+from relayr.rules import RuleDraft
+{%- endif %}
 
 {% if access == 'grantr' -%}
 from {{ package_name }}.access import Refused
@@ -65,6 +68,7 @@ class Collaboration:
 {%- if use_relayr %}
         on_open: Called each time a workspace is opened, after the mirrors': relayr's followers.
         turn_context: Entered around each turn: relayr's Langfuse context, when Langfuse is on.
+        drafting: The notes agent's ``draft_rule``, from relayr, for rules from chat.
 {%- endif %}
     """
 
@@ -83,6 +87,7 @@ class Collaboration:
 {%- if use_relayr %}
         on_open: OnOpen | None = None,
         turn_context: TurnContext | None = None,
+        drafting: AbstractCapability[Session[None]] | None = None,
 {%- endif %}
     ) -> None:
         self._authenticate = authenticate
@@ -104,7 +109,7 @@ class Collaboration:
             SqlStorage(database.engine, row_level_security=database.row_level_security)
             if database
             else InMemoryStorage(),
-            types=[Note{% if use_relayr %}, Timeline{% endif %}],
+            types=[Note{% if use_relayr %}, Timeline, RuleDraft{% endif %}],
             authorize=authorize,
             hidden=hidden,
             on_open=opened(self._mirrors.watch if self._mirrors else None{% if use_relayr %}, on_open{% endif %}),
@@ -120,6 +125,10 @@ class Collaboration:
         ]
         if telemetry is not None:
             capabilities.append(telemetry.capability())
+{%- if use_relayr %}
+        if drafting is not None:
+            capabilities.append(drafting)
+{%- endif %}
         self.runner = Runner[None](
             build_note_agent(model, capabilities=capabilities),
             app=None,

@@ -408,7 +408,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 - [x] Phase 2: outbound adapter and loop control, in relayr; messages are idempotent by id in artifactr, so there is no read-back, and the run behind each write is recorded before it ([relayr ADR-0019](../../relayr/adr/0019-runs-act-once-through-derived-ids-and-keyed-edits.md), [ADR-0021](../../relayr/adr/0021-chains-continue-across-the-bridge.md))
 - [x] Phase 3: template option, example and smoke test ([ADR-0021](../adr/0021-the-bridge-in-the-template.md))
 - [x] Phase 4: telemetry links and tags, in relayr ([relayr ADR-0023](../../relayr/adr/0023-traces-linked-across-the-bridge.md), [ADR-0024](../../relayr/adr/0024-langfuse-sessions-tagged-with-each-other.md)); LiteLLM's metadata waits on [lattice #86](https://github.com/alexnodeland/lattice/issues/86)
-- [ ] Phase 5: rules from chat
+- [x] Phase 5: rules from chat, in relayr ([relayr ADR-0028](../../relayr/adr/0028-rules-from-chat.md)) and the template ([ADR-0024](../adr/0024-rules-from-chat-in-the-template.md))
 - [ ] Phase 6: evaluation
 - [ ] Phase 7: docs, ADRs and the product repository
 

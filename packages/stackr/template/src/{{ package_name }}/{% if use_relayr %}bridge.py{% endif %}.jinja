@@ -9,6 +9,10 @@ Outbound, rules' runs act back in artifactr as their rules' own participants, wi
 allowlist: proposals and notices by default (``incidents.py``). The ledger, in the application's
 database, holds each follower's cursor and lease, and the run behind each write, so that rules
 that answer each other stop at reflexr's depth limit.
+
+Rules from chat: the notes agent drafts a rule with ``draft_rule``, and relayr's
+``relayr:rules-from-chat`` puts it live in reflexr once a person who may accepts it
+(``chat_rules.py``).
 """
 
 import contextlib
@@ -17,31 +21,37 @@ from collections.abc import AsyncGenerator
 from fastapi import FastAPI
 
 {% if access == 'grantr' -%}
+import artifactr.core as a
 from artifactr import Workspaces
 {% endif -%}
 from artifactr.agent import TurnContext
 {%- if access == 'grantr' %}
-from grantr import Grants
+from grantr import Grants, Resource, User
 {%- endif %}
-from reflexr.workspace import Action, RunContext
+from reflexr.workspace import Action, Reaction, RunContext, with_params
 from relayr.inbound import {% if access == 'grantr' %}FOLLOWER, {% endif %}Followers
 from relayr.langfuse import bridged_run, bridged_turns
 from relayr.ledger import InMemoryLedger, Ledger
 from relayr.outbound import Outbound
+from relayr.rules import RULES_FROM_CHAT, Installer, {% if access == 'grantr' %}RuleChange, RuleDrafting{% else %}RuleDrafting, anyone{% endif %}
 from relayr.sql import SqlLedger, migrate
 
 from {{ package_name }}.automation import Automation
+from {{ package_name }}.chat_rules import ALLOWLISTS as CHAT_ALLOWLISTS
+from {{ package_name }}.chat_rules import NotifyParams, chat_rule_actions
 from {{ package_name }}.collaboration import Collaboration
 from {{ package_name }}.database import Database
-from {{ package_name }}.incidents import ALLOWLISTS, incident_actions
+from {{ package_name }}.incidents import ALLOWLISTS as INCIDENT_ALLOWLISTS
+from {{ package_name }}.incidents import RULES as INCIDENT_RULES
+from {{ package_name }}.incidents import incident_actions
 from {{ package_name }}.telemetry import TelemetryHandle
 
 
 class Bridge:
-    """relayr's followers, its outbound adapter and its ledger.
+    """relayr's followers, its outbound adapter, its rules from chat, and its ledger.
 
     ``create_app`` gives :meth:`watch` to both parts as their ``on_open``, the bridge's actions
-    to the reactor, and then :meth:`connect` s the parts.
+    to the reactor, and its drafting to the notes agent, and then :meth:`connect` s the parts.
 
     Args:
         database: The database; without one, the ledger lives in memory.
@@ -76,28 +86,59 @@ class Bridge:
         self.run_context: RunContext | None = bridged_run if langfuse else None
         """The reactor's run context: Langfuse's, with the threads and person behind a run."""
         self._followers: Followers | None = None
+        self._actions: dict[str, Action[None]] | None = None
 {%- if access == 'grantr' %}
         self._grants = grants
         self._workspaces: Workspaces | None = None
 {%- endif %}
 
-    def actions(self, collaboration: Collaboration) -> dict[str, Action[None]]:
-        """The example rules' actions, which act in artifactr through relayr's outbound adapter."""
-        outbound = Outbound(
-            collaboration.workspaces,
-            self.ledger,
-            allowlists=ALLOWLISTS,
-            runner=collaboration.runner,
-        )
-        return incident_actions(outbound, collaboration.workspaces)
+    def actions(self) -> dict[str, Action[None]]:
+        """The actions of the bridge's rules, which act in artifactr through relayr.
+
+        They act once :meth:`connect` has run, before the reactor serves: the reactor is made
+        before the parts that the actions act in, so the notes agent can draft rules for it.
+        """
+
+        async def act(reaction: Reaction[None]) -> None:
+            assert self._actions is not None, "create_app connects the bridge before it serves"
+            await self._actions[reaction.rule.then.action](reaction)
+
+        async def notify(reaction: Reaction[None], _params: NotifyParams) -> None:
+            await act(reaction)
+
+        rules = [*INCIDENT_RULES, RULES_FROM_CHAT]
+        return {
+            **{rule.then.action: act for rule in rules},
+            "notify": with_params(notify, NotifyParams),
+        }
+
+    def drafting(self, automation: Automation) -> RuleDrafting:
+        """The notes agent's ``draft_rule``, which drafts rules for ``automation``'s reflexr."""
+        return RuleDrafting(automation.workspaces, automation.events)
 
     def connect(self, collaboration: Collaboration, automation: Automation) -> None:
-        """Follow artifactr's workspaces into reflexr's."""
+        """Follow artifactr's workspaces into reflexr's, and let the rules act in artifactr."""
         tracer_provider = self._telemetry.tracer_provider if self._telemetry else None
         meter_provider = self._telemetry.meter_provider if self._telemetry else None
 {%- if access == 'grantr' %}
         self._workspaces = collaboration.workspaces
 {%- endif %}
+        outbound = Outbound(
+            collaboration.workspaces,
+            self.ledger,
+            allowlists={**INCIDENT_ALLOWLISTS, **CHAT_ALLOWLISTS},
+            runner=collaboration.runner,
+        )
+        installer = Installer(
+            outbound,
+            collaboration.workspaces,
+            may_change={% if access == 'grantr' %}self._may_change{% else %}anyone{% endif %},
+        )
+        self._actions = {
+            **incident_actions(outbound, collaboration.workspaces),
+            **chat_rule_actions(outbound),
+            **installer.actions,
+        }
         self._followers = Followers(
             collaboration.workspaces,
             automation.workspaces,
@@ -133,6 +174,14 @@ class Bridge:
             await self._followers.aclose()
 
 {%- if access == 'grantr' %}
+
+    async def _may_change(
+        self, tenant_id: str, workspace_id: str, person: a.UserActor, change: RuleChange
+    ) -> bool:
+        """Whether grantr lets a person make a change to the workspace's stored rules."""
+        workspace = Resource(kind="workspace", workspace=workspace_id)
+        action = f"reflexr:{change}"
+        return await self._grants.check(tenant_id, User(id=person.id), action, workspace)
 
     async def _follow_every_tenant(self) -> None:
         workspaces = self._workspaces

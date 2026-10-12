@@ -1,0 +1,20 @@
+meta {
+  name: Read the stored rule
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/workspaces/{{workspace}}/rules/team:checkout-deploys
+  body: none
+  auth: none
+}
+
+tests {
+  test("it is stored, with its provenance", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.origin).to.equal("stored");
+    expect(res.body.version).to.equal(1);
+    expect(res.body.provenance).to.eql({ requested_by: "alice" });
+  });
+}

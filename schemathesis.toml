@@ -1,0 +1,27 @@
+# Schemathesis, as the `api` tasks run it (scripts/api, lattice ADR-0015). A server error, and every
+# check not turned off here, fails.
+
+[generation]
+# PostgreSQL can't store a NUL byte, and the libraries don't refuse one yet (#67).
+allow-x00 = false
+
+[checks]
+# The routers don't document their rejections yet (#66).
+status_code_conformance.enabled = false
+response_schema_conformance.enabled = false
+# Starlette's 405 names only the first matching route's methods in `Allow`.
+allow_header_conformance.enabled = false
+
+# A command's or an event's `type` has a default, so the document doesn't require it, but the
+# discriminator does: a body without one is refused (#66).
+[[operations]]
+include-method = "POST"
+include-path-regex = "/(commands|events)$"
+checks.positive_data_acceptance.enabled = false
+
+# These take string ids in their query, and a value Schemathesis means as a boolean or a number,
+# such as `true`, is a valid string id.
+[[operations]]
+include-method = "GET"
+include-path-regex = "/(artifacts|events|runs|dead-letters)$"
+checks.negative_data_rejection.enabled = false

@@ -1,0 +1,18 @@
+meta {
+  name: List the schedules
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{baseUrl}}/schedules
+  body: none
+  auth: none
+}
+
+tests {
+  test("oncall's heartbeat check", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.map((s) => s.name)).to.include("heartbeat-check");
+  });
+}

@@ -1,0 +1,18 @@
+meta {
+  name: List the threads
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/workspaces/{{workspace}}/threads
+  body: none
+  auth: none
+}
+
+tests {
+  test("the thread is listed", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.map((t) => t.id)).to.include(bru.getEnvVar("thread"));
+  });
+}

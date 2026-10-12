@@ -1,0 +1,9 @@
+docs {
+  reflexr's REST surface, as oncall serves it at /v1 (lattice ADR-0015). oncall trusts the x-user
+  header, so every request names its user. `moon run reflexr:api` starts oncall, runs this
+  collection and Schemathesis against it, and stops it.
+}
+
+headers {
+  x-user: alice
+}

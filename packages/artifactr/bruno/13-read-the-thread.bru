@@ -1,0 +1,19 @@
+meta {
+  name: Read the thread
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/workspaces/{{workspace}}/threads/{{thread}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("its title and mode", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.title).to.equal("Launch");
+    expect(res.body.mode).to.equal("edit");
+  });
+}

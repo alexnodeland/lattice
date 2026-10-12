@@ -1,0 +1,18 @@
+meta {
+  name: List the artifacts
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/workspaces/{{workspace}}/artifacts?kind=doc
+  body: none
+  auth: none
+}
+
+tests {
+  test("the doc is listed", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.map((a) => a.id)).to.include(bru.getEnvVar("doc"));
+  });
+}

@@ -1,0 +1,30 @@
+meta {
+  name: Publishing it again is a duplicate
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/workspaces/{{workspace}}/events
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "event": {
+      "type": "oncall:alert.fired",
+      "service": "checkout",
+      "severity": 8,
+      "message": "p99 latency is up"
+    },
+    "id": "evt_acceptance_alert"
+  }
+}
+
+tests {
+  test("nothing is appended", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body[0].duplicate).to.equal(true);
+  });
+}

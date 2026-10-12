@@ -1,0 +1,20 @@
+meta {
+  name: Read the log's tail
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/workspaces/{{workspace}}/events?last=3
+  body: none
+  auth: none
+}
+
+tests {
+  test("the last three envelopes, oldest first", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body).to.have.lengthOf(3);
+    const seqs = res.body.map((e) => e.seq);
+    expect(seqs).to.eql([...seqs].sort((a, b) => a - b));
+  });
+}

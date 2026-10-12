@@ -1,0 +1,31 @@
+meta {
+  name: Post a notice
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/workspaces/{{workspace}}/commands
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "type": "command",
+    "command_id": "post-notice",
+    "command": {
+      "type": "post_message",
+      "thread_id": "{{thread}}",
+      "content": "Deployed.",
+      "kind": "notice"
+    }
+  }
+}
+
+tests {
+  test("it starts no run", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.outcome.run_id).to.equal(null);
+  });
+}

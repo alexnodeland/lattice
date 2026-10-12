@@ -44,16 +44,17 @@ The packages' own tasks:
 
 | Task | What it does |
 |---|---|
-| `artifactr:schema`, `reflexr:schema` | Regenerate the protocol's JSON Schemas from the models (a test fails if they drift) |
+| `artifactr:schema`, `reflexr:schema` | Regenerate the protocol's JSON Schemas from the models, and the REST surface's OpenAPI document from the router (a test fails if they drift) |
 | `grantr:schema` | Regenerate the admin API's OpenAPI document from the router (a test fails if it drifts) |
 | `artifactr:dashboards`, `reflexr:dashboards` | Regenerate the Grafana dashboards in `deploy/grafana/dashboards/` (a test fails if they drift) |
 | `artifactr:pg-up`, `reflexr:pg-up`, `grantr:pg-up`, `relayr:pg-up` | Start PostgreSQL for the SQL tests, from the package's `compose.yaml` |
 | `artifactr:test-pg`, `reflexr:test-pg`, `grantr:test-pg`, `relayr:test-pg` | Run the tests on PostgreSQL as well as SQLite |
 | `artifactr:app-up`, `reflexr:app-up` | Build and start the reference implementation on PostgreSQL, at <http://localhost:8000> |
 | `artifactr:pg-down`, `reflexr:pg-down`, `grantr:pg-down`, `relayr:pg-down` | Stop the package's contributor stack |
+| `artifactr:api`, `reflexr:api` | Start the reference implementation on PostgreSQL, run the package's Bruno collection and Schemathesis against it, and stop it, as CI's Acceptance job does. It needs Docker |
 | `docplan:image`, `oncall:image` | Build the reference implementation's image from the root, start it on PostgreSQL and stop it, as CI's Images job does |
 | `lattice:knip` | Find unused files, exports and dependencies in the web packages |
-| `lattice:api` | Find the breaks the branch adds to the packages' public APIs, against their last releases |
+| `lattice:breaks` | Find the breaks the branch adds to the packages' public APIs, against their last releases |
 | `lattice:docs` | Build the documentation site in strict mode, and check that its lists rendered |
 | `lattice:docs-serve` | Serve the documentation site with live reload at <http://localhost:8000> |
 
@@ -104,7 +105,7 @@ fix(gateway): reach local model servers through host.docker.internal
 docs(adr): record the documentation tooling decision
 ```
 
-Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`. Scopes are a package's module or area names, as each package used them before (`core`, `workspace`, `mcp`, `scores`, `template`, ...); the paths a commit touches say which packages it belongs to. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The `Title` check compares each package's public API with its last release, through griffe, and fails on a break the pull request adds that neither the title nor the description marks; `moon run lattice:api` shows the same breaks locally ([lattice ADR-0012][lattice-adr-0012]).
+Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`. Scopes are a package's module or area names, as each package used them before (`core`, `workspace`, `mcp`, `scores`, `template`, ...); the paths a commit touches say which packages it belongs to. Mark breaking changes with `!` (`feat(core)!: ...`) and a `BREAKING CHANGE:` footer. The `Title` check compares each package's public API with its last release, through griffe, and fails on a break the pull request adds that neither the title nor the description marks; `moon run lattice:breaks` shows the same breaks locally ([lattice ADR-0012][lattice-adr-0012]).
 
 Each package's `CHANGELOG.md` is written from these messages by release-please, which keeps a release pull request open with what is pending. Don't edit a `CHANGELOG.md` by hand.
 

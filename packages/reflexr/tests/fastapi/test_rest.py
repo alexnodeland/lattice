@@ -97,6 +97,9 @@ async def test_reads_filter_the_log_and_list_rules_runs_and_schedules(app: App) 
         "dead_letters": 0,
     }
     [done] = (await client.get("/workspaces/prod/runs", params={"rule": "app:spike"})).json()
+    for limit in (-1, 2**63):  # what the document states: as many as storage holds
+        refused = await client.get("/workspaces/prod/runs", params={"limit": limit})
+        assert refused.status_code == 422
     assert (done["status"], done["output"]) == ("succeeded", {"paged": "auth"})
     fetched = await client.get(f"/workspaces/prod/runs/{done['id']}")
     assert fetched.json()["id"] == done["id"]

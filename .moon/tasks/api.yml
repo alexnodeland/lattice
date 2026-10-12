@@ -1,0 +1,23 @@
+# The task of every project tagged `api`: a library with a REST surface, whose acceptance tests run
+# against its reference application (stackr RFC-0003, lattice ADR-0015). The Acceptance job runs it
+# in each affected project; it needs Docker. Each run is a compose project of its own, on ports the
+# system picks, so the two run side by side, and beside the image tasks. The root's pyproject.toml
+# and uv.lock are inputs of every Python project's tasks.
+inheritedBy:
+  tag: 'api'
+
+tasks:
+  api:
+    description: "Start the reference application, and run the Bruno collection and Schemathesis against it"
+    command: '$workspaceRoot/scripts/api $API_SERVICE'
+    inputs:
+      - '**/*'
+      - '/scripts/api'
+      - '/schemathesis.toml'
+      - '/package.json'
+      - '/bun.lock'
+      - '/packages/evalr/src/**/*'
+    env:
+      # The reference applications' agents run on pydantic-ai's test model: no provider is called.
+      DOCPLAN_MODEL: 'test'
+      ONCALL_MODEL: 'test'

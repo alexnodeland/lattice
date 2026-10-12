@@ -28,6 +28,7 @@ from reflexr.core import (
 from reflexr.fastapi.stream import Stream
 from reflexr.telemetry import actor_attributes, workspace_attributes
 from reflexr.workspace import (
+    MAX_COUNT,
     RuleStatus,
     Schedule,
     ScheduleStatus,
@@ -48,6 +49,10 @@ STATUS_CODES: dict[str, int] = {
     "unsupported_protocol": 400,
 }
 """The HTTP status for each rejection ``type``."""
+
+
+Count = Annotated[int, Query(ge=0, le=MAX_COUNT)]
+"""A ``seq`` or a count in a query: as many as storage holds, which the document states."""
 
 
 class Unauthorized(Exception):
@@ -148,10 +153,10 @@ def reflexr_router(
 
     @router.get("/workspaces/{workspace_id}/events")
     async def list_events(
-        after_seq: int = 0,
-        before_seq: int | None = None,
-        limit: int | None = None,
-        last: int | None = None,
+        after_seq: Count = 0,
+        before_seq: Count | None = None,
+        limit: Count | None = None,
+        last: Count | None = None,
         type: Annotated[list[str] | None, Query()] = None,
         workspace: Workspace = current_workspace,
     ) -> list[Envelope]:
@@ -179,7 +184,7 @@ def reflexr_router(
         A status is the rule's origin, a stored rule's version, whether the rule is enabled,
         and its cursor, lag, generation and dead letters.
         """
-        return await workspace.rule_statuses()
+        return await _or_http(workspace.rule_statuses())
 
     @router.get("/workspaces/{workspace_id}/rules/{rule}")
     async def get_rule(rule: RuleName, workspace: Workspace = current_workspace) -> WorkspaceRule:
@@ -191,11 +196,13 @@ def reflexr_router(
         rule: RuleName | None = None,
         scope_key: str | None = None,
         status: RunStatus | None = None,
-        limit: int | None = None,
+        limit: Count | None = None,
         workspace: Workspace = current_workspace,
     ) -> list[Run]:
         """Return runs, newest first."""
-        return await workspace.runs(rule=rule, scope_key=scope_key, status=status, limit=limit)
+        return await _or_http(
+            workspace.runs(rule=rule, scope_key=scope_key, status=status, limit=limit)
+        )
 
     @router.get("/workspaces/{workspace_id}/runs/{run_id}")
     async def get_run(run_id: str, workspace: Workspace = current_workspace) -> Run:
@@ -207,7 +214,7 @@ def reflexr_router(
         rule: RuleName | None = None, workspace: Workspace = current_workspace
     ) -> list[EvaluationError]:
         """Return the envelopes rules could not evaluate, oldest first."""
-        return await workspace.dead_letters(rule=rule)
+        return await _or_http(workspace.dead_letters(rule=rule))
 
     @router.get("/schedules")
     async def list_schedules(request: Request) -> list[Schedule]:
@@ -224,7 +231,7 @@ def reflexr_router(
         workspace: Workspace = current_workspace,
     ) -> list[ScheduleStatus]:
         """Return when each schedule targeting this workspace last ticked and ticks next."""
-        return await workspace.schedule_statuses()
+        return await _or_http(workspace.schedule_statuses())
 
     @router.websocket("/workspaces/{workspace_id}/stream")
     async def stream(websocket: WebSocket, workspace_id: WorkspaceId) -> None:

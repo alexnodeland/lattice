@@ -1,0 +1,34 @@
+meta {
+  name: Post a message
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/workspaces/{{workspace}}/commands
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "type": "command",
+    "command_id": "post-message",
+    "command": {
+      "type": "post_message",
+      "thread_id": "{{thread}}",
+      "content": "Summarize the doc."
+    }
+  }
+}
+
+vars:post-response {
+  run: res.body.outcome.run_id
+}
+
+tests {
+  test("it starts a run", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.outcome.run_id).to.be.a("string");
+  });
+}

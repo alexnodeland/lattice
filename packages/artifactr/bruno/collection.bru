@@ -1,0 +1,9 @@
+docs {
+  artifactr's REST surface, as docplan serves it at /v1 (lattice ADR-0015). docplan trusts the
+  x-user header, so every request names its user. `moon run artifactr:api` starts docplan, runs
+  this collection and Schemathesis against it, and stops it.
+}
+
+headers {
+  x-user: alice
+}

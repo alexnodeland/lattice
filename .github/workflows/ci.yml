@@ -107,6 +107,37 @@ jobs:
           auto-install: true
       - run: uv run --no-project python scripts/affected.py image
 
+  # Each library's acceptance tests, against its reference application (stackr RFC-0003's phase 5,
+  # lattice ADR-0015): its `api` task starts docplan or oncall from the package's compose.yaml,
+  # runs the package's Bruno collection and Schemathesis over its committed OpenAPI document, and
+  # stops it. It runs when the library, its application or the tools change.
+  acceptance:
+    name: Acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+        with:
+          auto-install: true
+      # scripts/api installs Schemathesis itself, with `uv run --group acceptance`, only when a
+      # library is affected.
+      - run: bun install --frozen-lockfile
+      - run: uv run --no-project python scripts/affected.py api
+      # Schemathesis's JUnit report for each library, to read what failed.
+      - name: Upload the reports
+        if: failure() && hashFiles('.api-reports/**') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: acceptance-reports
+          path: .api-reports/
+          retention-days: 7
+
   # Each variant of the application template, generated and checked as its own CI would: lint,
   # strict types, and the tests with 100% coverage. It installs the libraries from the checkout, so
   # it runs when stackr or a library changes, and checks the two together (stackr ADR-0018). The
@@ -231,7 +262,7 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [check, tests, images, template, smoke, dependency-review, osv]
+    needs: [check, tests, images, acceptance, template, smoke, dependency-review, osv]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}

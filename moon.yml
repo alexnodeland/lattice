@@ -63,9 +63,9 @@ tasks:
     preset: 'server'
 
   # Not part of check: the Title check runs it, with the pull request's title and description.
-  api:
+  breaks:
     description: "Find the breaks the branch adds to the packages' public APIs, against their last releases"
-    command: 'uv run python scripts/api.py origin/main'
+    command: 'uv run python scripts/breaks.py origin/main'
     options:
       cache: false
       runInCI: false

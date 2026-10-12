@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6.41.0/schema.json",
   "moonrepo": true,
-  "ignoreBinaries": ["noop", "uv"]
+  "ignoreBinaries": ["noop", "uv"],
+  "ignoreDependencies": ["@usebruno/cli"]
 }

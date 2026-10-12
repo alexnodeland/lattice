@@ -1,0 +1,30 @@
+meta {
+  name: Replay a rule
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/workspaces/{{workspace}}/commands
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "type": "command",
+    "command_id": "replay-triage",
+    "command": {
+      "type": "replay_rule",
+      "rule": "oncall:triage"
+    }
+  }
+}
+
+tests {
+  test("its progress, from the start", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.outcome.type).to.equal("rule");
+    expect(res.body.outcome.rule).to.equal("oncall:triage");
+  });
+}

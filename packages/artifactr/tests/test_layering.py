@@ -45,9 +45,10 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"artifactr.core", "artifactr.telemetry", "artifactr.workspace", "artifactr.scores"},
         {"pydantic", "evalr.core"},
     ),
+    # The OpenAPI document's bare application gives its runner an agent, which never runs.
     "fastapi": (
         {*INNER, "artifactr.fastapi"},
-        {"fastapi", "starlette", "pydantic", *OTEL_API},
+        {"fastapi", "starlette", "pydantic", "pydantic_ai", *OTEL_API},
     ),
     "mcp": ({*INNER, "artifactr.mcp"}, {"mcp", "starlette", "pydantic", *OTEL_API}),
     # The OpenTelemetry SDK adapter; it imports FastAPI and SQLAlchemy only to instrument them.

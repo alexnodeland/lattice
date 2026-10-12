@@ -444,13 +444,20 @@ async def test_reading_passes_the_window_filter_and_tail_to_storage(
         ({"before_seq": -1}, "before_seq cannot be negative"),
         ({"limit": -1}, "limit cannot be negative"),
         ({"last": -1}, "last cannot be negative"),
+        ({"after_seq": 2**63}, f"after_seq cannot be more than {2**63 - 1}"),  # PostgreSQL's
     ],
 )
-async def test_a_read_takes_limit_or_last_and_no_negative_numbers(
+async def test_a_read_takes_limit_or_last_and_numbers_storage_holds(
     workspace: Workspace, options: dict[str, Any], message: str
 ) -> None:
     with pytest.raises(ValidationFailed, match=message):
         await workspace.read(**options)
+
+
+async def test_runs_are_listed_to_a_limit_storage_holds(workspace: Workspace) -> None:
+    for limit, message in ((-1, "limit cannot be negative"), (2**63, "limit cannot be more than")):
+        with pytest.raises(ValidationFailed, match=message):
+            await workspace.runs(limit=limit)
 
 
 async def test_handles_are_scoped_to_their_tenant(workspaces: Workspaces) -> None:

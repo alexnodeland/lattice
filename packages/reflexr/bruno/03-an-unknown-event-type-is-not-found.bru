@@ -1,0 +1,26 @@
+meta {
+  name: An unknown event type is not found
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/workspaces/{{workspace}}/events
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "event": {
+      "type": "oncall:nope"
+    }
+  }
+}
+
+tests {
+  test("404, with the rejection", function () {
+    expect(res.status).to.equal(404);
+    expect(res.body.detail.type).to.equal("not_found");
+  });
+}

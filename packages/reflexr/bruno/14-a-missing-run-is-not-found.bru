@@ -1,0 +1,18 @@
+meta {
+  name: A missing run is not found
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/workspaces/{{workspace}}/runs/run_missing
+  body: none
+  auth: none
+}
+
+tests {
+  test("404, with the rejection", function () {
+    expect(res.status).to.equal(404);
+    expect(res.body.detail.type).to.equal("not_found");
+  });
+}

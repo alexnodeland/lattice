@@ -61,13 +61,14 @@ class Recorder:
 
     def __init__(self) -> None:
         self.asked: list[tuple[str, WorkspaceId | None, Access]] = []
+        self.refused: frozenset[str] = frozenset()
 
     async def __call__(
         self, tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
     ) -> bool:
         assert tenant_id == TENANT
         self.asked.append((actor.participant, workspace_id, access))
-        return True
+        return access.action not in self.refused
 
     def actions(self) -> list[str]:
         return [access.action for _, _, access in self.asked]
@@ -343,6 +344,21 @@ def test_every_route_asks_for_the_actions_of_the_methods_it_calls(
         workspace = None if "{workspace_id}" not in path else WORKSPACE
         opened = [] if workspace is None else ["reflexr:open"]
         assert recorder.by(ADA, workspace) == [*opened, *actions], (method, path)
+
+
+def test_every_route_answers_a_refusal_with_403(client: TestClient, recorder: Recorder) -> None:
+    recorder.refused = ACTIONS - {"reflexr:open"}
+    for (method, path), (last, _) in ROUTES.items():
+        url = path.replace("{workspace_id}", WORKSPACE)
+        url = url[: url.rfind("{")] + last if last else url
+        if method == "POST":
+            body: dict[str, Any] = {"event": DEPLOY}
+            if path.endswith("commands"):
+                body = {"type": "command", "command_id": "c1", "command": {"type": "publish"}}
+                body["command"] |= {"event": DEPLOY}
+            assert client.post(url, json=body).status_code == 403, url
+        elif method == "GET":
+            assert client.get(url).status_code == 403, url
 
 
 def test_every_websocket_command_asks_for_the_action_its_type_names(

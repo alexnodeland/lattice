@@ -8,8 +8,8 @@ this checkout, working tree included, under the name in NAME, and checks each on
 
 - every Jinja expression was rendered: nothing is left of `{{ ... }}` or `{% ... %}`, apart
   from GitHub Actions' own `${{ ... }}`
-- the libraries come from lattice, each from its own directory, all at one commit: the one the
-  variant was rendered from (ADR-0018)
+- the libraries' sources are exactly the ones the variant needs, each from its own directory of
+  lattice's packages/, at the commit the variant was rendered from (ADR-0018)
 - the Python is formatted and passes lint, with the generated project's own ruff settings
 - the YAML passes yamllint, and the shell scripts shellcheck
 - the Compose file is valid for the app profile
@@ -40,6 +40,8 @@ LEFTOVER = re.compile(r"(?<!\$)\{\{|\{%|%\}")
 TEXT = {".py", ".toml", ".yaml", ".yml", ".md", ".json", ".sh", ".example", ""}
 ANSWERS = ".copier-answers.yml"
 REPOSITORY = "https://github.com/alexnodeland/lattice"
+DIRECTORIES = {"artifactr-ai": "artifactr", "reflexr": "reflexr", "evalr": "evalr"}
+"""Each library's distribution, and its directory in lattice's packages/."""
 NAME = "Acme Template Check At Max Len"
 """The name every variant is rendered with: its slug is 30 characters, the longest Copier
 accepts, and its package sorts before `conftest`, so line lengths and import order are
@@ -63,16 +65,27 @@ def render(libraries: str, evals: bool, destination: Path) -> str:
     return str(worker.template.commit_hash)
 
 
-def check_sources(app: Path, commit: str) -> list[str]:
-    """Check that the libraries come from lattice's packages/, at the rendered commit."""
+def expected_sources(libraries: str, evals: bool, commit: str) -> dict[str, dict[str, str]]:
+    """The `[tool.uv.sources]` a variant needs: each library it uses, from its directory of
+    lattice's packages/, at the commit it was rendered from."""
+    used = {
+        "artifactr-ai": libraries in {"artifactr", "both"},
+        "reflexr": libraries in {"reflexr", "both"},
+        "evalr": evals,
+    }
+    return {
+        name: {"git": REPOSITORY, "subdirectory": f"packages/{DIRECTORIES[name]}", "rev": commit}
+        for name, uses in used.items()
+        if uses
+    }
+
+
+def check_sources(app: Path, expected: dict[str, dict[str, str]]) -> list[str]:
+    """Check that the libraries' sources are exactly the ones the variant needs."""
     sources = tomllib.loads((app / "pyproject.toml").read_text())["tool"]["uv"]["sources"]
-    return [
-        f"pyproject.toml: {name} isn't packages/<library> at {commit}: {source}"
-        for name, source in sources.items()
-        if source.get("git") != REPOSITORY
-        or not str(source.get("subdirectory")).startswith("packages/")
-        or source.get("rev") != commit
-    ]
+    if sources == expected:
+        return []
+    return [f"pyproject.toml: [tool.uv.sources] is {sources}, not {expected}"]
 
 
 def run(label: str, command: list[str], cwd: Path) -> list[str]:
@@ -83,9 +96,9 @@ def run(label: str, command: list[str], cwd: Path) -> list[str]:
     return [f"{label}:\n{done.stdout}{done.stderr}".rstrip()]
 
 
-def check(app: Path, commit: str) -> list[str]:
-    """Check one rendered application; return the problems found."""
-    problems = check_sources(app, commit)
+def check(app: Path, sources: dict[str, dict[str, str]]) -> list[str]:
+    """Check one rendered application, which needs these sources; return the problems found."""
+    problems = check_sources(app, sources)
     files = [p for p in app.rglob("*") if p.is_file() and ".git" not in p.parts]
     for path in files:
         if path.suffix in TEXT or path.name.startswith("."):
@@ -117,7 +130,7 @@ def main() -> int:
             name = f"{libraries}{'-evals' if evals else ''}"
             app = base / name
             commit = render(libraries, evals, app)
-            problems = check(app, commit)
+            problems = check(app, expected_sources(libraries, evals, commit))
             for problem in problems:
                 print(f"FAIL: {name}: {problem}", file=sys.stderr)
             if problems:

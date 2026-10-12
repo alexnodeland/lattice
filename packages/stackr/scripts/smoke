@@ -21,12 +21,14 @@
 # the template (both libraries, with evals) runs in its app profile beside the
 # stack. Its image installs the libraries from GitHub at the commit it was
 # rendered from, HEAD, as an application generated from lattice does, so HEAD
-# must be pushed: in CI, it is the pull request's merge commit. A request without a token is refused. A user signed in with local
-# Supabase Auth sends a message (artifactr) and opens a ticket (reflexr); each
-# starts an agent whose model request goes through the gateway on a
-# stackr-smoke key, mocked so no provider is called. Each agent's trace, with
-# the gateway's spans in it, is in Tempo and Langfuse, and the application's
-# metrics are in Prometheus.
+# must be pushed and the working tree clean: Copier renders uncommitted
+# changes from a commit of its own, which GitHub doesn't have. In CI, HEAD is
+# the pull request's merge commit. A request without a token is refused. A
+# user signed in with local Supabase Auth sends a message (artifactr) and
+# opens a ticket (reflexr); each starts an agent whose model request goes
+# through the gateway on a stackr-smoke key, mocked so no provider is called.
+# Each agent's trace, with the gateway's spans in it, is in Tempo and
+# Langfuse, and the application's metrics are in Prometheus.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -376,7 +378,7 @@ smoke_app() {
   if ! uv run copier copy --quiet --defaults --vcs-ref HEAD --data project_name="stackr smoke app" \
     --data libraries=both --data evals=true ../.. "$app_dir" 2>/dev/null ||
     ! uv lock --quiet --directory "$app_dir"; then
-    log "FAIL: app: generating it from the template, with the libraries at HEAD, which must be pushed"
+    log "FAIL: app: generating it from the template, with the libraries at HEAD, which must be pushed, with a clean working tree"
     return 1
   fi
 

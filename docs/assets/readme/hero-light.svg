@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="400" viewBox="0 0 1280 400" role="img" aria-labelledby="title">
 <title id="title">lattice: libraries for apps where people and agents work together, and the stack they run on</title>
+<desc>lattice's banner: its wordmark, its tagline, and its mark, a cell of the lattice, whose eight strokes drop into place once.</desc>
 <style>
   .cell { animation: drop 900ms cubic-bezier(.2,.8,.2,1) both; transform-box: fill-box; transform-origin: center; }
   .cell:nth-of-type(2) { animation-delay: 90ms; } .cell:nth-of-type(3) { animation-delay: 180ms; } .cell:nth-of-type(4) { animation-delay: 270ms; }

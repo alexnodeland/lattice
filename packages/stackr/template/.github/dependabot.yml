@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # The Python dependencies in uv.lock. The family's libraries are pinned to git revisions in
+  # The Python dependencies in uv.lock. lattice's libraries are pinned to git revisions in
   # pyproject.toml, which change with `copier update` or by hand.
   - package-ecosystem: uv
     directory: /

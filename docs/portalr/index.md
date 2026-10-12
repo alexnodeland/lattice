@@ -1,6 +1,6 @@
 ---
 title: portalr
-description: The planned portal into an application built on the family, with an app UI to chat with its agents and see their work, and an admin UI to manage access and see feedback, evaluations, usage and spend.
+description: The planned portal into an application built on lattice, with an app UI to chat with its agents and see their work, and an admin UI to manage access and see feedback, evaluations, usage and spend.
 hide:
   - navigation
 ---
@@ -12,7 +12,7 @@ hide:
 ![portalr](assets/brand/lockup-light.svg#gh-light-mode-only)
 ![portalr](assets/brand/lockup-dark.svg#gh-dark-mode-only)
 
-The planned portal into an application built on the family: an `app` UI for the people who use it, to chat with its agents and see their artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and see feedback, evaluations, usage and spend.
+The planned portal into an application built on lattice: an `app` UI for the people who use it, to chat with its agents and see their artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and see feedback, evaluations, usage and spend.
 
 </div>
 
@@ -20,9 +20,9 @@ The planned portal into an application built on the family: an `app` UI for the 
 
     Built so far: its decisions and [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md), the Bun workspace, its brand with `ui`'s tokens and first primitives, the typed `client`, and the router with its readers, tested against the stack's tools for two tenants, and the app's sign-in and its tenant and workspace pickers, as its [architecture](architecture.md) describes. The app's areas and the admin UI come with the plan's later phases.
 
-## Why: the family has no face
+## Why: lattice has no face
 
-Every surface in the family is an API, a WebSocket or an MCP server, so an application built on it has to build its own UI before anyone can use it. Running one is blind without an admin UI: granting access, reviewing proposals, seeing what users thought of the agent and what each tenant spends all need one, and grantr's model is only usable through one.
+Every surface in lattice is an API, a WebSocket or an MCP server, so an application built on it has to build its own UI before anyone can use it. Running one is blind without an admin UI: granting access, reviewing proposals, seeing what users thought of the agent and what each tenant spends all need one, and grantr's model is only usable through one.
 
 [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md) designs that UI once, and portalr is where it is built.
 

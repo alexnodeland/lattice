@@ -1,10 +1,10 @@
 # Architecture
 
-> **Status:** lattice has held the family's packages since 2026-09-30, as [stackr RFC-0003](stackr/rfcs/0003-one-repository-lattice.md) designed; its phases 1 and 2 are done. This document is evergreen: it describes lattice as it is, and is updated in the same pull request as what it describes. The family's decisions are recorded in [`adr/`](adr/README.md), and each package's in its own section. RFC-0003 is the design, and its [Tracking section](stackr/rfcs/0003-one-repository-lattice.md#tracking) lists where lattice departed from it.
+> **Status:** lattice has held the packages since 2026-09-30, as [stackr RFC-0003](stackr/rfcs/0003-one-repository-lattice.md) designed; its phases 1 and 2 are done. This document is evergreen: it describes lattice as it is, and is updated in the same pull request as what it describes. lattice's decisions are recorded in [`adr/`](adr/README.md), and each package's in its own section. RFC-0003 is the design, and its [Tracking section](stackr/rfcs/0003-one-repository-lattice.md#tracking) lists where lattice departed from it.
 
 ## What lattice is
 
-lattice is the family's one repository: seven packages, two reference implementations, and one set of tools that checks, releases and documents them. It holds the packages, and changes nothing about what they are downstream. Each keeps its name, `pyproject.toml`, version, dependencies, extras, tests, 100% coverage gate, ADRs, RFCs, changelog and releases, and each installs on its own.
+lattice is one repository: seven packages, two reference implementations, and one set of tools that checks, releases and documents them. It holds the packages, and changes nothing about what they are downstream. Each keeps its name, `pyproject.toml`, version, dependencies, extras, tests, 100% coverage gate, ADRs, RFCs, changelog and releases, and each installs on its own.
 
 ### Goals
 
@@ -33,13 +33,13 @@ lattice/
 ├── examples/
 │   ├── docplan/         artifactr's reference implementation, and its image
 │   └── oncall/          reflexr's
-├── docs/                the site: the family's pages, and docs/<package>/ for each package
+├── docs/                the site: lattice's pages, and docs/<package>/ for each package
 ├── scripts/             affected.py, api (the acceptance tests), breaks.py, standalone.py, check_site.py, griffe_sphinx_roles.py
-├── tests/               the family's tests: the quality gates over all Python, and moon's edges
+├── tests/               lattice's tests: the quality gates over all Python, and moon's edges
 ├── .devcontainer/       the dev container
 ├── .moon/               workspace.yml, and the tasks projects inherit
 ├── .github/             the workflows, issue forms and pull request template
-├── pyproject.toml       the uv workspace's root: its members, the family's tools, and the shared ruff configuration
+├── pyproject.toml       the uv workspace's root: its members, lattice's tools, and the shared ruff configuration
 ├── uv.lock              one lock for every package
 ├── package.json         the Bun workspace's root: its members, and the shared web tools
 ├── bun.lock             one lock for every web package
@@ -56,11 +56,11 @@ lattice/
 - **A package's directory holds what it ships and what builds it:** code, tests, schemas, dashboards, changelog and license. Its wheel and sdist ship its `LICENSE`; the root has the same one.
 - **Its pages are at `docs/<package>/`,** its ADRs and RFCs included, so one build makes one site ([The docs site](#the-docs-site)).
 - **The reference implementations are in `examples/`,** since uv refuses a workspace member inside another member. Each is a project of its own, with its own 100% gate.
-- **The family's documents are at the root of `docs/`:** this one, the [family's ADRs](adr/README.md), and the project pages. Outside its package, an ADR or RFC is named with it, as in "reflexr ADR-0003", and the family's as "lattice ADR-0002".
+- **lattice's documents are at the root of `docs/`:** this one, [lattice's ADRs](adr/README.md), and the project pages. Outside its package, an ADR or RFC is named with it, as in "reflexr ADR-0003", and lattice's as "lattice ADR-0002".
 
 ## The projects
 
-moon knows fourteen projects: the thirteen below, and `lattice`, the root, which holds the site and the family's own tests and scripts.
+moon knows fourteen projects: the thirteen below, and `lattice`, the root, which holds the site and lattice's own tests and scripts.
 
 | Project | Path | What it is | Kind | Depends on |
 |---|---|---|---|---|
@@ -103,7 +103,7 @@ graph TD
 
 ## The uv workspace
 
-The root `pyproject.toml` is a virtual project (`package = false`) whose members are `packages/*` and `examples/*`. It holds the family's tools, in its `dev` and `docs` dependency groups, and their shared configuration.
+The root `pyproject.toml` is a virtual project (`package = false`) whose members are `packages/*` and `examples/*`. It holds lattice's tools, in its `dev` and `docs` dependency groups, and their shared configuration.
 
 | | Where it lives |
 |---|---|
@@ -157,7 +157,7 @@ moon runs every task, and only those a change affects; uv and Bun manage the dep
 | `.moon/toolchains.yml` | JavaScript, with Bun as its package manager, Bun, and TypeScript. Every setting that would install dependencies or rewrite a `package.json` or `tsconfig.json` is off, and moon installs no Bun of its own: proto does, from `.prototools` |
 | `.moon/tasks/typescript.yml` | For every web package: `lint` (Biome), `typecheck` (`tsc`), `test` (Vitest), `build` (Vite), `format` and `check`. The root's `package.json`, `bun.lock`, `biome.json` and `tsconfig.base.json` are inputs of every task. `client` and `ui` have no `build`, and `app` and `admin` no `test` until they have code to test |
 | `<project>/moon.yml` | The project's language, layer, tags and `dependsOn`, and tasks of its own |
-| `moon.yml` | The root project, `lattice`: lint, types and tests for the root's Python and the family's tests; `docs` and `docs-serve`; `workflows`, which runs actionlint and zizmor; `knip`, over the Bun workspace; and `check`. It inherits no task, which would check every package again |
+| `moon.yml` | The root project, `lattice`: lint, types and tests for the root's Python and lattice's tests; `docs` and `docs-serve`; `workflows`, which runs actionlint and zizmor; `knip`, over the Bun workspace; and `check`. It inherits no task, which would check every package again |
 | `.prototools` | The versions of moon, uv and Bun, which CI's `moonrepo/setup-toolchain` installs, and proto anywhere else. `detect-strategy = "only-prototools"` leaves Python to uv, from `.python-version` |
 
 - **`check` is one task per project** that runs nothing itself and depends on the project's checks, so the list lives in one place. `make check` runs `moon run :check`, and CI and Nightly run the same tasks.
@@ -224,11 +224,11 @@ prek runs the hooks in `.pre-commit-config.yaml`, and `make install` installs th
 
 **One site, one build, one `mkdocs.yml`,** at [lattice.alexnodeland.com](https://lattice.alexnodeland.com).
 
-- **Zensical builds it** from `docs/`. The family's pages are at its root, and each package's at `docs/<package>/`. The `awesome-nav` plugin orders each folder by its `.nav.yml`, so each package's section keeps its own order. Each section starts at its package's home page.
+- **Zensical builds it** from `docs/`. lattice's pages are at its root, and each package's at `docs/<package>/`. The `awesome-nav` plugin orders each folder by its `.nav.yml`, so each package's section keeps its own order. Each section starts at its package's home page.
 - **The site is styled in lattice's brand** ([ADR-0001](adr/0001-lattices-brand.md), [`docs/assets/brand/`](assets/brand/README.md)), with the dark mark in the header in the dark scheme, and the site's home and each package's open with a lockup.
 - **`moon run lattice:docs` is the build:** strict, so a broken link or anchor fails it, then [`scripts/check_site.py`](https://github.com/alexnodeland/lattice/blob/main/scripts/check_site.py), which fails on a list that rendered as text. CI runs it on a pull request that changes the site's inputs, as the root project's `docs` task, and `docs.yml` deploys it from `main`, one run at a time, never cancelled.
 - **One build resolves the references between packages.** mkdocstrings reads every package from the workspace's one environment, so no package needs another's inventory. [`scripts/griffe_sphinx_roles.py`](https://github.com/alexnodeland/lattice/blob/main/scripts/griffe_sphinx_roles.py) turns artifactr's and reflexr's Sphinx roles into cross-references; evalr's and relayr's docstrings are Markdown.
-- **Pages include files instead of copying them,** by their path from the root: the family's `CONTRIBUTING.md`, code of conduct, security policy and license under `docs/project/`, each package's `CHANGELOG.md` and schemas, and the files stackr's reference pages describe, which `stackr:reference` checks the pages against.
+- **Pages include files instead of copying them,** by their path from the root: lattice's `CONTRIBUTING.md`, code of conduct, security policy and license under `docs/project/`, each package's `CHANGELOG.md` and schemas, and the files stackr's reference pages describe, which `stackr:reference` checks the pages against.
 - **Each package's README is also its PyPI page,** so its links are absolute: the site's pages, and files on GitHub.
 - **The old sites,** at `artifactr.`, `reflexr.`, `evalr.` and `stackr.alexnodeland.com`, keep serving the old pages until they are retired separately (RFC-0003, D1).
 

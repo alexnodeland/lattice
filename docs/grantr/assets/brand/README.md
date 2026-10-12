@@ -33,4 +33,4 @@ Dark gold is 7.34:1 on white and 16.49:1 on the site's dark background, `#0D1920
 
 - **Its inverted triangle is near evalr's tick.** Both arms reach the top of the grid, where the tick cuts one short; it is symmetric, where the tick leans; and the slab closes it.
 - **It borrows two siblings' shapes:** artifactr's caret, turned over, and stackr's slab.
-- **On paper its overprint is lighter than the key it crosses,** where the family's overprints are darker than both their inks.
+- **On paper its overprint is lighter than the key it crosses,** where lattice's overprints are darker than both their inks.

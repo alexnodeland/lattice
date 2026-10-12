@@ -60,13 +60,12 @@
 <polygon fill="#F1F1F6" points="14.63,25 56.63,25 54.04,30 12.04,30"/>
 <polygon fill="#F1F1F6" points="9.96,34 51.96,34 49.37,39 7.37,39"/></g>
 <text x="132" y="490" class="name" fill="#E6F3F9">stackr</text>
-<text x="132" y="514" class="cap" fill="#A0BCCB">the stack it all runs on, an application template, and hosting recipes</text>
-<text x="1216" y="490" text-anchor="end" class="label" fill="#A0BCCB">127.0.0.1 locally · a server · AWS</text>
+<text x="132" y="514" class="cap" fill="#A0BCCB">the stack it all runs on, and an application template</text>
+<text x="1216" y="490" text-anchor="end" class="label" fill="#A0BCCB">runs locally, on 127.0.0.1</text>
 <g class="pulse" style="animation-delay:0.0s"><rect x="132" y="528" width="122.80000000000001" height="28" rx="14" fill="#0F1B22" stroke="#2A3F4B"/><text x="193.4" y="547" text-anchor="middle" class="cap" fill="#E6F3F9">🐘 PostgreSQL</text></g>
 <g class="pulse" style="animation-delay:0.3s"><rect x="264.8" y="528" width="89.2" height="28" rx="14" fill="#0F1B22" stroke="#2A3F4B"/><text x="309.40000000000003" y="547" text-anchor="middle" class="cap" fill="#E6F3F9">🔐 GoTrue</text></g>
 <g class="pulse" style="animation-delay:0.6s"><rect x="364.0" y="528" width="97.60000000000001" height="28" rx="14" fill="#0F1B22" stroke="#2A3F4B"/><text x="412.8" y="547" text-anchor="middle" class="cap" fill="#E6F3F9">🧭 LiteLLM</text></g>
 <g class="pulse" style="animation-delay:0.9s"><rect x="471.6" y="528" width="148.0" height="28" rx="14" fill="#0F1B22" stroke="#2A3F4B"/><text x="545.6" y="547" text-anchor="middle" class="cap" fill="#E6F3F9">📡 OpenTelemetry</text></g>
 <g class="pulse" style="animation-delay:1.2s"><rect x="629.6" y="528" width="97.60000000000001" height="28" rx="14" fill="#0F1B22" stroke="#2A3F4B"/><text x="678.4" y="547" text-anchor="middle" class="cap" fill="#E6F3F9">📊 Grafana</text></g>
 <g class="pulse" style="animation-delay:1.5s"><rect x="737.2" y="528" width="106.0" height="28" rx="14" fill="#0F1B22" stroke="#2A3F4B"/><text x="790.2" y="547" text-anchor="middle" class="cap" fill="#E6F3F9">🔍 Langfuse</text></g>
-<g class="pulse" style="animation-delay:1.8s"><rect x="853.2" y="528" width="114.4" height="28" rx="14" fill="#0F1B22" stroke="#2A3F4B"/><text x="910.4000000000001" y="547" text-anchor="middle" class="cap" fill="#E6F3F9">☁️ OpenTofu</text></g>
 </svg>

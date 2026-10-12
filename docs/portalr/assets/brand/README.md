@@ -1,6 +1,6 @@
 # Brand
 
-[lattice ADR-0014](../../../adr/0014-portalrs-and-grantrs-marks.md) records portalr's identity. It prints in cyan, magenta and yellow together, the full-colour proof, and its mark is lattice's cell with one side open: a window onto the lattice the family is drawn on, opened. Where two sides cross is its overprint, a violet, which is its working colour. The mark has two versions: `app`'s opens to the upper right, outward, and `admin`'s to the lower left. [`tokens.json`](tokens.json) holds its colours, and `ui`'s `tokens.css` holds them as CSS custom properties: the inks as `--portalr-*`, and the roles the components use, such as `--accent` and `--focus`, under brand-neutral names.
+[lattice ADR-0014](../../../adr/0014-portalrs-and-grantrs-marks.md) records portalr's identity. It prints in cyan, magenta and yellow together, the full-colour proof, and its mark is lattice's cell with one side open: a window onto the lattice every mark is drawn on, opened. Where two sides cross is its overprint, a violet, which is its working colour. The mark has two versions: `app`'s opens to the upper right, outward, and `admin`'s to the lower left. [`tokens.json`](tokens.json) holds its colours, and `ui`'s `tokens.css` holds them as CSS custom properties: the inks as `--portalr-*`, and the roles the components use, such as `--accent` and `--focus`, under brand-neutral names.
 
 <p>
   <img src="mark-light.svg#gh-light-mode-only" width="96" alt="portalr's mark, for app">
@@ -37,6 +37,6 @@ Violet is 8.27:1 on white and 12.06:1 on the site's dark background, `#0D1920`; 
 
 ## Known weaknesses
 
-- **It reads as lattice's child,** which suits the portal onto the family. Three inks, an open side and violet overlaps keep it apart from lattice's one-ink, closed cell, but at 16 pixels it reads as a broken ring before it reads as a window.
+- **It reads as lattice's child,** which suits the portal onto lattice. Three inks, an open side and violet overlaps keep it apart from lattice's one-ink, closed cell, but at 16 pixels it reads as a broken ring before it reads as a window.
 - **Its violet is a step from artifactr's indigo,** lighter and redder, and the marks share no shape; in a tab strip the colours are close.
 - **Its open ends keep lattice's points** rather than flat cuts.

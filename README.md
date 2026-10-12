@@ -27,7 +27,7 @@
 
 <p align="center">
   <b><a href="#-start-an-application">Quick start</a></b> ·
-  <b><a href="#-the-family">The family</a></b> ·
+  <b><a href="#-the-packages">The packages</a></b> ·
   <b><a href="#-how-it-fits-together">How it fits</a></b> ·
   <b><a href="https://lattice.alexnodeland.com">Docs</a></b> ·
   <b><a href="#-how-its-built">How it's built</a></b> ·
@@ -36,11 +36,11 @@
 
 ---
 
-**lattice** is a family of Python libraries for applications in which **people and agents work together**, and the stack they run on.
+**lattice** is a set of Python libraries for applications in which **people and agents work together**, and the stack they run on.
 
 - 🤝 People and agents share **versioned artifacts**. An agent proposes a change, and a person accepts it.
 - ⚡ **Rules over event streams** run agents, graphs and functions when something happens.
-- 💬 People can **draft those rules in chat**. A rule goes live only once a person allowed to install it accepts.
+- 💬 People can **draft those rules in chat** (🚧 landing now). A rule goes live only once a person allowed to install it accepts.
 - 📏 **Typed evaluations** learn from people's feedback.
 - 🔐 **Identity and access** is checked before every command and read, down to PostgreSQL's row-level security.
 - 🪟 A **portal** is where people use the application and run it.
@@ -79,15 +79,15 @@ sequenceDiagram
     L->>G: may this person install rules here?
     G-->>L: yes
     L->>R: install the rule, with its provenance
-    R-->>A: notice: the rule is live
+    L-->>A: notice: the rule is live
     Note over R,A: from now on, each alert<br/>posts a notice in the thread
 ```
 
-A forged acceptance installs nothing: relayr never trusts the event, only artifactr's record of it. A rule acts as itself, inside its own workspace, and can't post into a thread its workspace restricts. [relayr's guide](https://lattice.alexnodeland.com/relayr/guides/rules/) has the details.
+🚧 relayr's library does this today, and stackr's template is wiring it in. A forged acceptance installs nothing: relayr never trusts the event, only artifactr's record of it. A rule acts as itself, inside its own workspace, and can't post into a thread its workspace restricts. [relayr's guide](https://lattice.alexnodeland.com/relayr/guides/rules/) has the details.
 
 </details>
 
-## 🧩 The family
+## 🧩 The packages
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/family-dark.svg">
@@ -105,7 +105,7 @@ A forged acceptance installs nothing: relayr never trusts the event, only artifa
 | **[stackr](packages/stackr)** | The stack the libraries run on (Supabase or PostgreSQL, LiteLLM, OpenTelemetry, Grafana, Langfuse), an application template, and hosting recipes | ✅ template · 🚧 [hosting recipes](docs/stackr/rfcs/0004-hosting-recipes.md) |
 
 > [!NOTE]
-> **Alpha.** artifactr's [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) is the family's first release. The others will release once the family reaches v0.1. APIs may still change before 1.0.
+> **Alpha.** artifactr's [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) is lattice's first release. The others will release once lattice reaches v0.1. APIs may still change before 1.0.
 
 ## 🚀 Start an application
 
@@ -119,7 +119,7 @@ stackr's [Copier](https://copier.readthedocs.io) template generates an applicati
 - OpenTelemetry;
 - feedback as Langfuse scores;
 - evalr experiments;
-- the family's quality gates.
+- lattice's quality gates.
 
 ```bash
 uvx copier copy gh:alexnodeland/lattice my-app
@@ -192,20 +192,19 @@ uv run docplan --user alice     # in another
   <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind%20CSS-06B6D4?logo=tailwindcss&logoColor=white">
   <img alt="Bun" src="https://img.shields.io/badge/Bun-000000?logo=bun&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white">
-  <img alt="OpenTofu" src="https://img.shields.io/badge/OpenTofu-FFDA18?logo=opentofu&logoColor=black">
   <img alt="moon" src="https://img.shields.io/badge/moon-6F53F3">
 </p>
 
 ## 🧪 How it's built
 
-| | On every pull request |
+| | What holds every change |
 |:-:|---|
 | 💯 | **100% branch coverage** for every Python project, and **pyright strict** for every `src/` |
 | 🚫 | **No inline suppressions**, anywhere: no `# type: ignore`, `# noqa` or `@ts-expect-error` |
 | 🎲 | **Tests run in a random order**, with a timeout on every test and every job |
-| 🧾 | **Acceptance tests** run against the reference applications: Bruno and Schemathesis over each REST surface, and playwright-bdd scenarios for portalr's UI |
-| 🛡️ | **CodeQL** over the Python and the TypeScript, **osv-scanner** and dependency review, and **OpenSSF Scorecard** every week |
-| 🔍 | **The Title check** compares each package's public API with its last release, so a breaking change must say so |
+| 🧾 | **Acceptance tests** run against the reference applications: Bruno collections for artifactr's, reflexr's and portalr's APIs, Schemathesis over their OpenAPI documents, and playwright-bdd scenarios for portalr's UI |
+| 🛡️ | **CodeQL** over the Python and the TypeScript, and **osv-scanner** and dependency review, on every pull request; **OpenSSF Scorecard** every week |
+| 🔍 | **The Title check** compares each released package's public API with its last release, so a breaking change must say so |
 | 🚦 | **A merge queue** brings each reviewed pull request up to date and checks it again before it merges |
 | 🤖 | **Renovate** keeps dependencies current, and **release-please** writes each package's changelog from its commits |
 | 📜 | **Every decision is written down**: changes start as RFCs, and each decision is an ADR, in each package's documentation section |
@@ -227,8 +226,8 @@ moon runs every task, from any directory, and only what a change affects: `moon 
 
 The documentation site is at **<https://lattice.alexnodeland.com>**, with a section per package: getting started, guides, reference, architecture, decisions and RFCs. It's built from [`docs/`](docs) on every push to `main`. To serve it locally at <http://127.0.0.1:8000>, run `moon run lattice:docs-serve`.
 
-- 🏛️ [Architecture](docs/architecture.md) explains how the family fits together in one repository. The [family's decisions](docs/adr/README.md) are its ADRs.
-- 🗺️ [The family's RFCs](docs/rfcs/README.md) propose changes across packages: [grantr](docs/rfcs/0001-grantr-identity-and-access.md) and [portalr](docs/rfcs/0002-portalr-the-portal.md).
+- 🏛️ [Architecture](docs/architecture.md) explains how the packages fit together in one repository. [lattice's decisions](docs/adr/README.md) are its ADRs.
+- 🗺️ [lattice's RFCs](docs/rfcs/README.md) propose changes across packages: [grantr](docs/rfcs/0001-grantr-identity-and-access.md) and [portalr](docs/rfcs/0002-portalr-the-portal.md).
 - 🎨 [lattice's brand](docs/assets/brand/README.md) covers the marks, the colours and the type, and [ADR-0001](docs/adr/0001-lattices-brand.md) records why.
 
 ## 🤝 Contributing
@@ -249,4 +248,4 @@ Report a vulnerability privately, as [SECURITY.md](SECURITY.md) describes, never
 
 Every package is released under the [MIT License](LICENSE), and each keeps a copy of it in its own directory.
 
-<p align="center"><sub>Made of one cell of the lattice that every mark in the family is drawn on.</sub></p>
+<p align="center"><sub>Made of one cell of the lattice that every package's mark is drawn on.</sub></p>

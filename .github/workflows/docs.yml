@@ -1,4 +1,4 @@
-# The family's one docs build (stackr's RFC-0003, Docs), published to GitHub Pages at
+# lattice's one docs build (stackr's RFC-0003, Docs), published to GitHub Pages at
 # https://lattice.alexnodeland.com from main: on every push, so the site always shows main's
 # documentation, and by hand. CI builds the site strictly on every pull request, as the root
 # project's docs task. The custom domain is set in the repository's Pages settings, with

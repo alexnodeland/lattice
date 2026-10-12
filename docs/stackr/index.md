@@ -20,7 +20,7 @@ The infrastructure template for applications built on artifactr, reflexr and eva
 
     stackr v0.1 is built, as planned in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and has no release yet. The site describes `main`.
 
-## Why: one stack the family's applications share
+## Why: one stack every application on lattice shares
 
 Every application on [artifactr](../artifactr/index.md), [reflexr](../reflexr/index.md) or [evalr](../evalr/index.md) needs the same infrastructure: a database with sign-in, a gateway in front of the models with budgets and guardrails, traces, metrics, logs and profiles, and a place for LLM traces, scores and datasets. The libraries emit OpenTelemetry, reach models through a LiteLLM proxy and ship their own Grafana dashboards, but those only pay off when something is set up to receive them.
 
@@ -59,7 +59,7 @@ make up         # the application in its app profile, at http://localhost:8800
 - **An LLM gateway.** Model groups with fallbacks across providers, a team and a budget per tenant, and guardrails chosen per request. [The LLM gateway](guides/gateway.md)
 - **One route for telemetry.** The OpenTelemetry Collector sends traces to Tempo and Langfuse, metrics to Prometheus and logs to Loki, and Grafana links them to each other and to Pyroscope's profiles. [Observability](guides/observability.md)
 - **Self-hosted Langfuse.** Traces arrive through the Collector; applications use Langfuse's API only for scores and datasets. [Langfuse](guides/langfuse.md)
-- **An application template.** FastAPI with each library's REST, WebSocket and MCP surfaces, examples, evals, a dev container and the family's quality gates. [The application template](guides/template.md)
+- **An application template.** FastAPI with each library's REST, WebSocket and MCP surfaces, examples, evals, a dev container and lattice's quality gates. [The application template](guides/template.md)
 - **Checked every way it can be.** `make validate` checks every configuration with each service's own validator, and the smoke tests start the stack and follow telemetry, a gateway request and an application's agents to where they land. [Validation and CI](guides/validation.md)
 - **Local by default.** Secrets are generated into a gitignored `.env`, and every published port binds to `127.0.0.1`. [Security](guides/security.md)
 

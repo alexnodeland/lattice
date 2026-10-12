@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="332" viewBox="0 0 920 332" role="img" aria-labelledby="t d">
+<title id="t">Starting an application from stackr's template</title>
+<desc id="d">uvx copier copy gh:alexnodeland/lattice my-app; 🧩 libraries: both   🌉 bridge: yes   🔐 access: grantr   📏 evals: yes; cd my-app &amp;&amp; git init &amp;&amp; make install; 📦 one environment, one lockfile, the git hooks; make env &amp;&amp; make check; ✅ 100% branch coverage · pyright strict · no suppressions; make up; 🚀 my-app on http://127.0.0.1:8800, beside stackr&#x27;s stack</desc>
+<style>
+  text { font-family: "Fragment Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 16px; }
+  .p { fill: #38C6F4; } .c { fill: #E6F3F9; } .o { fill: #A0BCCB; }
+  .line { clip-path: inset(0 100% 0 0); animation: type 900ms steps(36, end) forwards; }
+  .out { clip-path: none; opacity: 0; animation: show 300ms ease-out forwards; }
+  .cursor { animation: blink 1s steps(1) infinite; }
+  @keyframes type { to { clip-path: inset(0 0 0 0); } }
+  @keyframes show { to { opacity: 1; } }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .line, .out { animation: none; clip-path: none; opacity: 1; } .cursor { animation: none; } }
+</style>
+<rect width="920" height="332" rx="14" fill="#0F1B22"/>
+<rect width="920" height="40" rx="14" fill="#15252E"/><rect y="26" width="920" height="14" fill="#15252E"/>
+<circle cx="24" cy="20" r="6" fill="#E4007C"/><circle cx="44" cy="20" r="6" fill="#FFC400"/><circle cx="64" cy="20" r="6" fill="#009FE3"/>
+<text x="460.0" y="25" text-anchor="middle" class="o" style="font-size:13px">~/code</text>
+<g class="line" style="animation-delay:0.30s"><text x="24" y="64"><tspan class="p">❯ </tspan><tspan class="c">uvx copier copy gh:alexnodeland/lattice my-app</tspan></text></g>
+<g class="line out" style="animation-delay:1.40s"><text x="24" y="94" class="o">🧩 libraries: both   🌉 bridge: yes   🔐 access: grantr   📏 evals: yes</text></g>
+<g class="line" style="animation-delay:2.00s"><text x="24" y="124"><tspan class="p">❯ </tspan><tspan class="c">cd my-app &amp;&amp; git init &amp;&amp; make install</tspan></text></g>
+<g class="line out" style="animation-delay:3.10s"><text x="24" y="154" class="o">📦 one environment, one lockfile, the git hooks</text></g>
+<g class="line" style="animation-delay:3.70s"><text x="24" y="184"><tspan class="p">❯ </tspan><tspan class="c">make env &amp;&amp; make check</tspan></text></g>
+<g class="line out" style="animation-delay:4.80s"><text x="24" y="214" class="o">✅ 100% branch coverage · pyright strict · no suppressions</text></g>
+<g class="line" style="animation-delay:5.40s"><text x="24" y="244"><tspan class="p">❯ </tspan><tspan class="c">make up</tspan></text></g>
+<g class="line out" style="animation-delay:6.50s"><text x="24" y="274" class="o">🚀 my-app on http://127.0.0.1:8800, beside stackr&#x27;s stack</text></g>
+<g class="line out" style="animation-delay:7.10s"><text x="24" y="304"><tspan class="p">❯ </tspan><tspan class="c cursor">▍</tspan></text></g>
+</svg>

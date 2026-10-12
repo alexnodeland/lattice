@@ -1,6 +1,6 @@
 # {{ project_name }}'s image, as the app profile runs it: `make up` builds it.
 #
-# The family's libraries come from GitHub at the revisions uv.lock pins, so the build needs git
+# lattice's libraries come from GitHub at the revisions uv.lock pins, so the build needs git
 # and the network. The runtime image holds the virtual environment and nothing else.
 
 FROM ghcr.io/astral-sh/uv:0.12-python{{ python_version }}-trixie-slim AS build

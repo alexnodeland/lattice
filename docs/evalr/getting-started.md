@@ -4,7 +4,7 @@ This page builds an evaluator for a support agent's replies, the way you would f
 
 ## Install
 
-evalr needs Python 3.12 or newer. Until it is published to PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the family's repository:
+evalr needs Python 3.12 or newer. Until it is published to PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the repository every package lives in:
 
 === "uv"
 

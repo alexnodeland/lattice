@@ -1,6 +1,6 @@
 # Brand
 
-[ADR-0011](../../adr/0011-documentation-site-and-brand.md) records relayr's identity: it prints on one plate, magenta, the ink artifactr and reflexr share, and its mark is two strokes on the family's diagonal, whose overlap is its overprint and working colour. [`tokens.json`](tokens.json) holds its colours.
+[ADR-0011](../../adr/0011-documentation-site-and-brand.md) records relayr's identity: it prints on one plate, magenta, the ink artifactr and reflexr share, and its mark is two strokes on lattice's diagonal, whose overlap is its overprint and working colour. [`tokens.json`](tokens.json) holds its colours.
 
 | File | What it is | Use it on |
 |---|---|---|

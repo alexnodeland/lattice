@@ -1,11 +1,11 @@
-# The family's documentation site, built with Zensical: one build, with a section per package
+# lattice's documentation site, built with Zensical: one build, with a section per package
 # under docs/<package>/, each ordered by its own .nav.yml (stackr's RFC-0003, Docs).
 # `moon run lattice:docs` builds it in strict mode; `moon run lattice:docs-serve` serves it with
 # live reload.
 
 site_name: lattice
 site_description: >-
-  The family's packages: artifactr, reflexr, evalr, relayr, grantr and stackr, for applications in
+  The packages: artifactr, reflexr, evalr, relayr, grantr and stackr, for applications in
   which people and agents work together.
 site_author: Alex Nodeland
 site_url: https://lattice.alexnodeland.com/

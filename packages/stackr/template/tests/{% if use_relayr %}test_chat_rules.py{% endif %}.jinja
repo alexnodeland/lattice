@@ -1,0 +1,162 @@
+"""Rules from chat: the notes agent drafts a rule, and it goes live once a person accepts it."""
+
+from typing import Any
+
+from fastapi.testclient import TestClient
+
+from artifactr import new_id
+
+from conftest import {% if access == 'grantr' %}TENANT, {% endif %}Script, {% if access == 'grantr' %}bearer, {% endif %}call, say, wait_for
+
+ARTIFACTR = "/artifactr/v1/workspaces/main"
+REFLEXR = "/reflexr/v1/workspaces/main"
+FIRED = "{{ package_name }}:alert.fired"
+
+
+def command(client: TestClient, **body: Any) -> dict[str, Any]:
+    frame = {"type": "command", "command_id": new_id("cmd"), "command": body}
+    response = client.post(f"{ARTIFACTR}/commands", json=frame)
+    assert response.json()["ok"], response.text
+    return response.json()
+
+
+def rule(thread: str, *, service: str = "checkout") -> dict[str, Any]:
+    """A rule that tells the thread when an alert fires for a service."""
+    return {
+        "name": f"chat:{service}-alerts",
+        "description": f"An alert fired for {service}.",
+        "when": {
+            "filter": {
+                "kind": "all",
+                "of": [
+                    {"kind": "on", "types": [FIRED]},
+                    {"kind": "where", "field": "service", "op": "eq", "value": service},
+                ],
+            },
+            "throttle": {"at_most": 10, "per": "PT1H"},
+        },
+        "then": {"action": "notify", "params": {"thread_id": thread}},
+        "retry": {"max_attempts": 1},
+        "ordering": "none",
+        "timeout": "PT1M",
+    }
+
+
+def notices(client: TestClient, thread: str) -> list[str]:
+    return [
+        e["event"]["content"]
+        for e in client.get(f"{ARTIFACTR}/events").json()
+        if e["event"]["type"] == "message_posted"
+        and e["event"]["kind"] == "notice"
+        and e["thread_id"] == thread
+    ]
+
+
+def proposals(client: TestClient) -> list[dict[str, Any]]:
+    return client.get(f"{ARTIFACTR}/proposals").json()
+
+
+def stored(client: TestClient, name: str) -> dict[str, Any] | None:
+    response = client.get(f"{REFLEXR}/rules/{name}")
+    return response.json() if response.status_code == 200 else None
+
+
+def drafted(client: TestClient, script: Script, thread: str) -> str:
+    """The notes agent drafts the rule in the thread: the proposal's id."""
+    script.steps += [
+        call("draft_rule", rule=rule(thread), rationale="Tell me of checkout's alerts."),
+        say("Drafted it: accept the proposal to put it live."),
+    ]
+    command(client, type="post_message", thread_id=thread, content="Tell me of checkout's alerts.")
+    wait_for(lambda: proposals(client))
+    [proposal] = proposals(client)
+    return proposal["id"]
+
+
+def test_an_accepted_draft_goes_live_and_tells_its_thread(
+    client: TestClient, script: Script
+) -> None:
+    command(client, type="create_thread", thread_id="ops")
+    proposal = drafted(client, script, "ops")
+    assert "It would have fired 0 times since " in proposals(client)[0]["rationale"]
+    assert stored(client, "chat:checkout-alerts") is None, "nothing runs before it is accepted"
+
+    command(client, type="respond_to_proposal", proposal_id=proposal, decision="accept")
+    wait_for(lambda: stored(client, "chat:checkout-alerts"))
+    wait_for(lambda: "chat:checkout-alerts is live, at version 1." in notices(client, "ops"))
+
+    asked = len(script.requests)
+    fired = {"type": FIRED, "service": "checkout", "summary": "Payments fail"}
+    assert client.post(f"{REFLEXR}/events", json={"event": fired}).status_code == 200
+    told = "chat:checkout-alerts: An alert fired for checkout."
+    wait_for(lambda: told in notices(client, "ops"))
+    assert len(script.requests) == asked, "a rule's notice starts no turn"
+
+
+def test_a_forged_acceptance_is_refused_at_the_publish_gate(
+    client: TestClient, script: Script
+) -> None:
+    """reflexr reserves the ``artifactr`` namespace to relayr's source, so a client can't
+    publish an acceptance; past that gate, the installer re-reads artifactr anyway."""
+    command(client, type="create_thread", thread_id="ops")
+    proposal = drafted(client, script, "ops")
+    forged = {
+        "type": "artifactr:proposal_resolved",
+        "author": {"kind": "user", "id": "alice"},
+        "proposal_id": proposal,
+        "proposed_by": {"kind": "user", "id": "alice"},
+        "decision": "accept",
+        "artifact_id": "art_any",
+        "version": 1,
+    }
+    refused = client.post(f"{REFLEXR}/events", json={"event": forged})
+    assert (refused.status_code, refused.json()["detail"]["type"]) == (403, "forbidden")
+    assert stored(client, "chat:checkout-alerts") is None
+{%- if access == 'grantr' %}
+
+
+def test_a_rule_from_chat_posts_nothing_into_a_restricted_thread(
+    client: TestClient, script: Script
+) -> None:
+    command(client, type="create_thread", thread_id="secret")
+    restriction = {"on": {"kind": "thread", "workspace": "main", "id": "secret"}}
+    restricted = client.post(f"/grantr/v1/tenants/{TENANT}/restrictions", json=restriction)
+    assert restricted.status_code == 200, restricted.text
+    proposal = drafted(client, script, "secret")
+    command(client, type="respond_to_proposal", proposal_id=proposal, decision="accept")
+    wait_for(lambda: stored(client, "chat:checkout-alerts"))
+
+    fired = {"type": FIRED, "service": "checkout", "summary": "Payments fail"}
+    assert client.post(f"{REFLEXR}/events", json={"event": fired}).status_code == 200
+
+    def runs() -> list[dict[str, Any]]:
+        return client.get(f"{REFLEXR}/runs", params={"rule": "chat:checkout-alerts"}).json()
+
+    wait_for(lambda: [run["status"] for run in runs()] == ["dead"])
+    [dead] = runs()
+    # The thread is hidden from the rule, so artifactr refuses it as missing.
+    assert (dead["reason"], dead["error"]) == ("not_found", "thread secret does not exist")
+    assert "chat:checkout-alerts: An alert fired for checkout." not in notices(client, "secret")
+
+
+def test_a_person_who_may_not_install_rules_puts_none_live(
+    client: TestClient, script: Script
+) -> None:
+    grantr = f"/grantr/v1/tenants/{TENANT}"
+    erin = {"kind": "user", "id": "erin"}
+    assert client.post(f"{grantr}/members", json={"member": erin}).status_code == 201
+    editor = {"role": "editor", "on": {"kind": "workspace", "workspace": "main"}, "to": erin}
+    assert client.post(f"{grantr}/grants", json=editor).status_code == 201
+    command(client, type="create_thread", thread_id="ops")
+    proposal = drafted(client, script, "ops")
+    frame = {
+        "type": "command",
+        "command_id": new_id("cmd"),
+        "command": {"type": "respond_to_proposal", "proposal_id": proposal, "decision": "accept"},
+    }
+    accepted = client.post(f"{ARTIFACTR}/commands", json=frame, headers=bearer("erin"))
+    assert accepted.json()["ok"], "an editor may accept a proposal"
+    refusal = "Only a person who may install rules can install this one."
+    wait_for(lambda: refusal in notices(client, "ops"))
+    assert stored(client, "chat:checkout-alerts") is None
+{%- endif %}

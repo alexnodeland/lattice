@@ -47,6 +47,7 @@ from reflexr.workspace import ACTIONS as REFLEXR_ACTIONS
 {%- if use_relayr %}
 from relayr.outbound import RULES as RULE_ACTORS
 from relayr.outbound import is_rule_actor
+from relayr.rules import RULES as CHAT_RULES
 {%- endif %}
 
 from {{ package_name }}.auth import (
@@ -72,11 +73,11 @@ KEY_PREFIX: Final = "grantr_sk_"
 
 {% if use_reflexr -%}
 {% if use_relayr -%}
-CODE_RULES: Final = frozenset(rule.name for rule in [*RULES, *INCIDENT_RULES])
+CODE_RULES: Final = frozenset(rule.name for rule in [*RULES, *INCIDENT_RULES, *CHAT_RULES])
 {%- else -%}
 CODE_RULES: Final = frozenset(rule.name for rule in RULES)
 {%- endif %}
-"""The rules defined here, in code, whose runs act as the application."""
+"""The rules defined in code, here and in relayr, whose runs act as the application."""
 
 {% endif -%}
 CATALOGS: Final = [{% if use_artifactr %}ARTIFACTR_ACTIONS{% endif %}{% if libraries == 'both' %}, {% endif %}{% if use_reflexr %}REFLEXR_ACTIONS{% endif %}]

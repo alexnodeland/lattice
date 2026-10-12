@@ -30,6 +30,7 @@ nav:
   - adr/0023-portalrs-admin-reads.md
   - adr/0024-who-sees-a-restricted-item.md
   - adr/0025-the-application-lists-tenants-and-workspaces-and-writes-for-code-rules.md
+  - adr/0026-row-level-security-under-the-scoping.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

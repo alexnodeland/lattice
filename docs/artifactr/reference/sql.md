@@ -19,3 +19,7 @@ The `sql`, `postgres` and `sqlite` extras. See [SQL storage](../guides/storage.m
 ::: artifactr.sql.migrate
 
 ::: artifactr.sql.create_schema
+
+## Row-level security
+
+::: artifactr.sql.tenancy

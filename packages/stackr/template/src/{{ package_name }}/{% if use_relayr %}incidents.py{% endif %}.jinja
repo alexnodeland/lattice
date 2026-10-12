@@ -1,0 +1,113 @@
+"""The bridge's example: rules keep an incident's timeline, in a thread people work in.
+
+Replace it with the application's own. relayr bridges the libraries both ways:
+
+- An ``alert.fired`` event, published into reflexr in the application's namespace, fires
+  ``open-incident``. Its run creates an incident thread in artifactr, a ``timeline`` artifact in
+  it, and posts a notice.
+- A person's message in that thread reaches reflexr as ``artifactr:message_posted`` and fires
+  ``timeline-entry``, whose run adds the message to the timeline, keyed by the message's event,
+  so a retried run rewrites its entry rather than adding another.
+
+The runs act in artifactr as their rules' own participants, within their allowlists: the
+timeline is written directly, everything else is a proposal or a notice.
+"""
+
+from collections.abc import Mapping
+
+from pydantic import BaseModel, Field
+
+from artifactr import Artifact, SystemActor, Workspaces
+from reflexr import Event, F, Rule, on, run
+from reflexr.workspace import Action, Reaction
+from relayr.events import MessagePosted
+from relayr.outbound import Allowlist, Outbound
+
+from {{ package_name }}.tickets import AppEvent
+
+
+class AlertFired(AppEvent, name="alert.fired"):
+    """Monitoring saw something wrong with a service."""
+
+    service: str
+    summary: str
+
+
+class Entry(BaseModel):
+    """One line of an incident's timeline."""
+
+    source: str
+    """Who or what it came from: the monitoring, or the person who wrote it."""
+
+    text: str
+
+
+class Timeline(Artifact, name="timeline"):
+    """An incident's timeline, in its thread: entries keyed by the event each came from."""
+
+    title: str
+    thread_id: str
+    entries: dict[str, Entry] = Field(default_factory=dict[str, Entry])
+
+
+EVENTS: list[type[Event]] = [AlertFired]
+"""The example's own event types, beside the bridged ones."""
+
+open_incident = Rule(
+    name="{{ package_name }}:open-incident",
+    description="An alert fired. Open an incident thread, with its timeline.",
+    when=on(AlertFired),
+    then=run("open-incident"),
+)
+
+timeline_entry = Rule(
+    name="{{ package_name }}:timeline-entry",
+    description="A person wrote in a thread. Add it to the thread's timeline, if it has one.",
+    when=on(MessagePosted).where(F.author.kind.eq("user")).where(F.kind.eq("message")),
+    then=run("timeline-entry"),
+)
+
+RULES = [open_incident, timeline_entry]
+
+ALLOWLISTS: Mapping[str, Allowlist] = {
+    open_incident.name: Allowlist(create_threads=True, direct=frozenset({"timeline"})),
+    timeline_entry.name: Allowlist(direct=frozenset({"timeline"})),
+}
+"""What each rule may do in artifactr beyond proposals and notices in its chain's threads."""
+
+
+def incident_actions(outbound: Outbound, workspaces: Workspaces) -> dict[str, Action[None]]:
+    """The rules' actions, which act in artifactr through relayr's outbound adapter.
+
+    Args:
+        outbound: What the runs do in artifactr.
+        workspaces: artifactr's workspaces, where ``timeline-entry`` finds a thread's timeline.
+    """
+
+    async def open_incident(reaction: Reaction[None]) -> None:
+        [fired] = reaction.events
+        assert isinstance(fired.event, AlertFired)
+        alert = fired.event
+        acting = outbound.acting(reaction)
+        thread = await acting.create_thread(f"Incident: {alert.service}")
+        entry = Entry(source="monitoring", text=alert.summary)
+        timeline = Timeline(title=alert.service, thread_id=thread, entries={fired.id: entry})
+        await acting.create(timeline, thread_id=thread)
+        await acting.notice(f"Opened the timeline: {alert.summary}", thread_id=thread)
+
+    async def timeline_entry(reaction: Reaction[None]) -> None:
+        [said] = reaction.events
+        assert isinstance(said.event, MessagePosted)
+        message = said.event
+        workspace = await workspaces.open(
+            reaction.workspace.tenant_id,
+            reaction.workspace.workspace_id,
+            actor=SystemActor(name="incidents"),
+        )
+        acting = outbound.acting(reaction)
+        for timeline in await workspace.artifacts(Timeline):
+            if timeline.data.thread_id == message.thread_id:
+                entry = Entry(source=message.author.display_name, text=message.content)
+                await acting.edit(timeline.id, f"/entries/{said.id}", entry.model_dump())
+
+    return {"open-incident": open_incident, "timeline-entry": timeline_entry}

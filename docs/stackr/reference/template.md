@@ -13,6 +13,7 @@ The application template's questions are in stackr's `copier.yml`, which the `co
 | `description` | str | `An application on stackr.` |  | always | One line about what it does |
 | `libraries` | str | `both` | `artifactr`, `reflexr`, `both` | always | The libraries it uses |
 | `evals` | bool | yes |  | always | Include evaluation with evalr (an evals/ directory and a starter experiment)? |
+| `bridge` | bool | yes |  | `libraries == 'both'` | Bridge them with relayr (chats and artifacts become events for rules, and rules' runs act back as proposals and notices; with an incident timeline example)? |
 | `access` | str | `grantr` | `grantr`, `none` | always | Who may do what |
 | `python_version` | str | `3.12` | `3.12`, `3.13`, `3.14` | always | The Python version it runs on |
 | `app_port` | int | `8800` |  | always | The port it is published on, on this machine |
@@ -33,6 +34,7 @@ These are computed from the answers, apart from `libraries_path`, which `scripts
 | `package_name` | str | `{{ project_slug | replace('-', '_') }}` |
 | `use_artifactr` | bool | `{{ libraries in ['artifactr', 'both'] }}` |
 | `use_reflexr` | bool | `{{ libraries in ['reflexr', 'both'] }}` |
+| `use_relayr` | bool | `{{ libraries == 'both' and bridge }}` |
 
 | Copier setting | Value |
 |---|---|
@@ -83,6 +85,8 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `src/<package>/notes.py` | `use_artifactr` | rendered |
 | `src/<package>/automation.py` | `use_reflexr` | rendered |
 | `src/<package>/tickets.py` | `use_reflexr` | rendered |
+| `src/<package>/bridge.py` | `use_relayr` | rendered |
+| `src/<package>/incidents.py` | `use_relayr` | rendered |
 | `stackr.env` | always | copied |
 | `tests/conftest.py` | always | rendered |
 | `tests/test_app.py` | always | rendered |
@@ -94,6 +98,7 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `tests/test_evals.py` | `evals` | rendered |
 | `tests/test_collaboration.py` | `use_artifactr` | rendered |
 | `tests/test_automation.py` | `use_reflexr` | rendered |
+| `tests/test_bridge.py` | `use_relayr` | rendered |
 | `access.md` | `access == 'grantr'` | rendered |
 | `evals/__init__.py` | `evals` | copied |
 | `evals/__main__.py` | `evals` | copied |

@@ -17,7 +17,20 @@ from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.otel import Tel
 
 from {{ package_name }}.scores import Mirrors, sync_configs
 
-from conftest import {% if use_reflexr %}OPENED, {% endif %}TENANT, Script, app, bearer, say, wait_for
+from conftest import (
+{%- if use_reflexr %}
+    OPENED,
+{%- endif %}
+    TENANT,
+{%- if use_reflexr %}
+    TRIAGE,
+{%- endif %}
+    Script,
+    app,
+    bearer,
+    say,
+    wait_for,
+)
 
 
 class FakeLangfuse:
@@ -108,9 +121,13 @@ def test_feedback_becomes_scores_on_the_traces_it_is_about(
         script.steps += [say("Low: a question about invoices.")]
         opened = {"type": OPENED, "subject": "Invoices", "body": "Where are they?"}
         client.post(f"{events}/events", json={"event": opened})
-        wait_for(lambda: [r["status"] for r in client.get(f"{events}/runs").json()] != [])
-        wait_for(lambda: client.get(f"{events}/runs").json()[0]["status"] == "succeeded")
-        [triage] = client.get(f"{events}/runs").json()
+
+        def triaged() -> list[dict[str, Any]]:
+            runs = client.get(f"{events}/runs").json()
+            return [r for r in runs if r["rule"] == TRIAGE and r["status"] == "succeeded"]
+
+        wait_for(triaged)
+        [triage] = triaged()
         review = {
             "type": "give_feedback",
             "feedback_type": "triage-review",

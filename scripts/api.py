@@ -2,11 +2,12 @@
 
 Usage: scripts/api.py BASE   (TITLE and BODY are the pull request's, when there is one)
 
-Each package that ships a wheel is compared with its last release (its newest `<name>-v*` tag
-in BASE) by griffe, as `griffe check` does: once as the working tree has it, and once as BASE
-has it. A break the working tree has and BASE doesn't is the change's own, and it must be
-marked as release-please reads it: `!` after the title's type or scope, or a `BREAKING CHANGE:`
-footer in the body. A package with no release yet has no public API to keep, and is skipped.
+Each package (`packages/<name>/src/<name>`) is compared with its last release (its newest
+`<name>-v*` tag in BASE) by griffe, as `griffe check` does: once as the working tree has it,
+and once as BASE has it. A break the working tree has and BASE doesn't is the change's own, and
+it must be marked as release-please reads it: `!` after the title's type or scope, or a
+`BREAKING CHANGE:` footer in the body. A package with no release yet has no public API to
+keep, and is skipped.
 
 griffe compares an attribute's value as text, so a union with a new member, or an edited
 string, reads as a break. Those (`Attribute value was changed`) aren't counted.

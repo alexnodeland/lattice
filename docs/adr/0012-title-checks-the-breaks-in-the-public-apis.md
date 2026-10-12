@@ -11,14 +11,14 @@
 Three things the RFC doesn't settle:
 
 - **A break stays a break until the next release.** artifactr's `main` already has 14 breaks against `artifactr-v0.1.0`. Checked plainly against the tag, every later pull request that touches artifactr, even a typo fix, would fail until the next release.
-- **Most packages have no release in lattice.** Only artifactr has a tag, `artifactr-v0.1.0`; evalr, reflexr and relayr are at `0.0.0` in the manifest.
+- **Most packages have no release in lattice.** Only artifactr has a tag, `artifactr-v0.1.0`; every other package is at `0.0.0` in the manifest, or not in it yet.
 - **griffe compares an attribute's value as text.** Of those 14 breaks, 8 are `Attribute value was changed`. Seven break no caller: a union with a new member (`Actor`, `Command`, `Event`, `KnownEvent`, `Note`), an edited string (`INSTRUCTIONS`), and an attribute's initial value (`ArtifactrMcp.server`). One does: `ResolveClient`, a type alias whose parameter changed type.
 
 The marking lives in the title and the description, which CI's jobs never rerun for when they are edited ([ADR-0003](0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md)).
 
 ## Decision
 
-- **A pull request answers for the breaks it adds.** [`scripts/api.py`](https://github.com/alexnodeland/lattice/blob/main/scripts/api.py) compares each package with its last release, its newest `<name>-v*` tag on the base branch, through griffe's library: once as the pull request's merge commit has it, and once as the base branch has it. A break the merge commit has and the base doesn't is the pull request's, and it fails unless the title has `!` after its type or scope, or the description has a `BREAKING CHANGE:` footer. Each break is an annotation on the file and line. A break that is reverted before the release adds nothing.
+- **A pull request answers for the breaks it adds.** [`scripts/api.py`](https://github.com/alexnodeland/lattice/blob/main/scripts/api.py) compares each package with its last release, its newest `<name>-v*` tag on the base, through griffe's library: once as the pull request's merge commit has it, and once as the merge commit's first parent (`HEAD^1`), the base it merges into, has it. A break the merge commit has and the base doesn't is the pull request's, and it fails unless the title has `!` after its type or scope, or the description has a `BREAKING CHANGE:` footer. Each break is an annotation on the file and line. A break that is reverted before the release adds nothing.
 - **A package with no release tag is skipped,** with a message saying so. It has no published API to keep, and its first release starts the comparison.
 - **`Attribute value was changed` isn't counted.** Every other kind griffe reports is: removed objects, changed kinds, removed bases, and added, removed, reordered or newly required parameters.
 - **The Title check runs it,** as a step after the title's own check. Title already reruns when the title or the description is edited, and is already required. So Title now says that the title is a Conventional Commit, and marks every break that the pull request makes.
@@ -58,5 +58,6 @@ Comparing with the base keeps the RFC's comparison with the release, so what is 
 - Easier: an unmarked break fails the pull request that makes it, with the file and line, before release-please writes a minor bump that should have been a breaking one.
 - Harder: the Title check checks out the repository and installs the root's tools, so it takes about half a minute instead of seconds.
 - Harder: a change to a type alias is a break that the author must still mark by judgement.
-- evalr, reflexr and relayr are checked from their first release.
+- Every package but artifactr is checked from its first release.
+- Harder: a changed enum member's value or `Final` constant goes unflagged too, as an attribute value; mark it by judgement.
 - This amends [ADR-0003](0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md): Title checks the title and what it must mark.

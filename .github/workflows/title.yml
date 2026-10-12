@@ -50,9 +50,10 @@ jobs:
       - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
         with:
           auto-install: true
+      # The checkout is the pull request's merge commit, so its first parent is the base it merges
+      # into, as CI tested it.
       - name: Public APIs
         env:
-          BASE: origin/${{ github.base_ref }}
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}
-        run: uv run --locked --only-group dev python scripts/api.py "$BASE"
+        run: uv run --locked --only-group dev python scripts/api.py HEAD^1

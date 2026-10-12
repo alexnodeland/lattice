@@ -45,11 +45,11 @@ class CreateArtifact(_Command):
     """
 
     type: Literal["create_artifact"] = "create_artifact"
-    artifact_id: ArtifactId = Field(default_factory=new_artifact_id)
+    artifact_id: ArtifactId = Field(default_factory=new_artifact_id, min_length=1)
     kind: str
     data: dict[str, JsonValue]
     thread_id: ThreadId | None = None
-    proposal_id: ProposalId = Field(default_factory=new_proposal_id)
+    proposal_id: ProposalId = Field(default_factory=new_proposal_id, min_length=1)
 
 
 class EditArtifact(_Command):
@@ -65,7 +65,7 @@ class EditArtifact(_Command):
     patch: Patch
     summary: str | None = None
     thread_id: ThreadId | None = None
-    proposal_id: ProposalId = Field(default_factory=new_proposal_id)
+    proposal_id: ProposalId = Field(default_factory=new_proposal_id, min_length=1)
 
 
 class ArchiveArtifact(_Command):
@@ -75,7 +75,7 @@ class ArchiveArtifact(_Command):
     artifact_id: ArtifactId
     base_version: int = Field(ge=1)
     thread_id: ThreadId | None = None
-    proposal_id: ProposalId = Field(default_factory=new_proposal_id)
+    proposal_id: ProposalId = Field(default_factory=new_proposal_id, min_length=1)
 
 
 ProposedChange = Annotated[
@@ -88,7 +88,7 @@ class ProposeChange(_Command):
     """Propose a change for someone else to accept, whatever the write policy."""
 
     type: Literal["propose_change"] = "propose_change"
-    proposal_id: ProposalId = Field(default_factory=new_proposal_id)
+    proposal_id: ProposalId = Field(default_factory=new_proposal_id, min_length=1)
     change: ProposedChange
     rationale: str | None = None
 
@@ -111,7 +111,7 @@ class CreateThread(_Command):
     """Create a thread."""
 
     type: Literal["create_thread"] = "create_thread"
-    thread_id: ThreadId = Field(default_factory=new_thread_id)
+    thread_id: ThreadId = Field(default_factory=new_thread_id, min_length=1)
     title: str = ""
 
 
@@ -120,7 +120,7 @@ class PostMessage(_Command):
 
     type: Literal["post_message"] = "post_message"
     thread_id: ThreadId
-    message_id: MessageId = Field(default_factory=new_message_id)
+    message_id: MessageId = Field(default_factory=new_message_id, min_length=1)
     content: str = Field(min_length=1)
     kind: MessageKind = "message"
 

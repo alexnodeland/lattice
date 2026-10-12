@@ -279,8 +279,8 @@ class RunActions:
             try:
                 await runner.send(workspace, thread, content, message_id=message_id)
             except a.InvalidState:
-                # The message id is used: an earlier attempt sent it, and may have stopped before
-                # it asked for the turn. Asking again starts it, or does nothing if a turn took it.
+                # The message id is used (see `_used`): an earlier attempt sent it, and may have
+                # stopped before it asked for the turn. Asking starts the turn, or does nothing.
                 await runner.ask(workspace, thread)
         except a.Rejection as rejection:
             raise _refused(rejection) from rejection

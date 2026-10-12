@@ -463,7 +463,9 @@ async def test_a_retried_run_sends_its_message_once(
 class StopsAfterPosting(artifactr.agent.Runner[None]):
     """A runner whose first `send` posts its message, then stops before it asks for a turn."""
 
-    stopped = False
+    def __init__(self, agent: Agent[artifactr.agent.Session[None], str]) -> None:
+        super().__init__(agent, app=None)
+        self.stopped = False
 
     @override
     async def send(
@@ -498,7 +500,7 @@ async def test_a_retry_asks_for_the_turn_an_earlier_attempt_never_asked_for(
         deps_type=artifactr.agent.Session[None],
         capabilities=[artifactr.agent.ArtifactWorkspace(types=[Note])],
     )
-    runner = StopsAfterPosting(agent, app=None)
+    runner = StopsAfterPosting(agent)
     turns = {"app:act": Allowlist(turns=True)}
     try:
         await act(
@@ -510,10 +512,9 @@ async def test_a_retry_asks_for_the_turn_an_earlier_attempt_never_asked_for(
             rules=[retried],
             trigger=noted_in_a_thread,
         )
-        await asyncio.sleep(0.01)
-        await stack.processes[-1].reactor.settle()
 
         async def answered() -> bool:
+            await stack.processes[-1].reactor.settle()  # the retry, once its backoff passes
             return any(e.event_type == "artifactr:turn_ended" for e in await stack.bridged())
 
         await until(answered)
@@ -523,6 +524,8 @@ async def test_a_retry_asks_for_the_turn_an_earlier_attempt_never_asked_for(
     [sent] = [e.event for e in await stack.log() if e.actor == ACTOR]
     assert isinstance(sent, a.MessagePosted)
     assert started.message_ids == (sent.message_id,)
+    [ended] = [e for e in await stack.bridged() if e.event_type == "artifactr:turn_ended"]
+    assert ended.depth > 0, "the turn continues the run's chain"
 
 
 async def test_a_retried_runs_writes_are_each_made_once(ledger: Ledger, stack: Stack) -> None:

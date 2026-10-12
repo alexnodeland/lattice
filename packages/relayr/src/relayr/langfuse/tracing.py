@@ -64,8 +64,7 @@ def bridged_turns(ledger: Ledger) -> TurnContext:
 @contextlib.asynccontextmanager
 async def _turn(ledger: Ledger, session: Session[Any]) -> AsyncGenerator[None]:
     attributes = await turn_attributes(session)
-    agent = session.workspace.actor
-    match agent:
+    match session.workspace.actor:
         case a.AgentActor(on_behalf_of=a.ExternalAgentActor(client_id=client) as rule) if (
             is_rule_actor(rule)
         ):

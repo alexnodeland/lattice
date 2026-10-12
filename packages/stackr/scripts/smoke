@@ -19,6 +19,8 @@
 # unless chosen); it redirects HTTP to HTTPS, serves GoTrue at auth.<domain>
 # with a certificate the probe trusts, and refuses GoTrue's admin API there. The auth
 # and app checks then go through it.
+# drill (on a single host, after `make backup restore-drill`): the restore
+# drill's success reached Prometheus, where Grafana's alert reads it.
 # langfuse (with observability): a trace with a known id, sent to the
 # Collector, is found in Langfuse through its public API, and in Tempo.
 # gateway: its guardrails and model groups are loaded; a request through a
@@ -888,6 +890,10 @@ for profile in "${profiles[@]}"; do
     gateway) smoke_gateway || status=1 ;;
     auth) smoke_auth || status=1 ;;
     edge) smoke_edge || status=1 ;;
+    drill)
+      eventually "the restore drill's success is in Prometheus" \
+        prometheus_has 'stackr_restore_drill_success{job="stackr-restore-drill"} == 1' || status=1
+      ;;
     app) smoke_app || status=1 ;;
     *)
       log "smoke: no checks for profile '$profile'"

@@ -12,7 +12,8 @@ name (the CLI labels its containers as a Compose project too), the Makefile
 and compose.yaml use it, every Supabase container or network name in a tracked
 file (the template's and the documentation's included) is the one it gives, and
 every postgres image in compose.yaml has the major version local Supabase runs,
-so both database adapters are the same PostgreSQL.
+so both database adapters are the same PostgreSQL, and the single host's image
+(deploy/host/postgres) is built from the one compose.yaml pins.
 
 litellm: the gateway's config has no validator of its own, and the proxy
 starts without a guardrail it can't load. Every model group a fallback names
@@ -144,6 +145,11 @@ def check_supabase() -> list[str]:
         for image in sorted(images)
         if image.removeprefix("postgres:").split(".")[0].split("-")[0] != major
     )
+    dockerfile = (ROOT / "deploy" / "host" / "postgres" / "Dockerfile").read_text()
+    base = re.search(r"^FROM (\S+)", dockerfile, re.M)
+    if base is None or {base[1]} != images:
+        pinned = ", ".join(sorted(images))
+        problems.append(f"deploy/host/postgres/Dockerfile isn't built from {pinned}")
     if not problems:
         print(f"ok: project {project}, in every file's Supabase names; PostgreSQL {major}")
     return problems

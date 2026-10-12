@@ -1,0 +1,90 @@
+# A single host's backup alerts (RFC-0004), from what deploy/host/backup and restore-drill send:
+# stackr.backup.success and stackr.restore_drill.success, 1 or 0, each run. No contact point is
+# provisioned: Grafana lists firing alerts, and an operator adds one (email through GF_SMTP_*, or
+# any other Grafana supports). Before a bucket is set, no backup has run, and the alerts fire.
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: backups
+    folder: stackr
+    interval: 5m
+    rules:
+      - uid: stackr-backup-missing
+        title: No backup has succeeded in 36 hours
+        condition: passed
+        data:
+          - &query
+            refId: metric
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: metric
+              expr: max_over_time(stackr_backup_success[36h])
+              instant: true
+          - &below-one
+            refId: passed
+            datasourceUid: __expr__
+            model:
+              refId: passed
+              type: threshold
+              expression: metric
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+        # No result at all means no backup ran.
+        noDataState: Alerting
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: No backup has succeeded in 36 hours. Run `make backup`, and read its output.
+      - uid: stackr-backup-failed
+        title: The latest backup failed
+        condition: passed
+        data:
+          - <<: *query
+            model:
+              refId: metric
+              expr: last_over_time(stackr_backup_success[2d])
+              instant: true
+          - *below-one
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: The latest backup failed. Run `make backup`, and read its output.
+      - uid: stackr-restore-drill
+        title: The restore drill hasn't passed in eight days
+        condition: passed
+        data:
+          - <<: *query
+            model:
+              refId: metric
+              expr: max_over_time(stackr_restore_drill_success[8d])
+              instant: true
+          - *below-one
+        # No result at all means the drill never ran.
+        noDataState: Alerting
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: >-
+            The restore drill hasn't passed in eight days. Run `make restore-drill`, and read its
+            output.
+      - uid: stackr-restore-drill-failed
+        title: The latest restore drill failed
+        condition: passed
+        data:
+          - <<: *query
+            model:
+              refId: metric
+              expr: last_over_time(stackr_restore_drill_success[8d])
+              instant: true
+          - *below-one
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: The latest restore drill failed. Run `make restore-drill`, and read its output.

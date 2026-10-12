@@ -6,10 +6,10 @@
 #
 # It installs Docker with Compose, make, jq and uv (at the version lattice's .prototools pins),
 # and refuses a Docker older than 28.0 or a Compose older than 2.24.4; rotates Docker's logs; lets
-# in only the port sshd listens on, HTTP and HTTPS, through ufw; and writes .env with fresh
-# secrets, the host recipe, Caddy on every interface, the postgres adapter, and GoTrue at
-# auth.<domain>. Point app.<domain> and auth.<domain> at this machine before `make up`, so Caddy
-# can get their certificates. Running it again keeps every secret in .env.
+# in only the port sshd listens on, HTTP and HTTPS, through ufw; writes .env with fresh secrets,
+# the host recipe, Caddy on every interface, the postgres adapter, and GoTrue at auth.<domain>;
+# and installs the backups' timers. Point app.<domain> and auth.<domain> at this machine before
+# `make up`, so Caddy can get their certificates. Running it again keeps every secret in .env.
 #
 # Left to you: hardening SSH (keys only, no root login), fail2ban, and unattended upgrades.
 
@@ -71,9 +71,18 @@ set_setting STACKR_DOMAIN "$domain"
 set_setting AUTH_PUBLIC_URL "https://auth.$domain"
 set_setting AUTH_SITE_URL "https://app.$domain"
 
+# The backups' timers: nightly, and the restore drill weekly. They run once BACKUP_S3_* in .env
+# name the bucket.
+for unit in deploy/host/systemd/*; do
+  sed "s|@STACKR_DIR@|$PWD|g" "$unit" >"/etc/systemd/system/${unit##*/}"
+done
+systemctl daemon-reload
+systemctl enable --now stackr-backup.timer stackr-restore-drill.timer
+
 cat <<NEXT
 bootstrap: ready. Keep a copy of .env off this machine: it holds every secret. Set AUTH_SMTP_*
-in .env for GoTrue's invitations and password resets. Then
+in .env for GoTrue's invitations and password resets, and BACKUP_S3_* to a bucket off this
+machine, for the nightly backups. Then
   make up
 and reach Grafana, Langfuse and LiteLLM's admin UI through an SSH tunnel, such as
   ssh -L 3000:127.0.0.1:3000 -L 3300:127.0.0.1:3300 -L 4400:127.0.0.1:4400 <this host>

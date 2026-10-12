@@ -247,6 +247,15 @@ jobs:
       CADDY_TLS: ${{ matrix.recipe == 'host' && 'tls internal' || '' }}
       AUTH_PUBLIC_URL: ${{ matrix.recipe == 'host' && 'https://auth.stackr.test' || '' }}
       AUTH_SITE_URL: ${{ matrix.recipe == 'host' && 'https://app.stackr.test' || '' }}
+      # Its backups' bucket: a MinIO of the job's own, over HTTPS, since pgBackRest speaks only
+      # HTTPS to S3, with a certificate the job makes, which pgBackRest and ClickHouse check
+      # (stackr ADR-0027).
+      BACKUP_S3_ENDPOINT: ${{ matrix.recipe == 'host' && 'backups' || '' }}
+      BACKUP_S3_PORT: ${{ matrix.recipe == 'host' && '9000' || '' }}
+      BACKUP_S3_BUCKET: ${{ matrix.recipe == 'host' && 'stackr-backups' || '' }}
+      BACKUP_S3_ACCESS_KEY_ID: ${{ matrix.recipe == 'host' && 'stackr-backups' || '' }}
+      BACKUP_S3_SECRET_ACCESS_KEY: ${{ matrix.recipe == 'host' && 'stackr-backups-in-ci' || '' }}
+      BACKUP_S3_CA_FILE: ${{ matrix.recipe == 'host' && '/tmp/stackr-backups/public.crt' || '' }}
       # Local Supabase without the services the smoke test doesn't use.
       SUPABASE_START_FLAGS: >-
         -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta,storage-api,postgrest
@@ -265,10 +274,34 @@ jobs:
         if: matrix.database == 'supabase' && matrix.profiles != 'observability'
         with:
           version: ${{ env.SUPABASE_CLI_VERSION }}
+      # The bucket's certificate, before `make up` mounts it.
+      - if: matrix.recipe == 'host'
+        name: The backups' bucket's certificate
+        run: |
+          mkdir -p /tmp/stackr-backups
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 1 \
+            -subj /CN=backups -addext subjectAltName=DNS:backups \
+            -keyout /tmp/stackr-backups/private.key -out /tmp/stackr-backups/public.crt
+          chmod 644 /tmp/stackr-backups/private.key
       - run: uv run --no-project python scripts/affected.py smoke
       # An application from the template, beside the whole stack (stackr ADR-0011).
       - if: matrix.app
         run: uv run --no-project python scripts/affected.py smoke-app
+      # A single host's backups, to the job's own MinIO, and the restore drill (RFC-0004).
+      - if: matrix.recipe == 'host'
+        name: Back up, and run the restore drill
+        working-directory: packages/stackr
+        run: |
+          minio=$(docker compose --profile langfuse config --format json | jq -r .services.minio.image)
+          docker run -d --name backups --network stackr -v /tmp/stackr-backups:/certs:ro \
+            -e MINIO_ROOT_USER="$BACKUP_S3_ACCESS_KEY_ID" -e MINIO_ROOT_PASSWORD="$BACKUP_S3_SECRET_ACCESS_KEY" \
+            "$minio" server --certs-dir /certs --address :9000 /data
+          # The job's own test keys, for mc inside the container.
+          mc=(docker exec -e MC_HOST_backups="https://$BACKUP_S3_ACCESS_KEY_ID:$BACKUP_S3_SECRET_ACCESS_KEY@localhost:9000" backups mc)
+          for _ in $(seq 1 30); do "${mc[@]}" ready backups --insecure >/dev/null 2>&1 && break; sleep 2; done
+          "${mc[@]}" mb --insecure "backups/$BACKUP_S3_BUCKET"
+          make backup restore-drill
+          make smoke PROFILES=drill
       - name: Logs
         if: failure() && hashFiles('packages/stackr/.env') != ''
         working-directory: packages/stackr
@@ -277,10 +310,13 @@ jobs:
           files=()
           if [[ $STACKR_RECIPE == host ]]; then files=(-f compose.yaml -f deploy/host/compose.prod.yaml); fi
           docker compose "${files[@]}" --profile '*' logs --no-color --tail=200
+          if docker inspect backups >/dev/null 2>&1; then docker logs --tail=200 backups; fi
       - name: Stop the stack
         if: always() && hashFiles('packages/stackr/.env') != ''
         working-directory: packages/stackr
-        run: make reset
+        run: |
+          docker rm -f backups >/dev/null 2>&1 || true
+          make reset
 
   dependency-review:
     name: Dependency review

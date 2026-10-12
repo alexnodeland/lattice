@@ -62,6 +62,35 @@ Where Caddy publishes 80 and 443, as STACKR_BIND is for the rest: this machine o
 |---|---|
 | `STACKR_EDGE_BIND` | `127.0.0.1` |
 
+On a single host, the S3-compatible bucket, off the host, that `make backup` (pgBackRest and ClickHouse's BACKUP) writes to and the restore drill reads. The endpoint is a host name, reached over HTTPS on the port, path-style.
+
+| Setting | In `.env.example` |
+|---|---|
+| `BACKUP_S3_ENDPOINT` | Empty |
+| `BACKUP_S3_PORT` | `443` |
+| `BACKUP_S3_BUCKET` | Empty |
+| `BACKUP_S3_REGION` | `us-east-1` |
+| `BACKUP_S3_ACCESS_KEY_ID` | Empty |
+| `BACKUP_S3_SECRET_ACCESS_KEY` | Empty |
+
+The CA bundle, on this host, the store's certificate is checked against: the host's own, unless the store's certificate is signed by a CA of its own.
+
+| Setting | In `.env.example` |
+|---|---|
+| `BACKUP_S3_CA_FILE` | `/etc/ssl/certs/ca-certificates.crt` |
+
+Encrypts PostgreSQL's backups before they leave the host. Without it, they can't be restored: keep it, with the rest of .env, somewhere off the host.
+
+| Setting | In `.env.example` |
+|---|---|
+| `BACKUP_CIPHER_PASS` | Generated: 43 URL-safe characters |
+
+The ClickHouse user the backups and the restore drill run as.
+
+| Setting | In `.env.example` |
+|---|---|
+| `CLICKHOUSE_BACKUP_PASSWORD` | Generated: 64 hex characters |
+
 ### Observability
 
 Grafana signs in as `admin` with this password.

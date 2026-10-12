@@ -73,6 +73,46 @@ ssh -L 3000:127.0.0.1:3000 -L 3300:127.0.0.1:3300 -L 4400:127.0.0.1:4400 <the ho
 
 Then open <http://localhost:3000>, <http://localhost:3300> and <http://localhost:4400/ui> as you would on one machine. `make tenant` runs on the host itself, against LiteLLM's port there.
 
+## Backups
+
+Set `BACKUP_S3_*` in `.env` to a bucket off the host, on any S3-compatible store reached over HTTPS, then `make up` again, and `make backup` at once: it makes pgBackRest's stanza, starts PostgreSQL archiving its WAL there, and takes the first full backup ([ADR-0027](../adr/0027-the-single-hosts-backups.md)):
+
+| Setting | What it is |
+|---|---|
+| `BACKUP_S3_ENDPOINT`, `BACKUP_S3_PORT` | The store's host name and HTTPS port, reached path-style |
+| `BACKUP_S3_BUCKET`, `BACKUP_S3_REGION` | The bucket, and its region |
+| `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` | Keys that may read and write the bucket |
+| `BACKUP_S3_CA_FILE` | The CA bundle on the host the store's certificate is checked against: the host's own, unless the store has a CA of its own |
+| `BACKUP_CIPHER_PASS` | Encrypts PostgreSQL's backups. Without it they can't be restored: keep it, with the rest of `.env`, off the host |
+
+ClickHouse's backups, Langfuse's traces, leave the host as they are: stackr doesn't encrypt them. Turn on the bucket's server-side encryption, as the AWS recipe's buckets have.
+
+- **Nightly,** `stackr-backup.timer` runs `deploy/host/backup`: pgBackRest backs up PostgreSQL, a full backup on Sundays and a differential on the other nights, keeping two full backups and what they need; then ClickHouse backs itself up whole, as `clickhouse/<UTC time>`. Give the bucket a lifecycle rule that expires `clickhouse/` after the days you need. `make backup` runs it now.
+- **Each Sunday,** after the backup, `stackr-restore-drill.timer` runs `deploy/host/restore-drill`: it writes a sentinel row, restores PostgreSQL's latest backup into a new container and ClickHouse's beside the live one, and checks the tables and the sentinel. `make restore-drill` runs it now.
+- **Alerts:** Grafana alerts when no backup has succeeded in 36 hours, when the latest one failed, when the drill hasn't passed in eight days, and when the latest one failed. Add a contact point in Grafana for them to reach you; none is provisioned.
+- **Not backed up:** Prometheus's data, 15 days of metrics; and `.env`, which you keep elsewhere yourself.
+
+### Restoring
+
+On a new host, with the same `.env` and the stack stopped:
+
+1. **PostgreSQL:** remove the `postgres` volume's contents, then, in the `postgres` service's image, write pgBackRest's configuration and restore:
+
+   ```bash
+   docker compose -f compose.yaml -f deploy/host/compose.prod.yaml run --rm --no-deps --entrypoint sh postgres \
+     -c 'pgbackrest-conf && gosu postgres pgbackrest --stanza=stackr restore'
+   ```
+
+2. **ClickHouse:** start only ClickHouse, before Langfuse, so its database is still empty, and restore the backup you choose as ClickHouse's admin, Langfuse's own user, with the bucket's keys in the statement. The `backup` user can't write Langfuse's tables, by design; ClickHouse masks the keys in its logs.
+
+   ```bash
+   docker compose -f compose.yaml -f deploy/host/compose.prod.yaml up --detach --wait clickhouse
+   docker compose -f compose.yaml -f deploy/host/compose.prod.yaml exec clickhouse clickhouse-client \
+     -q "RESTORE DATABASE default FROM S3('https://<endpoint>:<port>/<bucket>/clickhouse/<name>', '<key id>', '<secret>')"
+   ```
+
+3. `make up`.
+
 ## Update it
 
 Check out the new stackr tag, then `make up` again: Compose pulls the new images and recreates what changed. Langfuse, LiteLLM, GoTrue and the application migrate their databases when they start.

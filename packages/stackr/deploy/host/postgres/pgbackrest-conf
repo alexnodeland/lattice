@@ -1,0 +1,32 @@
+#!/usr/bin/env sh
+# Write pgBackRest's configuration from the BACKUP_* settings, readable by postgres alone. The
+# secrets go into the file, never onto a command line. The bucket's certificate is checked against
+# /etc/stackr/backup-ca.crt, and every file is encrypted before it leaves, with BACKUP_CIPHER_PASS.
+set -eu
+: "${BACKUP_S3_BUCKET:?set the BACKUP_S3_* settings}"
+: "${BACKUP_CIPHER_PASS:?run make env}"
+mkdir -p /etc/pgbackrest
+umask 077
+cat >/etc/pgbackrest/pgbackrest.conf <<CONF
+[global]
+repo1-type=s3
+repo1-path=/pgbackrest
+repo1-s3-bucket=$BACKUP_S3_BUCKET
+repo1-s3-endpoint=$BACKUP_S3_ENDPOINT
+repo1-storage-port=$BACKUP_S3_PORT
+repo1-s3-region=$BACKUP_S3_REGION
+repo1-s3-key=$BACKUP_S3_ACCESS_KEY_ID
+repo1-s3-key-secret=$BACKUP_S3_SECRET_ACCESS_KEY
+repo1-s3-uri-style=path
+repo1-storage-ca-file=/etc/stackr/backup-ca.crt
+repo1-cipher-type=aes-256-cbc
+repo1-cipher-pass=$BACKUP_CIPHER_PASS
+repo1-retention-full=2
+start-fast=y
+log-level-file=off
+lock-path=/tmp/pgbackrest
+
+[stackr]
+pg1-path=/var/lib/postgresql/data
+CONF
+chown postgres:postgres /etc/pgbackrest/pgbackrest.conf

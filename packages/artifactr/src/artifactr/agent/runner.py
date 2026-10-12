@@ -484,6 +484,7 @@ class Runner[AppDepsT]:
                 trigger=turn.trigger,
                 watch_after=turn.watch_after,
                 on_behalf_of=turn.on_behalf_of,
+                message_ids=turn.message_ids,
             )
             session.delivered.seq, session.delivered.cursor = turn.taken, _taken(thread_id)
             claim = stack.pop_all()  # the run's task holds the claim from here
@@ -558,6 +559,7 @@ class Runner[AppDepsT]:
                 asked=asked,
                 on_behalf_of=acting_for(first.actor),
                 traceparent=first.traceparent,
+                message_ids=(first.event.message_id,),
             )
             return await self._allowed(workspace, thread_id, turn)
         await workspace.save_cursor(_taken(thread_id), through)  # no message in it to carry out
@@ -842,6 +844,8 @@ class _Turn:
     """Whom the turn acts for: the author of the message or answer it carries out."""
     traceparent: str | None
     """Where the message or answer it carries out was committed."""
+    message_ids: tuple[MessageId, ...]
+    """The messages it carries out as it starts."""
 
 
 def _resume(
@@ -857,7 +861,8 @@ def _resume(
     It acts for whoever committed ``by``. The messages no turn has taken are its prompt, beside
     the answers, so they reach the model as the run resumes: up to the first from someone it
     does not act for, which the thread's next turn takes. Otherwise it takes the log through
-    ``through``.
+    ``through``. The messages it carries out are its prompt's, or, with no prompt, ``by``, when
+    that is the message that answered the run.
     """
     ours = (
         list(itertools.takewhile(lambda e: same_principal(e.actor, by.actor), untaken))
@@ -877,16 +882,19 @@ def _resume(
             if r.kind == "approval"
         },
     )
+    messages = [e.event for e in ours if isinstance(e.event, MessagePosted)]
+    carried = [by.event] if not ours and by is not None else messages
     return _Turn(
         run_id=run.id,
         trigger="resume",
-        prompt=[e.event.content for e in ours if isinstance(e.event, MessagePosted)] or None,
+        prompt=[message.content for message in messages] or None,
         deferred=deferred,
         watch_after=rest[0].seq - 1 if rest else through,
         taken=taken,
         asked=asked,
         on_behalf_of=None if by is None else acting_for(by.actor),
         traceparent=None if by is None else by.traceparent,
+        message_ids=tuple(e.message_id for e in carried if isinstance(e, MessagePosted)),
     )
 
 

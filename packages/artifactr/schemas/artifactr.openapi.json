@@ -2271,6 +2271,14 @@
       "RunStarted": {
         "description": "An agent run started, or resumed after a pause.",
         "properties": {
+          "message_ids": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/MessageId"
+            },
+            "title": "Message Ids",
+            "type": "array"
+          },
           "run_id": {
             "$ref": "#/components/schemas/RunId"
           },

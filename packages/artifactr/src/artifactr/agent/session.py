@@ -8,6 +8,7 @@ from pydantic_ai import ModelMessage, ModelMessagesTypeAdapter
 from artifactr.core import (
     AgentActor,
     ExternalAgentActor,
+    MessageId,
     RunId,
     ThreadId,
     UserActor,
@@ -61,6 +62,9 @@ class Session[AppDepsT]:
     watch_after: int | None = None
     """Watch the log for others' changes after this ``seq``; None means from the run's start."""
 
+    message_ids: tuple[MessageId, ...] = ()
+    """The messages the run segment's start carries out, which its ``run_started`` names."""
+
     delivered: Delivered = field(default_factory=Delivered, init=False, repr=False, compare=False)
     """How far the run has taken the log: to ``watch_after`` once it has started, then as far as
     its watcher delivers. The capability records it with the run's start and its end."""
@@ -85,6 +89,7 @@ class Session[AppDepsT]:
         trigger: Trigger = "api",
         watch_after: int | None = None,
         on_behalf_of: UserActor | ExternalAgentActor | None = None,
+        message_ids: tuple[MessageId, ...] = (),
     ) -> "Session[AppDepsT]":
         """Return a session for a new (or resuming) run of the thread's agent.
 
@@ -98,6 +103,7 @@ class Session[AppDepsT]:
             watch_after: The ``seq`` after which others' changes are delivered into the run.
             on_behalf_of: Whom the run segment acts for: the person, or the person's client,
                 whose message or answer started it.
+            message_ids: The messages its start carries out.
         """
         run_id = run_id or new_run_id()
         actor = AgentActor(
@@ -110,6 +116,7 @@ class Session[AppDepsT]:
             app=app,
             trigger=trigger,
             watch_after=watch_after,
+            message_ids=message_ids,
         )
 
 

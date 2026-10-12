@@ -1040,6 +1040,11 @@ export interface components {
          * @description An agent run started, or resumed after a pause.
          */
         RunStarted: {
+            /**
+             * Message Ids
+             * @default []
+             */
+            message_ids: components["schemas"]["MessageId"][];
             run_id: components["schemas"]["RunId"];
             thread_id: components["schemas"]["ThreadId"];
             trace_id?: components["schemas"]["TraceId"] | null;

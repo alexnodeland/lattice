@@ -175,6 +175,7 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
                 thread_id=session.thread_id,
                 trigger=session.trigger,
                 trace_id=current_trace_id(),
+                message_ids=session.message_ids,
             ),
             cursor=delivered.at(taken),
         )

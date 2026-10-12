@@ -67,7 +67,7 @@ telemetry = configure_telemetry(reflexr.otel.telemetry(), service_name="app")
 
 ## Traces
 
-A **turn** is one trace ([ADR-0035](../adr/0035-a-turn-is-its-own-trace.md)). When a message starts a run, or answers resume one, the `Runner` starts an `invoke_workflow turn` span as the root of a new trace, linked to the span that was current when the message arrived (the REST request, say). Inside it:
+A **turn** is one trace ([ADR-0035](../adr/0035-a-turn-is-its-own-trace.md)). When a message starts a run, or answers resume one, the `Runner` starts an `invoke_workflow turn` span as the root of a new trace, linked to the span that was current when the message arrived (the REST request, say). It starts from an empty context, so nothing the caller propagated, such as its baggage, a request's Langfuse attributes or a rule's run's tags, reaches the turn: attributes for a turn go in the `Runner`'s `turn_context` ([ADR-0059](../adr/0059-a-turn-starts-from-an-empty-context.md)). Inside it:
 
 ```text
 invoke_workflow turn                  the Runner
@@ -129,7 +129,7 @@ During a turn, the thread id is in OpenTelemetry baggage as `session.id`. `confi
 
 ## Logs
 
-`configure_telemetry` exports the standard `logging` module's records through OTLP, with the trace and span they were logged in; pass `logs=False` to leave logging alone.
+`configure_telemetry` exports the standard `logging` module's records through OTLP, with the trace and span they were logged in; pass `logs=False` to leave logging alone. A record logged in a span that names a tenant, as `artifactr.tenant.id`, or in any span inside one, carries that attribute too, so stackr's Collector can name its tenant as `tenant.id`, as it does for spans and metrics ([ADR-0060](../adr/0060-the-tenant-on-log-records.md)). A record logged in a trace the sampler drops carries no tenant.
 
 ## Langfuse
 

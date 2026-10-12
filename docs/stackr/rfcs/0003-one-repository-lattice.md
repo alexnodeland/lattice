@@ -146,7 +146,7 @@ moon runs every task, and only the ones a change affects. uv and Bun manage depe
 |---|---|
 | evalr, grantr | none |
 | artifactr, reflexr | evalr |
-| relayr | artifactr, reflexr |
+| relayr | artifactr, reflexr, and evalr (its `langfuse` extra) |
 | docplan, oncall | artifactr, reflexr respectively |
 | stackr | artifactr, reflexr and evalr (its template generates applications on them), and relayr once the template wires it in |
 | portalr's `app` and `admin` | `client`, `ui` |

@@ -1,7 +1,8 @@
 # The OpenTelemetry Collector: every application, and the LiteLLM proxy, sends
 # OTLP here, and the Collector fans it out:
 #   traces  -> Tempo, and Langfuse when the langfuse profile runs
-#   metrics -> Prometheus, through its OTLP receiver
+#   metrics -> Prometheus, through its OTLP receiver; portalr reads them
+#              through prom-label-proxy
 #   logs    -> Loki, through its OTLP endpoint
 # See docs/architecture.md and ADR-0007.
 
@@ -32,6 +33,33 @@ processors:
       - key: deployment.environment.name
         value: ${env:STACKR_ENVIRONMENT}
         action: insert
+  # One attribute names every signal's tenant, tenant.id, whichever library
+  # recorded it as artifactr.tenant.id or reflexr.tenant.id, so portalr filters
+  # Tempo, Loki and Prometheus on one name (lattice RFC-0002). Loki keeps it
+  # as the tenant_id structured metadata, and Prometheus as the tenant_id label.
+  transform/tenant:
+    error_mode: ignore
+    trace_statements:
+      - >-
+        set(span.attributes["tenant.id"], span.attributes["artifactr.tenant.id"])
+        where span.attributes["artifactr.tenant.id"] != nil
+      - >-
+        set(span.attributes["tenant.id"], span.attributes["reflexr.tenant.id"])
+        where span.attributes["reflexr.tenant.id"] != nil
+    metric_statements:
+      - >-
+        set(datapoint.attributes["tenant.id"], datapoint.attributes["artifactr.tenant.id"])
+        where datapoint.attributes["artifactr.tenant.id"] != nil
+      - >-
+        set(datapoint.attributes["tenant.id"], datapoint.attributes["reflexr.tenant.id"])
+        where datapoint.attributes["reflexr.tenant.id"] != nil
+    log_statements:
+      - >-
+        set(log.attributes["tenant.id"], log.attributes["artifactr.tenant.id"])
+        where log.attributes["artifactr.tenant.id"] != nil
+      - >-
+        set(log.attributes["tenant.id"], log.attributes["reflexr.tenant.id"])
+        where log.attributes["reflexr.tenant.id"] != nil
   batch: {}
 
 exporters:
@@ -60,17 +88,17 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, resource/environment, batch]
+      processors: [memory_limiter, resource/environment, transform/tenant, batch]
       # [otlp_grpc/tempo, otlp_http/langfuse], or Tempo alone when the
       # langfuse profile isn't running; set in compose.yaml and the Makefile.
       exporters: ${env:STACKR_TRACES_EXPORTERS}
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, resource/environment, batch]
+      processors: [memory_limiter, resource/environment, transform/tenant, batch]
       exporters: [otlp_http/prometheus]
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, resource/environment, batch]
+      processors: [memory_limiter, resource/environment, transform/tenant, batch]
       exporters: [otlp_http/loki]
   telemetry:
     # The Collector's own metrics, scraped by Prometheus for the Collector

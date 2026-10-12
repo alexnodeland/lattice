@@ -8,9 +8,9 @@ The OpenTelemetry Collector's configuration is `deploy/otel-collector/config.yam
 
 | Pipeline | Receivers | Processors | Exporters |
 |---|---|---|---|
-| `traces` | `otlp` | `memory_limiter`, `resource/environment`, `batch` | `${env:STACKR_TRACES_EXPORTERS}`: set by `make up` from the profiles |
-| `metrics` | `otlp` | `memory_limiter`, `resource/environment`, `batch` | `otlp_http/prometheus` |
-| `logs` | `otlp` | `memory_limiter`, `resource/environment`, `batch` | `otlp_http/loki` |
+| `traces` | `otlp` | `memory_limiter`, `resource/environment`, `transform/tenant`, `batch` | `${env:STACKR_TRACES_EXPORTERS}`: set by `make up` from the profiles |
+| `metrics` | `otlp` | `memory_limiter`, `resource/environment`, `transform/tenant`, `batch` | `otlp_http/prometheus` |
+| `logs` | `otlp` | `memory_limiter`, `resource/environment`, `transform/tenant`, `batch` | `otlp_http/loki` |
 
 <!-- end generated -->
 
@@ -33,6 +33,7 @@ The traces pipeline's exporters come from `STACKR_TRACES_EXPORTERS`, which `make
 |---|---|
 | `memory_limiter` | `{check_interval: 1s, limit_percentage: 80, spike_limit_percentage: 25}` |
 | `resource/environment` | `{attributes: [{key: deployment.environment.name, value: '${env:STACKR_ENVIRONMENT}', action: insert}]}` |
+| `transform/tenant` | `{error_mode: ignore, trace_statements: ['set(span.attributes["tenant.id"], span.attributes["artifactr.tenant.id"]) where span.attributes["artifactr.tenant.id"] != nil', 'set(span.attributes["tenant.id"], span.attributes["reflexr.tenant.id"]) where span.attributes["reflexr.tenant.id"] != nil'], metric_statements: ['set(datapoint.attributes["tenant.id"], datapoint.attributes["artifactr.tenant.id"]) where datapoint.attributes["artifactr.tenant.id"] != nil', 'set(datapoint.attributes["tenant.id"], datapoint.attributes["reflexr.tenant.id"]) where datapoint.attributes["reflexr.tenant.id"] != nil'], log_statements: ['set(log.attributes["tenant.id"], log.attributes["artifactr.tenant.id"]) where log.attributes["artifactr.tenant.id"] != nil', 'set(log.attributes["tenant.id"], log.attributes["reflexr.tenant.id"]) where log.attributes["reflexr.tenant.id"] != nil']}` |
 | `batch` | `{}` |
 
 ### Exporters

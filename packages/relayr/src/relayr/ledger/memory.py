@@ -24,7 +24,7 @@ class InMemoryLedger:
         self._clock = clock
         self._followed: dict[WorkspaceKey, _Followed] = {}
         self._dead_letters: dict[WorkspaceKey, dict[int, DeadLetter]] = {}
-        self._causes: dict[tuple[WorkspaceKey, CauseKind, str], Cause] = {}
+        self._causes: dict[tuple[WorkspaceKey, CauseKind, str], tuple[Cause, datetime]] = {}
 
     async def acquire_lease(self, workspace: WorkspaceKey, holder: str, ttl: timedelta) -> bool:
         """Take or renew the workspace's lease for `ttl`. Return False if another holder has it."""
@@ -65,11 +65,21 @@ class InMemoryLedger:
         self, workspace: WorkspaceKey, kind: CauseKind, key: str, cause: Cause
     ) -> None:
         """Record the run behind a write, by what the follower will find it by; the first kept."""
-        self._causes.setdefault((workspace, kind, key), cause)
+        self._causes.setdefault((workspace, kind, key), (cause, self._clock()))
 
     async def cause(self, workspace: WorkspaceKey, kind: CauseKind, key: str) -> Cause | None:
         """Return the run behind a write, or None if no run of a rule made it."""
-        return self._causes.get((workspace, kind, key))
+        found = self._causes.get((workspace, kind, key))
+        return None if found is None else found[0]
+
+    async def forget_causes(self, workspace: WorkspaceKey, *, older_than: timedelta) -> None:
+        """Forget the causes recorded longer ago than `older_than`, by the ledger's clock."""
+        before = self._clock() - older_than
+        self._causes = {
+            key: (cause, at)
+            for key, (cause, at) in self._causes.items()
+            if key[0] != workspace or at >= before
+        }
 
     async def followed(self) -> list[WorkspaceKey]:
         """Return every workspace a follower has held a lease on or saved a cursor for, in order."""

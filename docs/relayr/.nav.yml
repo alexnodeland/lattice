@@ -5,6 +5,7 @@ nav:
 - Guides:
   - Bridging artifactr into reflexr: guides/inbound.md
   - Acting in artifactr from rules: guides/outbound.md
+  - Tracing across the bridge: guides/telemetry.md
 - Reference: reference.md
 - Decisions:
   - adr/README.md
@@ -30,6 +31,9 @@ nav:
   - adr/0020-allowlists.md
   - adr/0021-chains-continue-across-the-bridge.md
   - adr/0022-what-a-rules-actor-needs-in-artifactr.md
+  - adr/0023-traces-linked-across-the-bridge.md
+  - adr/0024-langfuse-sessions-tagged-with-each-other.md
+  - adr/0025-counters-and-how-long-causes-are-kept.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

@@ -2865,7 +2865,7 @@
                 }
               }
             },
-            "description": "Bad Request"
+            "description": "Refused"
           },
           "401": {
             "content": {
@@ -2875,7 +2875,7 @@
                 }
               }
             },
-            "description": "Unauthorized"
+            "description": "Refused"
           },
           "403": {
             "content": {
@@ -2885,7 +2885,7 @@
                 }
               }
             },
-            "description": "Forbidden"
+            "description": "Refused"
           },
           "404": {
             "content": {
@@ -2895,7 +2895,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Refused"
           },
           "409": {
             "content": {
@@ -2905,7 +2905,7 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Refused"
           },
           "422": {
             "content": {
@@ -2915,7 +2915,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Refused"
           }
         },
         "summary": "List Workspaces"
@@ -2980,7 +2980,7 @@
                 }
               }
             },
-            "description": "Bad Request"
+            "description": "Refused"
           },
           "401": {
             "content": {
@@ -2990,7 +2990,7 @@
                 }
               }
             },
-            "description": "Unauthorized"
+            "description": "Refused"
           },
           "403": {
             "content": {
@@ -3000,7 +3000,7 @@
                 }
               }
             },
-            "description": "Forbidden"
+            "description": "Refused"
           },
           "404": {
             "content": {
@@ -3010,7 +3010,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Refused"
           },
           "409": {
             "content": {
@@ -3020,7 +3020,7 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Refused"
           },
           "422": {
             "content": {
@@ -3030,7 +3030,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Refused"
           }
         },
         "summary": "List Artifacts"
@@ -3079,7 +3079,7 @@
                 }
               }
             },
-            "description": "Bad Request"
+            "description": "Refused"
           },
           "401": {
             "content": {
@@ -3089,7 +3089,7 @@
                 }
               }
             },
-            "description": "Unauthorized"
+            "description": "Refused"
           },
           "403": {
             "content": {
@@ -3099,7 +3099,7 @@
                 }
               }
             },
-            "description": "Forbidden"
+            "description": "Refused"
           },
           "404": {
             "content": {
@@ -3109,7 +3109,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Refused"
           },
           "409": {
             "content": {
@@ -3119,7 +3119,7 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Refused"
           },
           "422": {
             "content": {
@@ -3129,7 +3129,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Refused"
           }
         },
         "summary": "Get Artifact"
@@ -3184,7 +3184,7 @@
                 }
               }
             },
-            "description": "Bad Request"
+            "description": "Refused"
           },
           "401": {
             "content": {
@@ -3194,7 +3194,7 @@
                 }
               }
             },
-            "description": "Unauthorized"
+            "description": "Refused"
           },
           "403": {
             "content": {
@@ -3204,7 +3204,7 @@
                 }
               }
             },
-            "description": "Forbidden"
+            "description": "Refused"
           },
           "404": {
             "content": {
@@ -3214,7 +3214,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Refused"
           },
           "409": {
             "content": {
@@ -3224,7 +3224,7 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Refused"
           },
           "422": {
             "content": {
@@ -3234,7 +3234,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Refused"
           }
         },
         "summary": "List Revisions"
@@ -3293,7 +3293,7 @@
                 }
               }
             },
-            "description": "Bad Request"
+            "description": "Refused, or rejected"
           },
           "401": {
             "content": {
@@ -3303,7 +3303,7 @@
                 }
               }
             },
-            "description": "Unauthorized"
+            "description": "Refused"
           },
           "403": {
             "content": {
@@ -3321,7 +3321,7 @@
                 }
               }
             },
-            "description": "Forbidden"
+            "description": "Refused, or rejected"
           },
           "404": {
             "content": {
@@ -3339,7 +3339,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Refused, or rejected"
           },
           "409": {
             "content": {
@@ -3357,7 +3357,7 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Refused, or rejected"
           },
           "422": {
             "content": {
@@ -3375,7 +3375,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Refused, or rejected"
           }
         },
         "summary": "Post Command"
@@ -3505,7 +3505,7 @@
                 }
               }
             },
-            "description": "Bad Request"
+            "description": "Refused"
           },
           "401": {
             "content": {
@@ -3515,7 +3515,7 @@
                 }
               }
             },
-            "description": "Unauthorized"
+            "description": "Refused"
           },
           "403": {
             "content": {
@@ -3525,7 +3525,7 @@
                 }
               }
             },
-            "description": "Forbidden"
+            "description": "Refused"
           },
           "404": {
             "content": {
@@ -3535,7 +3535,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Refused"
           },
           "409": {
             "content": {
@@ -3545,7 +3545,7 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Refused"
           },
           "422": {
             "content": {
@@ -3555,7 +3555,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Refused"
           }
         },
         "summary": "List Events"
@@ -3622,7 +3622,7 @@
                 }
               }
             },
-            "description": "Bad Request"
+            "description": "Refused"
           },
           "401": {
             "content": {
@@ -3632,7 +3632,7 @@
                 }
               }
             },
-            "description": "Unauthorized"
+            "description": "Refused"
           },
           "403": {
             "content": {
@@ -3642,7 +3642,7 @@
                 }
               }
             },
-            "description": "Forbidden"
+            "description": "Refused"
           },
           "404": {
             "content": {
@@ -3652,7 +3652,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Refused"
           },
           "409": {
             "content": {
@@ -3662,7 +3662,7 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Refused"
           },
           "422": {
             "content": {
@@ -3672,7 +3672,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Refused"
           }
         },
         "summary": "List Proposals"
@@ -3723,7 +3723,7 @@
                 }
               }
             },
-            "description": "Bad Request"
+            "description": "Refused"
           },
           "401": {
             "content": {
@@ -3733,7 +3733,7 @@
                 }
               }
             },
-            "description": "Unauthorized"
+            "description": "Refused"
           },
           "403": {
             "content": {
@@ -3743,7 +3743,7 @@
                 }
               }
             },
-            "description": "Forbidden"
+            "description": "Refused"
           },
           "404": {
             "content": {
@@ -3753,7 +3753,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Refused"
           },
           "409": {
             "content": {
@@ -3763,7 +3763,7 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Refused"
           },
           "422": {
             "content": {
@@ -3773,7 +3773,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Refused"
           }
         },
         "summary": "Get Run"
@@ -3818,7 +3818,7 @@
                 }
               }
             },
-            "description": "Bad Request"
+            "description": "Refused"
           },
           "401": {
             "content": {
@@ -3828,7 +3828,7 @@
                 }
               }
             },
-            "description": "Unauthorized"
+            "description": "Refused"
           },
           "403": {
             "content": {
@@ -3838,7 +3838,7 @@
                 }
               }
             },
-            "description": "Forbidden"
+            "description": "Refused"
           },
           "404": {
             "content": {
@@ -3848,7 +3848,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Refused"
           },
           "409": {
             "content": {
@@ -3858,7 +3858,7 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Refused"
           },
           "422": {
             "content": {
@@ -3868,7 +3868,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Refused"
           }
         },
         "summary": "List Threads"
@@ -3919,7 +3919,7 @@
                 }
               }
             },
-            "description": "Bad Request"
+            "description": "Refused"
           },
           "401": {
             "content": {
@@ -3929,7 +3929,7 @@
                 }
               }
             },
-            "description": "Unauthorized"
+            "description": "Refused"
           },
           "403": {
             "content": {
@@ -3939,7 +3939,7 @@
                 }
               }
             },
-            "description": "Forbidden"
+            "description": "Refused"
           },
           "404": {
             "content": {
@@ -3949,7 +3949,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Refused"
           },
           "409": {
             "content": {
@@ -3959,7 +3959,7 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Refused"
           },
           "422": {
             "content": {
@@ -3969,7 +3969,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Refused"
           }
         },
         "summary": "Get Thread"

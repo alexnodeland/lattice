@@ -1371,7 +1371,7 @@ export interface operations {
                     "application/json": components["schemas"]["WorkspaceId"][];
                 };
             };
-            /** @description Bad Request */
+            /** @description Refused */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1380,7 +1380,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unauthorized */
+            /** @description Refused */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1389,7 +1389,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Forbidden */
+            /** @description Refused */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1398,7 +1398,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Not Found */
+            /** @description Refused */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1407,7 +1407,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Conflict */
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1416,7 +1416,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Refused */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1450,7 +1450,7 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Bad Request */
+            /** @description Refused */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1459,7 +1459,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unauthorized */
+            /** @description Refused */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1468,7 +1468,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Forbidden */
+            /** @description Refused */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1477,7 +1477,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Not Found */
+            /** @description Refused */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1486,7 +1486,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Conflict */
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1495,7 +1495,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Refused */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1527,7 +1527,7 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Bad Request */
+            /** @description Refused */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1536,7 +1536,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unauthorized */
+            /** @description Refused */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1545,7 +1545,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Forbidden */
+            /** @description Refused */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1554,7 +1554,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Not Found */
+            /** @description Refused */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1563,7 +1563,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Conflict */
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1572,7 +1572,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Refused */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1604,7 +1604,7 @@ export interface operations {
                     "application/json": components["schemas"]["Revision"][];
                 };
             };
-            /** @description Bad Request */
+            /** @description Refused */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1613,7 +1613,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unauthorized */
+            /** @description Refused */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1622,7 +1622,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Forbidden */
+            /** @description Refused */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1631,7 +1631,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Not Found */
+            /** @description Refused */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1640,7 +1640,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Conflict */
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1649,7 +1649,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Refused */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1684,7 +1684,7 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
-            /** @description Bad Request */
+            /** @description Refused, or rejected */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1693,7 +1693,7 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"] | components["schemas"]["Refused"];
                 };
             };
-            /** @description Unauthorized */
+            /** @description Refused */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1702,7 +1702,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Forbidden */
+            /** @description Refused, or rejected */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1711,7 +1711,7 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"] | components["schemas"]["Refused"];
                 };
             };
-            /** @description Not Found */
+            /** @description Refused, or rejected */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1720,7 +1720,7 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"] | components["schemas"]["Refused"];
                 };
             };
-            /** @description Conflict */
+            /** @description Refused, or rejected */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1729,7 +1729,7 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"] | components["schemas"]["Refused"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Refused, or rejected */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1766,7 +1766,7 @@ export interface operations {
                     "application/json": components["schemas"]["Envelope"][];
                 };
             };
-            /** @description Bad Request */
+            /** @description Refused */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1775,7 +1775,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unauthorized */
+            /** @description Refused */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1784,7 +1784,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Forbidden */
+            /** @description Refused */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1793,7 +1793,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Not Found */
+            /** @description Refused */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1802,7 +1802,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Conflict */
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1811,7 +1811,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Refused */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1844,7 +1844,7 @@ export interface operations {
                     "application/json": components["schemas"]["Proposal"][];
                 };
             };
-            /** @description Bad Request */
+            /** @description Refused */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1853,7 +1853,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unauthorized */
+            /** @description Refused */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1862,7 +1862,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Forbidden */
+            /** @description Refused */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1871,7 +1871,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Not Found */
+            /** @description Refused */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1880,7 +1880,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Conflict */
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1889,7 +1889,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Refused */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1921,7 +1921,7 @@ export interface operations {
                     "application/json": components["schemas"]["Run"];
                 };
             };
-            /** @description Bad Request */
+            /** @description Refused */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1930,7 +1930,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unauthorized */
+            /** @description Refused */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1939,7 +1939,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Forbidden */
+            /** @description Refused */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -1948,7 +1948,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Not Found */
+            /** @description Refused */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1957,7 +1957,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Conflict */
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1966,7 +1966,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Refused */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1997,7 +1997,7 @@ export interface operations {
                     "application/json": components["schemas"]["Thread"][];
                 };
             };
-            /** @description Bad Request */
+            /** @description Refused */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2006,7 +2006,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unauthorized */
+            /** @description Refused */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2015,7 +2015,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Forbidden */
+            /** @description Refused */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2024,7 +2024,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Not Found */
+            /** @description Refused */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2033,7 +2033,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Conflict */
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2042,7 +2042,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Refused */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -2074,7 +2074,7 @@ export interface operations {
                     "application/json": components["schemas"]["Thread"];
                 };
             };
-            /** @description Bad Request */
+            /** @description Refused */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2083,7 +2083,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unauthorized */
+            /** @description Refused */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2092,7 +2092,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Forbidden */
+            /** @description Refused */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2101,7 +2101,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Not Found */
+            /** @description Refused */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2110,7 +2110,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Conflict */
+            /** @description Refused */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2119,7 +2119,7 @@ export interface operations {
                     "application/json": components["schemas"]["Refused"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Refused */
             422: {
                 headers: {
                     [name: string]: unknown;

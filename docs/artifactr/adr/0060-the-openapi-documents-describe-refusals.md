@@ -14,7 +14,7 @@ Schemathesis found that artifactr's router answers statuses and bodies its OpenA
 
 ## Decision
 
-- **Every route documents its refusals.** The router is built with `responses=REFUSALS`: 400, 401, 403, 404, 409 and 422, each answering `Refused`, whose `detail` is a `RejectionDetail` (`type`, `message` and the rejection's typed details), a string, or a list of `FieldError`s. `POST .../commands` answers a `CommandResult` or a `Refused` at each rejection's status. The models are shared verbatim with reflexr's router.
+- **Every route documents its refusals.** The router is built with `responses=REFUSALS`: 400, 401, 403, 404, 409 and 422, each answering `Refused`, whose `detail` is a `RejectionDetail` (`type`, `message` and the rejection's typed details), a string, or a list of `FieldError`s. `POST .../commands` answers a `CommandResult` or a `Refused` at each rejection's status. Each is described in words of its own, since FastAPI's default description, Python's phrase for the status, changed in 3.13 (`Unprocessable Content`). The models are shared verbatim with reflexr's router.
 - **Every union member's tag is required in its JSON Schema.** `tag_required`, in `artifactr.core.tagged` and shared verbatim with reflexr, marks a model's fields fixed to one value required. The members of every discriminated union name it in their config. A test holds the committed document to it. A command frame's own `type` is the exception: a REST body is always one.
 - **An unknown event's `type` is none of the known ones** in its JSON Schema, so no event matches two members of the union.**
 - **A path's ids are never empty** (`minLength: 1`).

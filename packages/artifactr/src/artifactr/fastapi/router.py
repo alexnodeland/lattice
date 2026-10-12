@@ -84,9 +84,11 @@ class Refused(BaseModel):
 
 
 REFUSALS: Final[dict[int | str, dict[str, Any]]] = {
-    status: {"model": Refused} for status in (400, 401, 403, 404, 409, 422)
+    status: {"model": Refused, "description": "Refused"}
+    for status in (400, 401, 403, 404, 409, 422)
 }
-"""The refused responses every route documents."""
+"""The refused responses every route documents, each described in words of its own, since
+FastAPI's default is Python's phrase for the status, which changes between versions."""
 
 
 class Unauthorized(Exception):
@@ -163,7 +165,10 @@ def artifactr_router(
 
     @router.post(
         "/workspaces/{workspace_id}/commands",
-        responses={status: {"model": CommandResult | Refused} for status in STATUS_CODES.values()},
+        responses={
+            status: {"model": CommandResult | Refused, "description": "Refused, or rejected"}
+            for status in STATUS_CODES.values()
+        },
     )
     async def post_command(
         frame: CommandFrame, response: Response, workspace: Workspace = current_workspace

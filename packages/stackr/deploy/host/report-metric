@@ -12,7 +12,7 @@ cd "$(dirname "$0")/../.."
 service=${1:?usage: report-metric SERVICE METRIC VALUE} metric=${2:?} value=${3:?}
 now=$(date +%s)
 docker compose -f compose.yaml -f deploy/host/compose.prod.yaml --profile smoke \
-  run --rm --no-deps -T probe -fsS -o /dev/null -H 'Content-Type: application/json' \
+  run --rm --no-deps -T probe -fsS --max-time 30 -o /dev/null -H 'Content-Type: application/json' \
   --data @- http://otel-collector:4318/v1/metrics <<JSON
 {"resourceMetrics": [{
   "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "$service"}}]},

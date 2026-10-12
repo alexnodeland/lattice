@@ -84,7 +84,11 @@ clickhouse "BACKUP DATABASE stackr_drill TO S3(backups, 'drill/$sentinel') FORMA
 databases="postgres langfuse litellm auth"
 tables="SELECT schemaname || '.' || tablename FROM pg_tables
   WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY 1"
-live=$(for database in $databases; do psql -d "$database" -c "$tables" | sed "s/^/$database /"; done)
+live=""
+for database in $databases; do
+  found=$(psql -d "$database" -c "$tables") || fail "listing $database's tables"
+  live+=$(while read -r table; do printf '%s %s\n' "$database" "$table"; done <<<"$found")$'\n'
+done
 
 # The scratch container gets the postgres service's settings in a private file, and its CA.
 config=$(host --profile postgres config --format json)
@@ -133,7 +137,9 @@ tables_with_rows() {
 clickhouse "DROP DATABASE IF EXISTS restore_drill SYNC"
 clickhouse "DROP DATABASE IF EXISTS restore_sentinel SYNC"
 clickhouse "RESTORE DATABASE default AS restore_drill FROM S3(backups, '$latest') FORMAT Null"
-missing=$(comm -23 <(tables_with_rows default) <(tables_with_rows restore_drill))
+live_rows=$(tables_with_rows default) || fail "listing Langfuse's tables"
+restored_rows=$(tables_with_rows restore_drill) || fail "listing the restored tables"
+missing=$(comm -23 <(printf '%s\n' "$live_rows") <(printf '%s\n' "$restored_rows"))
 [[ -z $missing ]] || fail "ClickHouse's restore of $latest has no rows in: $missing"
 clickhouse "RESTORE DATABASE stackr_drill AS restore_sentinel FROM S3(backups, 'drill/$sentinel') FORMAT Null"
 [[ $(clickhouse "SELECT count() FROM restore_sentinel.sentinel WHERE id = '$sentinel'") == 1 ]] ||

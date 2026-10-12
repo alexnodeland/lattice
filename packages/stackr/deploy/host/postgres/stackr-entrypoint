@@ -6,4 +6,6 @@ if [ -n "${BACKUP_S3_BUCKET:-}" ] && [ "${1:-}" = postgres ]; then
   pgbackrest-conf
   set -- "$@" -c archive_mode=on -c "archive_command=pgbackrest --stanza=stackr archive-push %p"
 fi
+# pgBackRest reads them from its configuration: PostgreSQL and its children don't inherit them.
+unset BACKUP_CIPHER_PASS BACKUP_S3_SECRET_ACCESS_KEY
 exec docker-entrypoint.sh "$@"

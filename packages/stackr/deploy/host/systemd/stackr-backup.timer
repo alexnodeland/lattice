@@ -1,4 +1,4 @@
-# Runs stackr-backup.service nightly; a run missed while the host was off runs at its next start.
+# Runs stackr-backup.service nightly. A run missed while the host was off runs when it starts.
 [Unit]
 Description=Back up stackr's PostgreSQL and ClickHouse to the backups' bucket, nightly
 

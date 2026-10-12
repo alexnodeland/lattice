@@ -1,5 +1,5 @@
 <!-- The user deploy/host/backup and restore-drill run as, from inside the container only: it may
-     back up Langfuse's database and restore it onto a new host, use the bucket, read the system tables, and own the drill's
+     back up Langfuse's database, use the bucket, read the system tables, and own the drill's
      three databases. Langfuse's own
      user can't reach the bucket. -->
 <clickhouse>
@@ -13,7 +13,7 @@
       <profile>default</profile>
       <quota>default</quota>
       <grants>
-        <query>GRANT SELECT, BACKUP, CREATE TABLE, INSERT ON default.*</query>
+        <query>GRANT SELECT, BACKUP ON default.*</query>
         <query>GRANT ALL ON stackr_drill.*</query>
         <query>GRANT ALL ON restore_drill.*</query>
         <query>GRANT ALL ON restore_sentinel.*</query>

@@ -16,7 +16,8 @@ RFC-0004 backs up a single host with pgBackRest and ClickHouse's native `BACKUP 
 
 - **The bucket is the `BACKUP_S3_*` settings:** an endpoint reached over HTTPS, path-style, its port, bucket, region and keys. pgBackRest and ClickHouse read the same settings.
 - **Its certificate is always checked,** against `BACKUP_S3_CA_FILE`, a CA bundle on the host: the host's own by default, or a store's own CA. pgBackRest names it with `repo1-storage-ca-file`; ClickHouse adds it with `caConfig`, beside the system's, leaving its verification mode as it is, since that setting is global.
-- **PostgreSQL's backups are encrypted before they leave the host,** with `aes-256-cbc` and `BACKUP_CIPHER_PASS`, which `make env` generates. Losing it loses the backups: it is kept with the rest of `.env`, off the host. ClickHouse's backups rely on the bucket's own encryption.
+- **PostgreSQL's backups are encrypted before they leave the host,** with `aes-256-cbc` and `BACKUP_CIPHER_PASS`, which `make env` generates. Losing it loses the backups: it is kept with the rest of `.env`, off the host. ClickHouse's backups leave the host unencrypted by stackr, and rely on the bucket's own server-side encryption, which the guide tells operators to turn on.
+- **Secrets in the containers' environment.** PostgreSQL's entrypoint writes the passphrase and the bucket's secret key into pgBackRest's configuration, then unsets them, so PostgreSQL and its children don't inherit them. They stay in the container's own settings, which `docker inspect` shows to anyone who can run it on the host, as every service's do: that is the host's root, which holds `.env` anyway.
 
 ### PostgreSQL
 
@@ -26,7 +27,7 @@ RFC-0004 backs up a single host with pgBackRest and ClickHouse's native `BACKUP 
 
 ### ClickHouse
 
-- **A `backup` user does the backups and the drill,** from inside the container only. It may back up Langfuse's database, use the `backups` named collection and S3, read the system tables, own the drill's databases, and create and fill Langfuse's tables, for a restore onto a new host. Langfuse's own user can't reach the bucket.
+- **A `backup` user does the backups and the drill,** from inside the container only. It may read and back up Langfuse's database, use the `backups` named collection and S3, read the system tables, and own the drill's databases; it can't write Langfuse's tables. Langfuse's own user can't reach the bucket. Restoring onto a new host is an operator's task, as ClickHouse's admin, with the bucket's keys in the statement, which ClickHouse masks in its logs; `RESTORE DATABASE default` restores into the empty `default` database, with no `CREATE DATABASE`.
 - **The named collection's URL and keys come from the environment** (`from_env`), so no key is written in a statement.
 - **Each nightly backup is whole,** of Langfuse's database and the drill's, as `clickhouse/<UTC time>`. The bucket's own lifecycle rule expires them.
 
@@ -44,7 +45,7 @@ The single host's run backs up to a MinIO of its own, over HTTPS, with a certifi
 
 ### Where this departs from RFC-0004
 
-- **ClickHouse is restored beside the live database, not into a new container.** The restore reads the same backup a new server would, through the same collection, with no second ClickHouse to configure. It costs the live server, while it runs, the disk of a second copy of Langfuse's database (checked first), the IO to write it, and the memory of the restore. The `backup` user needs `ALL` on the drill's databases, and on Langfuse's, `SELECT`, `BACKUP`, and `CREATE TABLE` and `INSERT` for a restore.
+- **ClickHouse is restored beside the live database, not into a new container.** The restore reads the same backup a new server would, through the same collection, with no second ClickHouse to configure. It costs the live server, while it runs, the disk of a second copy of Langfuse's database (checked first), the IO to write it, and the memory of the restore. The `backup` user needs `ALL` on the drill's databases, and only `SELECT` and `BACKUP` on Langfuse's.
 - **CI's drill uses a MinIO of its own, not the stack's.** pgBackRest needs HTTPS, and the stack's MinIO serves Langfuse over HTTP.
 - **RFC-0004's design says "full and incremental backups"** and "the latest backups into new containers". The design above is what the host does: weekly full and nightly differential backups for PostgreSQL, a new container for PostgreSQL's restore, and the live server for ClickHouse's. The RFC stays as accepted.
 

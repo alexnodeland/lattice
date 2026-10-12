@@ -3,7 +3,7 @@
 **Status:** Discussion
 **Author:** Alex Nodeland
 **Created:** 2026-10-12
-**Discussion:** the pull request that adds this RFC; its decisions were taken with the maintainer on 2026-10-12, and [Decisions](#decisions) records them
+**Discussion:** the pull request that adds this RFC; its decisions were taken with the maintainer on 2026-10-12 (D9 with the portal RFC's), and [Decisions](#decisions) records them
 **Siblings:**
 
 - [artifactr ADR-0012][a-adr-0012] and [ADR-0048][a-adr-0048] put authorization within a tenant behind one hook, asked in one place. This RFC widens that hook, and amends both.
@@ -129,6 +129,7 @@ The built-in roles:
 
 | Role | On | May |
 |---|---|---|
+| `operator` | the deployment | see every tenant, and the stack's shared tools (Langfuse, Grafana, Tempo, LiteLLM), which aren't tenant-scoped. Given only by another operator, or by the first one the template creates |
 | `owner` | tenant | everything in the tenant, including deleting it and managing owners |
 | `admin` | tenant | everything but the above: members, groups, roles, keys, every workspace |
 | `member` | tenant | belong to the tenant; workspace roles give access to its workspaces |
@@ -138,6 +139,7 @@ The built-in roles:
 
 Rule management (`reflexr:install_rule`, `update_rule`, `archive_rule`, `replay_rule`) is in the workspace `admin` role only. That answers stackr RFC-0002's "who may accept a rule": a workspace admin. A custom role can hand it to others.
 
+- **`operator` is a grant, never a flag.** It is given and revoked like any role, recorded in the audit log, and held by few. It doesn't put an operator inside a tenant's workspaces: reading a tenant's threads still needs a role there, which an operator can grant themselves, in the audit log.
 - **No one grants more than they hold.** A grant is refused if its role has an action the granter can't take on that resource.
 - **Custom roles** are a tenant's own named sets of actions, validated against the catalogs. They can be granted wherever a built-in workspace role can. The built-in roles can't be edited, so a deployment's meaning of `editor` doesn't drift.
 - **Checks are deny by default.** A principal with no grant that applies, an unknown action, an action not in any catalog, or a store that can't be read: each is a refusal. Being signed in isn't access, and the template shows a member with no workspace roles that they have none, rather than an empty app.
@@ -266,6 +268,7 @@ The maintainer decided these on 2026-10-12.
 | D6 | What else is in v0.1 | Groups, service principals, the matrix test, the audit log, custom roles, row-level security | Some of these after v0.1 |
 | D7 | Where the audit log lives | An append-only log in grantr | Telemetry only |
 | D8 | The engine | grantr's own model, with OpenFGA-shaped ports | OpenFGA, SpiceDB, Cedar, Casbin or Oso (below) |
+| D9 | Who sees across tenants | A deployment-wide `operator` role, an audited grant | No deployment-wide role; whoever runs the deployment uses the stack's tools directly |
 
 D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom roles cost little in the core, where roles already live; threads and artifacts, and row-level security, come after the parts everything else needs.
 
@@ -290,7 +293,6 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
 
 - **Who may restrict a thread?** Its creator, and workspace admins, is the proposal. Whether an editor may restrict a thread someone else started is open.
 - **A stored rule's grants at install:** the installer's role on the workspace, or a narrower set the installer picks in the review. Phase 5 of stackr RFC-0002 settles it with relayr.
-- **Cross-tenant staff access,** for support. It would be an explicit, audited grant, never a flag; whether v0.1 needs it is for the portal RFC.
 - **Ending a live connection on revocation,** rather than only refusing its next command. It needs a channel from grantr to the libraries' connections, which the template could provide.
 - **Workspaces without a library behind them:** grantr registers a workspace when it is first granted or checked. Whether artifactr #62's listing should come from grantr in applications that use it is for that issue.
 
@@ -298,7 +300,7 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
 
 grantr's RFC-0001 turns these phases into its plan, with a tracking issue.
 
-- [ ] Sign-off on D1 to D8
+- [ ] Sign-off on D1 to D9
 - [ ] Phase 1: the hook
 - [ ] Phase 2: grantr's core
 - [ ] Phase 3: storage and API

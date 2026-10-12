@@ -25,6 +25,9 @@ async def test_the_experiments_run_offline() -> None:
 {%- if use_reflexr %}
         "ticket-triage",
 {%- endif %}
+{%- if use_relayr %}
+        "incident-scenarios",
+{%- endif %}
     ]
     for result in results:
         assert all(item.verdicts and not item.errors for item in result.items), result
@@ -33,8 +36,26 @@ async def test_the_experiments_run_offline() -> None:
     assert {verdict.value.model_dump()["stars"] for verdict in replies.values()} == {5}
 {%- endif %}
 {%- if use_reflexr %}
-    reviews = results[-1].verdicts("review_triage")
+    reviews = results[{% if use_relayr %}-2{% else %}-1{% endif %}].verdicts("review_triage")
     assert {verdict.value.model_dump()["correct"] for verdict in reviews.values()} == {True}
+{%- endif %}
+{%- if use_relayr %}
+    incidents = {
+        example: verdict.value.model_dump()
+        for example, verdict in results[-1].verdicts("review_incident").items()
+    }
+    assert {example: v["outcome"] for example, v in incidents.items()} == {
+        "as-proposed": "accepted",
+        "edited": "edited",
+        "rejected": "rejected",
+    }
+    assert incidents["edited"]["rewrite_rate"] > 0, "a person rewrote the timeline"
+    assert incidents["as-proposed"]["rewrite_rate"] == 0
+
+
+async def test_a_scenario_that_never_gets_there_times_out() -> None:
+    with pytest.raises(TimeoutError, match="never got there"):
+        await evals.experiments._until(lambda: None, tries=1)
 {%- endif %}
 
 
@@ -46,6 +67,9 @@ def test_main_prints_the_results(capsys: pytest.CaptureFixture[str]) -> None:
 {%- endif %}
 {%- if use_reflexr %}
     assert "ticket-triage #1: 2 examples of ticket-triage" in printed
+{%- endif %}
+{%- if use_relayr %}
+    assert "incident-scenarios #1: 3 examples of incident-scenarios" in printed
 {%- endif %}
 
 

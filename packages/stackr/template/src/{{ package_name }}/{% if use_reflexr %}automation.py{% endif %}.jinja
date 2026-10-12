@@ -42,6 +42,7 @@ from reflexr.workspace import (
     Workspaces,
 )
 {%- if use_relayr %}
+from relayr.evals import RULES as EVALUATION_RULES
 from relayr.events import BRIDGED
 from relayr.inbound import SOURCE
 from relayr.rules import RULES as CHAT_RULES
@@ -148,7 +149,7 @@ class Automation:
             if database
             else InMemoryStorage(),
             events={% if use_relayr %}events{% else %}EVENTS{% endif %},
-            rules={% if use_relayr %}[*RULES, *([*INCIDENT_RULES, *CHAT_RULES] if actions else [])]{% else %}RULES{% endif %},
+            rules={% if use_relayr %}[*RULES, *([*INCIDENT_RULES, *CHAT_RULES, *EVALUATION_RULES] if actions else [])]{% else %}RULES{% endif %},
             authorize=authorize,
 {%- if use_relayr %}
             publishers={"artifactr": [SOURCE]},

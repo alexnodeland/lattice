@@ -14,10 +14,11 @@ timeline is written directly, everything else is a proposal or a notice.
 """
 
 from collections.abc import Mapping
+from typing import ClassVar
 
 from pydantic import BaseModel, Field
 
-from artifactr import Artifact, Workspaces
+from artifactr import Artifact, Workspaces, WritePolicy
 from reflexr import Event, F, Rule, on, run
 from reflexr.workspace import Action, Reaction
 from relayr.events import MessagePosted
@@ -50,7 +51,33 @@ class Timeline(Artifact, name="timeline"):
     entries: dict[str, Entry] = Field(default_factory=dict[str, Entry])
 
 
-EVENTS: list[type[Event]] = [AlertFired]
+class IncidentResolved(AppEvent, name="incident.resolved"):
+    """Monitoring, or a person, says a service's incident is over."""
+
+    service: str
+    summary: str
+
+
+class FollowUp(BaseModel):
+    """Something to do after an incident."""
+
+    text: str
+    owner: str | None = None
+
+
+class Postmortem(Artifact, name="postmortem"):
+    """What happened in an incident, drawn from its timeline, and what to do about it."""
+
+    write_policy: ClassVar[WritePolicy] = "propose"
+
+    title: str
+    thread_id: str
+    summary: str
+    timeline: list[Entry] = Field(default_factory=list[Entry])
+    follow_ups: list[FollowUp] = Field(default_factory=list[FollowUp])
+
+
+EVENTS: list[type[Event]] = [AlertFired, IncidentResolved]
 """The example's own event types, beside the bridged ones."""
 
 open_incident = Rule(
@@ -67,11 +94,20 @@ timeline_entry = Rule(
     then=run("timeline-entry"),
 )
 
-RULES = [open_incident, timeline_entry]
+close_incident = Rule(
+    name="{{ package_name }}:close-incident",
+    description="An incident was resolved. Say so in its thread, and propose its postmortem.",
+    when=on(IncidentResolved),
+    then=run("close-incident"),
+)
+
+RULES = [open_incident, timeline_entry, close_incident]
 
 ALLOWLISTS: Mapping[str, Allowlist] = {
     open_incident.name: Allowlist(create_threads=True, direct=frozenset({"timeline"})),
     timeline_entry.name: Allowlist(direct=frozenset({"timeline"})),
+    # The resolution comes from monitoring, so its chain holds no thread: it names the incident's.
+    close_incident.name: Allowlist(threads="any"),
 }
 """What each rule may do in artifactr beyond proposals and notices in its chain's threads."""
 
@@ -110,4 +146,37 @@ def incident_actions(outbound: Outbound, workspaces: Workspaces) -> dict[str, Ac
                 entry = Entry(source=message.author.display_name, text=message.content)
                 await acting.edit(timeline.id, f"/entries/{said.id}", entry.model_dump())
 
-    return {"open-incident": open_incident, "timeline-entry": timeline_entry}
+    async def close_incident(reaction: Reaction[None]) -> None:
+        [envelope] = reaction.events
+        assert isinstance(envelope.event, IncidentResolved)
+        resolved = envelope.event
+        workspace = await workspaces.open(
+            reaction.workspace.tenant_id,
+            reaction.workspace.workspace_id,
+            actor=rule_actor(reaction.run.rule),
+        )
+        timelines = await workspace.artifacts(Timeline)
+        incidents = [t for t in timelines if t.data.title == resolved.service]
+        if not incidents:
+            return
+        timeline = incidents[-1].data  # the service's latest incident
+        thread = timeline.thread_id
+        postmortem = Postmortem(
+            title=f"Postmortem: {resolved.service}",
+            thread_id=thread,
+            summary=resolved.summary,
+            timeline=list(timeline.entries.values()),
+        )
+        count = len(timeline.entries)
+        drawn = f"the incident's timeline, {count} {'entry' if count == 1 else 'entries'}"
+        why = f"Drawn from {drawn}, and from its resolution: {resolved.summary}"
+        acting = outbound.acting(reaction)
+        await acting.create(postmortem, thread_id=thread, rationale=why)
+        closed = f"Resolved: {resolved.summary} Its postmortem is proposed for review."
+        await acting.notice(closed, thread_id=thread)
+
+    return {
+        "open-incident": open_incident,
+        "timeline-entry": timeline_entry,
+        "close-incident": close_incident,
+    }

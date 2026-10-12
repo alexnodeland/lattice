@@ -18,7 +18,7 @@ dependencies = [
     "grantr[sql,postgres,fastapi]",
 {%- endif %}
 {%- if use_relayr %}
-    "relayr-ai[sql,postgres,otel,langfuse]",
+    "relayr-ai[sql,postgres,otel,langfuse,evals]",
 {%- endif %}
     "pyjwt[crypto]>=2.10",
     "uvicorn[standard]>=0.54",

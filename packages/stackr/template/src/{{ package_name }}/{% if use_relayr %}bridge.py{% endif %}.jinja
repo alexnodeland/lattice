@@ -30,6 +30,8 @@ from artifactr.agent import TurnContext
 from grantr import Grants, Resource, User
 {%- endif %}
 from reflexr.workspace import Action, Reaction, RunContext, with_params
+from relayr.evals import RULES as EVALUATION_RULES
+from relayr.evals import Outcomes
 from relayr.inbound import {% if access == 'grantr' %}FOLLOWER, {% endif %}Followers
 from relayr.langfuse import bridged_run, bridged_turns
 from relayr.ledger import InMemoryLedger, Ledger
@@ -119,7 +121,7 @@ class Bridge:
 
             return with_params(delegate, params)
 
-        rules = [*INCIDENT_RULES, *CHAT_RULES]
+        rules = [*INCIDENT_RULES, *CHAT_RULES, *EVALUATION_RULES]
         return {
             **{rule.then.action: act for rule in rules},
             # Every action rules from chat run declares its params.
@@ -156,6 +158,7 @@ class Bridge:
         self._actions = {
             **incident_actions(outbound, collaboration.workspaces),
             **installer.actions,
+            **Outcomes(collaboration.workspaces, self.ledger).actions,
         }
         self._followers = Followers(
             collaboration.workspaces,

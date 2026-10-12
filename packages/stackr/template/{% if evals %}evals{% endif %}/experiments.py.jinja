@@ -19,11 +19,23 @@ examples.
 
 import argparse
 import asyncio
+{%- if use_relayr %}
+import secrets
+import tempfile
+import time
+{%- endif %}
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any
+{%- if use_relayr %}
+from datetime import timedelta
+{%- endif %}
+from typing import Any{% if use_relayr %}, Literal{% endif %}
 
+{% if use_relayr -%}
+import jwt
+from fastapi.testclient import TestClient
+{% endif -%}
 from langfuse import Langfuse
-from pydantic import BaseModel
+from pydantic import BaseModel{% if use_relayr %}, Field{% endif %}
 from pydantic_ai import ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models import Model
 from pydantic_ai.models.function import AgentInfo
@@ -33,23 +45,47 @@ from artifactr import InMemoryStorage, Runner, UserActor, Workspaces
 from artifactr.agent import function_model
 from artifactr.core import CreateThread
 {% endif -%}
+{% if use_relayr -%}
+from artifactr.sql import SqlStorage as ArtifactrStorage
+{% endif -%}
 from evalr import Dataset, Example, ExperimentResult, ExperimentTracker, FunctionEvaluator
 from evalr.core import Task
 from evalr.langfuse import LangfuseExperimentTracker
+{%- if use_relayr %}
+from evalr.measures import measure_rewrites
+{%- endif %}
 from evalr.memory import InMemoryExperimentTracker
+{%- if access == 'grantr' and use_relayr %}
+from grantr import InMemoryStorage as GrantsMemory
+{%- endif %}
 {%- if use_reflexr %}
 {%- if not use_artifactr %}
 from reflexr.agent import function_model
 {%- endif %}
-from reflexr.core import Event
+from reflexr.core import Event{% if use_relayr %}, Feedback, SystemActor{% endif %}
 from reflexr.evals import Replay, replay_task
 {%- endif %}
+{%- if use_relayr %}
+from reflexr.sql import SqlStorage as ReflexrStorage
+from reflexr.workspace import Workspaces as ReflexrWorkspaces
+from relayr.evals import history, proposal_rates
+{%- endif %}
 
+{% if access == 'grantr' and use_relayr -%}
+from {{ package_name }}.access import build_grants
+{% endif -%}
+{% if use_relayr -%}
+from {{ package_name }}.app import create_app
+from {{ package_name }}.database import open_database
+{% endif -%}
 from {{ package_name }}.gateway import gateway_model
+{%- if use_relayr %}
+from {{ package_name }}.incidents import EVENTS as INCIDENT_EVENTS
+{%- endif %}
 {%- if use_artifactr %}
 from {{ package_name }}.notes import Note, Rating, build_note_agent
 {%- endif %}
-from {{ package_name }}.settings import Settings
+from {{ package_name }}.settings import {% if use_relayr %}AuthSettings, GatewaySettings, {% endif %}Settings
 {%- if use_reflexr %}
 from {{ package_name }}.tickets import (
     EVENTS,
@@ -193,6 +229,229 @@ async def ticket_triage(tracker: ExperimentTracker, model: Model) -> ExperimentR
         evaluators=[FunctionEvaluator(review_triage, verdict_type=TriageReview)],
     )
 {%- endif %}
+{%- if use_relayr %}
+
+
+# ─── relayr: the incident scenario, through the application ───────────────────
+
+
+class Scenario(BaseModel):
+    """An incident: what people write in its thread, and how they take its postmortem."""
+
+    messages: list[str]
+    rewrite: bool = False
+    """Whether a person rewrites the timeline as one entry of their own."""
+
+    decision: Literal["accept", "edit", "reject"]
+
+
+class Incident(BaseModel):
+    """What the scenario measured."""
+
+    outcome: Literal["accepted", "edited", "rejected"]
+    """How the postmortem the rule proposed was taken."""
+
+    agent_revisions: int
+    rewritten: int
+    """Of the timeline's versions the rules wrote, those a person rewrote."""
+
+    resolved_in: float
+    """Seconds from the alert to the resolution."""
+
+
+class IncidentReview(Feedback, name="incident_review", targets={"chain"}):
+    """How an incident went: its postmortem's outcome, the timeline's rewrites, and its length."""
+
+    outcome: Literal["accepted", "edited", "rejected"]
+    rewrite_rate: float = Field(ge=0, le=1)
+    resolved_in: float = Field(ge=0)
+
+
+SCENARIOS = Dataset(
+    "incident-scenarios",
+    [
+        Example(id="as-proposed", input=Scenario(messages=["Rolled back."], decision="accept")),
+        Example(
+            id="edited",
+            input=Scenario(messages=["Paged the team.", "Fixed."], rewrite=True, decision="edit"),
+        ),
+        Example(id="rejected", input=Scenario(messages=["False alarm."], decision="reject")),
+    ],
+    input_type=Scenario,
+    verdict_type=IncidentReview,
+    description="Incidents, from an alert to the postmortem's review.",
+)
+
+PERSON = "evals"
+"""Who acts in the scenarios."""
+
+WORKSPACE = "incidents"
+
+
+def incident(model: Model) -> Task[Scenario, IncidentReview, Incident]:
+    """The task: an example's incident, run through the application, in memory and SQLite."""
+
+    async def play(example: Example[Scenario, IncidentReview]) -> Incident:
+        with tempfile.TemporaryDirectory() as directory:
+            url = f"sqlite+aiosqlite:///{directory}/incident.db"
+            await _scenario(model, url, example.id, example.input)
+            return await _measured(url)
+
+    return play
+
+
+async def _scenario(model: Model, url: str, service: str, scenario: Scenario) -> None:
+    """Play a scenario through the application's REST API, as people and monitoring would."""
+    secret = secrets.token_hex(32)
+    settings = Settings(
+        database_url=url,
+        auth=AuthSettings(jwt_secret=secret),
+        gateway=GatewaySettings(tenant_keys={PERSON: "sk-evals"}),
+    )
+{%- if access == 'grantr' %}
+    grants = build_grants(GrantsMemory(), name=settings.service_name)
+    await grants.provision_tenant(PERSON, owner=PERSON)
+    application = create_app(settings, model=model, grants=grants, poll_interval=POLL)
+{%- else %}
+    application = create_app(settings, model=model, poll_interval=POLL)
+{%- endif %}
+    with TestClient(application, headers=_signed(secret)) as client:
+        artifactr = f"/artifactr/v1/workspaces/{WORKSPACE}"
+        reflexr = f"/reflexr/v1/workspaces/{WORKSPACE}"
+
+        def command(**body: Any) -> dict[str, Any]:
+            frame = {"type": "command", "command_id": secrets.token_hex(8), "command": body}
+            answered = client.post(f"{artifactr}/commands", json=frame).json()
+            assert answered["ok"], answered
+            return answered
+
+        def artifacts(kind: str) -> list[dict[str, Any]]:
+            found = client.get(f"{artifactr}/artifacts").json()
+            return [a for a in found if a["kind"] == kind]
+
+        fired = {"type": FIRED, "service": service, "summary": f"{service} is failing"}
+        client.post(f"{reflexr}/events", json={"event": fired}).raise_for_status()
+        [timeline] = await _until(lambda: artifacts("timeline"))
+        thread = timeline["data"]["thread_id"]
+        for count, message in enumerate(scenario.messages, start=2):
+            command(type="post_message", thread_id=thread, content=message)
+            await _until(lambda n=count: len(artifacts("timeline")[0]["data"]["entries"]) == n)
+        if scenario.rewrite:
+            current = artifacts("timeline")[0]
+            first = next(iter(current["data"]["entries"]))  # keyed by the alert
+            text = (
+                "Every checkout failed for twenty minutes after the 14:02 deploy, until the"
+                " rollback at 14:22; card payments, refunds and saved carts were all affected."
+            )
+            rewritten = {"source": "monitoring", "text": text}
+            patch = [{"op": "replace", "path": "/entries", "value": {first: rewritten}}]
+            command(
+                type="edit_artifact",
+                artifact_id=current["id"],
+                base_version=current["version"],
+                patch={"kind": "json_patch", "ops": patch},
+            )
+        resolved = {"type": RESOLVED, "service": service, "summary": "Fixed by a rollback."}
+        client.post(f"{reflexr}/events", json={"event": resolved}).raise_for_status()
+
+        def postmortems() -> list[dict[str, Any]]:
+            found = client.get(f"{artifactr}/proposals").json()
+            return [p for p in found if p["change"].get("kind") == "postmortem"]
+
+        [proposal] = await _until(postmortems)
+        follow_up = [{"op": "add", "path": "/follow_ups/-", "value": {"text": "Add a canary."}}]
+        edited = {"kind": "json_patch", "ops": follow_up}
+        command(
+            type="respond_to_proposal",
+            proposal_id=proposal["id"],
+            decision="reject" if scenario.decision == "reject" else "accept",
+            changes=edited if scenario.decision == "edit" else None,
+        )
+
+        def scored() -> list[dict[str, Any]]:
+            given = client.get(f"{reflexr}/events", params={"type": ["reflexr:feedback_given"]})
+            return given.json()
+
+        await _until(scored)
+
+
+async def _measured(url: str) -> Incident:
+    """Read what the scenario left in the libraries' storage, with relayr's measures."""
+    engine = open_database(url, schema="").engine
+    try:
+        source = await Workspaces(ArtifactrStorage(engine)).open(
+            PERSON, WORKSPACE, actor=UserActor(id=PERSON)
+        )
+        workspace = await ReflexrWorkspaces(ReflexrStorage(engine), events=INCIDENT_EVENTS).open(
+            PERSON, WORKSPACE, actor=SystemActor()
+        )
+        [rates] = (await proposal_rates(workspace)).values()
+        outcome = "accepted" if rates.accepted else "edited" if rates.edited else "rejected"
+        [timeline] = [a for a in await source.artifacts() if a.data.kind == "timeline"]
+        rewrites = measure_rewrites(await history(source, timeline.id), window=timedelta(hours=1))
+        log = await workspace.read(types=[FIRED, RESOLVED])
+        return Incident(
+            outcome=outcome,
+            agent_revisions=rewrites.agent_revisions,
+            rewritten=rewrites.rewritten,
+            resolved_in=(log[-1].ts - log[0].ts).total_seconds(),
+        )
+    finally:
+        await engine.dispose()
+
+
+def review_incident(played: Incident) -> IncidentReview:
+    """The scenario's measures, as a verdict."""
+    rate = played.rewritten / played.agent_revisions if played.agent_revisions else 0.0
+    return IncidentReview(outcome=played.outcome, rewrite_rate=rate, resolved_in=played.resolved_in)
+
+
+async def incident_scenarios(
+    tracker: ExperimentTracker, model: Model
+) -> ExperimentResult[Incident]:
+    """How incidents go: the postmortems' acceptance, the timelines' rewrites, and their length."""
+    return await tracker.run_experiment(
+        "incident-scenarios",
+        dataset=SCENARIOS,
+        task=incident(model),
+        evaluators=[FunctionEvaluator(review_incident, verdict_type=IncidentReview)],
+    )
+
+
+FIRED = "{{ package_name }}:alert.fired"
+RESOLVED = "{{ package_name }}:incident.resolved"
+
+POLL = timedelta(milliseconds=10)
+"""How often the reactor looks for work in a scenario."""
+
+
+async def _until[T](found: Callable[[], T], *, tries: int = 1_000) -> T:
+    """Wait, polling, until ``found()`` is truthy, and return it: the application is async."""
+    for _ in range(tries):
+        if value := found():
+            return value
+        await asyncio.sleep(0.01)
+    raise TimeoutError("the scenario never got there")
+
+
+def _signed(secret: str) -> dict[str, str]:
+    """The scenario's person, signed in with an HS256 token on the scenario's own secret."""
+    claims = {
+        "sub": PERSON,
+        "aud": "authenticated",
+        "exp": int(time.time()) + 3600,
+        "email": f"{PERSON}@example.com",
+{%- if access != 'grantr' %}
+        "app_metadata": {"tenant_id": PERSON},
+{%- endif %}
+    }
+    signed = jwt.encode(claims, secret, algorithm="HS256")
+{%- if access == 'grantr' %}
+    return {"Authorization": f"Bearer {signed}", "X-Tenant": PERSON}
+{%- else %}
+    return {"Authorization": f"Bearer {signed}"}
+{%- endif %}
+{%- endif %}
 
 
 # ─── running them ─────────────────────────────────────────────────────────────
@@ -203,6 +462,9 @@ EXPERIMENTS: list[Experiment] = [
 {%- endif %}
 {%- if use_reflexr %}
     ticket_triage,
+{%- endif %}
+{%- if use_relayr %}
+    incident_scenarios,
 {%- endif %}
 ]
 

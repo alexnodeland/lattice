@@ -108,4 +108,4 @@ One contract test, `tests/ledger/test_contract.py`, runs against memory, SQLite 
 
 ## What isn't built yet
 
-The template's evaluation experiment (phase 6). stackr's template wires relayr in with its `bridge` question ([stackr ADR-0021](../stackr/adr/0021-the-bridge-in-the-template.md)). LiteLLM's metadata doesn't carry relayr's tags yet ([lattice #86](https://github.com/alexnodeland/lattice/issues/86)).
+Docs, ADRs and the product repository (phase 7). stackr's template wires relayr in with its `bridge` question ([stackr ADR-0021](../stackr/adr/0021-the-bridge-in-the-template.md)). LiteLLM's metadata doesn't carry relayr's tags yet ([lattice #86](https://github.com/alexnodeland/lattice/issues/86)).

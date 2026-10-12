@@ -19,6 +19,7 @@ from conftest import TENANT, Script, app, bearer, say, settings, wait_for
 ARTIFACTR = "/artifactr/v1/workspaces/main"
 REFLEXR = "/reflexr/v1/workspaces/main"
 FIRED = "{{ package_name }}:alert.fired"
+RESOLVED = "{{ package_name }}:incident.resolved"
 
 
 def command(client: TestClient, **body: Any) -> None:
@@ -116,3 +117,36 @@ async def _cursor(url: str) -> int:
         return await SqlLedger(engine).cursor(WorkspaceKey(TENANT, "main"))
     finally:
         await engine.dispose()
+
+
+def test_a_resolution_with_no_incident_closes_nothing(client: TestClient) -> None:
+    resolved = {"type": RESOLVED, "service": "none", "summary": "Nothing."}
+    assert client.post(f"{REFLEXR}/events", json={"event": resolved}).status_code == 200
+
+    def ran() -> list[str]:
+        params = {"rule": "{{ package_name }}:close-incident"}
+        return [r["status"] for r in client.get(f"{REFLEXR}/runs", params=params).json()]
+
+    wait_for(lambda: ran() == ["succeeded"])
+    assert client.get(f"{ARTIFACTR}/proposals").json() == []
+
+
+def test_a_resolution_closes_its_incident_with_a_postmortem(
+    client: TestClient, script: Script
+) -> None:
+    fired = {"type": FIRED, "service": "checkout", "summary": "Payments fail"}
+    assert client.post(f"{REFLEXR}/events", json={"event": fired}).status_code == 200
+    wait_for(lambda: timelines(client))
+    thread = timelines(client)[0]["data"]["thread_id"]
+    resolved = {"type": RESOLVED, "service": "checkout", "summary": "Rolled back."}
+    assert client.post(f"{REFLEXR}/events", json={"event": resolved}).status_code == 200
+    wait_for(lambda: client.get(f"{ARTIFACTR}/proposals").json())
+    [proposal] = client.get(f"{ARTIFACTR}/proposals").json()
+    assert proposal["change"]["kind"] == "postmortem"
+    entry = {"source": "monitoring", "text": "Payments fail"}
+    assert proposal["change"]["data"]["timeline"] == [entry]
+    assert proposal["rationale"] == (
+        "Drawn from the incident's timeline, 1 entry, and from its resolution: Rolled back."
+    )
+    closed = "Resolved: Rolled back. Its postmortem is proposed for review."
+    wait_for(lambda: notices(client, thread)[-1:] == [closed])

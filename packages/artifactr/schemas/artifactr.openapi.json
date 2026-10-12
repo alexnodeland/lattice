@@ -531,7 +531,8 @@
         },
         "required": [
           "command_id",
-          "command"
+          "command",
+          "type"
         ],
         "title": "CommandFrame",
         "type": "object"

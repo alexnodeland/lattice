@@ -25,17 +25,13 @@ PROTOCOL: Final = "reflexr.v1"
 
 
 class _Model(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-
-class _Tagged(_Model):
-    model_config = ConfigDict(json_schema_extra=tag_required)
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
 
 # ─── commands ─────────────────────────────────────────────────────────────────
 
 
-class Publish(_Tagged):
+class Publish(_Model):
     """Publish an event. Publishing an ``id`` already in the log appends nothing."""
 
     type: Literal["publish"] = "publish"
@@ -45,7 +41,7 @@ class Publish(_Tagged):
     """The causal chain to join: the id of its first event. By default, a new chain."""
 
 
-class GiveFeedback(_Tagged):
+class GiveFeedback(_Model):
     """Give typed feedback on a run, a firing or a causal chain."""
 
     type: Literal["give_feedback"] = "give_feedback"
@@ -54,14 +50,14 @@ class GiveFeedback(_Tagged):
     value: dict[str, JsonValue]
 
 
-class RetryRun(_Tagged):
+class RetryRun(_Model):
     """Make a run runnable now."""
 
     type: Literal["retry_run"] = "retry_run"
     run_id: RunId
 
 
-class SkipRun(_Tagged):
+class SkipRun(_Model):
     """Give up on a waiting or dead-lettered run."""
 
     type: Literal["skip_run"] = "skip_run"
@@ -69,7 +65,7 @@ class SkipRun(_Tagged):
     reason: str | None = None
 
 
-class CancelRun(_Tagged):
+class CancelRun(_Model):
     """Cancel a run that has not finished, stopping its action if it is running."""
 
     type: Literal["cancel_run"] = "cancel_run"
@@ -77,7 +73,7 @@ class CancelRun(_Tagged):
     reason: str | None = None
 
 
-class ReplayRule(_Tagged):
+class ReplayRule(_Model):
     """Reset a rule to evaluate the log again, rebuilding its state or firing again."""
 
     type: Literal["replay_rule"] = "replay_rule"
@@ -86,7 +82,7 @@ class ReplayRule(_Tagged):
     mode: Literal["rebuild", "refire"] = "rebuild"
 
 
-class InstallRule(_Tagged):
+class InstallRule(_Model):
     """Install a stored rule: its first version, or the next version of an archived one."""
 
     type: Literal["install_rule"] = "install_rule"
@@ -96,7 +92,7 @@ class InstallRule(_Tagged):
     the rule and its fact, and does not read it."""
 
 
-class UpdateRule(_Tagged):
+class UpdateRule(_Model):
     """Replace an active stored rule with a new version, reset if its condition or scope changed."""
 
     type: Literal["update_rule"] = "update_rule"
@@ -107,7 +103,7 @@ class UpdateRule(_Tagged):
     provenance: dict[str, JsonValue] = {}
 
 
-class ArchiveRule(_Tagged):
+class ArchiveRule(_Model):
     """Archive a stored rule, and cancel its unfinished runs."""
 
     type: Literal["archive_rule"] = "archive_rule"
@@ -134,7 +130,7 @@ type Command = Annotated[
 # ─── outcomes ─────────────────────────────────────────────────────────────────
 
 
-class PublishedOutcome(_Tagged):
+class PublishedOutcome(_Model):
     """What publishing did: the event's position, and whether it was already there."""
 
     type: Literal["published"] = "published"
@@ -143,7 +139,7 @@ class PublishedOutcome(_Tagged):
     duplicate: bool = False
 
 
-class RecordedOutcome(_Tagged):
+class RecordedOutcome(_Model):
     """Where a fact the command recorded, such as feedback, was appended."""
 
     type: Literal["recorded"] = "recorded"
@@ -151,14 +147,14 @@ class RecordedOutcome(_Tagged):
     id: EventId
 
 
-class RunOutcome(_Tagged):
+class RunOutcome(_Model):
     """A run after the command changed it."""
 
     type: Literal["run"] = "run"
     run: Run
 
 
-class RuleOutcome(_Tagged):
+class RuleOutcome(_Model):
     """A rule's progress after the command reset it."""
 
     type: Literal["rule"] = "rule"
@@ -166,7 +162,7 @@ class RuleOutcome(_Tagged):
     progress: RuleProgress
 
 
-class RuleVersionOutcome(_Tagged):
+class RuleVersionOutcome(_Model):
     """A stored rule's version after the command changed it, or found it changed already."""
 
     type: Literal["rule_version"] = "rule_version"
@@ -286,7 +282,7 @@ class ReplayComplete(_Model):
     up_to_seq: int
 
 
-class CommandResult(_Tagged):
+class CommandResult(_Model):
     """The result of one command frame."""
 
     type: Literal["command_result"] = "command_result"

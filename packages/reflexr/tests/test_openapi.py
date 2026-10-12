@@ -3,8 +3,10 @@
 import io
 import json
 import runpy
+from collections.abc import Iterator
 from contextlib import redirect_stdout
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -12,7 +14,8 @@ import pytest
 from reflexr.fastapi.openapi import openapi_app, openapi_document
 from reflexr.fastapi.router import Refused
 
-DOCUMENT = Path(__file__).parent.parent / "schemas" / "reflexr.openapi.json"
+SCHEMAS = Path(__file__).parent.parent / "schemas"
+DOCUMENT = SCHEMAS / "reflexr.openapi.json"
 
 
 def test_the_committed_document_is_current() -> None:
@@ -34,15 +37,31 @@ async def test_the_documents_application_admits_no_one() -> None:
         assert (await client.get("/workspaces/main/runs/run_1")).status_code == 401
 
 
-def test_every_tag_is_required() -> None:
-    """A union member's tag is required (ADR-0060). A REST body is always a command frame, so
-    its own ``type`` may be left out."""
-    schemas = openapi_document()["components"]["schemas"]
-    for name, schema in schemas.items():
-        if name == "CommandFrame":
-            continue
-        tags = {key for key, field in schema.get("properties", {}).items() if "const" in field}
-        assert tags <= set(schema.get("required", [])), name
+def _schemas(node: object) -> Iterator[dict[str, Any]]:
+    """Every object schema in a JSON Schema or an OpenAPI document, however deep."""
+    if isinstance(node, dict):
+        if "properties" in node:
+            yield node
+        for value in node.values():
+            yield from _schemas(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _schemas(value)
+
+
+@pytest.mark.parametrize(
+    "document", ["openapi", *sorted(p.name for p in SCHEMAS.glob("*.v1.json"))]
+)
+def test_every_tag_is_required(document: str) -> None:
+    """A field fixed to one value, a union member's tag, is required (ADR-0060)."""
+    found = (
+        openapi_document()
+        if document == "openapi"
+        else json.loads((SCHEMAS / document).read_text())
+    )
+    for schema in _schemas(found):
+        tags = {key for key, field in schema["properties"].items() if "const" in field}
+        assert tags <= set(schema.get("required", [])), schema.get("title")
 
 
 async def test_a_refused_request_answers_as_the_document_says() -> None:

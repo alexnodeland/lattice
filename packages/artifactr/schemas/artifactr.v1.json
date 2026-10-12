@@ -176,7 +176,8 @@
         }
       },
       "required": [
-        "name"
+        "name",
+        "type"
       ],
       "title": "AppLive",
       "type": "object"
@@ -589,7 +590,8 @@
       },
       "required": [
         "command_id",
-        "command"
+        "command",
+        "type"
       ],
       "title": "CommandFrame",
       "type": "object"
@@ -856,7 +858,8 @@
       },
       "required": [
         "kind",
-        "data"
+        "data",
+        "type"
       ],
       "title": "Draft",
       "type": "object"
@@ -948,7 +951,8 @@
         }
       },
       "required": [
-        "message"
+        "message",
+        "type"
       ],
       "title": "ErrorFrame",
       "type": "object"
@@ -1135,7 +1139,8 @@
         "ts",
         "workspace_id",
         "actor",
-        "event"
+        "event",
+        "type"
       ],
       "title": "EventFrame",
       "type": "object"
@@ -1367,7 +1372,8 @@
         }
       },
       "required": [
-        "protocol"
+        "protocol",
+        "type"
       ],
       "title": "Hello",
       "type": "object"
@@ -1453,7 +1459,8 @@
       },
       "required": [
         "run_id",
-        "event"
+        "event",
+        "type"
       ],
       "title": "LiveFrame",
       "type": "object"
@@ -1561,7 +1568,8 @@
         }
       },
       "required": [
-        "part"
+        "part",
+        "type"
       ],
       "title": "PartEnded",
       "type": "object"
@@ -1603,7 +1611,8 @@
       },
       "required": [
         "part",
-        "part_kind"
+        "part_kind",
+        "type"
       ],
       "title": "PartStarted",
       "type": "object"
@@ -2004,7 +2013,8 @@
         }
       },
       "required": [
-        "up_to_seq"
+        "up_to_seq",
+        "type"
       ],
       "title": "ReplayComplete",
       "type": "object"
@@ -2434,7 +2444,8 @@
       },
       "required": [
         "part",
-        "delta"
+        "delta",
+        "type"
       ],
       "title": "TextDelta",
       "type": "object"
@@ -2508,7 +2519,8 @@
       },
       "required": [
         "part",
-        "delta"
+        "delta",
+        "type"
       ],
       "title": "ThinkingDelta",
       "type": "object"
@@ -2611,7 +2623,8 @@
       },
       "required": [
         "part",
-        "delta"
+        "delta",
+        "type"
       ],
       "title": "ToolArgsDelta",
       "type": "object"
@@ -2856,7 +2869,8 @@
       },
       "required": [
         "workspace_id",
-        "head_seq"
+        "head_seq",
+        "type"
       ],
       "title": "Welcome",
       "type": "object"

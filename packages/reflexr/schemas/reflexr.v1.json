@@ -334,7 +334,8 @@
       },
       "required": [
         "command_id",
-        "command"
+        "command",
+        "type"
       ],
       "title": "CommandFrame",
       "type": "object"
@@ -521,7 +522,8 @@
         }
       },
       "required": [
-        "message"
+        "message",
+        "type"
       ],
       "title": "ErrorFrame",
       "type": "object"
@@ -660,7 +662,8 @@
         "workspace_id",
         "actor",
         "correlation_id",
-        "event"
+        "event",
+        "type"
       ],
       "title": "EventFrame",
       "type": "object"
@@ -867,7 +870,8 @@
         }
       },
       "required": [
-        "protocol"
+        "protocol",
+        "type"
       ],
       "title": "Hello",
       "type": "object"
@@ -1155,7 +1159,8 @@
         }
       },
       "required": [
-        "up_to_seq"
+        "up_to_seq",
+        "type"
       ],
       "title": "ReplayComplete",
       "type": "object"
@@ -1926,7 +1931,8 @@
       },
       "required": [
         "workspace_id",
-        "head_seq"
+        "head_seq",
+        "type"
       ],
       "title": "Welcome",
       "type": "object"

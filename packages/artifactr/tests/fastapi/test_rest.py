@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from artifactr.fastapi.router import Refused, RejectionDetail
 from tests.agent.conftest import Script, call, say
 from tests.fastapi.conftest import build, command, wait_for
 
@@ -188,3 +189,15 @@ def test_a_nul_character_is_a_validation_failure(client: TestClient) -> None:
         422,
         {"type": "validation_failed", "message": "text cannot hold a NUL character", "errors": []},
     )
+
+
+def test_refusals_answer_as_the_document_says(client: TestClient) -> None:
+    missing = Refused.model_validate(client.get(f"{BASE}/artifacts/nope").json()).detail
+    assert isinstance(missing, RejectionDetail)
+    assert (missing.type, missing.model_extra) == (
+        "not_found",
+        {"entity": "artifact", "id": "nope"},
+    )
+    invalid = Refused.model_validate(client.get(f"{BASE}/events", params={"limit": -1}).json())
+    assert isinstance(invalid.detail, list)
+    assert [error.loc for error in invalid.detail] == [["query", "limit"]]

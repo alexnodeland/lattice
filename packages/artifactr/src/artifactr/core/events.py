@@ -271,8 +271,7 @@ class AppEvent(_Event):
 def _unknown_type(schema: dict[str, JsonValue]) -> None:
     """Say an unknown event's ``type`` is none of the known ones, so no event matches two."""
     properties = cast("dict[str, dict[str, JsonValue]]", schema["properties"])
-    known = [member.model_fields["type"].default for member in get_args(KnownEvent)]
-    properties["type"]["not"] = {"enum": sorted(known)}
+    properties["type"]["not"] = {"enum": sorted(_KNOWN_TAGS)}
 
 
 class UnknownEvent(BaseModel):
@@ -352,7 +351,7 @@ Event = Annotated[
 class Envelope(BaseModel):
     """A stored event with its position and attribution. Its shape is also the wire shape."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     seq: int = Field(ge=1)
     """The event's position in its workspace's log, gap-free from 1."""

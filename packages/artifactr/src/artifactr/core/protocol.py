@@ -25,7 +25,7 @@ PROTOCOL: Final = "artifactr.v1"
 class Hello(BaseModel):
     """The first frame a client sends on a connection."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     type: Literal["hello"] = "hello"
     protocol: str
@@ -43,7 +43,7 @@ class Hello(BaseModel):
 class ResumePlan(BaseModel):
     """Where a connection's replay starts."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     replay_after: int
     """Replay every event with a ``seq`` greater than this."""
@@ -110,7 +110,7 @@ class CommandFrame(BaseModel):
     ``command_id`` is also an idempotency key: the server deduplicates repeated ids.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     type: Literal["command"] = "command"
     command_id: str = Field(min_length=1)
@@ -124,7 +124,7 @@ ClientFrame = Annotated[Hello | CommandFrame, Field(discriminator="type")]
 class ActiveRun(BaseModel):
     """A run in progress, as listed in ``welcome``."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     run_id: RunId
     thread_id: ThreadId
@@ -133,7 +133,7 @@ class ActiveRun(BaseModel):
 class Welcome(BaseModel):
     """The server's answer to ``hello``."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     type: Literal["welcome"] = "welcome"
     protocol: str = PROTOCOL
@@ -152,7 +152,7 @@ class EventFrame(Envelope):
 class ReplayComplete(BaseModel):
     """Every event up to ``up_to_seq`` has been replayed; what follows is live."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     type: Literal["replay_complete"] = "replay_complete"
     up_to_seq: int
@@ -173,7 +173,7 @@ class CommandResult(BaseModel):
 class ErrorFrame(BaseModel):
     """A frame the server could not understand, or a failure it could not attribute."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     type: Literal["error"] = "error"
     message: str

@@ -55,7 +55,7 @@ Count = Annotated[int, Query(ge=0, le=MAX_COUNT)]
 """A ``seq`` or a count in a query: as many as storage holds, which the document states."""
 
 PathId = Annotated[str, Path(min_length=1)]
-"""An id in a path, which is never empty: ``.../threads/`` would be the list of threads."""
+"""An id in a path, which is never empty: ``.../runs/`` would be the list of runs."""
 
 
 # RejectionDetail, FieldError, Refused and REFUSALS are shared verbatim with artifactr's

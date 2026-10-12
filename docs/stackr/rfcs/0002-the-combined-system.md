@@ -391,8 +391,8 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 
 ## Unresolved questions
 
-- **Who may accept a rule?** An application callback. The template's default could be any user of the tenant, as with workspaces, or a role claim in the token.
-- **How far does a chat rule reach?** The bridge would ask for the workspace it was drafted in. #21 decides whether stored rules can be scoped to one workspace or only to a tenant.
+- **Who may accept a rule?** Settled by [ADR-0024](../adr/0024-rules-from-chat-in-the-template.md): a person who holds the change's own action in the workspace, as grantr says, through relayr's `may_change`; without access control, any person.
+- **How far does a chat rule reach?** Settled by [ADR-0024](../adr/0024-rules-from-chat-in-the-template.md), on reflexr RFC-0003: one workspace, the one it was drafted in, where its principal acts and nowhere else.
 - **A combined session measure** in evalr, covering a thread and the chains it started.
 - **Should `thread_created` be in the default set?** Rules that greet or file new threads would want it.
 - **How do clients show a notice** differently from a message? This depends on the notices prerequisite.
@@ -408,7 +408,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 - [x] Phase 2: outbound adapter and loop control, in relayr; messages are idempotent by id in artifactr, so there is no read-back, and the run behind each write is recorded before it ([relayr ADR-0019](../../relayr/adr/0019-runs-act-once-through-derived-ids-and-keyed-edits.md), [ADR-0021](../../relayr/adr/0021-chains-continue-across-the-bridge.md))
 - [x] Phase 3: template option, example and smoke test ([ADR-0021](../adr/0021-the-bridge-in-the-template.md))
 - [x] Phase 4: telemetry links and tags, in relayr ([relayr ADR-0023](../../relayr/adr/0023-traces-linked-across-the-bridge.md), [ADR-0024](../../relayr/adr/0024-langfuse-sessions-tagged-with-each-other.md)); LiteLLM's metadata waits on [lattice #86](https://github.com/alexnodeland/lattice/issues/86)
-- [ ] Phase 5: rules from chat
+- [x] Phase 5: rules from chat, in relayr ([relayr ADR-0028](../../relayr/adr/0028-rules-from-chat.md)) and the template ([ADR-0024](../adr/0024-rules-from-chat-in-the-template.md))
 - [ ] Phase 6: evaluation
 - [ ] Phase 7: docs, ADRs and the product repository
 

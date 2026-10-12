@@ -13,7 +13,7 @@ import pytest
 
 SRC = Path(__file__).parent.parent / "src" / "relayr"
 
-LIBRARIES = {"artifactr", "reflexr"}
+LIBRARIES = {"artifactr", "reflexr", "evalr"}
 
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (relayr packages it may import, third-party modules it may import)
@@ -36,7 +36,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     ),
     "evals": (
         {"relayr.events", "relayr.ledger", "relayr.outbound", "relayr.rules", "relayr.evals"},
-        {*LIBRARIES, "evalr"},
+        LIBRARIES,
     ),
     "rules": (
         {"relayr.events", "relayr.outbound", "relayr.rules"},

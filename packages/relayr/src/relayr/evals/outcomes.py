@@ -12,7 +12,7 @@ from typing import Any, Final, Literal
 import artifactr
 import artifactr.core as a
 import reflexr.core
-from reflexr import F, Feedback, Rule, on, run
+from reflexr import F, Feedback, Rule, by, on, run
 from reflexr.workspace import Action, Reaction, Workspace
 from relayr.events import ProposalResolved
 from relayr.ledger import Ledger, WorkspaceKey
@@ -29,6 +29,8 @@ class ProposalOutcome(Feedback, name="proposal_outcome", targets={"run"}):
     """
 
     outcome: Outcome
+    proposal_id: str
+    """The proposal resolved: a run may make several, and each is scored once."""
 
 
 EVALUATOR: Final = reflexr.core.EvaluatorActor(name="relayr:proposal-outcome", version="1")
@@ -38,6 +40,8 @@ PROPOSAL_OUTCOME: Final = Rule(
     name="relayr:proposal-outcome",
     description="A rule's proposal was resolved. Score the run that made it.",
     when=on(ProposalResolved).where(F.proposed_by.kind.eq("external_agent")),
+    # One proposal's resolutions are scored one at a time, so the check for an earlier score holds.
+    scope=by(F.proposal_id),
     then=run("proposal-outcome"),
 )
 
@@ -66,7 +70,8 @@ class Outcomes:
         """Give the run behind a resolved proposal its outcome, once.
 
         It re-reads the proposal in artifactr rather than trust the bridged event, and gives
-        nothing for a proposal no rule's run made, or one already scored.
+        nothing for a proposal no rule's run made, nor one already scored. The run must be the
+        proposer's own, so a proposal whose id someone else chose scores no rule's run.
         """
         [envelope] = reaction.events
         assert isinstance(envelope.event, ProposalResolved)
@@ -84,11 +89,15 @@ class Outcomes:
         cause = await self._ledger.cause(key, "proposal", proposal.id)
         if cause is None:
             return
-        on_run = reflexr.core.RunTarget(run_id=cause.run_id)
-        if await _scored(target, on_run, envelope.seq):
+        proposer = await target.run(cause.run_id)
+        if proposal.proposed_by != rule_actor(proposer.rule):
+            return  # the id was the run's to derive, but someone else's proposal holds it
+        if await _scored(target, proposal.id):
             return
         outcome = "rejected" if proposal.status == "rejected" else await _how(source, proposal)
-        await target.as_actor(EVALUATOR).give_feedback(ProposalOutcome(outcome=outcome), on=on_run)
+        verdict = ProposalOutcome(outcome=outcome, proposal_id=proposal.id)
+        on_run = reflexr.core.RunTarget(run_id=cause.run_id)
+        await target.as_actor(EVALUATOR).give_feedback(verdict, on=on_run)
 
 
 async def _how(source: artifactr.Workspace, proposal: a.Proposal) -> Outcome:
@@ -98,24 +107,26 @@ async def _how(source: artifactr.Workspace, proposal: a.Proposal) -> Outcome:
         return "accepted"  # an archive takes no changes
     revisions = await source.revisions(change.artifact_id)
     [made] = [r for r in revisions if r.proposal_id == proposal.id]
-    if isinstance(change, a.CreateArtifact):
-        alone = a.load_artifact(change.kind, change.data).to_json()
-    else:
-        [before] = [r for r in revisions if r.version == made.version - 1]
-        alone = a.load_artifact(made.kind, a.apply_patch(before.data, change.patch)).to_json()
+    try:
+        if isinstance(change, a.CreateArtifact):
+            alone = a.load_artifact(change.kind, change.data).to_json()
+        else:
+            [before] = [r for r in revisions if r.version == made.version - 1]
+            alone = a.load_artifact(made.kind, a.apply_patch(before.data, change.patch)).to_json()
+    except (a.PatchFailed, a.ValidationFailed):
+        return "edited"  # the proposal alone made no valid artifact: the person's changes did
     return "accepted" if made.data == alone else "edited"
 
 
-async def _scored(workspace: Workspace, on_run: reflexr.core.RunTarget, seq: int) -> bool:
-    """Whether the evaluator scored a run already, for the resolution at ``seq``."""
-    for fact in await workspace.read(types=["reflexr:feedback_given"]):
-        event = fact.event
-        if (
-            fact.actor == EVALUATOR
-            and isinstance(event, reflexr.core.FeedbackGiven)
-            and event.target == on_run
-            and fact.causation is not None
-            and seq in (await workspace.run(fact.causation.run_id)).matched
-        ):
-            return True
-    return False
+async def _scored(workspace: Workspace, proposal_id: str) -> bool:
+    """Whether the evaluator scored a proposal already.
+
+    reflexr reads facts by type alone, so this reads every ``reflexr:feedback_given`` fact.
+    """
+    return any(
+        fact.actor == EVALUATOR
+        and isinstance(fact.event, reflexr.core.FeedbackGiven)
+        and fact.event.feedback_type == ProposalOutcome.feedback_type
+        and fact.event.value.get("proposal_id") == proposal_id
+        for fact in await workspace.read(types=["reflexr:feedback_given"])
+    )

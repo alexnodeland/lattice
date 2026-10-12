@@ -11,9 +11,9 @@ import reflexr.core
 import reflexr.workspace as r
 from relayr.evals import RULES, Outcomes, ProposalRates, proposal_rates
 from relayr.events import ArtifactCreated, ProposalResolved
-from relayr.ledger import Ledger
-from relayr.outbound import Outbound
-from tests.app_types import Note
+from relayr.ledger import Cause, Ledger
+from relayr.outbound import Outbound, rule_actor
+from tests.app_types import Note, Range
 from tests.stack import ALICE, KEY, Actions, Process, Stack, until
 
 PROPOSE = reflexr.Rule(
@@ -28,10 +28,14 @@ class Scene:
     app: Process
     stack: Stack
     alice: artifactr.Workspace
+    change: str
 
     async def proposed(self) -> a.Proposal:
-        """A note Alice writes, and the rule's proposal to change it."""
-        await self.alice.create(Note(text="draft"), artifact_id="art_note")
+        """An artifact Alice writes, and the rule's proposal to change it."""
+        if self.change == "range":
+            await self.alice.create(Range(), artifact_id="art_range")
+        else:
+            await self.alice.create(Note(text="draft"), artifact_id="art_note")
 
         async def made() -> bool:
             await self.app.reactor.settle()
@@ -70,6 +74,8 @@ async def scene(stack: Stack, ledger: Ledger, change: str = "edit") -> Scene:
         acting = reaction.deps.acting(reaction)
         if change == "edit":
             await acting.edit("art_note", "/text", "proposed", rationale="clearer")
+        elif change == "range":
+            await acting.edit("art_range", "/low", 5)
         elif change == "create":
             await acting.create(Note(text="new"))
         else:
@@ -81,7 +87,7 @@ async def scene(stack: Stack, ledger: Ledger, change: str = "edit") -> Scene:
     app = stack.process(
         ledger, rules=[PROPOSE, *RULES], actions={"propose": propose}, more_actions=scoring
     )
-    return Scene(app, stack, await app.collaboration.open(*KEY, actor=ALICE))
+    return Scene(app, stack, await app.collaboration.open(*KEY, actor=ALICE), change)
 
 
 def text(value: str) -> a.Patch:
@@ -169,3 +175,64 @@ def test_rates_are_shares_of_what_was_resolved() -> None:
     rates = ProposalRates(accepted=1, edited=1, rejected=2)
     assert (rates.acceptance, rates.edit_rate) == (0.5, 0.5)
     assert (ProposalRates().acceptance, ProposalRates().edit_rate) == (0.0, 0.0)
+
+
+async def test_an_edit_accepted_after_another_is_scored_against_the_version_it_met(
+    ledger: Ledger, stack: Stack
+) -> None:
+    scene_ = await scene(stack, ledger)
+    proposal = await scene_.proposed()
+    current = await scene_.alice.get(Note, "art_note")
+    await scene_.alice.commit(current.edit(lambda note: setattr(note, "text", "meanwhile")))
+    await scene_.resolve(proposal, accept=True)
+    assert await scene_.rates() == {"app:propose": ProposalRates(accepted=1)}
+
+
+async def test_a_proposal_valid_only_with_the_persons_changes_is_edited(
+    ledger: Ledger, stack: Stack
+) -> None:
+    scene_ = await scene(stack, ledger, "range")
+    proposal = await scene_.proposed()
+    current = await scene_.alice.get(Range, "art_range")
+    await scene_.alice.commit(current.edit(lambda bounds: setattr(bounds, "high", 3)))
+    fix = a.JsonPatch(ops=({"op": "replace", "path": "/high", "value": 8},))
+    await scene_.resolve(proposal, accept=True, changes=fix)
+    assert await scene_.rates() == {"app:propose": ProposalRates(edited=1)}
+
+
+async def test_a_second_resolution_scores_nothing_more(ledger: Ledger, stack: Stack) -> None:
+    scene_ = await scene(stack, ledger)
+    proposal = await scene_.proposed()
+    await scene_.resolve(proposal, accept=True)
+    again = ProposalResolved(
+        author=ALICE,
+        proposal_id=proposal.id,
+        proposed_by=proposal.proposed_by,
+        decision="reject",
+        artifact_id="art_note",
+    )
+    automation = await scene_.app.automation.open(*KEY, actor=reflexr.SystemActor())
+    await automation.publish(again)
+    await scene_.app.reactor.settle()
+    assert await scene_.rates() == {"app:propose": ProposalRates(accepted=1)}
+
+
+async def test_a_squatted_proposal_id_scores_no_rules_run(ledger: Ledger, stack: Stack) -> None:
+    scene_ = await scene(stack, ledger)
+    proposal = await scene_.proposed()
+    automation = await scene_.app.automation.open(*KEY, actor=reflexr.SystemActor())
+    [proposing] = await automation.runs(rule="app:propose")
+    cause = Cause(
+        correlation_id=proposing.correlation_id,
+        firing_id=proposing.causation.firing_id,
+        run_id=proposing.causation.run_id,
+        depth=proposing.causation.depth,
+    )
+    await ledger.record_cause(KEY, "proposal", "prp_squat", cause)
+    other = scene_.alice.as_actor(rule_actor("app:other"))
+    current = await other.artifact("art_note")
+    edit = a.EditArtifact(artifact_id="art_note", base_version=current.version, patch=text("x"))
+    await other.commit(a.ProposeChange(change=edit, proposal_id="prp_squat"))
+    await scene_.resolve(await scene_.alice.proposal("prp_squat"), accept=False)
+    await scene_.resolve(proposal, accept=True)
+    assert await scene_.rates() == {"app:propose": ProposalRates(accepted=1)}

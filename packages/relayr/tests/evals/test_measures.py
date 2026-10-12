@@ -36,6 +36,8 @@ async def test_rules_from_chat_are_followed_from_draft_to_survival(clock: FakeCl
     )
     automation = await workspaces.open(*KEY, actor=OPERATOR)
     installer = automation.as_actor(RELAYR)
+    await automation.install_rule(draft("chat:one").rule)  # an operator's, archived before
+    await automation.archive_rule("chat:one")  # relayr ever installed it: no count against it
     await installer.install_rule(draft("chat:one").rule)
     await installer.install_rule(draft("chat:two").rule)
     await automation.install_rule(draft("chat:direct").rule)  # not from chat
@@ -43,10 +45,12 @@ async def test_rules_from_chat_are_followed_from_draft_to_survival(clock: FakeCl
     await installer.install_rule(draft("chat:three").rule)  # too recent to count
     await automation.archive_rule("chat:two", reason="an operator stopped it")
 
-    measured = await rule_conversion(alice, automation, now=clock.now)
+    later = clock.now + timedelta(seconds=1)
+    assert (await rule_conversion(alice, automation, now=clock.now)).installed == 2, "before now"
+    measured = await rule_conversion(alice, automation, now=later)
     assert measured == RuleConversion(proposed=4, accepted=3, installed=3, eligible=2, survived=1)
     assert measured.survival == 0.5
-    empty = await rule_conversion(alice, automation, now=clock.now, survival=timedelta(days=90))
+    empty = await rule_conversion(alice, automation, now=later, survival=timedelta(days=90))
     assert (empty.eligible, empty.survival) == (0, 0.0)
 
 
@@ -65,11 +69,22 @@ async def test_an_artifacts_history_is_read_for_evalrs_measures() -> None:
         )
     )
     edited = await alice.get(Note, "art_t")
+    proposing = await rule.commit(
+        a.ProposeChange(change=edited.edit(lambda note: setattr(note, "text", "The rule's take.")))
+    )
+    await alice.commit(a.RespondToProposal(proposal_id=proposing.proposal_id, decision="accept"))
+    for actor, said in (
+        (a.SystemActor(), "Tidied."),
+        (a.ExternalAgentActor(client_id="mcp", on_behalf_of=ALICE), "Alice, through her client."),
+    ):
+        edited = await alice.as_actor(actor).get(Note, "art_t")
+        await alice.as_actor(actor).commit(
+            edited.edit(lambda note, t=said: setattr(note, "text", t))
+        )
+    edited = await alice.get(Note, "art_t")
     await alice.commit(edited.archive())
     found = await history(alice, "art_t")
-    assert [(v.role, "Rolled" in v.text) for v in found.revisions] == [
-        ("agent", False),
-        ("person", True),
-    ]
+    assert [v.role for v in found.revisions] == ["agent", "person", "agent", "system", "person"]
+    assert "Rolled" in found.revisions[1].text, "an accepted proposal's version is its proposer's"
     rewrites = measure_rewrites(found, window=timedelta(hours=1))
-    assert rewrites.rewritten == 1
+    assert (rewrites.agent_revisions, rewrites.rewritten) == (2, 2)

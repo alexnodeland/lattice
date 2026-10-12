@@ -19,18 +19,20 @@ RFC-0002 measures the bridge's rules in four ways:
 
 - **An online rule scores each run's proposals.** `relayr:proposal-outcome` fires on `artifactr:proposal_resolved` where the proposer is an external agent. Its action, `Outcomes.score`:
   - re-reads the proposal in artifactr, rather than trust the bridged event;
-  - scores only a proposal a rule's participant made that the ledger traces to a run;
+  - scores only a proposal a rule's participant made that the ledger traces to a run, and only if the proposer is that run's own rule: clients choose proposal ids, so a proposal holding an id a run derived must not score that run;
   - gives that run a `ProposalOutcome`, as relayr's evaluator, `EvaluatorActor(name="relayr:proposal-outcome")`, which reflexr's feedback mirror carries on to a Langfuse score on the run.
 - **The outcome says whether the person changed the proposal.**
   - `accepted`: the artifact the acceptance made is what the proposal alone would have made.
   - `edited`: it differs, because the person's changes did something.
   - `rejected`: the proposal was rejected.
   - A `changes` field that changes nothing is `accepted`. An archive takes no changes, so it is `accepted` or `rejected`.
-- **Each resolution is scored once.** Before scoring, the action looks for the evaluator's feedback on the run, given by a run that matched the same resolution. So a retried attempt, and a rule replayed with `refire`, score nothing twice.
+- **Each proposal is scored once.** `ProposalOutcome` carries the `proposal_id`, which also tells Langfuse's scores apart, and the rule is scoped by it, so one proposal's resolutions run one at a time. Before scoring, the action looks for the evaluator's earlier feedback with that `proposal_id`. A retried attempt, a `refire` replay and a second resolution of the same proposal score nothing more. reflexr reads facts by type alone, so this reads every `reflexr:feedback_given` fact.
+- **The evaluator acts as the application.** The template checks an `EvaluatorActor` as the application's principal, which holds more than giving feedback, unlike RFC-0002's evaluator that "may only give feedback". It gives feedback and nothing else, in code. The template's PR adds `relayr.evals.RULES` to its `CODE_RULES`, so the rule's runs act as the application too.
 - **The measures are functions over the logs:**
   - `proposal_rates`: the outcomes, counted by the rule whose run proposed, with their acceptance and edit rates.
-  - `rule_conversion`: rule drafts proposed, accepted, put live by relayr, and still live after `survival` (30 days by default). Installs are counted from relayr's own `rule_installed` facts. A rule archived since, in reflexr directly, through its artifact or by anyone, does not survive.
-  - `history`: an artifact's versions as evalr's `History`, for `measure_rewrites`. A person's version is the person's; an agent's, a rule's or a client's is the agent's. Archives change no text, so they are left out.
+  - `rule_conversion`: rule drafts proposed, accepted, put live by relayr, and still live after `survival` (30 days by default). Installs are counted from relayr's own `rule_installed` facts. A rule archived after its first install, in reflexr directly, through its artifact or by anyone, does not survive; an archive before relayr installed it doesn't count.
+  - `history`: an artifact's versions as evalr's `History`, for `measure_rewrites`. A version is its author's. artifactr records an accepted proposal's version under whoever accepted it, so `history` credits it to the proposer instead. A person, or a client acting for one, is `person`; the system is `system`; an agent, a rule or a client for no one is `agent`. Archives change no text, so they are left out.
+  - The measures read the whole log, unlike drift's bounded window of installs: they run offline, as an experiment or a report, not on every event. `proposal_rates` takes `since` and `until`, and `rule_conversion` counts only what was logged before `now`.
 - **evalr is a new extra, `relayr-ai[evals]`.** `relayr.evals` builds evalr's `History`; nothing else in relayr needs evalr.
 
 ## Options considered

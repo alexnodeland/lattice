@@ -40,22 +40,37 @@ class ProposalRates:
         return self.edited / kept if kept else 0.0
 
 
-async def proposal_rates(workspace: Workspace) -> dict[RuleName, ProposalRates]:
-    """The proposal outcomes relayr's evaluator gave, counted by the rule whose run proposed."""
-    counts: dict[RuleName, dict[str, int]] = {}
+async def proposal_rates(
+    workspace: Workspace, *, since: datetime | None = None, until: datetime | None = None
+) -> dict[RuleName, ProposalRates]:
+    """The proposal outcomes relayr's evaluator gave, counted by the rule whose run proposed.
+
+    It reads the workspace's feedback facts and its runs, each once: reflexr reads facts by type
+    alone. A measure runs offline, as an experiment or a report, so it reads the whole log
+    rather than a bounded window of it.
+
+    Args:
+        workspace: The workspace in reflexr.
+        since: Count only outcomes given at or after this time.
+        until: Count only outcomes given before this time.
+    """
+    scored: list[tuple[str, ProposalOutcome]] = []
     for fact in await workspace.read(types=["reflexr:feedback_given"]):
         event = fact.event
         if (
-            fact.actor != EVALUATOR
-            or not isinstance(event, reflexr.core.FeedbackGiven)
-            or event.feedback_type != ProposalOutcome.feedback_type
-            or not isinstance(event.target, reflexr.core.RunTarget)
+            fact.actor == EVALUATOR
+            and isinstance(event, reflexr.core.FeedbackGiven)
+            and event.feedback_type == ProposalOutcome.feedback_type
+            and isinstance(event.target, reflexr.core.RunTarget)
+            and (since is None or fact.ts >= since)
+            and (until is None or fact.ts < until)
         ):
-            continue
-        rule = (await workspace.run(event.target.run_id)).rule
-        outcome = ProposalOutcome.model_validate(event.value).outcome
-        tally = counts.setdefault(rule, {})
-        tally[outcome] = tally.get(outcome, 0) + 1
+            scored.append((event.target.run_id, ProposalOutcome.model_validate(event.value)))
+    rules = {run.id: run.rule for run in await workspace.runs()} if scored else {}
+    counts: dict[RuleName, dict[str, int]] = {}
+    for run_id, verdict in scored:
+        tally = counts.setdefault(rules[run_id], {})
+        tally[verdict.outcome] = tally.get(verdict.outcome, 0) + 1
     return {rule: ProposalRates(**tally) for rule, tally in counts.items()}
 
 
@@ -90,7 +105,8 @@ async def rule_conversion(
     """Count rules from chat through their life, from artifactr's proposals and reflexr's facts.
 
     A rule survives while no ``reflexr:rule_archived`` follows its first install, whoever
-    archived it: a person, through its artifact, or an operator in reflexr directly.
+    archived it: a person, through its artifact, or an operator in reflexr directly. Only what
+    was logged before ``now`` counts, and the whole log is read, as for every measure.
 
     Args:
         source: The workspace in artifactr, where rules are drafted.
@@ -105,10 +121,14 @@ async def rule_conversion(
     ]
     first: dict[RuleName, datetime] = {}
     archived: set[RuleName] = set()
-    for fact in await workspace.read(types=["reflexr:rule_installed", "reflexr:rule_archived"]):
+    facts = await workspace.read(types=["reflexr:rule_installed", "reflexr:rule_archived"])
+    for fact in facts:
         event = fact.event
+        if fact.ts >= now:
+            break
         if isinstance(event, reflexr.core.RuleArchived):
-            archived.add(event.rule)
+            if event.rule in first:  # an archive before relayr installed the rule doesn't count
+                archived.add(event.rule)
         elif (
             isinstance(event, reflexr.core.RuleInstalled)
             and isinstance(fact.actor, reflexr.core.AgentActor)

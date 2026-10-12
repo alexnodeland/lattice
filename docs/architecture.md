@@ -139,7 +139,7 @@ portalr's web packages are a Bun workspace rooted at lattice's root, so TypeScri
 | knip | `knip.json`: one run over the workspace, from the root project, which reads moon's tasks for the tools they run |
 | A sibling | `"@portalr/ui": "workspace:*"`. `client` and `ui` are consumed as source: their `exports` point at `src/index.ts`, and Vite builds them into `app` and `admin` |
 
-**Bun runs every tool, in its own runtime.** Each task runs `bun x --bun --no-install <tool>`, so a tool's Node.js script runs in Bun, and one that `bun.lock` doesn't hold fails rather than being fetched. lattice installs no Node.js.
+**Bun runs every tool, in its own runtime.** Each task runs `bun x --bun --no-install <tool>`, so a tool's Node.js script runs in Bun, and one that `bun.lock` doesn't hold fails rather than being fetched. lattice pins no Node.js, and no task runs one.
 
 ## moon
 

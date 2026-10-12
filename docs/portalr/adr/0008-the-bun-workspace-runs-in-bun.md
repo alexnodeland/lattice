@@ -31,6 +31,7 @@ The tools' executables start with `#!/usr/bin/env node`, and moon runs them that
 
 - Easier: a contributor needs only what `proto use` installs.
 - Harder: a tool that breaks under Bun's runtime needs Node.js after all; that would be a new ADR.
+- To revisit: phase 2 first proves Vitest's browser mode, `@vitest/browser` with Playwright, under `bun x --bun`. If it fails, Node.js joins `.prototools`, with a new ADR.
 
 [rfc-0002-tooling]: ../../rfcs/0002-portalr-the-portal.md#tooling
 [s-rfc-0003-bun]: ../../stackr/rfcs/0003-one-repository-lattice.md#the-bun-workspace

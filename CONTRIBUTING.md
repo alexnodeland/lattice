@@ -1,6 +1,6 @@
 # Contributing to lattice
 
-Thanks for helping. lattice holds the family's packages, and this guide covers all of them: how to set up, the commands each package has, how work flows into `main`, and what "done" means here.
+Thanks for helping. lattice holds the packages, and this guide covers all of them: how to set up, the commands each package has, how work flows into `main`, and what "done" means here.
 
 ## Set up
 

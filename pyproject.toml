@@ -1,14 +1,14 @@
 # lattice: the uv workspace root (stackr's RFC-0003). It is a virtual project: it lists the
-# members and holds the family's tools and their shared configuration, and builds nothing.
+# members and holds lattice's tools and their shared configuration, and builds nothing.
 [project]
 name = "lattice"
 version = "0.0.0"
-description = "The family's packages: artifactr, reflexr, evalr, relayr, grantr, stackr and portalr."
+description = "The packages: artifactr, reflexr, evalr, relayr, grantr, stackr and portalr."
 requires-python = ">=3.12"
 dependencies = []
 
 [dependency-groups]
-# The family's own checks: the root tests, lint and types for the root's Python, and deptry over
+# lattice's own checks: the root tests, lint and types for the root's Python, and deptry over
 # each package's shipped code. pytest-randomly runs every project's tests in a random order, since
 # every project's tests run in this one environment. griffe finds the breaks in the packages'
 # public APIs.

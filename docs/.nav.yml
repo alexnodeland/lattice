@@ -1,4 +1,4 @@
-# The site's sections: the family's pages, and each package's, which its own .nav.yml orders.
+# The site's sections: lattice's pages, and each package's, which its own .nav.yml orders.
 nav:
   - Home: index.md
   - Architecture: architecture.md

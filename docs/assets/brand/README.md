@@ -1,6 +1,6 @@
 # Brand
 
-lattice holds the family's packages, and its identity is drawn in the family's system, which comes from print proofing. [ADR-0001](../../adr/0001-lattices-brand.md) records it. lattice prints on one plate, **cyan**: the ink artifactr and evalr share, and the hue of the blue that layout grids were printed in. Its mark is **one cell of the lattice** that every mark in the family is drawn on: four strokes on the family's two diagonals, artifactr's and reflexr's, which are square to each other. Where the cell's sides cross, the plate prints twice, into a deep cyan: lattice's working colour.
+lattice holds the packages, and its identity is drawn in one system, which comes from print proofing. [ADR-0001](../../adr/0001-lattices-brand.md) records it. lattice prints on one plate, **cyan**: the ink artifactr and evalr share, and the hue of the blue that layout grids were printed in. Its mark is **one cell of the lattice** that every package's mark is drawn on: four strokes on lattice's two diagonals, artifactr's and reflexr's, which are square to each other. Where the cell's sides cross, the plate prints twice, into a deep cyan: lattice's working colour.
 
 <p>
   <img src="mark-light.svg#gh-light-mode-only" width="96" alt="The lattice mark">
@@ -20,8 +20,8 @@ Every file is an SVG with no embedded images or fonts. Text is outlined, so noth
 | [`banner-light.svg`](banner-light.svg) | The README banner, 1280 × 400 | Light backgrounds |
 | [`banner-dark.svg`](banner-dark.svg) | The README banner, 1280 × 400 | Dark backgrounds |
 | [`favicon.svg`](favicon.svg) | The mark, switching to the dark colours when the system prefers a dark scheme | Browser tabs |
-| [`family-light.svg`](family-light.svg) | The eight marks of the family, over their names | Light backgrounds |
-| [`family-dark.svg`](family-dark.svg) | The eight marks of the family, over their names | Dark backgrounds |
+| [`family-light.svg`](family-light.svg) | lattice's eight marks, over their names | Light backgrounds |
+| [`family-dark.svg`](family-dark.svg) | lattice's eight marks, over their names | Dark backgrounds |
 | [`tokens.json`](tokens.json) | The colours below, and the site's, as data | Tools and new material |
 
 The site's colours are applied from [`lattice.css`](../stylesheets/lattice.css), to every section: lattice's palette is the site's, and each package's banner and lockup open its own section.
@@ -41,7 +41,7 @@ On paper, cyan printed over cyan makes a deeper cyan, so the light corners are a
 
 | Typeface | Role | Why |
 |---|---|---|
-| [Schibsted Grotesk](https://fonts.google.com/specimen/Schibsted+Grotesk) | The wordmark (Bold, outlined, tracked −1.2%), headings and body text on the site | The family's typeface: a plain, readable grotesque with an editorial voice |
+| [Schibsted Grotesk](https://fonts.google.com/specimen/Schibsted+Grotesk) | The wordmark (Bold, outlined, tracked −1.2%), headings and body text on the site | lattice's typeface: a plain, readable grotesque with an editorial voice |
 | [Fragment Mono](https://fonts.google.com/specimen/Fragment+Mono) | Code on the site | A monospace in the Helvetica tradition, so code sits comfortably beside the grotesque |
 
 Both are open-source (SIL Open Font License) and served by Google Fonts. The wordmark is always lowercase: **lattice**.
@@ -56,7 +56,9 @@ Both are open-source (SIL Open Font License) and served by Google Fonts. The wor
 - A package's section on the site opens with that package's lockup, and its own brand page holds its colours. lattice's colours are the site's.
 - In a README, switch between the light and dark banners with a `<picture>` element, as the repository's README does.
 
-## The family
+<a id="the-family"></a>
+
+## The marks
 
 artifactr, reflexr, evalr, relayr, stackr, portalr and grantr share one brand system, and lattice, which holds them, is drawn in it too, so that they read as a family wherever they appear together: a README that links its siblings, a stack that runs them all, a system built from them.
 
@@ -81,17 +83,17 @@ artifactr, reflexr, evalr, relayr, stackr, portalr and grantr share one brand sy
 | **[artifactr](../../artifactr/assets/brand/README.md)** | A caret, `^` | Magenta and cyan: a person and an agent | Indigo `#2D2A8C`: the artifact they share | The proofreader's sign for "insert here", and the letter A |
 | **[reflexr](../../reflexr/assets/brand/README.md)** | A chevron, `>`: the caret turned a quarter | Yellow and magenta: an event and a response | Red `#B3122E`: the rule firing | A reflex, a signal in and bent back out; and "then" |
 | **[evalr](../../evalr/assets/brand/README.md)** | A tick: the caret turned over, one arm cut short at two thirds of its height | Yellow and cyan: a person's judgement and an evaluator's | Green `#00704F`: the verdict where they agree | A verdict; its arms meet in a point, as the caret's do |
-| **[relayr](../../relayr/assets/brand/README.md)** | Two strokes on the family's diagonal, each two thirds of the grid's height and half a stroke apart | Magenta alone: one plate, the ink artifactr and reflexr share | Deep magenta `#9E0A5E`, where the plate prints twice | The bridge between artifactr and reflexr, in the ink they share |
-| **[stackr](../../stackr/assets/brand/README.md)** | Three slabs, stacked along the family's diagonal, their ends cut at its angle | Key: one tint for every layer | Key `#1C1D26`, where two layers overlap | The layers the other libraries run on, and the key plate the others are printed in register to |
+| **[relayr](../../relayr/assets/brand/README.md)** | Two strokes on lattice's diagonal, each two thirds of the grid's height and half a stroke apart | Magenta alone: one plate, the ink artifactr and reflexr share | Deep magenta `#9E0A5E`, where the plate prints twice | The bridge between artifactr and reflexr, in the ink they share |
+| **[stackr](../../stackr/assets/brand/README.md)** | Three slabs, stacked along lattice's diagonal, their ends cut at its angle | Key: one tint for every layer | Key `#1C1D26`, where two layers overlap | The layers the other libraries run on, and the key plate the others are printed in register to |
 | **[portalr](../../portalr/assets/brand/README.md)** | lattice's cell with one side open: to the upper right for `app`, to the lower left for `admin` | Cyan, magenta and yellow together: the full-colour proof | Violet `#6B2FA0`, chosen, where two sides cross | A window onto the lattice, opened: the portal onto every library |
 | **[grantr](../../grantr/assets/brand/README.md)** | A shield: artifactr's caret turned over, in key, under a slab in yellow | Yellow and key: a nod to the key plate, since grants are keys | Dark gold `#6B5300`, yellow's own shade, where the slab and arms cross | What a grant guards |
-| **lattice** | A cell of the lattice: four strokes on the family's two diagonals, meeting in points | Cyan alone: one plate, the ink artifactr and evalr share | Deep cyan `#005A87`, where the plate prints twice | The grid every mark is drawn on, and the repository that holds them |
+| **lattice** | A cell of the lattice: four strokes on lattice's two diagonals, meeting in points | Cyan alone: one plate, the ink artifactr and evalr share | Deep cyan `#005A87`, where the plate prints twice | The grid every mark is drawn on, and the repository that holds them |
 
 portalr's tokens are also `ui`'s CSS custom properties, which the UIs' theme is built from.
 
 ### Known weaknesses
 
-- **lattice's cell is the family's heaviest mark, and its only closed one.** Beside the siblings' open strokes it reads as a tile, and at 16 pixels as a ring or a tilted square before it reads as a lattice.
+- **lattice's cell is the heaviest mark, and the only closed one.** Beside the siblings' open strokes it reads as a tile, and at 16 pixels as a ring or a tilted square before it reads as a lattice.
 - **It has no flat cuts.** Every stroke ends where its neighbour's edge cuts it, which the stroke rule allows but no sibling does everywhere.
 - **Cyan was the last single plate that can carry text** (magenta is relayr's, and yellow can't). That doesn't touch grantr or portalr, whose inks are a pair with key and the three-ink set, but a member after them can't print on one plate of its own: it prints in cyan or magenta with key, or shares a sibling's inks.
 - **lattice's colours are close to its neighbours'.** The deep cyan sits between artifactr's indigo and evalr's green, and lattice's interactive accent, `#0077B6`, is evalr's. On the site the link colour and its hover are close, as relayr's are.

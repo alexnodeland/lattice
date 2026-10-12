@@ -20,8 +20,8 @@ Every file is a hand-authored SVG with no embedded images or fonts. Text is outl
 | [`banner-light.svg`](banner-light.svg) | The README banner, 1280 × 400 | Light backgrounds |
 | [`banner-dark.svg`](banner-dark.svg) | The README banner, 1280 × 400 | Dark backgrounds |
 | [`favicon.svg`](favicon.svg) | The mark, switching to the dark colours when the system prefers a dark scheme | Browser tabs |
-| [`family-light.svg`](family-light.svg) | The family's first four marks, over their names; [lattice's sheet](../../../assets/brand/README.md#the-family) has all six | Light backgrounds |
-| [`family-dark.svg`](family-dark.svg) | The family's first four marks, over their names; [lattice's sheet](../../../assets/brand/README.md#the-family) has all six | Dark backgrounds |
+| [`family-light.svg`](family-light.svg) | The first four marks, over their names; [lattice's sheet](../../../assets/brand/README.md#the-marks) has all six | Light backgrounds |
+| [`family-dark.svg`](family-dark.svg) | The first four marks, over their names; [lattice's sheet](../../../assets/brand/README.md#the-marks) has all six | Dark backgrounds |
 
 lattice's site takes lattice's palette in every section ([lattice ADR-0001](../../../adr/0001-lattices-brand.md)), and opens reflexr's section with reflexr's lockup. Where the table below names a role on the site, it is the role reflexr's own palette gives that colour.
 
@@ -41,7 +41,7 @@ On paper, overlapping inks make a darker colour, so the light overprint is a dee
 
 | Typeface | Role | Why |
 |---|---|---|
-| [Schibsted Grotesk](https://fonts.google.com/specimen/Schibsted+Grotesk) | The wordmark (Bold, outlined, tracked 1.2% tight), headings and body text on the site | artifactr's face, so the family reads as one: a plain, readable grotesque with an editorial voice |
+| [Schibsted Grotesk](https://fonts.google.com/specimen/Schibsted+Grotesk) | The wordmark (Bold, outlined, tracked 1.2% tight), headings and body text on the site | artifactr's face, so lattice reads as one: a plain, readable grotesque with an editorial voice |
 | [Fragment Mono](https://fonts.google.com/specimen/Fragment+Mono) | Code on the site | A monospace in the Helvetica tradition, so code sits comfortably beside the grotesque |
 
 Both are open-source (SIL Open Font License) and served by Google Fonts. The wordmark is always lowercase: **reflexr**.
@@ -56,12 +56,14 @@ Both are open-source (SIL Open Font License) and served by Google Fonts. The wor
 - Don't stretch, rotate, outline or add effects to the mark, and don't set the wordmark in another typeface.
 - In a README, switch between the light and dark banners with a `<picture>` element, as [reflexr's README](https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/README.md) does.
 
-## The family
+<a id="the-family"></a>
 
-artifactr, reflexr, evalr, relayr, stackr, portalr and grantr share one brand system with lattice, which holds them. [lattice's brand page](../../../assets/brand/README.md#the-family) states it in full: the inks, the grid, the stroke, the overprint and the layout every mark follows, each member's mark and inks, and a family sheet with all eight marks.
+## The marks
+
+artifactr, reflexr, evalr, relayr, stackr, portalr and grantr share one brand system with lattice, which holds them. [lattice's brand page](../../../assets/brand/README.md#the-marks) states it in full: the inks, the grid, the stroke, the overprint and the layout every mark follows, each member's mark and inks, and a family sheet with all eight marks.
 
 ### Known weaknesses
 
-- **The chevron reads as "play" or "next"** to some eyes, and in front of the wordmark it looks like a shell prompt. The family accepts this, as artifactr's caret also reads as "up", and for a library whose rules end in "then run this" the connotation is not wrong.
+- **The chevron reads as "play" or "next"** to some eyes, and in front of the wordmark it looks like a shell prompt. lattice accepts this, as artifactr's caret also reads as "up", and for a library whose rules end in "then run this" the connotation is not wrong.
 - **Yellow is the weakest ink on paper.** It holds at the size of the mark, and on dark backgrounds it is the strongest, but it must never carry text or thin lines.
-- **Magenta is shared with artifactr, and with relayr, which prints in it alone.** Side by side, the shapes and overprints tell them apart, but in a browser's tab strip at 16 pixels reflexr and artifactr are the closest pair in the family, and relayr's deep magenta is the working colour nearest to reflexr's red.
+- **Magenta is shared with artifactr, and with relayr, which prints in it alone.** Side by side, the shapes and overprints tell them apart, but in a browser's tab strip at 16 pixels reflexr and artifactr are the closest pair in lattice, and relayr's deep magenta is the working colour nearest to reflexr's red.

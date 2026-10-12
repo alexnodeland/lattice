@@ -22,7 +22,7 @@ In most chat applications the conversation is the only channel. artifactr adds a
 
 ## Install
 
-Python 3.12 or newer. artifactr is distributed as **`artifactr-ai`** and imported as `artifactr` (the name `artifactr` on PyPI is an unrelated project). Until it is on PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the family's repository:
+Python 3.12 or newer. artifactr is distributed as **`artifactr-ai`** and imported as `artifactr` (the name `artifactr` on PyPI is an unrelated project). Until it is on PyPI, install it from its directory in [lattice](https://github.com/alexnodeland/lattice), the repository every package lives in:
 
 ```bash
 uv add "artifactr-ai[fastapi] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"

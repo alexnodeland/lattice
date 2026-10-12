@@ -1,6 +1,6 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alexnodeland/lattice/main/docs/portalr/assets/brand/banner-dark.svg">
-  <img alt="portalr: the portal into an application built on the family." src="https://raw.githubusercontent.com/alexnodeland/lattice/main/docs/portalr/assets/brand/banner-light.svg" width="100%">
+  <img alt="portalr: the portal into an application built on lattice." src="https://raw.githubusercontent.com/alexnodeland/lattice/main/docs/portalr/assets/brand/banner-light.svg" width="100%">
 </picture>
 
 <p>
@@ -12,13 +12,13 @@
   <a href="https://github.com/alexnodeland/lattice/blob/main/packages/portalr/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-6B2FA0"></a>
 </p>
 
-**portalr** is the planned portal into an application built on the family: an `app` UI for the people who use it, to chat with its agents and see their artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and see feedback, evaluations, usage and spend. Both will be static single-page apps in React, sharing a typed `client` and a `ui` kit, and served by a router the application mounts beside the libraries'.
+**portalr** is the planned portal into an application built on lattice: an `app` UI for the people who use it, to chat with its agents and see their artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and see feedback, evaluations, usage and spend. Both will be static single-page apps in React, sharing a typed `client` and a `ui` kit, and served by a router the application mounts beside the libraries'.
 
 > **Status:** in progress, not yet usable. Built so far: its decisions and [v0.1 plan](https://lattice.alexnodeland.com/portalr/rfcs/0001-v0.1-implementation-plan/), the Bun workspace, its mark with `ui`'s tokens and first primitives, the typed `client`, and the router with its readers, tested against the stack's tools for two tenants, and the app's sign-in and its tenant and workspace pickers ([architecture](https://lattice.alexnodeland.com/portalr/architecture/)). The app's areas and the admin UI come with the plan's later phases.
 
 ## Why
 
-Every surface in the family is an API, a WebSocket or an MCP server, so an application built on it has to build its own UI before anyone can use it, and running one is blind without an admin UI. [lattice RFC-0002](https://lattice.alexnodeland.com/rfcs/0002-portalr-the-portal/) designs that UI once, and portalr is where it is built.
+Every surface in lattice is an API, a WebSocket or an MCP server, so an application built on it has to build its own UI before anyone can use it, and running one is blind without an admin UI. [lattice RFC-0002](https://lattice.alexnodeland.com/rfcs/0002-portalr-the-portal/) designs that UI once, and portalr is where it is built.
 
 ## What it will do
 

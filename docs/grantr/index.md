@@ -12,7 +12,7 @@ hide:
 ![grantr](assets/brand/lockup-light.svg#gh-light-mode-only)
 ![grantr](assets/brand/lockup-dark.svg#gh-dark-mode-only)
 
-Identity and access for the family: tenants, their members, groups, roles and service principals, and the grants that bind them to tenants, workspaces, threads, artifacts and rules.
+Identity and access for lattice's libraries: tenants, their members, groups, roles and service principals, and the grants that bind them to tenants, workspaces, threads, artifacts and rules.
 
 </div>
 

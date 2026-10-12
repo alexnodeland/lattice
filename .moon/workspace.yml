@@ -1,7 +1,7 @@
 # moon runs every task, and only the ones a change affects (stackr's RFC-0003, moon). uv manages
 # the Python dependencies and Bun the web packages'; moon never edits a manifest or a lockfile.
 
-# lattice is the root-level project: the family's documentation site and its own tests.
+# lattice is the root-level project: the documentation site and its own tests.
 projects:
   lattice: '.'
   artifactr: 'packages/artifactr'

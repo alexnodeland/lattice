@@ -125,6 +125,9 @@ def create_app(
         grants=grants,
         telemetry=telemetry,
     )
+{%- if use_artifactr %}
+    artifactr_hooks = access.grants.hooks(access.artifactr_subject)
+{%- endif %}
 {%- endif %}
     parts: list[Part] = [
 {%- if access == 'grantr' %}
@@ -136,7 +139,8 @@ def create_app(
 {%- if access == 'grantr' %}
             authenticate=access.authenticate,
             identify=access.identify,
-            authorize=access.grants.hooks(access.artifactr_subject).authorize,
+            authorize=artifactr_hooks.authorize,
+            hidden=artifactr_hooks.hidden,
 {%- else %}
             authenticate=verifier.authenticate,
             identify=verifier.authenticate,

@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Collection, Coroutine
-from typing import Any
+from typing import Any, Final
 
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from opentelemetry.trace import SpanKind
@@ -40,6 +40,9 @@ from artifactr.telemetry.metrics import STREAM_CONNECTIONS, STREAM_DISCONNECTS
 from artifactr.workspace import Workspace
 
 logger = logging.getLogger("artifactr.fastapi")
+
+REPLAY_PAGE: Final = 500
+"""How many envelopes a stream replays from storage at a time."""
 
 OpenWorkspace = Callable[[HTTPConnection, WorkspaceId], Awaitable[Workspace]]
 
@@ -146,7 +149,7 @@ class Stream:
         # Runs that started up to head_seq are watched from this list; later ones as they start.
         for run in running:
             if hello.threads is None or run.thread_id in hello.threads:
-                self._watch(run.id)
+                self._watch(workspace, run.id, run.thread_id)
         await self._read(workspace)
 
     async def _hello(self) -> Hello | None:
@@ -164,19 +167,23 @@ class Stream:
     async def _follow(
         self, workspace: Workspace, after: int, head: int, threads: Collection[ThreadId] | None
     ) -> None:
-        replaying = after < head
-        if not replaying:
-            self._put(ReplayComplete(up_to_seq=head))
-        # Follow the whole log and filter here, so the end of replay is seen even when the
-        # last replayed events belong to threads this client does not follow.
-        async for envelope in workspace.subscribe(after_seq=after):
+        # Replay the log up to head a page at a time, then follow it from head. Replay ends at
+        # head, not at the last envelope sent: what is hidden from the client leaves gaps.
+        while after < head:
+            page = await workspace.read(
+                after_seq=after, before_seq=head + 1, threads=threads, limit=REPLAY_PAGE
+            )
+            for envelope in page:
+                self._put(EventFrame(**dict(envelope)))
+            if len(page) < REPLAY_PAGE:
+                break
+            after = page[-1].seq
+        self._put(ReplayComplete(up_to_seq=head))
+        async for envelope in workspace.subscribe(after_seq=head):
             if delivered_to(envelope, threads):
                 self._put(EventFrame(**dict(envelope)))
-                if isinstance(envelope.event, RunStarted) and envelope.seq > head:
-                    self._watch(envelope.event.run_id)
-            if replaying and envelope.seq >= head:
-                self._put(ReplayComplete(up_to_seq=head))
-                replaying = False
+                if isinstance(envelope.event, RunStarted):
+                    self._watch(workspace, envelope.event.run_id, envelope.event.thread_id)
 
     async def _read(self, workspace: Workspace) -> None:
         while True:
@@ -192,8 +199,8 @@ class Stream:
     async def _handle(self, workspace: Workspace, frame: CommandFrame) -> None:
         try:
             if isinstance(frame.command, WatchRun):
-                await workspace.run(frame.command.run_id)  # it must belong to this workspace
-                self._watch(frame.command.run_id)
+                run = await workspace.run(frame.command.run_id)  # it must belong to this workspace
+                self._watch(workspace, run.id, run.thread_id)
                 self._put(CommandResult(command_id=frame.command_id, ok=True, outcome=Recorded()))
             else:
                 result = await self._runner.execute(
@@ -209,13 +216,16 @@ class Stream:
             logger.exception("command %s failed", frame.command_id)
             self._put(ErrorFrame(message=f"command {frame.command_id} failed on the server"))
 
-    def _watch(self, run_id: RunId) -> None:
+    def _watch(self, workspace: Workspace, run_id: RunId, thread_id: ThreadId) -> None:
+        """Forward a run's live frames until it ends, or its thread is hidden from the client."""
         if run_id in self._watched:
             return
         self._watched.add(run_id)
 
         async def forward() -> None:
             async for frame in self._runner.watch(run_id):
+                if thread_id in (await workspace.hidden()).threads:
+                    return
                 self._put(frame)
 
         self._spawn(forward())

@@ -335,7 +335,9 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
 - [x] Phase 3: storage and API
 - [x] Phase 4: the template
   - `on_tenant_created` is deferred: the template's gateway keys are settings, and stackr's `make tenant` still creates a tenant's gateway team (grantr ADR-0021)
-- [ ] Phase 5: threads and artifacts
+- [x] Phase 5: threads and artifacts
+  - [x] grantr's restricted flag and `grantr:restrict` ([#94](https://github.com/alexnodeland/lattice/pull/94), grantr ADR-0024)
+  - [x] artifactr's `hidden`, every read path filtered, and the template's exit criterion ([#97](https://github.com/alexnodeland/lattice/pull/97), artifactr ADR-0062)
 - [ ] Phase 6: row-level security
 - [ ] Phase 7: docs and ADRs
 

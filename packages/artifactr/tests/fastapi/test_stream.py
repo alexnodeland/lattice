@@ -1,5 +1,6 @@
 """The thread protocol over WebSocket."""
 
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -7,6 +8,8 @@ from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
+from artifactr.core import Actor, TenantId, Visibility, WorkspaceId
+from artifactr.fastapi import stream
 from tests.agent.conftest import Script, call, say
 from tests.fastapi.conftest import Latch, build, command, hello, wait_for
 
@@ -320,3 +323,62 @@ def test_a_client_that_cannot_keep_up_is_disconnected() -> None:
 def _drain(ws: WebSocketTestSession) -> None:
     for _ in range(100):
         ws.receive_json()
+
+
+async def _hide_t2_from_bob(
+    tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor
+) -> Visibility:
+    return Visibility(threads=frozenset({"t2"} if actor.participant == "user:bob" else ()))
+
+
+def test_replay_ends_at_the_head_whatever_is_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(stream, "REPLAY_PAGE", 1)
+    app, _ = build(Script(), hidden=_hide_t2_from_bob)
+    with TestClient(app) as client:
+        for n, thread in enumerate(("t1", "t3", "t2")):
+            _post(client, f"c{n}", type="create_thread", thread_id=thread)
+        with client.websocket_connect(STREAM, headers={"x-user": "bob"}) as ws:
+            ws.send_json(hello())
+            assert ws.receive_json()["head_seq"] == 3
+            replayed = _receive_until(ws, "replay_complete")
+            assert [f.get("seq") for f in replayed] == [1, 2, None], "t2's is hidden"
+            _post(client, "c4", type="set_thread_mode", thread_id="t2", mode="suggest")
+            _post(client, "c5", type="set_thread_mode", thread_id="t1", mode="suggest")
+            live = ws.receive_json()
+            assert (live["seq"], live["thread_id"]) == (5, "t1")
+
+
+class Hider:
+    """Hides t1 from Bob once told to."""
+
+    def __init__(self) -> None:
+        self.hiding = False
+
+    async def __call__(
+        self, tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor
+    ) -> Visibility:
+        hides = self.hiding and actor.participant == "user:bob"
+        return Visibility(threads=frozenset({"t1"} if hides else ()))
+
+
+def test_a_watched_run_stops_once_its_thread_is_hidden() -> None:
+    latch, hider = Latch(), Hider()
+    script = Script(call("hold"), say("Released."))
+    app, _ = build(script, latch=latch, hidden=hider, hidden_refresh=timedelta(0))
+    with TestClient(app) as client:
+        _post(client, "c1", type="create_thread", thread_id="t1")
+        _post(client, "c2", type="post_message", thread_id="t1", content="Go")
+        wait_for(latch.entered.is_set)
+        with client.websocket_connect(STREAM, headers={"x-user": "bob"}) as ws:
+            ws.send_json(hello())
+            [active] = ws.receive_json()["active_runs"]
+            _receive_until(ws, "replay_complete")
+            ws.send_json(command("c3", type="watch_run", run_id=active["run_id"]))
+            assert _receive_until(ws, "command_result")[-1]["ok"]
+            hider.hiding = True
+            latch.released.set()
+            wait_for(lambda: _runs_ended(client) == 1)
+            _post(client, "c4", type="create_thread", thread_id="t2")
+            frames = _until_event(ws, "thread_created")
+            assert [f["type"] for f in frames] == ["event"], "nothing of t1's run"
+            assert frames[-1]["thread_id"] == "t2"

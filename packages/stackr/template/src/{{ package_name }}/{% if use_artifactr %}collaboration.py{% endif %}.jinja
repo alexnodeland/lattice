@@ -25,7 +25,7 @@ from artifactr.litellm import LiteLLMGateway
 from artifactr.mcp import ArtifactrMcp, McpContext
 from artifactr.scores import FeedbackMirror, sync_score_configs
 from artifactr.sql import SqlStorage, migrate
-from artifactr.workspace import Authorize
+from artifactr.workspace import Authorize, Hidden
 from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
 
 {% if access == 'grantr' -%}
@@ -49,6 +49,7 @@ class Collaboration:
         authenticate: Says who each request comes from, and in which tenant.
         identify: Checks a request's credentials alone, for the MCP server's door.
         authorize: Whether an actor may take an action; without one, everything is allowed.
+        hidden: The threads and artifacts an actor may not see; without one, nothing is hidden.
         model: The agent's model.
         gateway: The gateway's settings: tenant keys and guardrails.
         engine: The database; without one, workspaces live in memory.
@@ -62,6 +63,7 @@ class Collaboration:
         authenticate: Authenticate,
         identify: Callable[[HTTPConnection], Awaitable[object]],
         authorize: Authorize | None = None,
+        hidden: Hidden | None = None,
         model: Model,
         gateway: GatewaySettings,
         engine: AsyncEngine | None = None,
@@ -86,6 +88,7 @@ class Collaboration:
             SqlStorage(engine) if engine else InMemoryStorage(),
             types=[Note],
             authorize=authorize,
+            hidden=hidden,
             on_open=self._mirrors.watch if self._mirrors else None,
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,

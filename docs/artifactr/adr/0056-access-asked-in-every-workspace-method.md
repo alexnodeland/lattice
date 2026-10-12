@@ -1,6 +1,6 @@
 # ADR-0056: Access asked in every workspace method
 
-**Status:** Accepted, amended by [ADR-0058](0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md)
+**Status:** Accepted, amended by [ADR-0058](0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md) and [ADR-0062](0062-restricted-items-left-out-of-every-read.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

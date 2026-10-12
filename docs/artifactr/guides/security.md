@@ -40,6 +40,18 @@ Finer rules come from the library itself:
 - **Run facts belong to the agent.** Only a thread's own agent, or the system, may record facts about that thread's runs; clients cannot forge `run_started` or `tool_returned`.
 - **Attribution cannot be borrowed.** A handle acts as the actor it was opened for. The agent's handle is derived from yours with `as_actor`, and only your code chooses the actor.
 
+### Restricted threads and artifacts
+
+An application that restricts some threads or artifacts to some of a workspace's members gives `Workspaces` a `hidden(tenant_id, workspace_id, actor)` hook, which returns what the actor may not see there: an `artifactr.core.Visibility`, or any object with its `threads` and `artifacts` sets ([ADR-0062](../adr/0062-restricted-items-left-out-of-every-read.md)). Every read leaves them out:
+
+- **A hidden item is missing.** Reading one, or a command or claim that names one, raises `NotFound`, 404 over REST, as for one that doesn't exist; so is a run in a hidden thread, and a proposal on a hidden artifact, and answering either. A hidden thread's runs and history are empty, as a missing thread's are.
+- **Listings leave them out,** and a thread's focus its hidden artifacts.
+- **The log drops what is about them.** An artifact or proposal event from a hidden thread is kept without its thread and run, and a hidden thread's agent is named with no thread, so a visible artifact's history stays whole. A page of the log is full whatever was hidden.
+- **A handle asks the hook at most once every `hidden_refresh`** (`Workspaces(hidden_refresh=)`, 30 seconds by default), so an open subscription, or a run the WebSocket forwards, learns of a new restriction within that time.
+- **The agent reads as its turn's actor,** so the hook sees whom the turn acts for, through `on_behalf_of`.
+
+Without a hook, nothing is hidden. grantr's `Grants.hooks(subject_of).hidden` is one.
+
 ## Keeping agents in bounds
 
 - **Write policies.** Give sensitive types `write_policy = "propose"`, or put a thread in suggest mode, and every agent change waits for a person. This covers external agents over MCP as well as the built-in agent.

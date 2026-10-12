@@ -390,7 +390,8 @@ In lattice, this list becomes a tracking issue with a sub-issue per phase (phase
 - [x] Phase 2: the day (2026-09-30)
 - [x] Phase 3: package ADRs and the family architecture (2026-09-30)
   - The family's architecture and ADRs ([#30](https://github.com/alexnodeland/lattice/pull/30)), each package's ADRs for the move ([#36](https://github.com/alexnodeland/lattice/pull/36)), lattice's brand and site styling ([#34](https://github.com/alexnodeland/lattice/pull/34)), every package's docs describing lattice ([#32](https://github.com/alexnodeland/lattice/pull/32)), and their follow-ups ([#33](https://github.com/alexnodeland/lattice/issues/33)).
-- [ ] Phase 4: the template in lattice
+- [x] Phase 4: the template in lattice (2026-10-12)
+  - Pinning by the rendered commit, path sources in the Template job, Template and Smoke run on a library's change, and `bump-libraries` retired ([#51](https://github.com/alexnodeland/lattice/pull/51), [ADR-0018](../adr/0018-the-template-pins-the-libraries-at-its-own-commit.md)). Path sources are editable, since the libraries' own evalr source is. The Smoke job's application builds in Docker, where a path to the checkout doesn't exist, so it installs from GitHub at the pull request's merge commit instead.
 - [ ] Phase 5: acceptance tests
 - [ ] Phase 6: test signal and hardening
 - [ ] Phase 7: agents and process

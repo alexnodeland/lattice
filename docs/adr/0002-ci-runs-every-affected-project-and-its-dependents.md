@@ -1,6 +1,6 @@
 # ADR-0002: CI runs every affected project and its dependents
 
-**Status:** Accepted
+**Status:** Accepted; amended by [stackr ADR-0018](../stackr/adr/0018-the-template-pins-the-libraries-at-its-own-commit.md)
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 

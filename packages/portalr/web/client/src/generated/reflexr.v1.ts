@@ -119,6 +119,11 @@ export type Of1 = [Filter, ...Filter[]];
 export type Kind7 = "not";
 export type Kind8 = "predicate";
 export type Name = string;
+/**
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "Pattern".
+ */
+export type Pattern = EachPattern | CountPattern | SequencePattern | AbsencePattern;
 export type Kind9 = "each";
 export type AtLeast = number;
 export type Kind10 = "count";
@@ -234,11 +239,6 @@ export type Rejection = {
 export type Type19 = "command_result";
 export type Message = string;
 export type Type20 = "error";
-/**
- * This interface was referenced by `ReflexrV1`'s JSON-Schema
- * via the `definition` "Pattern".
- */
-export type Pattern = EachPattern | CountPattern | SequencePattern | AbsencePattern;
 
 /**
  * Frames of the reflexr.v1 workspace protocol: `client` is any frame a client sends, `server` any frame a server sends.
@@ -413,6 +413,9 @@ export interface Rule {
 }
 /**
  * How a failed run is retried: exponential backoff, up to ``max_attempts`` attempts.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RetryPolicy".
  */
 export interface RetryPolicy {
   backoff?: Backoff;
@@ -422,6 +425,9 @@ export interface RetryPolicy {
 }
 /**
  * The event fields that partition a rule's state and ordering. None: the whole workspace.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "Scope".
  */
 export interface Scope {
   fields?: Fields;
@@ -448,7 +454,7 @@ export interface Params {
 export interface Condition {
   dedupe?: Dedupe | null;
   filter: Filter;
-  pattern?: EachPattern | CountPattern | SequencePattern | AbsencePattern;
+  pattern?: Pattern;
   throttle?: Throttle | null;
 }
 /**
@@ -483,9 +489,7 @@ export interface WhereFilter {
   field: Field;
   kind: Kind4;
   op: Op;
-  value?: {
-    [k: string]: unknown;
-  };
+  value?: JsonValue;
 }
 /**
  * Envelopes that match every filter in ``of``.
@@ -793,9 +797,7 @@ export interface RunOutcome {
  */
 export interface Run {
   attempts?: Attempts;
-  checkpoint?: {
-    [k: string]: unknown;
-  };
+  checkpoint?: JsonValue;
   checkpoints?: Checkpoints;
   correlation_id: CorrelationId3;
   created_at: CreatedAt;
@@ -805,9 +807,7 @@ export interface Run {
   id: RunId;
   matched: Matched;
   next_attempt_at: NextAttemptAt;
-  output?: {
-    [k: string]: unknown;
-  };
+  output?: JsonValue;
   reason?: Reason3;
   rule: RuleName;
   scope: Scope1;
@@ -869,25 +869,4 @@ export interface RuleVersionOutcome {
 export interface ErrorFrame {
   message: Message;
   type: Type20;
-}
-/**
- * How a failed run is retried: exponential backoff, up to ``max_attempts`` attempts.
- *
- * This interface was referenced by `ReflexrV1`'s JSON-Schema
- * via the `definition` "RetryPolicy".
- */
-export interface RetryPolicy1 {
-  backoff?: Backoff;
-  max_attempts?: MaxAttempts;
-  max_backoff?: MaxBackoff;
-  multiplier?: Multiplier;
-}
-/**
- * The event fields that partition a rule's state and ordering. None: the whole workspace.
- *
- * This interface was referenced by `ReflexrV1`'s JSON-Schema
- * via the `definition` "Scope".
- */
-export interface Scope2 {
-  fields?: Fields;
 }

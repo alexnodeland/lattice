@@ -10,9 +10,11 @@
     "@base-ui/react": "1.8.0",
     "clsx": "2.1.1",
     "react": "19.3.0",
+    "streamdown": "2.7.0",
     "tailwind-merge": "3.7.0"
   },
   "devDependencies": {
+    "@portalr/client": "workspace:*",
     "@tailwindcss/vite": "4.3.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",

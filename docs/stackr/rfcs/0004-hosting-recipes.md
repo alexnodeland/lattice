@@ -31,7 +31,7 @@ An application generated from the template runs beside the stack on a laptop. No
 - **Configuration is mounted from the checkout.** Every service reads its files from `deploy/<service>/`, and Grafana reads the libraries' dashboards from `packages/<library>/`. A container platform has no checkout to mount.
 - **Row-level security needs two roles.** An application with it migrates as the owner and works as a role that owns nothing, which `db-roles` creates before it first starts (ADR-0022).
 
-The applications built on the family are ready to be used by people other than their authors. They need somewhere to run that the maintainer can stand behind, on a VM or in one AWS account, with no further service to sign up for.
+The applications built on the family are ready to be used by people other than their authors. They need somewhere to run that the maintainer can stand behind, on a VM with an S3-compatible bucket off the host for its backups, or in one AWS account, with no other hosted service to sign up for.
 
 ## Design
 
@@ -165,7 +165,7 @@ Every task and the state host are in private subnets. Only the ALB is public.
 
 - **`envs/prod`** is the root an operator applies. Its state is in S3, with `use_lockfile`: one bucket per account, created once by hand with the commands its README lists, and one key per deployment. CI never applies it.
 - **`envs/floci`** is the same modules against Floci: local state, the provider pointed at Floci through `AWS_ENDPOINT_URL`, smaller sizes, and the tests (`tests/*.tofutest.hcl`).
-- **OpenTofu 1.13** and **tflint** are pinned in `.prototools`. proto has neither built in, so `[plugins]` names a community TOML plugin for each (`tofu`, `tflint`), pinned to a commit. The AWS provider is pinned at `~> 6.68`.
+- **OpenTofu 1.13** and **tflint** are pinned in `.prototools`. proto has neither built in, so `[plugins]` names a community TOML plugin for each (`tofu`, `tflint`), pinned to a commit. Renovate's proto manager doesn't follow third-party plugins, so a Renovate custom manager moves each plugin's commit and tool version from their GitHub releases. tflint's AWS ruleset is pinned to a version in `.tflint.hcl`, which the same custom manager moves. The AWS provider is pinned at `~> 6.68`.
 
 Where each service runs:
 
@@ -181,7 +181,7 @@ Where each service runs:
 - **Names.** Services find each other in one private namespace, `stackr.internal`, as `otel-collector.stackr.internal`. The state host keeps a fixed private address, registered once, which survives replacing the instance.
 - **Langfuse reaches S3** with its task role, not with keys.
 - **ElastiCache** has transit encryption and an auth token, so its clients use `rediss://`.
-- **RDS requires TLS.** RDS for PostgreSQL 15 and later sets `rds.force_ssl`, so every client's URL asks for it: `ssl=require` for asyncpg, and `sslmode=require` for Langfuse's and LiteLLM's Prisma, for GoTrue and for Grafana.
+- **RDS requires TLS.** RDS for PostgreSQL 15 and later sets `rds.force_ssl`, so every client asks for it: `ssl=require` in the application's asyncpg URLs; `sslmode=require` in the URLs of Langfuse's and LiteLLM's Prisma, GoTrue, and the one-off tasks (`db-init`'s psql, `auth-keys` and `db-roles`); and `GF_DATABASE_SSL_MODE=require` for Grafana, which takes its database in separate settings, not a URL.
 - **Operators** reach Grafana, Langfuse and LiteLLM's admin UI with SSM port forwarding through the state host, which runs the SSM agent. Nothing is opened for it: no bastion, no SSH.
 
 ### Images and configuration on AWS
@@ -207,13 +207,13 @@ Fargate can't mount a checkout, so each service on Fargate whose configuration s
 - **No admin UI faces the internet.** Grafana, Langfuse, LiteLLM's admin UI, and MinIO's console on the host, are reached by an SSH tunnel on the host, and by SSM through the state host on AWS. The edge refuses GoTrue's `/admin/*`, and the admin commands reach it on the private network through `AUTH_ADMIN_URL`.
 - **A firewall on the host,** ufw, allows 22, 80 and 443. Docker writes its own iptables rules for published ports, which ufw doesn't see, so a port published on every interface would bypass it. That is why the overlay publishes nothing but Caddy's ports, and binds the rest to `127.0.0.1`.
 - **Security groups on AWS:** the ALB takes 443 and 80 from anywhere, and each task takes traffic only from the services that call it. RDS, ElastiCache and the state host take nothing from outside the VPC.
-- **Row-level security** (ADR-0022). With access by grantr, the application gets `DATABASE_URL`, a role that owns nothing, and `DATABASE_ADMIN_URL`, the tables' owner: it migrates at startup as the owner, and keeps the owner's engine for the reads that span tenants. `db-roles` creates the first role before the application first starts. With `access=none`, there is no `db-roles`, and the application gets one URL.
+- **Row-level security** (ADR-0022). With access by grantr, the application gets `DATABASE_URL`, a role that owns nothing, and `DATABASE_ADMIN_URL`, the tables' owner: it migrates at startup as the owner, and keeps the owner's engine for the reads that span tenants. `db-roles` creates the first role before the application first starts. With `access=none`, there is no `db-roles`, and the application gets one URL. ADR-0022 lets such an application turn row-level security on and create its role itself; the recipes don't wire that.
 - **Images** are pinned by digest, and Renovate moves them.
 
 ### Operations
 
 - **Updates.** On the host: check out the new stackr tag, `docker compose pull`, then `up`. On AWS: merge Renovate's digests in `envs/prod`, then `tofu apply`. ECS rolls each service, with its deployment circuit breaker rolling back a deployment whose tasks fail. Langfuse, LiteLLM and the application migrate their databases when they start, as they do now.
-- **Backups on the host.** pgBackRest takes full and incremental backups of PostgreSQL to an S3 bucket, with its WAL archived, so it can restore to a point in time. ClickHouse's native `BACKUP ... TO S3` copies ClickHouse to the same bucket. Prometheus's data is not backed up: it is 15 days of metrics.
+- **Backups on the host.** pgBackRest takes full and incremental backups of PostgreSQL to an S3 bucket, with its WAL archived, so it can restore to a point in time. ClickHouse's native `BACKUP ... TO S3` copies ClickHouse to the same bucket, run nightly by a systemd timer like pgBackRest's. Its bucket and credentials come from `.env` into a named collection in ClickHouse's configuration, so no key is written in the `BACKUP` statement. The bucket is any S3-compatible store off the host. Prometheus's data is not backed up: it is 15 days of metrics.
 - **Backups on AWS.** RDS takes automated backups with point-in-time restore. DLM snapshots the state host's volume daily, which covers ClickHouse and Prometheus.
 - **The restore drill.** On the host, a weekly systemd timer runs `deploy/host/restore-drill`: it restores the latest backups into new containers beside the stack, checks that the application's tables and Langfuse's traces are there, and sends the result as a metric to the Collector. A Grafana alert fires when the drill hasn't passed in eight days. On AWS, an operator runs the drill by hand at each upgrade: a point-in-time RDS restore and a volume from the latest snapshot, with the same checks.
 - **The hosted stack observes itself.** The Collector's health dashboard already shows whether each service is up. On AWS, container logs also go to CloudWatch Logs, with a short retention, for when the Collector itself is down.
@@ -290,7 +290,7 @@ Some of the design rests on behaviour of Floci or AWS that nothing here has conf
 - **A `hosting` question** in the template, `none` by default, or `host` or `aws`:
   - `host` adds `deploy/host/compose.prod.yaml` for the application: its published image, no published port (Caddy reaches it on `stackr`), and its settings from `.env`.
   - `aws` adds `deploy/aws/`, a root that uses stackr's `stack` module from lattice at the commit the template was rendered from, as the libraries are pinned ([ADR-0018](../adr/0018-the-template-pins-the-libraries-at-its-own-commit.md)), with the application's image, host and settings.
-- **`db-roles` is the one one-off.** With access by grantr, it runs before the service rolls: `docker compose run --rm` on the host, and an ECS task on AWS. The application then migrates at startup as the owner. `db-init` creates the application's database and its owner role, as it does Langfuse's.
+- **`db-roles` is the application's only one-off.** With access by grantr, it runs before the service rolls: `docker compose run --rm` on the host, and an ECS task on AWS. The application then migrates at startup as the owner. `db-init` creates the application's database and its owner role, as it does Langfuse's.
 - **Settings.** Each recipe writes the application's settings for the ports: `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_ADMIN_URL`, `DATABASE_URL` and `DATABASE_ADMIN_URL`, `LITELLM_BASE_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT` and the rest. A tenant's gateway key is still made with `make tenant`, run against the hosted gateway.
 
 ### What comes later
@@ -305,7 +305,7 @@ Some of the design rests on behaviour of Floci or AWS that nothing here has conf
 
 ## Decisions
 
-The maintainer decided H1 to H5, H12 and H15 on 2026-10-12. The rest were settled while writing this RFC, and accepted with it.
+The maintainer decided H1 to H5, H12 and H15 on 2026-10-12, and H13's state bucket: one per account, one key per deployment. The rest were settled while writing this RFC, and accepted with it.
 
 | # | Decision | Decided | Instead of |
 |---|---|---|---|
@@ -336,7 +336,7 @@ The maintainer decided H1 to H5, H12 and H15 on 2026-10-12. The rest were settle
 | 2. Single host | The `auth` profile, `scripts/auth-keys`, `AUTH_ADMIN_URL`, `deploy/host/` with the overlay, the Caddyfile, PostgreSQL's image with pgBackRest, the backups and `restore-drill`, the CI job, and the template's `hosting: host` | CI brings the stack up with the overlay behind Caddy on a local CA, and `make smoke` and `make smoke-app` pass through it on the `postgres` adapter. The restore drill passes in the same job, against MinIO. An application generated with `hosting: host` passes its CI |
 | 3. AWS modules and tier 1 | The thin images and the Images job, the seven modules, `envs/prod` and `envs/floci`, OpenTofu and tflint in `.prototools`, and tier 1 | Tier 1 passes on a pull request that touches `deploy/aws/**`, and each of checkov's findings is fixed, or skipped with its reason in checkov's configuration |
 | 4. Tier 2 | The Docker-mode apply, the smoke through the ALB, `psql` through the relay, the trace in Tempo, destroy, and the template's `hosting: aws` | Tier 2 passes on a pull request that changes the recipe, and leaves nothing behind. An application generated with `hosting: aws` passes its CI |
-| 5. Docs, ADRs and the gate | The hosting guides, an ADR for each decision, the release step that publishes the thin images, and the manual apply on real AWS | A real AWS apply passes the smoke over HTTPS, then destroys, before stackr's v0.1 is tagged |
+| 5. Docs, ADRs and the gate | The hosting guides, ADRs that record the decisions grouped by area (the hosts, AWS's layout, secrets, backups, CI), beside the spike's ADRs, the release step that publishes the thin images, and the manual apply on real AWS | A real AWS apply passes the smoke over HTTPS, then destroys, before stackr's v0.1 is tagged |
 
 Phase 2 and phase 3 are independent after the spike. Phase 4 needs 3.
 

@@ -136,6 +136,7 @@ These are enforced by CI, for every package, and described in each package's qua
 - **TypeScript strict,** from `tsconfig.base.json`, and **Biome** for formatting and linting, in the web packages; **knip** fails on an unused file, export or dependency.
 - **No inline suppressions** in any Python in the repository: no `# type: ignore`, `# pyright: ignore`, `# noqa` or `# pragma: no cover`; nor in the TypeScript: no `@ts-expect-error`, `@ts-ignore`, `@ts-nocheck` or `biome-ignore`. Restructure the code instead; the root's `tests/test_quality.py` fails on any. Per-file ignores in the root `pyproject.toml` are configuration, reviewed as such.
 - **Warnings are errors** in the test suites.
+- **Tests run in a random order,** through pytest-randomly, and each run prints its seed. A test that fails in only some orders is reproduced with `uv run pytest --randomly-seed=N` and fixed; `-p no:randomly` runs the tests in file order ([lattice ADR-0010][lattice-adr-0010]).
 - **The libraries stay independent.** Each library's layering test lists what each of its modules may import, deptry fails on an import a package doesn't declare, and each package's `standalone` task installs it outside the workspace.
 
 ## Definition of done
@@ -163,5 +164,6 @@ By contributing, you agree that your contributions are licensed under the [MIT L
 [artifactr-adr-0014]: docs/artifactr/adr/0014-trunk-based-development-with-rfcs-and-adrs.md
 [artifactr-adr-0015]: docs/artifactr/adr/0015-quality-gates.md
 [code-of-conduct]: CODE_OF_CONDUCT.md
+[lattice-adr-0010]: docs/adr/0010-every-projects-tests-run-in-a-random-order.md
 [license]: LICENSE
 [security]: SECURITY.md

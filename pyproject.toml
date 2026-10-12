@@ -9,13 +9,15 @@ dependencies = []
 
 [dependency-groups]
 # The family's own checks: the root tests, lint and types for the root's Python, and deptry over
-# each package's shipped code.
+# each package's shipped code. pytest-randomly runs every project's tests in a random order, since
+# every project's tests run in this one environment.
 dev = [
     "actionlint-py>=1.7.12",
     "deptry>=0.25",
     "prek>=0.5.4",
     "pyright>=1.1.414",
     "pytest>=9.1",
+    "pytest-randomly>=5.0",
     "pytest-timeout>=2.4",
     "pyyaml>=6.0.3",
     "ruff>=0.16",

@@ -394,6 +394,8 @@ In lattice, this list becomes a tracking issue with a sub-issue per phase (phase
   - Pinning by the rendered commit, path sources in the Template job, Template and Smoke run on a library's change, and `bump-libraries` retired ([#51](https://github.com/alexnodeland/lattice/pull/51), [ADR-0018](../adr/0018-the-template-pins-the-libraries-at-its-own-commit.md)). Path sources are editable, since the libraries' own evalr source is. The Smoke job's application builds in Docker, where a path to the checkout doesn't exist, so it installs from GitHub at the pull request's merge commit instead.
 - [ ] Phase 5: acceptance tests
 - [ ] Phase 6: test signal and hardening
+  - The timeouts, on the day ([#4](https://github.com/alexnodeland/lattice/pull/4), [lattice ADR-0007](../../adr/0007-a-timeout-on-every-test-and-every-job.md)).
+  - pytest-randomly ([#55](https://github.com/alexnodeland/lattice/pull/55), [lattice ADR-0010](../../adr/0010-every-projects-tests-run-in-a-random-order.md)): no test depended on its order.
 - [ ] Phase 7: agents and process
 
 ### What the rehearsal settled

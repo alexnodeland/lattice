@@ -1,5 +1,6 @@
 Feature: Feedback
-  A person gives thumbs, and says why if they like, on a rule's run and on the agent's turn.
+  A person gives thumbs, and says why if they like, on a rule's run, the agent's turn and an
+  artifact.
 
   Background:
     Given bob has signed in
@@ -19,3 +20,13 @@ Feature: Feedback
     Then their thread's turn is "Done"
     When they find their thread's turn helpful
     Then their thread's turn shows them finding it helpful
+
+  Scenario: Thumbs up on a note
+    When they start the thread "A note to judge"
+    And they post "propose an edit"
+    And they keep the note the assistant proposed an edit to
+    And they open the workspace's artifacts
+    And they open the note
+    And they find the note helpful
+    Then the note shows them finding it helpful
+

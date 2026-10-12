@@ -63,7 +63,7 @@ Every durable event arrives in the same envelope. The stored envelope and the wi
   "workspace_id": "ws_1",
   "thread_id": "thr_9",
   "run_id": "run_42",
-  "actor": {"kind": "agent", "thread_id": "thr_9", "run_id": "run_42", "name": "assistant"},
+  "actor": {"kind": "agent", "thread_id": "thr_9", "run_id": "run_42", "name": "assistant", "on_behalf_of": {"kind": "user", "id": "u_alice", "name": "Alice"}},
   "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
   "event": {
     "type": "artifact_changed",
@@ -79,7 +79,7 @@ Every durable event arrives in the same envelope. The stored envelope and the wi
 }
 ```
 
-`actor.kind` is one of `user` (`id`, `name?`), `agent` (`thread_id`, `run_id?`, `name`), `external_agent` (`client_id`, `name?`), `system` (`name`) or `evaluator` (`name`, `version`). Every event of one thread's agent is the same participant, whatever its run.
+`actor.kind` is one of `user` (`id`, `name?`), `agent` (`thread_id`, `run_id?`, `name`, `on_behalf_of?`), `external_agent` (`client_id`, `name?`, `on_behalf_of?`), `system` (`name`) or `evaluator` (`name`, `version`). Every event of one thread's agent is the same participant, whatever its run. An agent's `on_behalf_of` is the `user` or `external_agent` whose message or answer started its run, and an external agent's the `user` whose token it carries; each is `null` when it acts for no one ([ADR-0057](adr/0057-a-turn-acts-for-one-author.md)).
 
 `traceparent` is the W3C trace context of the span that committed the event, or `null` when it was not traced. For a command, that is its `artifactr.commit` span. It has the name, format and meaning of reflexr's `traceparent`, so a client reads both the same way, and what an event causes elsewhere can link back to it ([ADR-0033](adr/0033-trace-links-on-runs-and-revisions.md)).
 
@@ -182,7 +182,7 @@ The command is one of the `Command` models in `artifactr.core`, or `stop_run` or
 | `type` | Fields | Effect |
 |---|---|---|
 | `create_thread` | `thread_id?`, `title?` | `thread_created` |
-| `post_message` | `thread_id`, `content`, `message_id?`, `kind?` (`message`, the default, or `notice`) | `message_posted`. A message starts a run if the thread is idle, steers the running run if there is one, and answers a paused run's pending requests (declining approvals, with the message as the reason) before resuming it. A message sent as a run ends is taken by the next turn, which that run starts as it releases the thread; the thread's messages are carried out once each, in the log's order ([ADR-0055](adr/0055-turns-from-the-log.md)). A message is a message however it was committed: in a paused thread the oldest one not yet taken is the reply, so post what should not answer as a notice. A notice does none of these, and the thread's agent is told of it only if the application asks ([ADR-0051](adr/0051-notices.md)). A `message_id` already used in the workspace, by a message or a notice, is `invalid_state`. |
+| `post_message` | `thread_id`, `content`, `message_id?`, `kind?` (`message`, the default, or `notice`) | `message_posted`. A message starts a run if the thread is idle, steers the running run if there is one and the run acts for the message's author (otherwise the next turn takes it, acting for its author), and answers a paused run's pending requests (declining approvals, with the message as the reason) before resuming it. A message sent as a run ends is taken by the next turn, which that run starts as it releases the thread; the thread's messages are carried out once each, in the log's order ([ADR-0055](adr/0055-turns-from-the-log.md)). A message is a message however it was committed: in a paused thread the oldest one not yet taken is the reply, so post what should not answer as a notice. A notice does none of these, and the thread's agent is told of it only if the application asks ([ADR-0051](adr/0051-notices.md)). A `message_id` already used in the workspace, by a message or a notice, is `invalid_state`. |
 | `set_focus` | `thread_id`, `artifact_ids` | `focus_changed` |
 | `set_thread_mode` | `thread_id`, `mode` (`edit`, `suggest`) | `thread_mode_changed` |
 | `create_artifact` | `kind`, `data`, `artifact_id?`, `thread_id?`, `proposal_id?` | `artifact_created`, or `proposal_created` under the type's write policy |
@@ -224,7 +224,7 @@ Beyond the memory, core refuses a command that creates something with an id alre
 | `1001` | Server going away | reconnect and resume |
 | `4400` | The first frame was not a valid `hello`, asked for an unsupported protocol version, or asked both to start at the head and to resume | fix or upgrade the client |
 | `4401` | Unauthenticated | re-authenticate |
-| `4403` | Actor may not access this workspace | stop |
+| `4403` | The actor may not open this workspace, or read its log or runs | stop |
 | `4408` | `hello` not received in time | reconnect |
 | `4429` | The client did not read frames fast enough and its outbox overflowed | reconnect and resume |
 
@@ -244,18 +244,18 @@ REST mirrors the commands and exposes reads; `artifactr.fastapi.artifactr_router
 | `GET /v1/workspaces/{workspace_id}/proposals?status=` | Proposals, pending by default. |
 | `GET /v1/workspaces/{workspace_id}/runs/{run_id}` | A run, with any requests it is paused on. |
 
-Authentication is the host's: `resolve_actor(request)` returns the tenant and actor, or raises `Unauthorized` (401). An optional `authorize(tenant, workspace, actor)` refuses with 403, whose `detail` is the `forbidden` rejection, as for every other rejection a read raises.
+Authentication is the host's: `resolve_actor(request)` returns the tenant and actor, or raises `Unauthorized` (401). The `authorize(tenant, workspace, actor, access)` hook of the application's `Workspaces` is asked for every request: for opening the workspace, then for each action the request takes ([ADR-0056](adr/0056-access-asked-in-every-workspace-method.md)). A refusal is 403, whose `detail` is the `forbidden` rejection, as for every other rejection a read raises; over the WebSocket, a command it refuses has a `forbidden` result.
 
 Rejections map to HTTP status codes (`artifactr.fastapi.STATUS_CODES`): `version_conflict` and `invalid_state` → 409, `validation_failed` and `patch_failed` → 422, `not_found` → 404, `forbidden` → 403. `watch_run` over REST is rejected as `invalid_state`.
 
 ## MCP mapping
 
-External agents connect over MCP (`artifactr.mcp.ArtifactrMcp`) with the same authority as any other actor. The host's `resolve(ctx)` returns the client's tenant and `ExternalAgentActor`. An optional `authorize(tenant, workspace, actor)`, the same hook as REST's, is asked on every tool call, resource read and resource subscription that names a workspace. Every tool goes through the same workspace rules and `Runner`.
+External agents connect over MCP (`artifactr.mcp.ArtifactrMcp`) with the same authority as any other actor. The host's `resolve(ctx)` returns the client's tenant and `ExternalAgentActor`. The same `authorize` hook as REST's is asked on every tool call, resource read and resource subscription, for each action it takes. Every tool goes through the same workspace rules and `Runner`.
 
 | MCP | artifactr |
 |---|---|
-| Resource template `artifactr://{tenant_id}/{workspace_id}/artifacts/{artifact_id}` | The artifact's current `Versioned` JSON. Only readable by clients of that tenant, in a workspace `authorize` allows. |
-| `subscriptions/listen` and resource-updated notifications | Published for `artifact_created`, `artifact_changed` and `artifact_archived` in every workspace a client has used, through the server's `SubscriptionBus`. A `listen` request that names an artifact of another tenant, or of a workspace `authorize` refuses, fails as a read of it would. |
+| Resource template `artifactr://{tenant_id}/{workspace_id}/artifacts/{artifact_id}` | The artifact's current `Versioned` JSON. Only readable by clients of that tenant, and only if `authorize` allows them `artifactr:read_artifacts`. |
+| `subscriptions/listen` and resource-updated notifications | Published for `artifact_created`, `artifact_changed` and `artifact_archived` in every workspace a client has used, through the server's `SubscriptionBus`. A `listen` request that names an artifact of another tenant, or one `authorize` refuses, fails as a read of it would. |
 | Tools `list_artifacts`, `read_artifact`, `create_artifact`, `edit_text`, `edit_artifact`, `archive_artifact` | Artifact commands and reads. `list_artifacts` takes REST's `kind` and `include_archived`. The edit tools take an optional `base_version` (required for `edit_artifact`) and `propose` with `rationale`. |
 | Tool `list_revisions` | `GET .../artifacts/{artifact_id}/revisions`, as JSON lines. |
 | Tools `list_proposals`, `respond_to_proposal` | Review others' proposals. `list_proposals` takes REST's `status`, `pending` by default. |
@@ -267,9 +267,9 @@ External agents connect over MCP (`artifactr.mcp.ArtifactrMcp`) with the same au
 
 Every tool that changes something (`create_artifact`, `edit_text`, `edit_artifact`, `archive_artifact`, `respond_to_proposal`, `post_message`, `give_feedback`) takes an optional `command_id`, the command frame's idempotency key: a retry with the same id returns the first result ([Deduplication](#deduplication)). The MCP request id cannot serve, since a retry is a new request.
 
-Rejections are returned as tool errors carrying the rejection's message. A workspace `authorize` refuses is a tool error too, carrying `this workspace is not yours to use`, the message of REST's 403.
+Rejections are returned as tool errors carrying the rejection's message. An action `authorize` refuses is a tool error too, carrying the message of REST's 403, such as `artifactr:open is refused in this workspace`.
 
-A resource read of an artifact that does not exist, of another tenant, or in a workspace `authorize` refuses fails with the JSON-RPC error `INVALID_PARAMS` (`-32602`), as the MCP SDK reports a missing resource, and a `subscriptions/listen` request that names one fails the same way. The error's `data` holds the `uri` and the `rejection`, the same object as REST's error body, so a client can tell `not_found` from `forbidden`. `INTERNAL_ERROR` means only that the server failed.
+A resource read of an artifact that does not exist, of another tenant, or one `authorize` refuses fails with the JSON-RPC error `INVALID_PARAMS` (`-32602`), as the MCP SDK reports a missing resource, and a `subscriptions/listen` request that names one fails the same way. The error's `data` holds the `uri` and the `rejection`, the same object as REST's error body, so a client can tell `not_found` from `forbidden`. `INTERNAL_ERROR` means only that the server failed.
 
 ```json
 {"code": -32602, "message": "artifact plan_9 does not exist", "data": {"uri": "artifactr://acme/ws_1/artifacts/plan_9", "rejection": {"type": "not_found", "message": "artifact plan_9 does not exist", "entity": "artifact", "id": "plan_9"}}}

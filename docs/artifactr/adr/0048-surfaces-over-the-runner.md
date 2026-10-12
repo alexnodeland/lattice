@@ -1,6 +1,6 @@
 # ADR-0048: Surfaces over the runner
 
-**Status:** Accepted; its recorded message's run amended by [ADR-0055](0055-turns-from-the-log.md)
+**Status:** Accepted; its recorded message's run amended by [ADR-0055](0055-turns-from-the-log.md), its authorization by [ADR-0056](0056-access-asked-in-every-workspace-method.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 
@@ -67,3 +67,12 @@ A client that cannot keep up:
 1. [x] The WebSocket, REST and MCP surfaces over `Runner.execute`.
 2. [x] `authorize` on every surface, through `Workspaces.open`.
 3. [ ] Share command deduplication and run control across processes.
+
+## Amendment (2026-10-12): authorization in every workspace method
+
+"Authorization within a tenant is one hook, asked in one place" still holds, but the place moves ([ADR-0056](0056-access-asked-in-every-workspace-method.md), [lattice RFC-0001](../../rfcs/0001-grantr-identity-and-access.md)):
+
+- **The hook hears the action.** `authorize(tenant_id, workspace_id, actor, access)`, where `access` is an `Access` naming one of `ACTIONS` and the thread or artifact it is about.
+- **`Workspaces` holds it,** with `on_open`, and the router, `ArtifactrMcp` and `Workspaces.open` no longer take it. Every `Workspace` method asks it, so every REST request, WebSocket command, MCP tool call, resource read and subscription, and in-process call is asked.
+- **The runner asks for `stop_run`,** which no workspace method carries out, and does its own work as `SystemActor(name="runner")`.
+- **Refusals keep their shapes:** REST's 403, the WebSocket's 4403 when it may not open the workspace or read its log, a `forbidden` command result, and MCP's tool error or `INVALID_PARAMS`. The message names the action.

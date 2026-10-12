@@ -136,6 +136,17 @@ def test_a_bad_first_frame_closes_the_connection(
     assert closed.value.code == code
 
 
+def test_a_client_that_may_not_read_the_log_is_closed_before_welcome(client: TestClient) -> None:
+    with client.websocket_connect("/v1/workspaces/sealed/stream") as ws:
+        ws.send_json(hello())
+        with pytest.raises(WebSocketDisconnect) as closed:
+            ws.receive_json()
+    assert (closed.value.code, closed.value.reason) == (
+        4403,
+        "artifactr:read_events is refused in this workspace",
+    )
+
+
 def test_hello_must_arrive_in_time() -> None:
     app, _ = build(Script(), hello_timeout=0.05)
     with TestClient(app) as client, client.websocket_connect(STREAM) as ws:

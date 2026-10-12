@@ -5,7 +5,15 @@ from typing import Literal
 
 from pydantic_ai import ModelMessage, ModelMessagesTypeAdapter
 
-from artifactr.core import Actor, AgentActor, RunId, ThreadId, new_run_id
+from artifactr.core import (
+    AgentActor,
+    ExternalAgentActor,
+    RunId,
+    ThreadId,
+    UserActor,
+    acting_for,
+    new_run_id,
+)
 from artifactr.workspace import Workspace
 
 Trigger = Literal["message", "resume", "api"]
@@ -36,8 +44,9 @@ class Delivered:
 class Session[AppDepsT]:
     """The pydantic-ai ``deps`` of one agent run.
 
-    Tools receive it as ``ctx.deps``. Its workspace handle acts as the thread's agent, so
-    everything a tool commits is attributed to the agent and this run.
+    Tools receive it as ``ctx.deps``. Its workspace handle acts as the thread's agent, for
+    whoever started the run segment, so everything a tool commits is attributed to the agent
+    and this run, and checked as done for them.
 
     Create it with :meth:`start` rather than directly.
     """
@@ -52,13 +61,17 @@ class Session[AppDepsT]:
     watch_after: int | None = None
     """Watch the log for others' changes after this ``seq``; None means from the run's start."""
 
-    requested_by: Actor | None = None
-    """Whose message or answer started this run segment, if anyone's. Spans record a person
-    here as the user."""
-
     delivered: Delivered = field(default_factory=Delivered, init=False, repr=False, compare=False)
     """How far the run has taken the log: to ``watch_after`` once it has started, then as far as
     its watcher delivers. The capability records it with the run's start and its end."""
+
+    @property
+    def on_behalf_of(self) -> UserActor | ExternalAgentActor | None:
+        """Whom the run segment acts for: its agent's ``on_behalf_of``.
+
+        Spans record a person here as the user.
+        """
+        return acting_for(self.workspace.actor)
 
     @classmethod
     def start(
@@ -71,7 +84,7 @@ class Session[AppDepsT]:
         agent_name: str = "assistant",
         trigger: Trigger = "api",
         watch_after: int | None = None,
-        requested_by: Actor | None = None,
+        on_behalf_of: UserActor | ExternalAgentActor | None = None,
     ) -> "Session[AppDepsT]":
         """Return a session for a new (or resuming) run of the thread's agent.
 
@@ -83,10 +96,13 @@ class Session[AppDepsT]:
             agent_name: How the agent is named in change notes and messages.
             trigger: What started the run.
             watch_after: The ``seq`` after which others' changes are delivered into the run.
-            requested_by: Whose message or answer started the run segment.
+            on_behalf_of: Whom the run segment acts for: the person, or the person's client,
+                whose message or answer started it.
         """
         run_id = run_id or new_run_id()
-        actor = AgentActor(thread_id=thread_id, run_id=run_id, name=agent_name)
+        actor = AgentActor(
+            thread_id=thread_id, run_id=run_id, name=agent_name, on_behalf_of=on_behalf_of
+        )
         return cls(
             workspace=workspace.as_actor(actor),
             thread_id=thread_id,
@@ -94,7 +110,6 @@ class Session[AppDepsT]:
             app=app,
             trigger=trigger,
             watch_after=watch_after,
-            requested_by=requested_by,
         )
 
 

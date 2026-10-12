@@ -32,8 +32,12 @@ class Mirrors:
         self._follow = follow
         self._tasks: dict[tuple[str, str], asyncio.Task[None]] = {}
 
-    def watch(self, tenant_id: str, workspace_id: str) -> None:
-        """Mirror a workspace, unless it is mirrored already."""
+    async def watch(self, tenant_id: str, workspace_id: str) -> None:
+        """Mirror a workspace, unless it is mirrored already: the libraries' ``on_open`` hook.
+
+        It is called each time a workspace is opened, its mirror's own opening included, so it
+        does nothing for a workspace it mirrors already.
+        """
         key = (tenant_id, workspace_id)
         if key in self._tasks:
             return
@@ -47,7 +51,7 @@ class Mirrors:
         It allows every request: every user of a tenant may use the tenant's workspaces.
         """
         del actor
-        self.watch(tenant_id, workspace_id)
+        await self.watch(tenant_id, workspace_id)
         return True
 
     def _ended(self, key: tuple[str, str], task: asyncio.Task[None]) -> None:

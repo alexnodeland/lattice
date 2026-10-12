@@ -16,6 +16,7 @@ from artifactr.core import (
     CreateArtifact,
     EditArtifact,
     EvaluatorActor,
+    ExternalAgentActor,
     FeedbackGiven,
     Forbidden,
     GiveFeedback,
@@ -34,7 +35,14 @@ from artifactr.core import (
     ValidationFailed,
     VersionConflict,
 )
-from artifactr.workspace import InMemoryStorage, Storage, ThreadBusy, Workspace, Workspaces
+from artifactr.workspace import (
+    Access,
+    InMemoryStorage,
+    Storage,
+    ThreadBusy,
+    Workspace,
+    Workspaces,
+)
 from tests.artifact_types import Checklist, Counter, Item, Note
 from tests.leases import Partitioned
 from tests.workspace.conftest import ALICE
@@ -152,6 +160,29 @@ async def test_agents_propose_and_people_resolve(ws: Workspace) -> None:
     assert [p.status for p in await ws.proposals(status=None)] == ["accepted"]
     with pytest.raises(NotFound):
         await ws.proposal("prp_nope")
+
+
+async def test_no_one_accepts_their_own_proposal_through_an_agent(ws: Workspace) -> None:
+    thread = await ws.create_thread("Launch")
+    await ws.create(Note(text="Friday"), artifact_id="n1")
+    edit = (await ws.get(Note, "n1")).edit_text("Friday", "Monday")
+    mine = await ws.commit(ProposeChange(change=edit))
+    run = AgentActor(thread_id=thread.id, run_id="run_1", on_behalf_of=ALICE)
+    client = ExternalAgentActor(client_id="claude", on_behalf_of=ALICE)
+    for proxy in (run, client, AgentActor(thread_id=thread.id, on_behalf_of=client)):
+        accept = RespondToProposal(proposal_id=mine.proposal_id, decision="accept")
+        with pytest.raises(Forbidden, match="someone other than its author"):
+            await ws.as_actor(proxy).commit(accept)
+    via_mcp = await ws.as_actor(client).commit(ProposeChange(change=edit))
+    accept = RespondToProposal(proposal_id=via_mcp.proposal_id, decision="accept")
+    with pytest.raises(Forbidden, match="someone other than its author"):
+        await ws.commit(accept)  # proposed through Alice's own client, accepted in the UI
+    theirs = await ws.as_actor(run).commit(ProposeChange(change=edit))
+    assert (await ws.proposal(theirs.proposal_id)).proposed_by == run, "stored with its person"
+    assert (await ws.read(last=1))[0].actor == run
+    accept = RespondToProposal(proposal_id=theirs.proposal_id, decision="accept")
+    resolved = await ws.commit(accept)
+    assert resolved.decision == "accept", "a person accepts what a run for them proposes"
 
 
 async def test_threads_and_messages(ws: Workspace) -> None:
@@ -302,13 +333,46 @@ async def test_change_notes_are_from_the_viewers_point_of_view(ws: Workspace) ->
     assert len(await ws.change_notes(after_seq=0, viewer=AGENT)) == 1
 
 
-async def test_a_workspace_opens_only_if_authorize_allows_it(workspaces: Workspaces) -> None:
-    async def authorize(tenant_id: str, workspace_id: str, actor: Actor) -> bool:
+async def test_a_workspace_opens_only_if_authorize_allows_it(storage: Storage) -> None:
+    opened: list[tuple[str, str]] = []
+
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: Actor, access: Access
+    ) -> bool:
         return workspace_id != "secret"
 
-    assert await workspaces.open("tenant_a", "ws_1", actor=ALICE, authorize=authorize)
-    with pytest.raises(Forbidden, match="this workspace is not yours to use"):
-        await workspaces.open("tenant_a", "secret", actor=ALICE, authorize=authorize)
+    async def on_open(tenant_id: str, workspace_id: str) -> None:
+        opened.append((tenant_id, workspace_id))
+
+    workspaces = Workspaces(storage, authorize=authorize, on_open=on_open)
+    assert await workspaces.open("tenant_a", "ws_1", actor=ALICE)
+    with pytest.raises(Forbidden, match="artifactr:open is refused in this workspace"):
+        await workspaces.open("tenant_a", "secret", actor=ALICE)
+    assert opened == [("tenant_a", "ws_1")], "on_open is called on every allowed open only"
+
+
+async def test_every_method_asks_authorize_as_its_handles_actor(storage: Storage) -> None:
+    refused = {"artifactr:read_threads"}
+    asked: list[tuple[str, str]] = []
+
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: Actor, access: Access
+    ) -> bool:
+        asked.append((actor.participant, access.action))
+        return access.action not in refused
+
+    ws = await Workspaces(storage, authorize=authorize).open("tenant_a", "ws_1", actor=ALICE)
+    thread = await ws.create_thread()
+    with pytest.raises(Forbidden, match="artifactr:read_threads is refused in this workspace"):
+        await ws.threads()
+    agent = AgentActor(thread_id=thread.id, on_behalf_of=ALICE)
+    await ws.as_actor(agent).post_message(thread.id, "hi")
+    assert asked == [
+        ("user:alice", "artifactr:open"),
+        ("user:alice", "artifactr:create_thread"),
+        ("user:alice", "artifactr:read_threads"),
+        (agent.participant, "artifactr:post_message"),
+    ]
 
 
 async def test_a_thread_is_claimed_by_one_run_at_a_time(ws: Workspace) -> None:

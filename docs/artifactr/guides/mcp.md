@@ -41,37 +41,31 @@ Clients then connect to `https://your-host/mcp/` with any MCP client that speaks
   ```python
   from mcp.server.mcpserver.exceptions import ToolError
 
+  from artifactr.core import UserActor
+
 
   async def resolve_client(ctx: McpContext) -> tuple[TenantId, ExternalAgentActor]:
       request = ctx.request_context.request  # a starlette Request, or None
       if request is None:
           raise ToolError("connect over HTTP")
       user = await authenticate(request)  # the function resolve_actor uses
-      return user.tenant_id, ExternalAgentActor(client_id=user.id, name=f"{user.name} (MCP)")
+      return user.tenant_id, ExternalAgentActor(
+          client_id=user.id,
+          name=f"{user.name} (MCP)",
+          on_behalf_of=UserActor(id=user.id, name=user.name),
+      )
   ```
 
-- **`authorize(tenant_id, workspace_id, actor)`**, optional, decides which workspaces of its tenant a client may use ([Authorization](#authorization)).
+  A client a person connects with their own token acts for them: set `on_behalf_of`, so checks, and the proposal rule, see the person. Leave it empty for a client with credentials of its own.
+
 - **`runner`** carries out every tool's command, so an external agent can talk to the thread's built-in agent: its `post_message` starts, steers or answers a run like any other message. The runner also remembers commands' results, so a retried tool call with a `command_id` is carried out once ([Retries](#retries)).
 - **`name`** is the server's name (`"artifactr"`), and **`bus`** is where resource notifications go (in-process by default).
 
 ## Authorization
 
-To decide which workspaces of its tenant a client may use, pass `authorize`, the same `artifactr.workspace.Authorize` hook the [router](serving.md#authentication-and-authorization) takes:
+The `authorize` hook `Workspaces` holds decides what a client may do, as it does for the router ([Authentication and authorization](serving.md#authentication-and-authorization)); the server takes no hook of its own ([ADR-0056](../adr/0056-access-asked-in-every-workspace-method.md)). Each tool calls `Workspace` methods, and each method asks the hook first, so a tool call is asked for opening the workspace (`artifactr:open`) and for each action it takes: `edit_text` for reading the artifact and editing it, `list_threads` for `artifactr:read_threads`. A resource read is asked for `artifactr:read_artifacts`, and so is each artifact a `subscriptions/listen` request names, when the stream opens.
 
-```python
-from artifactr.core import Actor, WorkspaceId
-
-
-async def authorize(tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor) -> bool:
-    return await api_keys.may_use(actor, tenant_id, workspace_id)  # your access control
-
-
-mcp = ArtifactrMcp(workspaces, runner, resolve=resolve_client, authorize=authorize)
-```
-
-It is asked on every tool call and resource read that names a workspace, before anything is read or written, and when a client subscribes to an artifact's changes. A refusal is a tool error carrying the message of the router's 403, `Error executing tool list_artifacts: this workspace is not yours to use`. A refused resource read fails with the same message, and so does a `subscriptions/listen` request that names an artifact of a refused workspace ([Resources](#resources)). Listing the tools and the resource template names no workspace, so neither is asked. Without `authorize`, a client may use every workspace of the tenant `resolve` returns.
-
-Pass the router and the server the same function, so a client cannot reach over MCP what REST and the WebSocket refuse it.
+A refusal is a tool error carrying the message of REST's 403, such as `Error executing tool list_artifacts: artifactr:open is refused in this workspace`. A refused resource read fails with the same message, and so does a `subscriptions/listen` request that names a refused artifact ([Resources](#resources)). Listing the tools and the resource template names no workspace, so neither is asked. Without `authorize`, a client may do anything in every workspace of the tenant `resolve` returns.
 
 ## What a client sees
 
@@ -118,9 +112,9 @@ again = await client.call_tool("post_message", {**message, "command_id": "c_7"})
 
 ## Resources
 
-Each artifact is also a resource at `artifactr://{tenant_id}/{workspace_id}/artifacts/{artifact_id}`, whose content is the artifact's current version as JSON. A client may read, and subscribe to, the artifacts of its own tenant only, in the workspaces `authorize` allows. Once a client has used a workspace, every change to its artifacts is published as a resource-updated notification for that URI, so subscribed clients know to read again. `artifact_uri(tenant_id, workspace_id, artifact_id)` builds the URI.
+Each artifact is also a resource at `artifactr://{tenant_id}/{workspace_id}/artifacts/{artifact_id}`, whose content is the artifact's current version as JSON. A client may read, and subscribe to, the artifacts of its own tenant only, that `authorize` lets it read. Once a client has used a workspace, every change to its artifacts is published as a resource-updated notification for that URI, so subscribed clients know to read again. `artifact_uri(tenant_id, workspace_id, artifact_id)` builds the URI.
 
-A read the server refuses (an artifact that does not exist, another tenant's, or one in a workspace `authorize` refuses) fails with the JSON-RPC error `INVALID_PARAMS`, as the MCP SDK reports a missing resource. The error's `data` holds the `uri` and the `rejection` as REST reports it, whose `type` is `not_found` or `forbidden`. A `subscriptions/listen` request that names such an artifact fails the same way. `INTERNAL_ERROR` means the server itself failed.
+A read the server refuses (an artifact that does not exist, another tenant's, or one `authorize` refuses) fails with the JSON-RPC error `INVALID_PARAMS`, as the MCP SDK reports a missing resource. The error's `data` holds the `uri` and the `rejection` as REST reports it, whose `type` is `not_found` or `forbidden`. A `subscriptions/listen` request that names such an artifact fails the same way. `INTERNAL_ERROR` means the server itself failed.
 
 ## Rules for external agents
 

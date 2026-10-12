@@ -27,7 +27,7 @@ from artifactr.core import (
 )
 from artifactr.fastapi.stream import Stream
 from artifactr.telemetry import Telemetry, annotate, attribution
-from artifactr.workspace import Authorize, Workspace, Workspaces
+from artifactr.workspace import Workspace, Workspaces
 
 ResolveActor = Callable[[HTTPConnection], Awaitable[tuple[TenantId, Actor]]]
 """Authenticates a request or connection: returns its tenant and actor, or raises Unauthorized."""
@@ -53,7 +53,6 @@ def artifactr_router(
     runner: Runner[Any],
     *,
     resolve_actor: ResolveActor,
-    authorize: Authorize | None = None,
     hello_timeout: float = 10.0,
     outbox_size: int = 1000,
     tracer_provider: TracerProvider | None = None,
@@ -62,10 +61,10 @@ def artifactr_router(
     """Build the router for the thread protocol, REST commands and reads.
 
     Args:
-        workspaces: Opens tenant-scoped workspaces.
+        workspaces: Opens tenant-scoped workspaces, and asks their ``authorize`` hook about
+            each request, command and read.
         runner: Carries out commands, once per ``command_id``, and runs the agent.
         resolve_actor: Authenticates each request and connection.
-        authorize: Whether an actor may use a workspace; allows everything if omitted.
         hello_timeout: Seconds a new connection has to send ``hello``.
         outbox_size: Frames buffered for a slow connection before it is closed (4429).
         tracer_provider: Where ``artifactr.stream`` spans go. Defaults to the global one.
@@ -82,14 +81,14 @@ def artifactr_router(
 
         Raises:
             HTTPException: 401, if ``resolve_actor`` refuses it.
-            Forbidden: If ``authorize`` refuses the actor this workspace.
+            Forbidden: If the workspaces' ``authorize`` refuses the actor this workspace.
         """
         try:
             tenant_id, actor = await resolve_actor(connection)
         except Unauthorized as error:
             raise HTTPException(status_code=401, detail=str(error) or "unauthorized") from error
         annotate(attribution(tenant_id=tenant_id, workspace_id=workspace_id, actor=actor))
-        return await workspaces.open(tenant_id, workspace_id, actor=actor, authorize=authorize)
+        return await workspaces.open(tenant_id, workspace_id, actor=actor)
 
     async def workspace_dependency(request: Request, workspace_id: WorkspaceId) -> Workspace:
         return await _or_http(open_workspace(request, workspace_id))

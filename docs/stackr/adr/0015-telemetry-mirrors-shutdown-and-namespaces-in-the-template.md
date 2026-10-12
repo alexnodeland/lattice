@@ -1,6 +1,6 @@
 # ADR-0015: Telemetry, mirrors, shutdown and namespaces in the template
 
-**Status:** Accepted
+**Status:** Accepted; how mirrors start amended on 2026-10-12, below
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 
@@ -70,3 +70,9 @@ The rest of ADR-0011, and of its amendments, stands.
 ## Action items
 
 1. [x] Refuse the libraries' names, `artifactr`, `artifactr-ai`, `reflexr` and `evalr`, in the `project_slug` validator.
+
+## Amendment (2026-10-12): mirrors start on `on_open`
+
+[lattice RFC-0001](../../rfcs/0001-grantr-identity-and-access.md) moves the libraries' `authorize` hook onto `Workspaces`, asks it for every action, and gives side effects their own hook, `on_open`, called each time a workspace is opened and allowed, so a permission check has none. `Mirrors.watch` is that hook: it is async, and does nothing for a workspace it already mirrors, which it must, since a mirror's own opening calls it again. A mirror that stopped starts again the next time its workspace is opened, as before.
+
+artifactr's `Workspaces` take `on_open=mirrors.watch` ([artifactr ADR-0056](../../artifactr/adr/0056-access-asked-in-every-workspace-method.md)), and the template passes no `authorize`, so every user of a tenant may still use each of its workspaces. reflexr's surfaces start their mirrors through `Mirrors.authorize` until its own change of the hook follows.

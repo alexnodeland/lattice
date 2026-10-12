@@ -15,7 +15,7 @@ from starlette.requests import HTTPConnection
 from artifactr.agent import ArtifactWorkspace, Runner, Session
 from artifactr.core import Actor, TenantId, UserActor, WorkspaceId
 from artifactr.fastapi import Unauthorized, artifactr_router
-from artifactr.workspace import InMemoryStorage, Workspaces
+from artifactr.workspace import Access, InMemoryStorage, Workspaces
 from tests.agent.conftest import Script
 from tests.artifact_types import Checklist, Note
 
@@ -52,7 +52,12 @@ async def resolve_actor(connection: HTTPConnection) -> tuple[TenantId, Actor]:
     )
 
 
-async def authorize(tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor) -> bool:
+async def authorize(
+    tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
+) -> bool:
+    """Refuse everything in ``secret``, and everything but opening it in ``sealed``."""
+    if workspace_id == "sealed":
+        return access.action == "artifactr:open"
     return workspace_id != "secret"
 
 
@@ -69,11 +74,9 @@ def build(
         capabilities=[ArtifactWorkspace(types=[Note, Checklist])],
     )
     runner = Runner(agent, app=latch or Latch())
-    workspaces = Workspaces(InMemoryStorage(), types=[Note, Checklist])
+    workspaces = Workspaces(InMemoryStorage(), types=[Note, Checklist], authorize=authorize)
     app = FastAPI()
-    router = artifactr_router(
-        workspaces, runner, resolve_actor=resolve_actor, authorize=authorize, **options
-    )
+    router = artifactr_router(workspaces, runner, resolve_actor=resolve_actor, **options)
     app.include_router(router, prefix="/v1")
     return app, runner
 

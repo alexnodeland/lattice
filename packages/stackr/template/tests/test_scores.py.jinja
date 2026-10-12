@@ -153,7 +153,7 @@ async def test_a_workspace_is_mirrored_once() -> None:
 
     mirrors = Mirrors(follow)
     assert await mirrors.authorize("acme", "main", object())
-    mirrors.watch("acme", "main")
+    await mirrors.watch("acme", "main")
     await asyncio.sleep(0.01)
     assert started == [("acme", "main")]
     await mirrors.aclose()
@@ -168,7 +168,7 @@ async def test_a_mirror_that_stops_starts_again_when_used(caplog: pytest.LogCapt
 
     mirrors = Mirrors(follow)
     for _ in range(2):
-        mirrors.watch("acme", "main")
+        await mirrors.watch("acme", "main")
         await asyncio.sleep(0.01)
     assert outcomes == []
     assert "Langfuse is down" in caplog.text

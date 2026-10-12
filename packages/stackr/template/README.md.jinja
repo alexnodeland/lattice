@@ -20,7 +20,11 @@ make up             # build the image and run it beside the stack, at http://loc
 
 ## What it serves
 
+{% if access == 'grantr' -%}
+Every surface needs a Supabase access token, or a service principal's key in its place: in the `Authorization: Bearer` header, or, for a WebSocket, in the `access_token` query parameter. The token's `sub` is the user. The request names its tenant, in the `X-Tenant` header or a WebSocket's `tenant` query parameter, and may leave it out when its user is a member of one tenant only; a key names its own. Without a valid token or key it is 401; a tenant its caller isn't in is 403. Then grantr decides each command and read ([Access](#access)).
+{%- else -%}
 Every surface needs a Supabase access token: in the `Authorization: Bearer` header, or, for a WebSocket, in the `access_token` query parameter. The token's `sub` is the user, and its `app_metadata.tenant_id` is the tenant, whose workspaces the user can use. Anything else is 401.
+{%- endif %}
 
 | Path | What |
 |---|---|
@@ -31,6 +35,9 @@ Every surface needs a Supabase access token: in the `Authorization: Bearer` head
 {%- if use_reflexr %}
 | `/reflexr/v1` | reflexr's REST publishing, reads and administration, and its WebSocket stream |
 | `/reflexr/mcp/` | reflexr's MCP server: external agents publish events and operate runs |
+{%- endif %}
+{%- if access == 'grantr' %}
+| `/grantr/v1` | grantr's admin API: tenants, members, groups, roles, grants, keys and the audit log; `/me` and `/checks` for UIs |
 {%- endif %}
 | `/healthz` | Whether it is up, without a token |
 
@@ -44,18 +51,33 @@ The examples to replace with your own:
 
 ### Sign in and try it
 
-Local Supabase issues the tokens. Create a user with a tenant through its admin API, with the secret key `supabase status` prints in stackr, then sign in with the publishable key:
+Local Supabase issues the tokens. Create a user {% if access != 'grantr' %}with a tenant {% endif %}through its admin API, with the secret key `supabase status` prints in stackr, then sign in with the publishable key:
 
 ```bash
 eval "$(supabase status -o env | grep -E '^(SECRET_KEY|PUBLISHABLE_KEY)=')"   # in stackr
 curl -X POST http://127.0.0.1:54321/auth/v1/admin/users \
   -H "apikey: $SECRET_KEY" -H "Authorization: Bearer $SECRET_KEY" -H 'Content-Type: application/json' \
+{%- if access == 'grantr' %}
+  -d '{"email": "ada@example.com", "password": "a-local-password", "email_confirm": true}'
+{%- else %}
   -d '{"email": "ada@example.com", "password": "a-local-password", "email_confirm": true,
        "app_metadata": {"tenant_id": "acme"}}'
+{%- endif %}
 TOKEN=$(curl -s 'http://127.0.0.1:54321/auth/v1/token?grant_type=password' \
   -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Type: application/json' \
   -d '{"email": "ada@example.com", "password": "a-local-password"}' | jq -r .access_token)
 ```
+
+{%- if access == 'grantr' %}
+
+Then create the tenant, with Ada its owner. With `AUTH_SERVICE_ROLE_KEY=$SECRET_KEY` in `.env`, the command finds her by her email; her user id works without it:
+
+```bash
+make tenant NAME=acme OWNER=ada@example.com
+```
+
+Ada is a member of one tenant, so her requests needn't name it.
+{%- endif %}
 
 The agents call the gateway with the tenant's key: `make tenant NAME=acme` in stackr prints one, for `LITELLM_API_KEY` (or `LITELLM_TENANT_KEYS`) in `.env`. Then:
 {% if use_artifactr %}
@@ -79,6 +101,20 @@ curl -H "Authorization: Bearer $TOKEN" $app/runs
 {% endif %}
 The agent's trace, through the gateway to the model, is in Grafana (Tempo) and Langfuse; the application's metrics are in Prometheus, with `job="{{ project_slug }}"`.
 
+{% if access == 'grantr' -%}
+## Access
+
+[grantr](https://lattice.alexnodeland.com/grantr/) decides who may do what ([`access.py`](src/{{ package_name }}/access.py)). Each library's `Workspaces` asks it before every command and read, on every surface. A tenant's `owner` and `admin` may do anything in it; a workspace's `admin`, `editor` and `viewer` what their names say; and the application's own principal, which its runner, reactor, mirrors and rules act as, holds the `application` role, granted when it first starts. [`access.md`](access.md) is every role against every action: a test compares it with the libraries' catalogs, so a library's new action, or a change to a role, is reviewed here (`make access-matrix` rewrites it).
+
+| Command | What it does |
+|---|---|
+| `make operator EMAIL=...` | Make a user the deployment's first operator, who may create tenants |
+| `make tenant NAME=... OWNER=...` | Create a tenant, with its owner; once |
+| `make migrate-tenants` | Move each user's tenant from their token's `app_metadata.tenant_id` into grantr, once: each tenant's earliest user becomes its owner, and the rest its admins |
+
+People are added, given roles and issued keys through grantr's API at `/grantr/v1`.
+
+{% endif -%}
 ## How it is wired
 
 It talks to stackr's ports only, through the settings in `.env` ([`settings.py`](src/{{ package_name }}/settings.py)). Pointing them at other services (hosted Supabase, another OTLP backend, another OpenAI-compatible gateway) changes settings, never code.
@@ -87,7 +123,11 @@ It talks to stackr's ports only, through the settings in `.env` ([`settings.py`]
 |---|---|---|
 | Telemetry | `OTEL_EXPORTER_OTLP_ENDPOINT` (OTLP over HTTP), `OTEL_SERVICE_NAME` | [`telemetry.py`](src/{{ package_name }}/telemetry.py): the libraries' `configure_telemetry`, on when the endpoint is set, tracing requests, queries and model calls. Traces reach Langfuse through stackr's Collector, so the application sends it only scores |
 | Database | `DATABASE_URL`, `DATABASE_SCHEMA` | [`database.py`](src/{{ package_name }}/database.py): the libraries' SQL storage, migrated at startup, in a schema of its own outside the `public` schema Supabase's API serves |
+{%- if access == 'grantr' %}
+| Identity | `AUTH_JWKS_URL`, `AUTH_JWT_SECRET`, `AUTH_AUDIENCE`, `AUTH_ISSUER`, `AUTH_SERVICE_ROLE_KEY` | [`auth.py`](src/{{ package_name }}/auth.py): Supabase's ES256 tokens against its published keys, or HS256 tokens with a legacy secret; [`access.py`](src/{{ package_name }}/access.py): the tenant, and what grantr allows |
+{%- else %}
 | Identity | `AUTH_JWKS_URL`, `AUTH_JWT_SECRET`, `AUTH_AUDIENCE`, `AUTH_ISSUER`, `AUTH_TENANT_CLAIM` | [`auth.py`](src/{{ package_name }}/auth.py): Supabase's ES256 tokens against its published keys, or HS256 tokens with a legacy secret |
+{%- endif %}
 | LLM gateway | `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `LITELLM_TENANT_KEYS`, `LITELLM_MODEL`, `LITELLM_GUARDRAILS` | [`gateway.py`](src/{{ package_name }}/gateway.py): agents on the `default` model group, each request with its tenant's key and the `pii-mask` and `prompt-injection` guardrails |
 | Evaluation data | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | [`scores.py`](src/{{ package_name }}/scores.py): each workspace's feedback mirrored to Langfuse scores on the traces it is about, a score per field by evalr's score mapping, carrying on after a cursor saved in the workspace when the application restarts |
 

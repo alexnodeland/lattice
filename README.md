@@ -31,7 +31,7 @@
 | [stackr](packages/stackr) | The infrastructure the libraries run on (local Supabase, the LiteLLM gateway, OpenTelemetry, Grafana and Langfuse), and an application template | [stackr](https://lattice.alexnodeland.com/stackr/) | none: it ships no wheel |
 | [portalr](packages/portalr) | The portal into an application: an app UI to chat with its agents and see their artifacts, rules and runs, and an admin UI to manage access and see feedback, evaluations, traces and spend. Planned: it holds only its version so far | [portalr](https://lattice.alexnodeland.com/portalr/) | `portalr` |
 
-grantr's core, storage and admin API are built, and [its plan](docs/grantr/rfcs/0001-v0.1-implementation-plan.md) wires it into the libraries and the template. portalr holds only its version so far, and [its plan](docs/portalr/rfcs/0001-v0.1-implementation-plan.md) builds it.
+grantr is built and in stackr's template, and [its plan](docs/grantr/rfcs/0001-v0.1-implementation-plan.md) adds restricted items and row-level security. portalr holds only its version so far, and [its plan](docs/portalr/rfcs/0001-v0.1-implementation-plan.md) builds it.
 
 > **Status:** alpha. artifactr's [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) is the family's first release; the other packages haven't had one. APIs may still change before 1.0.
 

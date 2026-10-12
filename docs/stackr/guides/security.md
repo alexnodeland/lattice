@@ -39,7 +39,7 @@ On a network you don't trust, either block ports 54320 to 54329 with a firewall,
 The application template carries the same defaults into what it generates ([ADR-0011](../adr/0011-the-application-template-in-detail.md)):
 
 - **Every library surface needs a valid token.** The libraries' REST and WebSocket routes and MCP servers answer 401 without one; only `/healthz` and `/`, which lists the surfaces, don't ask.
-- **Users can't choose their tenant.** The tenant comes from `app_metadata.tenant_id`, which only Supabase's service role can set.
+- **Users can't choose their tenant.** With grantr, the default, a request names its tenant and grantr says whether its user is a member; every command and read is checked against the user's roles, and a key reaches only its own tenant ([ADR-0019](../adr/0019-access-with-grantr-in-the-template.md)). Without it, the tenant comes from `app_metadata.tenant_id`, which only Supabase's service role can set.
 - **Tables stay out of `public`.** The libraries' tables live in a schema of the application's own, since Supabase's Data API serves `public` to anyone with the publishable key.
 - **Guardrails on every model request,** `pii-mask` and `prompt-injection`, as `LITELLM_GUARDRAILS` configures.
 - **Prompts stay off spans** in the gateway's telemetry.

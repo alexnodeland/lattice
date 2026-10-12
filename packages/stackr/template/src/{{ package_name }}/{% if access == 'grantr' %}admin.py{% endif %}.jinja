@@ -1,0 +1,180 @@
+"""The deployment's own commands: ``make tenant``, ``make operator`` and ``make migrate-tenants``.
+
+Each runs in process, on the database ``DATABASE_URL`` names, and is recorded in grantr's audit
+log as made by no one (grantr ADR-0021). A user is named by their id, Supabase Auth's ``sub``, or
+by their email, which Supabase Auth's admin API looks up with ``AUTH_SERVICE_ROLE_KEY``.
+
+    {{ project_slug }}-admin operator alice@example.com
+    {{ project_slug }}-admin tenant acme alice@example.com
+    {{ project_slug }}-admin migrate-tenants
+"""
+
+import argparse
+import asyncio
+import json
+import sys
+import urllib.request
+from collections.abc import Sequence
+from dataclasses import dataclass
+from itertools import groupby
+from typing import Any, cast
+
+from grantr import Grants, Invalid
+from grantr.sql import SqlStorage, migrate
+
+from {{ package_name }}.access import build_grants
+from {{ package_name }}.database import create_schema, open_database
+from {{ package_name }}.settings import Settings
+
+PROGRAM = "{{ project_slug }}-admin"
+"""The command's name."""
+
+PAGE = 200
+"""How many users the admin API is asked for at a time."""
+
+
+@dataclass(frozen=True)
+class Account:
+    """A Supabase Auth user, as the admin API lists them."""
+
+    id: str
+    email: str
+    created_at: str
+    tenant: str | None
+    """The tenant in their token's claim, from before grantr: ``app_metadata.tenant_id``."""
+
+
+class Users:
+    """Supabase Auth's users, through its admin API.
+
+    Args:
+        issuer: Supabase Auth's URL, the tokens' ``iss``, such as
+            ``http://127.0.0.1:54321/auth/v1``.
+        key: The service role's key.
+    """
+
+    def __init__(self, issuer: str | None, key: str | None) -> None:
+        self._issuer = issuer
+        self._key = key
+
+    async def find(self, who: str) -> str:
+        """A user's id: ``who`` itself, unless it is an email, which is looked up.
+
+        Raises:
+            LookupError: If no user has that email.
+        """
+        if "@" not in who:
+            return who
+        for account in await self.accounts():
+            if account.email.lower() == who.lower():
+                return account.id
+        raise LookupError(f"no user has the email {who}")
+
+    async def accounts(self) -> list[Account]:
+        """Every user, oldest first.
+
+        Raises:
+            LookupError: If the issuer or the service role's key isn't set.
+        """
+        if not self._issuer or not self._key:
+            raise LookupError("set AUTH_ISSUER and AUTH_SERVICE_ROLE_KEY to find users by email")
+        found: list[Account] = []
+        page = 1
+        while users := await asyncio.to_thread(self._page, page):
+            found += [_account(user) for user in users]
+            page += 1
+        return sorted(found, key=lambda account: account.created_at)
+
+    def _page(self, page: int) -> list[dict[str, Any]]:
+        request = urllib.request.Request(
+            f"{self._issuer}/admin/users?page={page}&per_page={PAGE}",
+            headers={"apikey": str(self._key), "Authorization": f"Bearer {self._key}"},
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return cast(list[dict[str, Any]], json.load(response)["users"])
+
+
+def _account(user: dict[str, Any]) -> Account:
+    metadata = cast(dict[str, Any], user.get("app_metadata") or {})
+    tenant = metadata.get("tenant_id")
+    return Account(
+        id=str(user["id"]),
+        email=str(user.get("email") or ""),
+        created_at=str(user.get("created_at") or ""),
+        tenant=tenant if isinstance(tenant, str) and tenant else None,
+    )
+
+
+async def operator(grants: Grants, users: Users, who: str) -> str:
+    """Make a user the deployment's first operator."""
+    user = await users.find(who)
+    await grants.first_operator(user)
+    return f"{who} is the deployment's operator"
+
+
+async def tenant(grants: Grants, users: Users, name: str, owner: str) -> str:
+    """Create a tenant, with its owner; a tenant that exists is left as it is."""
+    entries = await grants.provision_tenant(name, owner=await users.find(owner))
+    return f"created {name}, owned by {owner}" if entries else f"{name} exists, and is unchanged"
+
+
+async def migrate_tenants(grants: Grants, users: Users) -> str:
+    """Move each user's tenant from their token's claim into grantr.
+
+    Each tenant's earliest user becomes its owner, and the rest its admins, so no one loses what
+    they could do; the owners narrow it afterwards. A tenant grantr has is left as it is.
+    """
+    lines: list[str] = []
+    claimed = sorted(
+        (account for account in await users.accounts() if account.tenant),
+        key=lambda account: (account.tenant or "", account.created_at),
+    )
+    for name, accounts in groupby(claimed, key=lambda account: account.tenant or ""):
+        owner, *admins = list(accounts)
+        if await grants.provision_tenant(name, owner=owner.id, admins=[a.id for a in admins]):
+            emails = ", ".join(admin.email for admin in admins) or "no one"
+            lines.append(f"{name}: owner {owner.email}; admins {emails}")
+        else:
+            lines.append(f"{name}: exists, and is unchanged")
+    return "\n".join(lines) or "no user names a tenant"
+
+
+async def run(arguments: Sequence[str], settings: Settings) -> str:
+    """Carry out one command, and return what to print.
+
+    Raises:
+        SystemExit: If the arguments are wrong, or there is no database.
+    """
+    parser = argparse.ArgumentParser(prog=PROGRAM, description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("operator", help="make a user the first operator").add_argument("user")
+    new = commands.add_parser("tenant", help="create a tenant, with its owner")
+    new.add_argument("name")
+    new.add_argument("owner")
+    commands.add_parser("migrate-tenants", help="move users' tenants from their tokens")
+    parsed = parser.parse_args(arguments)
+    if not settings.database_url:
+        parser.error("set DATABASE_URL: the commands change the application's database")
+    engine = open_database(settings.database_url, schema=settings.database_schema)
+    try:
+        await create_schema(engine, settings.database_schema)
+        await migrate(engine)
+        grants = build_grants(SqlStorage(engine), name=settings.service_name)
+        users = Users(settings.auth.issuer, settings.auth.service_role_key)
+        match parsed.command:
+            case "operator":
+                return await operator(grants, users, parsed.user)
+            case "tenant":
+                return await tenant(grants, users, parsed.name, parsed.owner)
+            case _:
+                return await migrate_tenants(grants, users)
+    finally:
+        await engine.dispose()
+
+
+def main() -> None:
+    """Run a command from the command line, with the settings in the environment."""
+    try:
+        sys.stdout.write(asyncio.run(run(sys.argv[1:], Settings.from_environ())) + "\n")
+    except (Invalid, LookupError) as error:
+        sys.exit(f"{PROGRAM}: {error}")

@@ -57,6 +57,14 @@ evals:
   help: Include evaluation with evalr (an evals/ directory and a starter experiment)?
   default: true
 
+access:
+  type: str
+  help: Who may do what
+  choices:
+    grantr (tenants, members, roles and keys; the request names its tenant): grantr
+    none (any user of a tenant, named in their token, may do anything in it): none
+  default: grantr
+
 python_version:
   type: str
   help: The Python version it runs on

@@ -1,0 +1,127 @@
+"""The deployment's own commands, on a SQLite database, with Supabase Auth's admin API faked."""
+
+import json
+import threading
+from collections.abc import Iterator
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+from urllib.parse import parse_qs, urlparse
+
+import pytest
+
+from {{ package_name }}.admin import Users, main, run
+from {{ package_name }}.settings import AuthSettings, Settings
+
+from conftest import SECRET
+
+USERS: list[dict[str, Any]] = [
+    {
+        "id": "u-bob",
+        "email": "bob@example.com",
+        "created_at": "2026-02-01T00:00:00Z",
+        "app_metadata": {"tenant_id": "acme"},
+    },
+    {
+        "id": "u-alice",
+        "email": "alice@example.com",
+        "created_at": "2026-01-01T00:00:00Z",
+        "app_metadata": {"tenant_id": "acme"},
+    },
+    {
+        "id": "u-carol",
+        "email": "carol@example.com",
+        "created_at": "2026-03-01T00:00:00Z",
+        "app_metadata": {"tenant_id": "initech"},
+    },
+    {"id": "u-dave", "email": None, "created_at": None, "app_metadata": None},
+]
+
+
+class Admin(BaseHTTPRequestHandler):
+    """Supabase Auth's ``/admin/users``, two users a page, for the service role's key only."""
+
+    users: list[dict[str, Any]] = USERS
+
+    def do_GET(self) -> None:
+        url = urlparse(self.path)
+        page = int(parse_qs(url.query)["page"][0])
+        allowed = self.headers["apikey"] == "service" and url.path == "/auth/v1/admin/users"
+        body = json.dumps({"users": self.users[(page - 1) * 2 : page * 2]}).encode()
+        self.send_response(200 if allowed else 401)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format: str, *args: Any) -> None:
+        pass
+
+
+@pytest.fixture
+def issuer() -> Iterator[str]:
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Admin)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_address[1]}/auth/v1"
+    server.shutdown()
+    server.server_close()
+
+
+@pytest.fixture
+def config(tmp_path: Path, issuer: str) -> Settings:
+    auth = AuthSettings(jwt_secret=SECRET, issuer=issuer, service_role_key="service")
+    return Settings(database_url=f"sqlite+aiosqlite:///{tmp_path / 'app.db'}", auth=auth)
+
+
+async def test_a_user_is_found_by_their_email_or_named_by_their_id(issuer: str) -> None:
+    users = Users(issuer, "service")
+    assert await users.find("ALICE@example.com") == "u-alice"
+    assert await users.find("u-someone") == "u-someone"
+    with pytest.raises(LookupError, match="no user has the email"):
+        await users.find("erin@example.com")
+    with pytest.raises(LookupError, match="AUTH_SERVICE_ROLE_KEY"):
+        await Users(issuer, None).find("alice@example.com")
+
+
+async def test_the_first_operator_and_a_tenant(config: Settings) -> None:
+    assert await run(["operator", "alice@example.com"], config) == (
+        "alice@example.com is the deployment's operator"
+    )
+    assert await run(["tenant", "acme", "u-bob"], config) == "created acme, owned by u-bob"
+    assert await run(["tenant", "acme", "u-carol"], config) == "acme exists, and is unchanged"
+
+
+async def test_migrating_keeps_what_each_user_could_do(config: Settings) -> None:
+    assert await run(["migrate-tenants"], config) == (
+        "acme: owner alice@example.com; admins bob@example.com\n"
+        "initech: owner carol@example.com; admins no one"
+    )
+    assert await run(["migrate-tenants"], config) == (
+        "acme: exists, and is unchanged\ninitech: exists, and is unchanged"
+    )
+
+
+async def test_migrating_with_no_tenants_says_so(
+    config: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Admin, "users", USERS[3:])
+    assert await run(["migrate-tenants"], config) == "no user names a tenant"
+
+
+async def test_the_commands_need_a_database() -> None:
+    with pytest.raises(SystemExit):
+        await run(["migrate-tenants"], Settings())
+
+
+def test_main_prints_the_outcome_or_why_it_failed(
+    config: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", str(config.database_url))
+    monkeypatch.setenv("AUTH_ISSUER", str(config.auth.issuer))
+    monkeypatch.setenv("AUTH_SERVICE_ROLE_KEY", "service")
+    monkeypatch.setattr("sys.argv", ["admin", "operator", "u-alice"])
+    main()
+    assert capsys.readouterr().out == "u-alice is the deployment's operator\n"
+    with pytest.raises(SystemExit, match="has an operator already"):
+        main()

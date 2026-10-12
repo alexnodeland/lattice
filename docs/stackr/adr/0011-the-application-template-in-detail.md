@@ -1,6 +1,6 @@
 # ADR-0011: The application template, in detail
 
-**Status:** Accepted; partly superseded by [ADR-0013](0013-how-the-template-pins-the-libraries.md), [ADR-0015](0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md) and [ADR-0018](0018-the-template-pins-the-libraries-at-its-own-commit.md), and amended by [ADR-0016](0016-stackr-in-lattice.md)
+**Status:** Accepted; partly superseded by [ADR-0013](0013-how-the-template-pins-the-libraries.md), [ADR-0015](0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md) and [ADR-0018](0018-the-template-pins-the-libraries-at-its-own-commit.md), and amended by [ADR-0016](0016-stackr-in-lattice.md) and [ADR-0019](0019-access-with-grantr-in-the-template.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 

@@ -87,7 +87,12 @@ The app profile joins the stack's two networks and reaches its services by name,
 ### Every request is 401
 
 - **No token, or an expired one.** Local Supabase's access tokens last an hour; sign in again.
-- **No tenant.** The token's `app_metadata.tenant_id` must be set, which only the admin API, with Supabase's secret key, can do.
+- **No tenant.** With `access=none`, the token's `app_metadata.tenant_id` must be set, which only the admin API, with Supabase's secret key, can do.
+
+### A signed-in request is 400 or 403
+
+- **400: no tenant named.** The user is a member of several tenants, or of none; name one with `X-Tenant` (a WebSocket's `tenant` query parameter).
+- **403: not a member.** The user isn't in the tenant the request names: `make tenant` gives a tenant its owner, and grantr's API at `/grantr/v1` adds members. A key belongs to one tenant, and is refused every other.
 - **Another issuer.** `AUTH_ISSUER` must match the token's `iss`: `http://127.0.0.1:54321/auth/v1` for tokens from local Supabase's published port.
 
 ### `make smoke-app` fails at once

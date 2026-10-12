@@ -1,0 +1,232 @@
+"""Access, with grantr: tenants from memberships, keys, the hooks, and the role matrix."""
+
+import io
+import runpy
+from contextlib import redirect_stdout
+from pathlib import Path
+from typing import Any
+
+import httpx
+import httpx2
+import pytest
+from fastapi.testclient import TestClient
+from mcp import Client
+from mcp.client.streamable_http import streamable_http_client
+from starlette.requests import HTTPConnection
+
+{% if use_artifactr -%}
+import artifactr.core as artifactr
+{% endif -%}
+from grantr import TENANT as ON_TENANT
+from grantr import {% if use_artifactr %}Agent, {% endif %}Grants, Resource, ServicePrincipal, User
+from grantr.testing import matrix
+{% if use_reflexr -%}
+from reflexr import core as reflexr
+{% endif %}
+from {{ package_name }}.access import CATALOGS, Access, Refused
+from {{ package_name }}.auth import Principal, TokenVerifier, Unauthenticated
+from {{ package_name }}.settings import Settings
+
+from conftest import OTHER, SECRET, TENANT, Script, app, seeded, serving, token
+
+ROOT = Path(__file__).parent.parent
+APPLICATION = ServicePrincipal(id=Settings().service_name)
+RUNTIME = "{% if use_artifactr %}artifactr:claim_thread{% else %}reflexr:checkpoint_run{% endif %}"
+"""An action of the application's own, which no person's role holds."""
+
+PARTS = [
+{%- if use_artifactr %}
+    ("/artifactr/v1/workspaces/main/threads", "/artifactr/mcp/", "list_artifacts"),
+{%- endif %}
+{%- if use_reflexr %}
+    ("/reflexr/v1/workspaces/main/runs", "/reflexr/mcp/", "list_runs"),
+{%- endif %}
+]
+"""Each library's REST read, and its MCP server and read tool."""
+
+
+def access(grants: Grants) -> Access:
+    verifier = TokenVerifier(audience="authenticated", secret=SECRET)
+    return Access(name=APPLICATION.id, verifier=verifier, grants=grants)
+
+
+def request(**headers: str) -> HTTPConnection:
+    raw = [(k.lower().encode(), v.encode()) for k, v in headers.items()]
+    return HTTPConnection({"type": "http", "headers": raw, "query_string": b""})
+
+
+def signed(user: str = "alice", **headers: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token(user)}", **headers}
+
+
+async def with_key(grants: Grants) -> str:
+    """A key for ``ci``, a service principal of acme, which may view its workspaces."""
+    ci = ServicePrincipal(id="ci")
+    await grants.add_member(TENANT, ci, by=User(id="alice"))
+    workspace = Resource(kind="workspace", workspace="main")
+    await grants.grant(TENANT, "viewer", on=workspace, to=ci, by=User(id="alice"))
+    key, _ = await grants.issue_key(TENANT, ci, by=User(id="alice"))
+    return key
+
+
+async def test_a_users_only_tenant_needs_no_naming() -> None:
+    principal = await access(seeded()).authenticate(request(Authorization=f"Bearer {token()}"))
+    assert principal == Principal(tenant_id=TENANT, user_id="alice", name="alice@example.com")
+
+
+async def test_a_user_in_several_tenants_names_one() -> None:
+    grants = seeded()
+    await grants.provision_tenant("globex", owner="alice")
+    with pytest.raises(Refused, match="X-Tenant") as refused:
+        await access(grants).authenticate(request(Authorization=f"Bearer {token()}"))
+    assert refused.value.status == 400
+    named = request(Authorization=f"Bearer {token()}", **{"X-Tenant": "globex"})
+    assert (await access(grants).authenticate(named)).tenant_id == "globex"
+
+
+async def test_a_tenant_its_user_isnt_in_is_refused() -> None:
+    elsewhere = request(Authorization=f"Bearer {token()}", **{"X-Tenant": OTHER})
+    with pytest.raises(Refused, match="isn't a member of initech") as refused:
+        await access(seeded()).authenticate(elsewhere)
+    assert refused.value.status == 403
+
+
+async def test_a_websocket_names_its_tenant_in_the_query() -> None:
+    connection = HTTPConnection(
+        {
+            "type": "websocket",
+            "headers": [],
+            "query_string": f"access_token={token('carol')}&tenant={OTHER}".encode(),
+        }
+    )
+    assert (await access(seeded()).authenticate(connection)).tenant_id == OTHER
+
+
+async def test_a_key_is_its_tenants_and_no_others() -> None:
+    grants = seeded()
+    key = await with_key(grants)
+    principal = await access(grants).authenticate(request(Authorization=f"Bearer {key}"))
+    assert principal == Principal(tenant_id=TENANT, user_id="ci", name="ci", service=True)
+    elsewhere = request(Authorization=f"Bearer {key}", **{"X-Tenant": OTHER})
+    with pytest.raises(Refused, match="another tenant"):
+        await access(grants).authenticate(elsewhere)
+    with pytest.raises(Unauthenticated, match="key is not valid"):
+        await access(grants).identify(request(Authorization=f"Bearer {key[:-1]}0"))
+{%- if use_artifactr %}
+
+
+@pytest.mark.parametrize(
+    ("actor", "subject"),
+    [
+        (artifactr.UserActor(id="alice"), User(id="alice")),
+        (artifactr.ExternalAgentActor(client_id="ci"), ServicePrincipal(id="ci")),
+        (
+            artifactr.ExternalAgentActor(client_id="x", on_behalf_of=artifactr.UserActor(id="bob")),
+            User(id="bob"),
+        ),
+        (artifactr.AgentActor(thread_id="t1"), Agent()),
+        (
+            artifactr.AgentActor(
+                thread_id="t1",
+                on_behalf_of=artifactr.ExternalAgentActor(
+                    client_id="x", on_behalf_of=artifactr.UserActor(id="bob")
+                ),
+            ),
+            User(id="bob"),
+        ),
+        (artifactr.SystemActor(), APPLICATION),
+        (artifactr.EvaluatorActor(name="judge", version="1"), APPLICATION),
+    ],
+)
+def test_artifactrs_actors_are_checked_as_who_they_act_for(
+    actor: artifactr.Actor, subject: Any
+) -> None:
+    assert access(seeded()).artifactr_subject(TENANT, "main", actor) == subject
+{%- endif %}
+{%- if use_reflexr %}
+
+
+@pytest.mark.parametrize(
+    ("actor", "subject"),
+    [
+        (reflexr.UserActor(id="alice"), User(id="alice")),
+        (reflexr.ExternalAgentActor(client_id="ci"), ServicePrincipal(id="ci")),
+        (
+            reflexr.ExternalAgentActor(client_id="x", on_behalf_of=reflexr.UserActor(id="bob")),
+            User(id="bob"),
+        ),
+        (reflexr.SourceActor(name="monitor"), ServicePrincipal(id="source:monitor")),
+        (reflexr.AgentActor(rule="app:triage", run_id="r1", name="triage"), APPLICATION),
+        (reflexr.SystemActor(), APPLICATION),
+        (reflexr.EvaluatorActor(name="judge", version="1"), APPLICATION),
+    ],
+)
+def test_reflexrs_actors_are_checked_as_who_they_act_for(
+    actor: reflexr.Actor, subject: Any
+) -> None:
+    assert access(seeded()).reflexr_subject(TENANT, "main", actor) == subject
+{%- endif %}
+
+
+@pytest.mark.parametrize(("read", "mcp", "tool"), PARTS)
+def test_the_libraries_answer_refusals_over_rest(read: str, mcp: str, tool: str) -> None:
+    with TestClient(app(Script())) as client:
+        assert client.get(read, headers=signed()).status_code == 200
+        assert client.get(read, headers=signed("dave")).status_code == 400
+        refused = client.get(read, headers=signed("alice", **{"X-Tenant": OTHER}))
+        assert (refused.status_code, refused.json()["detail"]["type"]) == (403, "forbidden")
+
+
+@pytest.mark.parametrize(("read", "mcp", "tool"), PARTS)
+async def test_a_key_reads_over_rest_and_mcp(read: str, mcp: str, tool: str) -> None:
+    grants = seeded()
+    key = await with_key(grants)
+    async with serving(app(Script(), grants=grants)) as server:
+        async with httpx.AsyncClient(base_url=server) as client:
+            response = await client.get(read, headers={"Authorization": f"Bearer {key}"})
+            assert response.status_code == 200
+        headers = {"Authorization": f"Bearer {key}"}
+        async with (
+            httpx2.AsyncClient(headers=headers) as http,
+            Client(streamable_http_client(f"{server}{mcp}", http_client=http)) as client,
+        ):
+            assert not (await client.call_tool(tool, {"workspace_id": "main"})).is_error
+        refused = {"Authorization": f"Bearer {token()}", "X-Tenant": OTHER}
+        async with (
+            httpx2.AsyncClient(headers=refused) as http,
+            Client(streamable_http_client(f"{server}{mcp}", http_client=http)) as client,
+        ):
+            answer = await client.call_tool(tool, {"workspace_id": "main"})
+            assert answer.is_error
+
+
+async def test_grantrs_api_is_mounted_and_the_application_bootstrapped() -> None:
+    grants = seeded()
+    key = await with_key(grants)
+    async with (
+        serving(app(Script(), grants=grants)) as server,
+        httpx.AsyncClient(base_url=f"{server}/grantr/v1") as client,
+    ):
+        me = await client.get("/me", headers=signed())
+        assert me.json() == {
+            "memberships": [{"tenant": TENANT, "user": "alice", "roles": ["member", "owner"]}]
+        }
+        assert (await client.get("/me", headers={"Authorization": "Bearer x"})).status_code == 401
+        mine = await client.get("/me", headers={"Authorization": f"Bearer {key}"})
+        assert mine.json() == {"tenant": TENANT, "roles": ["member"], "workspaces": ["main"]}
+        thread = Resource(kind="thread", workspace="main", id="t1")
+        assert await grants.check(OTHER, APPLICATION, RUNTIME, thread), "it acts in every tenant"
+        assert not await grants.check(TENANT, APPLICATION, "grantr:grant", ON_TENANT)
+
+
+def test_the_committed_access_matrix_is_current() -> None:
+    expected = matrix(CATALOGS)
+    assert (ROOT / "access.md").read_text() == expected, "run `make access-matrix`, and review it"
+
+
+@pytest.mark.filterwarnings("ignore:.*found in sys.modules:RuntimeWarning")
+def test_the_module_prints_the_matrix() -> None:
+    output = io.StringIO()
+    with redirect_stdout(output):
+        runpy.run_module("{{ package_name }}.access", run_name="__main__")
+    assert output.getvalue() == matrix(CATALOGS)

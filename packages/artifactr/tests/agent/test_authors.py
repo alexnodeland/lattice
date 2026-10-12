@@ -191,3 +191,23 @@ async def test_a_message_whose_ask_was_lost_is_taken_once_asked_again(
     assert await _for_whom(ws) == ["user:alice"]
     assert script.prompt_texts(0)[-1] == "Hello"
     assert await runner.ask(ws, thread.id) is None, "taken, so nothing more to take"
+
+
+async def test_ask_is_asked_as_the_agent_acting_for_its_caller_once(
+    storage: InMemoryStorage, gate: Gate
+) -> None:
+    asked: list[tuple[Actor, str]] = []
+
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: Actor, access: Access
+    ) -> bool:
+        asked.append((actor, access.action))
+        return True
+
+    ws = await Workspaces(storage, authorize=authorize).open("tenant", "ws", actor=ALICE)
+    thread = await ws.create_thread()
+    runner = make_runner(make_agent(Script()), gate)
+    asked.clear()
+    assert await runner.ask(ws, thread.id) is None
+    records = [actor for actor, action in asked if action == "artifactr:record"]
+    assert records == [AgentActor(thread_id=thread.id, on_behalf_of=ALICE)]

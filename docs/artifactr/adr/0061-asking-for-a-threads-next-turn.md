@@ -13,6 +13,7 @@ relayr starts a turn with `Runner.send(workspace, thread_id, content, message_id
 - **`Runner.ask(workspace, thread_id)`** asks for the thread's next turn, for whatever its log has that no turn has taken, up to the log's head. It returns the run it started, or `None`, as `resume` does. With nothing untaken, it does nothing.
 - **It is asked as `send` is:** `authorize` hears `artifactr:record` in the thread, from the agent acting for the handle's actor (ADR-0057), so a caller who may not start a turn by sending may not start one by asking.
 - **`send` is unchanged.** A caller that finds its message id used asks for the turn itself.
+- **`resume` keeps its own checks.** It reads the run (`artifactr:read_runs`) and asks nothing more: the turn it resumes is the paused run's, whose answers were checked as they were committed, and the turn checks its agent as it starts. `ask` names no run, so it asks what `send` asks before it starts one.
 
 ## Options considered
 

@@ -18,7 +18,13 @@ nav:
       - adr/0007-a-timeout-on-every-test-and-every-job.md
       - adr/0008-one-resolution-litellm-held-at-1-83-0.md
       - adr/0009-one-dev-container-at-the-root.md
+      - adr/0010-every-projects-tests-run-in-a-random-order.md
+      - adr/0011-codeql-and-scorecard.md
+      - adr/0012-title-checks-the-breaks-in-the-public-apis.md
+      - adr/0013-pyright-stays-until-ty-can-replace-it.md
       - adr/0014-portalrs-and-grantrs-marks.md
+      - adr/0015-acceptance-tests-against-the-reference-applications.md
+      - adr/0016-a-merge-queue-on-mergify.md
       - Template: adr/template.md
   - Brand: assets/brand/README.md
   - artifactr: artifactr

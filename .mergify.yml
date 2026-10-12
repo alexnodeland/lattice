@@ -1,0 +1,17 @@
+# The merge queue (lattice ADR-0016). A pull request labelled `queue` is
+# brought up to date with main, checked again, and squash-merged; the
+# ruleset's required checks, CI and Title, are Mergify's merge conditions.
+queue_rules:
+  - name: default
+    merge_method: squash
+    commit_message_format:
+      title: pr-title
+      body: pr-body
+    queue_conditions:
+      - base = main
+      - label = queue
+      - -draft
+
+merge_protections_settings:
+  auto_merge_conditions:
+    - label = queue

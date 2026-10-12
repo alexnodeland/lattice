@@ -63,7 +63,7 @@ The telemetry port. Receives OTLP from applications and the gateway, and exports
 | Property | Value |
 |---|---|
 | Profiles | `observability` |
-| Image | `otel/opentelemetry-collector-contrib`, pinned by tag in `compose.yaml` |
+| Image | `otel/opentelemetry-collector-contrib`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 4317 (`OTLP_GRPC_PORT`) → 4317, 4318 (`OTLP_HTTP_PORT`) → 4318 |
 | Networks | `stackr` |
 | Volumes | `./deploy/otel-collector/config.yaml` → `/etc/otelcol-contrib/config.yaml` (read-only) |
@@ -86,7 +86,7 @@ Traces, with its metrics generator for span metrics and service graphs.
 | Property | Value |
 |---|---|
 | Profiles | `observability` |
-| Image | `grafana/tempo`, pinned by tag in `compose.yaml` |
+| Image | `grafana/tempo`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 3200 (`TEMPO_PORT`) → 3200 |
 | Networks | `stackr` |
 | Volumes | `./deploy/tempo/tempo.yaml` → `/etc/tempo/tempo.yaml` (read-only), `tempo-data` → `/var/tempo` |
@@ -101,7 +101,7 @@ Metrics: OTLP from the Collector, remote write from Tempo, and scrapes of the st
 | Property | Value |
 |---|---|
 | Profiles | `observability` |
-| Image | `prom/prometheus`, pinned by tag in `compose.yaml` |
+| Image | `prom/prometheus`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 9090 (`PROMETHEUS_PORT`) → 9090 |
 | Networks | `stackr` |
 | Volumes | `./deploy/prometheus/prometheus.yml` → `/etc/prometheus/prometheus.yml` (read-only), `prometheus-data` → `/prometheus` |
@@ -117,7 +117,7 @@ portalr's path to Prometheus: it rewrites every query's selectors to the tenant 
 | Property | Value |
 |---|---|
 | Profiles | `observability` |
-| Image | `quay.io/prometheuscommunity/prom-label-proxy`, pinned by tag in `compose.yaml` |
+| Image | `quay.io/prometheuscommunity/prom-label-proxy`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 9091 (`PROM_LABEL_PROXY_PORT`) → 8080 |
 | Networks | `stackr` |
 | Volumes | none |
@@ -133,7 +133,7 @@ Logs, over OTLP.
 | Property | Value |
 |---|---|
 | Profiles | `observability` |
-| Image | `grafana/loki`, pinned by tag in `compose.yaml` |
+| Image | `grafana/loki`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 3100 (`LOKI_PORT`) → 3100 |
 | Networks | `stackr` |
 | Volumes | `./deploy/loki/loki.yaml` → `/etc/loki/loki.yaml` (read-only), `loki-data` → `/loki` |
@@ -148,7 +148,7 @@ Profiles, pushed by applications.
 | Property | Value |
 |---|---|
 | Profiles | `observability` |
-| Image | `grafana/pyroscope`, pinned by tag in `compose.yaml` |
+| Image | `grafana/pyroscope`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 4040 (`PYROSCOPE_PORT`) → 4040 |
 | Networks | `stackr` |
 | Volumes | `./deploy/pyroscope/config.yaml` → `/etc/pyroscope/config.yaml` (read-only), `pyroscope-data` → `/data` |
@@ -163,7 +163,7 @@ Dashboards and exploration, over the four backends.
 | Property | Value |
 |---|---|
 | Profiles | `observability` |
-| Image | `grafana/grafana`, pinned by tag in `compose.yaml` |
+| Image | `grafana/grafana`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 3000 (`GRAFANA_PORT`) → 3000 |
 | Networks | `stackr` |
 | Volumes | `./deploy/grafana/provisioning/datasources` → `/etc/grafana/provisioning/datasources` (read-only), `./deploy/grafana/provisioning/dashboards` → `/etc/grafana/provisioning/dashboards` (read-only), `./deploy/grafana/dashboards/stackr` → `/var/lib/grafana/dashboards/stackr` (read-only), `../artifactr/deploy/grafana/dashboards` → `/var/lib/grafana/dashboards/artifactr` (read-only), `../reflexr/deploy/grafana/dashboards` → `/var/lib/grafana/dashboards/reflexr` (read-only), `grafana-data` → `/var/lib/grafana` |
@@ -189,7 +189,7 @@ Plain PostgreSQL, the alternative database adapter, used when STACKR_DATABASE is
 | Property | Value |
 |---|---|
 | Profiles | `postgres` |
-| Image | `postgres`, pinned by tag in `compose.yaml` |
+| Image | `postgres`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 55432 (`POSTGRES_PORT`) → 5432 |
 | Networks | `stackr` |
 | Volumes | `postgres-data` → `/var/lib/postgresql/data` |
@@ -213,7 +213,7 @@ Creates each service's role and database on the database adapter, on every start
 | Property | Value |
 |---|---|
 | Profiles | `langfuse`, `gateway` |
-| Image | `postgres`, pinned by tag in `compose.yaml` |
+| Image | `postgres`, pinned by tag and digest in `compose.yaml` |
 | Published ports | none |
 | Networks | `stackr`, `supabase_network_stackr-supabase` |
 | Volumes | `./deploy/postgres/init.sql` → `/init.sql` (read-only) |
@@ -241,7 +241,7 @@ Valkey, for the Redis protocol: Langfuse's queues and cache in database 0, the g
 | Property | Value |
 |---|---|
 | Profiles | `langfuse`, `gateway` |
-| Image | `valkey/valkey`, pinned by tag in `compose.yaml` |
+| Image | `valkey/valkey`, pinned by tag and digest in `compose.yaml` |
 | Published ports | none |
 | Networks | `stackr` |
 | Volumes | `redis-data` → `/data` |
@@ -287,7 +287,7 @@ Langfuse's traces, observations and scores.
 | Property | Value |
 |---|---|
 | Profiles | `langfuse` |
-| Image | `clickhouse/clickhouse-server`, pinned by tag in `compose.yaml` |
+| Image | `clickhouse/clickhouse-server`, pinned by tag and digest in `compose.yaml` |
 | Published ports | none |
 | Networks | `stackr` |
 | Volumes | `clickhouse-data` → `/var/lib/clickhouse`, `clickhouse-logs` → `/var/log/clickhouse-server` |
@@ -310,7 +310,7 @@ Langfuse's worker: runs ingestion and evaluation jobs from the queues.
 | Property | Value |
 |---|---|
 | Profiles | `langfuse` |
-| Image | `langfuse/langfuse-worker`, pinned by tag in `compose.yaml` |
+| Image | `langfuse/langfuse-worker`, pinned by tag and digest in `compose.yaml` |
 | Published ports | none |
 | Networks | `stackr`, `supabase_network_stackr-supabase` |
 | Volumes | none |
@@ -356,7 +356,7 @@ Langfuse's UI and public API. Receives traces from the Collector, and runs the m
 | Property | Value |
 |---|---|
 | Profiles | `langfuse` |
-| Image | `langfuse/langfuse`, pinned by tag in `compose.yaml` |
+| Image | `langfuse/langfuse`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 3300 (`LANGFUSE_PORT`) → 3000 |
 | Networks | `stackr`, `supabase_network_stackr-supabase` |
 | Volumes | none |
@@ -414,7 +414,7 @@ The LLM gateway port: the LiteLLM proxy's OpenAI-compatible API.
 | Property | Value |
 |---|---|
 | Profiles | `gateway` |
-| Image | `ghcr.io/berriai/litellm`, pinned by tag in `compose.yaml` |
+| Image | `ghcr.io/berriai/litellm`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 4400 (`LITELLM_PORT`) → 4000 |
 | Networks | `stackr`, `supabase_network_stackr-supabase` |
 | Volumes | `./deploy/litellm/config.yaml` → `/etc/litellm/config.yaml` (read-only) |
@@ -453,7 +453,7 @@ Sends test telemetry for scripts/smoke; not a service that stays up.
 | Property | Value |
 |---|---|
 | Profiles | `smoke` |
-| Image | `ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen`, pinned by tag in `compose.yaml` |
+| Image | `ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen`, pinned by tag and digest in `compose.yaml` |
 | Published ports | none |
 | Networks | `stackr` |
 | Volumes | none |

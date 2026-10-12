@@ -14,6 +14,7 @@ grantr decides who may do what in a tenant. artifactr and reflexr ask it, throug
 | `grantr.telemetry` | The check counter, slow checks' spans and the audit log's copy, through the OpenTelemetry API | `grantr.core`, the OpenTelemetry API |
 | `grantr.grants` | `Grants`, with its checks, the hooks, the commands that change access and the lists an admin reads; the storage port, `Storage`; and `InMemoryStorage` | `grantr.core`, `grantr.telemetry`, the OpenTelemetry API |
 | `grantr.sql` | `SqlStorage`, its tables and Alembic migrations, and `create_sqlite_engine`. The `sql`, `sqlite` and `postgres` extras | `grantr.core`, pydantic, SQLAlchemy, Alembic |
+| `grantr.testing` | `matrix`, every role against every action, as a table to commit | `grantr.core` |
 | `grantr.fastapi` | `grantr_router`, the admin API, and its OpenAPI document. The `fastapi` extra | `grantr.core`, `grantr.grants`, FastAPI |
 
 `tests/test_layering.py` holds each package to its column, and keeps I/O out of the core.
@@ -35,17 +36,21 @@ A subject holds an action on a resource when a grant to it, or to a group it is 
 
 ### Built-in roles
 
-The application hands `Grants` each library's catalog, its `ACTIONS`, and grantr adds its own. The built-in roles are defined over them ([ADR-0011](adr/0011-built-in-roles-over-the-catalogs.md)):
+The application hands `Grants` each library's catalog, its `ACTIONS`, and grantr adds its own. The built-in roles are defined over them ([ADR-0011](adr/0011-built-in-roles-over-the-catalogs.md), [ADR-0019](adr/0019-runtime-actions-and-the-application-role.md), [ADR-0020](adr/0020-the-rule-role.md)). No person's role holds the bookkeeping: `artifactr:claim_thread`, and `save_cursor` and `read_cursors` in both libraries.
 
 | Role | On | Holds |
 |---|---|---|
 | `operator` | the deployment | `grantr:create_tenant` and `grantr:grant_operator` |
-| `owner` | a tenant | every action in every catalog but the operator's |
+| `application` | the deployment, holding in every tenant | the bookkeeping, `artifactr:record`, `reflexr:publish`, `reflexr:checkpoint_run`, its evaluators' feedback, and every `open` and read |
+| `owner` | a tenant | every action in every catalog but the operator's and the bookkeeping |
 | `admin` | a tenant | the owner's, but `grantr:delete_tenant` |
 | `member` | a tenant | nothing: it makes a user or service principal a member |
-| `admin` | a workspace | every library action, and `grantr:grant`, `revoke` and `restrict` |
-| `editor` | a workspace, thread, artifact or rule | a viewer's, and the commands that post, create, edit, propose, archive, resolve proposals and operate runs |
-| `viewer` | a workspace, thread, artifact or rule | every `read_` action, every `open`, and giving feedback |
+| `admin` | a workspace | every library action but the bookkeeping, and `grantr:grant`, `revoke` and `restrict` |
+| `editor` | a workspace, thread, artifact or rule | a viewer's, and the commands that post, create, edit, propose, archive, resolve proposals, record a turn, and stop and operate runs |
+| `viewer` | a workspace, thread, artifact or rule | every `read_` action but the cursors, every `open`, and giving feedback |
+| `rule` | a workspace | `reflexr:open`, `reflexr:publish`, `reflexr:checkpoint_run`, `reflexr:read_events` and `reflexr:read_runs`: a stored rule's runs |
+
+`application` is the one deployment role that holds in every tenant, and only the application's own service principal holds it: `Grants(application=...)` names it, and `Grants.bootstrap()` grants it at start, and revokes it from any other holder. That principal is no tenant's member, and no key of it is answered, so no tenant can borrow it. A catalog that names a library's actions must name all its bookkeeping, or `Catalog.of` refuses it. `grantr.testing.matrix(catalogs, roles)` prints every role against every action, for an application to commit and review.
 
 A custom role is a tenant's own set of actions, granted wherever `editor` can be. It holds only actions a workspace's admin holds, and can't take a built-in role's name.
 
@@ -56,6 +61,8 @@ A custom role is a tenant's own set of actions, granted wherever `editor` can be
 | Command | Requires |
 |---|---|
 | `first_operator` | No operator yet |
+| `bootstrap` | The application's configured principal: grants it `application`, and revokes it from any other |
+| `provision_tenant` | The deployment's own tools, in process: a tenant, its owner and its admins, once ([ADR-0021](adr/0021-the-deployments-own-tools.md)) |
 | `grant_operator`, `revoke_operator` | `grantr:grant_operator` on the deployment |
 | `create_tenant` | `grantr:create_tenant` on the deployment; its owner is made a member and an owner |
 | `delete_tenant` | `grantr:delete_tenant` |

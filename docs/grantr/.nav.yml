@@ -23,6 +23,9 @@ nav:
   - adr/0016-the-sql-adapter.md
   - adr/0017-the-admin-api.md
   - adr/0018-telemetry-through-the-api.md
+  - adr/0019-runtime-actions-and-the-application-role.md
+  - adr/0020-the-rule-role.md
+  - adr/0021-the-deployments-own-tools.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

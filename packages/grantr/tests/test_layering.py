@@ -20,6 +20,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "core": ({"grantr.core"}, {"pydantic"}),
     "grants": ({"grantr.core", "grantr.grants", "grantr.telemetry"}, OTEL_API),
     "telemetry": ({"grantr.core", "grantr.telemetry"}, {"opentelemetry", *OTEL_API}),
+    "testing": ({"grantr.core", "grantr.testing"}, set()),
     "fastapi": (
         {"grantr.core", "grantr.grants", "grantr.fastapi"},
         {"fastapi", "starlette", "pydantic"},

@@ -1,6 +1,6 @@
 # ADR-0011: Built-in roles over the catalogs
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0019](0019-runtime-actions-and-the-application-role.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

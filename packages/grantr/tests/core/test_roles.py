@@ -1,7 +1,7 @@
 import pytest
 
 from grantr.core import GRANTR_ACTIONS, OPERATOR, Catalog, Invalid, ResourceKind, Role
-from grantr.core.roles import LEVELS
+from grantr.core.roles import BOOKKEEPING, LEVELS
 from tests.catalogs import ARTIFACTR, PORTALR, REFLEXR
 
 CATALOG = Catalog.of(ARTIFACTR, REFLEXR, PORTALR)
@@ -27,10 +27,12 @@ def test_a_viewer_reads_opens_and_gives_feedback() -> None:
         "artifactr:open",
         "artifactr:read_artifacts",
         "artifactr:read_threads",
+        "artifactr:read_events",
         "artifactr:give_feedback",
         "reflexr:open",
         "reflexr:read_rules",
         "reflexr:read_runs",
+        "reflexr:read_events",
         "reflexr:give_feedback",
         "portalr:read_telemetry",
     }
@@ -41,6 +43,9 @@ def test_an_editor_adds_the_commands_it_names_that_the_catalogs_have() -> None:
         "artifactr:post_message",
         "artifactr:edit_artifact",
         "artifactr:propose_change",
+        "artifactr:stop_run",
+        "artifactr:record",
+        "reflexr:publish",
         "reflexr:cancel_run",
     }
 
@@ -52,7 +57,7 @@ def test_rule_management_is_the_workspace_admins_alone() -> None:
 
 
 def test_the_tenant_roles_cover_every_catalog_but_the_operators_actions() -> None:
-    assert _role("owner", "tenant") == CATALOG.actions - OPERATOR
+    assert _role("owner", "tenant") == CATALOG.actions - OPERATOR - BOOKKEEPING
     assert _role("owner", "tenant") - _role("admin", "tenant") == {"grantr:delete_tenant"}
     assert _role("member", "tenant") == frozenset()
     assert _role("operator", "deployment") == OPERATOR
@@ -93,3 +98,40 @@ def test_a_custom_role_is_checked_against_the_catalogs(role: Role, message: str)
 
 def test_a_custom_role_from_the_catalogs_passes() -> None:
     CATALOG.check(Role(name="triage", actions=frozenset({"reflexr:cancel_run", "grantr:grant"})))
+
+
+def test_no_persons_role_holds_the_bookkeeping() -> None:
+    for (level, name), actions in CATALOG.built_in.items():
+        if name not in ("application", "operator"):
+            assert actions & BOOKKEEPING == frozenset(), f"{name} ({level})"
+    assert "artifactr:read_cursors" not in _role("viewer")
+    assert "reflexr:checkpoint_run" not in _role("editor")
+    assert "reflexr:checkpoint_run" in _role("admin")
+
+
+def test_a_library_catalog_has_its_bookkeeping() -> None:
+    with pytest.raises(ValueError, match="lack the bookkeeping artifactr:claim_thread"):
+        Catalog.of(ARTIFACTR - {"artifactr:claim_thread"})
+    assert Catalog.of({"portalr:read_telemetry"}).actions >= {"portalr:read_telemetry"}
+
+
+def test_the_application_holds_the_runtime_and_every_read() -> None:
+    application = _role("application", "deployment")
+    assert application >= BOOKKEEPING
+    assert {"artifactr:record", "reflexr:publish", "reflexr:checkpoint_run"} <= application
+    assert {"artifactr:read_artifacts", "reflexr:open", "artifactr:give_feedback"} <= application
+    bridge = {"artifactr:open", "artifactr:read_events", "reflexr:open", "reflexr:publish"}
+    assert bridge <= application, "what relayr's bridge does, as the application"
+    assert application & {"artifactr:edit_artifact", "reflexr:install_rule"} == frozenset()
+
+
+def test_a_rule_publishes_checkpoints_and_reads_its_workspace() -> None:
+    assert _role("rule") == {
+        "reflexr:open",
+        "reflexr:publish",
+        "reflexr:checkpoint_run",
+        "reflexr:read_events",
+        "reflexr:read_runs",
+    }
+    assert CATALOG.role("rule", "rule", {}) is None, "granted on a workspace only"
+    assert _role("rule") <= _role("admin"), "so a workspace's admin may grant it"

@@ -23,5 +23,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0017](0017-one-site-for-the-family.md) | One site for the family | Accepted |
 | [0018](0018-the-template-pins-the-libraries-at-its-own-commit.md) | The template pins the libraries at its own commit | Accepted |
 | [0019](0019-access-with-grantr-in-the-template.md) | Access with grantr in the template | Accepted |
+| [0020](0020-one-tenant-attribute-and-prom-label-proxy.md) | One tenant attribute, and prom-label-proxy | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

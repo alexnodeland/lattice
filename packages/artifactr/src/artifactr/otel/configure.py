@@ -7,18 +7,18 @@ used: an application that does not use FastAPI or SQLAlchemy does not need them 
 import importlib.util
 import logging
 import os
-from collections.abc import Callable, Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Final, Literal, Protocol, Self
+from typing import TYPE_CHECKING, Any, Final, Literal, Protocol, Self, cast
 
-from opentelemetry import metrics, trace
+from opentelemetry import context, metrics, trace
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.logging.handler import LoggingHandler
 from opentelemetry.processor.baggage import BaggageSpanProcessor
-from opentelemetry.sdk._logs import LoggerProvider
+from opentelemetry.sdk._logs import LoggerProvider, LogRecordProcessor, ReadWriteLogRecord
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, LogRecordExporter
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import MetricReader, PeriodicExportingMetricReader
@@ -423,6 +423,8 @@ def configure_telemetry(
 
     tracer_provider = TracerProvider(resource=resource)
     tracer_provider.add_span_processor(BaggageSpanProcessor(lambda key: key in BAGGAGE_KEYS))
+    tenancy = _Tenancy(frozenset(each.name + TENANT_SUFFIX for each in chosen))
+    tracer_provider.add_span_processor(tenancy)
     exporter = span_exporter or OTLPSpanExporter(
         endpoint=_signal(otlp_endpoint, "traces"), headers=headers
     )
@@ -440,6 +442,7 @@ def configure_telemetry(
     log_handler: logging.Handler | None = None
     if logs:
         logger_provider = LoggerProvider(resource=resource)
+        logger_provider.add_log_record_processor(_TenancyLogs(tenancy))
         logger_provider.add_log_record_processor(
             BatchLogRecordProcessor(
                 log_exporter
@@ -499,6 +502,57 @@ def _remove(handler: logging.Handler) -> None:
     logging.getLogger().removeHandler(handler)
     # Closed and unreferenced, so the logging module's exit hook no longer flushes it.
     handler.close()
+
+
+# Shared verbatim with reflexr's otel/configure.py: change both.
+TENANT_SUFFIX: Final = ".tenant.id"
+"""A contribution's tenant attribute is its name and this: ``artifactr.tenant.id``,
+``reflexr.tenant.id``. The log records of a span that names one, or of any span inside it, carry
+it too, so the Collector can filter every signal by tenant (lattice RFC-0002)."""
+
+
+class _Tenancy(SpanProcessor):
+    """Remembers the tenant of every span that is open: its own, or the span it is in's."""
+
+    def __init__(self, names: frozenset[str]) -> None:
+        self._names = names
+        self._open: dict[int, dict[str, str]] = {}
+
+    def _own(self, span: object) -> dict[str, str]:
+        attributes = (span.attributes if isinstance(span, ReadableSpan) else None) or {}
+        return {name: str(attributes[name]) for name in self._names if name in attributes}
+
+    def of(self, span: trace.Span) -> dict[str, str]:
+        """The tenant attributes of a span: those it carries now, or those it was opened in."""
+        return self._own(span) or self._open.get(span.get_span_context().span_id, {})
+
+    def on_start(self, span: Any, parent_context: context.Context | None = None) -> None:
+        if tenancy := self._own(span) or self.of(trace.get_current_span(parent_context)):
+            self._open[span.get_span_context().span_id] = tenancy
+
+    def on_end(self, span: ReadableSpan) -> None:
+        self._open.pop(getattr(span.get_span_context(), "span_id", 0), None)
+
+
+class _TenancyLogs(LogRecordProcessor):
+    """Copies the tenant of the span a record is logged in onto the record."""
+
+    def __init__(self, tenancy: _Tenancy) -> None:
+        self._tenancy = tenancy
+
+    def on_emit(self, log_record: ReadWriteLogRecord) -> None:
+        # The SDK gives every record it emits a mutable BoundedAttributes.
+        attributes = cast("MutableMapping[str, object]", log_record.log_record.attributes)
+        for name, value in self._tenancy.of(trace.get_current_span()).items():
+            attributes.setdefault(name, value)
+
+    def shutdown(self) -> None:
+        """Nothing to release."""
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        """Nothing is buffered."""
+        del timeout_millis
+        return True
 
 
 def _signal(endpoint: str | None, signal: str) -> str | None:

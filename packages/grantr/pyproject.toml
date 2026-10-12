@@ -10,7 +10,6 @@ requires-python = ">=3.12"
 keywords = ["authorization", "access-control", "rbac", "multi-tenant", "agents", "pydantic"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
-    "Framework :: Pydantic :: 2",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3 :: Only",

@@ -14,7 +14,7 @@ Someone creates tenants, and sees the stack's shared tools (Langfuse, Grafana, L
 
 - **`operator` is a role on the deployment,** held by few: it may create tenants and see every tenant, and the stack's shared tools.
 - **It is a grant, never a flag:** given and revoked like any role, only by another operator, and recorded in the audit log. `make operator EMAIL=...` grants the first.
-- **It doesn't put an operator inside a tenant's workspaces.** Reading a tenant's threads still needs a role there.
+- **It doesn't put an operator inside a tenant's workspaces.** Reading a tenant's threads still needs a role there, which an operator can grant themselves, recorded in the audit log.
 
 ## Options considered
 

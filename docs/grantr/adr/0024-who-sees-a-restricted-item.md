@@ -24,6 +24,7 @@ ADR-0003 makes a thread or artifact visible to its workspace unless it is restri
 |---|---|---|
 | **Ancestor grants hold if their role may restrict (chosen)** | One rule for built-in and custom roles; who may lift a restriction already sees what it hides | A custom role with `grantr:restrict` sees every restricted item where it is granted |
 | Name the built-in roles that see through | Exactly ADR-0003's words | A custom admin role is blind to what it restricts |
+| The item's creator restricts it too (lattice RFC-0001's open question) | Whoever starts a private thread can close it | grantr doesn't know who created an item; an application can grant its creator a custom role holding `grantr:restrict` on it instead |
 | A separate `see_restricted` action | Seeing and restricting apart | One more action for every catalog and matrix, with no request for it |
 
 ## Consequences

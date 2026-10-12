@@ -293,6 +293,8 @@ await reactor.settle()
 
 `replay_rule` clears the rule's scope states, saves its new progress with a new generation, and appends `reflexr:rule_reset` (`reason: "replayed"`, with `from_seq` and `silent_through`, the position up to which a rebuild records nothing), attributed to whoever asked. The reactor does the evaluating. `from_seq` must be between 0 and the head of the log, or the replay is rejected with `validation_failed`.
 
+A [stored rule](rules.md#stored-rules) is replayed the same way, in its own workspace. It starts at its own `reflexr:rule_installed` fact, so a rebuild from an earlier position is how it starts warm, with the state its current version would have had.
+
 ## Several processes
 
 Any number of reactors, in any number of processes, can share the work, as long as they share a storage that works across processes, such as [SQL storage](storage.md#sql-storage); in-memory storage lives in one process. Leases divide the work:

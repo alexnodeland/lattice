@@ -1,6 +1,6 @@
 # The reference implementation
 
-[`examples/oncall`](https://github.com/alexnodeland/lattice/tree/main/examples/oncall) is a small, complete application built on reflexr: incident response. Monitoring fires alerts, CI reports deploys, and services send heartbeats. A burst of severe alerts runs a triage agent, which opens an incident; an opened incident runs a runbook graph, which rolls back a recent deploy or pages a person, then resolves the incident; and a service that stops sending heartbeats is paged. It uses only the library's public API, a test enforces that, and it is held to the same quality gates as the library ([ADR-0015](adr/0015-reference-implementation-oncall.md), [ADR-0031](adr/0031-the-reference-implementations-events-and-rules.md)). Read it when you want to see every piece of this documentation working together.
+[`examples/oncall`](https://github.com/alexnodeland/lattice/tree/main/examples/oncall) is a small, complete application built on reflexr: incident response. Monitoring fires alerts, CI reports deploys, and services send heartbeats. A burst of severe alerts runs a triage agent, which opens an incident; an opened incident runs a runbook graph, which rolls back a recent deploy or pages a person, then resolves the incident; and a service that stops sending heartbeats is paged. People add rules of their own at runtime, which page a service's person on call. It uses only the library's public API, a test enforces that, and it is held to the same quality gates as the library ([ADR-0015](adr/0015-reference-implementation-oncall.md), [ADR-0031](adr/0031-the-reference-implementations-events-and-rules.md)). Read it when you want to see every piece of this documentation working together.
 
 ## What it contains
 
@@ -10,9 +10,9 @@
 | Rules | [`rules.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/rules.py) | `oncall:triage`, a count of severe alerts per service within five minutes; `oncall:runbook`, every opened incident per service, with its own retry policy; `oncall:silence`, no heartbeat from a service for two minutes; and a `Schedule` whose ticks keep time moving |
 | Triage agent | [`triage.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/triage.py) | A pydantic-ai `Agent` over `Reaction[OncallDeps]` with the `EventContext` capability, allowed to emit `oncall:incident.opened` only, with a structured verdict, usage limits, and the LiteLLM gateway when a proxy is configured |
 | Runbook graph | [`runbook.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/runbook.py) | A pydantic-graph `GraphBuilder` graph with a decision, checkpointed after every step, that reads the log and emits through the `Reaction` |
-| Paging | [`actions.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/actions.py) | A plain async function, idempotent by its run id, and the table of actions by the names rules use |
+| Paging | [`actions.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/actions.py) | Plain async functions, idempotent by their run id: `page`, and `notify`, which takes params; and the table of actions by the names rules use |
 | Services | [`services.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/services.py) | The pager and deployer the workflows act on: in-memory fakes, given to every action as `reaction.deps` |
-| Server | [`app.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/app.py) | FastAPI with REST and the WebSocket stream at `/v1` and MCP at `/mcp`, the reactor in its lifespan, in-memory or SQL storage, and OpenTelemetry and Langfuse from the environment |
+| Server | [`app.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/app.py) | FastAPI with REST and the WebSocket stream at `/v1` and MCP at `/mcp`, the reactor in its lifespan, in-memory or SQL storage, OpenTelemetry and Langfuse from the environment, and the `StoredRules` that let people install rules |
 | Terminal client | [`cli.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/cli.py) | Publishes events, follows the stream live, and operates runs: a template for a client in any language |
 | Tests | [`tests/`](https://github.com/alexnodeland/lattice/tree/main/examples/oncall/tests) | The whole stack end to end with a scripted model and a clock the tests move, inside the coverage gate |
 
@@ -88,6 +88,33 @@ In Docker, reflexr's Compose file, `packages/reflexr/compose.yaml`, runs oncall 
 
 The same server speaks the other surfaces too: REST under `/v1` (the demo trusts an `x-user` header, as in `curl -H 'x-user: alice' localhost:8000/v1/workspaces/prod/runs`), and MCP at `http://127.0.0.1:8000/mcp/` for external agents. Opening an incident by hand over REST runs the runbook as well.
 
+## Install a rule at runtime
+
+People can add rules while oncall runs, without a deploy ([Stored rules](guides/rules.md#stored-rules)). oncall's `StoredRules` lets a person (a `UserActor`), but not an MCP client, install rules named in the `team` namespace that run only `notify`, which pages the person on call for the service its params name. This one pages checkout's whenever checkout is deployed:
+
+```bash
+curl -H 'x-user: alice' -H 'content-type: application/json' \
+  localhost:8000/v1/workspaces/prod/commands -d '{
+  "type": "command", "command_id": "install-checkout-deploys",
+  "command": {"type": "install_rule", "provenance": {"requested_by": "alice"}, "rule": {
+    "name": "team:checkout-deploys",
+    "description": "Tell the person on call for checkout whenever it is deployed.",
+    "when": {
+      "filter": {"kind": "all", "of": [
+        {"kind": "on", "types": ["oncall:deploy.completed"]},
+        {"kind": "where", "field": "service", "op": "eq", "value": "checkout"}
+      ]},
+      "throttle": {"at_most": 1, "per": "PT15M"}
+    },
+    "then": {"action": "notify", "params": {"service": "checkout"}},
+    "ordering": "none",
+    "timeout": "PT1M"
+  }}}'
+uv run oncall --user ci deploy checkout --version v7
+```
+
+The command answers `rule_version`, and the watch shows the rule installed, then firing for the deploy. `GET /v1/workspaces/prod/rules/team:checkout-deploys` reads the rule back with its version and provenance; `update_rule` replaces it, and `archive_rule` stops it.
+
 !!! warning "Demo authentication"
 
     oncall trusts whichever user the `x-user` header or `user` query parameter names, and puts everyone in one tenant. It shows where authentication plugs in, not how to do it. See [Multi-tenancy and security](guides/security.md).
@@ -109,7 +136,8 @@ uv run pytest examples/oncall/tests
 | `AlertFired`, `DeployCompleted`, `Heartbeat`, `IncidentOpened`, `IncidentResolved` | [Events and envelopes](guides/events.md) |
 | `triage_rule`, `runbook_rule`, `silence_rule` | [Rules](guides/rules.md) |
 | `Oncall`, its `Workspaces` and `Reactor` | [Workspaces and the log](guides/workspaces.md), [The reactor](guides/reactor.md) |
-| The triage agent, the runbook graph and `page` | [Actions](guides/actions.md) |
+| The triage agent, the runbook graph, `page` and `notify` | [Actions](guides/actions.md) |
+| `STORED_RULES` and `allow_people` | [Stored rules](guides/rules.md#stored-rules) |
 | `heartbeat_check` | [Schedules](guides/schedules.md) |
 | The FastAPI app and `resolve_actor` | [Serving over REST and WebSocket](guides/serving.md) |
 | `ReflexrMcp` and `resolve_client` | [External agents over MCP](guides/mcp.md) |

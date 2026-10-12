@@ -1,4 +1,4 @@
-"""The package layering in docs/architecture.md, enforced.
+"""The package layering in <https://lattice.alexnodeland.com/evalr/architecture/>, enforced.
 
 Each package may import the standard library, the evalr packages below it, and an explicit list of
 third-party packages. Dependencies point one way, so each package is usable without the others,

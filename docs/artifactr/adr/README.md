@@ -67,6 +67,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0061](0061-a-nul-character-is-refused-at-the-boundary.md) | A NUL character is refused at the boundary | Accepted |
 | [0062](0062-restricted-items-left-out-of-every-read.md) | Restricted items left out of every read | Accepted |
 | [0063](0063-the-openapi-documents-describe-refusals.md) | The OpenAPI documents describe refusals | Accepted |
-| [0061](0061-asking-for-a-threads-next-turn.md) | Asking for a thread's next turn | Accepted |
+| [0064](0064-asking-for-a-threads-next-turn.md) | Asking for a thread's next turn | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

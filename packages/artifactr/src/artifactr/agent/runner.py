@@ -277,7 +277,7 @@ class Runner[AppDepsT]:
         remembered. A repeated id returns the remembered result and carries nothing out,
         whatever command it comes with, so a retry is safe on every surface.
         """
-        if "\x00" in command_id:  # remembered under no key: storage can't hold it (ADR-0061)
+        if "\x00" in command_id:  # remembered under no key: storage can't hold it (ADR-0064)
             refused = ValidationFailed("text cannot hold a NUL character", [])
             return CommandResult(command_id=command_id, ok=False, rejection=refused.payload())
         key = CommandKey(
@@ -324,7 +324,7 @@ class Runner[AppDepsT]:
 
         :meth:`send` asks once it has committed its message. A caller whose ask may have been
         lost, because its process stopped between the two, asks again here: a retried send
-        finds its message id used (ADR-0061). It is asked as :meth:`send` is, as the agent
+        finds its message id used (ADR-0064). It is asked as :meth:`send` is, as the agent
         acting for the handle's actor. With nothing untaken, it does nothing.
 
         Raises:

@@ -1,4 +1,4 @@
-# ADR-0061: Asking for a thread's next turn
+# ADR-0064: Asking for a thread's next turn
 
 **Status:** Accepted
 **Date:** 2026-10-12

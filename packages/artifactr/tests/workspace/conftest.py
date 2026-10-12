@@ -9,7 +9,7 @@ import pytest
 from artifactr.core import UserActor
 from artifactr.sql import SqlStorage, create_schema
 from artifactr.workspace import InMemoryStorage, Storage, Workspace, Workspaces
-from tests.databases import SQL_BACKENDS, empty_database
+from tests.databases import ROW_LEVEL_SECURITY, SQL_BACKENDS, empty_database, row_level_security
 
 ALICE = UserActor(id="alice", name="Alice")
 
@@ -18,12 +18,16 @@ StorageFactory = Callable[[Clock], Storage]
 """Makes a storage with the given clock; every storage it makes shares one database."""
 
 
-@pytest.fixture(params=["memory", *SQL_BACKENDS])
+@pytest.fixture(params=["memory", *SQL_BACKENDS, ROW_LEVEL_SECURITY])
 async def storage_factory(
     request: pytest.FixtureRequest, tmp_path: Path
 ) -> AsyncIterator[StorageFactory]:
     if request.param == "memory":
         yield lambda clock: InMemoryStorage(clock=clock)
+        return
+    if request.param == "postgres-rls":
+        async with row_level_security() as (_, application):
+            yield lambda clock: SqlStorage(application, clock=clock, row_level_security=True)
         return
     async with empty_database(request.param, tmp_path) as database:
         engine = database.engine()

@@ -38,7 +38,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0032](0032-libraries-and-the-stackr-template.md) | Libraries, and stackr as the infrastructure template | Accepted, amended by 0052 and 0054 |
 | [0033](0033-trace-links-on-runs-and-revisions.md) | Trace links on runs and revisions | Accepted |
 | [0034](0034-ports-and-adapters-for-integrations.md) | Ports and adapters for integrations | Accepted |
-| [0035](0035-a-turn-is-its-own-trace.md) | A turn is its own trace | Accepted |
+| [0035](0035-a-turn-is-its-own-trace.md) | A turn is its own trace | Accepted, amended by 0059 |
 | [0036](0036-metric-cardinality-through-sdk-views.md) | Metric cardinality through SDK views | Accepted |
 | [0037](0037-feedback-targets-and-evaluators.md) | Feedback targets and evaluators | Accepted |
 | [0038](0038-feedback-as-scores.md) | Feedback as scores, through ports | Superseded by 0049 |
@@ -62,5 +62,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0056](0056-access-asked-in-every-workspace-method.md) | Access asked in every workspace method | Accepted, amended by 0058 |
 | [0057](0057-a-turn-acts-for-one-author.md) | A turn acts for one author | Accepted |
 | [0058](0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md) | A tenant's workspaces, listed by what each actor may open | Accepted |
+| [0059](0059-a-turn-starts-from-an-empty-context.md) | A turn starts from an empty context | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

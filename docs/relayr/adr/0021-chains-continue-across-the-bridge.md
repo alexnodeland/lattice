@@ -1,6 +1,6 @@
 # ADR-0021: Chains continue across the bridge
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0025](0025-counters-and-how-long-causes-are-kept.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0015](0015-cursors-leases-and-dead-letters-in-the-ledger.md): the ledger also keeps the run behind each write, and a chain continued past the depth limit is dead-lettered

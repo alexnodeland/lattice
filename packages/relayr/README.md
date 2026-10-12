@@ -25,7 +25,7 @@ An application can mount artifactr and reflexr side by side, on one database and
 - **Inbound: chats and artifacts become events (built).** One follower per workspace, with a lease, a cursor and dead letters, publishes selected artifactr events into reflexr under the `artifactr` namespace, such as `artifactr:message_posted`, `artifactr:artifact_changed` and `artifactr:proposal_resolved`, so that a message fires a rule exactly once, across a restart and a redelivery ([ADR-0006](https://lattice.alexnodeland.com/relayr/adr/0006-bridged-types-in-the-artifactr-namespace/)).
 - **Outbound: runs act as participants (built).** A pydantic-ai capability and helpers let a run act in artifactr as its rule's own external agent, `reflexr:<rule>`, so artifactr's rules apply to it: under a `propose` write policy its edits are proposals, and relayr never resolves one ([ADR-0002](https://lattice.alexnodeland.com/relayr/adr/0002-the-outbound-actor-an-external-agent-per-rule/)).
 - **Notices by default (built).** A rule's messages start no turn in the thread, unless the rule's allowlist grants it ([ADR-0007](https://lattice.alexnodeland.com/relayr/adr/0007-notices-by-default/)).
-- **Chains and sessions kept apart, and linked.** A thread is never a causal chain, and a chain never joins a thread's session or model history; traces are linked, and Langfuse sessions tagged, across the two ([ADR-0003](https://lattice.alexnodeland.com/relayr/adr/0003-a-thread-is-never-a-chain/), [ADR-0004](https://lattice.alexnodeland.com/relayr/adr/0004-sessions-linked-not-continued/)).
+- **Chains and sessions kept apart, and linked (built).** A thread is never a causal chain, and a chain never joins a thread's session or model history; traces are linked, and Langfuse sessions tagged, across the two ([ADR-0003](https://lattice.alexnodeland.com/relayr/adr/0003-a-thread-is-never-a-chain/), [ADR-0004](https://lattice.alexnodeland.com/relayr/adr/0004-sessions-linked-not-continued/)).
 - **Rules from chat.** A rule drafted in a thread is a `rule` artifact, reviewed as a proposal, and goes live in reflexr's stored rules only when a person accepts it, with provenance recorded both ways ([ADR-0005](https://lattice.alexnodeland.com/relayr/adr/0005-where-a-rules-source-of-truth-lives/)).
 - **Evaluation.** Proposal outcomes become feedback on the runs that proposed them, with measures of acceptance, rewrites and time to resolution.
 - **A ledger of its own (built)**, in memory or in SQL, behind the `sql`, `sqlite` and `postgres` extras.
@@ -36,6 +36,7 @@ relayr's documentation is its section of lattice's site, at **<https://lattice.a
 
 - [Bridging artifactr into reflexr](https://lattice.alexnodeland.com/relayr/guides/inbound/): wiring the followers into an application.
 - [Acting in artifactr from rules](https://lattice.alexnodeland.com/relayr/guides/outbound/): the outbound adapter, allowlists and loops.
+- [Tracing across the bridge](https://lattice.alexnodeland.com/relayr/guides/telemetry/): links, Langfuse tags and counters.
 - [Architecture](https://lattice.alexnodeland.com/relayr/architecture/): what exists, and how it works.
 - [Architecture decision records](https://lattice.alexnodeland.com/relayr/adr/): why each part will be the way it is.
 - [RFCs](https://lattice.alexnodeland.com/relayr/rfcs/): the v0.1 plan, its phases and what each waits on.

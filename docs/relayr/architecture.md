@@ -1,6 +1,6 @@
 # Architecture
 
-Decisions are recorded in [`adr/`](adr/README.md), and the plan that builds relayr in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). The design is [stackr RFC-0002](../stackr/rfcs/0002-the-combined-system.md). This page describes what exists: the inbound adapter and the outbound adapter with its loop control, phases 1 and 2 of the plan.
+Decisions are recorded in [`adr/`](adr/README.md), and the plan that builds relayr in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). The design is [stackr RFC-0002](../stackr/rfcs/0002-the-combined-system.md). This page describes what exists: the inbound adapter, the outbound adapter with its loop control, and their telemetry, phases 1, 2 and 4 of the plan.
 
 ## What relayr is
 
@@ -25,7 +25,10 @@ graph LR
 | `relayr.ledger` | The `Ledger` port, `DeadLetter`, `Cause`, `WorkspaceKey`, and `InMemoryLedger` | pydantic |
 | `relayr.sql` | `SqlLedger`, its tables and Alembic migrations, and `create_sqlite_engine`. The `sql`, `sqlite` and `postgres` extras | `relayr.ledger`, SQLAlchemy, Alembic |
 | `relayr.inbound` | `Followers`, and the two actors a follower acts as | `relayr.events`, `relayr.ledger`, artifactr, reflexr |
-| `relayr.outbound` | `Outbound` and its per-attempt `RunActions`, `Allowlist`, `NotAllowed`, `rule_actor`, and `ArtifactrCapability` with its tools | `relayr.events`, `relayr.ledger`, artifactr, reflexr, pydantic, pydantic-ai |
+| `relayr.outbound` | `Outbound` and its per-attempt `RunActions`, `Allowlist`, `NotAllowed`, `Refused`, the rule's actor, `turn_cause`, and `ArtifactrCapability` with its tools | `relayr.events`, `relayr.ledger`, artifactr, reflexr, pydantic, pydantic-ai |
+| `relayr.telemetry` | The `relayr` scope's attributes, the counters' registry, and `Telemetry`, through the OpenTelemetry API | the OpenTelemetry API |
+| `relayr.otel` | `telemetry()`, relayr's contribution to the libraries' `configure_telemetry`, and `metric_views`. The `otel` extra | `relayr.telemetry`, the OpenTelemetry SDK |
+| `relayr.langfuse` | `bridged_run` and `bridged_turns`, the libraries' Langfuse contexts with relayr's tags. The `langfuse` extra | `relayr.events`, `relayr.ledger`, `relayr.outbound`, artifactr, reflexr, Langfuse |
 
 `tests/test_layering.py` holds each package to its column, and checks that every name relayr imports from artifactr or reflexr is in its module's `__all__`.
 
@@ -76,9 +79,17 @@ A rule's run acts in artifactr through `Outbound.acting(reaction)`: a function a
 
 Before each write, `RunActions` records the run behind it in the ledger, by the ids the follower will read off its envelope. The follower publishes a rule's write back into reflexr through `caused_by(...)`, in the run's chain, as deep as the run's own events; a turn acting for a rule continues the chain of the rule's last message in its thread. reflexr refuses a firing past its depth limit, so two rules that answer each other stop there. A person's answer to a rule's proposal joins the proposal's chain without going deeper ([ADR-0021](adr/0021-chains-continue-across-the-bridge.md)). `tests/outbound/test_loops.py` checks both of phase 2's exit criteria, on every ledger.
 
+## Telemetry
+
+relayr records through the OpenTelemetry API, under the scope `relayr`, with attributes named as the libraries name theirs (`relayr.tenant.id`, `relayr.workspace.id`).
+
+- **Traces are linked, not continued** ([ADR-0004](adr/0004-sessions-linked-not-continued.md), [ADR-0023](adr/0023-traces-linked-across-the-bridge.md)). The follower runs in an empty context, whatever opened its workspace, and publishes each bridged event in a `relayr.bridge <type>` span, the root of its own trace, linked to the span that committed the artifactr envelope; reflexr's publish is its child, and the run links to that. A run's `send` starts a turn linked to the run's span, and the turn starts from an empty context, so the run's Langfuse attributes stay with the run.
+- **Langfuse sessions are tagged with each other** ([ADR-0024](adr/0024-langfuse-sessions-tagged-with-each-other.md)). `bridged_run` tags a run with the threads of its bridged events, and sets its user to the person who acted. `bridged_turns(ledger)` tags a turn acting for a rule with the rule and with the chain of the run that sent its message, found by `turn_cause`, as the follower finds it. `tests/telemetry/test_links.py` checks phase 4's exit criterion.
+- **Counters** ([ADR-0025](adr/0025-counters-and-how-long-causes-are-kept.md)): `relayr.followers.stopped` and `relayr.dead_letters`. `relayr.otel.telemetry()` keeps relayr's spans in Langfuse's traces and applies the cardinality policy to its counters.
+
 ## The ledger
 
-The `Ledger` port keeps, per workspace, the follower's cursor and lease, and its dead letters, once per `seq`; and, for the outbound adapter, the `Cause` of each write, once per key. `followed()` lists the workspaces with a cursor or a lease. Its adapters:
+The `Ledger` port keeps, per workspace, the follower's cursor and lease, and its dead letters, once per `seq`; and, for the outbound adapter, the `Cause` of each write, once per key, kept for `cause_ttl` (a week by default): each follower forgets its workspace's older causes at most hourly while it holds the lease, once it has caught up with the log. `followed()` lists the workspaces with a cursor or a lease. Its adapters:
 
 - **`InMemoryLedger`,** for tests, and for applications whose followers may start over.
 - **`SqlLedger`,** on PostgreSQL or SQLite through SQLAlchemy's asyncio extension, in three tables in the application's schema: `relayr_followers` (a workspace's cursor and lease, one row, locked while it changes), `relayr_dead_letters` and `relayr_causes`. Its migrations record their version in `relayr_alembic_version`. On SQLite, its engine comes from `create_sqlite_engine`, shared verbatim with the libraries' and grantr's, and every call is awaited to its end even when its caller is cancelled, as theirs are.
@@ -87,4 +98,4 @@ One contract test, `tests/ledger/test_contract.py`, runs against memory, SQLite 
 
 ## What isn't built yet
 
-The template's `bridge` question (phase 3), telemetry links and tags (phase 4), rules from chat (phase 5) and evaluation (phase 6).
+The template's `bridge` question (phase 3), rules from chat (phase 5) and evaluation (phase 6). LiteLLM's metadata doesn't carry relayr's tags yet ([lattice #86](https://github.com/alexnodeland/lattice/issues/86)).

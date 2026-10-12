@@ -101,6 +101,10 @@ class Ledger(Protocol):
         """Return the run behind a write, or None if no run of a rule made it."""
         ...
 
+    async def forget_causes(self, workspace: WorkspaceKey, *, older_than: timedelta) -> None:
+        """Forget the causes recorded longer ago than `older_than`, by the ledger's clock."""
+        ...
+
     async def followed(self) -> list[WorkspaceKey]:
         """Return every workspace a follower has held a lease on or saved a cursor for, in order.
 

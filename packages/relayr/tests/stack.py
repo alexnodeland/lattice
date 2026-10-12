@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 
 import pytest
+from opentelemetry.metrics import MeterProvider
+from opentelemetry.trace import TracerProvider
 
 import artifactr
 import artifactr.agent
@@ -103,6 +105,10 @@ class Stack:
         allowlists: Mapping[str, Allowlist] | None = None,
         runner: artifactr.agent.Runner[None] | None = None,
         max_depth: int = 8,
+        cause_ttl: timedelta = timedelta(days=7),
+        tracer_provider: TracerProvider | None = None,
+        meter_provider: MeterProvider | None = None,
+        run_context: r.RunContext | None = None,
     ) -> Process:
         async def on_open(tenant_id: str, workspace_id: str) -> None:
             await bridge.watch(tenant_id, workspace_id)
@@ -112,7 +118,10 @@ class Stack:
             self.greeted.append(envelope.event.model_dump()["content"])
 
         collaboration = artifactr.Workspaces(
-            self.artifactr_storage, authorize=artifactr_authorize, on_open=on_open
+            self.artifactr_storage,
+            authorize=artifactr_authorize,
+            on_open=on_open,
+            tracer_provider=tracer_provider,
         )
         automation = r.Workspaces(
             self.reflexr_storage,
@@ -121,6 +130,7 @@ class Stack:
             authorize=authorize,
             max_depth=max_depth,
             on_open=on_open,
+            tracer_provider=tracer_provider,
         )
         bridge = Followers(
             collaboration,
@@ -131,9 +141,17 @@ class Stack:
             lease_ttl=TTL,
             save_every=save_every,
             read_back=read_back,
+            cause_ttl=cause_ttl,
+            tracer_provider=tracer_provider,
+            meter_provider=meter_provider,
         )
         outbound = Outbound(collaboration, ledger, allowlists=allowlists, runner=runner)
-        reactor = r.Reactor(automation, actions=actions or {"greet": greet}, deps=outbound)
+        reactor = r.Reactor(
+            automation,
+            actions=actions or {"greet": greet},
+            deps=outbound,
+            run_context=run_context,
+        )
         process = Process(collaboration, automation, bridge, outbound, reactor)
         self.processes.append(process)
         return process

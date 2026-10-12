@@ -5,11 +5,11 @@ grantr's SQL storage, and artifactr's, reflexr's and relayr's, scope every query
 ## How it works
 
 - **Each transaction names its tenant.** With `SqlStorage(..., row_level_security=True)`, every transaction sets `lattice.tenant_id` as it begins, for itself only, so a pooled connection never carries a tenant on. A session that names no tenant can't begin one.
-- **The policies keep it there.** The migrations create a policy on every table, enabled and not forced: a transaction reads, changes and adds only its tenant's rows, and grantr's tenants also read the deployment's grants, which their checks need. A transaction that names no tenant sees nothing.
-- **They hold every role but the tables' owner,** so the application works as a role that owns nothing, and the owner migrates the tables and grants that role them: `migrate(owner_engine, application_role="app")`.
+- **The policies keep it there.** The migrations create a policy on every table, enabled and not forced: a transaction reads, changes and adds only its tenant's rows, and grantr's tenants also read the deployment's rows of `grantr_grants` and `grantr_group_members`, which their checks need. A transaction that names no tenant sees nothing.
+- **The policies apply to every role except the tables' owner,** so the application works as a role that owns nothing, and the owner migrates the tables and grants that role them: `migrate(owner_engine, application_role="app")`.
 - **A few reads span tenants,** and go to the owner's engine, `across_tenants`, and nothing else does: in grantr, finding a key's tenant, a user's memberships and the tenants' list; reflexr's dispatcher and scheduler; relayr's followers' start.
 
-```python
+```python title="Illustrative: needs PostgreSQL"
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from grantr import Grants
@@ -23,7 +23,7 @@ grants = Grants(
 )
 ```
 
-Each library takes the same option, in its own `SqlStorage` or `SqlLedger` ([artifactr ADR-0066](../../artifactr/adr/0066-row-level-security-under-the-scoping.md), [reflexr ADR-0062](../../reflexr/adr/0062-row-level-security-under-the-scoping.md), [relayr ADR-0027](../../relayr/adr/0027-row-level-security-under-the-scoping.md)).
+reflexr's `SqlStorage` and relayr's `SqlLedger` take the same two options. artifactr's `SqlStorage` takes `row_level_security` but no `across_tenants`, since none of its reads span tenants ([artifactr ADR-0066](../../artifactr/adr/0066-row-level-security-under-the-scoping.md), [reflexr ADR-0062](../../reflexr/adr/0062-row-level-security-under-the-scoping.md), [relayr ADR-0027](../../relayr/adr/0027-row-level-security-under-the-scoping.md)).
 
 ## In stackr's template
 

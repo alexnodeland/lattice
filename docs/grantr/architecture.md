@@ -1,6 +1,6 @@
 # Architecture
 
-Decisions are recorded in [`adr/`](adr/README.md), and the plan that builds grantr in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). The design is [lattice RFC-0001](../rfcs/0001-grantr-identity-and-access.md). This page describes what exists: grantr's core, its storage port with in-memory and SQL adapters, the hooks, the admin API, telemetry, and how stackr's template wires it in. The [guides](guides/getting-started.md) show how to use it.
+Decisions are recorded in [`adr/`](adr/README.md), and the plan that builds grantr in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). The design is [lattice RFC-0001](../rfcs/0001-grantr-identity-and-access.md). This page describes what exists: grantr's core, its storage port with in-memory and SQL adapters, the hooks, the admin API, telemetry, and how stackr's template wires it in. [Getting started](getting-started.md) and the guides show how to use it.
 
 ## What grantr is
 

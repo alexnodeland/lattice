@@ -46,13 +46,13 @@ await grants.grant("acme", "editor", on=main, to=User(id="bob"), by=User(id="ali
 assert await grants.check("acme", User(id="bob"), "artifactr:edit_artifact", main)
 ```
 
-[Getting started](https://lattice.alexnodeland.com/grantr/guides/getting-started/) goes on to the libraries' hooks, SQL storage and the admin API.
+[Getting started](https://lattice.alexnodeland.com/grantr/getting-started/) goes on to the libraries' hooks, SQL storage and the admin API.
 
 ## Documentation
 
 grantr's documentation is its section of lattice's site, at **<https://lattice.alexnodeland.com/grantr/>**, built from [`docs/grantr/`](https://github.com/alexnodeland/lattice/tree/main/docs/grantr).
 
-- [Guides](https://lattice.alexnodeland.com/grantr/guides/getting-started/): getting started, roles and grants, restricted threads and artifacts, service principals and keys, row-level security, and the permission matrix.
+- [Getting started](https://lattice.alexnodeland.com/grantr/getting-started/), and the guides: roles and grants, restricted threads and artifacts, service principals and keys, row-level security, and the permission matrix.
 - [Architecture](https://lattice.alexnodeland.com/grantr/architecture/): the model, the checks, the commands and the storage port.
 - [Architecture decision records](https://lattice.alexnodeland.com/grantr/adr/): why each part is the way it is.
 - [RFCs](https://lattice.alexnodeland.com/grantr/rfcs/): the v0.1 plan, its phases and what each waits on.

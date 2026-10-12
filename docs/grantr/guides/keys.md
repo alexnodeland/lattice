@@ -21,7 +21,7 @@ key, entry = await grants.issue_key("acme", ci, by=ALICE)
 
 A key is `grantr_sk_<id>_<secret>`, shown once: grantr stores its public id, its tenant, its principal and a digest of its secret, never the secret. Issuing or revoking one needs `grantr:issue_key` or `grantr:revoke_key`, and every action the principal's grants hold, since a key acts with them. `revoke_key` takes the key's id, and removing the principal takes its keys with it.
 
-## Answering a key
+## Authenticating a key
 
 ```python
 found = await grants.authenticate(key)  # ("acme", ServicePrincipal(id="ci")), or None
@@ -29,4 +29,4 @@ found = await grants.authenticate(key)  # ("acme", ServicePrincipal(id="ci")), o
 
 `authenticate` finds the key by its id and compares digests in constant time. It answers with the key's one tenant and its principal, so a key reaches only its own tenant; give that tenant to the admin API's `Caller(principal, tenant)`, and to the libraries' resolvers. A key for the application's own principal is never answered.
 
-stackr's template takes a key in the `Authorization` header only, where a token would be, so it never lands in a URL's logs, and checks the libraries' external agents with no person behind them as the key's principal.
+stackr's template reads a key only from the `Authorization` header, where a token would be, so a key never lands in a URL's logs. When an external agent has no person behind it, the template checks it as the key's principal.

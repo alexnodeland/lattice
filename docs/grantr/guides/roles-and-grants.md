@@ -9,22 +9,29 @@ grantr builds its roles over the catalogs it is given, so a library's new action
 | Role | Granted on | For |
 |---|---|---|
 | `owner` | a tenant | whoever answers for a tenant: everything in it, deleting it included |
-| `admin` | a tenant | the owner's, but deleting the tenant |
+| `admin` | a tenant | everything the owner holds except deleting the tenant |
 | `member` | a tenant | belonging to it; on its own, listing the workspaces the member can open |
 | `admin` | a workspace | everything in the workspace, its grants and restricted items included |
-| `editor` | a workspace, thread, artifact or rule | reading, and the commands that change things |
+| `editor` | a workspace, thread, artifact or rule | reading, and the commands that change threads, artifacts and runs; not installing, updating, archiving or replaying rules, which are the workspace admin's |
 | `viewer` | a workspace, thread, artifact or rule | reading, and giving feedback |
 | `operator` | the deployment | creating tenants and granting other operators; nothing inside a tenant until they grant themselves a role there ([ADR-0009](../adr/0009-a-deployment-wide-operator-role.md), [ADR-0014](../adr/0014-an-operator-enters-a-tenant-by-granting-themselves.md)) |
 | `application` | the deployment | the application's own work in every tenant ([ADR-0019](../adr/0019-runtime-actions-and-the-application-role.md)) |
-| `rule` | a workspace | a stored rule's runs ([ADR-0020](../adr/0020-the-rule-role.md), [ADR-0029](../adr/0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md)) |
+| `rule` | a workspace, held without a grant since ADR-0029 | a stored rule's runs, in its own workspace ([ADR-0020](../adr/0020-the-rule-role.md), [ADR-0029](../adr/0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md)) |
 
 The [architecture](../architecture.md#built-in-roles) lists each role's actions, and the [permission matrix](matrix.md) shows every role against every action of artifactr, reflexr and grantr.
 
 ### The application and its rules
 
-The application's own principal, the one `Grants(application=...)` names, is the only holder of `application`. `Grants.bootstrap()` grants it as the application starts, and takes it from any other holder; no key of that principal is answered, and it can't be made a tenant's member, so no tenant can borrow it. It holds the application's bookkeeping, every `open` and read, the runner's records, what its code rules write in artifactr through relayr, and, as `RULE_INSTALLS`, installing, updating and archiving the stored rules relayr installs for people who may ([ADR-0025](../adr/0025-the-application-lists-tenants-and-workspaces-and-writes-for-code-rules.md), [ADR-0027](../adr/0027-the-application-installs-the-rules-people-accept.md)).
+Only the application's own principal holds `application`. That is the principal `Grants(application=...)` names. `Grants.bootstrap()` grants it the role as the application starts, and takes the role from any other holder. grantr never answers a key for that principal, and it can't be made a tenant's member, so no tenant can borrow it.
 
-A stored rule acts as itself, a `RulePrincipal(workspace, rule)`. It holds `rule` in its own workspace with no grant, and can be granted nothing beyond it, nor any role that manages access ([ADR-0029](../adr/0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md)).
+The role holds:
+
+- the application's bookkeeping, every `open` and every read;
+- the runner's records;
+- what its code rules write in artifactr through relayr;
+- as `RULE_INSTALLS`, installing, updating and archiving the stored rules relayr installs on behalf of people who may install them ([ADR-0025](../adr/0025-the-application-lists-tenants-and-workspaces-and-writes-for-code-rules.md), [ADR-0027](../adr/0027-the-application-installs-the-rules-people-accept.md)).
+
+A stored rule acts as itself, a `RulePrincipal(workspace, rule)`. It holds `rule` in its own workspace with no grant. You can't grant it anything beyond its own workspace, nor any role that manages access. A grant made to it beyond its own workspace before that was refused counts for nothing. Since no grant gives a stored rule its role, revoking doesn't stop it: archiving it does ([ADR-0029](../adr/0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md)).
 
 ## Granting
 
@@ -43,7 +50,7 @@ await grants.revoke("acme", "viewer", on=Resource(kind="workspace", workspace="m
 
 - **Only members are granted roles.** `add_member` makes a user or service principal a member; `remove_member` takes its grants, its places in groups and its keys with it.
 - **No one gives more than they hold** ([ADR-0010](../adr/0010-commands-bounded-by-what-their-maker-holds.md)). Granting a role on a resource needs `grantr:grant` there, and every action the role holds there.
-- **A tenant keeps an owner.** Revoking, removing or deleting its last `owner` grant is refused.
+- **A tenant keeps an owner.** grantr refuses to take its last `owner` grant, whether by `revoke`, by `remove_member` or by `delete_group` on the group that holds it.
 
 ## Groups
 

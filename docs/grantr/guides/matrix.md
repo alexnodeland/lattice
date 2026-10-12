@@ -1,6 +1,12 @@
 # The permission matrix
 
-Every built-in role against every action of artifactr's, reflexr's and grantr's catalogs, where it is granted: what `grantr.testing.matrix` prints for the two libraries ([ADR-0011](../adr/0011-built-in-roles-over-the-catalogs.md)). A role granted on a thread, artifact or rule holds there what it holds on their workspace. A test regenerates this page from the catalogs, and fails when it is out of date. An application's own, with its custom roles, is in its `access.md` ([Roles and grants](roles-and-grants.md#reviewing-who-may-do-what)).
+Every built-in role against every action of artifactr's, reflexr's and grantr's catalogs, where it is granted: what `grantr.testing.matrix` prints for the two libraries ([ADR-0011](../adr/0011-built-in-roles-over-the-catalogs.md)). A role granted on a thread, artifact or rule holds there what it holds on their workspace. A test checks this page against the catalogs, and fails when it is out of date. To regenerate it, replace the table with what this prints:
+
+```bash
+uv run python -c "from artifactr.workspace import ACTIONS as A; from reflexr.workspace import ACTIONS as R; from grantr.testing import matrix; print(matrix([A, R]), end='')"
+```
+
+An application's own, with its custom roles, is in its `access.md` ([Roles and grants](roles-and-grants.md#reviewing-who-may-do-what)).
 
 | Action | operator (deployment) | application (deployment) | owner (tenant) | admin (tenant) | member (tenant) | admin (workspace) | editor (workspace) | viewer (workspace) | rule (workspace) |
 |---|---|---|---|---|---|---|---|---|---|

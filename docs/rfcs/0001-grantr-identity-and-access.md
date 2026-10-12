@@ -319,7 +319,7 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
 ## Unresolved questions
 
 - **Who may restrict a thread?** Resolved by grantr [ADR-0024](../grantr/adr/0024-who-sees-a-restricted-item.md): whoever holds `grantr:restrict` on it, which is its workspace's admins, the tenant's owners and admins, and any custom role holding it; an application can give an item's creator such a role.
-- **A stored rule's grants at install:** the installer's role on the workspace, or a narrower set the installer picks in the review. Phase 5 of stackr RFC-0002 settles it with relayr.
+- **A stored rule's grants at install?** Resolved by grantr [ADR-0029](../grantr/adr/0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md): a stored rule holds the `rule` role in its own workspace with no grant, and can be granted nothing beyond it, so archiving a rule, not revoking, stops it.
 - **Ending a live connection on revocation,** rather than only refusing its next command. It needs a channel from grantr to the libraries' connections, which the template could provide.
 - **Workspaces without a library behind them:** grantr knows a workspace once a grant names it or an item in it. Whether artifactr #62's listing should come from grantr in applications that use it is for that issue.
 

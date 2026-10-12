@@ -26,7 +26,7 @@ grantr doesn't know whether an item exists: check that it does, with artifactr, 
 
 ## Who sees a restricted item
 
-On a restricted item, a grant on its workspace or tenant counts only if its role holds `grantr:restrict`; a grant on the item itself counts as ever. So:
+On a restricted item, a grant on its workspace or tenant counts only if its role holds `grantr:restrict`. A grant on the item itself counts as it does on any item. So:
 
 | Who | Sees it |
 |---|---|

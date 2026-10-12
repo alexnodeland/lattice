@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
-# Back up a single host (RFC-0004) to the BACKUP_S3_* settings' bucket: PostgreSQL with pgBackRest
-# (full the first time, incremental after, its WAL archived as it is written), then ClickHouse
-# with its own BACKUP, as clickhouse/<UTC time>. stackr-backup.timer runs it nightly; `make
-# backup` runs it now. Run it from packages/stackr. Keep clickhouse/ in the bucket for as long as
-# you need, with the bucket's own lifecycle rule: each of its backups is whole.
+# Back up a single host (RFC-0004) to the BACKUP_S3_* settings' bucket, and report how it went.
+#
+# PostgreSQL, with pgBackRest: a full backup on Sundays, before the weekly restore drill, and a
+# differential on the other nights, encrypted before it leaves the host; its WAL is archived as it
+# is written, which `pgbackrest check` proves first. pgBackRest keeps two full backups, and what
+# they need. Then ClickHouse, with its own BACKUP, as the `backup` user: Langfuse's database and
+# the drill's, whole, as clickhouse/<UTC time>; the bucket's own lifecycle rule expires them.
+#
+# Whatever happens, it sends stackr.backup.success, 1 or 0, to the Collector, where Grafana's
+# alerts read it. stackr-backup.timer runs it nightly; `make backup` runs it now, and BACKUP_TYPE
+# (full, diff or incr) chooses the kind. Run it from packages/stackr.
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 host() { docker compose -f compose.yaml -f deploy/host/compose.prod.yaml "$@"; }
+status=1
+report() { deploy/host/report-metric stackr-backup stackr.backup.success $((status == 0)) || true; }
+trap report EXIT
 
 # The bucket, as the container's environment has it.
 if ! host exec -T postgres sh -c "test -n \"\$BACKUP_S3_BUCKET\""; then
@@ -16,12 +25,22 @@ if ! host exec -T postgres sh -c "test -n \"\$BACKUP_S3_BUCKET\""; then
   exit 1
 fi
 
-host exec -T -u postgres postgres pgbackrest --stanza=stackr --log-level-console=warn stanza-create
-host exec -T -u postgres postgres pgbackrest --stanza=stackr --log-level-console=warn --type=incr backup
-echo "backup: PostgreSQL, with pgBackRest"
+type=${BACKUP_TYPE:-$([[ $(date -u +%u) == 7 ]] && echo full || echo diff)}
+pgbackrest() { host exec -T -u postgres postgres pgbackrest --stanza=stackr --log-level-console=warn "$@"; }
+pgbackrest stanza-create
+pgbackrest check
+pgbackrest --type="$type" backup
+echo "backup: PostgreSQL, $type, with pgBackRest"
 
-# The client reads its user and password from the container's environment.
+# As the backup user, whose password is in the container's environment, never on a command line.
+clickhouse() {
+  host exec -T clickhouse sh -c \
+    "CLICKHOUSE_USER=backup CLICKHOUSE_PASSWORD=\"\$CLICKHOUSE_BACKUP_PASSWORD\" clickhouse-client --query \"\$0\"" "$1" </dev/null
+}
+clickhouse "CREATE DATABASE IF NOT EXISTS stackr_drill"
+clickhouse "CREATE TABLE IF NOT EXISTS stackr_drill.sentinel (id String, at DateTime DEFAULT now())
+  ENGINE = MergeTree ORDER BY id"
 name=$(date -u +%Y-%m-%dT%H-%M-%SZ)
-host exec -T clickhouse clickhouse-client \
-  --query "BACKUP DATABASE default TO S3(backups, '$name') FORMAT Null"
+clickhouse "BACKUP DATABASE default, DATABASE stackr_drill TO S3(backups, '$name') FORMAT Null"
 echo "backup: ClickHouse, as clickhouse/$name"
+status=0

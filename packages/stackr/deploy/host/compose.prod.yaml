@@ -63,29 +63,35 @@ services:
     ports: !reset []
   pyroscope:
     ports: !reset []
-  # PostgreSQL with pgBackRest (deploy/host/postgres), archiving its WAL to the backups' bucket.
+  # PostgreSQL with pgBackRest (deploy/host/postgres), archiving its WAL to the backups' bucket,
+  # encrypted with BACKUP_CIPHER_PASS.
   postgres:
     build: ./deploy/host/postgres
     image: stackr-postgres:local
-    environment: &backups
-      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
-      BACKUP_S3_PORT: ${BACKUP_S3_PORT:-443}
-      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
-      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
-      BACKUP_S3_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
-      BACKUP_S3_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:-}
-      # relaxed verifies the bucket's certificate; none, only for a test bucket's own.
-      BACKUP_S3_TLS_VERIFICATION: ${BACKUP_S3_TLS_VERIFICATION:-relaxed}
+    environment:
+      <<: &bucket
+        BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+        BACKUP_S3_PORT: ${BACKUP_S3_PORT:-443}
+        BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+        BACKUP_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+        BACKUP_S3_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
+        BACKUP_S3_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:-}
+      BACKUP_CIPHER_PASS: ${BACKUP_CIPHER_PASS:?run make env}
+    volumes:
+      - &ca ${BACKUP_S3_CA_FILE:-/etc/ssl/certs/ca-certificates.crt}:/etc/stackr/backup-ca.crt:ro
     ports: !reset []
-  # ClickHouse's BACKUP and RESTORE, to the same bucket, through the `backups` named collection.
+  # ClickHouse's BACKUP and RESTORE, to the same bucket, as the `backup` user, through the
+  # `backups` named collection.
   clickhouse:
     environment:
-      <<: *backups
+      <<: *bucket
       # yamllint disable-line rule:line-length
       CLICKHOUSE_BACKUP_URL: https://${BACKUP_S3_ENDPOINT:-backups.invalid}:${BACKUP_S3_PORT:-443}/${BACKUP_S3_BUCKET:-none}/clickhouse/
+      CLICKHOUSE_BACKUP_PASSWORD: ${CLICKHOUSE_BACKUP_PASSWORD:?run make env}
     volumes:
+      - *ca
       - ./deploy/host/clickhouse/backups.xml:/etc/clickhouse-server/config.d/backups.xml:ro
-      - ./deploy/host/clickhouse/backup-user.xml:/etc/clickhouse-server/users.d/backups.xml:ro
+      - ./deploy/host/clickhouse/backup-user.xml:/etc/clickhouse-server/users.d/backup-user.xml:ro
   # Reached at the edge, as auth.<domain>. Caddy sets X-Forwarded-For to each client's address,
   # which GoTrue's per-address rate limits read: without the header it applies none.
   gotrue:

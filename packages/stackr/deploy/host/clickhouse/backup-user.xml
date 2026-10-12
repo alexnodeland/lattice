@@ -1,8 +1,26 @@
-<!-- Langfuse's user may use the named collections, the backups' among them. -->
+<!-- The user deploy/host/backup and restore-drill run as, from inside the container only: it may
+     back up Langfuse's database and restore it onto a new host, use the bucket, read the system tables, and own the drill's
+     three databases. Langfuse's own
+     user can't reach the bucket. -->
 <clickhouse>
   <users>
-    <langfuse>
-      <named_collection_control>1</named_collection_control>
-    </langfuse>
+    <backup>
+      <password from_env="CLICKHOUSE_BACKUP_PASSWORD"/>
+      <networks>
+        <ip>127.0.0.1</ip>
+        <ip>::1</ip>
+      </networks>
+      <profile>default</profile>
+      <quota>default</quota>
+      <grants>
+        <query>GRANT SELECT, BACKUP, CREATE TABLE, INSERT ON default.*</query>
+        <query>GRANT ALL ON stackr_drill.*</query>
+        <query>GRANT ALL ON restore_drill.*</query>
+        <query>GRANT ALL ON restore_sentinel.*</query>
+        <query>GRANT SELECT ON system.*</query>
+        <query>GRANT READ, WRITE ON S3</query>
+        <query>GRANT NAMED COLLECTION ON backups</query>
+      </grants>
+    </backup>
   </users>
 </clickhouse>

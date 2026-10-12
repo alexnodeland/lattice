@@ -2,9 +2,10 @@
 [Unit]
 Description=Restore stackr's latest backups beside it, check them, and report
 Requires=docker.service
-After=docker.service
+After=docker.service stackr-backup.service
 
 [Service]
 Type=oneshot
+TimeoutStartSec=2h
 WorkingDirectory=@STACKR_DIR@
 ExecStart=@STACKR_DIR@/deploy/host/restore-drill

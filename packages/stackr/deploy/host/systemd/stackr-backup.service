@@ -6,5 +6,6 @@ After=docker.service
 
 [Service]
 Type=oneshot
+TimeoutStartSec=3h
 WorkingDirectory=@STACKR_DIR@
 ExecStart=@STACKR_DIR@/deploy/host/backup

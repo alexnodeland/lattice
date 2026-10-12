@@ -1,6 +1,7 @@
 <!-- ClickHouse's backups on a single host (RFC-0004): the bucket, as the `backups` named
      collection, from the BACKUP_S3_* settings in the environment, so no key is written in a
-     BACKUP statement. deploy/host/backup and restore-drill use it. -->
+     BACKUP statement; and its certificate checked against /etc/stackr/backup-ca.crt as well as
+     the system's. Only the `backup` user may use it. -->
 <clickhouse>
   <named_collections>
     <backups>
@@ -11,7 +12,8 @@
   </named_collections>
   <openSSL>
     <client>
-      <verificationMode from_env="BACKUP_S3_TLS_VERIFICATION"/>
+      <loadDefaultCAFile>true</loadDefaultCAFile>
+      <caConfig>/etc/stackr/backup-ca.crt</caConfig>
     </client>
   </openSSL>
 </clickhouse>

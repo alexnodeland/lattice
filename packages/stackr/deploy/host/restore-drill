@@ -1,91 +1,142 @@
 #!/usr/bin/env bash
-# The restore drill, on a single host (RFC-0004): restore the latest backups beside the running
-# stack, check them against it, and report the result as a metric.
+# The restore drill, on a single host (RFC-0004): prove the latest backups restore, with a row
+# written just before, and report the result as a metric, however the drill ends.
 #
-# PostgreSQL's latest backup is restored by pgBackRest into a new container, with the WAL archived
-# since, and must have every table the live databases have. ClickHouse's latest backup is
-# restored as the database restore_drill, beside Langfuse's, and must have every table with rows
-# where the live one has rows; it is dropped after. The result goes to the Collector as
-# stackr.restore_drill.success, 1 or 0, where Grafana's alert reads it. stackr-restore-drill.timer
-# runs it weekly; `make restore-drill` runs it now. Run it from packages/stackr.
+# 1. The latest backups are fresh: PostgreSQL's and ClickHouse's nightly ones are under
+#    DRILL_MAX_AGE_HOURS (36) old.
+# 2. A sentinel row goes into each database: stackr_drill.sentinel in PostgreSQL, whose WAL is
+#    then switched and archived, and in ClickHouse, whose drill database is then backed up.
+# 3. PostgreSQL's latest backup, with the WAL archived since, is restored by pgBackRest into a new
+#    container from the same image, with no volume, and must have every table the live databases
+#    have, and the sentinel.
+# 4. ClickHouse's latest nightly backup is restored as restore_drill, beside Langfuse's, and must
+#    have rows in every table where the live one has rows; the drill's own backup is restored as
+#    restore_sentinel, and must have the sentinel. Both are dropped after.
+#
+# Each restore first checks there is room for it. The result goes to the Collector as
+# stackr.restore_drill.success, 1 or 0, from an exit trap, so a drill that fails part way, or
+# can't reach the bucket, still says so. stackr-restore-drill.timer runs it weekly, after
+# Sunday's full backup; `make restore-drill` runs it now. Run it from packages/stackr.
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 host() { docker compose -f compose.yaml -f deploy/host/compose.prod.yaml "$@"; }
 log() { printf '%s\n' "$*" >&2; }
-status=0
+fail() {
+  log "FAIL: $*"
+  exit 1
+}
 
-# --- PostgreSQL ------------------------------------------------------------------------------
+status=1
+scratch=$(mktemp -d)
+clickhouse() {
+  host exec -T clickhouse sh -c \
+    "CLICKHOUSE_USER=backup CLICKHOUSE_PASSWORD=\"\$CLICKHOUSE_BACKUP_PASSWORD\" clickhouse-client --query \"\$0\"" "$1" </dev/null
+}
+finish() {
+  clickhouse "DROP DATABASE IF EXISTS restore_drill SYNC" >/dev/null 2>&1 || true
+  clickhouse "DROP DATABASE IF EXISTS restore_sentinel SYNC" >/dev/null 2>&1 || true
+  rm -rf "$scratch"
+  deploy/host/report-metric stackr-restore-drill stackr.restore_drill.success $((status == 0)) || true
+  log "restore-drill: reported $((status == 0)) to the Collector"
+}
+trap finish EXIT
+
+max_age=$((${DRILL_MAX_AGE_HOURS:-36} * 3600))
+now=$(date +%s)
+sentinel="drill-$now-$RANDOM"
+psql() { host exec -T -u postgres postgres psql -v ON_ERROR_STOP=1 -Atq "$@"; }
+
+# --- 1. fresh backups ------------------------------------------------------------------------
+
+info=$(host exec -T -u postgres postgres pgbackrest --stanza=stackr --output=json info) ||
+  fail "pgBackRest can't read the bucket"
+[[ $(jq -r '.[0].status.code' <<<"$info") == 0 ]] ||
+  fail "pgBackRest: $(jq -r '.[0].status.message' <<<"$info")"
+stopped=$(jq -r '.[0].backup[-1].timestamp.stop // 0' <<<"$info")
+((now - stopped < max_age)) || fail "PostgreSQL's latest backup is older than $((max_age / 3600)) hours"
+latest=$(clickhouse "SELECT max(extract(_path, '([^/]+)/\\\\.backup\$'))
+  FROM s3(backups, filename = '*/.backup', format = 'RawBLOB')")
+[[ -n $latest ]] || fail "ClickHouse has no backup"
+taken=$(clickhouse "SELECT toUnixTimestamp(parseDateTimeBestEffort(replaceRegexpOne('$latest',
+  '^(\\\\d{4}-\\\\d{2}-\\\\d{2})T(\\\\d{2})-(\\\\d{2})-(\\\\d{2})Z\$', '\\\\1 \\\\2:\\\\3:\\\\4')))")
+((now - taken < max_age)) || fail "ClickHouse's latest backup, $latest, is older than $((max_age / 3600)) hours"
+log "ok: the latest backups are fresh"
+
+# --- 2. the sentinels ------------------------------------------------------------------------
+
+psql -d postgres -c "SET client_min_messages TO warning" -c "CREATE SCHEMA IF NOT EXISTS stackr_drill" \
+  -c "CREATE TABLE IF NOT EXISTS stackr_drill.sentinel (id text PRIMARY KEY, at timestamptz DEFAULT now())" \
+  -c "INSERT INTO stackr_drill.sentinel (id) VALUES ('$sentinel')"
+wal=$(psql -d postgres -c "SELECT pg_walfile_name(pg_switch_wal())")
+for _ in $(seq 1 120); do
+  [[ $(psql -d postgres -c "SELECT coalesce(last_archived_wal, '') >= '$wal' FROM pg_stat_archiver") == t ]] && break
+  sleep 1
+done
+[[ $(psql -d postgres -c "SELECT coalesce(last_archived_wal, '') >= '$wal' FROM pg_stat_archiver") == t ]] ||
+  fail "PostgreSQL didn't archive the sentinel's WAL within 120 seconds"
+clickhouse "INSERT INTO stackr_drill.sentinel (id) VALUES ('$sentinel')"
+clickhouse "BACKUP DATABASE stackr_drill TO S3(backups, 'drill/$sentinel') FORMAT Null"
+
+# --- 3. PostgreSQL ---------------------------------------------------------------------------
 
 databases="postgres langfuse litellm auth"
 tables="SELECT schemaname || '.' || tablename FROM pg_tables
   WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY 1"
+live=$(for database in $databases; do psql -d "$database" -c "$tables" | sed "s/^/$database /"; done)
 
-live_tables() {
-  local database
-  for database in $databases; do
-    host exec -T -u postgres postgres psql -d "$database" -Atc "$tables" | sed "s/^/$database /"
-  done
-}
+# The scratch container gets the postgres service's settings in a private file, and its CA.
+config=$(host --profile postgres config --format json)
+(
+  umask 077
+  jq -r '.services.postgres.environment | to_entries[] | "\(.key)=\(.value)"' <<<"$config" >"$scratch/env"
+)
+ca=$(jq -r '.services.postgres.volumes[] | select(.target == "/etc/stackr/backup-ca.crt") | .source' <<<"$config")
+image=$(jq -r .services.postgres.image <<<"$config")
+need=$(jq -r '.[0].backup[-1].info.size' <<<"$info")
 
-# In a new container from the same image, with its own data directory: the live volume is
-# mounted there too, but nothing touches it.
-restored_tables() {
-  host run --rm --no-deps -T --entrypoint sh postgres -s <<SH
+restored=$(docker run --rm -i --network stackr --env-file "$scratch/env" -v "$ca:/etc/stackr/backup-ca.crt:ro" \
+  --entrypoint sh "$image" -s <<SH
 set -eu
+free=\$((\$(df -Pk /tmp | awk 'NR == 2 {print \$4}') * 1024))
+[ "\$free" -gt \$(($need + $need / 5)) ] || { echo "no room: \$free bytes free, $need needed" >&2; exit 1; }
 pgbackrest-conf
 mkdir -p /tmp/drill && chown postgres /tmp/drill && chmod 700 /tmp/drill
 gosu postgres pgbackrest --stanza=stackr --log-level-console=warn --pg1-path=/tmp/drill restore
 gosu postgres pg_ctl -D /tmp/drill -o "-c archive_mode=off -c listen_addresses=''" -w -t 300 start >/dev/null
-until gosu postgres psql -Atc 'SELECT NOT pg_is_in_recovery()' 2>/dev/null | grep -q t; do sleep 1; done
+promoted=
+for _ in \$(seq 1 300); do
+  if gosu postgres psql -Atc 'SELECT NOT pg_is_in_recovery()' 2>/dev/null | grep -q t; then promoted=1; break; fi
+  sleep 1
+done
+[ -n "\$promoted" ] || { echo "still recovering after 300 seconds" >&2; exit 1; }
 for database in $databases; do
   gosu postgres psql -d "\$database" -Atc "$tables" | sed "s/^/\$database /"
 done
+gosu postgres psql -Atc "SELECT 'sentinel ' || id FROM stackr_drill.sentinel WHERE id = '$sentinel'"
 SH
-}
+) || fail "PostgreSQL's restore"
+missing=$(comm -23 <(sort <<<"$live") <(grep -v '^sentinel ' <<<"$restored" | sort))
+[[ -z $missing ]] || fail "PostgreSQL's restore lacks tables: $missing"
+grep -qx "sentinel $sentinel" <<<"$restored" || fail "PostgreSQL's restore lacks the sentinel"
+log "ok: PostgreSQL's latest backup restores, with every table the live databases have, and the sentinel"
 
-live=$(live_tables)
-if restored=$(restored_tables) &&
-  missing=$(comm -23 <(sort <<<"$live") <(sort <<<"$restored")) && [[ -z $missing ]]; then
-  log "ok: PostgreSQL's latest backup restores, with every table the live databases have"
-else
-  log "FAIL: PostgreSQL's restore, or tables it lacks: ${missing:-}"
-  status=1
-fi
+# --- 4. ClickHouse ---------------------------------------------------------------------------
 
-# --- ClickHouse ------------------------------------------------------------------------------
-
-clickhouse() { host exec -T clickhouse clickhouse-client --query "$1"; }
+used=$(clickhouse "SELECT sum(bytes_on_disk) FROM system.parts WHERE database = 'default' AND active")
+free=$(clickhouse "SELECT free_space FROM system.disks WHERE name = 'default'")
+((free > used + used / 5)) || fail "ClickHouse has no room to restore: $free bytes free, $used used"
 tables_with_rows() {
-  clickhouse "SELECT name FROM system.tables WHERE database = '$1' AND total_rows > 0 ORDER BY name"
+  clickhouse "SELECT name FROM system.tables WHERE database = '$1' AND total_rows > 0" | sort
 }
-trap 'clickhouse "DROP DATABASE IF EXISTS restore_drill SYNC" >/dev/null 2>&1 || true' EXIT
-
-latest=$(clickhouse "SELECT max(extract(_path, '([^/]+)/\\\\.backup\$'))
-  FROM s3(backups, filename = '*/.backup', format = 'RawBLOB')")
-if [[ -n $latest ]] &&
-  clickhouse "RESTORE DATABASE default AS restore_drill FROM S3(backups, '$latest') FORMAT Null" &&
-  missing=$(comm -23 <(tables_with_rows default | sort) <(tables_with_rows restore_drill | sort)) &&
-  [[ -z $missing ]]; then
-  log "ok: ClickHouse's latest backup, $latest, restores, with rows in every table the live one has"
-else
-  log "FAIL: ClickHouse's restore of ${latest:-no backup}, or tables it has no rows in: ${missing:-}"
-  status=1
-fi
-
-# --- the result ------------------------------------------------------------------------------
-
-now=$(date +%s)
-host --profile smoke run --rm --no-deps -T probe -fsS -o /dev/null \
-  -H 'Content-Type: application/json' --data @- http://otel-collector:4318/v1/metrics <<JSON
-{"resourceMetrics": [{
-  "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "stackr-restore-drill"}}]},
-  "scopeMetrics": [{"scope": {"name": "stackr.restore_drill"}, "metrics": [{
-    "name": "stackr.restore_drill.success",
-    "gauge": {"dataPoints": [{"asInt": "$((1 - status))", "timeUnixNano": "${now}000000000"}]}
-  }]}]
-}]}
-JSON
-log "restore-drill: reported $((1 - status)) to the Collector"
-exit $status
+clickhouse "DROP DATABASE IF EXISTS restore_drill SYNC"
+clickhouse "DROP DATABASE IF EXISTS restore_sentinel SYNC"
+clickhouse "RESTORE DATABASE default AS restore_drill FROM S3(backups, '$latest') FORMAT Null"
+missing=$(comm -23 <(tables_with_rows default) <(tables_with_rows restore_drill))
+[[ -z $missing ]] || fail "ClickHouse's restore of $latest has no rows in: $missing"
+clickhouse "RESTORE DATABASE stackr_drill AS restore_sentinel FROM S3(backups, 'drill/$sentinel') FORMAT Null"
+[[ $(clickhouse "SELECT count() FROM restore_sentinel.sentinel WHERE id = '$sentinel'") == 1 ]] ||
+  fail "ClickHouse's drill backup lacks the sentinel"
+log "ok: ClickHouse's latest backup, $latest, restores with rows in every table, and the sentinel's does"
+status=0

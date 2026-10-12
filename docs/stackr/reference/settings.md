@@ -73,11 +73,23 @@ On a single host, the S3-compatible bucket, off the host, that `make backup` (pg
 | `BACKUP_S3_ACCESS_KEY_ID` | Empty |
 | `BACKUP_S3_SECRET_ACCESS_KEY` | Empty |
 
-relaxed checks the bucket's certificate; none, only for a test bucket with a certificate of its own.
+The CA bundle, on this host, the store's certificate is checked against: the host's own, unless the store's certificate is signed by a CA of its own.
 
 | Setting | In `.env.example` |
 |---|---|
-| `BACKUP_S3_TLS_VERIFICATION` | `relaxed` |
+| `BACKUP_S3_CA_FILE` | `/etc/ssl/certs/ca-certificates.crt` |
+
+Encrypts PostgreSQL's backups before they leave the host. Without it, they can't be restored: keep it, with the rest of .env, somewhere off the host.
+
+| Setting | In `.env.example` |
+|---|---|
+| `BACKUP_CIPHER_PASS` | Generated: 43 URL-safe characters |
+
+The ClickHouse user the backups and the restore drill run as.
+
+| Setting | In `.env.example` |
+|---|---|
+| `CLICKHOUSE_BACKUP_PASSWORD` | Generated: 64 hex characters |
 
 ### Observability
 

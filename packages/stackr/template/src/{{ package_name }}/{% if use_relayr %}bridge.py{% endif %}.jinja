@@ -34,6 +34,7 @@ from relayr.inbound import {% if access == 'grantr' %}FOLLOWER, {% endif %}Follo
 from relayr.langfuse import bridged_run, bridged_turns
 from relayr.ledger import InMemoryLedger, Ledger
 from relayr.outbound import Outbound
+from relayr.rules import ALLOWLISTS as RELAYR_ALLOWLISTS
 from relayr.rules import RULES as CHAT_RULES
 from relayr.rules import Installer, {% if access == 'grantr' %}RuleChange, RuleDrafting{% else %}RuleDrafting, anyone{% endif %}
 from relayr.sql import SqlLedger, migrate
@@ -143,7 +144,7 @@ class Bridge:
         outbound = Outbound(
             collaboration.workspaces,
             self.ledger,
-            allowlists={**INCIDENT_ALLOWLISTS, **CHAT_ALLOWLISTS},
+            allowlists={**INCIDENT_ALLOWLISTS, **CHAT_ALLOWLISTS, **RELAYR_ALLOWLISTS},
             runner=collaboration.runner,
         )
         installer = Installer(

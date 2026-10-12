@@ -12,18 +12,10 @@
             "type": "object"
           },
           "supabase": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "title": "Supabase",
-            "type": "object"
+            "$ref": "#/components/schemas/Supabase"
           },
           "surfaces": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "title": "Surfaces",
-            "type": "object"
+            "$ref": "#/components/schemas/Surfaces"
           }
         },
         "required": [
@@ -633,6 +625,52 @@
           "spend"
         ],
         "title": "Spend",
+        "type": "object"
+      },
+      "Supabase": {
+        "description": "The Supabase project the UIs sign in to.",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "key"
+        ],
+        "title": "Supabase",
+        "type": "object"
+      },
+      "Surfaces": {
+        "description": "Where the application mounts each router, as the UIs' client calls them.",
+        "properties": {
+          "artifactr": {
+            "default": "/artifactr/v1",
+            "title": "Artifactr",
+            "type": "string"
+          },
+          "grantr": {
+            "default": "",
+            "title": "Grantr",
+            "type": "string"
+          },
+          "portalr": {
+            "default": "/portalr/v1",
+            "title": "Portalr",
+            "type": "string"
+          },
+          "reflexr": {
+            "default": "/reflexr/v1",
+            "title": "Reflexr",
+            "type": "string"
+          }
+        },
+        "title": "Surfaces",
         "type": "object"
       },
       "TenantId": {

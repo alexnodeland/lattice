@@ -4,7 +4,7 @@
 **Author:** Alex Nodeland
 **Created:** 2026-10-12
 **Discussion:** [#43](https://github.com/alexnodeland/lattice/pull/43); accepted on 2026-10-12, with the decisions in [Decisions](#decisions) (D9 taken with lattice RFC-0002's)
-**Amended by:** [grantr ADR-0015](../grantr/adr/0015-a-check-writes-nothing.md): a check writes nothing, so grantr knows a workspace from its grants; [relayr ADR-0017](../relayr/adr/0017-the-follower-acts-as-the-application.md): `subject_of` maps the source `artifactr` to the application's own principal; [artifactr ADR-0058](../artifactr/adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md): artifactr lists a tenant's workspaces, asked with no workspace; [relayr ADR-0022](../relayr/adr/0022-what-a-rules-actor-needs-in-artifactr.md): `subject_of` maps a rule's actor in artifactr, and a turn acting for it, to the rule's principal; [grantr ADR-0024](../grantr/adr/0024-who-sees-a-restricted-item.md): who may restrict a thread or artifact, and who sees it
+**Amended by:** [grantr ADR-0015](../grantr/adr/0015-a-check-writes-nothing.md): a check writes nothing, so grantr knows a workspace from its grants; [relayr ADR-0017](../relayr/adr/0017-the-follower-acts-as-the-application.md): `subject_of` maps the source `artifactr` to the application's own principal; [artifactr ADR-0058](../artifactr/adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md): artifactr lists a tenant's workspaces, asked with no workspace; [relayr ADR-0022](../relayr/adr/0022-what-a-rules-actor-needs-in-artifactr.md): `subject_of` maps a rule's actor in artifactr, and a turn acting for it, to the rule's principal; [grantr ADR-0024](../grantr/adr/0024-who-sees-a-restricted-item.md): who may restrict a thread or artifact, and who sees it; [grantr ADR-0026](../grantr/adr/0026-row-level-security-under-the-scoping.md): the second engine runs as the tables' owner, not a role with `BYPASSRLS`, and a transaction that names no tenant sees nothing, rather than failing; [artifactr ADR-0066](../artifactr/adr/0066-row-level-security-under-the-scoping.md): the same, in artifactr's adapter, which reads nothing across tenants; [reflexr ADR-0062](../reflexr/adr/0062-row-level-security-under-the-scoping.md): the same, in reflexr's adapter, whose dispatcher and scheduler read across tenants on the owner's engine
 **Siblings:**
 
 - [artifactr ADR-0012][a-adr-0012] and [ADR-0048][a-adr-0048] put authorization within a tenant behind one hook, asked in one place. This RFC widens that hook, and amends both.
@@ -339,6 +339,10 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
   - [x] grantr's restricted flag and `grantr:restrict` ([#94](https://github.com/alexnodeland/lattice/pull/94), grantr ADR-0024)
   - [x] artifactr's `hidden`, every read path filtered, and the template's exit criterion ([#97](https://github.com/alexnodeland/lattice/pull/97), artifactr ADR-0062)
 - [ ] Phase 6: row-level security
+  - [ ] grantr's and artifactr's adapters (grantr ADR-0026, artifactr ADR-0066)
+  - [ ] reflexr's, with its scheduler on the second engine (reflexr ADR-0062)
+  - [ ] relayr's
+  - [ ] the template's two roles, and the exit criterion
 - [ ] Phase 7: docs and ADRs
 
 [a-adr-0012]: ../artifactr/adr/0012-surfaces-websocket-rest-mcp.md

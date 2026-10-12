@@ -67,6 +67,19 @@ workspaces = Workspaces(
 
 PostgreSQL, including a hosted one such as Supabase's, must run at its default `READ COMMITTED` isolation level.
 
+#### Row-level security
+
+As a second line of defence under reflexr's own scoping, PostgreSQL can keep tenants apart itself ([ADR-0062](../adr/0062-row-level-security-under-the-scoping.md)). The migrations create a policy on each table, which holds for every role but the tables' owner. Create a role that owns nothing, run the migrations as the owner with it, and connect as it with the option on; the dispatcher's and the scheduler's reads, which span tenants, go to the owner's engine:
+
+```python
+owner = create_async_engine("postgresql+asyncpg://owner:secret@localhost/app")
+await migrate(owner, application_role="app")  # grants the role reflexr's tables
+engine = create_async_engine("postgresql+asyncpg://app:secret@localhost/app")
+storage = SqlStorage(engine, row_level_security=True, across_tenants=owner)
+```
+
+Each transaction then names its tenant in `lattice.tenant_id`, and reads and writes only that tenant's rows; one that names none sees nothing.
+
 ### SQLite
 
 SQLite has no row locks, so its engine must take the database's write lock as every transaction begins. `create_sqlite_engine` makes such an engine:

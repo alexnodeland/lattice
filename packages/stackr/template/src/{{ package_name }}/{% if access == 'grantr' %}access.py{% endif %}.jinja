@@ -37,6 +37,7 @@ from grantr import (
     Subject,
     User,
 )
+from grantr.core import PRINCIPAL_ID
 from grantr.fastapi import Caller, Unauthorized, grantr_router
 from grantr.sql import SqlStorage, migrate
 from grantr.testing import matrix
@@ -45,7 +46,8 @@ from reflexr import core as reflexr
 from reflexr.workspace import ACTIONS as REFLEXR_ACTIONS
 {%- endif %}
 {%- if use_relayr %}
-from relayr.outbound import rule_actor
+from relayr.outbound import RULES as RULE_ACTORS
+from relayr.outbound import is_rule_actor
 {%- endif %}
 
 from {{ package_name }}.auth import (
@@ -75,11 +77,6 @@ CODE_RULES: Final = frozenset(rule.name for rule in [*RULES, *INCIDENT_RULES])
 CODE_RULES: Final = frozenset(rule.name for rule in RULES)
 {%- endif %}
 """The rules defined here, in code, whose runs act as the application."""
-{%- if use_relayr %}
-
-CODE_RULE_ACTORS: Final = frozenset(rule_actor(rule).client_id for rule in CODE_RULES)
-"""Who the code rules' runs act as in artifactr, through relayr: the application too."""
-{%- endif %}
 
 {% endif -%}
 CATALOGS: Final = [{% if use_artifactr %}ARTIFACTR_ACTIONS{% endif %}{% if libraries == 'both' %}, {% endif %}{% if use_reflexr %}REFLEXR_ACTIONS{% endif %}]
@@ -213,8 +210,8 @@ class Access:
 {%- if use_relayr %}
         """Who grantr checks for an artifactr actor: the person a run or client acts for.
 
-        A code rule's run, which acts in artifactr through relayr, and a turn it starts, act as
-        the application, as the rule's run does in reflexr.
+        A rule's run acts in artifactr through relayr, and a turn it starts acts for it: a code
+        rule's as the application, and a stored rule's as the rule, as in reflexr.
         """
 {%- else %}
         """Who grantr checks for an artifactr actor: the person a run or client acts for."""
@@ -223,13 +220,20 @@ class Access:
             case artifactr.UserActor():
                 return User(id=actor.id)
 {%- if use_relayr %}
-            case artifactr.ExternalAgentActor(client_id=client) if client in CODE_RULE_ACTORS:
-                return self.application
+            case artifactr.ExternalAgentActor(client_id=client) if is_rule_actor(actor):
+                # Only relayr makes a rule's actor, in process: a key's principal can't take
+                # its id, which holds a ":" (grantr ADR-0028).
+                rule = client.removeprefix(RULE_ACTORS)
+                if rule in CODE_RULES:
+                    return self.application
+                if _workspace is None:
+                    return Agent()
+                return RulePrincipal(workspace=_workspace, rule=rule)
 {%- endif %}
-            case artifactr.ExternalAgentActor(on_behalf_of=person):
-                return (
-                    ServicePrincipal(id=actor.client_id) if person is None else User(id=person.id)
-                )
+            case artifactr.ExternalAgentActor(on_behalf_of=None):
+                return principal(actor.client_id)
+            case artifactr.ExternalAgentActor(on_behalf_of=artifactr.UserActor(id=person)):
+                return User(id=person)
             case artifactr.AgentActor(on_behalf_of=acting):
                 if acting is None:
                     return Agent()
@@ -255,10 +259,10 @@ class Access:
         match actor:
             case reflexr.UserActor():
                 return User(id=actor.id)
-            case reflexr.ExternalAgentActor(on_behalf_of=person):
-                return (
-                    ServicePrincipal(id=actor.client_id) if person is None else User(id=person.id)
-                )
+            case reflexr.ExternalAgentActor(on_behalf_of=None):
+                return principal(actor.client_id)
+            case reflexr.ExternalAgentActor(on_behalf_of=reflexr.UserActor(id=person)):
+                return User(id=person)
             case reflexr.AgentActor(rule=rule) if rule in CODE_RULES:
                 return self.application
             case reflexr.AgentActor(rule=rule) if _workspace is not None:
@@ -279,6 +283,14 @@ class Access:
             tenant, principal = who
             return Caller(principal, tenant)
         return Caller(User(id=who.user_id))
+
+
+def principal(client_id: str) -> Subject:
+    """Who a client acting for no one is: the principal its key is for, if its id can be one.
+
+    Any other id is no principal's, and holds nothing (grantr ADR-0028).
+    """
+    return ServicePrincipal(id=client_id) if PRINCIPAL_ID.match(client_id) else Agent()
 
 
 def main() -> None:

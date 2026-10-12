@@ -1,4 +1,5 @@
 {
   "extends": "../../../../tsconfig.base.json",
-  "include": ["src", "vite.config.ts"]
+  "compilerOptions": { "types": ["vite/client"] },
+  "include": ["src", "bdd", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
 }

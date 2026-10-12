@@ -59,6 +59,19 @@ workspaces = Workspaces(SqlStorage(engine), types=[Plan, Brief])
 
 PostgreSQL must run at its default `READ COMMITTED` isolation level.
 
+#### Row-level security
+
+As a second line of defence under artifactr's own scoping, PostgreSQL can keep tenants apart itself ([ADR-0066](../adr/0066-row-level-security-under-the-scoping.md)). The migrations create a policy on each table; it holds for every role but the tables' owner. Create a role that owns nothing, run the migrations as the owner with it, and connect as it with the option on:
+
+```python
+owner = create_async_engine("postgresql+asyncpg://owner:secret@localhost/app")
+await migrate(owner, application_role="app")  # grants the role artifactr's tables
+engine = create_async_engine("postgresql+asyncpg://app:secret@localhost/app")
+workspaces = Workspaces(SqlStorage(engine, row_level_security=True))
+```
+
+Each transaction then names its tenant in `lattice.tenant_id`, and reads and writes only that tenant's rows; one that names none sees nothing.
+
 ### SQLite
 
 SQLite has no row locks, so its engine must begin every transaction by taking the database's write lock. `create_sqlite_engine` makes such an engine:

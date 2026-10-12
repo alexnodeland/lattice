@@ -16,6 +16,9 @@ nav:
   - adr/0010-the-client-generated-types-and-resumable-stores.md
   - adr/0011-the-router-and-its-readers.md
   - adr/0012-acceptance-against-a-two-tenant-stack.md
+  - adr/0013-the-apps-scenarios-against-the-test-application.md
+  - adr/0014-the-apps-shell.md
+  - adr/0015-the-chat-components-and-streamdown.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

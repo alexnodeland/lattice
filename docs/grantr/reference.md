@@ -23,6 +23,13 @@ The reference is generated from grantr's docstrings and type annotations. It doc
       show_root_heading: false
       show_root_toc_entry: false
 
+## grantr.sql.tenancy
+
+::: grantr.sql.tenancy
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## grantr.fastapi
 
 ::: grantr.fastapi

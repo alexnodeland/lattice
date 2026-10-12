@@ -4,7 +4,7 @@ import { afterAll, beforeAll, expect, test } from "vitest";
 import type * as v1 from "./generated/artifactr.v1";
 import type * as reflexrV1 from "./generated/reflexr.v1";
 import { createQueries, keys, stale } from "./queries";
-import { createApi } from "./rest";
+import { createApi, readConfig } from "./rest";
 
 interface Seen {
   readonly method: string;
@@ -14,6 +14,19 @@ interface Seen {
 }
 
 const seen: Seen[] = [];
+const CONFIG = {
+  supabase: { url: "/", key: "sb_publishable_x" },
+  surfaces: {
+    artifactr: "/artifactr/v1",
+    reflexr: "/reflexr/v1",
+    grantr: "",
+    portalr: "/portalr/v1",
+  },
+  readers: { tempo: true },
+};
+const ME = { tenant: "acme", roles: ["owner"], workspaces: ["ws_1"] };
+const MEMBERSHIPS = [{ tenant: "acme", user: "alice", roles: ["owner"] }];
+let origin: string;
 let server: Server<unknown>;
 let queries: ReturnType<typeof createQueries>;
 
@@ -24,13 +37,23 @@ beforeAll(() => {
       const url = new URL(request.url);
       const body = request.method === "POST" ? await request.json() : null;
       seen.push({ method: request.method, url, headers: request.headers, body });
-      if (url.pathname.endsWith("/missing")) {
+      if (url.pathname.endsWith("/missing") || url.pathname.startsWith("/missing/")) {
         return Response.json({ detail: "not found" }, { status: 404 });
+      }
+      if (url.pathname === "/portalr/config.json") {
+        return Response.json(CONFIG);
+      }
+      if (url.pathname === "/grantr/v1/me") {
+        const tenant = request.headers.get("x-tenant");
+        const forOne = request.headers.get("authorization") === "Bearer wrong";
+        return Response.json(
+          (tenant !== null && tenant !== "confused") || forOne ? ME : { memberships: MEMBERSHIPS },
+        );
       }
       return Response.json(url.pathname.endsWith("/checks") ? [true, false] : []);
     },
   });
-  const origin = `http://127.0.0.1:${server.port}`;
+  origin = `http://127.0.0.1:${server.port}`;
   const api = createApi(
     { artifactr: `${origin}/artifactr/v1`, reflexr: `${origin}/reflexr/v1`, grantr: origin },
     () => ({ token: "t0k3n", tenant: "acme" }),
@@ -43,7 +66,7 @@ afterAll(() => {
 });
 
 test("a read goes to its surface, with the session", async () => {
-  await new QueryClient().fetchQuery(queries.artifactr.tail("ws_1", "thr_1", 50));
+  await new QueryClient().fetchQuery(queries.artifactr.tail("acme", "ws_1", "thr_1", 50));
   const request = seen.at(-1);
   expect(request?.url.pathname).toBe("/artifactr/v1/workspaces/ws_1/events");
   expect(request?.url.searchParams.getAll("thread_id")).toEqual(["thr_1"]);
@@ -55,23 +78,46 @@ test("a read goes to its surface, with the session", async () => {
 test("every read has its own path", async () => {
   const client = new QueryClient();
   const reads = [
-    [queries.artifactr.workspaces(), "/artifactr/v1/workspaces"],
-    [queries.artifactr.threads("ws_1"), "/artifactr/v1/workspaces/ws_1/threads"],
-    [queries.artifactr.thread("ws_1", "thr_1"), "/artifactr/v1/workspaces/ws_1/threads/thr_1"],
-    [queries.artifactr.artifacts("ws_1"), "/artifactr/v1/workspaces/ws_1/artifacts"],
+    [queries.artifactr.workspaces("acme"), "/artifactr/v1/workspaces"],
+    [queries.artifactr.threads("acme", "ws_1"), "/artifactr/v1/workspaces/ws_1/threads"],
     [
-      queries.artifactr.artifact("ws_1", "plan_1"),
+      queries.artifactr.thread("acme", "ws_1", "thr_1"),
+      "/artifactr/v1/workspaces/ws_1/threads/thr_1",
+    ],
+    [queries.artifactr.artifacts("acme", "ws_1"), "/artifactr/v1/workspaces/ws_1/artifacts"],
+    [
+      queries.artifactr.artifact("acme", "ws_1", "plan_1"),
       "/artifactr/v1/workspaces/ws_1/artifacts/plan_1",
     ],
-    [queries.artifactr.proposals("ws_1"), "/artifactr/v1/workspaces/ws_1/proposals"],
-    [queries.reflexr.rules("ws_1"), "/reflexr/v1/workspaces/ws_1/rules"],
-    [queries.reflexr.runs("ws_1"), "/reflexr/v1/workspaces/ws_1/runs"],
-    [queries.grantr.me("acme"), "/grantr/v1/me"],
+    [queries.artifactr.proposals("acme", "ws_1"), "/artifactr/v1/workspaces/ws_1/proposals"],
+    [queries.reflexr.rules("acme", "ws_1"), "/reflexr/v1/workspaces/ws_1/rules"],
+    [queries.reflexr.runs("acme", "ws_1"), "/reflexr/v1/workspaces/ws_1/runs"],
   ] as const;
   for (const [options, path] of reads) {
     await client.fetchQuery(options as unknown as Parameters<QueryClient["fetchQuery"]>[0]);
     expect(seen.at(-1)?.url.pathname).toBe(path);
   }
+});
+
+test("grantr says who the caller is in the tenant a read names, or lists them all", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  expect(await client.fetchQuery(queries.grantr.me("acme"))).toEqual(ME);
+  expect(seen.at(-1)?.headers.get("x-tenant")).toBe("acme");
+  expect(await client.fetchQuery(queries.grantr.memberships("alice"))).toEqual(MEMBERSHIPS);
+  expect(seen.at(-1)?.headers.get("x-tenant")).toBeNull();
+});
+
+test("an answer for the wrong question throws", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // The stand-in answers a tenant named `confused` for every tenant, and `wrong`'s token for one.
+  await expect(client.fetchQuery(queries.grantr.me("confused"))).rejects.toThrow(/every tenant/);
+  const wrong = createQueries(
+    createApi({ artifactr: "", reflexr: "", grantr: origin }, () => ({
+      token: "wrong",
+      tenant: null,
+    })),
+  );
+  await expect(client.fetchQuery(wrong.grantr.memberships("alice"))).rejects.toThrow(/one tenant/);
 });
 
 test("checks are asked in one call, and answered in order", async () => {
@@ -87,28 +133,30 @@ test("checks are asked in one call, and answered in order", async () => {
 test("a refused read throws", async () => {
   await expect(
     new QueryClient({ defaultOptions: { queries: { retry: false } } }).fetchQuery(
-      queries.artifactr.thread("ws_1", "missing"),
+      queries.artifactr.thread("acme", "ws_1", "missing"),
     ),
-  ).rejects.toThrow(/refused/);
+  ).rejects.toMatchObject({ status: 404, detail: { detail: "not found" } });
 });
 
 test("keys nest under their workspace, so invalidating it refetches its reads", () => {
-  const workspace = keys.artifactr.workspace("ws_1");
+  const workspace = keys.artifactr.workspace("acme", "ws_1");
   for (const key of [
-    keys.artifactr.threads("ws_1"),
-    keys.artifactr.artifact("ws_1", "plan_1"),
-    keys.artifactr.tail("ws_1", "thr_1", 50),
+    keys.artifactr.threads("acme", "ws_1"),
+    keys.artifactr.artifact("acme", "ws_1", "plan_1"),
+    keys.artifactr.tail("acme", "ws_1", "thr_1", 50),
   ]) {
     expect(key.slice(0, workspace.length)).toEqual(workspace);
   }
-  expect(keys.reflexr.runs("ws_1").slice(0, 3)).toEqual(keys.reflexr.workspace("ws_1"));
+  expect(keys.reflexr.runs("acme", "ws_1").slice(0, 4)).toEqual(
+    keys.reflexr.workspace("acme", "ws_1"),
+  );
 });
 
 test("a list's key doesn't prefix its details' or the tail's, so a list refetches alone", () => {
-  const list = keys.artifactr.threads("ws_1");
+  const list = keys.artifactr.threads("acme", "ws_1");
   for (const key of [
-    keys.artifactr.thread("ws_1", "thr_1"),
-    keys.artifactr.tail("ws_1", "thr_1", 50),
+    keys.artifactr.thread("acme", "ws_1", "thr_1"),
+    keys.artifactr.tail("acme", "ws_1", "thr_1", 50),
   ]) {
     expect(key.slice(0, list.length)).not.toEqual(list);
   }
@@ -121,34 +169,50 @@ const reflexrFrame = (type: string) =>
 
 test("an artifactr event makes stale the reads it changes", () => {
   expect(
-    stale.artifactr("ws_1", artifactrFrame({ type: "artifact_changed", artifact_id: "plan_1" })),
-  ).toEqual([keys.artifactr.artifacts("ws_1"), keys.artifactr.artifact("ws_1", "plan_1")]);
-  expect(
-    stale.artifactr("ws_1", artifactrFrame({ type: "thread_created", thread_id: "t" })),
-  ).toEqual([keys.artifactr.threads("ws_1")]);
-  expect(
-    stale.artifactr("ws_1", artifactrFrame({ type: "focus_changed", thread_id: "t" })),
-  ).toEqual([keys.artifactr.threads("ws_1"), keys.artifactr.thread("ws_1", "t")]);
-  expect(stale.artifactr("ws_1", artifactrFrame({ type: "proposal_created" }))).toEqual([
-    keys.artifactr.proposals("ws_1"),
-  ]);
-  expect(
-    stale.artifactr("ws_1", artifactrFrame({ type: "proposal_resolved", artifact_id: "plan_1" })),
+    stale.artifactr(
+      "acme",
+      "ws_1",
+      artifactrFrame({ type: "artifact_changed", artifact_id: "plan_1" }),
+    ),
   ).toEqual([
-    keys.artifactr.proposals("ws_1"),
-    keys.artifactr.artifacts("ws_1"),
-    keys.artifactr.artifact("ws_1", "plan_1"),
+    keys.artifactr.artifacts("acme", "ws_1"),
+    keys.artifactr.artifact("acme", "ws_1", "plan_1"),
   ]);
-  expect(stale.artifactr("ws_1", artifactrFrame({ type: "message_posted" }))).toEqual([]);
-  expect(stale.artifactr("ws_1", artifactrFrame({ type: "something_new" }))).toEqual([]);
+  expect(
+    stale.artifactr("acme", "ws_1", artifactrFrame({ type: "thread_created", thread_id: "t" })),
+  ).toEqual([keys.artifactr.threads("acme", "ws_1")]);
+  expect(
+    stale.artifactr("acme", "ws_1", artifactrFrame({ type: "focus_changed", thread_id: "t" })),
+  ).toEqual([keys.artifactr.threads("acme", "ws_1"), keys.artifactr.thread("acme", "ws_1", "t")]);
+  expect(stale.artifactr("acme", "ws_1", artifactrFrame({ type: "proposal_created" }))).toEqual([
+    keys.artifactr.proposals("acme", "ws_1"),
+  ]);
+  expect(
+    stale.artifactr(
+      "acme",
+      "ws_1",
+      artifactrFrame({ type: "proposal_resolved", artifact_id: "plan_1" }),
+    ),
+  ).toEqual([
+    keys.artifactr.proposals("acme", "ws_1"),
+    keys.artifactr.artifacts("acme", "ws_1"),
+    keys.artifactr.artifact("acme", "ws_1", "plan_1"),
+  ]);
+  expect(stale.artifactr("acme", "ws_1", artifactrFrame({ type: "message_posted" }))).toEqual([]);
+  expect(stale.artifactr("acme", "ws_1", artifactrFrame({ type: "something_new" }))).toEqual([]);
 });
 
 test("reflexr's rule events make its rules stale, and its run events its runs", () => {
-  expect(stale.reflexr("ws_1", reflexrFrame("reflexr:rule_installed"))).toEqual([
-    keys.reflexr.rules("ws_1"),
+  expect(stale.reflexr("acme", "ws_1", reflexrFrame("reflexr:rule_installed"))).toEqual([
+    keys.reflexr.rules("acme", "ws_1"),
   ]);
-  expect(stale.reflexr("ws_1", reflexrFrame("reflexr:run_succeeded"))).toEqual([
-    keys.reflexr.runs("ws_1"),
+  expect(stale.reflexr("acme", "ws_1", reflexrFrame("reflexr:run_succeeded"))).toEqual([
+    keys.reflexr.runs("acme", "ws_1"),
   ]);
-  expect(stale.reflexr("ws_1", reflexrFrame("ops:alert.fired"))).toEqual([]);
+  expect(stale.reflexr("acme", "ws_1", reflexrFrame("ops:alert.fired"))).toEqual([]);
+});
+
+test("config.json is read from the deployment, or its failure said", async () => {
+  expect(await readConfig(origin)).toEqual(CONFIG);
+  await expect(readConfig(`${origin}/missing`)).rejects.toThrow(/config.json answered 404/);
 });

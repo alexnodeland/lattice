@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any
+from typing import Any, override
 
 import pytest
 from pydantic_ai import Agent, ModelMessage, ModelResponse, TextPart
@@ -18,7 +18,15 @@ import reflexr
 import reflexr.workspace as r
 from relayr.events import ArtifactCreated, MessagePosted
 from relayr.ledger import Ledger
-from relayr.outbound import Allowlist, NotAllowed, Outbound, Refused, RunActions, rule_actor
+from relayr.outbound import (
+    Allowlist,
+    NotAllowed,
+    Outbound,
+    Refused,
+    RunActions,
+    is_rule_actor,
+    rule_actor,
+)
 from tests.app_types import Note
 from tests.stack import ALICE, KEY, Access, Stack, bridged, notices, until
 
@@ -460,6 +468,74 @@ async def test_a_retried_run_sends_its_message_once(
     assert len(sent) == 1
 
 
+class StopsAfterPosting(artifactr.agent.Runner[None]):
+    """A runner whose first `send` posts its message, then stops before it asks for a turn."""
+
+    def __init__(self, agent: Agent[artifactr.agent.Session[None], str]) -> None:
+        super().__init__(agent, app=None)
+        self.stopped = False
+
+    @override
+    async def send(
+        self,
+        workspace: artifactr.Workspace,
+        thread_id: a.ThreadId,
+        content: str,
+        *,
+        message_id: a.MessageId | None = None,
+    ) -> artifactr.agent.Sent:
+        if self.stopped:
+            return await super().send(workspace, thread_id, content, message_id=message_id)
+        self.stopped = True
+        await workspace.post_message(thread_id, content, message_id=message_id)
+        raise RuntimeError("the process stopped before it asked for the turn")
+
+
+async def test_a_retry_asks_for_the_turn_an_earlier_attempt_never_asked_for(
+    ledger: Ledger, stack: Stack
+) -> None:
+    async def body(acting: RunActions, reaction: r.Reaction[Outbound]) -> object:
+        return await acting.send("please look")
+
+    retried = reflexr.Rule(
+        name="app:act",
+        when=reflexr.on(ArtifactCreated).where(reflexr.F.author.kind.eq("user")),
+        then=reflexr.run("act"),
+        retry=reflexr.RetryPolicy(max_attempts=2, backoff=timedelta(milliseconds=1)),
+    )
+    agent = Agent(
+        artifactr.agent.function_model(reply),
+        deps_type=artifactr.agent.Session[None],
+        capabilities=[artifactr.agent.ArtifactWorkspace(types=[Note])],
+    )
+    runner = StopsAfterPosting(agent)
+    turns = {"app:act": Allowlist(turns=True)}
+    try:
+        await act(
+            stack,
+            ledger,
+            body,
+            allowlists=turns,
+            runner=runner,
+            rules=[retried],
+            trigger=noted_in_a_thread,
+        )
+
+        async def answered() -> bool:
+            await stack.processes[-1].reactor.settle()  # the retry, once its backoff passes
+            return any(e.event_type == "artifactr:turn_ended" for e in await stack.bridged())
+
+        await until(answered)
+    finally:
+        await runner.aclose()
+    [started] = [e.event for e in await stack.log() if isinstance(e.event, a.RunStarted)]
+    [sent] = [e.event for e in await stack.log() if e.actor == ACTOR]
+    assert isinstance(sent, a.MessagePosted)
+    assert started.message_ids == (sent.message_id,)
+    [ended] = [e for e in await stack.bridged() if e.event_type == "artifactr:turn_ended"]
+    assert ended.depth > 0, "the turn continues the run's chain"
+
+
 async def test_a_retried_runs_writes_are_each_made_once(ledger: Ledger, stack: Stack) -> None:
     async def body(acting: RunActions, reaction: r.Reaction[Outbound]) -> object:
         thread = await acting.create_thread("incident")
@@ -525,3 +601,10 @@ async def test_an_edit_of_an_artifact_archived_meanwhile_fails_for_good(
     ).errors
     assert isinstance(error, r.RunFailure)
     assert (error.reason, error.permanent) == ("invalid_state", True)
+
+
+def test_a_rules_actor_acts_for_no_person() -> None:
+    person = a.UserActor(id="bob")
+    assert is_rule_actor(rule_actor("app:triage"))
+    assert not is_rule_actor(rule_actor("app:triage").model_copy(update={"on_behalf_of": person}))
+    assert not is_rule_actor(a.ExternalAgentActor(client_id="ci"))

@@ -24,6 +24,7 @@ grantr decides who may do what in a tenant. artifactr and reflexr ask it, throug
 | Concept | What it is |
 |---|---|
 | **Subject** | Who a check is about: a `User`, a `ServicePrincipal`, a `RulePrincipal` (a reflexr rule, by its workspace and name) or the `Agent`, which holds nothing. Frozen models, discriminated by `kind` |
+| **Service principal's id** | Not empty, and with no `:`, `~` or whitespace, so it can't pass for the libraries' own actors, such as relayr's code rules, `reflexr:<rule>` ([ADR-0028](adr/0028-a-principals-id-cant-pass-for-the-libraries-actors.md)) |
 | **Grantee** | Who a grant names: any subject but the agent, or a `Group` |
 | **Resource** | The deployment, a tenant, a workspace, or a thread, artifact or rule in a workspace. It names no tenant: the tenant is the check's |
 | **Role** | A named set of actions: built in, or a tenant's own (`Role`) |
@@ -43,7 +44,7 @@ The application hands `Grants` each library's catalog, its `ACTIONS`, and grantr
 | Role | On | Holds |
 |---|---|---|
 | `operator` | the deployment | `grantr:create_tenant`, `grantr:grant_operator`, and portalr's `portalr:read_deployment` |
-| `application` | the deployment, holding in every tenant | the bookkeeping, `artifactr:record`, `reflexr:publish`, `reflexr:checkpoint_run`, its evaluators' feedback, what its code rules write in artifactr through relayr (`propose_change`, `post_message`, `create_artifact`, `edit_artifact`, `create_thread`), and every `open` and read but portalr's admin reads ([ADR-0025](adr/0025-the-application-lists-tenants-and-workspaces-and-writes-for-code-rules.md)) |
+| `application` | the deployment, holding in every tenant | the bookkeeping, `artifactr:record`, `reflexr:publish`, `reflexr:checkpoint_run`, its evaluators' feedback, what its code rules write in artifactr through relayr (`propose_change`, `post_message`, `create_artifact`, `edit_artifact`, `create_thread`), the stored rules relayr installs for people who may (`install_rule`, `update_rule`, `archive_rule`, [ADR-0027](adr/0027-the-application-installs-the-rules-people-accept.md)), and every `open` and read but portalr's admin reads ([ADR-0025](adr/0025-the-application-lists-tenants-and-workspaces-and-writes-for-code-rules.md)) |
 | `owner` | a tenant | every action in every catalog but the operator's, the deployment's reads and the bookkeeping; portalr's `read_telemetry` and `read_spend` included |
 | `admin` | a tenant | the owner's, but `grantr:delete_tenant` |
 | `member` | a tenant | `artifactr:read_workspaces`: listing the tenant's workspaces, which artifactr filters by what the caller may open; it makes a user or service principal a member |
@@ -129,6 +130,7 @@ The contract test, `tests/grants/test_contract.py`, runs every behaviour on this
 - **A transaction locks its tenant's row** in `grantr_tenants`, inserting it first if needed; the row's `live` flag says whether the tenant exists.
 - **The audit log's sequence numbers are the database's.** A tenant's transactions run one at a time, so its entries are numbered in the order they commit.
 - **Every database call is awaited to its end,** even when its caller is cancelled, as in the libraries' SQL storage.
+- **Row-level security is an option** ([ADR-0026](adr/0026-row-level-security-under-the-scoping.md)). With `row_level_security=True`, each transaction names its tenant, or `~deployment`, in `lattice.tenant_id`, and the policies migration 0003 creates on PostgreSQL keep every command to its tenant's rows, and let it read the deployment's grants and group members besides. `migrate(application_role=...)` grants a role that owns nothing the tables. `tenant_grants`, `key` and `tenants`, which span tenants, go to `across_tenants`, an engine as the tables' owner, and nothing else does.
 
 ## The admin API
 

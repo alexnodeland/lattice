@@ -351,12 +351,12 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 | Prerequisite | Library | Issue | Needed by | Until then |
 |---|---|---|---|---|
 | Namespaced event types | reflexr | [#45][r-45], decided in [ADR-0039][r-adr-0039] and implemented (reflexr #83) | phase 1 (D6) | done |
-| Runtime rule management: per-tenant, versioned, installed through the API, not listed to other tenants | reflexr | [#21][r-21] | phase 5 | no rules from chat |
+| Runtime rule management: per-tenant, versioned, installed through the API, not listed to other tenants | reflexr | [#21][r-21], designed in [reflexr RFC-0003](../../reflexr/rfcs/0003-managing-rules-at-runtime.md) and implemented | phase 5 | done |
 | Telemetry setup that composes across both libraries, polling without a trace per poll, and mirror cursors | reflexr, artifactr | [reflexr #62][r-62], [artifactr #50][a-50] | phase 4 | links and tags, without the combined setup |
 | `traceparent` on artifactr envelopes | artifactr | [#60][a-60] | phase 4, for links in the artifactr-to-reflexr direction | tags only, in that direction |
 | Durable message idempotency: core checks `message_id` | artifactr | [#61][a-61] | phase 2 | the ledger's read-back |
 | Reserved publishers: a type only one source (or runs) may publish | reflexr | [#72][r-72] | phase 5 | bridge rules check the envelope's actor, and re-read artifactr |
-| Workspace discovery: list a tenant's workspaces | artifactr | [#62][a-62] | phase 3 | followers start on first use, and resume from the ledger |
+| Workspace discovery: list a tenant's workspaces | artifactr | [lattice #5](https://github.com/alexnodeland/lattice/issues/5), was [#62][a-62] | phase 3 | followers start on first use, and resume from the ledger |
 | Notices that don't start or steer a turn, marked as notices | artifactr | [#63][a-63] | phase 2 | direct commits, which start no turn but still reach a running one |
 
 ## Phases

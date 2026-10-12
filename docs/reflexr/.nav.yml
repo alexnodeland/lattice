@@ -87,12 +87,16 @@ nav:
     - adr/0048-reflexr-in-lattice.md
     - adr/0049-one-site-for-the-family.md
     - adr/0050-dashboards-from-the-checkout.md
+    - adr/0051-qualified-rule-names.md
+    - adr/0052-typed-action-parameters.md
+    - adr/0053-stored-rules-one-fixed-configuration.md
+    - adr/0054-installing-updating-and-archiving-stored-rules.md
+    - adr/0055-reading-stored-rules.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md
     - rfcs/0002-observability-feedback-and-evaluation.md
     - rfcs/0003-managing-rules-at-runtime.md
-    - rfcs/template.md
 - Project:
   - Changelog: project/changelog.md
   - Brand: assets/brand/README.md

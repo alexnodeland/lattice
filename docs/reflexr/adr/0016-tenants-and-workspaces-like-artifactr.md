@@ -1,6 +1,6 @@
 # ADR-0016: Tenants and workspaces, like artifactr
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0053](0053-stored-rules-one-fixed-configuration.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

@@ -290,7 +290,7 @@ An explicit type always wins over an annotation or an inferred one. `input_types
 
 ## Parameters
 
-One action can serve many rules that differ in a value, such as the chat thread to post in. The action declares a params model, and each rule passes values for it with `run` ([RFC-0003](../rfcs/0003-managing-rules-at-runtime.md)):
+One action can serve many rules that differ in a value, such as the chat thread to post in. The action declares a params model, and each rule passes values for it with `run` ([ADR-0052](../adr/0052-typed-action-parameters.md)):
 
 ```python
 from pydantic import BaseModel

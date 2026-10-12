@@ -6,4 +6,4 @@ portalr's RFCs: an RFC proposes a substantial change before it is built, and ADR
 |---|---|
 | [RFC-0001: v0.1 implementation plan](0001-v0.1-implementation-plan.md) | Accepted |
 
-A new RFC starts from a package's [template](../../relayr/rfcs/template.md), until [#40](https://github.com/alexnodeland/lattice/issues/40) makes the templates one.
+A new RFC starts from lattice's [RFC template](../../rfcs/template.md).

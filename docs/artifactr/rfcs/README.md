@@ -27,7 +27,7 @@ stateDiagram-v2
     Accepted --> Superseded
 ```
 
-1. Copy [`template.md`](template.md) to the next number, for example `0002-short-title.md`, with status **Draft**.
+1. Copy lattice's [RFC template](../../rfcs/template.md) to the next number, for example `0002-short-title.md`, with status **Draft**.
 2. Open a pull request titled `docs(rfc): RFC-0002 short title`. Discussion happens on the PR.
 3. When consensus is reached, set the status to **Accepted** (or **Rejected** or **Withdrawn**, keeping the reasoning) and merge.
 4. Implementation PRs reference the RFC and tick its tracking checklist. Decisions made along the way get ADRs.

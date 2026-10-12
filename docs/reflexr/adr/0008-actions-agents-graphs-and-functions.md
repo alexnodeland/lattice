@@ -1,6 +1,6 @@
 # ADR-0008: Actions: agents, graphs and functions over one Reaction
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0052](0052-typed-action-parameters.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

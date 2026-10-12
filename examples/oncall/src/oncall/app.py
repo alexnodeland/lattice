@@ -11,6 +11,10 @@ with ``LANGFUSE_PUBLIC_KEY`` too, it files each run in Langfuse. stackr's stack 
 and its Collector sends Langfuse every trace, so with ``ONCALL_LANGFUSE=scores`` oncall sends
 Langfuse only each run's session, user and tags.
 
+People can install rules at runtime, in the ``team`` namespace, over REST and the WebSocket
+(``install_rule``, ``update_rule`` and ``archive_rule``); each may only page a service's person on
+call, through the ``notify`` action.
+
 Authentication here is a demo: the user is whatever the ``x-user`` header (or ``user`` query
 parameter) says, and every user shares one tenant. Real applications resolve actors from their
 own sessions or tokens.
@@ -31,12 +35,12 @@ from sqlalchemy import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from starlette.requests import HTTPConnection
 
-from oncall.actions import build_actions
+from oncall.actions import NotifyParams, build_actions
 from oncall.events import EVENTS
 from oncall.rules import RULES, SCHEDULES
 from oncall.services import OncallDeps
 from reflexr import Actor, ExternalAgentActor, UserActor
-from reflexr.core import TenantId
+from reflexr.core import RuleChange, StoredRules, TenantId, WorkspaceId
 from reflexr.fastapi import reflexr_router
 from reflexr.langfuse import langfuse_run
 from reflexr.mcp import ReflexrMcp
@@ -56,6 +60,22 @@ async def resolve_actor(connection: HTTPConnection) -> tuple[TenantId, Actor]:
 async def resolve_client(_ctx: object) -> tuple[TenantId, ExternalAgentActor]:
     """Demo authentication for MCP clients: every client is one external agent."""
     return TENANT, ExternalAgentActor(client_id="mcp", name="MCP client")
+
+
+async def allow_people(
+    _tenant_id: TenantId, _workspace_id: WorkspaceId, actor: Actor, _change: RuleChange
+) -> bool:
+    """Demo policy for rules installed at runtime: people may change them, MCP clients may not."""
+    return isinstance(actor, UserActor)
+
+
+STORED_RULES = StoredRules(
+    allow=allow_people, actions={"notify": NotifyParams}, namespaces={"team"}
+)
+"""Rules installed at runtime: named ``team:...``, by people, and only paging through ``notify``.
+
+The code rules are ``oncall:...``, so a stored rule can never take one's name.
+"""
 
 
 class Oncall:
@@ -104,6 +124,7 @@ class Oncall:
             events=EVENTS,
             rules=RULES,
             schedules=SCHEDULES,
+            stored_rules=STORED_RULES,
             clock=clock,
             **providers,
         )

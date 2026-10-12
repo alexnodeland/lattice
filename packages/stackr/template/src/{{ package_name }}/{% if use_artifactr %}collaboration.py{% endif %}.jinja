@@ -16,7 +16,6 @@ from starlette.requests import HTTPConnection
 
 from artifactr import InMemoryStorage, Runner, Session, SystemActor, UserActor, Workspaces
 from artifactr.core import Actor, ExternalAgentActor, TenantId
-from artifactr.core.ids import SCRATCH_TAG
 from artifactr.fastapi import Unauthorized, artifactr_router
 from artifactr.langfuse import langfuse_turn
 from artifactr.litellm import LiteLLMGateway
@@ -31,9 +30,6 @@ from {{ package_name }}.notes import Note, Rating, build_note_agent
 from {{ package_name }}.scores import Mirrors, sync_configs
 from {{ package_name }}.settings import GatewaySettings
 from {{ package_name }}.telemetry import TelemetryHandle
-
-SCRATCH = SCRATCH_TAG
-"""Scratch: artifactr's name from this commit only (dropped before merge)."""
 
 PREFIX = "/artifactr"
 

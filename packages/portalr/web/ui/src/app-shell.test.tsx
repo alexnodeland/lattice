@@ -1,0 +1,103 @@
+import { expect, onTestFinished, test } from "vitest";
+import { page, userEvent } from "vitest/browser";
+import { render } from "vitest-browser-react";
+import { AppShell } from "./app-shell";
+import type { Ui } from "./marks";
+import { NavLink, SideNav } from "./side-nav";
+
+async function shell(width: number, ui: Ui = "app") {
+  await page.viewport(width, 800);
+  onTestFinished(() => page.viewport(414, 896));
+  return render(
+    <AppShell
+      ui={ui}
+      home={<a href="#home" />}
+      switcher={<button type="button">Workspace: acme / notes</button>}
+      account={<button type="button">Account: Alex</button>}
+      nav={
+        <SideNav label="Workspace">
+          <NavLink href="#threads">Threads</NavLink>
+          <NavLink href="#runs">Runs</NavLink>
+        </SideNav>
+      }
+    >
+      <h1>Threads</h1>
+    </AppShell>,
+  );
+}
+
+test("from 1024 pixels, a rail holds the mark, the switcher, the navigation and the account", async () => {
+  const screen = await shell(1280);
+  await expect.element(screen.getByRole("link", { name: "portalr" })).toBeVisible();
+  await expect.element(screen.getByRole("navigation", { name: "Workspace" })).toBeVisible();
+  await expect
+    .element(screen.getByRole("button", { name: "Workspace: acme / notes" }))
+    .toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Account: Alex" })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Menu" })).not.toBeInTheDocument();
+  await expect.element(screen.getByRole("main")).toHaveTextContent("Threads");
+});
+
+test("the first stop is a link past the frame, to the content", async () => {
+  const screen = await shell(1280);
+  await userEvent.tab();
+  const skip = screen.getByRole("link", { name: "Skip to content" });
+  await expect.element(skip).toHaveFocus();
+  await expect.element(skip).toHaveAttribute("href", "#main");
+});
+
+test("narrower, the navigation waits behind Menu, in a drawer that keeps the focus", async () => {
+  const screen = await shell(390);
+  await expect.element(screen.getByRole("navigation")).not.toBeInTheDocument();
+  const menu = screen.getByRole("button", { name: "Menu" });
+  await menu.click();
+  const drawer = screen.getByRole("dialog", { name: "Navigation" });
+  await expect.element(drawer).toHaveAttribute("aria-modal", "true");
+  await expect.element(drawer.getByRole("navigation", { name: "Workspace" })).toBeVisible();
+  await expect.element(screen.getByRole("main")).not.toBeInTheDocument();
+  for (let i = 0; i < 5; i += 1) {
+    await userEvent.tab();
+    expect(drawer.element().contains(document.activeElement)).toBe(true);
+  }
+  await userEvent.keyboard("{Escape}");
+  await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+  await expect.element(menu).toHaveFocus();
+});
+
+test("following a link in the drawer, or Close, closes it", async () => {
+  const screen = await shell(390);
+  await screen.getByRole("button", { name: "Menu" }).click();
+  await screen.getByRole("link", { name: "Runs" }).click();
+  await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+  await screen.getByRole("button", { name: "Menu" }).click();
+  await screen.getByRole("button", { name: "Close" }).click();
+  await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+});
+
+test("widening past the rail's width closes the drawer", async () => {
+  const screen = await shell(390);
+  await screen.getByRole("button", { name: "Menu" }).click();
+  await expect.element(screen.getByRole("dialog")).toBeVisible();
+  await page.viewport(1280, 800);
+  await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+  await expect.element(screen.getByRole("navigation", { name: "Workspace" })).toBeVisible();
+});
+
+test("the switcher, the navigation and the account are each rendered once", async () => {
+  const screen = await shell(1280);
+  expect(screen.container.querySelectorAll("nav")).toHaveLength(1);
+  expect(screen.getByRole("button", { name: "Workspace: acme / notes" }).elements()).toHaveLength(
+    1,
+  );
+  expect(screen.getByRole("button", { name: "Account: Alex" }).elements()).toHaveLength(1);
+});
+
+test("admin's frame is named for admin, and shows its own mark", async () => {
+  const app = await shell(1280);
+  const appMark = app.getByRole("link", { name: "portalr" }).element().innerHTML;
+  app.unmount();
+  const admin = await shell(1280, "admin");
+  const adminLink = admin.getByRole("link", { name: "portalr admin" });
+  await expect.element(adminLink).toBeVisible();
+  expect(adminLink.element().innerHTML).not.toBe(appMark);
+});

@@ -15,7 +15,7 @@ import {
   Thumbs,
   ToolCall,
 } from "./chat";
-import { token } from "./test/colours";
+import { contrast, token } from "./test/colours";
 
 /** A command handler whose commands end as `outcome`. */
 const sent = (outcome: "done" | "refused" | "closed" = "done") => vi.fn(async () => ({ outcome }));
@@ -136,7 +136,10 @@ test("a disabled composer sends nothing, and looks it", async () => {
   const screen = await render(<Composer onSend={sent()} disabled />);
   const box = screen.getByRole("textbox", { name: "Message" });
   await expect.element(box).toBeDisabled();
-  expect(getComputedStyle(box.element()).opacity).toBe("0.5");
+  const style = getComputedStyle(box.element());
+  expect(style.opacity).toBe("1");
+  expect(style.color).toBe(token("muted"));
+  expect(contrast(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5);
 });
 
 test("the composer reached by the keyboard shows the focus ring", async () => {

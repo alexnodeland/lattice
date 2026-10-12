@@ -83,7 +83,7 @@ And the APIs applications and tools use:
 | Tempo, Loki | <http://localhost:3200>, <http://localhost:3100> | `tempo:3200`, `loki:3100` |
 | MinIO's S3 API | <http://localhost:9000> | `minio:9000` |
 
-Local Supabase's ports are the exception to `127.0.0.1`: its CLI publishes them on every interface. [Security](guides/security.md) says what to do about that on a shared network. [Compose services and profiles](reference/compose.md) lists every service's ports and settings.
+Local Supabase's ports bind to `STACKR_BIND` too ([Security](guides/security.md)). [Compose services and profiles](reference/compose.md) lists every service's ports and settings.
 
 ## Check it works
 

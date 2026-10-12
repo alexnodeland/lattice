@@ -19,16 +19,16 @@ installed.
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Any, Final, Literal
 
-from pydantic import JsonValue
+from pydantic import BaseModel, JsonValue
 
 import artifactr
 import artifactr.core as a
 import reflexr.core
 from reflexr import F, Rule, by, on, run
-from reflexr.core import AnyFilter, Condition
+from reflexr.core import AnyFilter, Condition, RuleName
 from reflexr.workspace import Action, Reaction, Workspace, WorkspaceRule
 from relayr.events import ArtifactArchived, ProposalResolved
-from relayr.outbound import Outbound, RunActions, rule_actor
+from relayr.outbound import Allowlist, Outbound, RunActions, rule_actor
 from relayr.rules.drafts import RuleDraft
 
 type RuleChange = Literal["install_rule", "update_rule", "archive_rule"]
@@ -61,8 +61,25 @@ RULES_FROM_CHAT: Final = Rule(
     then=run("rules-from-chat"),
 )
 
-RULES: Final = [RULES_FROM_CHAT]
+RULE_DRIFT: Final = Rule(
+    name="relayr:rule-drift",
+    description="A rule from chat changed in reflexr directly. Propose it to its artifact.",
+    when=on("reflexr:rule_installed", "reflexr:rule_archived"),
+    scope=by(F.rule),
+    then=run("rule-drift"),
+)
+
+INSTALLS_READ: Final = 1_000
+"""How many of reflexr's latest ``rule_installed`` facts relayr reads to know its rules from chat:
+far more than the 50 stored rules a workspace may have live."""
+
+RULES: Final = [RULES_FROM_CHAT, RULE_DRIFT]
 """relayr's rules from chat, for the application's reflexr workspaces."""
+
+ALLOWLISTS: Final[Mapping[RuleName, Allowlist]] = {RULE_DRIFT.name: Allowlist(threads="any")}
+"""What relayr's rules from chat may do beyond proposals and notices in their chains' threads:
+``relayr:rule-drift`` proposes in the thread its rule was drafted in, which its chain doesn't
+hold. Give them to the outbound adapter with the application's own."""
 
 
 class Installer:
@@ -85,8 +102,8 @@ class Installer:
 
     @property
     def actions(self) -> Mapping[str, Action[Any]]:
-        """The rule's action, by the name `RULES_FROM_CHAT` runs."""
-        return {"rules-from-chat": self.act}
+        """The rules' actions, by the names `RULES` run."""
+        return {"rules-from-chat": self.act, "rule-drift": self.drift}
 
     async def act(self, reaction: Reaction[Any]) -> None:
         """Install or update the rule an accepted proposal drafted, or archive an artifact's."""
@@ -97,6 +114,38 @@ class Installer:
         else:
             assert isinstance(event, ArtifactArchived), "the rule fires on nothing else"
             await self._archive(reaction, event)
+
+    async def drift(self, reaction: Reaction[Any]) -> None:
+        """Propose to its artifact a change made to a rule from chat in reflexr directly.
+
+        A change relayr made itself, from an accepted draft, is in step already. A rule no draft
+        installed has no artifact to keep in step.
+        """
+        [envelope] = reaction.events
+        if isinstance(envelope.actor, reflexr.core.AgentActor) and (
+            envelope.actor.rule == RULES_FROM_CHAT.name
+        ):
+            return
+        event = envelope.event
+        assert isinstance(event, reflexr.core.RuleInstalled | reflexr.core.RuleArchived)
+        origin = _artifact_of(await _installs(reaction.workspace), event.rule)
+        if origin is None:
+            return
+        source = await self._open(reaction)
+        # relayr installed the rule from this artifact, on this proposal: both exist.
+        current = await source.get(RuleDraft, origin.artifact)
+        if current.archived:
+            return
+        thread = (await source.proposal(origin.proposal)).thread_id
+        acting = self._outbound.acting(reaction)
+        who = envelope.actor.participant
+        outside = f"{event.rule} was changed in reflexr by {who}, outside its artifact"
+        if isinstance(event, reflexr.core.RuleArchived):
+            why = f"{outside}: it was archived. Accept to archive the artifact too."
+            await acting.archive(current.id, thread_id=thread, rationale=why)
+        elif current.data.rule != Rule.model_validate(event.spec):
+            why = f"{outside}, to version {event.version}. Accept to keep the two in step."
+            await acting.edit(current.id, "/rule", event.spec, thread_id=thread, rationale=why)
 
     async def _install(self, reaction: Reaction[Any], resolved: ProposalResolved) -> None:
         source = await self._open(reaction)
@@ -114,17 +163,19 @@ class Installer:
         ):
             return  # not accepted, or changed since, or not a rule
         target = reaction.workspace
-        if await _installed_by(target, proposal.id):
+        installs = await _installs(target)
+        if any(install.provenance.get("proposal") == proposal.id for install in installs):
             return  # replayed: this acceptance was installed, and may be archived since
         acting = self._outbound.acting(reaction)
         thread = proposal.thread_id
         # artifactr validated the revision as a `RuleDraft` when it committed it.
         rule = RuleDraft.model_validate(revision.data).rule
-        installed = await _installed_from(target, revision.artifact_id)
-        if installed is not None and installed.rule.name != rule.name:
-            renamed = f"{installed.rule.name} can't be renamed {rule.name}"
+        name = _rule_of(installs, revision.artifact_id)
+        if name is not None and name != rule.name:
+            renamed = f"{name} can't be renamed {rule.name}"
             await _tell(acting, f"{renamed}: archive it, and draft the new rule apart.", thread)
             return
+        installed = await _active(target, name)
         change: RuleChange = "install_rule" if installed is None else "update_rule"
         approver = await self._approver(reaction, acting, revision, change, thread)
         if approver is None:
@@ -146,8 +197,8 @@ class Installer:
         except reflexr.core.Rejection as rejection:
             await _tell(acting, f"{rule.name} wasn't installed: {_why(rejection)}", thread)
             return
-        # No duplicate reaches here: provenance names the proposal, and `_installed_by` has
-        # looked for its install.
+        # No duplicate reaches here: provenance names the proposal, and the replay check above
+        # has looked for its install.
         live = f"{rule.name} is live, at version {changed.stored.version}."
         await _tell(acting, live, thread)
 
@@ -161,7 +212,7 @@ class Installer:
         if not revision.archived or revision.kind != RuleDraft.kind:
             return
         target = reaction.workspace
-        installed = await _installed_from(target, archived.artifact_id)
+        installed = await _active(target, _rule_of(await _installs(target), archived.artifact_id))
         if installed is None:
             return
         acting = self._outbound.acting(reaction)
@@ -203,27 +254,50 @@ class Installer:
         return None
 
 
-async def _installed_by(workspace: Workspace, proposal_id: a.ProposalId) -> bool:
-    """Whether reflexr's log has an install from a proposal, whose facts carry provenance."""
-    facts = await workspace.read(types=["reflexr:rule_installed"])
-    return any(
-        isinstance(fact.event, reflexr.core.RuleInstalled)
-        and fact.event.provenance.get("proposal") == proposal_id
-        for fact in facts
-    )
+async def _installs(workspace: Workspace) -> list[reflexr.core.RuleInstalled]:
+    """The installs relayr made from accepted drafts, oldest first, as reflexr's log has them.
 
-
-async def _installed_from(workspace: Workspace, artifact_id: a.ArtifactId) -> WorkspaceRule | None:
-    """The active stored rule installed from an artifact, if there is one.
-
-    reflexr reads a stored rule's provenance one rule at a time; a workspace has at most 50.
+    Each fact names the run that made it, so an install anyone else made, whatever provenance it
+    claims, is not among them. Only the latest ``INSTALLS_READ`` installs are read: reflexr can't
+    yet read one rule's facts alone.
     """
-    for status in await workspace.rule_statuses():
-        if status.origin == "stored":
-            found = await workspace.get_rule(status.rule)
-            if (found.provenance or {}).get("artifact") == artifact_id:
-                return found
-    return None
+    facts = await workspace.read(types=["reflexr:rule_installed"], last=INSTALLS_READ)
+    return [
+        fact.event
+        for fact in facts
+        if isinstance(fact.event, reflexr.core.RuleInstalled)
+        and isinstance(fact.actor, reflexr.core.AgentActor)
+        and fact.actor.rule == RULES_FROM_CHAT.name
+    ]
+
+
+def _rule_of(installs: list[reflexr.core.RuleInstalled], artifact_id: str) -> RuleName | None:
+    """The rule relayr installed from an artifact, if it has installed one."""
+    names = [i.rule for i in installs if i.provenance.get("artifact") == artifact_id]
+    return names[-1] if names else None
+
+
+class _Origin(BaseModel):
+    """Where relayr installed a rule from, as its provenance says."""
+
+    artifact: str
+    proposal: str
+
+
+def _artifact_of(installs: list[reflexr.core.RuleInstalled], rule: RuleName) -> _Origin | None:
+    """Where relayr last installed a rule from: its artifact and proposal, if it did."""
+    found = [i.provenance for i in installs if i.rule == rule]
+    return _Origin.model_validate(found[-1]) if found else None
+
+
+async def _active(workspace: Workspace, rule: RuleName | None) -> WorkspaceRule | None:
+    """A stored rule, if it is active."""
+    if rule is None:
+        return None
+    try:
+        return await workspace.get_rule(rule)
+    except reflexr.core.NotFound:
+        return None
 
 
 async def _tell(acting: RunActions, content: str, thread_id: a.ThreadId | None) -> None:

@@ -146,14 +146,16 @@ async def test_a_keyed_edit_is_a_proposal_by_default(ledger: Ledger, stack: Stac
     assert proposal.rationale == "why"
 
 
-def changing(storage: artifactr.InMemoryStorage, times: int) -> artifactr.workspace.Authorize:
-    """A hook that has Alice change the note just before each of the rule's edits."""
+def changing(
+    storage: artifactr.InMemoryStorage, times: int, action: str = "artifactr:edit_artifact"
+) -> artifactr.workspace.Authorize:
+    """A hook that has Alice change the note just before each of the rule's edits, or archives."""
     changes = iter(range(times))
 
     async def authorize(
         tenant_id: str, workspace_id: str | None, actor: a.Actor, access: Access
     ) -> bool:
-        if actor == ACTOR and access.action == "artifactr:edit_artifact":
+        if actor == ACTOR and access.action == action:
             for n in changes:
                 alice = await artifactr.Workspaces(storage).open(*KEY, actor=ALICE)
                 current = await alice.get(Note, "art_alice")
@@ -184,6 +186,30 @@ async def test_an_edit_is_made_again_after_a_version_conflict(ledger: Ledger, st
     )
     assert acted.errors == []
     assert (await (await people(stack)).get(Note, "art_alice")).data.text == "mine"
+
+
+@pytest.mark.parametrize(("times", "archived"), [(1, True), (5, False)], ids=["once", "always"])
+async def test_an_archive_is_made_again_after_a_version_conflict(
+    ledger: Ledger, stack: Stack, times: int, archived: bool
+) -> None:
+    async def body(acting: RunActions, reaction: r.Reaction[Outbound]) -> object:
+        await acting.archive("art_alice")
+        return None
+
+    acted = await act(
+        stack,
+        ledger,
+        body,
+        allowlists={"app:act": DIRECT},
+        artifactr_authorize=changing(stack.artifactr_storage, times, "artifactr:archive_artifact"),
+        on=ArtifactCreated,
+        trigger=created_by_alice,
+    )
+    assert (await (await people(stack)).artifact("art_alice")).archived == archived
+    if not archived:
+        [error] = acted.errors
+        assert isinstance(error, r.RunFailure)
+        assert (error.reason, error.permanent) == ("version_conflict", False)
 
 
 async def test_an_edit_whose_artifact_keeps_changing_fails_the_attempt(
@@ -570,6 +596,7 @@ async def test_a_retried_runs_writes_are_each_made_once(ledger: Ledger, stack: S
     async def body(acting: RunActions, reaction: r.Reaction[Outbound]) -> object:
         thread = await acting.create_thread("incident")
         await acting.edit("art_alice", "/text", "proposed")
+        await acting.archive("art_alice", rationale="done with it")
         await acting.create(Note(text="new"))
         await acting.notice("noted")
         if reaction.attempt == 1:
@@ -594,9 +621,22 @@ async def test_a_retried_runs_writes_are_each_made_once(ledger: Ledger, stack: S
     await stack.processes[-1].reactor.settle()
     [thread] = acted.results
     workspace = await people(stack)
-    assert len(await workspace.proposals()) == 2, "the edit's and the create's, once each"
+    assert len(await workspace.proposals()) == 3, "the edit's, the archive's and the create's"
     assert [t.id for t in await workspace.threads()] == [thread]
     assert notices(await stack.log()) == [(ACTOR, "noted")]
+
+
+async def test_an_archived_artifact_is_archived_no_further(ledger: Ledger, stack: Stack) -> None:
+    async def archived_by_alice(workspace: artifactr.Workspace) -> object:
+        await workspace.create(Note(text=""), artifact_id="art_alice")
+        return await workspace.commit(a.ArchiveArtifact(artifact_id="art_alice", base_version=1))
+
+    async def body(acting: RunActions, reaction: r.Reaction[Outbound]) -> object:
+        return await acting.archive("art_alice")
+
+    acted = await act(stack, ledger, body, on=ArtifactCreated, trigger=archived_by_alice)
+    assert (acted.results, acted.errors) == ([None], [])
+    assert await (await people(stack)).proposals() == []
 
 
 def archiving(storage: artifactr.InMemoryStorage) -> artifactr.workspace.Authorize:

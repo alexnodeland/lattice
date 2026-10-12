@@ -4160,6 +4160,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+evals = [
+    { name = "evalr" },
+]
 langfuse = [
     { name = "artifactr-ai", extra = ["langfuse"] },
     { name = "evalr", extra = ["langfuse"] },
@@ -4215,6 +4218,7 @@ requires-dist = [
     { name = "artifactr-ai", editable = "packages/artifactr" },
     { name = "artifactr-ai", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/artifactr" },
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31" },
+    { name = "evalr", marker = "extra == 'evals'", editable = "packages/evalr" },
     { name = "evalr", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/evalr" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
     { name = "opentelemetry-api", specifier = ">=1.45" },
@@ -4227,7 +4231,7 @@ requires-dist = [
     { name = "relayr-ai", extras = ["sql"], marker = "extra == 'sqlite'" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
 ]
-provides-extras = ["sql", "sqlite", "postgres", "otel", "langfuse"]
+provides-extras = ["sql", "sqlite", "postgres", "otel", "evals", "langfuse"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -1,3 +1,4 @@
+import "@portalr/ui/styles.css";
 import { Page } from "@portalr/ui";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

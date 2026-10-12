@@ -82,7 +82,7 @@ Every port the stack publishes binds to `STACKR_BIND`, `127.0.0.1` by default, s
 | `LITELLM_PORT` | 4400 | The gateway |
 | `POSTGRES_PORT` | 55432 | Plain PostgreSQL, with the `postgres` adapter |
 
-ClickHouse, Valkey and the Collector's own metrics aren't published: nothing outside the stack uses them. Local Supabase's ports (54321 to 54324 and 54327) are the CLI's to publish, on every interface; see [Security](security.md).
+ClickHouse, Valkey and the Collector's own metrics aren't published: nothing outside the stack uses them. Local Supabase's ports (54321 to 54324 and 54327) are the CLI's to publish, at `STACKR_BIND` too, through the network `make up` creates for it; see [Security](security.md).
 
 ## Everyday commands
 

@@ -16,6 +16,7 @@ import {
 import { Button } from "./button";
 import { cn } from "./cn";
 import { Markdown } from "./markdown";
+import { StatusBadge, type Tone } from "./status-badge";
 import { TextField } from "./text-field";
 
 const card = "flex flex-col gap-2 rounded-md border border-line bg-surface p-3 text-sm";
@@ -359,19 +360,21 @@ export function ProposalCard({
   );
 }
 
-const STATUS: Record<Artifactr.Run["status"], string> = {
-  running: "Working",
-  paused: "Waiting for you",
-  completed: "Done",
-  failed: "Failed",
-  stopped: "Stopped",
+/** How a run is going, in words and a shape: one wording wherever a run is shown. */
+const RUN_STATUS: Record<Artifactr.Run["status"], readonly [Tone, string]> = {
+  running: ["working", "Working"],
+  paused: ["waiting", "Waiting for you"],
+  completed: ["done", "Done"],
+  failed: ["failed", "Failed"],
+  stopped: ["stopped", "Stopped"],
 };
 
 /** How a run is going, announced as it changes. */
 export function RunStatus({ status }: { status: Artifactr.Run["status"] }) {
+  const [tone, words] = RUN_STATUS[status];
   return (
-    <p role="status" className="text-muted text-xs">
-      {STATUS[status]}
-    </p>
+    <StatusBadge tone={tone} live className="self-start">
+      {words}
+    </StatusBadge>
   );
 }

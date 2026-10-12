@@ -277,6 +277,14 @@ supabase_status() {
   supabase_secret=$(jq -er .SECRET_KEY <<<"$settings") || return 1
   supabase_publishable=$(jq -er .PUBLISHABLE_KEY <<<"$settings")
 }
+# The addresses local Supabase's containers publish at.
+supabase_published() {
+  local container
+  for container in $(docker ps -q --filter label=com.supabase.cli.project=stackr-supabase); do
+    docker inspect --format '{{range .NetworkSettings.Ports}}{{range .}}{{println .HostIp}}{{end}}{{end}}' \
+      "$container"
+  done | grep -v '^$' | sort -u
+}
 supabase_api_ok() {
   probe -fsS -o /dev/null "$supabase_kong/auth/v1/health"
 }
@@ -374,6 +382,15 @@ smoke_database() {
   if [[ $adapter == supabase ]]; then
     supabase_status || { log "FAIL: local Supabase's status"; return 1; }
     eventually "local Supabase's API answers" supabase_api_ok
+    local bind outside
+    bind=$(setting STACKR_BIND)
+    outside=$(supabase_published | grep -vxF "$bind" || true)
+    if [[ -z $outside ]]; then
+      log "ok: local Supabase publishes its ports only at STACKR_BIND ($bind)"
+    else
+      log "FAIL: local Supabase publishes at $(tr '\n' ' ' <<<"$outside")not only at $bind"
+      status=1
+    fi
   fi
 }
 

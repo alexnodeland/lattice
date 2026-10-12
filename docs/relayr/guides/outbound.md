@@ -35,6 +35,7 @@ async def log_deploy(reaction: Reaction[Outbound]) -> None:
 |---|---|---|
 | `create(artifact)` | Creates an artifact | As a proposal |
 | `edit(artifact_id, path, value)` | Sets one value at a JSON Pointer path; skipped when it is in place | As a proposal |
+| `archive(artifact_id)` | Archives an artifact; skipped when it is archived | As a proposal |
 | `notice(content)` | Posts a notice, which starts no turn | Allowed |
 | `create_thread(title)` | Creates a thread the run may then act in | Refused |
 | `send(content)` | Posts a message that starts the assistant's next turn | Refused |

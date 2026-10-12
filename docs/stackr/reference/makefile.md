@@ -38,6 +38,7 @@ Set a variable on the command line (`make up PROFILES=observability`) or in the 
 | `STACKR_DATABASE` | `$(or $(shell sed -n 's/^STACKR_DATABASE=//p' .env 2>/dev/null),supabase)` |
 | `SUPABASE` | `$(shell command -v supabase 2>/dev/null || echo npx --yes supabase@$(SUPABASE_CLI_VERSION))` |
 | `SUPABASE_START_FLAGS` | empty |
+| `STACKR_BIND` | `$(or $(shell sed -n 's/^STACKR_BIND=//p' .env 2>/dev/null),127.0.0.1)` |
 | `STACKR_RECIPE` | `$(or $(shell sed -n 's/^STACKR_RECIPE=//p' .env 2>/dev/null),local)` |
 
 <!-- end generated -->

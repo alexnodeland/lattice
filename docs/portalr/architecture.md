@@ -95,6 +95,24 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 
 `ui` imports `client`'s types alone, which a root test holds it to.
 
+## The kit's look
+
+`ui`'s tokens are lattice ADR-0014's, with `--edge`, `--wash`, `--accent-hover` and `--scrim` beside them, each pair's contrast asserted in both schemes ([ADR-0019](adr/0019-the-kits-look.md)). Its typefaces, Schibsted Grotesk and Fragment Mono, are served from the UIs' own origin. The frame and its parts:
+
+| Component | What it is |
+|---|---|
+| `AppShell` | The frame: a rail from 1024 pixels, a bar and a drawer below, and the mark of `app` or `admin` |
+| `SideNav`, `NavLink` | The areas, the current one marked, with how many wait for the reader |
+| `Switcher` | The tenant and the workspace, and a menu of the others |
+| `AccountMenu` | Who is signed in, their scheme, and signing out |
+| `PageHeader` | A page's way back, its one heading, a line about it, and its actions |
+| `Card`, `EmptyState`, `Table` | What asks something of the reader; nothing yet, and what to do; rows, named by a caption |
+| `StatusBadge` | How a thing is going, as a shape and a word; only waiting for you in the working colour |
+| `SegmentedFilter` | One filter of a few, side by side |
+| `Icon`, `Mark`, `Lockup` | A Lucide icon beside its word; portalr's marks |
+
+`gallery.screenshot.test.tsx` pins how they sit together, wide and narrow, in each scheme. It runs in CI alone, against Linux baselines.
+
 ## The wheel
 
-Vite builds `app` and `admin` into `src/portalr/static/`, which git ignores and the wheel carries. portalr's `build` depends on theirs, and `ui-in-wheel`, in `check` and the release workflow, fails unless this version's wheel holds both.
+Vite builds `app` and `admin` into `src/portalr/static/`, which git ignores and the wheel carries. portalr's `build` depends on theirs, and `ui-in-wheel`, in `check` and the release workflow, fails unless this version's wheel holds both, each with its typefaces, and the typefaces' licences.

@@ -1,5 +1,5 @@
-import { type Artifactr, type Reflexr, thumbs } from "@portalr/client";
-import { CommandButton, TextLink, Thumbs } from "@portalr/ui";
+import { type Reflexr, thumbs } from "@portalr/client";
+import { CommandButton, RunStatus, StatusBadge, TextLink, Thumbs, type Tone } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
@@ -45,22 +45,15 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/runs")({
 const newest = <R extends { started: number }>(runs: Readonly<Record<string, R>>) =>
   Object.values(runs).sort((a, b) => b.started - a.started);
 
-const TURN: Record<Artifactr.Run["status"], string> = {
-  running: "Working",
-  paused: "Waiting for someone",
-  completed: "Done",
-  failed: "Failed",
-  stopped: "Stopped",
-};
-
-const RULE_RUN: Record<Reflexr.Run["status"], string> = {
-  pending: "Queued",
-  running: "Running",
-  retrying: "Retrying",
-  succeeded: "Succeeded",
-  dead_lettered: "Dead-lettered",
-  cancelled: "Cancelled",
-  skipped: "Skipped",
+/** A rule run's status, as ui's badge shows it: a tone and a word. */
+const RULE_RUN: Record<Reflexr.Run["status"], readonly [Tone, string]> = {
+  pending: ["queued", "Queued"],
+  running: ["working", "Running"],
+  retrying: ["queued", "Retrying"],
+  succeeded: ["done", "Succeeded"],
+  dead_lettered: ["failed", "Dead-lettered"],
+  cancelled: ["stopped", "Cancelled"],
+  skipped: ["stopped", "Skipped"],
 };
 
 function Runs() {
@@ -103,7 +96,7 @@ function Runs() {
                 >
                   {turns.state.threads[run.threadId]?.title || "Untitled"}
                 </TextLink>
-                <span role="status">{TURN[run.status]}</span>
+                <RunStatus status={run.status} />
               </span>
               {run.status === "running" && allowed.has("artifactr:stop_run") && (
                 <CommandButton onSend={() => artifactr.send({ type: "stop_run", run_id: run.id })}>
@@ -137,7 +130,9 @@ function Runs() {
             <li key={run.id} aria-label={`Run ${run.id}`} className="flex flex-col gap-1">
               <span className="flex flex-wrap gap-2 text-sm">
                 <code className="font-mono">{run.rule}</code>
-                <span role="status">{RULE_RUN[run.status]}</span>
+                <StatusBadge tone={RULE_RUN[run.status][0]} live>
+                  {RULE_RUN[run.status][1]}
+                </StatusBadge>
                 <span className="text-muted">attempt {run.attempt}</span>
                 {run.retries > 0 && (
                   <span className="text-muted">

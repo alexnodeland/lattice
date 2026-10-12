@@ -93,6 +93,33 @@ def test_an_accepted_draft_goes_live_and_tells_its_thread(
     assert len(script.requests) == asked, "a rule's notice starts no turn"
 
 
+def test_a_change_made_in_reflexr_is_proposed_back_to_its_thread(
+    client: TestClient, script: Script
+) -> None:
+    command(client, type="create_thread", thread_id="ops")
+    proposal = drafted(client, script, "ops")
+    command(client, type="respond_to_proposal", proposal_id=proposal, decision="accept")
+    wait_for(lambda: stored(client, "chat:checkout-alerts"))
+    changed = {**rule("ops"), "description": "Checkout's alerts, as an operator put it."}
+    frame = {
+        "type": "command",
+        "command_id": new_id("cmd"),
+        "command": {"type": "update_rule", "rule": changed, "expected_version": 1},
+    }
+    assert client.post(f"{REFLEXR}/commands", json=frame).json()["ok"]
+
+    def drifted() -> list[dict[str, Any]]:
+        return [
+            p
+            for p in proposals(client)
+            if p["proposed_by"].get("client_id") == "reflexr:relayr:rule-drift"
+        ]
+
+    wait_for(drifted)
+    [back] = drifted()
+    assert back["thread_id"] == "ops", "in the thread the rule was drafted in"
+
+
 def test_a_forged_acceptance_is_refused_at_the_publish_gate(
     client: TestClient, script: Script
 ) -> None:

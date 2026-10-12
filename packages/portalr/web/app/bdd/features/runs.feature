@@ -38,7 +38,7 @@ Feature: Runs
     When they start a thread of their own
     And they post "ask me something"
     And they open the workspace's runs
-    Then their thread's turn is "Waiting for someone"
+    Then their thread's turn is "Waiting for you"
     And their thread's turn has no Stop
 
   Scenario: A viewer sees runs, and can't retry or skip them

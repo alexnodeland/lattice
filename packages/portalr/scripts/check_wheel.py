@@ -1,4 +1,6 @@
-"""Fail unless portalr's built wheel carries both UIs, and the app's styles hold ui's classes.
+"""Fail unless portalr's wheel carries both UIs, their typefaces, and the typefaces' licence.
+
+The app's styles must hold ui's own classes too.
 
 An application installs the wheel to serve the UIs.
 
@@ -11,6 +13,7 @@ import zipfile
 from pathlib import Path
 
 UIS = ("app", "admin")
+LICENCES = ("OFL-schibsted-grotesk.txt", "OFL-fragment-mono.txt")
 
 STYLED = ".bg-accent"
 """A class of ui's own components: an app's styles without it lack the kit's (portalr ADR-0018)."""
@@ -36,7 +39,22 @@ def main() -> int:
     if STYLED not in styles:
         sys.stderr.write(f"check_wheel: the app's styles in {wheel.name} lack ui's classes\n")
         return 1
-    sys.stdout.write(f"check_wheel: {wheel.name} carries {' and '.join(UIS)}\n")
+    if unfaced := [
+        ui
+        for ui in UIS
+        if not any(
+            n.startswith(f"portalr/static/{ui}/assets/") and n.endswith(".woff2") for n in names
+        )
+    ]:
+        sys.stderr.write(f"check_wheel: the {', '.join(unfaced)} UI has no typefaces\n")
+        return 1
+    licences = {Path(n).name for n in names if ".dist-info/licenses/" in n}
+    if unlicensed := [licence for licence in LICENCES if licence not in licences]:
+        sys.stderr.write(f"check_wheel: {wheel.name} lacks {', '.join(unlicensed)}\n")
+        return 1
+    sys.stdout.write(
+        f"check_wheel: {wheel.name} carries {' and '.join(UIS)}, with their typefaces\n"
+    )
     return 0
 
 

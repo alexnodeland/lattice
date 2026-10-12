@@ -7,6 +7,7 @@ nav:
   - Acting in artifactr from rules: guides/outbound.md
   - Tracing across the bridge: guides/telemetry.md
   - Rules from chat: guides/rules.md
+  - Evaluating the bridge's rules: guides/evaluation.md
 - Reference: reference.md
 - Decisions:
   - adr/README.md
@@ -39,6 +40,8 @@ nav:
   - adr/0027-row-level-security-under-the-scoping.md
   - adr/0028-rules-from-chat.md
   - adr/0029-an-allowlist-for-a-whole-rule-namespace.md
+  - adr/0030-drift-proposed-back-to-a-rules-artifact.md
+  - adr/0031-proposal-outcomes-and-the-measures.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

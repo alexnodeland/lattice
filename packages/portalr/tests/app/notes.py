@@ -2,11 +2,12 @@
 
 The agent answers from a script, so the app's scenarios choose its path by the first word they
 post: ``ask`` makes it ask a question, ``publish`` makes it call a tool that waits for approval,
-and ``propose`` makes it write a note of its own and propose an edit to it, which it names in its
-answer, so each scenario resolves a proposal of its own. Anything else gets its words back. Each
-run streams, as every run does.
+``propose`` makes it write a note of its own and propose an edit to it, which it names in its
+answer, so each scenario resolves a proposal of its own, and ``wait`` keeps its turn running until
+it is stopped. Anything else gets its words back. Each run streams, as every run does.
 """
 
+import asyncio
 import re
 
 from pydantic_ai import (
@@ -50,13 +51,14 @@ class Note(MarkdownArtifact):
     """A Markdown note."""
 
 
-class Thumbs(Feedback, name="thumbs", targets={"message"}):
-    """Whether a message helped."""
+class Thumbs(Feedback, name="thumbs", targets={"message", "artifact", "turn"}):
+    """Whether a message, an artifact or a turn helped, and why."""
 
     up: bool
+    comment: str | None = None
 
 
-def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+async def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
     """The script: what the agent says or calls, from what it was just given."""
     given = messages[-1]
     parts = given.parts if isinstance(given, ModelRequest) else []
@@ -72,6 +74,9 @@ def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
             return ModelResponse(parts=[ToolCallPart("publish", {"note": "the notes"})])
         case ["ask"]:
             return ModelResponse(parts=[ToolCallPart("ask_user", {"question": "Which week?"})])
+        case ["wait"]:
+            await asyncio.Event().wait()  # until someone stops the turn, which cancels it
+            return ModelResponse(parts=[TextPart("Done waiting.")])
         case _:
             return ModelResponse(parts=[TextPart(f"You said: **{prompt}**")])
 

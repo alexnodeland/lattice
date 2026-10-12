@@ -6,6 +6,7 @@
  * compiler checks; an event type it doesn't know is kept by the log and changes nothing here.
  */
 
+import type { Feedback as Given } from "./feedback";
 import type * as v1 from "./generated/artifactr.v1";
 import type { Classified, Protocol, Stream } from "./stream";
 
@@ -18,12 +19,8 @@ export type Known = v1.Event extends infer E
     : never
   : never;
 
-/** Feedback someone gave on a message: its type, such as `thumbs`, and its value. */
-export interface Feedback {
-  readonly actor: v1.Actor;
-  readonly type: v1.FeedbackGiven["feedback_type"];
-  readonly value: Readonly<v1.FeedbackGiven["value"]>;
-}
+/** Feedback someone gave on a message, an artifact or a turn; on an artifact, on one version. */
+export type Feedback = Given<v1.Actor> & { readonly version?: number };
 
 export interface Message {
   readonly id: v1.MessageId;
@@ -52,6 +49,8 @@ export interface Artifact {
   /** The latest version the log has reached; its content is read over REST. */
   readonly version: number;
   readonly archived: boolean;
+  /** The feedback given on its latest version, oldest first: each version is judged anew. */
+  readonly feedback: readonly Feedback[];
 }
 
 export interface Proposal {
@@ -81,6 +80,10 @@ export interface Run {
   readonly text: string;
   /** What a paused run waits on: questions to answer and calls to approve, until each is. */
   readonly requests: readonly v1.DeferredRequest[];
+  /** The `seq` it started at: the later, the newer. */
+  readonly started: number;
+  /** The feedback given on the turn, oldest first. */
+  readonly feedback: readonly Feedback[];
 }
 
 export interface Workspace {
@@ -106,8 +109,10 @@ function withThread(state: Workspace, id: v1.ThreadId, change: Partial<Thread>):
   return { ...state, threads: { ...state.threads, [id]: { ...thread(state, id), ...change } } };
 }
 
-function withArtifact(state: Workspace, artifact: Artifact): Workspace {
-  return { ...state, artifacts: { ...state.artifacts, [artifact.id]: artifact } };
+function withArtifact(state: Workspace, artifact: Omit<Artifact, "feedback">): Workspace {
+  const before = state.artifacts[artifact.id];
+  const feedback = before?.version === artifact.version ? before.feedback : [];
+  return { ...state, artifacts: { ...state.artifacts, [artifact.id]: { ...artifact, feedback } } };
 }
 
 function withRun(state: Workspace, id: v1.RunId, change: Partial<Run>): Workspace {
@@ -122,6 +127,8 @@ function withRun(state: Workspace, id: v1.RunId, change: Partial<Run>): Workspac
     tools: {},
     text: "",
     requests: [],
+    started: 0,
+    feedback: [],
   };
   return { ...state, runs: { ...state.runs, [id]: { ...base, ...change } } };
 }
@@ -205,8 +212,12 @@ const handlers: Handlers = {
       },
     };
   },
-  run_started: (state, event) =>
-    withRun(state, event.run_id, { threadId: event.thread_id, status: "running" }),
+  run_started: (state, event, envelope) =>
+    withRun(state, event.run_id, {
+      threadId: event.thread_id,
+      status: "running",
+      started: envelope.seq,
+    }),
   tool_called: (state, event) =>
     withRun(state, event.run_id, {
       tools: {
@@ -235,42 +246,49 @@ const handlers: Handlers = {
   run_ended: (state, event) =>
     withRun(state, event.run_id, { status: event.status, text: "", requests: [] }),
   feedback_given: (state, event, envelope) => {
-    const { target } = event;
-    if (target.kind !== "message") {
-      return state; // feedback on a thread, a turn or an artifact isn't shown with messages
-    }
-    const messages = state.threads[target.thread_id]?.messages ?? [];
-    if (!messages.some(({ id }) => id === target.message_id)) {
-      return state; // a message before what the store read: its feedback has nowhere to go
-    }
     const feedback: Feedback = {
       actor: envelope.actor,
       type: event.feedback_type,
       value: event.value,
     };
-    return withThread(state, target.thread_id, {
-      messages: messages.map((message) =>
-        message.id === target.message_id
-          ? { ...message, feedback: [...message.feedback, feedback] }
-          : message,
-      ),
-    });
+    // Feedback on what the store hasn't read, or on a whole thread, has nowhere to go.
+    const { target } = event;
+    switch (target.kind) {
+      case "message": {
+        const messages = state.threads[target.thread_id]?.messages ?? [];
+        if (!messages.some(({ id }) => id === target.message_id)) {
+          return state;
+        }
+        return withThread(state, target.thread_id, {
+          messages: messages.map((message) =>
+            message.id === target.message_id
+              ? { ...message, feedback: [...message.feedback, feedback] }
+              : message,
+          ),
+        });
+      }
+      case "artifact": {
+        const artifact = state.artifacts[target.artifact_id];
+        if (artifact?.version !== target.version) {
+          return state; // an earlier version's, or an artifact the store hasn't read
+        }
+        const judged = { ...feedback, version: target.version };
+        const given = { ...artifact, feedback: [...artifact.feedback, judged] };
+        return { ...state, artifacts: { ...state.artifacts, [artifact.id]: given } };
+      }
+      case "turn": {
+        const run = state.runs[target.run_id];
+        return run ? withRun(state, run.id, { feedback: [...run.feedback, feedback] }) : state;
+      }
+      case "thread":
+        return state;
+      default:
+        return target satisfies never;
+    }
   },
   // The application's own events change nothing the store shows.
   app_event: ignore,
 };
-
-/**
- * Whether a person's latest thumbs on a message was up, down, or not given: `me` is the id the
- * server attributes their feedback to.
- */
-export function thumbs(message: Message, me: string): boolean | null {
-  const mine = message.feedback.filter(
-    (given) => given.type === "thumbs" && "id" in given.actor && given.actor.id === me,
-  );
-  const up = mine.at(-1)?.value.up;
-  return typeof up === "boolean" ? up : null;
-}
 
 /** Whether this version knows the event's type. */
 export function isKnown(event: v1.Event): event is Known {

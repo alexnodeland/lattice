@@ -40,7 +40,7 @@ test("a run moves through its statuses", () => {
     [{ type: "reflexr:run_started", run_id: "run_1", rule: "ops:page", attempt: 1 }, "running"],
     [{ type: "reflexr:run_retrying", run_id: "run_1", attempt: 2 }, "retrying"],
     [{ type: "reflexr:run_dead_lettered", run_id: "run_1" }, "dead_lettered"],
-    [{ type: "reflexr:run_requeued", run_id: "run_1" }, "running"],
+    [{ type: "reflexr:run_requeued", run_id: "run_1" }, "pending"],
     [{ type: "reflexr:run_succeeded", run_id: "run_1" }, "succeeded"],
   ];
   const events: v1.EventFrame["event"][] = [];
@@ -53,6 +53,9 @@ test("a run moves through its statuses", () => {
     rule: "ops:page",
     status: "succeeded",
     attempt: 2,
+    retries: 1,
+    started: 1,
+    feedback: [],
   });
   expect(replay({ type: "reflexr:run_cancelled", run_id: "r" }).runs.r?.status).toBe("cancelled");
   expect(replay({ type: "reflexr:run_skipped", run_id: "r" }).runs.r?.status).toBe("skipped");
@@ -66,4 +69,33 @@ test("the application's events, and reflexr's that the store doesn't show, chang
   );
   expect(state).toEqual(reflexr.initial());
   expect(reflexr.creates({ type: "publish", event: { type: "ops:x" } })).toBe(false);
+});
+
+test("feedback on a run is kept with it; on a firing, a chain or an unread run, nowhere", () => {
+  const thumbs = (target: Record<string, unknown>) => ({
+    type: "reflexr:feedback_given",
+    feedback_type: "thumbs",
+    target,
+    value: { up: false },
+  });
+  const state = replay(
+    { type: "reflexr:run_started", run_id: "run_1", rule: "ops:page", attempt: 1 },
+    thumbs({ kind: "run", run_id: "run_1" }),
+    thumbs({ kind: "firing", firing_id: "fir_1" }),
+    thumbs({ kind: "run", run_id: "run_9" }),
+    { type: "reflexr:feedback_given", feedback_type: "thumbs", target: "run_1", value: 3 },
+  );
+  expect(state.runs.run_1?.feedback).toEqual([
+    { actor: { kind: "system", name: "reflexr" }, type: "thumbs", value: { up: false } },
+  ]);
+  expect(state.runs.run_9).toBeUndefined();
+});
+
+test("a run is as new as its first attempt", () => {
+  const state = replay(
+    { type: "reflexr:run_started", run_id: "run_1", rule: "ops:page", attempt: 1 },
+    { type: "reflexr:run_retrying", run_id: "run_1", attempt: 1 },
+    { type: "reflexr:run_started", run_id: "run_1", rule: "ops:page", attempt: 2 },
+  );
+  expect(state.runs.run_1).toMatchObject({ attempt: 2, started: 1 });
 });

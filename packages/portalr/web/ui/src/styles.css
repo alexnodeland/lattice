@@ -5,6 +5,11 @@
 @import "tailwindcss";
 @import "./tokens.css";
 @import "./fonts/fonts.css";
+/*
+ * ui's own classes: an app that imports this reaches ui through node_modules, which Tailwind
+ * doesn't scan of itself, so without this its buttons and cards would have no style.
+ */
+@source "./";
 /* Streamdown renders with Tailwind classes of its own, which Tailwind finds here. */
 @source "../node_modules/streamdown/dist/*.js";
 

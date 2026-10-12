@@ -71,6 +71,7 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 | `/t/$tenant/w/$workspace/artifacts` | The workspace's artifacts that aren't archived, each by kind and latest version |
 | `/t/$tenant/w/$workspace/artifacts/$artifact` | An artifact through its kind's renderer, its revisions newest first with what each changed, and its open proposals |
 | `/t/$tenant/w/$workspace/proposals` | Every proposal in the workspace, the open ones first, to accept or reject |
+| `/t/$tenant/w/$workspace/runs` | The agent's turns and the rules' runs, newest first, with Stop, Retry, Skip and Cancel as each library and grantr allow, and thumbs on each |
 
 TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test holds it to `src/routes/`. `moon run app:bdd` runs one feature per area through playwright-bdd, in Bun, against the test application with Supabase Auth (GoTrue, alone) in compose's `bdd` profile, served at `/auth/v1` on its origin ([ADR-0013](adr/0013-the-apps-scenarios-against-the-test-application.md)).
 
@@ -88,6 +89,8 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `RunStatus` | How a run is going | Nothing |
 | `ArtifactContent`, `rendererFor`, `markdown`, `json` | An artifact, through the renderer its kind is registered with, or as JSON | Nothing |
 | `Diff` | What a revision changed, as `client`'s `changes` cut it | Nothing |
+| `Thumbs` | The reader's thumbs on a message, an artifact or a run, and why | Thumbs, then a comment ([ADR-0018](adr/0018-the-runs-area-and-feedback.md)) |
+| `CommandButton` | One action, waiting while its command is in flight | The command |
 | `Markdown` | Markdown through Streamdown: no raw HTML, links to the web, mail, the page and the application alone, images from this origin alone | Nothing |
 
 `ui` imports `client`'s types alone, which a root test holds it to.

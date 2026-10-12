@@ -176,7 +176,7 @@ class RunStarted(_Event):
     """The OpenTelemetry trace this attempt runs in, when it is traced."""
 
     message_ids: tuple[MessageId, ...] = ()
-    """The messages this start carries out, oldest first (ADR-0062): the one that starts the
+    """The messages this start carries out, oldest first (ADR-0065): the one that starts the
     run, or the reply and the messages a resumed run takes as its prompt. Messages that reach
     the run later, through its watcher, are not named."""
 

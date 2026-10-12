@@ -1,4 +1,4 @@
-# ADR-0062: `run_started` names its messages
+# ADR-0065: `run_started` names its messages
 
 **Status:** Accepted
 **Date:** 2026-10-12

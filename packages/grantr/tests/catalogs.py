@@ -28,6 +28,8 @@ REFLEXR = frozenset(
         "reflexr:give_feedback",
         "reflexr:cancel_run",
         "reflexr:install_rule",
+        "reflexr:update_rule",
+        "reflexr:archive_rule",
         "reflexr:publish",
         "reflexr:checkpoint_run",
         "reflexr:save_cursor",

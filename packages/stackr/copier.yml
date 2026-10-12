@@ -73,6 +73,14 @@ access:
     none (any user of a tenant, named in their token, may do anything in it): none
   default: grantr
 
+hosting:
+  type: str
+  help: Where it is hosted, beside stackr's recipe for it (stackr RFC-0004)
+  choices:
+    none (beside the stack on this machine only): none
+    host (a single host, behind stackr's edge): host
+  default: none
+
 python_version:
   type: str
   help: The Python version it runs on

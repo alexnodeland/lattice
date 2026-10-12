@@ -205,7 +205,9 @@ async def run(arguments: Sequence[str], settings: Settings) -> str:
             across_tenants=database.owner,
         )
         grants = build_grants(storage, name=settings.service_name)
-        users = Users(settings.auth.issuer, settings.auth.service_role_key)
+        users = Users(
+            settings.auth.admin_url or settings.auth.issuer, settings.auth.service_role_key
+        )
         match parsed.command:
             case "operator":
                 return await operator(grants, users, parsed.user)

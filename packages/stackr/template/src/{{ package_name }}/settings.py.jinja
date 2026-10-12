@@ -31,6 +31,8 @@ class AuthSettings:
 {%- if access == 'grantr' %}
         service_role_key: Supabase's service role key, for the admin commands that find a user
             by their email; the issuer's admin API is asked.
+        admin_url: Where that admin API is, when not at the issuer: on a single host, GoTrue's
+            private address, since the edge refuses its admin API (stackr RFC-0004).
 {%- else %}
         tenant_claim: Where the tenant is in the token's claims, as a dotted path.
 {%- endif %}
@@ -42,6 +44,7 @@ class AuthSettings:
     issuer: str | None = None
 {%- if access == 'grantr' %}
     service_role_key: str | None = None
+    admin_url: str | None = None
 {%- else %}
     tenant_claim: str = "app_metadata.tenant_id"
 {%- endif %}
@@ -123,6 +126,7 @@ class Settings:
             issuer=env.get("AUTH_ISSUER"),
 {%- if access == 'grantr' %}
             service_role_key=env.get("AUTH_SERVICE_ROLE_KEY"),
+            admin_url=env.get("AUTH_ADMIN_URL"),
 {%- else %}
             tenant_claim=env.get("AUTH_TENANT_CLAIM", AuthSettings.tenant_claim),
 {%- endif %}

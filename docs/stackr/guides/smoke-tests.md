@@ -17,7 +17,7 @@ make smoke
 make up PROFILES=observability && make smoke PROFILES=observability
 ```
 
-It runs one set of checks per profile, and a database check when a profile keeps data in PostgreSQL. Each check is retried every 3 seconds until it passes or `SMOKE_TIMEOUT` (120 seconds by default) runs out, and every failure is reported before it exits non-zero.
+It runs one set of checks per profile, and a database check when a profile keeps data in PostgreSQL. Its requests run in the `probe` container, curl on the stack's networks, so they reach each service by name and need no published port: a single host publishes only Caddy's. portalr's readers and `scripts/create-tenant` run on this machine, at Langfuse's and the gateway's ports, which stay on `127.0.0.1` on a single host too. Each check is retried every 3 seconds until it passes or `SMOKE_TIMEOUT` (120 seconds by default) runs out, and every failure is reported before it exits non-zero.
 
 ### `observability`
 
@@ -31,7 +31,7 @@ It sends a trace, a metric and a log through the Collector's gRPC port with `tel
 
 ### The database
 
-Over `db-init`'s own connection to the adapter (its host, admin role and networks, as `make` configures them), it checks that `db-init` created Langfuse's database and the gateway's, for whichever of those profiles run. With local Supabase, it also checks that Supabase's API answers.
+Over `db-init`'s own connection to the adapter (its host, admin role and networks, as `make` configures them), it checks that `db-init` created Langfuse's database, the gateway's and GoTrue's, for whichever of those profiles run. With local Supabase, it also checks that Supabase's API answers.
 
 ### `langfuse`
 
@@ -46,6 +46,19 @@ It sends a trace with a known id to the Collector's HTTP port, and finds it in L
 
 The key is deleted at the end.
 
+### `auth`
+
+GoTrue's database exists, and GoTrue serves its ES256 key at `/.well-known/jwks.json`, without the private part. Its admin API refuses a request without the service role's key, and creates a confirmed user with it. The user signs in, at `AUTH_PUBLIC_URL` on a single host, and gets an ES256 token whose issuer is `AUTH_PUBLIC_URL`.
+
+### `edge`: a single host
+
+With `STACKR_RECIPE=host`, `make smoke` adds the edge's checks:
+
+- only Caddy publishes a port on an interface other than the loopback
+- Caddy redirects HTTP to HTTPS
+- it serves GoTrue at `auth.<domain>`, with a certificate the probe trusts: with `CADDY_TLS="tls internal"`, Caddy's own root, copied from Caddy's container, and nothing else
+- it refuses GoTrue's admin API there, with 404
+
 ### `langfuse` and `gateway` together: portalr's readers
 
 portalr's Acceptance job runs neither Langfuse nor LiteLLM, so this reads both through portalr's readers, as the `stackr-smoke` tenant ([portalr ADR-0012](../../portalr/adr/0012-acceptance-against-a-two-tenant-stack.md)). portalr's `scripts/smoke_readers.py` sends Langfuse a trace tagged `tenant:stackr-smoke` with a score on it, and the Langfuse reader must find the score. The LiteLLM reader must read the tenant's team, which the gateway's check created, and find it in every tenant's spend. Each must answer `ok`.
@@ -57,27 +70,35 @@ make up             # the default profiles, on local Supabase
 make smoke-app
 ```
 
+or, on the `postgres` adapter, with GoTrue:
+
+```bash
+make up PROFILES="observability langfuse gateway auth"   # with STACKR_DATABASE=postgres in .env
+make smoke-app
+```
+
 It runs an application from the template beside the whole stack:
 
 1. It generates an application with both libraries and evals from this checkout, locks its dependencies, and creates a key on the `stackr-smoke` tenant for it.
-2. It starts the application in its app profile, on port `SMOKE_APP_PORT` (8800 by default), with telemetry, Langfuse and mocked model replies, and waits for it to be healthy.
+2. It creates the role the application works as (`db-roles`), starts the application in its app profile, on port `SMOKE_APP_PORT` (8800 by default), with telemetry, Langfuse and mocked model replies, and waits for it to be healthy. On a single host, the application is generated with `hosting: host` and runs with its overlay, behind Caddy, at `https://app.<domain>`.
 3. A request without a token must be refused with 401.
-4. It creates a user with local Supabase's admin API, and signs them in.
+4. It creates a user with the identity adapter's admin API, local Supabase's or GoTrue's, and signs them in.
 5. With the application's own command, it creates two tenants in grantr: `stackr-smoke`, which the user owns, and `stackr-smoke-other`, which they aren't in. The user's request in the first must succeed, and in the second be refused with 403.
 6. As that user, in `stackr-smoke`, it posts a message to the notes agent (artifactr) and opens a ticket for the triage agent (reflexr). Each agent's model request goes through the gateway on the tenant's key.
 7. For each agent, the turn or run must end successfully, and its trace must be in Tempo, with the gateway's spans in it, and in Langfuse.
 8. The completed turn and the succeeded run must be counted in Prometheus, as `artifactr_turns_total` and `reflexr_runs_total`, for the run's own workspace.
 
-At the end it removes the application, its image and volumes, the key, the user and the application's schema. It needs local Supabase, whose Auth signs the user in, so it fails on the `postgres` adapter. Building the application's image fetches the libraries from GitHub at `HEAD`, the commit the application was rendered from, so it needs the network, and `HEAD` must be pushed and the working tree clean: Copier renders uncommitted changes from a commit of its own, which GitHub doesn't have. In CI, `HEAD` is the pull request's merge commit, so the application runs the pull request's libraries.
+At the end it removes the application, its image and volumes, the key, the user and the application's schema. On the `postgres` adapter it needs the `auth` profile, whose GoTrue signs the user in. Building the application's image fetches the libraries from GitHub at `HEAD`, the commit the application was rendered from, so it needs the network, and `HEAD` must be pushed and the working tree clean: Copier renders uncommitted changes from a commit of its own, which GitHub doesn't have. In CI, `HEAD` is the pull request's merge commit, so the application runs the pull request's libraries.
 
 ## In CI
 
-CI's smoke job starts the stack three ways, each on a fresh runner, and runs `make smoke` against it:
+CI's smoke job starts the stack four ways, each on a fresh runner, and runs `make smoke` against it:
 
 | Run | Profiles | Database |
 |---|---|---|
 | observability | `observability` | None |
 | everything on local Supabase, and an application | `observability langfuse gateway`, then `make smoke-app` | Local Supabase |
 | everything on PostgreSQL | `observability langfuse gateway` | Plain PostgreSQL |
+| a single host, behind Caddy, and an application | `observability langfuse gateway auth`, with `STACKR_RECIPE=host` and Caddy's own CA, then `make smoke-app` | Plain PostgreSQL |
 
 It installs the Supabase CLI version pinned in `versions.env`, and starts Supabase without the services the smoke tests don't use (`SUPABASE_START_FLAGS`). When a run fails, it prints every container and the last 200 lines of each service's logs, and it always ends with `make reset`.

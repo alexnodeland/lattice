@@ -170,3 +170,44 @@ async def test_a_resume_its_answerer_may_not_start_ends_the_run(
     [end] = [e.event for e in await ws.read() if isinstance(e.event, RunEnded)][:1]
     assert (end.reason, end.error) == ("forbidden", "artifactr:record is refused in this workspace")
     assert await _for_whom(ws) == ["user:alice", "user:alice"], "Alice's message runs next"
+
+
+async def test_a_message_whose_ask_was_lost_is_taken_once_asked_again(
+    storage: InMemoryStorage, gate: Gate
+) -> None:
+    workspaces = Workspaces(storage, authorize=_refusing(("user:bob", "artifactr:record")))
+    ws = await workspaces.open("tenant", "ws", actor=ALICE)
+    thread = await ws.create_thread()
+    script = Script(say("Hi Alice."))
+    runner = make_runner(make_agent(script), gate)
+    assert await runner.ask(ws, thread.id) is None, "nothing to take"
+    await ws.post_message(thread.id, "Hello")  # committed, and the process stopped before asking
+    with pytest.raises(Forbidden, match="artifactr:record is refused"):
+        await runner.ask(ws.as_actor(BOB), thread.id)
+    handle = await runner.ask(ws, thread.id)
+    assert handle is not None
+    await handle.wait()
+    await settled(thread.id, runner)
+    assert await _for_whom(ws) == ["user:alice"]
+    assert script.prompt_texts(0)[-1] == "Hello"
+    assert await runner.ask(ws, thread.id) is None, "taken, so nothing more to take"
+
+
+async def test_ask_is_asked_as_the_agent_acting_for_its_caller_once(
+    storage: InMemoryStorage, gate: Gate
+) -> None:
+    asked: list[tuple[Actor, str]] = []
+
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: Actor, access: Access
+    ) -> bool:
+        asked.append((actor, access.action))
+        return True
+
+    ws = await Workspaces(storage, authorize=authorize).open("tenant", "ws", actor=ALICE)
+    thread = await ws.create_thread()
+    runner = make_runner(make_agent(Script()), gate)
+    asked.clear()
+    assert await runner.ask(ws, thread.id) is None
+    records = [actor for actor, action in asked if action == "artifactr:record"]
+    assert records == [AgentActor(thread_id=thread.id, on_behalf_of=ALICE)]

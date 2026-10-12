@@ -277,7 +277,7 @@ class Runner[AppDepsT]:
         remembered. A repeated id returns the remembered result and carries nothing out,
         whatever command it comes with, so a retry is safe on every surface.
         """
-        if "\x00" in command_id:  # remembered under no key: storage can't hold it (ADR-0061)
+        if "\x00" in command_id:  # remembered under no key: storage can't hold it (ADR-0064)
             refused = ValidationFailed("text cannot hold a NUL character", [])
             return CommandResult(command_id=command_id, ok=False, rejection=refused.payload())
         key = CommandKey(
@@ -315,10 +315,24 @@ class Runner[AppDepsT]:
         message = PostMessage(
             thread_id=thread_id, content=content, message_id=message_id or new_message_id()
         )
-        acting = AgentActor(thread_id=thread_id, on_behalf_of=acting_for(workspace.actor))
-        await workspace.as_actor(acting).check(_starting(thread_id))
+        await _check_starting(workspace, thread_id)
         posted = await workspace.commit(message)
         return _sent(posted, await self._ask(_runner(workspace), thread_id, posted.seq))
+
+    async def ask(self, workspace: Workspace, thread_id: ThreadId) -> RunHandle | None:
+        """Ask for the thread's next turn, for whatever its log has that no turn has taken.
+
+        :meth:`send` asks once it has committed its message. A caller whose ask may have been
+        lost, because its process stopped between the two, asks again here: a retried send
+        finds its message id used (ADR-0064). It is asked as :meth:`send` is, as the agent
+        acting for the handle's actor. With nothing untaken, it does nothing.
+
+        Raises:
+            Forbidden: If ``authorize`` refuses the turn it would start.
+        """
+        await _check_starting(workspace, thread_id)
+        runner = _runner(workspace)
+        return await self._ask(runner, thread_id, await runner.head_seq())
 
     async def answer(self, workspace: Workspace, command: AnswerDeferred) -> Sent:
         """Answer one of a paused run's requests, resuming the run once all are answered."""
@@ -787,6 +801,16 @@ async def _cancel_when_lost(lost: asyncio.Event, run: "asyncio.Task[Any]") -> No
 def _starting(thread_id: ThreadId) -> Access:
     """What starting a turn asks, as its agent acting for its author: to record ``run_started``."""
     return Access(action="artifactr:record", thread_id=thread_id)
+
+
+async def _check_starting(workspace: Workspace, thread_id: ThreadId) -> None:
+    """Ask whether the handle's actor may start the thread's turn, as the agent acting for it.
+
+    Raises:
+        Forbidden: If ``authorize`` refuses it.
+    """
+    acting = AgentActor(thread_id=thread_id, on_behalf_of=acting_for(workspace.actor))
+    await workspace.as_actor(acting).check(_starting(thread_id))
 
 
 def _runner(workspace: Workspace) -> Workspace:

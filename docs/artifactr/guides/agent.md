@@ -160,12 +160,13 @@ The run `send` started may take an older message first: the thread's oldest mess
 
 A message in an idle thread, such as one just created, starts a run unless another starts one first. Code that owns its thread, such as a test or an evaluation, can assert that `sent.run` is set.
 
-`send` takes a `message_id`. Sending a used one again raises `InvalidState` before anything else happens, so a retry never starts or steers a second turn ([ADR-0045](../adr/0045-a-message-id-is-used-once.md)).
+`send` takes a `message_id`. Sending a used one again raises `InvalidState` before anything else happens, so a retry never starts or steers a second turn ([ADR-0045](../adr/0045-a-message-id-is-used-once.md)). `send` commits the message, then asks for the thread's turn; a process that stops between the two leaves the message waiting for the next turn. A retry that finds its id used asks with `runner.ask(workspace, thread_id)` instead, and the turn takes the message ([ADR-0064](../adr/0064-asking-for-a-threads-next-turn.md)).
 
 | Runner method | What it does |
 |---|---|
 | `send(workspace, thread_id, content, message_id=None)` | Posts a message and starts, steers or resumes a run |
 | `answer(workspace, AnswerDeferred(...))` | Answers one request of a paused run, resuming it once all are answered |
+| `ask(workspace, thread_id)` | Asks for the thread's next turn, for whatever its log has that no turn has taken, as `send` asks after its message; it does nothing when there is nothing to take |
 | `resume(workspace, run_id)` | Asks for the thread's next turn, which resumes a paused run whose requests are answered; the oldest message not yet taken answers any left open |
 | `stop(run_id)` | Cancels a run in this process; it ends with status `stopped` |
 | `drain()` | Waits until no run that has ended is still handing its thread over; `aclose()` cancels them instead |

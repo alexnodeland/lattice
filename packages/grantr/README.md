@@ -9,9 +9,9 @@
   <a href="https://github.com/alexnodeland/lattice/blob/main/packages/grantr/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-005A87"></a>
 </p>
 
-**grantr** is the planned identity and access package for [artifactr](https://lattice.alexnodeland.com/artifactr/) and [reflexr](https://lattice.alexnodeland.com/reflexr/): tenants, their members, groups, roles and service principals, and the grants that bind them to tenants, workspaces, threads, artifacts and rules. The libraries will ask it, through their own hooks, before every command and read. It imports neither library, and neither imports it.
+**grantr** is the identity and access package for [artifactr](https://lattice.alexnodeland.com/artifactr/) and [reflexr](https://lattice.alexnodeland.com/reflexr/): tenants, their members, groups, roles and service principals, and the grants that bind them to tenants, workspaces, threads, artifacts and rules. The libraries will ask it, through their own hooks, before every command and read. It imports neither library, and neither imports it.
 
-> **Status:** planned, not yet usable. Its foundation is done: the package, its tooling, its decisions and its [v0.1 plan](https://lattice.alexnodeland.com/grantr/rfcs/0001-v0.1-implementation-plan/). The package holds only its version so far, and everything below describes what the plan's phases build. Its mark is drawn later, with portalr's.
+> **Status:** in progress, not yet wired in. Its core is built: the model, built-in and custom roles, groups, service principals and keys, checks, the libraries' hooks, the audit log, and in-memory storage. The libraries don't ask it yet, and its SQL storage and API come next, as its [v0.1 plan](https://lattice.alexnodeland.com/grantr/rfcs/0001-v0.1-implementation-plan/) sets out. Its mark is drawn later, with portalr's.
 
 ## Why
 
@@ -29,9 +29,10 @@ Today, any user of a tenant may do anything in every workspace of that tenant. T
 
 ## Documentation
 
-grantr's documentation is its section of lattice's site, at **<https://lattice.alexnodeland.com/grantr/>**, built from [`docs/grantr/`](https://github.com/alexnodeland/lattice/tree/main/docs/grantr). Its guides and architecture come with the phases that build what they describe.
+grantr's documentation is its section of lattice's site, at **<https://lattice.alexnodeland.com/grantr/>**, built from [`docs/grantr/`](https://github.com/alexnodeland/lattice/tree/main/docs/grantr). Its guides come with the phases that wire it in.
 
-- [Architecture decision records](https://lattice.alexnodeland.com/grantr/adr/): why each part will be the way it is.
+- [Architecture](https://lattice.alexnodeland.com/grantr/architecture/): the model, the checks, the commands and the storage port.
+- [Architecture decision records](https://lattice.alexnodeland.com/grantr/adr/): why each part is the way it is.
 - [RFCs](https://lattice.alexnodeland.com/grantr/rfcs/): the v0.1 plan, its phases and what each waits on.
 - [Identity and access](https://lattice.alexnodeland.com/rfcs/0001-grantr-identity-and-access/), lattice's RFC-0001: the design grantr builds.
 

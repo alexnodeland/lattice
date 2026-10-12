@@ -9,9 +9,9 @@ hide:
 
 Identity and access for the family: tenants, their members, groups, roles and service principals, and the grants that bind them to tenants, workspaces, threads, artifacts and rules.
 
-!!! note "Planned, not yet usable"
+!!! note "In progress, not yet wired in"
 
-    grantr's foundation is done: the package, its tooling, its decisions and its [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md). The package holds only its version so far, and everything below describes what the plan's phases build. Its mark is drawn later, in [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md)'s phase 2.
+    grantr's core is built: its model, built-in and custom roles, groups, service principals and keys, checks, the libraries' hooks, the audit log, and in-memory storage, as its [architecture](architecture.md) describes. The libraries don't ask it yet, and its SQL storage and API come next; the rest of this page describes what the [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)'s phases build. Its mark is drawn later, in [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md)'s phase 2.
 
 ## Why: one model of who may do what
 
@@ -30,13 +30,14 @@ Today, any user of a tenant may do anything in every workspace of that tenant. a
 - **Its own model, with OpenFGA-shaped ports,** in memory or in SQL ([ADR-0008](adr/0008-grantrs-own-model-with-openfga-shaped-ports.md)).
 - **A deployment-wide `operator` role,** an audited grant held by few ([ADR-0009](adr/0009-a-deployment-wide-operator-role.md)).
 
-[RFC-0001](rfcs/0001-v0.1-implementation-plan.md#phases) builds these in seven phases after the foundation, and says where each lands. Its guides, reference and architecture come with the phases that build what they describe.
+[RFC-0001](rfcs/0001-v0.1-implementation-plan.md#phases) builds these in seven phases after the foundation, and says where each lands. Its guides come with the phases that wire it in.
 
 ## Where to go next
 
 | If you want to | Read |
 |---|---|
-| Understand why each part will be the way it is | The [decision records](adr/README.md) |
+| See how it is built | The [architecture](architecture.md), and the [reference](reference.md) |
+| Understand why each part is the way it is | The [decision records](adr/README.md) |
 | See the plan, its phases and what each waits on | [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and the [RFCs](rfcs/README.md) |
 | Read the design grantr builds | [lattice RFC-0001](../rfcs/0001-grantr-identity-and-access.md) |
 | See what has changed | The [changelog](project/changelog.md) |

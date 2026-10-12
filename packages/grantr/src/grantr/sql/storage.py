@@ -65,8 +65,8 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-# Shared verbatim with artifactr's src/artifactr/sql/storage.py and reflexr's
-# src/reflexr/sql/storage.py; change all three.
+# Shared verbatim with artifactr's src/artifactr/sql/storage.py, reflexr's
+# src/reflexr/sql/storage.py and relayr's src/relayr/sql/ledger.py; change all four.
 async def _to_the_end[T](call: Awaitable[T]) -> T:
     """Await a database call to its end; a cancellation that came meanwhile is raised after."""
     task = asyncio.ensure_future(call)
@@ -83,8 +83,8 @@ async def _to_the_end[T](call: Awaitable[T]) -> T:
     return task.result()
 
 
-# Shared verbatim with artifactr's src/artifactr/sql/storage.py and reflexr's
-# src/reflexr/sql/storage.py; change all three.
+# Shared verbatim with artifactr's src/artifactr/sql/storage.py, reflexr's
+# src/reflexr/sql/storage.py and relayr's src/relayr/sql/ledger.py; change all four.
 def _awaited_to_the_end[**P, T](
     method: Callable[P, Awaitable[T]],
 ) -> Callable[P, "CoroutineType[Any, Any, T]"]:  # subscriptable at run time from Python 3.13

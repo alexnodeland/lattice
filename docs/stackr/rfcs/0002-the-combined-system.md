@@ -403,7 +403,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 - [x] Decide reflexr #45's namespaces ([ADR-0039][r-adr-0039], 2026-09-29)
 - [x] Implement reflexr #45 (reflexr #83): event types and rule names are `namespace:name`, so relayr's bridged types are `artifactr:<type>` and its rules are qualified too
 - [x] File the prerequisite issues: artifactr [#60][a-60], [#61][a-61], [#62][a-62] and [#63][a-63], and reflexr [#72][r-72]
-- [ ] Phase 1: inbound adapter
+- [x] Phase 1: inbound adapter, in relayr ([relayr RFC-0001](../../relayr/rfcs/0001-v0.1-implementation-plan.md)); its followers start from `on_open`, which lattice RFC-0001 made for this, not from `authorize` ([relayr ADR-0016](../../relayr/adr/0016-followers-start-on-open.md))
 - [ ] Phase 2: outbound adapter and loop control
 - [ ] Phase 3: template option, example and smoke test
 - [ ] Phase 4: telemetry links and tags

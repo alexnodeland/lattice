@@ -25,8 +25,8 @@ def create_sqlite_engine(url: str | URL, **kwargs: Any) -> AsyncEngine:
     lock for up to the ``timeout`` connect argument of Python's ``sqlite3`` (5 seconds unless
     ``connect_args`` says otherwise). Use a database file (or a shared-cache memory database).
 
-    Shared verbatim with artifactr's ``src/artifactr/sql/sqlite.py`` and grantr's
-    ``src/grantr/sql/sqlite.py``; change all three.
+    Shared verbatim with artifactr's ``src/artifactr/sql/sqlite.py``, grantr's
+    ``src/grantr/sql/sqlite.py`` and relayr's ``src/relayr/sql/sqlite.py``; change all four.
 
     Args:
         url: A SQLite URL for an async driver, such as ``sqlite+aiosqlite:///app.db``

@@ -4033,6 +4033,7 @@ version = "0.1.0.dev0"
 source = { editable = "packages/relayr" }
 dependencies = [
     { name = "artifactr-ai" },
+    { name = "pydantic" },
     { name = "reflexr" },
 ]
 
@@ -4054,6 +4055,8 @@ sqlite = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "aiosqlite" },
+    { name = "asyncpg" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -4066,6 +4069,8 @@ lint = [
     { name = "ruff" },
 ]
 test = [
+    { name = "aiosqlite" },
+    { name = "asyncpg" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -4078,6 +4083,7 @@ requires-dist = [
     { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.20" },
     { name = "artifactr-ai", editable = "packages/artifactr" },
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31" },
+    { name = "pydantic", specifier = ">=2.13" },
     { name = "reflexr", editable = "packages/reflexr" },
     { name = "relayr-ai", extras = ["sql"], marker = "extra == 'postgres'" },
     { name = "relayr-ai", extras = ["sql"], marker = "extra == 'sqlite'" },
@@ -4087,6 +4093,8 @@ provides-extras = ["sql", "sqlite", "postgres"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "aiosqlite", specifier = ">=0.22" },
+    { name = "asyncpg", specifier = ">=0.31" },
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "pytest-asyncio", specifier = ">=1.4" },
@@ -4099,6 +4107,8 @@ lint = [
     { name = "ruff", specifier = ">=0.16" },
 ]
 test = [
+    { name = "aiosqlite", specifier = ">=0.22" },
+    { name = "asyncpg", specifier = ">=0.31" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "pytest-cov", specifier = ">=7.1" },

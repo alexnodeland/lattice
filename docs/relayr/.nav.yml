@@ -1,6 +1,10 @@
 # relayr's section of the site, in order. Paths are from docs/relayr/.
 nav:
 - Home: index.md
+- Architecture: architecture.md
+- Guides:
+  - Bridging artifactr into reflexr: guides/inbound.md
+- Reference: reference.md
 - Decisions:
   - adr/README.md
   - adr/0001-relayr-its-own-repository-and-package.md
@@ -17,6 +21,10 @@ nav:
   - adr/0012-the-libraries-pinned-by-git-revision.md
   - adr/0013-relayr-in-lattice.md
   - adr/0014-one-site-for-the-family.md
+  - adr/0015-cursors-leases-and-dead-letters-in-the-ledger.md
+  - adr/0016-followers-start-on-open.md
+  - adr/0017-the-follower-acts-as-the-application.md
+  - adr/0018-bridged-events-their-fields-ids-and-projections.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

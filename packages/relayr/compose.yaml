@@ -1,0 +1,18 @@
+# The contributor stack: PostgreSQL for relayr's SQL tests, and nothing else.
+#
+#   docker compose up -d --wait              (moon run relayr:pg-up)
+
+name: relayr
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: relayr
+    ports:
+      - "127.0.0.1:${RELAYR_PG_PORT:-54332}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 30

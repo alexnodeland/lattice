@@ -54,6 +54,11 @@ export type Of1 = [Filter, ...Filter[]];
 export type Kind4 = "not";
 export type Kind5 = "predicate";
 export type Name = string;
+/**
+ * This interface was referenced by `Rule`'s JSON-Schema
+ * via the `definition` "Pattern".
+ */
+export type Pattern = EachPattern | CountPattern | SequencePattern | AbsencePattern;
 export type Kind6 = "each";
 export type AtLeast = number;
 export type Kind7 = "count";
@@ -68,11 +73,6 @@ export type Kind9 = "absence";
 export type Within3 = string;
 export type AtMost = number;
 export type Per = string;
-/**
- * This interface was referenced by `Rule`'s JSON-Schema
- * via the `definition` "Pattern".
- */
-export type Pattern = EachPattern | CountPattern | SequencePattern | AbsencePattern;
 
 /**
  * When ``when`` holds for a scope, run ``then``.
@@ -92,6 +92,9 @@ export interface Rule {
 }
 /**
  * How a failed run is retried: exponential backoff, up to ``max_attempts`` attempts.
+ *
+ * This interface was referenced by `Rule`'s JSON-Schema
+ * via the `definition` "RetryPolicy".
  */
 export interface RetryPolicy {
   backoff?: Backoff;
@@ -101,6 +104,9 @@ export interface RetryPolicy {
 }
 /**
  * The event fields that partition a rule's state and ordering. None: the whole workspace.
+ *
+ * This interface was referenced by `Rule`'s JSON-Schema
+ * via the `definition` "Scope".
  */
 export interface Scope {
   fields?: Fields;
@@ -127,7 +133,7 @@ export interface Params {
 export interface Condition {
   dedupe?: Dedupe | null;
   filter: Filter;
-  pattern?: EachPattern | CountPattern | SequencePattern | AbsencePattern;
+  pattern?: Pattern;
   throttle?: Throttle | null;
 }
 /**
@@ -162,9 +168,7 @@ export interface WhereFilter {
   field: Field;
   kind: Kind1;
   op: Op;
-  value?: {
-    [k: string]: unknown;
-  };
+  value?: JsonValue;
 }
 /**
  * Envelopes that match every filter in ``of``.
@@ -264,25 +268,4 @@ export interface AbsencePattern {
 export interface Throttle {
   at_most: AtMost;
   per: Per;
-}
-/**
- * How a failed run is retried: exponential backoff, up to ``max_attempts`` attempts.
- *
- * This interface was referenced by `Rule`'s JSON-Schema
- * via the `definition` "RetryPolicy".
- */
-export interface RetryPolicy1 {
-  backoff?: Backoff;
-  max_attempts?: MaxAttempts;
-  max_backoff?: MaxBackoff;
-  multiplier?: Multiplier;
-}
-/**
- * The event fields that partition a rule's state and ordering. None: the whole workspace.
- *
- * This interface was referenced by `Rule`'s JSON-Schema
- * via the `definition` "Scope".
- */
-export interface Scope1 {
-  fields?: Fields;
 }

@@ -1,6 +1,9 @@
 # @portalr/ui: the brand tokens, the primitives, and the chat and artifact components.
 language: 'typescript'
 layer: 'library'
+# Its chat renders client's store, whose types alone it imports (portalr ADR-0015).
+dependsOn:
+  - 'client'
 workspace:
   inheritedTasks:
     exclude: ['build'] # its source is built into app and admin

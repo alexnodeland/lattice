@@ -6,6 +6,17 @@
  */
 
 export { Button } from "./button";
+export {
+  Composer,
+  Message,
+  Messages,
+  ProposalCard,
+  Request,
+  RunStatus,
+  Streaming,
+  ToolCall,
+} from "./chat";
+export { Markdown } from "./markdown";
 export { Page } from "./page";
 export { Switch } from "./switch";
 export { TextField } from "./text-field";

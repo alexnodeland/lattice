@@ -70,6 +70,22 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 
 TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test holds it to `src/routes/`. `moon run app:bdd` runs one feature per area through playwright-bdd, in Bun, against the test application with Supabase Auth (GoTrue, alone) in compose's `bdd` profile, served at `/auth/v1` on its origin ([ADR-0013](adr/0013-the-apps-scenarios-against-the-test-application.md)).
 
+## The chat
+
+`ui`'s chat renders what `client`'s artifactr store holds, and hands each command to its caller ([ADR-0015](adr/0015-the-chat-components-and-streamdown.md)):
+
+| Component | Renders | Sends |
+|---|---|---|
+| `Messages`, `Message`, `Streaming` | A thread's messages, oldest first, and what a run is streaming | Thumbs on a message |
+| `Composer` | A message being written | The message |
+| `ToolCall` | A tool a run called, and how it returned | Nothing |
+| `Request` | What a paused run waits on: a call to approve, or a question | An approval, a denial or an answer |
+| `ProposalCard` | A proposed change, its rationale and how it was resolved | Accept or reject |
+| `RunStatus` | How a run is going | Nothing |
+| `Markdown` | Markdown through Streamdown: no raw HTML, links to the web, mail, the page and the application alone, images from this origin alone | Nothing |
+
+`ui` imports `client`'s types alone, which a root test holds it to.
+
 ## The wheel
 
 Vite builds `app` and `admin` into `src/portalr/static/`, which git ignores and the wheel carries. portalr's `build` depends on theirs, and `ui-in-wheel`, in `check` and the release workflow, fails unless this version's wheel holds both.

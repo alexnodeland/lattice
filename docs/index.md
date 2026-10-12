@@ -27,7 +27,7 @@ The family's packages, in one repository: libraries for applications in which pe
 | [stackr](stackr/index.md) | The infrastructure the libraries run on, and an application template |
 | [portalr](portalr/index.md) | The portal into an application: an app UI to chat with its agents and see their work, and an admin UI to run it. Planned: it holds only its version so far |
 
-grantr and portalr hold only their versions so far, and their plans build them: [grantr's](grantr/rfcs/0001-v0.1-implementation-plan.md) and [portalr's](portalr/rfcs/0001-v0.1-implementation-plan.md).
+grantr's core is built, and [its plan](grantr/rfcs/0001-v0.1-implementation-plan.md) wires it into the libraries and the template. portalr holds only its version so far, and [its plan](portalr/rfcs/0001-v0.1-implementation-plan.md) builds it.
 
 lattice's mark is one cell of the lattice that every mark in the family is drawn on. Its [brand page](assets/brand/README.md) has the mark, the colours and the family's brand system, and [ADR-0001](adr/0001-lattices-brand.md) records why.
 

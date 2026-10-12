@@ -1,0 +1,150 @@
+"""The storage port: where tenants, grants, groups, custom roles, keys and the audit log live.
+
+grantr ships an in-memory implementation, :class:`~grantr.grants.InMemoryStorage`; the SQL one
+comes with grantr's ``sql`` extra. The contract test in the test tree shows what an
+implementation must do.
+
+Every read but two is in one tenant, or on the deployment. :meth:`Storage.tenant_grants` and
+:meth:`Storage.key` span tenants: they are asked before the tenant is known.
+"""
+
+from collections.abc import Collection
+from contextlib import AbstractAsyncContextManager
+from typing import Protocol
+
+from grantr.core import (
+    AuditEntry,
+    AuditEvent,
+    Grant,
+    Grantee,
+    Group,
+    Key,
+    ListableKind,
+    Member,
+    Resource,
+    Role,
+    Subject,
+    TenantId,
+    UserId,
+)
+
+
+class Reads(Protocol):
+    """What a decision reads: in a transaction, or outside one."""
+
+    async def tenant(self, tenant: TenantId) -> bool:
+        """Whether the tenant exists."""
+        ...
+
+    async def grants(
+        self, tenant: TenantId | None, to: Grantee, *, on: Collection[Resource] | None = None
+    ) -> list[Grant]:
+        """The grants that apply to a grantee: made to it, or to a group it is in.
+
+        Args:
+            tenant: The tenant, or ``None`` for the grants on the deployment.
+            to: The grantee. A group is in no group.
+            on: Only the grants on these resources; ``None`` for every one.
+        """
+        ...
+
+    async def has(self, grant: Grant) -> bool:
+        """Whether this grant was made, exactly."""
+        ...
+
+    async def granted(
+        self, tenant: TenantId | None, on: Resource, *, role: str | None = None
+    ) -> list[Grant]:
+        """Every grant on a resource, to anyone, as it was made; only of one role, if given."""
+        ...
+
+    async def roles(self, tenant: TenantId) -> dict[str, Role]:
+        """A tenant's custom roles, by name."""
+        ...
+
+    async def group(self, tenant: TenantId, group: Group) -> frozenset[Member] | None:
+        """A group's members, or None if there is no such group."""
+        ...
+
+    async def resources(self, tenant: TenantId, kind: ListableKind) -> list[Resource]:
+        """The workspaces, threads, artifacts or rules a grant in the tenant names, or is in."""
+        ...
+
+
+class Transaction(Reads, Protocol):
+    """One atomic change to access, serialized with every other in its tenant.
+
+    It commits when its block exits normally, and leaves nothing behind when it raises.
+    """
+
+    async def create_tenant(self, tenant: TenantId) -> None:
+        """Register a tenant."""
+        ...
+
+    async def delete_tenant(self, tenant: TenantId) -> None:
+        """Remove a tenant and everything in it, but its audit log."""
+        ...
+
+    async def add_grant(self, grant: Grant) -> None:
+        """Store a grant."""
+        ...
+
+    async def remove_grant(self, grant: Grant) -> None:
+        """Remove a grant."""
+        ...
+
+    async def remove_member(self, tenant: TenantId, member: Member) -> None:
+        """Remove a member's grants, its places in groups, and its keys."""
+        ...
+
+    async def put_group(self, tenant: TenantId, group: Group, members: frozenset[Member]) -> None:
+        """Create a group, or replace its members."""
+        ...
+
+    async def remove_group(self, tenant: TenantId, group: Group) -> None:
+        """Remove a group and its grants."""
+        ...
+
+    async def put_role(self, tenant: TenantId, role: Role) -> None:
+        """Create a custom role, or replace its actions."""
+        ...
+
+    async def remove_role(self, tenant: TenantId, name: str) -> None:
+        """Remove a custom role and its grants."""
+        ...
+
+    async def add_key(self, key: Key) -> None:
+        """Store a key."""
+        ...
+
+    async def remove_key(self, tenant: TenantId, key_id: str) -> Key | None:
+        """Remove one of the tenant's keys, and return it; None if it has no such key."""
+        ...
+
+    async def append(
+        self, tenant: TenantId | None, by: Subject | None, event: AuditEvent
+    ) -> AuditEntry:
+        """Append an event to the audit log, with the next sequence number and the time."""
+        ...
+
+
+class Storage(Reads, Protocol):
+    """Persistence for grantr: reads, transactions, and the reads that span tenants."""
+
+    def transaction(self, tenant: TenantId | None) -> AbstractAsyncContextManager[Transaction]:
+        """Begin a change to one tenant, or to the deployment's operators with ``None``."""
+        ...
+
+    async def tenant_grants(self, user: UserId) -> list[Grant]:
+        """The grants on tenants made to a user directly, in every tenant."""
+        ...
+
+    async def key(self, key_id: str) -> Key | None:
+        """A key, by its public id, in any tenant."""
+        ...
+
+    async def audit(
+        self, tenant: TenantId | None, *, after_seq: int = 0, limit: int = 100
+    ) -> list[AuditEntry]:
+        """A tenant's audit entries after ``after_seq``, in order, or the deployment's with None."""
+        ...

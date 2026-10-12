@@ -28,7 +28,7 @@ lattice/
 │   ├── reflexr/         the same shape
 │   ├── evalr/
 │   ├── relayr/          relayr-ai
-│   ├── grantr/          planned: its version, tooling and plan so far
+│   ├── grantr/          its core, with in-memory storage, so far
 │   ├── stackr/          the stack and the application template: compose.yaml, supabase/, deploy/, scripts/, template/, copier.yml, versions.env, Makefile
 │   └── portalr/         the portal: its Python package, and its web packages to come
 ├── examples/
@@ -66,7 +66,7 @@ moon knows ten projects: the nine below, and `lattice`, the root, which holds th
 | artifactr | `packages/artifactr` | Chat applications where people and agents share versioned artifacts; distributed as `artifactr-ai` | Library | evalr |
 | reflexr | `packages/reflexr` | Rules over event streams that run LLM workflows | Library | evalr |
 | relayr | `packages/relayr` | The bridge between artifactr and reflexr; distributed as `relayr-ai` | Library | artifactr, reflexr |
-| grantr | `packages/grantr` | Identity and access for artifactr and reflexr; planned ([its plan](grantr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
+| grantr | `packages/grantr` | Identity and access for artifactr and reflexr; its core so far ([its plan](grantr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
 | stackr | `packages/stackr` | The stack the libraries run on, and the application template | Tool (shell), ships no wheel | artifactr, reflexr, evalr |
 | portalr | `packages/portalr` | The portal: the router that serves the app and admin UIs. Planned: it holds only its version ([RFC-0001](portalr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
 | docplan | `examples/docplan` | artifactr's reference implementation | Application | artifactr, evalr |

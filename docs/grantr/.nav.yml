@@ -1,6 +1,8 @@
 # grantr's section of the site, in order. Paths are from docs/grantr/.
 nav:
 - Home: index.md
+- Architecture: architecture.md
+- Reference: reference.md
 - Decisions:
   - adr/README.md
   - adr/0001-the-hook-hears-the-action.md
@@ -12,6 +14,12 @@ nav:
   - adr/0007-an-append-only-audit-log.md
   - adr/0008-grantrs-own-model-with-openfga-shaped-ports.md
   - adr/0009-a-deployment-wide-operator-role.md
+  - adr/0010-commands-bounded-by-what-their-maker-holds.md
+  - adr/0011-built-in-roles-over-the-catalogs.md
+  - adr/0012-every-item-an-access-names-and-hooks-typed-by-actor.md
+  - adr/0013-transactions-by-tenant-and-one-audit-log.md
+  - adr/0014-an-operator-enters-a-tenant-by-granting-themselves.md
+  - adr/0015-a-check-writes-nothing.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

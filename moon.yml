@@ -62,6 +62,14 @@ tasks:
     command: 'uv run zensical serve'
     preset: 'server'
 
+  # Not part of check: the Title check runs it, with the pull request's title and description.
+  api:
+    description: "Find the breaks the branch adds to the packages' public APIs, against their last releases"
+    command: 'uv run python scripts/api.py origin/main'
+    options:
+      cache: false
+      runInCI: false
+
   workflows:
     description: 'Lint the workflows with actionlint and zizmor'
     script: 'uv run actionlint && uv run zizmor --quiet .github/workflows'

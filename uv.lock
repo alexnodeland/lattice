@@ -2084,6 +2084,7 @@ source = { virtual = "." }
 dev = [
     { name = "actionlint-py" },
     { name = "deptry" },
+    { name = "griffelib" },
     { name = "prek" },
     { name = "pyright" },
     { name = "pytest" },
@@ -2106,6 +2107,7 @@ docs = [
 dev = [
     { name = "actionlint-py", specifier = ">=1.7.12" },
     { name = "deptry", specifier = ">=0.25" },
+    { name = "griffelib", specifier = ">=2.3" },
     { name = "prek", specifier = ">=0.5.4" },
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1" },

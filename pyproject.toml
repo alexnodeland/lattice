@@ -10,10 +10,12 @@ dependencies = []
 [dependency-groups]
 # The family's own checks: the root tests, lint and types for the root's Python, and deptry over
 # each package's shipped code. pytest-randomly runs every project's tests in a random order, since
-# every project's tests run in this one environment.
+# every project's tests run in this one environment. griffe finds the breaks in the packages'
+# public APIs.
 dev = [
     "actionlint-py>=1.7.12",
     "deptry>=0.25",
+    "griffelib>=2.3",
     "prek>=0.5.4",
     "pyright>=1.1.414",
     "pytest>=9.1",

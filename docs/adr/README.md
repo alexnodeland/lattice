@@ -8,7 +8,7 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 |---|---|---|
 | [0001](0001-lattices-brand.md) | lattice's brand | Accepted, amended by [0014](0014-portalrs-and-grantrs-marks.md) |
 | [0002](0002-ci-runs-every-affected-project-and-its-dependents.md) | CI runs every affected project and its dependents | Accepted, amended by [stackr ADR-0018](../stackr/adr/0018-the-template-pins-the-libraries-at-its-own-commit.md) |
-| [0003](0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md) | CI on pull requests, Nightly on main, and a required Title check | Accepted |
+| [0003](0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md) | CI on pull requests, Nightly on main, and a required Title check | Accepted, amended by [0012](0012-title-checks-the-breaks-in-the-public-apis.md) |
 | [0004](0004-one-github-app-for-release-please-and-renovate.md) | One GitHub App for release-please and Renovate | Accepted |
 | [0005](0005-renovate-runs-in-lattices-own-actions.md) | Renovate runs in lattice's own Actions | Accepted |
 | [0006](0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md) | release-please: first versions, pre-1.0 bumps, and what releases | Accepted |
@@ -17,6 +17,7 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0009](0009-one-dev-container-at-the-root.md) | One dev container, at the root | Accepted |
 | [0010](0010-every-projects-tests-run-in-a-random-order.md) | Every project's tests run in a random order | Accepted |
 | [0011](0011-codeql-and-scorecard.md) | CodeQL on every change, and Scorecard every week | Accepted |
+| [0012](0012-title-checks-the-breaks-in-the-public-apis.md) | The Title check holds each break in a public API to its marking | Accepted |
 | [0013](0013-pyright-stays-until-ty-can-replace-it.md) | pyright stays until ty can replace it | Accepted |
 | [0014](0014-portalrs-and-grantrs-marks.md) | portalr's and grantr's marks | Accepted |
 

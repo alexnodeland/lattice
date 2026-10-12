@@ -1,6 +1,6 @@
 # ADR-0003: CI on pull requests, Nightly on main, and a required Title check
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0012](0012-title-checks-the-breaks-in-the-public-apis.md)
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 

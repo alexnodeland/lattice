@@ -1,7 +1,11 @@
-# The pull request's title becomes its squash commit, so it must be a Conventional Commit. It is
-# checked again whenever the title is edited, which CI's jobs never rerun for, so it is a
-# workflow and a required check of its own. Scopes are the packages' module and area names, as
-# before, and aren't listed here: a new module brings a new scope.
+# The pull request's title becomes its squash commit, so it must be a Conventional Commit, and
+# release-please reads it, with the description as the commit's body. It is checked again whenever
+# either is edited, which CI's jobs never rerun for, so it is a workflow and a required check of
+# its own. Scopes are the packages' module and area names, as before, and aren't listed here: a
+# new module brings a new scope.
+#
+# A break in a package's public API, against its last release, must be marked as breaking
+# (scripts/api.py, with griffe).
 
 name: Title
 
@@ -19,8 +23,9 @@ jobs:
   title:
     name: Title
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
+      contents: read
       pull-requests: read
     steps:
       - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
@@ -38,3 +43,17 @@ jobs:
             ci
             chore
             revert
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the release tags, and the base branch to compare with
+          persist-credentials: false
+      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+        with:
+          auto-install: true
+      # The checkout is the pull request's merge commit, so its first parent is the base it merges
+      # into, as CI tested it.
+      - name: Public APIs
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: uv run --locked --only-group dev python scripts/api.py HEAD^1

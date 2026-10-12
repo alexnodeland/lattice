@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="600" viewBox="0 0 1280 600" role="img" aria-labelledby="t d">
+<title id="t">How lattice fits together</title>
+<desc id="d">People use portalr, which talks to artifactr and reflexr. relayr carries events from artifactr to reflexr, and reflexr's runs act back in artifactr. grantr checks every command and read, evalr judges the agents, and everything runs on stackr's stack.</desc>
+<style>
+  text { font-family: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .name { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  .cap { font-size: 15px; }
+  .label { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .wire { fill: none; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 2 12; animation: flow 1.2s linear infinite; }
+  .back { animation-direction: reverse; }
+  .tick { fill: none; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 3 7; animation: flow 2s linear infinite; }
+  .pulse { animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes flow { to { stroke-dashoffset: -28; } }
+  @keyframes pulse { 50% { opacity: .6; } }
+  @media (prefers-reduced-motion: reduce) { .wire, .tick, .pulse { animation: none; } }
+</style>
+<rect width="1280" height="600" rx="24" fill="#F3F8FA"/>
+<g><rect x="170" y="32" width="1040" height="84" rx="16" fill="#FFFFFF" stroke="#C9D8E0"/><g transform="translate(186 48.0) scale(0.8125)"><polygon fill="#FFC400" points="5,6 59,6 51.73,20 12.27,20"/>
+<polygon fill="#1C1D26" points="5,6 19,6 39,44.52 32,58"/>
+<polygon fill="#1C1D26" points="59,6 45,6 25,44.52 32,58"/>
+<polygon fill="#6B5300" points="5,6 12.27,20 26.27,20 19,6"/>
+<polygon fill="#6B5300" points="37.73,20 51.73,20 59,6 45,6"/>
+<polygon fill="#6B5300" points="25,44.52 32,58 39,44.52 32,31.04"/></g><text x="252" y="70.0" class="name" fill="#0F2A3A">grantr</text><text x="252" y="94.0" class="cap" fill="#4D6573">identity and access: checks every command and read, down to row-level security</text></g>
+<path class="tick" stroke="#005A87" d="M285.0 120 V172"/>
+<path class="tick" stroke="#005A87" d="M555.0 120 V172"/>
+<path class="tick" stroke="#005A87" d="M1095.0 120 V172"/>
+<g class="pulse"><circle cx="78" cy="224.0" r="34" fill="#FFFFFF" stroke="#C9D8E0"/><text x="78" y="236.0" text-anchor="middle" font-size="34">🧑‍💻</text></g>
+<text x="78" y="288.0" text-anchor="middle" class="cap" fill="#4D6573">people</text>
+<path class="wire" stroke="#009FE3" d="M116 224.0 H166"/>
+<path class="wire" stroke="#009FE3" d="M404 224.0 H436"/>
+<path class="wire" stroke="#009FE3" d="M674 210.0 H706"/>
+<path class="wire back" stroke="#E4007C" d="M674 238.0 H706"/>
+<path class="wire" stroke="#009FE3" d="M944 210.0 H976"/>
+<path class="wire back" stroke="#E4007C" d="M944 238.0 H976"/>
+<g><rect x="170" y="176" width="230" height="96" rx="16" fill="#FFFFFF" stroke="#C9D8E0"/><g transform="translate(186 198.0) scale(0.8125)"><polygon fill="#009FE3" points="6,40.23 17.03,45.95 34.8,11.73 23.77,6"/>
+<polygon fill="#E4007C" points="6,40.23 40.23,58 45.95,46.97 11.73,29.2"/>
+<polygon fill="#FFC400" points="29.2,52.27 40.23,58 58,23.77 46.97,18.05"/>
+<polygon fill="#6B2FA0" points="6,40.23 17.03,45.95 22.76,34.93 11.73,29.2"/>
+<polygon fill="#6B2FA0" points="29.2,52.27 40.23,58 45.95,46.97 34.93,41.24"/></g><text x="252" y="220.0" class="name" fill="#0F2A3A">portalr</text><text x="252" y="244.0" class="cap" fill="#4D6573">app and admin UIs</text></g>
+<g><rect x="440" y="176" width="230" height="96" rx="16" fill="#FFFFFF" stroke="#C9D8E0"/><g transform="translate(456 198.0) scale(0.8125)"><polygon fill="#E4007C" points="5,58 19,58 39,19.48 32,6"/>
+<polygon fill="#009FE3" points="59,58 45,58 25,19.48 32,6"/>
+<polygon fill="#2D2A8C" points="32,6 39,19.48 32,32.96 25,19.48"/></g><text x="522" y="220.0" class="name" fill="#0F2A3A">artifactr</text><text x="522" y="244.0" class="cap" fill="#4D6573">chats and artifacts</text></g>
+<g><rect x="710" y="176" width="230" height="96" rx="16" fill="#FFFFFF" stroke="#C9D8E0"/><g transform="translate(726 198.0) scale(0.8125)"><polygon fill="#E4007C" points="35,6 49,6 31,40.67 17,40.67"/>
+<polygon fill="#E4007C" points="33,23.33 47,23.33 29,58 15,58"/>
+<polygon fill="#9E0A5E" points="33,23.33 40,23.33 31,40.67 24,40.67"/></g><text x="792" y="220.0" class="name" fill="#0F2A3A">relayr</text><text x="792" y="244.0" class="cap" fill="#4D6573">the bridge</text></g>
+<g><rect x="980" y="176" width="230" height="96" rx="16" fill="#FFFFFF" stroke="#C9D8E0"/><g transform="translate(996 198.0) scale(0.8125)"><polygon fill="#FFC400" points="6,5 6,19 44.52,39 58,32"/>
+<polygon fill="#E4007C" points="6,59 6,45 44.52,25 58,32"/>
+<polygon fill="#B3122E" points="58,32 44.52,39 31.04,32 44.52,25"/></g><text x="1062" y="220.0" class="name" fill="#0F2A3A">reflexr</text><text x="1062" y="244.0" class="cap" fill="#4D6573">rules over events</text></g>
+<text x="825" y="162" text-anchor="middle" class="label" fill="#009FE3">events →</text>
+<text x="825" y="300" text-anchor="middle" class="label" fill="#E4007C">← proposals and notices</text>
+<g><rect x="440" y="330" width="770" height="84" rx="16" fill="#FFFFFF" stroke="#C9D8E0"/><g transform="translate(456 346.0) scale(0.8125)"><polygon fill="#FFC400" points="9.67,24 23.67,24 34.33,44.52 27.33,58"/>
+<polygon fill="#009FE3" points="54.33,6 40.33,6 20.33,44.52 27.33,58"/>
+<polygon fill="#00704F" points="27.33,58 34.33,44.52 27.33,31.04 20.33,44.52"/></g><text x="522" y="368.0" class="name" fill="#0F2A3A">evalr</text><text x="522" y="392.0" class="cap" fill="#4D6573">typed evaluation: judges the agents, trained on people's feedback</text></g>
+<path class="tick" stroke="#005A87" d="M555.0 276 V326"/>
+<path class="tick" stroke="#005A87" d="M1095.0 276 V326"/>
+<rect x="40" y="446" width="1200" height="124" rx="18" fill="#FFFFFF" stroke="#C9D8E0"/>
+<g transform="translate(64 468) scale(0.8125)"><polygon fill="#6A6C7C" points="19.31,16 61.31,16 54.04,30 12.04,30"/>
+<polygon fill="#6A6C7C" points="14.63,25 56.63,25 49.37,39 7.37,39"/>
+<polygon fill="#6A6C7C" points="9.96,34 51.96,34 44.69,48 2.69,48"/>
+<polygon fill="#1C1D26" points="14.63,25 56.63,25 54.04,30 12.04,30"/>
+<polygon fill="#1C1D26" points="9.96,34 51.96,34 49.37,39 7.37,39"/></g>
+<text x="132" y="490" class="name" fill="#0F2A3A">stackr</text>
+<text x="132" y="514" class="cap" fill="#4D6573">the stack it all runs on, an application template, and hosting recipes</text>
+<text x="1216" y="490" text-anchor="end" class="label" fill="#4D6573">127.0.0.1 locally · a server · AWS</text>
+<g class="pulse" style="animation-delay:0.0s"><rect x="132" y="528" width="122.80000000000001" height="28" rx="14" fill="#F3F8FA" stroke="#C9D8E0"/><text x="193.4" y="547" text-anchor="middle" class="cap" fill="#0F2A3A">🐘 PostgreSQL</text></g>
+<g class="pulse" style="animation-delay:0.3s"><rect x="264.8" y="528" width="89.2" height="28" rx="14" fill="#F3F8FA" stroke="#C9D8E0"/><text x="309.40000000000003" y="547" text-anchor="middle" class="cap" fill="#0F2A3A">🔐 GoTrue</text></g>
+<g class="pulse" style="animation-delay:0.6s"><rect x="364.0" y="528" width="97.60000000000001" height="28" rx="14" fill="#F3F8FA" stroke="#C9D8E0"/><text x="412.8" y="547" text-anchor="middle" class="cap" fill="#0F2A3A">🧭 LiteLLM</text></g>
+<g class="pulse" style="animation-delay:0.9s"><rect x="471.6" y="528" width="148.0" height="28" rx="14" fill="#F3F8FA" stroke="#C9D8E0"/><text x="545.6" y="547" text-anchor="middle" class="cap" fill="#0F2A3A">📡 OpenTelemetry</text></g>
+<g class="pulse" style="animation-delay:1.2s"><rect x="629.6" y="528" width="97.60000000000001" height="28" rx="14" fill="#F3F8FA" stroke="#C9D8E0"/><text x="678.4" y="547" text-anchor="middle" class="cap" fill="#0F2A3A">📊 Grafana</text></g>
+<g class="pulse" style="animation-delay:1.5s"><rect x="737.2" y="528" width="106.0" height="28" rx="14" fill="#F3F8FA" stroke="#C9D8E0"/><text x="790.2" y="547" text-anchor="middle" class="cap" fill="#0F2A3A">🔍 Langfuse</text></g>
+<g class="pulse" style="animation-delay:1.8s"><rect x="853.2" y="528" width="114.4" height="28" rx="14" fill="#F3F8FA" stroke="#C9D8E0"/><text x="910.4000000000001" y="547" text-anchor="middle" class="cap" fill="#0F2A3A">☁️ OpenTofu</text></g>
+</svg>

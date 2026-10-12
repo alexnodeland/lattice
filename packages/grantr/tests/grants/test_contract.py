@@ -213,6 +213,15 @@ async def test_a_rule_holds_what_it_is_granted(grants: Grants) -> None:
     assert await grants.check("acme", rule, "reflexr:cancel_run", WS)
 
 
+async def test_a_rule_posts_notices_but_not_in_a_restricted_thread(grants: Grants) -> None:
+    rule = RulePrincipal(workspace="w1", rule="chat:deploys")
+    await grants.grant("acme", "rule", on=WS, to=rule, by=ALICE)
+    assert await grants.check("acme", rule, "artifactr:post_message", THREAD)
+    await grants.restrict("acme", THREAD, by=ALICE)
+    assert not await grants.check("acme", rule, "artifactr:post_message", THREAD)
+    assert not await grants.check("acme", rule, "artifactr:edit_artifact", WS), "notices only"
+
+
 async def test_tenant_roles_reach_every_workspace_and_every_catalog(grants: Grants) -> None:
     assert await grants.check("acme", ALICE, "reflexr:install_rule", RULE)
     assert await grants.check("acme", ALICE, "portalr:read_telemetry", TENANT)

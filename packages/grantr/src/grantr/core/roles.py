@@ -143,10 +143,13 @@ RULE: Final = frozenset(
         "reflexr:checkpoint_run",
         "reflexr:read_events",
         "reflexr:read_runs",
+        "artifactr:open",
+        "artifactr:post_message",
     }
 )
 """What a stored rule's ``rule`` role holds: opening its workspace, publishing events,
-checkpointing its runs, and reading the log and its runs, as its actions do."""
+checkpointing its runs, and reading the log and its runs, as its actions do; and, through
+relayr, opening the workspace in artifactr and posting there, for its notices."""
 
 type Level = Literal["deployment", "tenant", "workspace", "item"]
 """Where a role is granted: a thread, an artifact and a rule are each an item."""

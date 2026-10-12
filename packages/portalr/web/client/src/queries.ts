@@ -32,6 +32,8 @@ export const keys = {
       [...keys.artifactr.workspace(tenant, ws), "artifacts", "list"] as const,
     artifact: (tenant: string, ws: string, artifact: string) =>
       [...keys.artifactr.workspace(tenant, ws), "artifacts", "detail", artifact] as const,
+    revisions: (tenant: string, ws: string, artifact: string) =>
+      [...keys.artifactr.artifact(tenant, ws, artifact), "revisions"] as const,
     proposals: (tenant: string, ws: string) =>
       [...keys.artifactr.workspace(tenant, ws), "proposals", "list"] as const,
   },
@@ -133,6 +135,18 @@ export function createQueries(api: Api) {
           queryFn: () =>
             body(
               api.artifactr.GET("/workspaces/{workspace_id}/artifacts/{artifact_id}", {
+                ...named(tenant),
+                params: { path: { workspace_id: ws, artifact_id: artifact } },
+              }),
+            ),
+        }),
+      /** An artifact's versions, oldest first, each with its whole data: the last is now. */
+      revisions: (tenant: string, ws: string, artifact: string) =>
+        queryOptions({
+          queryKey: keys.artifactr.revisions(tenant, ws, artifact),
+          queryFn: () =>
+            body(
+              api.artifactr.GET("/workspaces/{workspace_id}/artifacts/{artifact_id}/revisions", {
                 ...named(tenant),
                 params: { path: { workspace_id: ws, artifact_id: artifact } },
               }),

@@ -5,12 +5,23 @@
  * both.
  */
 
+export {
+  ArtifactContent,
+  type Data,
+  Diff,
+  json,
+  markdown,
+  type Renderer,
+  type Renderers,
+  rendererFor,
+} from "./artifacts";
 export { Button } from "./button";
 export {
   Composer,
   Message,
   Messages,
   ProposalCard,
+  proposedOn,
   Request,
   RunStatus,
   type Sent,

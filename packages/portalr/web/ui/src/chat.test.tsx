@@ -7,6 +7,7 @@ import {
   Message,
   Messages,
   ProposalCard,
+  proposedOn,
   Request,
   RunStatus,
   Streaming,
@@ -365,4 +366,22 @@ test("refused thumbs say so", async () => {
   await expect
     .element(screen.getByRole("alert"))
     .toHaveTextContent("That wasn't done: the server refused it.");
+});
+
+test("a proposal holds what its caller adds", async () => {
+  const screen = await render(
+    <ProposalCard proposal={proposal()}>
+      <a href="#plan_1">plan_1</a>
+    </ProposalCard>,
+  );
+  const card = screen.getByRole("region", { name: "Proposal: Tighten the launch plan" });
+  await expect.element(card.getByRole("link", { name: "plan_1" })).toBeVisible();
+});
+
+test("a proposal names the artifact it would change, unless it makes a new one", () => {
+  expect(proposedOn(proposal())).toBe("plan_1");
+  expect(
+    proposedOn(proposal({ change: { type: "create_artifact", kind: "plan", data: {} } })),
+  ).toBeNull();
+  expect(proposedOn(proposal({ change: null }))).toBeNull();
 });

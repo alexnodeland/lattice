@@ -12,6 +12,10 @@ import { Signed } from "./signed";
 const refusedFor = (error: unknown, ...statuses: number[]) =>
   error instanceof Refused && statuses.includes(error.status);
 
+/** Whether the server refused a read for what was asked: asking again would get the same. */
+const refusedOutright = (error: unknown) =>
+  error instanceof Refused && error.status >= 400 && error.status < 500;
+
 function start(root: Root, config: Config) {
   const signed = new Signed(config, () => {
     queryClient.clear();
@@ -27,7 +31,7 @@ function start(root: Root, config: Config) {
       },
     }),
     defaultOptions: {
-      queries: { retry: (count, error) => !refusedFor(error, 401, 403) && count < 3 },
+      queries: { retry: (count, error) => !refusedOutright(error) && count < 3 },
     },
   });
   const router = createRouter({

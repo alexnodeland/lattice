@@ -6,6 +6,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "diff": "9.0.0",
     "openapi-fetch": "0.17.0"
   },
   "peerDependencies": {

@@ -68,6 +68,9 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 | `/t/$tenant` | The workspaces grantr says they can open there |
 | `/t/$tenant/w/$workspace` | A workspace's threads, and a new one; its artifactr stream is open while any of its routes is |
 | `/t/$tenant/w/$workspace/threads/$thread` | A thread's chat: its messages, its runs as they stream, what a paused run waits on, its proposals, and a message to post |
+| `/t/$tenant/w/$workspace/artifacts` | The workspace's artifacts that aren't archived, each by kind and latest version |
+| `/t/$tenant/w/$workspace/artifacts/$artifact` | An artifact through its kind's renderer, its revisions newest first with what each changed, and its open proposals |
+| `/t/$tenant/w/$workspace/proposals` | Every proposal in the workspace, the open ones first, to accept or reject |
 
 TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test holds it to `src/routes/`. `moon run app:bdd` runs one feature per area through playwright-bdd, in Bun, against the test application with Supabase Auth (GoTrue, alone) in compose's `bdd` profile, served at `/auth/v1` on its origin ([ADR-0013](adr/0013-the-apps-scenarios-against-the-test-application.md)).
 
@@ -83,6 +86,8 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Request` | What a paused run waits on: a call to approve, or a question | An approval, a denial or an answer |
 | `ProposalCard` | A proposed change, its rationale and how it was resolved | Accept or reject |
 | `RunStatus` | How a run is going | Nothing |
+| `ArtifactContent`, `rendererFor`, `markdown`, `json` | An artifact, through the renderer its kind is registered with, or as JSON | Nothing |
+| `Diff` | What a revision changed, as `client`'s `changes` cut it | Nothing |
 | `Markdown` | Markdown through Streamdown: no raw HTML, links to the web, mail, the page and the application alone, images from this origin alone | Nothing |
 
 `ui` imports `client`'s types alone, which a root test holds it to.

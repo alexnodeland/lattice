@@ -20,6 +20,7 @@ nav:
   - adr/0014-the-apps-shell.md
   - adr/0015-the-chat-components-and-streamdown.md
   - adr/0016-the-threads-area.md
+  - adr/0017-the-artifacts-and-proposals-areas.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

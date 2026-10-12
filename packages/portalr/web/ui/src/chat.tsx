@@ -242,6 +242,12 @@ export function Request({
   );
 }
 
+/** The artifact a proposal would change, if it names one: a new one's is chosen when accepted. */
+export function proposedOn(proposal: Artifactr.Proposal): string | null {
+  const { change } = proposal;
+  return change !== null && "artifact_id" in change ? (change.artifact_id ?? null) : null;
+}
+
 /** What a change would do, in words. */
 function describe(change: NonNullable<Artifactr.Proposal["change"]>): string {
   switch (change.type) {
@@ -256,13 +262,16 @@ function describe(change: NonNullable<Artifactr.Proposal["change"]>): string {
   }
 }
 
-/** A proposed change, with accept and reject while it is open. */
+/** A proposed change, with accept and reject while it is open, and what its caller adds. */
 export function ProposalCard({
   proposal,
   onRespond,
+  children,
 }: {
   proposal: Artifactr.Proposal;
   onRespond?: (decision: "accept" | "reject") => Sent;
+  /** More about it, such as a link to the artifact it would change. */
+  children?: ReactNode;
 }) {
   const what = proposal.change ? describe(proposal.change) : "A change";
   const { pending, unsent, send } = useSending();
@@ -270,6 +279,7 @@ export function ProposalCard({
     <section className={card} aria-label={`Proposal: ${what}`}>
       <p className="font-semibold">{what}</p>
       {proposal.rationale && <p className="text-muted">{proposal.rationale}</p>}
+      {children}
       {proposal.status === "open" ? (
         onRespond && (
           <span className="flex gap-2">

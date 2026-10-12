@@ -20,6 +20,16 @@ function Workspace() {
         <TextLink render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}>
           Threads
         </TextLink>
+        <TextLink
+          render={<Link to="/t/$tenant/w/$workspace/artifacts" params={{ tenant, workspace }} />}
+        >
+          Artifacts
+        </TextLink>
+        <TextLink
+          render={<Link to="/t/$tenant/w/$workspace/proposals" params={{ tenant, workspace }} />}
+        >
+          Proposals
+        </TextLink>
       </nav>
       <WorkspaceStream
         key={`${tenant}/${workspace}`}

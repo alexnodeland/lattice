@@ -97,6 +97,7 @@ The documentation site is at **<https://lattice.alexnodeland.com>**, with a sect
 - [Architecture](docs/architecture.md): how the family fits together in one repository, and the [family's decisions](docs/adr/README.md).
 - Each package's section has its getting-started page, guides, reference, architecture, decisions and RFCs.
 - [RFC-0003](docs/stackr/rfcs/0003-one-repository-lattice.md) is the proposal that made lattice.
+- [The family's RFCs](docs/rfcs/README.md) propose changes across packages, starting with [grantr](docs/rfcs/0001-grantr-identity-and-access.md).
 - [lattice's brand](docs/assets/brand/README.md): the mark, the colours, and the family's brand system, recorded in [ADR-0001](docs/adr/0001-lattices-brand.md).
 
 ## Contributing

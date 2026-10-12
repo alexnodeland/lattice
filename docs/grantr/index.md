@@ -1,6 +1,6 @@
 ---
 title: grantr
-description: The planned identity and access package for artifactr and reflexr, which decides what each actor may do in a tenant before every command and read.
+description: The identity and access package for artifactr and reflexr, which decides what each actor may do in a tenant before every command and read.
 hide:
   - navigation
 ---

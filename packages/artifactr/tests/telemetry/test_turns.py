@@ -6,7 +6,8 @@ from collections.abc import AsyncGenerator, Sequence
 from typing import Any
 
 import pytest
-from opentelemetry import baggage, trace
+from langfuse import propagate_attributes
+from opentelemetry import baggage, context, trace
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.trace import StatusCode
 from pydantic_ai import Agent, DeferredToolRequests, FunctionToolset, RunContext
@@ -87,6 +88,43 @@ def parent_id(span: ReadableSpan) -> int | None:
 def span_id(span: ReadableSpan) -> int:
     assert span.context is not None
     return span.context.span_id
+
+
+async def test_a_turn_propagates_nothing_its_caller_did(
+    ws: Workspace, thread: Thread, recorder: Recorder, gate: Gate
+) -> None:
+    seen: list[dict[str, object]] = []
+
+    @contextlib.asynccontextmanager
+    async def turn_context(session: Session[Any]) -> AsyncGenerator[None]:
+        seen.append(dict(baggage.get_all()))
+        yield
+
+    script = Script(say("Done."))
+    runner = Runner(
+        traced(script, recorder), app=gate, turn_context=turn_context, **recorder.providers
+    )
+    request_tracer = recorder.tracer_provider.get_tracer("the application")
+    token = context.attach(baggage.set_baggage("caller.tags", "rule:ops:triage"))
+    try:
+        with (
+            request_tracer.start_as_current_span("invoke_workflow ops:triage") as caller,
+            propagate_attributes(tags=["rule:ops:triage"], user_id="bob"),
+        ):
+            handle = started(await runner.send(ws, thread.id, "Look"))
+    finally:
+        context.detach(token)
+    await handle.wait()
+
+    turn = recorder.span("invoke_workflow turn")
+    assert [link.context.span_id for link in turn.links] == [caller.get_span_context().span_id]
+    assert seen == [{SESSION_ID: thread.id}], "only the turn's own session"
+    in_turn = [
+        dict(span.attributes or {}) for span in recorder.spans() if trace_id(span) == trace_id(turn)
+    ]
+    assert in_turn
+    assert all("langfuse.trace.tags" not in found for found in in_turn), "not the caller's tags"
+    assert all(found.get(USER_ID) != "bob" for found in in_turn), "nor its user"
 
 
 async def test_a_turn_is_its_own_trace_linked_to_what_started_it(

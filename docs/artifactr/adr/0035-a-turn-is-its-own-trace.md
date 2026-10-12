@@ -1,6 +1,6 @@
 # ADR-0035: A turn is its own trace
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0059](0059-a-turn-starts-from-an-empty-context.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

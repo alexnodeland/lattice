@@ -18,7 +18,7 @@ ADR-0001 to ADR-0007 record the decisions D1 to D7 of [stackr RFC-0002](../../st
 | [0010](0010-mit-license.md) | MIT license | Accepted |
 | [0011](0011-documentation-site-and-brand.md) | The documentation site and brand | Accepted, amended by 0014 |
 | [0012](0012-the-libraries-pinned-by-git-revision.md) | The libraries pinned by git revision | Superseded by 0013 |
-| [0013](0013-relayr-in-lattice.md) | relayr in lattice | Accepted |
+| [0013](0013-relayr-in-lattice.md) | relayr in lattice | Accepted, amended by 0024 |
 | [0014](0014-one-site-for-the-family.md) | One site for the family | Accepted |
 | [0015](0015-cursors-leases-and-dead-letters-in-the-ledger.md) | Cursors, leases and dead letters in the ledger | Accepted, amended by 0021 |
 | [0016](0016-followers-start-on-open.md) | Followers start on open | Accepted |
@@ -26,7 +26,10 @@ ADR-0001 to ADR-0007 record the decisions D1 to D7 of [stackr RFC-0002](../../st
 | [0018](0018-bridged-events-their-fields-ids-and-projections.md) | Bridged events, their fields, ids and projections | Accepted |
 | [0019](0019-runs-act-once-through-derived-ids-and-keyed-edits.md) | Runs act once, through derived ids and keyed edits | Accepted |
 | [0020](0020-allowlists.md) | Allowlists | Accepted |
-| [0021](0021-chains-continue-across-the-bridge.md) | Chains continue across the bridge | Accepted |
+| [0021](0021-chains-continue-across-the-bridge.md) | Chains continue across the bridge | Accepted, amended by 0025 |
 | [0022](0022-what-a-rules-actor-needs-in-artifactr.md) | What a rule's actor needs in artifactr | Accepted |
+| [0023](0023-traces-linked-across-the-bridge.md) | Traces linked across the bridge | Accepted |
+| [0024](0024-langfuse-sessions-tagged-with-each-other.md) | Langfuse sessions tagged with each other | Accepted |
+| [0025](0025-counters-and-how-long-causes-are-kept.md) | Counters, and how long causes are kept | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

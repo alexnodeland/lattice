@@ -16,7 +16,7 @@ from datetime import UTC, timedelta
 from types import CoroutineType
 from typing import Any
 
-from sqlalchemy import ColumnElement, or_, select, update
+from sqlalchemy import ColumnElement, delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
@@ -182,8 +182,12 @@ class SqlLedger:
         self, workspace: WorkspaceKey, kind: CauseKind, key: str, cause: Cause
     ) -> None:
         """Record the run behind a write, by what the follower will find it by; the first kept."""
+        # Normalized to UTC, because SQLite compares timestamps as text.
+        at = self._clock().astimezone(UTC)
         await self._insert_once(
-            CauseRow(**workspace._asdict(), kind=kind, key=key, **cause.model_dump())
+            CauseRow(
+                **workspace._asdict(), kind=kind, key=key, recorded_at=at, **cause.model_dump()
+            )
         )
 
     @_awaited_to_the_end
@@ -199,6 +203,19 @@ class SqlLedger:
             run_id=row.run_id,
             depth=row.depth,
         )
+
+    @_awaited_to_the_end
+    async def forget_causes(self, workspace: WorkspaceKey, *, older_than: timedelta) -> None:
+        """Forget the causes recorded longer ago than `older_than`, by the ledger's clock."""
+        before = self._clock().astimezone(UTC) - older_than
+        async with self._sessions() as session, session.begin():
+            await session.execute(
+                delete(CauseRow).where(
+                    CauseRow.tenant_id == workspace.tenant_id,
+                    CauseRow.workspace_id == workspace.workspace_id,
+                    CauseRow.recorded_at < before,
+                )
+            )
 
     @_awaited_to_the_end
     async def followed(self) -> list[WorkspaceKey]:

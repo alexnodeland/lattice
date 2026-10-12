@@ -463,7 +463,7 @@ artifactr is traced and measured through the OpenTelemetry API only, under the i
 
 | Span | Name | Key attributes |
 |---|---|---|
-| A turn: the `Runner` handling a message, or answers that resume a run | `invoke_workflow turn`, a new trace linked to the span that started it ([ADR-0035](adr/0035-a-turn-is-its-own-trace.md)) | `gen_ai.operation.name=invoke_workflow`, `gen_ai.workflow.name=turn`, `artifactr.turn.trigger`, `artifactr.turn.outcome`, `langfuse.observation.type=chain` |
+| A turn: the `Runner` handling a message, or answers that resume a run | `invoke_workflow turn`, a new trace linked to the span that started it, and from an empty context, so it carries nothing its caller propagated ([ADR-0035](adr/0035-a-turn-is-its-own-trace.md), [ADR-0059](adr/0059-a-turn-starts-from-an-empty-context.md)) | `gen_ai.operation.name=invoke_workflow`, `gen_ai.workflow.name=turn`, `artifactr.turn.trigger`, `artifactr.turn.outcome`, `langfuse.observation.type=chain` |
 | A command committed through `Workspace.commit` | `artifactr.commit {type}` | `artifactr.command.type`, `artifactr.outcome`, `artifactr.rejection`, and what the command is about: `artifactr.artifact.id`, `artifactr.artifact.version`, `artifactr.proposal.id`, `artifactr.patch.kind`, `artifactr.patch.size` |
 | The agent run inside a turn | pydantic-ai's `invoke_agent` | artifactr's attribution, added by the capability's `wrap_run` |
 | A tool call | pydantic-ai's `execute_tool` | artifactr's attribution, and `artifactr.artifact.id` when the tool is about one artifact |

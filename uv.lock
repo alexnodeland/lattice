@@ -4135,12 +4135,22 @@ version = "0.1.0.dev0"
 source = { editable = "packages/relayr" }
 dependencies = [
     { name = "artifactr-ai" },
+    { name = "opentelemetry-api" },
     { name = "pydantic" },
     { name = "pydantic-ai-slim" },
     { name = "reflexr" },
 ]
 
 [package.optional-dependencies]
+langfuse = [
+    { name = "artifactr-ai", extra = ["langfuse"] },
+    { name = "evalr", extra = ["langfuse"] },
+    { name = "langfuse" },
+    { name = "reflexr", extra = ["langfuse"] },
+]
+otel = [
+    { name = "opentelemetry-sdk" },
+]
 postgres = [
     { name = "alembic" },
     { name = "asyncpg" },
@@ -4185,15 +4195,21 @@ requires-dist = [
     { name = "aiosqlite", marker = "extra == 'sqlite'", specifier = ">=0.22" },
     { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.20" },
     { name = "artifactr-ai", editable = "packages/artifactr" },
+    { name = "artifactr-ai", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/artifactr" },
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31" },
+    { name = "evalr", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/evalr" },
+    { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
+    { name = "opentelemetry-api", specifier = ">=1.45" },
+    { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.45" },
     { name = "pydantic", specifier = ">=2.13" },
     { name = "pydantic-ai-slim", specifier = ">=2.51" },
     { name = "reflexr", editable = "packages/reflexr" },
+    { name = "reflexr", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/reflexr" },
     { name = "relayr-ai", extras = ["sql"], marker = "extra == 'postgres'" },
     { name = "relayr-ai", extras = ["sql"], marker = "extra == 'sqlite'" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
 ]
-provides-extras = ["sql", "sqlite", "postgres"]
+provides-extras = ["sql", "sqlite", "postgres", "otel", "langfuse"]
 
 [package.metadata.requires-dev]
 dev = [

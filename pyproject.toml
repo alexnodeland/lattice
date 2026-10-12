@@ -73,6 +73,7 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["D", "ARG"]
+"packages/portalr/acceptance/**" = ["D", "ARG"]
 # pydantic-ai hides a tool's RunContext from the model, so tool docstrings don't document it.
 "packages/artifactr/src/artifactr/agent/tools.py" = ["D417"]
 "packages/reflexr/src/reflexr/agent/tools.py" = ["D417"]

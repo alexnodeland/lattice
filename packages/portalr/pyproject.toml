@@ -61,7 +61,7 @@ build-backend = "uv_build"
 # ─── types ────────────────────────────────────────────────────────────────────
 
 [tool.pyright]
-include = ["src", "tests", "scripts"]
+include = ["src", "tests", "scripts", "acceptance"]
 strict = ["src", "scripts"]
 typeCheckingMode = "standard"
 pythonVersion = "3.12"

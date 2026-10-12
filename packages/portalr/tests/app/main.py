@@ -13,11 +13,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from starlette.requests import HTTPConnection
+
 from grantr.core import User
 from grantr.fastapi import Caller, Unauthorized
 from grantr.grants import Grants, InMemoryStorage
-from starlette.requests import HTTPConnection
-
 from portalr.actions import ACTIONS
 from portalr.fastapi import UI, Site, portalr_router
 from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo

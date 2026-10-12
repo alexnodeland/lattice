@@ -8,7 +8,7 @@ and, for operators, the deployment's tenants and deep links (lattice RFC-0002).
 from collections.abc import Awaitable, Callable
 from importlib.resources import files
 from pathlib import Path
-from typing import Annotated, Any, Final, Protocol
+from typing import Annotated, Any, Final
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -16,19 +16,15 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from grantr.core import (
     DEPLOYMENT,
     TENANT,
-    AuditEntry,
     Forbidden,
     GrantrError,
     Invalid,
-    Member,
-    Membership,
-    Resource,
     Subject,
     TenantId,
     User,
-    UserId,
 )
 from grantr.fastapi import STATUS_CODES, Caller, ResolveActor, Unauthorized
+from grantr.grants import Grants
 from portalr.actions import READ_DEPLOYMENT, READ_SPEND, READ_TELEMETRY
 from portalr.fastapi.site import Site
 from portalr.fastapi.ui import ui_router
@@ -56,30 +52,6 @@ from portalr.tenant import Tenant, allowed
 
 UI: Final = Path(str(files("portalr") / "static"))
 """Where portalr's wheel carries the built UIs: ``static/app`` and ``static/admin``."""
-
-
-class Grants(Protocol):
-    """What portalr asks of grantr: its checks, its members, and its tenants.
-
-    grantr's ``Grants`` is one. The protocol exists so that the router's tests can answer
-    portalr's actions as lattice RFC-0002 intends until grantr's roles place them.
-    """
-
-    async def check(self, tenant: TenantId, subject: Subject, action: str, on: Resource) -> bool:
-        """Whether a subject may take an action on a resource in a tenant."""
-        ...
-
-    async def add_member(self, tenant: TenantId, member: Member, *, by: Subject) -> AuditEntry:
-        """Add a user to a tenant, if ``by`` may."""
-        ...
-
-    async def tenants(self, *, by: Subject) -> list[TenantId]:
-        """Every tenant, if ``by`` may list them."""
-        ...
-
-    async def member(self, tenant: TenantId, user: UserId) -> Membership | None:
-        """A user's membership of a tenant, or None if they aren't a member."""
-        ...
 
 
 class Config(BaseModel):

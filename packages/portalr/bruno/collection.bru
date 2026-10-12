@@ -1,6 +1,14 @@
 docs {
-  portalr's routes, as its test application serves them at /portalr (lattice ADR-0015). The
+  portalr's routes, as its test application serves them at /portalr (portalr ADR-0012). The
   application trusts the x-user header, so every request names its user. `moon run portalr:api`
   starts it beside Tempo, Loki, Prometheus and prom-label-proxy, seeds two tenants' telemetry,
   runs `up/` with every tool up, stops them, runs `down/`, then runs Schemathesis.
+}
+
+script:pre-request {
+  // The last hour, which holds what the two-tenant test seeded: Tempo refuses a search wider
+  // than its limit.
+  const now = Date.now();
+  bru.setVar("start", new Date(now - 60 * 60 * 1000).toISOString());
+  bru.setVar("end", new Date(now + 60 * 1000).toISOString());
 }

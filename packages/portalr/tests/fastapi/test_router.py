@@ -4,13 +4,12 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
-from grantr.core import AuditEntry, Forbidden, Invalid, Member, Subject
+from grantr.core import AuditEntry, Forbidden, Invalid, Member, Subject, User
 from grantr.grants import Grants
 from portalr.fastapi import portalr_router
 from portalr.invites import Invite, InviteFailed
 from portalr.readers import Readers
-from tests.access import Intended
-from tests.fastapi.conftest import ALICE, SITE, Stack, app_for, resolve_actor
+from tests.fastapi.conftest import ALICE, SITE, Stack, app_for, resolve_actor, seeded
 from tests.tools import fails, json
 
 WINDOW = {"start": "2026-10-12T00:00:00Z", "end": "2026-10-12T01:00:00Z"}
@@ -233,16 +232,20 @@ async def test_a_caller_bound_to_another_tenant_invites_no_one(
 
 @pytest.mark.parametrize(("error", "status"), [(Forbidden("no"), 403), (Invalid("no"), 422)])
 async def test_grantr_refusing_the_member_refuses_the_invitation(
-    grants: Grants, stack: Stack, invite: Invite, ui: Path, error: Exception, status: int
+    stack: Stack, invite: Invite, ui: Path, error: Exception, status: int
 ) -> None:
-    class Refusing(Intended):
+    class Refusing(Grants):
+        """grantr, refusing dan, whom the invitation is for."""
+
         async def add_member(self, tenant: str, member: Member, *, by: Subject) -> AuditEntry:
-            raise error
+            if member == User(id="dan"):
+                raise error
+            return await super().add_member(tenant, member, by=by)
 
     app = FastAPI()
     router = portalr_router(
         resolve_actor=resolve_actor,
-        grants=Refusing(grants),
+        grants=await seeded(Refusing),
         readers=stack.readers(),
         invite=invite,
         site=SITE,

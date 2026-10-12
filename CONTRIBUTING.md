@@ -46,6 +46,7 @@ The packages' own tasks:
 |---|---|
 | `artifactr:schema`, `reflexr:schema` | Regenerate the protocol's JSON Schemas from the models, and the REST surface's OpenAPI document from the router (a test fails if they drift) |
 | `grantr:schema` | Regenerate the admin API's OpenAPI document from the router (a test fails if it drifts) |
+| `portalr:schema` | Regenerate portalr's router's OpenAPI document (a test fails if it drifts) |
 | `artifactr:dashboards`, `reflexr:dashboards` | Regenerate the Grafana dashboards in `deploy/grafana/dashboards/` (a test fails if they drift) |
 | `artifactr:pg-up`, `reflexr:pg-up`, `grantr:pg-up`, `relayr:pg-up` | Start PostgreSQL for the SQL tests, from the package's `compose.yaml` |
 | `artifactr:test-pg`, `reflexr:test-pg`, `grantr:test-pg`, `relayr:test-pg` | Run the tests on PostgreSQL as well as SQLite |
@@ -53,6 +54,7 @@ The packages' own tasks:
 | `artifactr:pg-down`, `reflexr:pg-down`, `grantr:pg-down`, `relayr:pg-down` | Stop the package's contributor stack |
 | `artifactr:api`, `reflexr:api` | Start the reference implementation on PostgreSQL, run the package's Bruno collection and Schemathesis against it, and stop it, as CI's Acceptance job does. It needs Docker |
 | `docplan:image`, `oncall:image` | Build the reference implementation's image from the root, start it on PostgreSQL and stop it, as CI's Images job does |
+| `portalr:api` | Start portalr's test application beside Tempo, Loki, Prometheus and prom-label-proxy, seed two tenants, run its Bruno collection with the tools up and down and Schemathesis, and stop it, as CI's Acceptance job does. It needs Docker |
 | `client:api` | Start docplan and oncall, and run portalr's client against them, as CI's Acceptance job does. It needs Docker |
 | `client:types` | Regenerate the client's types from the packages' committed documents (a test fails if they drift) |
 | `lattice:knip` | Find unused files, exports and dependencies in the web packages |

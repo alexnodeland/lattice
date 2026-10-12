@@ -15,7 +15,7 @@ portalr's design is [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md), and 
 
 ## The router
 
-An application mounts `portalr_router(resolve_actor=, grants=, readers=, invite=, site=)` at `/portalr` ([ADR-0011](adr/0011-the-router-and-its-readers.md)).
+An application mounts `portalr_router(resolve_actor=, grants=, readers=, invite=, site=)` at `/portalr` ([ADR-0011](adr/0011-the-router-and-its-readers.md)). `grants` is grantr's `Grants`, with portalr's catalog, `portalr.actions.ACTIONS`, among its catalogs: grantr's roles give a tenant's owners and admins its reads, and operators the deployment's.
 
 | Route | Answers | Needs |
 |---|---|---|
@@ -45,3 +45,18 @@ Each reader takes a `Tenant` and typed parameters, and builds its query with the
 | LiteLLM | The tenant's team, `tenant-<id>`, checked again on its answer |
 
 `tests/readers/test_queries.py` builds every query each reader can send, and fails if one lacks its tenant.
+
+## The acceptance tests
+
+`moon run portalr:api` starts a test application, `tests/app/`, beside Tempo, Loki, Prometheus and prom-label-proxy, from `compose.yaml` and stackr's configuration ([ADR-0012](adr/0012-acceptance-against-a-two-tenant-stack.md)). Then:
+
+1. `acceptance/` seeds two tenants' traces, logs and metrics, one trace shared between them, and reads as each: neither sees the other's;
+2. the Bruno collection's `up/` reads every route, and checks the refusals;
+3. Tempo, Loki and the proxy stop, and `down/` finds each read `unavailable`;
+4. Schemathesis runs over `schemas/portalr.openapi.json`.
+
+Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` there; contract tests and stackr's Smoke job cover them up.
+
+## The wheel
+
+Vite builds `app` and `admin` into `src/portalr/static/`, which git ignores and the wheel carries. portalr's `build` depends on theirs, and `ui-in-wheel`, in `check`, fails unless the wheel holds both.

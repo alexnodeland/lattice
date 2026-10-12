@@ -15,6 +15,7 @@ nav:
   - adr/0009-ui-tested-in-chromium-in-both-schemes-under-bun.md
   - adr/0010-the-client-generated-types-and-resumable-stores.md
   - adr/0011-the-router-and-its-readers.md
+  - adr/0012-acceptance-against-a-two-tenant-stack.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

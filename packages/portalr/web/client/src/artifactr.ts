@@ -42,6 +42,8 @@ export interface Thread {
   readonly mode: "edit" | "suggest";
   readonly focus: readonly v1.ArtifactId[];
   readonly messages: readonly Message[];
+  /** The `seq` of its latest message, or of its start: how recently it was active. */
+  readonly active: number;
 }
 
 export interface Artifact {
@@ -97,7 +99,7 @@ type Handlers = {
 };
 
 function thread(state: Workspace, id: v1.ThreadId): Thread {
-  return state.threads[id] ?? { id, title: "", mode: "edit", focus: [], messages: [] };
+  return state.threads[id] ?? { id, title: "", mode: "edit", focus: [], messages: [], active: 0 };
 }
 
 function withThread(state: Workspace, id: v1.ThreadId, change: Partial<Thread>): Workspace {
@@ -129,7 +131,8 @@ function ignore(state: Workspace): Workspace {
 }
 
 const handlers: Handlers = {
-  thread_created: (state, event) => withThread(state, event.thread_id, { title: event.title }),
+  thread_created: (state, event, envelope) =>
+    withThread(state, event.thread_id, { title: event.title, active: envelope.seq }),
   thread_mode_changed: (state, event) => withThread(state, event.thread_id, { mode: event.mode }),
   focus_changed: (state, event) =>
     withThread(state, event.thread_id, { focus: event.artifact_ids }),
@@ -145,6 +148,7 @@ const handlers: Handlers = {
     };
     const next = withThread(state, event.thread_id, {
       messages: [...thread(state, event.thread_id).messages, message],
+      active: envelope.seq,
     });
     // The posted message is the authoritative text of what the run streamed.
     return event.run_id ? withRun(next, event.run_id, { text: "" }) : next;

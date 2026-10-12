@@ -62,6 +62,7 @@ test("a thread holds its title, mode, focus and messages", () => {
         feedback: [],
       },
     ],
+    active: 5,
   });
 });
 

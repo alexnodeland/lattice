@@ -7,7 +7,6 @@ names the tenant itself too, so a reader pointed at Prometheus directly is still
 """
 
 from dataclasses import dataclass, field
-from datetime import timedelta
 from typing import Annotated, Final, Literal
 
 import httpx
@@ -44,9 +43,8 @@ class MetricQuery(Window):
     """A metric over a window, at a step."""
 
     metric: Metric
-    step: Annotated[timedelta, Field(ge=timedelta(seconds=15), le=timedelta(days=1))] = timedelta(
-        minutes=5
-    )
+    step: Annotated[int, Field(ge=15, le=86_400)] = 300
+    """Seconds between points: from 15 to a day."""
 
 
 class Point(BaseModel):
@@ -80,7 +78,7 @@ def parameters(tenant: Tenant, query: MetricQuery) -> dict[str, str | float]:
         "query": promql(tenant, query.metric),
         "start": query.start.timestamp(),
         "end": query.end.timestamp(),
-        "step": query.step.total_seconds(),
+        "step": query.step,
         TENANT_LABEL: tenant.id,
     }
 

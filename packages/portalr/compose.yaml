@@ -15,15 +15,26 @@ services:
       dockerfile: packages/portalr/tests/app/Dockerfile
     ports:
       - "127.0.0.1::8000"
+    # Loki's image has no shell or probe of its own, so the application's check waits for it too.
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/portalr/config.json')"]
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import urllib.request
+          for url in ("http://127.0.0.1:8000/portalr/config.json", "http://loki:3100/ready"):
+              urllib.request.urlopen(url)
       interval: 2s
       timeout: 5s
-      retries: 30
+      retries: 60
     depends_on:
-      - tempo
-      - loki
-      - prom-label-proxy
+      tempo:
+        condition: service_healthy
+      loki:
+        condition: service_started
+      prom-label-proxy:
+        condition: service_healthy
 
   tempo:
     image: grafana/tempo:3.0.3
@@ -33,8 +44,14 @@ services:
     ports:
       - "127.0.0.1::3200"
       - "127.0.0.1::4318"
+    healthcheck:
+      test: ["CMD", "/tempo", "-health"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
 
   prometheus:
     image: prom/prometheus:v3.15.0
@@ -46,6 +63,11 @@ services:
       - ../stackr/deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "127.0.0.1::9090"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
 
   prom-label-proxy:
     image: quay.io/prometheuscommunity/prom-label-proxy:v0.15.1
@@ -53,10 +75,17 @@ services:
       - -label=tenant_id
       - -upstream=http://prometheus:9090
       - -insecure-listen-address=0.0.0.0:8080
+      - -internal-listen-address=127.0.0.1:8081
     ports:
       - "127.0.0.1::8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/metrics"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
 
   loki:
     image: grafana/loki:3.7.8

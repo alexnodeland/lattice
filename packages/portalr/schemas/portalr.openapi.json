@@ -88,6 +88,7 @@
         "type": "object"
       },
       "Id": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$",
         "type": "string"
       },
       "Invited": {
@@ -1129,10 +1130,11 @@
             "name": "step",
             "required": false,
             "schema": {
-              "default": "PT5M",
-              "format": "duration",
+              "default": 300,
+              "maximum": 86400,
+              "minimum": 15,
               "title": "Step",
-              "type": "string"
+              "type": "integer"
             }
           },
           {
@@ -1500,6 +1502,7 @@
             "name": "trace_id",
             "required": true,
             "schema": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$",
               "title": "Trace Id",
               "type": "string"
             }

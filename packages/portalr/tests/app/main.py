@@ -51,7 +51,7 @@ def readers() -> Readers:
     return Readers(
         tempo=Tempo(env("PORTALR_TEMPO_URL", "http://tempo:3200")),
         loki=Loki(env("PORTALR_LOKI_URL", "http://loki:3100")),
-        prometheus=Prometheus(env("PORTALR_PROMETHEUS_URL", "http://prom-label-proxy:8080")),
+        prometheus=Prometheus(env("PORTALR_PROXY_URL", "http://prom-label-proxy:8080")),
         langfuse=Langfuse(env("PORTALR_LANGFUSE_URL", "http://langfuse:3000"), project="p1"),
         litellm=LiteLLM(env("PORTALR_LITELLM_URL", "http://litellm:4000")),
         grafana=Grafana("http://localhost:3000"),

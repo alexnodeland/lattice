@@ -68,12 +68,12 @@ async def test_loki_down_or_absent_is_unavailable() -> None:
 async def test_prometheus_reads_a_metric_through_the_proxy_with_the_tenant() -> None:
     answer = {"data": {"result": [{"metric": {}, "values": [[1.5, "0.25"], [2.5, "0.5"]]}]}}
     tool = Tool({"/api/v1/query_range": json(answer)})
-    query = MetricQuery(start=START, end=END, metric="failed_runs", step=timedelta(minutes=1))
+    query = MetricQuery(start=START, end=END, metric="failed_runs", step=60)
     series = await Prometheus("http://proxy", tool.client()).series(ACME, query)
     assert isinstance(series, Ok)
     assert [(point.time, point.value) for point in series.data] == [(1.5, 0.25), (2.5, 0.5)]
     assert tool.last.url.params["tenant_id"] == "acme"
-    assert tool.last.url.params["step"] == "60.0"
+    assert tool.last.url.params["step"] == "60"
 
 
 async def test_prometheus_answering_nonsense_or_nothing_is_unavailable() -> None:

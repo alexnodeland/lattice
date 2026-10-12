@@ -50,13 +50,13 @@ Each reader takes a `Tenant` and typed parameters, and builds its query with the
 
 `moon run portalr:api` starts a test application, `tests/app/`, beside Tempo, Loki, Prometheus and prom-label-proxy, from `compose.yaml` and stackr's configuration ([ADR-0012](adr/0012-acceptance-against-a-two-tenant-stack.md)). Then:
 
-1. `acceptance/` seeds two tenants' traces, logs and metrics, one trace shared between them, and reads as each: neither sees the other's;
+1. `tests/acceptance/` seeds two tenants' traces, logs and metrics, one trace shared between them, and reads as each, through the readers and raw through prom-label-proxy: neither sees the other's;
 2. the Bruno collection's `up/` reads every route, and checks the refusals;
 3. Tempo, Loki and the proxy stop, and `down/` finds each read `unavailable`;
 4. Schemathesis runs over `schemas/portalr.openapi.json`.
 
-Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` there; contract tests and stackr's Smoke job cover them up.
+Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` there; contract tests cover them, and stackr's Smoke job reads both up through `scripts/smoke_readers.py`.
 
 ## The wheel
 
-Vite builds `app` and `admin` into `src/portalr/static/`, which git ignores and the wheel carries. portalr's `build` depends on theirs, and `ui-in-wheel`, in `check`, fails unless the wheel holds both.
+Vite builds `app` and `admin` into `src/portalr/static/`, which git ignores and the wheel carries. portalr's `build` depends on theirs, and `ui-in-wheel`, in `check` and the release workflow, fails unless this version's wheel holds both.

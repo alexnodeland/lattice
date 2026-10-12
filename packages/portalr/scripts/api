@@ -2,7 +2,7 @@
 # portalr's acceptance tests (portalr ADR-0012, lattice ADR-0015). It starts the test
 # application (tests/app/) beside Tempo, Loki, Prometheus and prom-label-proxy, from compose.yaml,
 # as a compose project of its own on ports the system picks. Then:
-#   1. the two-tenant test (acceptance/) seeds two tenants' telemetry and reads as each;
+#   1. the two-tenant test (tests/acceptance/) seeds two tenants' telemetry and reads as each;
 #   2. the Bruno collection's up/ runs with every tool up;
 #   3. Tempo, Loki and the proxy stop, and its down/ runs;
 #   4. Schemathesis runs over schemas/portalr.openapi.json.
@@ -32,18 +32,16 @@ PORTALR_TEMPO_OTLP=$(at tempo 4318) \
 PORTALR_LOKI_URL=$(at loki 3100) \
 PORTALR_PROMETHEUS_URL=$(at prometheus 9090) \
 PORTALR_PROXY_URL=$(at prom-label-proxy 8080) \
-  uv run pytest acceptance -p no:randomly
+  uv run --locked pytest tests/acceptance
 
 (cd bruno && bun x --bun --no-install bru run up --env app --env-var "baseUrl=$base")
 docker compose stop tempo loki prom-label-proxy
 (cd bruno && bun x --bun --no-install bru run down --env app --env-var "baseUrl=$base")
 
-# A caller who owns acme. Schemathesis also sends tenants it makes up, which grantr refuses:
-# positive data, rightly not accepted.
+# As acme's owner, in acme: schemathesis.toml names the tenant for portalr's reads.
 uv run --locked --group acceptance schemathesis --config-file "$root/schemathesis.toml" run \
   schemas/portalr.openapi.json \
   --url "$base" \
   --header 'x-user: alice' \
-  --exclude-checks positive_data_acceptance \
   --report junit \
   --report-dir "$report"

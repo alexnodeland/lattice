@@ -61,7 +61,7 @@ build-backend = "uv_build"
 # ─── types ────────────────────────────────────────────────────────────────────
 
 [tool.pyright]
-include = ["src", "tests", "scripts", "acceptance"]
+include = ["src", "tests", "scripts"]
 strict = ["src", "scripts"]
 typeCheckingMode = "standard"
 pythonVersion = "3.12"
@@ -79,6 +79,9 @@ timeout_method = "thread"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 filterwarnings = ["error"]
+markers = [
+    "acceptance: reads the stack's tools, which `moon run portalr:api` starts (sets PORTALR_TEMPO_URL)",
+]
 
 [tool.coverage.run]
 branch = true

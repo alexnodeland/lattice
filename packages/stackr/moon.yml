@@ -64,6 +64,11 @@ tasks:
   smoke:
     description: 'Start the stack (PROFILES, STACKR_DATABASE) and send telemetry through it'
     script: 'make up && make smoke'
+    # It also runs portalr's readers for Langfuse and LiteLLM, which nothing else runs up.
+    inputs:
+      - '**/*'
+      - '/packages/portalr/src/portalr/readers/**/*'
+      - '/packages/portalr/scripts/smoke_readers.py'
     options:
       cache: false
 

@@ -12,7 +12,6 @@ fileGroups:
     - '!src/portalr/static/**/*'
     - 'scripts/**/*'
     - 'tests/**/*'
-    - 'acceptance/**/*'
     - 'schemas/**/*'
     - 'pyproject.toml'
     - 'README.md'

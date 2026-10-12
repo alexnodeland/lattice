@@ -1,0 +1,23 @@
+meta {
+  name: a trace, with Tempo down
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/portalr/v1/traces/0123456789abcdef0123456789abcdef
+  body: none
+  auth: none
+}
+
+headers {
+  x-user: alice
+  x-tenant: acme
+}
+
+tests {
+  test("unavailable, and nothing else fails", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal("unavailable");
+  });
+}

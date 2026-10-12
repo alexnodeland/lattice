@@ -46,6 +46,10 @@ It sends a trace with a known id to the Collector's HTTP port, and finds it in L
 
 The key is deleted at the end.
 
+### `langfuse` and `gateway` together: portalr's readers
+
+portalr's Acceptance job runs neither Langfuse nor LiteLLM, so this reads both through portalr's readers, as the `stackr-smoke` tenant ([portalr ADR-0012](../../portalr/adr/0012-acceptance-against-a-two-tenant-stack.md)). portalr's `scripts/smoke_readers.py` sends Langfuse a trace tagged `tenant:stackr-smoke` with a score on it, and the Langfuse reader must find the score. The LiteLLM reader must read the tenant's team, which the gateway's check created, and find it in every tenant's spend. Each must answer `ok`.
+
 ## `make smoke-app`
 
 ```bash

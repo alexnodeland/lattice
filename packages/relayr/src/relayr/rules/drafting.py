@@ -18,9 +18,6 @@ from reflexr.core import StoredRules
 from relayr.rules.drafts import RuleDraft, check_draft
 from relayr.rules.preview import preview
 
-PREVIEWER = reflexr.SystemActor(name="relayr")
-"""Who reads reflexr's log for a preview."""
-
 INSTRUCTIONS = (
     "When a person asks for something to happen whenever something else does, draft a rule "
     "with `draft_rule`. It checks the rule and proposes it; it goes live once a person accepts "
@@ -32,20 +29,29 @@ INSTRUCTIONS = (
 class RuleDrafting(AbstractCapability[Session[Any]]):
     """Give the chat agent `draft_rule`, which checks a rule, previews it, and proposes it.
 
+    The preview reads reflexr's log as the person the turn acts for, so it counts only what they
+    may read.
+
     Args:
-        automation: reflexr's workspaces, whose log the preview replays.
+        automation: reflexr's workspaces, whose log the preview replays, and whose stored rules'
+            configuration a draft is checked against.
         events: The event types those workspaces accept, by name.
-        stored_rules: Their configuration of stored rules.
         window: How far back the preview looks.
+
+    Raises:
+        ValueError: If ``automation`` has no stored rules.
     """
 
     automation: reflexr.workspace.Workspaces
     events: Mapping[str, type[Event]]
-    stored_rules: StoredRules
     window: timedelta = timedelta(days=7)
+    _stored_rules: StoredRules = field(init=False, repr=False)
     _toolset: FunctionToolset[Session[Any]] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        if self.automation.stored_rules is None:
+            raise ValueError("the reflexr workspaces have no stored rules to draft")
+        self._stored_rules = self.automation.stored_rules
         self._toolset = self._tools()
 
     @override
@@ -77,12 +83,13 @@ class RuleDrafting(AbstractCapability[Session[Any]]):
                 rationale: Why, in the person's words.
                 artifact_id: The `rule` artifact to change, if this changes a drafted rule.
             """
-            problems = check_draft(rule, events=self.events, stored_rules=self.stored_rules)
+            problems = check_draft(rule, events=self.events, stored_rules=self._stored_rules)
             if problems:
                 raise ModelRetry("The rule can't be installed: " + "; ".join(problems))
+            person = _person(ctx.deps.on_behalf_of)
             workspace = ctx.deps.workspace
             change = await _change(workspace, rule, artifact_id, ctx.deps.thread_id)
-            fired = await self._preview(workspace, rule)
+            fired = await self._preview(workspace, rule, person)
             outcome = await submit(
                 workspace, change, propose=True, rationale=f"{rationale}\n\n{fired}"
             )
@@ -90,15 +97,27 @@ class RuleDrafting(AbstractCapability[Session[Any]]):
 
         return toolset
 
-    async def _preview(self, workspace: artifactr.Workspace, rule: Rule) -> str:
+    async def _preview(
+        self, workspace: artifactr.Workspace, rule: Rule, person: reflexr.UserActor
+    ) -> str:
         """What the preview found, for the proposal's rationale."""
         replayed = await self.automation.open(
-            workspace.tenant_id, workspace.workspace_id, actor=PREVIEWER
+            workspace.tenant_id, workspace.workspace_id, actor=person
         )
         since = self.automation.clock() - self.window
         previewed = await preview(replayed, rule, since=since)
+        times = "1 time" if previewed.firings == 1 else f"{previewed.firings} times"
         seen = "" if previewed.complete else ", among the newest events"
-        return f"It would have fired {previewed.firings} times since {since:%Y-%m-%d}{seen}."
+        return f"It would have fired {times} since {since:%Y-%m-%d}{seen}."
+
+
+def _person(acting_for: a.UserActor | a.ExternalAgentActor | None) -> reflexr.UserActor:
+    """The person a turn acts for, as reflexr names them, directly or through their client."""
+    if isinstance(acting_for, a.ExternalAgentActor):
+        acting_for = acting_for.on_behalf_of
+    if acting_for is None:
+        raise ModelRetry("Only a person can ask for a rule; this turn acts for no one.")
+    return reflexr.UserActor(id=acting_for.id, name=acting_for.name)
 
 
 async def _change(
@@ -114,6 +133,10 @@ async def _change(
         current = await workspace.get(RuleDraft, artifact_id)
     except a.NotFound as missing:
         raise ModelRetry(str(missing)) from missing
+    if current.data.rule.name != rule.name:
+        raise ModelRetry(
+            f"A rule's name can't change: keep {current.data.rule.name}, or draft a new rule."
+        )
     return current.edit(_with(rule), thread_id=thread_id)
 
 

@@ -27,6 +27,9 @@ class Preview:
     complete: bool
     """Whether it replayed the whole window, rather than only its newest envelopes."""
 
+    errors: int = 0
+    """How many envelopes the rule's evaluation recorded as errors, as reflexr would."""
+
 
 async def preview(
     workspace: Workspace, rule: Rule, *, since: datetime, limit: int = MAX_PREVIEWED
@@ -52,6 +55,7 @@ async def preview(
         replayed=len(envelopes),
         since=since,
         complete=complete,
+        errors=len(evaluation.errors),
     )
 
 

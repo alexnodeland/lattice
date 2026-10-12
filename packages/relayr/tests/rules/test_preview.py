@@ -30,8 +30,11 @@ async def _workspace(clock: FakeClock, services: list[str]) -> r.Workspace:
 async def test_it_counts_what_would_have_fired_in_the_window(clock: FakeClock) -> None:
     workspace = await _workspace(clock, ["auth", "auth", "billing", "auth"])
     since = START + timedelta(minutes=30)
+    head = len(await workspace.read())
     previewed = await preview(workspace, RULE, since=since)
     assert previewed == Preview(firings=2, replayed=3, since=since, complete=True)
+    assert len(await workspace.read()) == head, "it writes nothing"
+    assert await workspace.runs() == [], "and runs nothing"
 
 
 async def test_it_replays_only_the_newest_envelopes_past_its_limit(clock: FakeClock) -> None:

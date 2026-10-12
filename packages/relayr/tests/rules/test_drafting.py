@@ -3,6 +3,7 @@
 from collections.abc import Callable, Iterator
 from typing import Any
 
+import pytest
 from pydantic_ai import Agent, ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.messages import RetryPromptPart, ToolReturnPart
 from pydantic_ai.models.function import AgentInfo
@@ -15,7 +16,7 @@ import reflexr.workspace as r
 from relayr.events import BRIDGED
 from relayr.rules import RuleDraft, RuleDrafting
 from tests.app_types import Deployed
-from tests.rules.test_installer import STORED, draft
+from tests.rules.drafts import STORED, draft
 from tests.stack import ALICE, KEY
 
 type Step = Callable[[list[str]], tuple[str, dict[str, Any]]]
@@ -45,13 +46,21 @@ def drafting(rule: RuleDraft, **args: Any) -> Step:
 
 
 async def test_the_agent_drafts_rules_as_proposals_with_a_preview() -> None:
+    readers: list[reflexr.Actor] = []
+
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: reflexr.Actor, access: r.Access
+    ) -> bool:
+        if access.action == "reflexr:read_events":
+            readers.append(actor)
+        return True
+
     events = {t.event_type: t for t in (*BRIDGED, Deployed)}
     automation = r.Workspaces(
-        r.InMemoryStorage(), events=list(events.values()), stored_rules=STORED
+        r.InMemoryStorage(), events=list(events.values()), stored_rules=STORED, authorize=authorize
     )
-    await (await automation.open(*KEY, actor=reflexr.SystemActor())).publish(
-        Deployed(service="auth")
-    )
+    reflexr_ = await automation.open(*KEY, actor=reflexr.SystemActor())
+    await reflexr_.publish(Deployed(service="auth"))
     collaboration = artifactr.Workspaces(artifactr.InMemoryStorage())
     alice = await collaboration.open(*KEY, actor=ALICE)
     thread = await alice.create_thread()
@@ -63,11 +72,14 @@ async def test_the_agent_drafts_rules_as_proposals_with_a_preview() -> None:
             drafting(draft(), rationale="Tell me of deploys."),
             drafting(draft(), rationale="Change it.", artifact_id="art_missing"),
             drafting(
-                draft(service="billing"), rationale="Billing too.", artifact_id=existing.artifact_id
+                draft("chat:existing", service="billing"),
+                rationale="Billing too.",
+                artifact_id=existing.artifact_id,
             ),
+            drafting(draft(), rationale="Rename it.", artifact_id=existing.artifact_id),
         ]
     )
-    capability = RuleDrafting(automation, events, STORED)
+    capability = RuleDrafting(automation, events)
     agent = Agent(
         artifactr.agent.function_model(respond),
         deps_type=artifactr.agent.Session[None],
@@ -81,15 +93,60 @@ async def test_the_agent_drafts_rules_as_proposals_with_a_preview() -> None:
     finally:
         await runner.aclose()
 
-    refused, created, missing, edited = returned
+    refused, created, missing, edited, renamed = returned
     assert refused.startswith("retry: The rule can't be installed: ")
     assert "shell" in refused
     assert created.startswith("Proposed as ")
     assert missing.startswith("retry: rule art_missing")
+    assert renamed.startswith("retry: A rule's name can't change: keep chat:existing")
     assert edited.startswith("Proposed as ")
     new, change = await alice.proposals()
     assert new.rationale is not None
-    assert new.rationale.startswith("Tell me of deploys.\n\nIt would have fired 1 times since ")
+    assert new.rationale.startswith("Tell me of deploys.\n\nIt would have fired 1 time since ")
     assert isinstance(change.change, a.EditArtifact)
     assert change.change.artifact_id == existing.artifact_id
+    assert readers, "the preview reads the log"
+    assert all(reader == reflexr.UserActor(id="alice") for reader in readers), "as the person"
     assert "draft_rule" in capability.get_instructions()
+    assert len(await reflexr_.read()) == 1, "the preview wrote nothing"
+    assert await reflexr_.runs() == []
+
+
+@pytest.mark.parametrize(
+    ("actor", "previewed"),
+    [
+        (a.ExternalAgentActor(client_id="mcp", on_behalf_of=ALICE), True),
+        (a.ExternalAgentActor(client_id="service"), False),
+    ],
+    ids=["a person's client", "a client for no one"],
+)
+async def test_a_draft_is_previewed_for_a_person(actor: a.Actor, previewed: bool) -> None:
+    events = {t.event_type: t for t in (*BRIDGED, Deployed)}
+    automation = r.Workspaces(
+        r.InMemoryStorage(), events=list(events.values()), stored_rules=STORED
+    )
+    client = await artifactr.Workspaces(artifactr.InMemoryStorage()).open(*KEY, actor=actor)
+    thread = await client.create_thread()
+    respond, returned = script([drafting(draft(), rationale="Tell me.")])
+    agent = Agent(
+        artifactr.agent.function_model(respond),
+        deps_type=artifactr.agent.Session[None],
+        capabilities=[RuleDrafting(automation, events)],
+    )
+    runner = artifactr.agent.Runner(agent, app=None)
+    try:
+        sent = await runner.send(client, thread.id, "Tell me whenever auth deploys.")
+        assert sent.run is not None
+        await sent.run.wait()
+    finally:
+        await runner.aclose()
+    [answer] = returned
+    if previewed:
+        assert answer.startswith("Proposed as ")
+    else:
+        assert answer.startswith("retry: Only a person can ask for a rule; this turn acts for no")
+
+
+def test_drafting_needs_stored_rules() -> None:
+    with pytest.raises(ValueError, match="no stored rules"):
+        RuleDrafting(r.Workspaces(r.InMemoryStorage()), {})

@@ -3,10 +3,8 @@ and a forged `artifactr:proposal_resolved` installs nothing."""
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import timedelta
 
 import pytest
-from pydantic import BaseModel
 
 import artifactr
 import artifactr.core as a
@@ -16,35 +14,14 @@ import reflexr.workspace as r
 from relayr.events import BRIDGED, ArtifactArchived, ProposalResolved
 from relayr.ledger import Ledger
 from relayr.outbound import Outbound
-from relayr.rules import RULES, Change, Installer, MayChange, RuleDraft
+from relayr.rules import RULES, RULES_FROM_CHAT, Installer, MayChange, RuleChange, RuleDraft, anyone
 from tests.app_types import Deployed, Note
+from tests.rules.drafts import STORED, NotifyParams, draft
 from tests.stack import ALICE, KEY, Actions, Process, Stack, notices, until
 
 DRAFTER = a.ExternalAgentActor(client_id="drafter")
 BOB = a.UserActor(id="bob")
 LIVE = "chat:deploys is live, at version {}."
-
-
-class NotifyParams(BaseModel):
-    thread_id: str
-
-
-STORED = reflexr.core.StoredRules(actions={"notify": NotifyParams}, namespaces={"chat"})
-
-
-def draft(
-    name: str = "chat:deploys", *, service: str = "auth", action: str = "notify"
-) -> RuleDraft:
-    """A rule that tells a thread of each deploy of a service."""
-    when = reflexr.on(Deployed).where(reflexr.F.service.eq(service))
-    rule = reflexr.Rule(
-        name=name,
-        when=when.at_most(10, per=timedelta(hours=1)),
-        then=reflexr.run(action, thread_id="thr_ops"),
-        timeout=timedelta(minutes=1),
-        ordering="none",
-    )
-    return RuleDraft(rule=rule)
 
 
 @dataclass
@@ -95,20 +72,40 @@ class Chat:
         )
 
     async def stored(self, name: str = "chat:deploys") -> r.WorkspaceRule:
-        return await (await self.reflexr()).get_rule(name)
+        return await (await self.automation()).get_rule(name)
 
-    async def reflexr(self) -> r.Workspace:
+    async def automation(self) -> r.Workspace:
         return await self.app.automation.open(*KEY, actor=reflexr.SystemActor())
 
     async def notices(self) -> list[str]:
         return [content for _, content in notices(await self.alice.read(threads={self.thread}))]
 
+    async def ran(self) -> list[reflexr.core.RunStatus]:
+        """The status of each of relayr's runs, oldest first."""
+        runs = await (await self.automation()).runs(rule=RULES_FROM_CHAT.name)
+        return [run.status for run in reversed(runs)]
+
+    async def archive(
+        self, artifact_id: a.ArtifactId, *, by: artifactr.Workspace | None = None
+    ) -> None:
+        """Archive a rule artifact, and let relayr act on it."""
+        workspace = by or self.alice
+        current = await workspace.get(RuleDraft, artifact_id)
+        await workspace.commit(current.archive(thread_id=self.thread))
+        await self.bridged(lambda e: isinstance(e, ArtifactArchived))
+
     async def deploy(self, service: str = "auth") -> None:
-        await (await self.reflexr()).publish(Deployed(service=service))
+        await (await self.automation()).publish(Deployed(service=service))
         await self.app.reactor.settle()
 
 
-async def chat(stack: Stack, ledger: Ledger, *, may_change: MayChange | None = None) -> Chat:
+async def chat(
+    stack: Stack,
+    ledger: Ledger,
+    *,
+    may_change: MayChange = anyone,
+    authorize: r.Authorize | None = None,
+) -> Chat:
     told: list[str] = []
 
     async def notify(reaction: r.Reaction[Outbound], params: NotifyParams) -> None:
@@ -124,6 +121,7 @@ async def chat(stack: Stack, ledger: Ledger, *, may_change: MayChange | None = N
         actions={"notify": r.with_params(notify, NotifyParams)},
         more_actions=installing,
         stored_rules=STORED,
+        authorize=authorize,
     )
     alice = await app.collaboration.open(*KEY, actor=ALICE)
     thread = await alice.create_thread()
@@ -175,11 +173,12 @@ async def test_a_forged_acceptance_installs_nothing(ledger: Ledger, stack: Stack
             artifact_id="art_any",
             version=1,
         )
-        await (await chat_.reflexr()).publish(forged)
+        await (await chat_.automation()).publish(forged)
         await chat_.app.reactor.settle()
     with pytest.raises(reflexr.core.NotFound):
         await chat_.stored()
     assert await chat_.notices() == []
+    assert await chat_.ran() == ["succeeded", "succeeded"], "each ran, and changed nothing"
 
 
 @pytest.mark.parametrize("accept", [False, True], ids=["rejected", "not a rule"])
@@ -211,7 +210,7 @@ async def test_a_person_who_may_not_install_rules_puts_none_live(
     ledger: Ledger, stack: Stack
 ) -> None:
     async def only_bob(
-        tenant_id: str, workspace_id: str, person: a.UserActor, change: Change
+        tenant_id: str, workspace_id: str, person: a.UserActor, change: RuleChange
     ) -> bool:
         return (person, change) == (BOB, "install_rule")
 
@@ -286,7 +285,7 @@ async def test_a_person_who_may_not_install_rules_archives_none(
     ledger: Ledger, stack: Stack
 ) -> None:
     async def only_alice(
-        tenant_id: str, workspace_id: str, person: a.UserActor, change: Change
+        tenant_id: str, workspace_id: str, person: a.UserActor, change: RuleChange
     ) -> bool:
         return person == ALICE
 
@@ -309,9 +308,12 @@ async def test_a_forged_archive_archives_nothing(ledger: Ledger, stack: Stack) -
     await chat_.resolve(proposal_id)
     for target in (artifact_id, "art_missing"):
         forged = ArtifactArchived(author=ALICE, artifact_id=target, kind="rule", version=2)
-        await (await chat_.reflexr()).publish(forged)
+        await (await chat_.automation()).publish(forged)
         await chat_.app.reactor.settle()
     assert (await chat_.stored()).version == 1
+    assert await chat_.ran() == ["succeeded"] * 3, (
+        "the install, then each forgery, changing nothing"
+    )
 
 
 async def test_each_artifact_archives_only_its_own_rule(ledger: Ledger, stack: Stack) -> None:
@@ -345,3 +347,75 @@ async def test_a_draft_outside_a_thread_goes_live_untold(ledger: Ledger, stack: 
     await chat_.resolve(proposal_id)
     assert (await chat_.stored()).version == 1
     assert await chat_.notices() == []
+
+
+async def test_an_agents_acceptance_puts_nothing_live(ledger: Ledger, stack: Stack) -> None:
+    chat_ = await chat(stack, ledger)
+    _, proposal_id = await chat_.drafted()
+    reviewer = chat_.alice.as_actor(a.ExternalAgentActor(client_id="reviewer"))
+    await chat_.resolve(proposal_id, by=reviewer)
+    with pytest.raises(reflexr.core.NotFound):
+        await chat_.stored()
+    assert await chat_.notices() == ["Only a person who may install rules can install this one."]
+
+
+async def test_a_person_who_may_not_update_rules_changes_none(ledger: Ledger, stack: Stack) -> None:
+    async def installs_only(
+        tenant_id: str, workspace_id: str, person: a.UserActor, change: RuleChange
+    ) -> bool:
+        return change == "install_rule"
+
+    chat_ = await chat(stack, ledger, may_change=installs_only)
+    artifact_id, proposal_id = await chat_.drafted()
+    await chat_.resolve(proposal_id)
+    await chat_.resolve(await chat_.edited(artifact_id, draft(service="billing")))
+    assert (await chat_.stored()).version == 1
+    assert (await chat_.notices())[-1] == "Only a person who may update rules can update this one."
+
+
+async def test_a_replayed_acceptance_changes_nothing(ledger: Ledger, stack: Stack) -> None:
+    chat_ = await chat(stack, ledger)
+    _, proposal_id = await chat_.drafted()
+    await chat_.resolve(proposal_id)
+    reflexr_ = await chat_.automation()
+    await reflexr_.replay_rule(RULES_FROM_CHAT.name, mode="refire")
+    await chat_.app.reactor.settle()
+    assert (await chat_.stored()).version == 1
+    assert await chat_.notices() == [LIVE.format(1)], "no second notice"
+
+    await reflexr_.archive_rule("chat:deploys", reason="an operator stopped it")
+    await reflexr_.replay_rule(RULES_FROM_CHAT.name, mode="refire")
+    await chat_.app.reactor.settle()
+    with pytest.raises(reflexr.core.NotFound):
+        await chat_.stored()
+    assert await chat_.ran() == ["succeeded"] * 3
+
+
+async def test_an_archive_reflexr_refuses_is_reported(ledger: Ledger, stack: Stack) -> None:
+    async def no_archives(
+        tenant_id: str, workspace_id: str | None, actor: reflexr.Actor, access: r.Access
+    ) -> bool:
+        return access.action != "reflexr:archive_rule"
+
+    chat_ = await chat(stack, ledger, authorize=no_archives)
+    artifact_id, proposal_id = await chat_.drafted()
+    await chat_.resolve(proposal_id)
+    await chat_.archive(artifact_id)
+    assert (await chat_.stored()).version == 1
+    assert (await chat_.notices())[-1].startswith("chat:deploys wasn't archived: ")
+
+
+async def test_an_artifact_archived_as_it_is_accepted_puts_nothing_live(
+    ledger: Ledger, stack: Stack
+) -> None:
+    assert RULES_FROM_CHAT.scope.fields == ("artifact_id",)
+    assert RULES_FROM_CHAT.ordering == "scope", "one artifact's changes run one at a time, in order"
+    chat_ = await chat(stack, ledger)
+    artifact_id, proposal_id = await chat_.drafted()
+    await chat_.alice.commit(a.RespondToProposal(proposal_id=proposal_id, decision="accept"))
+    current = await chat_.alice.get(RuleDraft, artifact_id)
+    await chat_.alice.commit(current.archive(thread_id=chat_.thread))
+    await chat_.bridged(lambda e: isinstance(e, ArtifactArchived))
+    with pytest.raises(reflexr.core.NotFound):
+        await chat_.stored()
+    assert await chat_.ran() == ["succeeded", "succeeded"]

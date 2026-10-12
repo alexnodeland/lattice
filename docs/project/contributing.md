@@ -16,5 +16,6 @@ as they do on GitHub. Add a definition here for every link added to CONTRIBUTING
 [lattice-adr-0010]: ../adr/0010-every-projects-tests-run-in-a-random-order.md
 [lattice-adr-0011]: ../adr/0011-codeql-and-scorecard.md
 [lattice-adr-0012]: ../adr/0012-title-checks-the-breaks-in-the-public-apis.md
+[lattice-adr-0016]: ../adr/0016-a-merge-queue-on-mergify.md
 [license]: license.md
 [security]: security.md

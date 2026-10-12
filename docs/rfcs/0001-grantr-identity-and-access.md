@@ -1,16 +1,16 @@
 # RFC-0001: grantr, identity and access
 
-**Status:** Discussion
+**Status:** Accepted
 **Author:** Alex Nodeland
 **Created:** 2026-10-12
-**Discussion:** the pull request that adds this RFC; its decisions were taken with the maintainer on 2026-10-12 (D9 with the portal RFC's), and [Decisions](#decisions) records them
+**Discussion:** [#43](https://github.com/alexnodeland/lattice/pull/43); accepted on 2026-10-12, with the decisions in [Decisions](#decisions) (D9 taken with lattice RFC-0002's)
 **Siblings:**
 
 - [artifactr ADR-0012][a-adr-0012] and [ADR-0048][a-adr-0048] put authorization within a tenant behind one hook, asked in one place. This RFC widens that hook, and amends both.
 - [reflexr ADR-0016][r-adr-0016] and [reflexr RFC-0003][r-rfc-0003] scope reflexr to tenants and workspaces, and give stored rules their own `allow` hook, which this RFC folds into the widened one.
 - [stackr ADR-0002][s-adr-0002] and [ADR-0011][s-adr-0011] verify Supabase Auth tokens in the template, with the tenant in a claim. This RFC moves the tenant out of the token.
 - [stackr RFC-0002][s-rfc-0002] leaves open who may accept a rule drafted in chat. grantr answers it.
-- The portal RFC, which follows this one, builds portalr's admin UI on grantr's API.
+- [lattice RFC-0002](0002-portalr-the-portal.md) is portalr, whose admin UI manages access through grantr's API.
 
 ## Summary
 
@@ -50,7 +50,7 @@ Supabase Auth proves who a person is. grantr decides what they may do. The libra
 
 ### The widened hook
 
-Both libraries define the same types, in their `workspace` modules, where `Authorize` lives today:
+The libraries define these types in their `workspace` modules, where `Authorize` lives today. artifactr defines all of them, and its `Access` has no `rule`. reflexr has no threads or artifacts, so it defines `Access` (with `rule`, without `thread_id` and `artifact_id`), `Authorize`, `OnOpen` and `ACTIONS`, and no `Visibility` or `Hidden`. grantr reads an `Access`'s fields by name, so the two shapes need no common class.
 
 ```python
 class Access(BaseModel):
@@ -122,14 +122,14 @@ This makes the work codebase's bug impossible by construction: the actor a check
 | **Service principal** | A tenant's non-human principal, with an id, a name and any number of keys. Integrations, MCP clients and rules are service principals |
 | **Group** | A tenant's named set of users and service principals |
 | **Role** | A named set of actions. Built-in roles are fixed; a tenant may define its own |
-| **Grant** | A role, on a resource (the tenant, a workspace, a thread, an artifact or a rule), to a subject (a user, a group or a service principal) |
+| **Grant** | A role, on a resource (the deployment, a tenant, a workspace, or a thread, artifact or rule in a workspace), to a subject (a user, a group or a service principal) |
 | **Restricted** | A flag on a thread or artifact, set and cleared with `grantr:restrict`. Grants on an item add to the workspace's grants; on a restricted item, they are the only ones |
 
 The built-in roles:
 
 | Role | On | May |
 |---|---|---|
-| `operator` | the deployment | see every tenant, and the stack's shared tools (Langfuse, Grafana, Tempo, LiteLLM), which aren't tenant-scoped. Given only by another operator, or by the first one the template creates |
+| `operator` | the deployment | see every tenant, and the stack's shared tools (Langfuse, Grafana, LiteLLM), which aren't tenant-scoped. Given only by another operator, or by `make operator EMAIL=...`, which grants the first |
 | `owner` | tenant | everything in the tenant, including deleting it and managing owners |
 | `admin` | tenant | everything but the above: members, groups, roles, keys, every workspace |
 | `member` | tenant | belong to the tenant; workspace roles give access to its workspaces |
@@ -139,6 +139,8 @@ The built-in roles:
 
 Rule management (`reflexr:install_rule`, `update_rule`, `archive_rule`, `replay_rule`) is in the workspace `admin` role only. That answers stackr RFC-0002's "who may accept a rule": a workspace admin. A custom role can hand it to others.
 
+- **grantr's own catalog:** `grantr:create_tenant`, `delete_tenant`, `add_member`, `remove_member`, `manage_groups`, `define_role`, `grant`, `revoke`, `issue_key`, `revoke_key`, `restrict`, `read_audit` and `grant_operator`. `operator` holds `create_tenant` and `grant_operator`, on the deployment. `owner` holds the rest on its tenant, and `admin` all of them but `delete_tenant` and granting `owner`. A workspace `admin` holds `grant`, `revoke` and `restrict` within its workspace.
+- **Tenant roles cover every catalog.** The catalogs come from the application, so a tenant `owner` or `admin` holds every tenant-level action in every catalog it is handed: portalr's `portalr:read_telemetry` and `portalr:read_spend` (lattice RFC-0002), for one. Workspace roles are defined by action names in the libraries' catalogs, so a library's new read lands in `viewer` by its `read_` prefix, and a new command lands in no built-in role until the role is changed, which the matrix snapshot makes a reviewed change.
 - **`operator` is a grant, never a flag.** It is given and revoked like any role, recorded in the audit log, and held by few. It doesn't put an operator inside a tenant's workspaces: reading a tenant's threads still needs a role there, which an operator can grant themselves, in the audit log.
 - **No one grants more than they hold.** A grant is refused if its role has an action the granter can't take on that resource.
 - **Custom roles** are a tenant's own named sets of actions, validated against the catalogs. They can be granted wherever a built-in workspace role can. The built-in roles can't be edited, so a deployment's meaning of `editor` doesn't drift.
@@ -160,6 +162,25 @@ class Grants:
 
 
 SubjectOf = Callable[[TenantId, WorkspaceId | None, Actor], Subject]
+
+type UserId = str
+type Subject = User | ServicePrincipal | RulePrincipal | Agent    # frozen models, discriminated by kind
+#   User(id: UserId); ServicePrincipal(id: str); RulePrincipal(workspace: WorkspaceId, rule: str); Agent()
+type ResourceKind = Literal["deployment", "tenant", "workspace", "thread", "artifact", "rule"]
+
+class Resource(BaseModel):          # frozen; its parent chain is implied by the fields set
+    kind: ResourceKind
+    workspace: WorkspaceId | None = None
+    id: str | None = None           # the thread, artifact or rule
+
+class Membership(BaseModel):        # frozen
+    tenant: TenantId
+    user: UserId
+    roles: tuple[str, ...]
+
+class Hooks(NamedTuple):
+    authorize: Authorize
+    hidden: Hidden
 ```
 
 - **`check`, and `hidden` and `resources`, are shaped like OpenFGA's `Check` and `ListObjects`,** so an OpenFGA adapter can be added if the model ever outgrows fixed resource levels. None is planned.
@@ -174,7 +195,7 @@ SubjectOf = Callable[[TenantId, WorkspaceId | None, Actor], Subject]
   | `SystemActor`, `EvaluatorActor` | the application's service principal |
   | `SourceActor` | the service principal for that source |
 
-- **The SQL adapter** uses SQLAlchemy and Alembic, with `grantr_`-prefixed tables in the application's schema, as the libraries' adapters do. One query answers a check: the grants on the resource and its ancestors, for the subject and its groups.
+- **The SQL adapter** uses SQLAlchemy and Alembic, with `grantr_`-prefixed tables in the application's schema, as the libraries' adapters do: `grantr_tenants`, `grantr_users`, `grantr_principals`, `grantr_keys`, `grantr_groups`, `grantr_group_members`, `grantr_roles`, `grantr_grants`, `grantr_resources` (each workspace, thread, artifact and rule grantr knows, with its parent and the restricted flag) and `grantr_audit`. One query answers a check: the grants on the resource and its ancestors, for the subject and its groups, through an index on `grantr_grants (tenant_id, resource_id, subject_id)`.
 - **Decisions aren't cached across requests.** A check is one indexed query, and a cache would make revocation late. A request may reuse its own answers.
 
 ### Tenancy and authentication
@@ -187,7 +208,9 @@ grantr owns membership; Supabase Auth only authenticates.
 - **Service principal keys** are a public id and 32 random bytes, `grantr_sk_<id>_<secret>`, shown once. grantr finds a key by its id and compares a SHA-256 digest of the secret; 32 random bytes need no salt.
 - **A key names its tenant.** A request with a key resolves to the key's service principal and tenant, so a key can't reach another tenant.
 - **MCP clients.** A client with a key is an `ExternalAgentActor` whose `client_id` is its service principal's id. A person who connects with their own token is an `ExternalAgentActor` acting for them, and is checked as them.
-- **Provisioning is one call.** Creating a tenant in grantr calls the application's `on_tenant_created` callback, where the template creates the tenant's LiteLLM team and key, as `make tenant` does by hand today. Inviting a user goes through the Supabase Auth admin API in the console (portalr's RFC), which returns the `sub` that grantr's membership records.
+- **Provisioning is one call.** Creating a tenant in grantr calls the application's `on_tenant_created` callback, where the template creates the tenant's LiteLLM team and key, as `make tenant` does by hand today. Inviting a user is portalr's `POST /portalr/v1/invites` (lattice RFC-0002), which calls the Supabase Auth admin API for the user's `sub`, then adds the membership in grantr.
+
+- **Errors keep the libraries' shapes.** No token, or an invalid one, is 401. A request from a non-member of the named tenant, or one `authorize` refuses, is the existing `Forbidden`: 403 over REST, a `forbidden` error frame on a WebSocket, and `INVALID_PARAMS` over MCP. A hidden item is `NotFound`, 404. A request with no tenant from a user with several memberships is 400.
 
 ### The audit log
 
@@ -216,7 +239,7 @@ grantr ships the other half, `grantr.testing.matrix(catalogs, roles)`, which pri
 ### grantr's surfaces
 
 - **A FastAPI router,** `grantr_router(grants, resolve_actor=...)`, for tenants, members, groups, roles, grants, restrictions, keys and the audit log. It checks its callers with grantr's own actions (`grantr:add_member`, `grantr:issue_key`, ...), granted by the tenant `owner` and `admin` roles.
-- **Two reads for UIs:** `GET /grantr/v1/me`, the caller's roles in the active tenant and the workspaces they can open (from `resources`), and `POST /grantr/v1/checks`, a batch of `(action, resource)` questions answered in one call. A UI asks rather than working out a permission itself; each command is checked again when it arrives. portalr (lattice RFC-0002) uses both.
+- **Two reads for UIs:** `GET /grantr/v1/me`, the caller's roles in the active tenant and the workspaces they can open (from `resources`), or, without `X-Tenant`, the caller's memberships; and `POST /grantr/v1/checks`, a batch of `{"action": ..., "resource": {"kind": ..., "workspace": ..., "id": ...}}` questions answered with a list of booleans in the same order. A UI asks rather than working out a permission itself; each command is checked again when it arrives. portalr (lattice RFC-0002) uses both.
 - **Its OpenAPI document** is committed in `packages/grantr/schemas/` with a drift test, as stackr RFC-0003 plans, and portalr's client takes its types from it.
 - **No MCP server in v0.1.** Managing access through an agent is a later decision.
 - **Telemetry** follows the family's: spans for checks over a threshold, counters for allowed and refused checks by action, and the audit events.
@@ -226,8 +249,9 @@ grantr ships the other half, `grantr.testing.matrix(catalogs, roles)`, which pri
 The template gains an `access` question, `grantr` by default, `none` to keep today's behaviour.
 
 - `auth.py` resolves a principal from a Supabase token or a service principal key, and the active tenant from the request, checked against grantr.
-- `collaboration.py` and `automation.py` pass `grants.hooks(subject_of)` to their `Workspaces`, and `on_open=` the mirrors and, later, relayr's followers.
-- `make tenant NAME=acme OWNER=alice@example.com` creates the tenant in grantr, which creates its LiteLLM team, and makes Alice its owner.
+- `collaboration.py` and `automation.py` pass `grants.hooks(subject_of)` to their `Workspaces`. `Workspaces` takes one `on_open`, which the template composes from the mirrors' `watch` and, once relayr is wired, its followers' start, each idempotent.
+- `make tenant NAME=acme OWNER=alice@example.com` creates the tenant in grantr, which creates its LiteLLM team, and makes Alice its owner. `make operator EMAIL=...` grants a deployment's first operator.
+- **Migrating an application.** `make migrate-tenants`, run once, reads each Supabase user's `app_metadata.tenant_id` and creates the tenant and the membership in grantr. `AUTH_TENANT_CLAIM` is then removed.
 - The SQL options turn on row-level security with PostgreSQL, and the application connects as a non-owner role that the template's migrations create.
 
 ### What changes in each package
@@ -235,22 +259,22 @@ The template gains an `access` question, `grantr` by default, `none` to keep tod
 | Package | Changes | Breaking |
 |---|---|---|
 | artifactr | `Access`, `Visibility`, the widened `Authorize`, `Hidden` and `OnOpen` on `Workspaces`; `ACTIONS`; a check in every `Workspace` method; filtered reads; `on_behalf_of` on the agent and external agent actors; one author per turn; the row-level security option; the matrix test | Yes: `Authorize`'s signature, and where the hooks are passed |
-| reflexr | The same types, hooks and checks; `ACTIONS`; the tenant-wide reads ask `authorize`; `StoredRules.allow` removed; the row-level security option, with its dispatcher on the second engine; the matrix test | Yes: `Authorize`'s signature, where the hooks are passed, and `StoredRules.allow` |
-| relayr | `on_open` for its followers; row-level security option | No: relayr has no release yet |
+| reflexr | `Access`, the widened `Authorize` and `OnOpen` on `Workspaces`, with no `Hidden`; `ACTIONS`; the tenant-wide reads ask `authorize`; `StoredRules.allow` removed; the row-level security option, with its dispatcher on the second engine; the matrix test | Yes: `Authorize`'s signature, where the hooks are passed, and `StoredRules.allow` |
+| relayr | Its followers start from an `OnOpen` the template composes with the mirrors'; the row-level security option | No: relayr has no release yet |
 | stackr | The `access` question; tenancy from grantr; keys; `make tenant`; row-level security with PostgreSQL | Yes, for generated applications: a client must name its tenant if its user has several |
 | grantr | New | |
 
-The ADRs this amends: artifactr ADR-0012 and ADR-0048, reflexr ADR-0016 and its amendment, and stackr ADR-0002, ADR-0011 and ADR-0015.
+The ADRs this amends: artifactr ADR-0012 and ADR-0048, reflexr ADR-0016 and its amendment, and stackr ADR-0002, ADR-0011 and ADR-0015. The breaking changes land as `feat(<package>)!:` commits, which bump the minor version before 1.0 (lattice ADR-0006), and each changelog entry links this RFC.
 
 ### Phases
 
 | Phase | Deliverable | Exit criteria |
 |---|---|---|
-| 1. The hook | `Access`, the widened `Authorize`, `OnOpen` and `ACTIONS` in artifactr and reflexr, held by `Workspaces`; a check in every `Workspace` method; `StoredRules.allow` folded in; one author per turn; the matrix tests; the template's mirrors on `on_open` | Every library's matrix test passes, and a template application behaves as before with an allow-all hook |
-| 2. grantr's core | The package, its model, built-in and custom roles, groups, service principals, `check`, the audit log, and the in-memory adapter, with the contract test | In the contract test, a viewer is refused an edit, a key can't reach another tenant, and no one grants more than they hold |
+| 1. The hook | `Access`, the widened `Authorize`, `OnOpen` and `ACTIONS` in artifactr and reflexr, held by `Workspaces`; `on_behalf_of` on artifactr's agent and external agent actors; a check in every `Workspace` method; `StoredRules.allow` folded in; one author per turn; the matrix tests; the template's mirrors on `on_open` | Every library's matrix test passes, and a template application behaves as before with an allow-all hook |
+| 2. grantr's core | The package, its model and types, built-in and custom roles, groups, service principals, `check`, `resources`, `hooks` and `SubjectOf`, the audit log, and the in-memory adapter, with the contract test | In the contract test, a viewer is refused an edit, a key can't reach another tenant, and no one grants more than they hold |
 | 3. Storage and API | The SQL adapter and its migrations; the admin router and its committed OpenAPI document | The contract test passes on SQLite and PostgreSQL, and the drift test passes |
-| 4. The template | The `access` question, tenancy from memberships, keys, `make tenant`, the matrix snapshot | A generated application passes its CI, and the smoke test signs a user in to one of two tenants and is refused the other |
-| 5. Threads and artifacts | `Visibility` and `Hidden` in artifactr, every read path filtered, the restricted flag in grantr, `on_behalf_of` | A restricted thread is absent from every surface for a non-member, including the agent's tools in another user's turn |
+| 4. The template | The `access` question, tenancy from memberships, keys, `make tenant`, `make operator`, `make migrate-tenants`, the matrix snapshot | A generated application passes its CI, and the smoke test signs a user in to one of two tenants and is refused the other |
+| 5. Threads and artifacts | `Visibility` and `Hidden` in artifactr, every read path filtered, the restricted flag in grantr, and turns that act for their user | A restricted thread is absent from every surface for a non-member, including the agent's tools in another user's turn |
 | 6. Row-level security | The option in artifactr's, reflexr's, relayr's and grantr's SQL adapters, the second engine, and the template's non-owner role | With the libraries' tenant scoping bypassed in a test, PostgreSQL returns no other tenant's rows, and reflexr's scheduler still runs every tenant's due runs |
 | 7. Docs and ADRs | grantr's site section, the ADRs for each decision and the amendments, and grantr's README | grantr's section builds, with the architecture updated |
 
@@ -285,7 +309,7 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
 
 ## Alternatives
 
-- **An authorization engine.** OpenFGA (a CNCF incubating project, with a maintained Python SDK) and SpiceDB answer list queries well, but each is a server to run, and grantr's grants would be written to it as well as to the data they protect. Cedar is embeddable through `cedarpy`, but takes the entities on every call and can't list what an actor may see. Casbin's models are untyped configuration files with weak filtering. Oso's open-source library is deprecated in favour of its cloud, and Aserto, which made Topaz, has shut down. The model here has four resource levels and needs no relations deeper than that; the ports leave room for OpenFGA if it ever does.
+- **An authorization engine.** OpenFGA (a CNCF incubating project, with a maintained Python SDK) and SpiceDB answer list queries well, but each is a server to run, and grantr's grants would be written to it as well as to the data they protect. Cedar is embeddable through `cedarpy`, but takes the entities on every call and can't list what an actor may see. Casbin's models are untyped configuration files with weak filtering. Oso's open-source library is deprecated in favour of its cloud, and Aserto, which made Topaz, has shut down. The model here has four resource levels (the deployment, a tenant, a workspace, and a thread, artifact or rule) and needs no relations deeper than that; the ports leave room for OpenFGA if it ever does.
 - **Supabase row-level security as the model,** with roles in the database and policies per action. It can't be mirrored in the in-memory adapters, puts the model in SQL, and only covers the SQL adapters. It stays as defence in depth.
 - **Roles in the token,** through Supabase's access-token hook. They would be stale until the token refreshes, about an hour, and grow the token with every workspace.
 - **Checking in the routes,** before handing a command on. It is what the libraries' guides advise today, and what the work codebase did. Every surface has to remember, in-process calls and agent tools included, and they drift.
@@ -302,7 +326,7 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
 
 grantr's RFC-0001 turns these phases into its plan, with a tracking issue.
 
-- [ ] Sign-off on D1 to D9
+- [x] Sign-off on D1 to D9 (2026-10-12)
 - [ ] Phase 1: the hook
 - [ ] Phase 2: grantr's core
 - [ ] Phase 3: storage and API

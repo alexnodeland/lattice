@@ -6,6 +6,6 @@ Outside this series, an RFC is named as "lattice RFC-0001".
 
 | RFC | Title | Status |
 |---|---|---|
-| [0001](0001-grantr-identity-and-access.md) | grantr, identity and access | Discussion |
+| [0001](0001-grantr-identity-and-access.md) | grantr, identity and access | Accepted |
 
 A new RFC starts from a package's [template](../relayr/rfcs/template.md), until [#40](https://github.com/alexnodeland/lattice/issues/40) makes the templates one.

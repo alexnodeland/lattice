@@ -5,6 +5,7 @@ ARTIFACTR = frozenset(
         "artifactr:open",
         "artifactr:read_artifacts",
         "artifactr:read_threads",
+        "artifactr:read_events",
         "artifactr:give_feedback",
         "artifactr:post_message",
         "artifactr:edit_artifact",

@@ -27,6 +27,7 @@ def test_a_viewer_reads_opens_and_gives_feedback() -> None:
         "artifactr:open",
         "artifactr:read_artifacts",
         "artifactr:read_threads",
+        "artifactr:read_events",
         "artifactr:give_feedback",
         "reflexr:open",
         "reflexr:read_rules",
@@ -116,6 +117,8 @@ def test_the_application_holds_the_runtime_and_every_read() -> None:
     assert application >= BOOKKEEPING
     assert {"artifactr:record", "reflexr:publish", "reflexr:checkpoint_run"} <= application
     assert {"artifactr:read_artifacts", "reflexr:open", "artifactr:give_feedback"} <= application
+    bridge = {"artifactr:open", "artifactr:read_events", "reflexr:open", "reflexr:publish"}
+    assert bridge <= application, "what relayr's bridge does, as the application"
     assert application & {"artifactr:edit_artifact", "reflexr:install_rule"} == frozenset()
 
 

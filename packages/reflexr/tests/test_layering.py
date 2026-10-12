@@ -1,4 +1,4 @@
-"""The package layering in docs/architecture.md, enforced.
+"""The package layering in <https://lattice.alexnodeland.com/reflexr/architecture/>, enforced.
 
 Each layer may import the standard library, the reflexr layers below it, and an explicit list of
 third-party modules. Dependencies point one way, so each layer is usable without the ones above.

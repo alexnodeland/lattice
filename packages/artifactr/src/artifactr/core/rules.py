@@ -17,9 +17,10 @@ from artifactr.core.actors import (
     Actor,
     AgentActor,
     EvaluatorActor,
+    ExternalAgentActor,
     SystemActor,
+    acts_as,
     is_agent,
-    same_participant,
 )
 from artifactr.core.artifacts import Artifact, Versioned, get_artifact_type, load_artifact
 from artifactr.core.commands import (
@@ -314,7 +315,7 @@ def _respond(command: RespondToProposal, state: State, actor: Actor) -> CommitRe
         raise NotFound("proposal", command.proposal_id)
     if proposal.status != "pending":
         raise InvalidState(f"proposal {proposal.id} is already {proposal.status}")
-    if same_participant(actor, proposal.proposed_by):
+    if _authored_by(proposal.proposed_by, actor):
         raise Forbidden("a proposal must be resolved by someone other than its author")
     if command.decision == "reject":
         return CommitResult(
@@ -339,6 +340,18 @@ def _respond(command: RespondToProposal, state: State, actor: Actor) -> CommitRe
         revisions=applied.revisions,
         proposals=(proposal.model_copy(update={"status": "accepted"}),),
     )
+
+
+def _authored_by(author: Actor, actor: Actor) -> bool:
+    """Whether ``actor`` counts as a proposal's author, looking through ``on_behalf_of``.
+
+    Acting for the author counts both ways for a person's own MCP client, which is the person:
+    neither may resolve what the other proposed. A thread's agent is the exception the other
+    way, so a person accepts what a run for them proposed, which is how suggest mode works.
+    """
+    if acts_as(actor, author):
+        return True
+    return isinstance(author, ExternalAgentActor) and acts_as(author, actor)
 
 
 def _resolved(

@@ -79,7 +79,7 @@ async def test_attributes_are_ascii_and_within_langfuses_limits() -> None:
     ws = await Workspaces(InMemoryStorage()).open("acme", "launch", actor=client)
     thread_id = "thr_é" + "x" * 300
     await ws.commit(CreateThread(thread_id=thread_id))
-    session = Session[None].start(ws, thread_id, app=None, requested_by=client)
+    session = Session[None].start(ws, thread_id, app=None, on_behalf_of=client)
     attributes = await turn_attributes(session)
     assert attributes["session_id"] == ("thr_?" + "x" * 300)[:MAX_ATTRIBUTE]
     assert attributes["user_id"] is None, "only people are users"

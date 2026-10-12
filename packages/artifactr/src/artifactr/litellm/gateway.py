@@ -152,7 +152,7 @@ class LiteLLMGateway(AbstractCapability[Session[Any]]):
             "session_id": session.thread_id,
             "tags": ["artifactr", f"tenant:{tenant_id}", f"workspace:{workspace_id}", *self.tags],
         }
-        if isinstance(person := session.requested_by, UserActor):
+        if isinstance(person := session.on_behalf_of, UserActor):
             metadata["trace_user_id"] = person.id
         if (trace_id := current_trace_id()) is not None:
             metadata["existing_trace_id"] = trace_id

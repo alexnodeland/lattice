@@ -18,7 +18,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0012](0012-documentation-site.md) | The documentation site, and publishing it from main | Accepted; amended by [0014](0014-one-docs-build.md), [0016](0016-stackr-in-lattice.md) and [0017](0017-one-site-for-the-family.md) |
 | [0013](0013-how-the-template-pins-the-libraries.md) | How the template pins the libraries | Superseded by [0018](0018-the-template-pins-the-libraries-at-its-own-commit.md) |
 | [0014](0014-one-docs-build.md) | One docs build | Accepted; amended by [0017](0017-one-site-for-the-family.md) |
-| [0015](0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md) | Telemetry, mirrors, shutdown and namespaces in the template | Accepted |
+| [0015](0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md) | Telemetry, mirrors, shutdown and namespaces in the template | Accepted; how mirrors start amended |
 | [0016](0016-stackr-in-lattice.md) | stackr in lattice | Accepted; amended by [0018](0018-the-template-pins-the-libraries-at-its-own-commit.md) |
 | [0017](0017-one-site-for-the-family.md) | One site for the family | Accepted |
 | [0018](0018-the-template-pins-the-libraries-at-its-own-commit.md) | The template pins the libraries at its own commit | Accepted |

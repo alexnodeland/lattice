@@ -44,26 +44,41 @@ Authentication is your application's. `resolve_actor` receives the `HTTPConnecti
 
 The actor always comes from `resolve_actor`, never from the client's frames, so a client cannot act as someone else.
 
-To decide which workspaces an actor may use, pass `authorize`:
+To decide what an actor may do, give `Workspaces` an `authorize` hook. It hears the tenant, the workspace, the actor and an `Access`, which names the action (one of `artifactr.workspace.ACTIONS`) and the thread or artifact it is about, when it names one:
 
 ```python
-from artifactr.core import ExternalAgentActor
+from artifactr.core import AgentActor, ExternalAgentActor
+from artifactr.workspace import Access, Workspaces
 
 
-async def authorize(tenant_id: TenantId, workspace_id: str, actor: Actor) -> bool:
+def person(actor: Actor) -> str | None:
+    """The user an actor is, or acts for."""
     match actor:
-        case UserActor(id=user_id):
-            return await memberships.exists(tenant_id, workspace_id, user_id)
-        case ExternalAgentActor(client_id=client_id):
-            return await grants.exists(tenant_id, workspace_id, client_id)
+        case UserActor(id=user_id) | ExternalAgentActor(on_behalf_of=UserActor(id=user_id)):
+            return user_id
+        case AgentActor(on_behalf_of=behalf) if behalf is not None:
+            return person(behalf)
         case _:
-            return False
+            return None
 
 
-router = artifactr_router(workspaces, runner, resolve_actor=resolve_actor, authorize=authorize)
+async def authorize(
+    tenant_id: TenantId, workspace_id: str | None, actor: Actor, access: Access
+) -> bool:
+    user_id = person(actor)
+    role = user_id and await roles.of(tenant_id, workspace_id, user_id)
+    return bool(role) and access.action in role.actions
+
+
+workspaces = Workspaces(storage, types=[Plan, Brief], authorize=authorize)
+router = artifactr_router(workspaces, runner, resolve_actor=resolve_actor)
 ```
 
-People reach the router as `UserActor`s and MCP clients reach `ArtifactrMcp` as `ExternalAgentActor`s, which have a `client_id` instead of an `id`, so one function can serve both by matching on the kind. A refusal answers 403, or closes the WebSocket with 4403. Without `authorize`, any authenticated actor may use any workspace of its own tenant. `ArtifactrMcp` takes the same hook, so pass it the same function ([External agents over MCP](mcp.md#authorization)). [Multi-tenancy and security](security.md) covers the rest.
+Every `Workspace` method asks it first, as the handle's actor ([ADR-0056](../adr/0056-access-asked-in-every-workspace-method.md)): opening the workspace is `artifactr:open`, a command is its type (`artifactr:edit_artifact`), and a read is `read_` and what it reads (`artifactr:read_artifacts`). So every REST request, every command on a WebSocket, every MCP tool call and every in-process call is asked, and none can be given a different hook. A refusal answers 403, closes a WebSocket that may not open the workspace or read its log with 4403, and answers a command on an open WebSocket with a `forbidden` result. Without `authorize`, any authenticated actor may do anything in any workspace of its own tenant.
+
+An agent's run acts for the person whose message or answer started it, in its `on_behalf_of`, and an MCP client a person connects with their own token acts for them, so a check can ask about the person ([ADR-0057](../adr/0057-a-turn-acts-for-one-author.md)). The runner's own work, holding a thread and keeping its place in the log, is asked as `SystemActor(name="runner")`.
+
+`Workspaces` also takes `on_open(tenant_id, workspace_id)`, called each time a workspace is opened and allowed. Start a workspace's background work there, such as a feedback mirror; it is called often, so make it idempotent. [Multi-tenancy and security](security.md) covers the rest.
 
 ## REST
 

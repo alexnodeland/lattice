@@ -18,6 +18,12 @@ Tenant-scoped handles. See [Workspaces, commits and the log](../guides/workspace
 
 ::: artifactr.workspace.Authorize
 
+::: artifactr.workspace.Access
+
+::: artifactr.workspace.ACTIONS
+
+::: artifactr.workspace.OnOpen
+
 ## Storage
 
 The storage protocol, and the in-memory implementation. See [Storage](../guides/storage.md).

@@ -1,6 +1,6 @@
 # ADR-0055: Turns from the log
 
-**Status:** Accepted
+**Status:** Accepted; its batching amended by [ADR-0057](0057-a-turn-acts-for-one-author.md)
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 
@@ -150,3 +150,7 @@ And it still misses the stretch between the agent's run ending and its end being
 ## Action items
 
 1. [x] The asked and taken positions, saved with the writes that consume, the claimant's plan, hand-overs, a holder per claim, `Runner.drain`, eager runs and the watcher's order; with a test for each invariant on both storages, and the reviews' probes.
+
+## Amendment (2026-10-12): one author per turn
+
+A turn takes messages only up to the first from another author ([ADR-0057](0057-a-turn-acts-for-one-author.md)). The watcher stops at that message before marking it delivered, so I1 and I2 hold: the message stays untaken, and the run's hand-over starts the next turn with it. A resumed run acts for whoever answered it last, and takes the log only up to just before the first message from someone else.

@@ -18,7 +18,7 @@
       "type": "object"
     },
     "AgentActor": {
-      "description": "The built-in agent of one thread, acting within one run.",
+      "description": "The built-in agent of one thread, acting within one run.\n\nA run acts for whoever's message or answer started it: its ``on_behalf_of``, which every\ncheck sees. A run started by the system, or by another agent, acts for no one.",
       "properties": {
         "kind": {
           "const": "agent",
@@ -30,6 +30,21 @@
           "default": "assistant",
           "title": "Name",
           "type": "string"
+        },
+        "on_behalf_of": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UserActor"
+            },
+            {
+              "$ref": "#/$defs/ExternalAgentActor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "On Behalf Of"
         },
         "run_id": {
           "anyOf": [
@@ -1109,7 +1124,7 @@
       "type": "object"
     },
     "ExternalAgentActor": {
-      "description": "An agent outside artifactr, connected over MCP.",
+      "description": "An agent outside artifactr, connected over MCP.\n\nA person who connects a client with their own credentials acts through it: their actor is\nits ``on_behalf_of``, and it is checked as them. A client with credentials of its own acts\nfor no one.",
       "properties": {
         "client_id": {
           "title": "Client Id",
@@ -1132,6 +1147,17 @@
           ],
           "default": null,
           "title": "Name"
+        },
+        "on_behalf_of": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UserActor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [

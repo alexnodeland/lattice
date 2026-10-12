@@ -125,7 +125,12 @@ async def test_mcp_clients_work_in_the_same_workspace(server: str) -> None:
     async with httpx.AsyncClient(base_url=server, headers={"x-user": "alice"}) as http:
         [doc] = (await http.get(f"{BASE}/artifacts")).json()
     assert (doc["kind"], doc["data"]["title"]) == ("doc", "Notes")
-    assert doc["updated_by"] == {"kind": "external_agent", "client_id": "mcp", "name": "MCP client"}
+    assert doc["updated_by"] == {
+        "kind": "external_agent",
+        "client_id": "mcp",
+        "name": "MCP client",
+        "on_behalf_of": None,
+    }, "a client with no user's token acts for no one"
 
 
 def test_main_serves_on_the_configured_address(monkeypatch: pytest.MonkeyPatch) -> None:

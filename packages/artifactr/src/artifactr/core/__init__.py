@@ -12,8 +12,11 @@ from artifactr.core.actors import (
     ExternalAgentActor,
     SystemActor,
     UserActor,
+    acting_for,
+    acts_as,
     is_agent,
     same_participant,
+    same_principal,
 )
 from artifactr.core.artifacts import (
     Artifact,
@@ -298,6 +301,8 @@ __all__ = [
     "Welcome",
     "WorkspaceId",
     "WritePolicy",
+    "acting_for",
+    "acts_as",
     "apply_patch",
     "artifact_types",
     "change_notes",
@@ -324,5 +329,6 @@ __all__ = [
     "render_notes",
     "resume",
     "same_participant",
+    "same_principal",
     "scope_of",
 ]

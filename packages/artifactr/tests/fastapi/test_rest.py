@@ -50,7 +50,7 @@ def test_authentication_and_authorization(client: TestClient) -> None:
     assert refused.status_code == 403
     assert refused.json()["detail"] == {
         "type": "forbidden",
-        "message": "this workspace is not yours to use",
+        "message": "artifactr:open is refused in this workspace",
     }, "a rejection's payload, as every REST error"
 
 

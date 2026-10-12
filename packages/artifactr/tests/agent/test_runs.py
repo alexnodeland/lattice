@@ -61,8 +61,8 @@ async def test_a_message_starts_a_recorded_run(ws: Workspace, thread: Thread, ga
         "message_posted",
         "run_ended",
     ]
-    agent = AgentActor(thread_id=thread.id, run_id=handle.run_id)
-    assert [e.actor for e in log[2:]] == [agent] * 7
+    agent = AgentActor(thread_id=thread.id, run_id=handle.run_id, on_behalf_of=ALICE)
+    assert [e.actor for e in log[2:]] == [agent] * 7, "the run acts for whoever started it"
     [note] = await ws.artifacts(Note)
     assert note.updated_by == agent
     run = await ws.run(handle.run_id)

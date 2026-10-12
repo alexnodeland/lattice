@@ -17,14 +17,14 @@ from starlette.requests import Request
 from artifactr.agent import Runner
 from artifactr.core import Actor, ExternalAgentActor, TenantId, UserActor, WorkspaceId
 from artifactr.mcp import ArtifactrMcp, McpContext, artifact_uri
-from artifactr.workspace import InMemoryStorage, Workspace, Workspaces
+from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces
 from tests.agent.conftest import Gate, Script, make_agent, say
 from tests.artifact_types import Checklist, Note
 
 CLAUDE = ExternalAgentActor(client_id="claude-code", name="Claude Code")
 REVIEWER = ExternalAgentActor(client_id="reviewer")
 ALICE = UserActor(id="alice", name="Alice")
-FORBIDDEN = "this workspace is not yours to use"
+FORBIDDEN = "artifactr:open is refused in this workspace"
 
 
 class RecordingBus(InMemorySubscriptionBus):
@@ -63,8 +63,13 @@ def bus() -> RecordingBus:
 
 
 @pytest.fixture
-def workspaces() -> Workspaces:
-    return Workspaces(InMemoryStorage(), types=[Note, Checklist])
+def storage() -> InMemoryStorage:
+    return InMemoryStorage()
+
+
+@pytest.fixture
+def workspaces(storage: InMemoryStorage) -> Workspaces:
+    return Workspaces(storage, types=[Note, Checklist])
 
 
 @pytest.fixture
@@ -329,12 +334,15 @@ async def test_artifacts_are_resources_of_their_tenant(
 
 
 async def test_authorize_decides_which_workspaces_a_client_may_use(
-    workspaces: Workspaces, ws: Workspace, bus: RecordingBus, gate: Gate
+    storage: InMemoryStorage, workspaces: Workspaces, ws: Workspace, bus: RecordingBus, gate: Gate
 ) -> None:
-    asked: list[tuple[TenantId, WorkspaceId, str]] = []
+    asked: list[tuple[TenantId, WorkspaceId | None, str]] = []
 
-    async def authorize(tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor) -> bool:
-        asked.append((tenant_id, workspace_id, actor.kind))
+    async def authorize(
+        tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
+    ) -> bool:
+        if access.action == "artifactr:open":
+            asked.append((tenant_id, workspace_id, actor.kind))
         return workspace_id != "secret"
 
     secret = await workspaces.open("tenant", "secret", actor=ALICE)
@@ -342,7 +350,8 @@ async def test_authorize_decides_which_workspaces_a_client_may_use(
     thread = await secret.create_thread("Plans")
     head = await secret.head_seq()
     runner = Runner(make_agent(Script(say("On it."))), app=gate)
-    mcp = ArtifactrMcp(workspaces, runner, resolve=Identity().resolve, authorize=authorize, bus=bus)
+    guarded = Workspaces(storage, types=[Note, Checklist], authorize=authorize)
+    mcp = ArtifactrMcp(guarded, runner, resolve=Identity().resolve, bus=bus)
     n1 = {"artifact_id": "n1"}
     replace = [{"op": "replace", "path": "/text", "value": "public"}]
     on_thread = {"kind": "thread", "thread_id": thread.id}

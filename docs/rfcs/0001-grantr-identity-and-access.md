@@ -329,6 +329,8 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
 
 - [x] Sign-off on D1 to D9 (2026-10-12)
 - [ ] Phase 1: the hook
+  - [x] artifactr and the template's collaboration ([#59](https://github.com/alexnodeland/lattice/pull/59))
+  - [ ] reflexr and the template's automation
 - [x] Phase 2: grantr's core
 - [x] Phase 3: storage and API
 - [ ] Phase 4: the template

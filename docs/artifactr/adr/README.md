@@ -51,13 +51,15 @@ Each record captures one decision: the context that forced it, the options consi
 | [0045](0045-a-message-id-is-used-once.md) | A message id is used once in a workspace | Accepted |
 | [0046](0046-telemetry-that-composes-across-libraries.md) | Telemetry that composes across libraries, untraced polling and mirror cursors | Accepted |
 | [0047](0047-cancel-safe-storage.md) | Cancel-safe storage | Accepted |
-| [0048](0048-surfaces-over-the-runner.md) | Surfaces over the runner | Accepted; its recorded message's run amended by 0055 |
+| [0048](0048-surfaces-over-the-runner.md) | Surfaces over the runner | Accepted; its recorded message's run amended by 0055, its authorization by 0056 |
 | [0049](0049-scores-on-evalr.md) | Scores on evalr | Accepted |
 | [0050](0050-one-docs-build.md) | One docs build | Accepted, amended by 0053 |
 | [0051](0051-notices.md) | Notices: messages that start no turn | Accepted; its direct messages amended by 0055 |
 | [0052](0052-artifactr-in-lattice.md) | artifactr in lattice | Accepted |
 | [0053](0053-one-site-for-the-family.md) | One site for the family | Accepted |
 | [0054](0054-dashboards-from-the-checkout.md) | Dashboards from the checkout | Accepted |
-| [0055](0055-turns-from-the-log.md) | Turns from the log | Accepted |
+| [0055](0055-turns-from-the-log.md) | Turns from the log | Accepted; its batching amended by 0057 |
+| [0056](0056-access-asked-in-every-workspace-method.md) | Access asked in every workspace method | Accepted |
+| [0057](0057-a-turn-acts-for-one-author.md) | A turn acts for one author | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

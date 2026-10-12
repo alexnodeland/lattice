@@ -10,14 +10,16 @@ comes from:
 
 The log decides what each turn carries out (ADR-0055). A thread's messages are taken in order,
 each by one turn: as the prompt of a run, the reply to a paused one, or through the watcher of
-the run that holds the thread. A message is a message, however it was committed: in a paused
-thread the oldest one not taken is the reply. Post a notice for what should not be one. A
-message or an answer sent with the runner asks for a turn; whoever holds the thread next, in any
-process, starts it with the oldest message not yet taken, and a run hands its thread over the
-same way as it ends. A message committed directly, without the runner, asks for nothing, so it
-starts no turn, but the thread's next turn takes it. A message is taken in the transaction of the
-write that consumes it: the start of the run it prompts, the answer it replies with, or the end of
-the run that delivered it. So a turn that fails or is stopped before it starts takes nothing.
+the run that holds the thread. A turn acts for one author (ADR-0057): it takes messages up to the
+first from someone else, whose messages start the next turn, and a resumed run acts for whoever
+answered it. A message is a message, however it was committed: in a paused thread the oldest
+one not taken is the reply. Post a notice for what should not be one. A message or an answer
+sent with the runner asks for a turn; whoever holds the thread next, in any process, starts it
+with the oldest message not yet taken, and a run hands its thread over the same way as it ends.
+A message committed directly, without the runner, asks for nothing, so it starts no turn, but
+the thread's next turn takes it. A message is taken in the transaction of the write that
+consumes it: the start of the run it prompts, the answer it replies with, or the end of the run
+that delivered it. So a turn that fails or is stopped before it starts takes nothing.
 
 A notice, a ``post_message`` of kind ``notice``, is for people: it is committed as it is, so it
 starts no run, and the thread's agent is not told unless its capability asks for notices
@@ -32,7 +34,9 @@ records it as abandoned first, the capability drops what it records afterwards.
 
 Surfaces send each command with the id its client chose to :meth:`Runner.execute`, which
 remembers results in :class:`~artifactr.agent.CommandResults`, so a retried command is carried
-out once (ADR-0048).
+out once (ADR-0048). The command, and the reads that find what it is about, are checked as its
+sender; the Runner's own work, holding threads, keeping its cursors and planning turns, acts as
+the system's ``runner`` (ADR-0056).
 
 Each turn (a run started by a message, or resumed by answers) is traced as its own trace, an
 ``invoke_workflow turn`` span linked to the span that started it (ADR-0035). The thread is the
@@ -46,13 +50,14 @@ When a turn ends, the Runner hands it to its evaluators, which judge it in the b
 import asyncio
 import contextlib
 import contextvars
+import itertools
 import logging
 import time
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Literal, Protocol
+from typing import Any, Final, Literal, Protocol
 
 from opentelemetry import baggage, trace
 from opentelemetry import context as otel_context
@@ -66,18 +71,20 @@ from opentelemetry.trace import (
     TracerProvider,
 )
 from pydantic_ai import Agent, AgentRunResult, DeferredToolRequests, DeferredToolResults, ToolDenied
+from pydantic_ai.messages import repair_messages
 
 from artifactr.agent.live import FanoutChannel, forward_live
 from artifactr.agent.results import CommandKey, CommandResults, InMemoryCommandResults
 from artifactr.agent.session import Session, Trigger, last_seen, load_history
 from artifactr.core import (
-    Actor,
     AgentActor,
     AnswerDeferred,
     Command,
     CommandResult,
     DeferredAnswered,
     Envelope,
+    ExternalAgentActor,
+    Forbidden,
     InvalidState,
     LiveFrame,
     MessageId,
@@ -93,9 +100,12 @@ from artifactr.core import (
     StopRun,
     SystemActor,
     ThreadId,
+    UserActor,
+    acting_for,
     new_id,
     new_message_id,
     new_run_id,
+    same_principal,
 )
 from artifactr.telemetry import Telemetry, attribution, parse_traceparent
 from artifactr.telemetry.attributes import (
@@ -110,7 +120,7 @@ from artifactr.telemetry.attributes import (
     WORKSPACE_ID,
 )
 from artifactr.telemetry.metrics import TURN_DURATION, TURNS
-from artifactr.workspace import ThreadBusy, Workspace
+from artifactr.workspace import Access, ThreadBusy, Workspace
 
 logger = logging.getLogger("artifactr.agent")
 
@@ -123,6 +133,9 @@ propagated trace attributes, implements it, and the Runner stays free of the bac
 
 type TurnOutcome = Literal["completed", "paused", "failed", "stopped"]
 """How a turn ended: the agent finished, paused on questions, raised, or was stopped."""
+
+_RUNNER: Final = SystemActor(name="runner")
+"""Who the Runner's own work acts as: holding threads, keeping its cursors, planning turns."""
 
 _ABANDONED = "the run was abandoned: its claim lapsed"
 """The error recorded for a run whose claim lapsed before it ended, whether its process stopped
@@ -185,7 +198,8 @@ class Sent:
     - The thread's run is active, in this process or another, so the message steers it. If
       that run is ending or pausing and takes no more messages, it hands the thread over as it
       releases it, and the next turn takes the message.
-    - Another message or answer took the thread first, and its turn takes this one too.
+    - Another message or answer took the thread first, and its turn takes this one too, if it
+      acts for the same author; otherwise the turn after it does.
     - An answer leaves some of the paused run's requests unanswered, so the run waits for them.
     - The runner is closed (:meth:`Runner.aclose`), as the application shuts down. The thread's
       next claimant, in any process, carries the message or answer out.
@@ -291,12 +305,16 @@ class Runner[AppDepsT]:
 
         Raises:
             InvalidState: If ``message_id`` is already used in the workspace; nothing is done.
+            Forbidden: If ``authorize`` refuses the message, or the turn it would start, as
+                the agent acting for the sender (ADR-0057); nothing is done.
         """
         message = PostMessage(
             thread_id=thread_id, content=content, message_id=message_id or new_message_id()
         )
+        acting = AgentActor(thread_id=thread_id, on_behalf_of=acting_for(workspace.actor))
+        await workspace.as_actor(acting).check(_starting(thread_id))
         posted = await workspace.commit(message)
-        return _sent(posted, await self._ask(workspace, thread_id, posted.seq))
+        return _sent(posted, await self._ask(_runner(workspace), thread_id, posted.seq))
 
     async def answer(self, workspace: Workspace, command: AnswerDeferred) -> Sent:
         """Answer one of a paused run's requests, resuming the run once all are answered."""
@@ -312,10 +330,15 @@ class Runner[AppDepsT]:
         that no turn has taken, it does nothing.
         """
         run = await workspace.run(run_id)
-        return await self._ask(workspace, run.thread_id, await workspace.head_seq())
+        runner = _runner(workspace)
+        return await self._ask(runner, run.thread_id, await runner.head_seq())
 
     async def stop(self, run_id: RunId) -> bool:
-        """Cancel a run of this process. Returns whether there was one to stop."""
+        """Cancel a run of this process. Returns whether there was one to stop.
+
+        It asks nothing: callers check. ``execute`` asks ``artifactr:stop_run`` before it stops
+        a run for a client.
+        """
         handle = self._runs.get(run_id)
         if handle is None:
             return False
@@ -361,7 +384,8 @@ class Runner[AppDepsT]:
             case AnswerDeferred():
                 return (await self.answer(workspace, command)).outcome
             case StopRun():
-                await workspace.run(command.run_id)  # the run must belong to this workspace
+                run = await workspace.run(command.run_id)  # it must belong to this workspace
+                await workspace.check(Access(action="artifactr:stop_run", thread_id=run.thread_id))
                 if not await self.stop(command.run_id):
                     raise NotFound("running run", command.run_id)
                 return Recorded()
@@ -371,15 +395,16 @@ class Runner[AppDepsT]:
     # ─── turns, from the log (ADR-0055) ───────────────────────────────────────
 
     async def _ask(
-        self, workspace: Workspace, thread_id: ThreadId, seq: int | None
+        self, runner: Workspace, thread_id: ThreadId, seq: int | None
     ) -> RunHandle | None:
         """Ask for a turn for what is committed up to ``seq``, and take it if the thread is free.
 
         The ask is saved before the thread is claimed, so a run that holds the thread and
         refuses this claim sees it when it releases the thread, and hands the thread over.
+        ``runner`` is a handle acting as the Runner, as every handle from here on is.
         """
-        await workspace.save_cursor(_asked(thread_id), seq or 0)
-        return await self._take(workspace, thread_id, trace.get_current_span().get_span_context())
+        await runner.save_cursor(_asked(thread_id), seq or 0)
+        return await self._take(runner, thread_id, trace.get_current_span().get_span_context())
 
     async def _take(
         self, workspace: Workspace, thread_id: ThreadId, caller: SpanContext | None
@@ -440,7 +465,7 @@ class Runner[AppDepsT]:
                 agent_name=self._agent_name,
                 trigger=turn.trigger,
                 watch_after=turn.watch_after,
-                requested_by=turn.requested_by,
+                on_behalf_of=turn.on_behalf_of,
             )
             session.delivered.seq, session.delivered.cursor = turn.taken, _taken(thread_id)
             claim = stack.pop_all()  # the run's task holds the claim from here
@@ -480,22 +505,32 @@ class Runner[AppDepsT]:
         if paused:
             run = paused[-1]
             if run.all_answered:
-                # Resumed by the last answer or message, unless a resume that failed before it
-                # began took the answers: then by whoever asks now.
-                askers = [e for e in log if isinstance(e.event, DeferredAnswered) or e in untaken]
-                by = askers[-1] if askers else None
-                return _resume(run, taken, asked, through, untaken, by, workspace.actor)
+                # Resumed for whoever answered last, unless a resume that failed before it began
+                # took the answers: then for the author of the oldest message not taken, or,
+                # with neither, for no one.
+                answers = [e for e in log if isinstance(e.event, DeferredAnswered)]
+                by = answers[-1] if answers else next(iter(untaken), None)
+                turn = _resume(run, taken, asked, through, untaken, by)
+                return await self._allowed(workspace, thread_id, turn)
             if untaken:
                 reply = untaken[0]
                 replier = workspace.as_actor(reply.actor)
-                if not await _reply(replier, run, reply, cursor=(_taken(thread_id), reply.seq)):
+                try:
+                    replied = await _reply(
+                        replier, run, reply, cursor=(_taken(thread_id), reply.seq)
+                    )
+                except Forbidden as refused:  # its author may not answer: the next message may
+                    await self._refused(workspace, thread_id, reply.seq, refused)
+                    return await self._plan(workspace, thread_id)
+                if not replied:
                     return await self._plan(workspace, thread_id)  # answers came first
                 run = await workspace.run(run.id)
-                return _resume(run, taken, asked, reply.seq, [], reply, reply.actor)
+                turn = _resume(run, taken, asked, reply.seq, [], reply)
+                return await self._allowed(workspace, thread_id, turn)
         elif untaken:
             first = untaken[0]
             assert isinstance(first.event, MessagePosted)
-            return _Turn(
+            turn = _Turn(
                 run_id=new_run_id(),
                 trigger="message",
                 prompt=first.event.content,
@@ -503,11 +538,52 @@ class Runner[AppDepsT]:
                 watch_after=first.seq,
                 taken=taken,
                 asked=asked,
-                requested_by=first.actor,
+                on_behalf_of=acting_for(first.actor),
                 traceparent=first.traceparent,
             )
+            return await self._allowed(workspace, thread_id, turn)
         await workspace.save_cursor(_taken(thread_id), through)  # no message in it to carry out
         return None
+
+    async def _allowed(
+        self, workspace: Workspace, thread_id: ThreadId, turn: "_Turn"
+    ) -> "_Turn | None":
+        """The turn, if ``authorize`` lets its agent start it, acting for its author; else the next.
+
+        A turn whose author may not start it would refuse its own start forever, so no message
+        after it would run (ADR-0057). Nothing is recorded for it: the runner takes the log past
+        it, ends a paused run it would have resumed as failed, and plans the next turn. Each
+        refusal takes more of the log, or ends the run, so planning again ends.
+        """
+        agent = AgentActor(
+            thread_id=thread_id,
+            run_id=turn.run_id,
+            name=self._agent_name,
+            on_behalf_of=turn.on_behalf_of,
+        )
+        try:
+            await workspace.as_actor(agent).check(_starting(thread_id))
+        except Forbidden as refused:
+            if turn.trigger == "resume":
+                ended = RunEnded(
+                    run_id=turn.run_id,
+                    thread_id=thread_id,
+                    status="failed",
+                    error=refused.message,
+                    reason="forbidden",
+                )
+                await workspace.record(ended)
+            await self._refused(workspace, thread_id, turn.watch_after, refused)
+            return await self._plan(workspace, thread_id)
+        return turn
+
+    @staticmethod
+    async def _refused(
+        workspace: Workspace, thread_id: ThreadId, through: int, refused: Forbidden
+    ) -> None:
+        """Take a thread's log through a message whose turn its author may not start."""
+        logger.info("thread %s skips a turn through %d: %s", thread_id, through, refused.message)
+        await workspace.save_cursor(_taken(thread_id), through)
 
     async def _run(
         self,
@@ -530,7 +606,7 @@ class Runner[AppDepsT]:
                     await asyncio.gather(stopping, return_exceptions=True)
         finally:
             self._hand_over(
-                session.workspace,
+                _runner(session.workspace),
                 session.thread_id,
                 taken=turn.taken,
                 asked=turn.asked,
@@ -609,7 +685,7 @@ class Runner[AppDepsT]:
                 workspace_id=workspace.workspace_id,
                 thread_id=session.thread_id,
                 run_id=session.run_id,
-                actor=session.requested_by,
+                actor=session.on_behalf_of,
             ),
         }
         started = time.perf_counter()
@@ -627,10 +703,13 @@ class Runner[AppDepsT]:
                 async with contextlib.AsyncExitStack() as scope:
                     if self._turn_context is not None:
                         await scope.enter_async_context(self._turn_context(session))
+                    history = await load_history(workspace, session.thread_id)
+                    if deferred is None:  # a new run: close the calls an ended run left open
+                        history = repair_messages(history)
                     result = await self._agent.run(
                         prompt,
                         deps=session,
-                        message_history=await load_history(workspace, session.thread_id),
+                        message_history=history,
                         deferred_tool_results=deferred,
                         event_stream_handler=forward_live(self.live),
                         conversation_id=session.thread_id,
@@ -675,8 +754,8 @@ async def _abandon(workspace: Workspace, thread_id: ThreadId) -> None:
 
     A run the Runner starts holds its thread's claim until it records its end, so a run still
     ``running`` when the thread is claimed again was left by a process that stopped.
+    ``workspace`` acts as the Runner, which records it.
     """
-    system = workspace.as_actor(SystemActor(name="runner"))
     for run in await workspace.runs(thread_id=thread_id, status="running"):
         abandoned = RunEnded(
             run_id=run.id,
@@ -686,13 +765,23 @@ async def _abandon(workspace: Workspace, thread_id: ThreadId) -> None:
             reason="abandoned",
         )
         with contextlib.suppress(InvalidState):  # it ended meanwhile
-            await system.record(abandoned)
+            await workspace.record(abandoned)
 
 
 async def _cancel_when_lost(lost: asyncio.Event, run: "asyncio.Task[Any]") -> None:
     """Cancel a run once its thread claim is lost, before the claim's next holder abandons it."""
     await lost.wait()
     run.cancel()
+
+
+def _starting(thread_id: ThreadId) -> Access:
+    """What starting a turn asks, as its agent acting for its author: to record ``run_started``."""
+    return Access(action="artifactr:record", thread_id=thread_id)
+
+
+def _runner(workspace: Workspace) -> Workspace:
+    """A handle on the same workspace for the Runner's own work, checked as the Runner."""
+    return workspace.as_actor(_RUNNER)
 
 
 def _sent(recorded: Recorded, run: RunHandle | None) -> Sent:
@@ -715,7 +804,8 @@ class _Turn:
     """How far the thread's messages were taken before the turn."""
     asked: int
     """How far messages and answers had asked for a turn as it was planned."""
-    requested_by: Actor
+    on_behalf_of: UserActor | ExternalAgentActor | None
+    """Whom the turn acts for: the author of the message or answer it carries out."""
     traceparent: str | None
     """Where the message or answer it carries out was committed."""
 
@@ -724,16 +814,23 @@ def _resume(
     run: Run,
     taken: int,
     asked: int,
-    watch_after: int,
+    through: int,
     untaken: list[Envelope],
     by: Envelope | None,
-    anyone: Actor,
 ) -> _Turn:
     """The turn that resumes a paused run whose requests are all answered.
 
-    The messages no turn has taken are its prompt, beside the answers, so they reach the model
-    as the run resumes. It is requested by whoever committed ``by``, or else by ``anyone``.
+    It acts for whoever committed ``by``. The messages no turn has taken are its prompt, beside
+    the answers, so they reach the model as the run resumes: up to the first from someone it
+    does not act for, which the thread's next turn takes. Otherwise it takes the log through
+    ``through``.
     """
+    ours = (
+        list(itertools.takewhile(lambda e: same_principal(e.actor, by.actor), untaken))
+        if by is not None
+        else []
+    )
+    rest = untaken[len(ours) :]
     deferred = DeferredToolResults(
         calls={
             r.tool_call_id: run.answers[r.tool_call_id].answer
@@ -749,12 +846,12 @@ def _resume(
     return _Turn(
         run_id=run.id,
         trigger="resume",
-        prompt=[e.event.content for e in untaken if isinstance(e.event, MessagePosted)] or None,
+        prompt=[e.event.content for e in ours if isinstance(e.event, MessagePosted)] or None,
         deferred=deferred,
-        watch_after=watch_after,
+        watch_after=rest[0].seq - 1 if rest else through,
         taken=taken,
         asked=asked,
-        requested_by=anyone if by is None else by.actor,
+        on_behalf_of=None if by is None else acting_for(by.actor),
         traceparent=None if by is None else by.traceparent,
     )
 

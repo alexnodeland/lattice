@@ -21,12 +21,12 @@ An actor is who does something, and every event is attributed to one:
 | Actor | Who |
 |---|---|
 | `UserActor(id, name=None)` | A person, identified by your application's user id |
-| `AgentActor(thread_id, run_id=None, name="assistant")` | A thread's built-in agent. Every run of one thread's agent is the same participant. |
-| `ExternalAgentActor(client_id, name=None)` | An agent connected over MCP |
+| `AgentActor(thread_id, run_id=None, name="assistant", on_behalf_of=None)` | A thread's built-in agent. Every run of one thread's agent is the same participant. A run acts for the person, or the person's MCP client, whose message or answer started it, in `on_behalf_of` |
+| `ExternalAgentActor(client_id, name=None, on_behalf_of=None)` | An agent connected over MCP; `on_behalf_of` is the person it acts for, when it carries their token |
 | `SystemActor(name="system")` | Your application itself, for automated changes |
 | `EvaluatorActor(name, version)` | A judge whose verdicts are recorded as feedback; it can only give feedback ([Evaluation](evaluation.md)) |
 
-`ws.as_actor(actor)` returns a handle on the same workspace acting as someone else. The agent layer uses it to act as the agent; you can use it for system jobs.
+`ws.as_actor(actor)` returns a handle on the same workspace acting as someone else. The agent layer uses it to act as the agent; you can use it for system jobs. Each method of a handle asks the `authorize` hook `Workspaces` holds, as the handle's actor, before it reads or writes ([Authentication and authorization](serving.md#authentication-and-authorization)).
 
 ## Commands and outcomes
 

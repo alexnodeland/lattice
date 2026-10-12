@@ -99,7 +99,7 @@ The agent is told what other participants did, as short notes in their own words
 ```
 
 - **When a run starts**, the agent receives the notes it missed since the thread's history was last saved. Nothing is reported twice and nothing is skipped.
-- **While a run is in progress**, a watcher follows the log. Others' changes to followed artifacts arrive as notes, and a new message in the thread arrives as-is. Both reach the model at its next request, so a person can steer a long run without stopping it.
+- **While a run is in progress**, a watcher follows the log. Others' changes to followed artifacts arrive as notes, and a new message in the thread arrives as-is. Both reach the model at its next request, so a person can steer a long run without stopping it. The watcher delivers messages only from the author the run acts for: it stops at the first from anyone else, which starts the next turn ([One author per turn](#one-author-per-turn)).
 
 Notes cover the artifacts the thread follows, plus artifacts created in the thread. They leave out the agent's own changes, including those of its earlier runs: every run of one thread's agent is the same participant. They arrive as user-prompt parts, so they are stored in the model history with the rest of the conversation.
 
@@ -132,7 +132,7 @@ await rule.post_message(thread.id, "The rule is live.", kind="notice")
 | The thread is | The message |
 |---|---|
 | Idle | starts a run |
-| Running | steers the running agent, which is told at its next request |
+| Running | steers the running agent, which is told at its next request, if the run acts for its author; otherwise it is taken by the next turn |
 | Ending, or pausing: its run no longer takes messages but still holds the thread | is taken by the next turn, which the run starts as it releases the thread |
 | Paused on questions or approvals | is the reply: it answers the questions, declines the approvals with the message as the reason, and resumes the run |
 
@@ -153,7 +153,7 @@ if sent.run is not None:  # None when the thread's run takes the message, or wil
 `sent.run` is `None` when the message or answer started no run, which is not a failure:
 
 - the thread's run is already active, in this process or another, so the message steers it; if that run is ending or pausing, it hands the thread over as it releases it, and the next turn takes the message
-- another message or answer took the thread first, and its turn takes this one too
+- another message or answer took the thread first, and its turn takes this one too, or the turn after it does, if this one is from another author
 - an answer leaves some of the paused run's requests unanswered, so the run waits for them
 
 The run `send` started may take an older message first: the thread's oldest message that no turn has taken.
@@ -182,6 +182,16 @@ A run whose process lives on loses its claim if no renewal succeeds for a whole 
 
 A runner's `evaluators` judge each turn as it ends, in the background, and record their verdicts as feedback; see [Online evaluation](evaluation.md#online-evaluation).
 
+### One author per turn
+
+A run acts for the person, or the person's MCP client, whose message or answer started it: its agent's `AgentActor.on_behalf_of`, which `Session.on_behalf_of` reads and every `authorize` check sees ([ADR-0057](../adr/0057-a-turn-acts-for-one-author.md)). The log records it on every write of the run, starting with `run_started`. A run started by the system, or by another agent, acts for no one.
+
+So a turn takes messages only up to the first from another author, whose messages start the next turn. A paused run resumed by answers acts for whoever answered it last, and the messages waiting for it join it only up to the first from someone else. One person's message never rides on another's rights, and a person cannot accept their own proposal through a run acting for them.
+
+The runner's own work, claiming the thread and keeping its place in the log, acts as `SystemActor(name="runner")`, so `authorize` hears it apart from the person.
+
+Starting a turn asks `artifactr:record` as the agent acting for its author. `send` asks it before posting, and raises `Forbidden` if the sender may not start a turn. A message that reached the thread otherwise, or a reply its author may not give, is passed over: the runner takes the log past it, records nothing for it, and runs the next turn, so it never wedges the thread; a paused run whose resume is refused ends as failed, with the reason `forbidden`.
+
 ### Running without a runner
 
 The capability works in any pydantic-ai run. Build the session with `Session.start` and pass the thread's history yourself:
@@ -196,7 +206,7 @@ result = await agent.run(
 )
 ```
 
-The run is recorded the same way (with trigger `api`) and its history is saved. The prompt itself is not posted to the thread; post it with `ws.post_message` first if people should see it. A direct run takes no claim: nothing stops two in one thread at once, and a runner that claims the thread meanwhile records the direct run as abandoned. A direct run a runner has recorded as abandoned returns normally if it ends without calling another tool, but its end and history are dropped. If a runner also serves the thread, hold the claim around the run: `async with ws.claim_thread(thread_id, holder=...) as lost:`, and stop the run if the event `lost` is set, as the runner does.
+Pass `Session.start(..., on_behalf_of=user)` for a run that acts for a person; without it, the run acts for no one, and its watcher stops at the first message a person posts. The run is recorded the same way (with trigger `api`) and its history is saved. The prompt itself is not posted to the thread; post it with `ws.post_message` first if people should see it. A direct run takes no claim: nothing stops two in one thread at once, and a runner that claims the thread meanwhile records the direct run as abandoned. A direct run a runner has recorded as abandoned returns normally if it ends without calling another tool, but its end and history are dropped. If a runner also serves the thread, hold the claim around the run: `async with ws.claim_thread(thread_id, holder=...) as lost:`, and stop the run if the event `lost` is set, as the runner does.
 
 ## What is recorded
 

@@ -7,19 +7,20 @@
  */
 
 export type * as Artifactr from "./artifactr";
-export { artifactr } from "./artifactr";
+export { type ArtifactrStream, artifactr } from "./artifactr";
 export type * as ArtifactrApi from "./generated/artifactr.openapi";
 export type * as ArtifactrV1 from "./generated/artifactr.v1";
 export type * as GrantrApi from "./generated/grantr.openapi";
 export type * as ReflexrApi from "./generated/reflexr.openapi";
 export type * as ReflexrRulesV1 from "./generated/reflexr.rules.v1";
 export type * as ReflexrV1 from "./generated/reflexr.v1";
-export { createQueries, keys, staleAfter } from "./queries";
+export { createQueries, keys, stale } from "./queries";
 export type * as Reflexr from "./reflexr";
-export { reflexr } from "./reflexr";
+export { type ReflexrStream, reflexr } from "./reflexr";
 export { type Api, createApi, type Surfaces } from "./rest";
 export { type Session, sessionHeaders, streamUrl } from "./session";
 export {
+  type Classified,
   type Envelope,
   type Protocol,
   type Result,

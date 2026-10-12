@@ -670,6 +670,10 @@ export interface AgentActor {
 /**
  * An agent outside reflexr, connected over MCP.
  *
+ * A person who connects a client with their own credentials acts through it: their actor is
+ * its ``on_behalf_of``, and an application's ``authorize`` checks it as them, as artifactr's
+ * does. A client with credentials of its own acts for no one.
+ *
  * This interface was referenced by `ReflexrV1`'s JSON-Schema
  * via the `definition` "ExternalAgentActor".
  */
@@ -677,6 +681,7 @@ export interface ExternalAgentActor {
   client_id: ClientId;
   kind: Kind15;
   name?: Name3;
+  on_behalf_of?: UserActor | null;
 }
 /**
  * reflexr itself (the reactor, schedules), or the application acting on its own behalf.

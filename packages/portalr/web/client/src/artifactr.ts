@@ -7,10 +7,16 @@
  */
 
 import type * as v1 from "./generated/artifactr.v1";
-import type { Protocol } from "./stream";
+import type { Classified, Protocol, Stream } from "./stream";
 
-/** The events this version of the protocol names. */
-export type Known = Exclude<v1.Event, v1.UnknownEvent>;
+/** The events this version of the protocol names: those whose `type` is a literal. */
+export type Known = v1.Event extends infer E
+  ? E extends { type: infer T }
+    ? string extends T
+      ? never
+      : E
+    : never
+  : never;
 
 export interface Message {
   readonly id: v1.MessageId;
@@ -197,6 +203,8 @@ export function apply(state: Workspace, envelope: v1.EventFrame): Workspace {
   if (!isKnown(event)) {
     return state;
   }
+  // A correlated union: `handlers[event.type]` takes this very event, which the compiler can't
+  // follow through the lookup.
   const handler = handlers[event.type] as (
     state: Workspace,
     event: Known,
@@ -214,22 +222,50 @@ function live(state: Workspace, frame: v1.Server): Workspace {
   return run ? withRun(state, frame.run_id, { text: run.text + frame.event.delta }) : state;
 }
 
-/** The commands that create something, and the field that carries the id a client may choose. */
-const CREATED_ID: Partial<Record<v1.Command["type"], string>> = {
-  create_thread: "thread_id",
-  create_artifact: "artifact_id",
-  propose_change: "proposal_id",
-  post_message: "message_id",
-};
+function classify(frame: v1.Server): Classified<v1.Server, v1.CommandResult> {
+  switch (frame.type) {
+    case "welcome":
+      return { kind: "welcome", headSeq: frame.head_seq, reset: frame.reset ?? false };
+    case "replay_complete":
+      return { kind: "replay_complete" };
+    case "event":
+      return { kind: "event", envelope: frame };
+    case "command_result":
+      return { kind: "result", result: frame };
+    case "error":
+      return { kind: "error", message: frame.message };
+    case "live":
+      return { kind: "other", frame };
+    default:
+      return frame satisfies never;
+  }
+}
+
+/** The id a client may choose for what a command creates; `undefined` for other commands. */
+function createdId(command: v1.Command): string | null | undefined {
+  switch (command.type) {
+    case "create_thread":
+      return command.thread_id;
+    case "create_artifact":
+      return command.artifact_id;
+    case "propose_change":
+      return command.proposal_id;
+    case "post_message":
+      return command.message_id;
+    default:
+      return undefined;
+  }
+}
 
 /** artifactr's thread protocol, for a `Stream`. */
-export const artifactr: Protocol<Workspace, v1.Server, v1.Command> = {
+export const artifactr: Protocol<Workspace, v1.Server, v1.Command, v1.CommandResult> = {
   name: "artifactr.v1",
   initial: () => ({ threads: {}, artifacts: {}, proposals: {}, runs: {} }),
+  classify,
   apply,
   other: live,
-  creates: (command) => {
-    const field = CREATED_ID[command.type];
-    return field !== undefined && (command as unknown as Record<string, unknown>)[field] != null;
-  },
+  creates: (command) => createdId(command) != null,
 };
+
+/** A store over an artifactr workspace's stream. */
+export type ArtifactrStream = Stream<Workspace, v1.Server, v1.Command, v1.CommandResult, v1.Hello>;

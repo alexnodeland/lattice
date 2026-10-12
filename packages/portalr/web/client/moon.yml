@@ -15,6 +15,11 @@ tasks:
 
   test:
     command: 'bun x --bun --no-install vitest run --project unit'
+    inputs:
+      # The documents the drift test regenerates the types from.
+      - '/packages/artifactr/schemas/*.json'
+      - '/packages/reflexr/schemas/*.json'
+      - '/packages/grantr/schemas/*.json'
     options:
       mergeArgs: 'replace'
 

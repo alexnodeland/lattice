@@ -30,7 +30,7 @@ async function publish(ws: string, n: number): Promise<void> {
 
 test("a client resumes oncall's stream across a dropped connection, losing and repeating nothing", async () => {
   const ws = workspace();
-  const store = new Stream(reflexr, { url: streamUrl(base, ws, session) });
+  const store = new Stream(reflexr, { url: () => streamUrl(base, ws, session) });
   close = () => store.close();
   const seqs = applied(store);
   store.open();
@@ -38,10 +38,11 @@ test("a client resumes oncall's stream across a dropped connection, losing and r
   await publish(ws, 1);
   await until(store, (s) => s.seq >= 1);
 
-  // The connection drops, and alerts are published while the client is away.
-  store.reconnect();
+  // The client goes away, two alerts are published, and it comes back.
+  store.close();
   await publish(ws, 2);
   await publish(ws, 3);
+  store.open();
 
   const { data: log } = await api.reflexr.GET("/workspaces/{workspace_id}/events", {
     params: { path: { workspace_id: ws } },

@@ -24,22 +24,39 @@ export interface Result {
   readonly rejection?: { readonly [key: string]: unknown } | null;
 }
 
-/** A command's settled result. `done` is true when it was carried out, now or by an earlier try. */
-export interface Settled<R extends Result> {
-  readonly done: boolean;
-  readonly result: R;
-}
+/** A frame, as the store acts on it. */
+export type Classified<Frame, R extends Result> =
+  | { readonly kind: "welcome"; readonly headSeq: number; readonly reset: boolean }
+  | { readonly kind: "replay_complete" }
+  | { readonly kind: "event"; readonly envelope: Extract<Frame, Envelope> }
+  | { readonly kind: "result"; readonly result: R }
+  | { readonly kind: "error"; readonly message: string }
+  | { readonly kind: "other"; readonly frame: Frame };
 
-/** One protocol's part: its name, its hello, its reducer, and which commands create by id. */
-export interface Protocol<State, Frame extends { readonly type: string }, Command> {
+/**
+ * A command's end.
+ *
+ * - `done`: it was carried out, now or by an earlier try. For `post_message`, that means the
+ *   message was posted, not that its turn ran.
+ * - `refused`: the server refused it, with the rejection in `result`.
+ * - `closed`: the store was closed before an answer came.
+ */
+export type Settled<R extends Result> =
+  | { readonly outcome: "done" | "refused"; readonly result: R }
+  | { readonly outcome: "closed" };
+
+/** One protocol's part: its name, its frames, its reducer, and which commands create by id. */
+export interface Protocol<State, Frame, Command, R extends Result> {
   /** The protocol's identifier, which is also the WebSocket subprotocol: `artifactr.v1`. */
   readonly name: string;
   /** The state before any event. */
   initial(): State;
+  /** What a frame is, to the store. */
+  classify(frame: Frame): Classified<Frame, R>;
   /** The state after one event; the same object if the event changes nothing. */
   apply(state: State, envelope: Extract<Frame, Envelope>): State;
-  /** The state after a frame that isn't an event, welcome or result, such as a live frame. */
-  other?(state: State, frame: Frame): State;
+  /** The state after a frame that isn't an event, welcome, result or error, such as a live frame. */
+  other(state: State, frame: Frame): State;
   /** Whether the command creates something under an id the client chose. */
   creates(command: Command): boolean;
 }
@@ -47,18 +64,35 @@ export interface Protocol<State, Frame extends { readonly type: string }, Comman
 /** Where the store is in its connection's life. */
 export type Status = "connecting" | "replaying" | "live" | "closed";
 
-/** What a component reads: the state, the store's position in the log, and its status. */
+/** What a component reads. */
 export interface Snapshot<State> {
   readonly state: State;
+  /** The last `seq` applied: the store's position in the log. */
   readonly seq: number;
   readonly status: Status;
+  /** The last `error` frame's message: a frame the server couldn't parse, or a failed command. */
+  readonly error: string | null;
 }
 
-/** Close codes after which reconnecting can't help (both protocols' 4400, 4401 and 4403). */
+/** Close codes after which reconnecting by itself can't help (both protocols' 4400, 4401, 4403). */
 const FINAL = new Set([4400, 4401, 4403]);
 
-/** How long to wait before each reconnect, in milliseconds; the last repeats. */
+/** The most to wait before each reconnect, in milliseconds; the last repeats. Full jitter. */
 const BACKOFF = [100, 500, 1000, 2000, 5000];
+
+/** The fields a hello frame carries that the store sets itself. */
+type Handshake = "type" | "protocol" | "resume_after_seq" | "from_head";
+
+export interface StreamOptions<Hello> {
+  /** The stream's URL, `ws://` or `wss://`, read at every connect, as `streamUrl` makes it. */
+  readonly url: () => string;
+  /** The hello's own fields, such as artifactr's `threads` or reflexr's `types`. */
+  readonly hello?: Omit<Hello, Handshake>;
+  /** Where to resume from: the last `seq` of a tail already read over REST. */
+  readonly after?: number;
+  /** Start at the log's head, replaying nothing, on the first connect; resume from there after. */
+  readonly fromHead?: boolean;
+}
 
 interface Pending<Command, R extends Result> {
   readonly command: Command;
@@ -66,37 +100,28 @@ interface Pending<Command, R extends Result> {
   settle(settled: Settled<R>): void;
 }
 
-export interface StreamOptions {
-  /** The stream's URL, `ws://` or `wss://`, with the session in its query, as `streamUrl` makes. */
-  readonly url: string;
-  /** The hello's fields besides its type, protocol and position, such as `threads` or `types`. */
-  readonly hello?: Readonly<Record<string, unknown>>;
-  /** Where to resume from: the last `seq` of a tail already read over REST. */
-  readonly after?: number;
-}
-
-export class Stream<State, Frame extends { readonly type: string }, Command, R extends Result> {
+export class Stream<State, Frame, Command, R extends Result, Hello> {
+  readonly protocol: Protocol<State, Frame, Command, R>;
+  readonly options: StreamOptions<Hello>;
   #current: Snapshot<State>;
   #socket: WebSocket | null = null;
   #attempt = 0;
-  #stopped = false;
+  #stopped = true;
+  #fromHead: boolean;
   #timer: ReturnType<typeof setTimeout> | null = null;
-  #url: string;
   readonly #listeners = new Set<() => void>();
   readonly #pending = new Map<string, Pending<Command, R>>();
-  readonly protocol: Protocol<State, Frame, Command>;
-  readonly options: StreamOptions;
 
   /** A store, closed until `open`; `state` is what a tail read over REST built, if any. */
   constructor(
-    protocol: Protocol<State, Frame, Command>,
-    options: StreamOptions,
+    protocol: Protocol<State, Frame, Command, R>,
+    options: StreamOptions<Hello>,
     state: State = protocol.initial(),
   ) {
     this.protocol = protocol;
     this.options = options;
-    this.#url = options.url;
-    this.#current = { state, seq: options.after ?? 0, status: "closed" };
+    this.#fromHead = options.fromHead ?? false;
+    this.#current = { state, seq: options.after ?? 0, status: "closed", error: null };
   }
 
   /** The current snapshot; a new object whenever anything in it changes. */
@@ -110,31 +135,38 @@ export class Stream<State, Frame extends { readonly type: string }, Command, R e
 
   /** Connects, and keeps reconnecting after drops, until `close`. */
   open(): void {
-    this.#stopped = false;
-    this.#connect();
+    if (this.#stopped) {
+      this.#stopped = false;
+      this.#connect();
+    }
   }
 
   /**
-   * Drops the connection and resumes on a new one, as after a network drop: after the session's
-   * token is refreshed, say, with a `url` that carries the new one.
+   * Connects again now, on a new connection, whatever the store's state: after the session's token
+   * is refreshed, say, or after the server refused the old one (4401).
    */
-  reconnect(url: string = this.options.url): void {
-    this.#url = url;
-    this.#socket?.close(1000);
+  reconnect(): void {
+    this.#stopped = false;
+    this.#detach();
+    this.#connect();
   }
 
-  /** Closes the connection for good; unanswered commands stay unanswered. */
+  /** Closes the connection for good, and settles every unanswered command as `closed`. */
   close(): void {
     this.#stopped = true;
-    if (this.#timer) {
-      clearTimeout(this.#timer);
+    this.#detach();
+    for (const pending of this.#pending.values()) {
+      pending.settle({ outcome: "closed" });
     }
-    this.#socket?.close(1000);
+    this.#pending.clear();
     this.#update({ status: "closed" });
   }
 
-  /** Sends a command, now if connected and otherwise once reconnected, and settles on its result. */
+  /** Sends a command, now if connected and otherwise once reconnected, and settles on its end. */
   send(command: Command, commandId: string = crypto.randomUUID()): Promise<Settled<R>> {
+    if (this.#stopped) {
+      return Promise.resolve({ outcome: "closed" });
+    }
     return new Promise((settle) => {
       this.#pending.set(commandId, { command, sent: 0, settle });
       if (this.#current.status === "replaying" || this.#current.status === "live") {
@@ -143,46 +175,70 @@ export class Stream<State, Frame extends { readonly type: string }, Command, R e
     });
   }
 
+  /** Forgets the current socket and any pending reconnect, so nothing from them reaches the store. */
+  #detach(): void {
+    if (this.#timer) {
+      clearTimeout(this.#timer);
+      this.#timer = null;
+    }
+    const socket = this.#socket;
+    this.#socket = null;
+    socket?.close(1000);
+  }
+
   #connect(): void {
     this.#update({ status: "connecting" });
-    const socket = new WebSocket(this.#url, this.protocol.name);
+    const socket = new WebSocket(this.options.url(), this.protocol.name);
     this.#socket = socket;
     socket.onopen = () => {
+      const position = this.#fromHead
+        ? { from_head: true }
+        : { resume_after_seq: this.#current.seq };
       socket.send(
         JSON.stringify({
           ...this.options.hello,
           type: "hello",
           protocol: this.protocol.name,
-          resume_after_seq: this.#current.seq,
+          ...position,
         }),
       );
     };
-    socket.onmessage = (message) => this.#receive(JSON.parse(String(message.data)) as Frame);
+    socket.onmessage = (message) => {
+      if (this.#socket === socket) {
+        this.#receive(JSON.parse(String(message.data)) as Frame);
+      }
+    };
     socket.onclose = (closed) => {
       if (this.#socket !== socket) {
-        return;
+        return; // a socket the store already let go of
       }
       this.#socket = null;
       if (this.#stopped || FINAL.has(closed.code)) {
         this.#update({ status: "closed" });
         return;
       }
-      const delay = BACKOFF[Math.min(this.#attempt, BACKOFF.length - 1)];
+      const ceiling = BACKOFF[Math.min(this.#attempt, BACKOFF.length - 1)] ?? 0;
       this.#attempt += 1;
       this.#update({ status: "connecting" });
-      this.#timer = setTimeout(() => this.#connect(), delay);
+      this.#timer = setTimeout(() => {
+        this.#timer = null;
+        this.#connect();
+      }, Math.random() * ceiling);
     };
   }
 
   #receive(frame: Frame): void {
-    switch (frame.type) {
+    const classified = this.protocol.classify(frame);
+    switch (classified.kind) {
       case "welcome": {
-        const { reset } = frame as Frame & { reset?: boolean };
-        this.#update(
-          reset
-            ? { state: this.protocol.initial(), seq: 0, status: "replaying" }
-            : { status: "replaying" },
-        );
+        if (this.#fromHead) {
+          this.#fromHead = false;
+          this.#update({ seq: classified.headSeq, status: "replaying" });
+        } else if (classified.reset) {
+          this.#update({ state: this.protocol.initial(), seq: 0, status: "replaying" });
+        } else {
+          this.#update({ status: "replaying" });
+        }
         // Commands sent before the drop and still unanswered go again, with their ids.
         for (const id of this.#pending.keys()) {
           this.#transmit(id);
@@ -194,9 +250,9 @@ export class Stream<State, Frame extends { readonly type: string }, Command, R e
         this.#update({ status: "live" });
         return;
       case "event": {
-        const envelope = frame as Extract<Frame, Envelope>;
+        const { envelope } = classified;
         if (envelope.seq <= this.#current.seq) {
-          return; // already applied: a replay overlapping a tail read over REST
+          return; // already applied: a frame sent twice, or a replay overlapping a tail
         }
         this.#update({
           state: this.protocol.apply(this.#current.state, envelope),
@@ -204,14 +260,17 @@ export class Stream<State, Frame extends { readonly type: string }, Command, R e
         });
         return;
       }
-      case "command_result": {
-        this.#settle(frame as unknown as R);
+      case "result":
+        this.#settle(classified.result);
         return;
-      }
+      case "error":
+        this.#update({ error: classified.message });
+        return;
+      case "other":
+        this.#update({ state: this.protocol.other(this.#current.state, classified.frame) });
+        return;
       default:
-        if (this.protocol.other) {
-          this.#update({ state: this.protocol.other(this.#current.state, frame) });
-        }
+        classified satisfies never;
     }
   }
 
@@ -237,7 +296,7 @@ export class Stream<State, Frame extends { readonly type: string }, Command, R e
       pending.sent > 1 &&
       this.protocol.creates(pending.command) &&
       result.rejection?.type === "invalid_state";
-    pending.settle({ done: result.ok || madeEarlier, result });
+    pending.settle({ outcome: result.ok || madeEarlier ? "done" : "refused", result });
   }
 
   #update(change: Partial<Snapshot<State>>): void {
@@ -245,7 +304,8 @@ export class Stream<State, Frame extends { readonly type: string }, Command, R e
     if (
       next.state === this.#current.state &&
       next.seq === this.#current.seq &&
-      next.status === this.#current.status
+      next.status === this.#current.status &&
+      next.error === this.#current.error
     ) {
       return;
     }

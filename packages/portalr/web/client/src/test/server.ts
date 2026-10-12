@@ -1,27 +1,36 @@
 /**
  * A scripted stream server, on Bun.serve, that speaks the handshake both protocols share: `hello`,
  * `welcome`, the replay after the client's `seq`, `replay_complete`, then events as the test
- * appends them. A test drops connections, resets the log, and decides how each command is
- * answered.
+ * appends them. A test drops connections, resets the log, cuts a replay short, sends a frame
+ * twice, and decides how each command is answered.
  */
 
 import type { Server, ServerWebSocket } from "bun";
 
 export interface Hello {
   readonly protocol: string;
-  readonly resume_after_seq: number;
+  readonly resume_after_seq?: number;
+  readonly from_head?: boolean;
 }
 
 /** How the server answers a command: with a result, or by dropping the connection first. */
 export type Answer = { readonly ok: true } | { readonly rejection: string } | "drop";
 
+interface Entry {
+  readonly seq: number;
+  readonly event: Record<string, unknown>;
+}
+
 export class ScriptedServer {
   readonly hellos: Hello[] = [];
   readonly commands: string[] = [];
-  #log: { seq: number; event: Record<string, unknown> }[] = [];
+  #log: Entry[] = [];
   readonly #sockets = new Set<ServerWebSocket<unknown>>();
   readonly #server: Server<unknown>;
   #answers: Answer[] = [];
+  #waiting: { count: number; resolve: () => void }[] = [];
+  /** How many events the next replay sends before the server drops the connection. */
+  #cutReplayAfter: number | null = null;
 
   constructor() {
     this.#server = Bun.serve({
@@ -55,12 +64,33 @@ export class ScriptedServer {
     return this.#log.at(-1)?.seq ?? 0;
   }
 
+  /** Resolves once the server has received `count` hellos in all. */
+  hello(count: number): Promise<void> {
+    return new Promise((resolve) => {
+      this.#waiting.push({ count, resolve });
+      this.#wake();
+    });
+  }
+
   /** Appends an event, and sends it to every client past its replay. */
   append(event: Record<string, unknown>): void {
     const entry = { seq: this.head + 1, event };
     this.#log.push(entry);
+    this.#broadcast(entry);
+  }
+
+  /** Sends an event already in the log again, as a server overlapping two deliveries would. */
+  repeat(seq: number): void {
+    const entry = this.#log.find((candidate) => candidate.seq === seq);
+    if (entry) {
+      this.#broadcast(entry);
+    }
+  }
+
+  /** Sends a frame as it is to every client. */
+  send(frame: Record<string, unknown>): void {
     for (const socket of this.#sockets) {
-      socket.send(JSON.stringify(this.#frame(entry)));
+      socket.send(JSON.stringify(frame));
     }
   }
 
@@ -76,6 +106,11 @@ export class ScriptedServer {
     this.#log = events.map((event, index) => ({ seq: index + 1, event }));
   }
 
+  /** Makes the next replay send `count` events, then drop the connection. */
+  cutNextReplay(count: number): void {
+    this.#cutReplayAfter = count;
+  }
+
   /** How the next commands are answered, in order; after them, each is `{ ok: true }`. */
   answer(...answers: Answer[]): void {
     this.#answers.push(...answers);
@@ -85,7 +120,21 @@ export class ScriptedServer {
     this.#server.stop(true);
   }
 
-  #frame(entry: { seq: number; event: Record<string, unknown> }) {
+  #broadcast(entry: Entry): void {
+    for (const socket of this.#sockets) {
+      socket.send(JSON.stringify(this.#frame(entry)));
+    }
+  }
+
+  #wake(): void {
+    const ready = this.#waiting.filter((waiting) => this.hellos.length >= waiting.count);
+    this.#waiting = this.#waiting.filter((waiting) => this.hellos.length < waiting.count);
+    for (const waiting of ready) {
+      waiting.resolve();
+    }
+  }
+
+  #frame(entry: Entry) {
     return {
       type: "event",
       seq: entry.seq,
@@ -100,17 +149,7 @@ export class ScriptedServer {
 
   #receive(socket: ServerWebSocket<unknown>, frame: Record<string, unknown>): void {
     if (frame.type === "hello") {
-      const hello = frame as unknown as Hello;
-      this.hellos.push(hello);
-      const reset = hello.resume_after_seq > this.head;
-      const after = reset ? 0 : hello.resume_after_seq;
-      socket.send(
-        JSON.stringify({ type: "welcome", workspace_id: "ws_1", head_seq: this.head, reset }),
-      );
-      for (const entry of this.#log.filter((entry) => entry.seq > after)) {
-        socket.send(JSON.stringify(this.#frame(entry)));
-      }
-      socket.send(JSON.stringify({ type: "replay_complete", up_to_seq: this.head }));
+      this.#hello(socket, frame as unknown as Hello);
       return;
     }
     const commandId = String(frame.command_id);
@@ -129,5 +168,27 @@ export class ScriptedServer {
           : { ok: true, outcome: null }),
       }),
     );
+  }
+
+  #hello(socket: ServerWebSocket<unknown>, hello: Hello): void {
+    this.hellos.push(hello);
+    this.#wake();
+    const position = hello.from_head ? this.head : (hello.resume_after_seq ?? 0);
+    const reset = position > this.head;
+    const after = reset ? 0 : position;
+    socket.send(
+      JSON.stringify({ type: "welcome", workspace_id: "ws_1", head_seq: this.head, reset }),
+    );
+    const replay = this.#log.filter((entry) => entry.seq > after);
+    const cut = this.#cutReplayAfter;
+    this.#cutReplayAfter = null;
+    for (const entry of cut === null ? replay : replay.slice(0, cut)) {
+      socket.send(JSON.stringify(this.#frame(entry)));
+    }
+    if (cut !== null) {
+      socket.close(1001, "dropped mid-replay");
+      return;
+    }
+    socket.send(JSON.stringify({ type: "replay_complete", up_to_seq: this.head }));
   }
 }

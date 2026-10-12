@@ -26,6 +26,17 @@
       "matchDepNames": ["bun"],
       "groupName": "Bun",
       "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "json-schema-to-typescript 16 needs js-yaml 5, and the root's overrides hold js-yaml at 4.3.2 for the Bruno CLI (portalr ADR-0010).",
+      "matchPackageNames": ["json-schema-to-typescript"],
+      "allowedVersions": "<16"
+    },
+    {
+      "description": "client's typescript is TypeScript 6, which openapi-typescript loads, until it supports TypeScript 7's API (portalr ADR-0007).",
+      "matchFileNames": ["packages/portalr/web/client/package.json"],
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<7"
     }
   ]
 }

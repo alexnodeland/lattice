@@ -14,20 +14,20 @@ afterEach(() => close());
 
 test("a client resumes docplan's stream across a dropped connection, losing and repeating nothing", async () => {
   const ws = workspace();
-  const store = new Stream(artifactr, { url: streamUrl(base, ws, session) });
+  const store = new Stream(artifactr, { url: () => streamUrl(base, ws, session) });
   close = () => store.close();
   const seqs = applied(store);
   store.open();
   await until(store, (s) => s.status === "live");
 
   const created = await store.send({ type: "create_thread", thread_id: "thr_1", title: "Launch" });
-  expect(created.done).toBe(true);
+  expect(created.outcome).toBe("done");
   await store.send({ type: "post_message", thread_id: "thr_1", content: "Draft the plan" });
   // The agent's turn, on pydantic-ai's test model, ends.
   await until(store, (s) => Object.values(s.state.runs).some((run) => run.status !== "running"));
 
-  // The connection drops, and two notices are posted over REST while the client is away.
-  store.reconnect();
+  // The client goes away, two notices are posted over REST, and it comes back.
+  store.close();
   for (const n of [1, 2]) {
     const { data } = await api.artifactr.POST("/workspaces/{workspace_id}/commands", {
       params: { path: { workspace_id: ws } },
@@ -45,6 +45,7 @@ test("a client resumes docplan's stream across a dropped connection, losing and 
     expect(data?.ok).toBe(true);
   }
 
+  store.open();
   const { data: tail } = await api.artifactr.GET("/workspaces/{workspace_id}/events", {
     params: { path: { workspace_id: ws }, query: { last: 1 } },
   });

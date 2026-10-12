@@ -4,11 +4,12 @@
  *
  * reflexr's schema types an event as open, `{type, ...}`, since the application's events share
  * the log with reflexr's own. The reducer has one handler for each of reflexr's run and rule
- * events, by name, and reads their fields as JSON; every other event changes nothing here.
+ * events, by name, and reads their fields as JSON; every other event changes nothing here. Once
+ * reflexr's schema names its own events (lattice#83), this reducer is typed like artifactr's.
  */
 
 import type * as v1 from "./generated/reflexr.v1";
-import type { Protocol } from "./stream";
+import type { Classified, Protocol, Stream } from "./stream";
 
 export interface Run {
   readonly id: string;
@@ -100,10 +101,38 @@ export function apply(state: Workspace, envelope: v1.EventFrame): Workspace {
   return handler ? handler(state, envelope.event) : state;
 }
 
+function classify(frame: v1.ServerFrame): Classified<v1.ServerFrame, v1.CommandResult> {
+  switch (frame.type) {
+    case "welcome":
+      return { kind: "welcome", headSeq: frame.head_seq, reset: frame.reset ?? false };
+    case "replay_complete":
+      return { kind: "replay_complete" };
+    case "event":
+      return { kind: "event", envelope: frame };
+    case "command_result":
+      return { kind: "result", result: frame };
+    case "error":
+      return { kind: "error", message: frame.message };
+    default:
+      return frame satisfies never;
+  }
+}
+
 /** reflexr's workspace protocol, for a `Stream`. A publish with an `id` is idempotent itself. */
-export const reflexr: Protocol<Workspace, v1.ServerFrame, v1.Command> = {
+export const reflexr: Protocol<Workspace, v1.ServerFrame, v1.Command, v1.CommandResult> = {
   name: "reflexr.v1",
   initial: () => ({ rules: {}, runs: {} }),
+  classify,
   apply,
+  other: (state) => state,
   creates: () => false,
 };
+
+/** A store over a reflexr workspace's stream. */
+export type ReflexrStream = Stream<
+  Workspace,
+  v1.ServerFrame,
+  v1.Command,
+  v1.CommandResult,
+  v1.Hello
+>;

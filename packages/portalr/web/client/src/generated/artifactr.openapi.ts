@@ -2,6 +2,29 @@
 // packages/artifactr/schemas/artifactr.openapi.json
 
 export interface paths {
+    "/workspaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Workspaces
+         * @description Return a page of the caller's tenant's workspaces that the caller may open, by id.
+         *
+         *     Pass the last id as ``after`` for the next page; a page shorter than ``limit`` is the
+         *     last.
+         */
+        get: operations["list_workspaces_workspaces_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{workspace_id}/artifacts": {
         parameters: {
             query?: never;
@@ -1308,6 +1331,38 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_workspaces_workspaces_get: {
+        parameters: {
+            query?: {
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceId"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_artifacts_workspaces__workspace_id__artifacts_get: {
         parameters: {
             query?: {

@@ -32,7 +32,7 @@ const SCHEMAS = {
 /**
  * The schema with every constant property required. pydantic marks a discriminator with a default
  * as optional, but every frame and event carries it, and a required literal lets the compiler
- * narrow the unions on it.
+ * narrow the unions on it. This goes when the schemas mark it required themselves (lattice#82).
  */
 function requireConstants(node: unknown): unknown {
   if (Array.isArray(node)) {

@@ -548,6 +548,10 @@ export interface components {
         /**
          * ExternalAgentActor
          * @description An agent outside reflexr, connected over MCP.
+         *
+         *     A person who connects a client with their own credentials acts through it: their actor is
+         *     its ``on_behalf_of``, and an application's ``authorize`` checks it as them, as artifactr's
+         *     does. A client with credentials of its own acts for no one.
          */
         ExternalAgentActor: {
             /** Client Id */
@@ -559,6 +563,7 @@ export interface components {
             kind: "external_agent";
             /** Name */
             name?: string | null;
+            on_behalf_of?: components["schemas"]["UserActor"] | null;
         };
         FeedbackTarget: components["schemas"]["RunTarget"] | components["schemas"]["FiringTarget"] | components["schemas"]["ChainTarget"];
         "Filter-Input": components["schemas"]["OnFilter"] | components["schemas"]["WhereFilter"] | components["schemas"]["AllFilter-Input"] | components["schemas"]["AnyFilter-Input"] | components["schemas"]["NotFilter-Input"] | components["schemas"]["PredicateFilter"];

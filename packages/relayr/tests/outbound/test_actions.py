@@ -1,6 +1,7 @@
 """What a run does in artifactr through `RunActions`: ids, allowlists, keyed edits, refusals."""
 
 import asyncio
+import re
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -17,7 +18,7 @@ import artifactr.workspace
 import reflexr
 import reflexr.workspace as r
 from relayr.events import ArtifactCreated, MessagePosted
-from relayr.ledger import Ledger
+from relayr.ledger import InMemoryLedger, Ledger
 from relayr.outbound import (
     Allowlist,
     NotAllowed,
@@ -298,18 +299,47 @@ async def test_a_run_allowed_threads_creates_and_acts_in_them(ledger: Ledger, st
     assert (await workspace.thread(str(thread))).title == "incident"
 
 
-async def test_a_run_allowed_any_thread_acts_anywhere(ledger: Ledger, stack: Stack) -> None:
+@pytest.mark.parametrize(
+    ("allowlists", "allowed"),
+    [
+        ({"app:act": Allowlist(threads="any")}, True),
+        ({"app:*": Allowlist(threads="any")}, True),
+        ({"app:act": Allowlist(), "app:*": Allowlist(threads="any")}, False),
+        ({"other:*": Allowlist(threads="any")}, False),
+        ({"ap:*": Allowlist(threads="any")}, False),
+        ({"apps:*": Allowlist(threads="any")}, False),
+    ],
+    ids=[
+        "its own",
+        "its namespace's",
+        "its own before its namespace's",
+        "another namespace's",
+        "a shorter namespace's",
+        "a longer namespace's",
+    ],
+)
+async def test_a_rule_takes_its_own_allowlist_else_its_namespaces(
+    ledger: Ledger, stack: Stack, allowlists: dict[str, Allowlist], allowed: bool
+) -> None:
     async def body(acting: RunActions, reaction: r.Reaction[Outbound]) -> object:
         return await acting.notice("there", thread_id="thr_elsewhere")
 
-    acted = await act(
-        stack,
-        ledger,
-        body,
-        allowlists={"app:act": Allowlist(threads="any")},
-        trigger=elsewhere,
-    )
-    assert acted.errors == []
+    acted = await act(stack, ledger, body, allowlists=allowlists, trigger=elsewhere)
+    if allowed:
+        assert acted.errors == []
+    else:
+        [error] = acted.errors
+        assert isinstance(error, NotAllowed)
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["*", "app:act*", "app:*:x", "App:*", "reflexr:*", "chat:**", "*:x", "chat", "reflexr:run"],
+)
+def test_an_allowlist_key_is_a_rule_or_a_whole_namespace(key: str) -> None:
+    workspaces = artifactr.Workspaces(artifactr.InMemoryStorage())
+    with pytest.raises(ValueError, match=f"not '{re.escape(key)}'"):
+        Outbound(workspaces, InMemoryLedger(), allowlists={key: Allowlist()})
 
 
 async def elsewhere(workspace: artifactr.Workspace) -> object:

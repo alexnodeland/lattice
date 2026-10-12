@@ -17,6 +17,7 @@ continues the run's causal chain when it bridges the write back into reflexr.
 
 import hashlib
 import json
+import re
 import weakref
 from collections import Counter
 from collections.abc import Awaitable, Callable, Mapping
@@ -85,8 +86,14 @@ class Outbound:
     Args:
         artifactr: The workspaces runs act in: the same tenant and id as the run's.
         ledger: Where the run behind each write is recorded, for the follower.
-        allowlists: Each rule's allowlist, by name. A rule with none gets the default.
+        allowlists: Each rule's allowlist, by name, or by a whole namespace's, as ``"chat:*"``,
+            for rules installed at runtime. A rule's own name comes first; a rule with neither
+            gets the default.
         runner: Starts the turns that rules allowed to `send` ask for. Without one, no rule may.
+
+    Raises:
+        ValueError: If a key of ``allowlists`` is neither a rule's name nor a whole namespace's,
+            or names reflexr's own namespace.
     """
 
     def __init__(
@@ -94,12 +101,18 @@ class Outbound:
         artifactr: artifactr.Workspaces,
         ledger: Ledger,
         *,
-        allowlists: Mapping[RuleName, Allowlist] | None = None,
+        allowlists: Mapping[str, Allowlist] | None = None,
         runner: artifactr.agent.Runner[Any] | None = None,
     ) -> None:
         self._artifactr = artifactr
         self._ledger = ledger
         self._allowlists = dict(allowlists or {})
+        for key in self._allowlists:
+            if not _KEY.fullmatch(key) or key.startswith("reflexr:"):
+                raise ValueError(
+                    f"an allowlist's key is a rule's name, as 'chat:deploys', or a whole "
+                    f"namespace's, as 'chat:*', and not reflexr's: not {key!r}"
+                )
         self._runner = runner
         self._acting: weakref.WeakKeyDictionary[Reaction[Any], RunActions] = (
             weakref.WeakKeyDictionary()
@@ -109,7 +122,12 @@ class Outbound:
         """Return what an attempt of a run may do in artifactr; the same for the whole attempt."""
         actions = self._acting.get(reaction)
         if actions is None:
-            allowlist = self._allowlists.get(reaction.run.rule, Allowlist())
+            rule = reaction.run.rule
+            namespace = f"{rule.partition(':')[0]}:*"
+            if rule in self._allowlists:
+                allowlist = self._allowlists[rule]
+            else:
+                allowlist = self._allowlists.get(namespace, Allowlist())
             actions = RunActions(reaction, self._artifactr, self._ledger, allowlist, self._runner)
             self._acting[reaction] = actions
         return actions
@@ -422,6 +440,9 @@ async def _used(_: artifactr.Workspace) -> bool:
     """
     return True
 
+
+_KEY: Final = re.compile(r"[a-z][a-z0-9_]*:(\*|[a-z0-9][a-z0-9._-]*)")
+"""An allowlist's key: a rule's name, as reflexr names rules, or a whole namespace's."""
 
 _RETRIED: Final = frozenset({"validation_failed", "patch_failed", "not_found"})
 """The refusals a run can do otherwise about: an agent's model is told, and may retry."""

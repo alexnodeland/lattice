@@ -32,6 +32,7 @@ from grantr.core.resources import (
     ResourceKind,
 )
 from grantr.core.roles import (
+    APPLICATION,
     BUILT_IN,
     GRANTR_ACTIONS,
     MEMBER,
@@ -52,6 +53,7 @@ from grantr.core.subjects import (
 )
 
 __all__ = [
+    "APPLICATION",
     "BUILT_IN",
     "DEPLOYMENT",
     "GRANTR_ACTIONS",

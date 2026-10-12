@@ -9,6 +9,11 @@ ARTIFACTR = frozenset(
         "artifactr:post_message",
         "artifactr:edit_artifact",
         "artifactr:propose_change",
+        "artifactr:stop_run",
+        "artifactr:record",
+        "artifactr:claim_thread",
+        "artifactr:save_cursor",
+        "artifactr:read_cursors",
     }
 )
 
@@ -20,6 +25,10 @@ REFLEXR = frozenset(
         "reflexr:give_feedback",
         "reflexr:cancel_run",
         "reflexr:install_rule",
+        "reflexr:publish",
+        "reflexr:checkpoint_run",
+        "reflexr:save_cursor",
+        "reflexr:read_cursors",
     }
 )
 

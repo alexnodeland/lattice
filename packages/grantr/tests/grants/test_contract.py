@@ -35,6 +35,7 @@ from grantr.core import (
     key_id,
 )
 from grantr.grants import Grants, Storage
+from tests.catalogs import ARTIFACTR, REFLEXR
 from tests.grants.conftest import ALICE, NOW, ROOT
 
 WS = Resource(kind="workspace", workspace="w1")
@@ -545,3 +546,62 @@ async def test_an_operator_lists_the_tenants(grants: Grants) -> None:
         await grants.tenants(by=ALICE)
     with pytest.raises(Invalid, match="isn't empty"):
         await grants.create_tenant("", owner=CAROL.id, by=ROOT)
+
+
+# ─── the application and the deployment's own tools ─────────────────────────
+
+APP = ServicePrincipal(id="app")
+
+
+async def test_the_application_holds_its_runtime_in_every_tenant_and_operators_dont(
+    storage: Storage,
+) -> None:
+    grants = Grants(storage, catalogs=[ARTIFACTR, REFLEXR], application=APP)
+    await grants.first_operator(ROOT.id)
+    for tenant in ("acme", "globex"):
+        await grants.provision_tenant(tenant, owner=ALICE.id)
+    assert not await grants.check("acme", APP, "artifactr:claim_thread", THREAD)
+
+    entry = await grants.bootstrap()
+    assert entry is not None
+    assert (entry.by, entry.tenant) == (None, None)
+    assert await grants.bootstrap() is None, "a second start grants nothing"
+    for tenant in ("acme", "globex"):
+        assert await grants.check(tenant, APP, "artifactr:claim_thread", THREAD)
+        assert await grants.check(tenant, APP, "reflexr:checkpoint_run", RULE)
+        assert not await grants.check(tenant, APP, "artifactr:edit_artifact", ARTIFACT)
+        assert not await grants.check(tenant, ROOT, "artifactr:read_artifacts", WS)
+    assert not await grants.check("acme", ServicePrincipal(id="other"), "artifactr:open", WS)
+
+
+async def test_only_a_configured_application_is_bootstrapped(grants: Grants) -> None:
+    with pytest.raises(Invalid, match="no application principal"):
+        await grants.bootstrap()
+
+
+async def test_the_deployments_tools_provision_a_tenant_once(grants: Grants) -> None:
+    entries = await grants.provision_tenant("globex", owner=BOB.id, admins=[BOB.id, CAROL.id])
+    assert [(entry.by, type(entry.event)) for entry in entries] == [
+        (None, TenantCreated),
+        (None, Granted),
+        (None, MemberAdded),
+        (None, Granted),
+    ]
+    assert await grants.member("globex", BOB.id) == Membership(
+        tenant="globex", user="bob", roles=("admin", "member", "owner")
+    )
+    assert await grants.member("globex", CAROL.id) == Membership(
+        tenant="globex", user="carol", roles=("admin", "member")
+    )
+    assert await grants.provision_tenant("globex", owner=CAROL.id) == []
+    with pytest.raises(Invalid, match="has no ~"):
+        await grants.provision_tenant("a~b", owner=BOB.id)
+
+
+async def test_a_workspaces_admin_grants_a_stored_rule_its_role(grants: Grants) -> None:
+    await _members(grants, BOB)
+    await grants.grant("acme", "admin", on=WS, to=BOB, by=ALICE)
+    rule = RulePrincipal(workspace="w1", rule="ops:page")
+    await grants.grant("acme", "rule", on=RULE, to=rule, by=BOB)
+    assert await grants.check("acme", rule, "reflexr:checkpoint_run", RULE)
+    assert not await grants.check("acme", rule, "reflexr:install_rule", RULE)

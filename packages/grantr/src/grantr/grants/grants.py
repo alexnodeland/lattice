@@ -17,6 +17,7 @@ from opentelemetry.metrics import MeterProvider
 from opentelemetry.trace import TracerProvider
 
 from grantr.core import (
+    APPLICATION,
     BUILT_IN,
     DEPLOYMENT,
     MEMBER,
@@ -128,6 +129,8 @@ class Grants:
         tracer_provider: Where slow checks' spans go. Defaults to the global tracer provider.
         meter_provider: Where the check counter goes. Defaults to the global meter provider.
         slow_check: How long a check takes before it is recorded as a span.
+        application: The application's own service principal, which :meth:`bootstrap` grants
+            the ``application`` role.
     """
 
     def __init__(
@@ -138,9 +141,11 @@ class Grants:
         tracer_provider: TracerProvider | None = None,
         meter_provider: MeterProvider | None = None,
         slow_check: timedelta = SLOW_CHECK,
+        application: ServicePrincipal | None = None,
     ) -> None:
         self._storage = storage
         self._catalog = Catalog.of(*catalogs)
+        self._application = application
         self._telemetry = Telemetry(
             tracer_provider=tracer_provider, meter_provider=meter_provider, slow_check=slow_check
         )
@@ -342,6 +347,24 @@ class Grants:
             await tx.add_grant(grant)
             return await record(None, None, Granted(grant=grant))
 
+    async def bootstrap(self) -> AuditEntry | None:
+        """Grant the application's service principal the ``application`` role, if it hasn't it.
+
+        The application calls it as it starts; no one else grants the role. It returns the
+        audit entry, made by no one, or None if the role was granted already.
+
+        Raises:
+            Invalid: If ``Grants`` was made with no ``application`` principal.
+        """
+        if self._application is None:
+            raise Invalid("no application principal is configured")
+        grant = _application(self._application)
+        async with self._change(None) as (tx, record):
+            if await tx.has(grant):
+                return None
+            await tx.add_grant(grant)
+            return await record(None, None, Granted(grant=grant))
+
     async def grant_operator(self, user: UserId, *, by: Subject) -> AuditEntry:
         """Make a user an operator of the deployment.
 
@@ -379,16 +402,41 @@ class Grants:
             Forbidden: If ``by`` may not: ``grantr:create_tenant`` on the deployment.
             Invalid: If the tenant exists, or its id is empty or has a ``~``.
         """
-        if not TENANT_ID.fullmatch(tenant):
-            raise Invalid("a tenant's id isn't empty, and has no ~")
+        _tenant_id(tenant)
         async with self._change(tenant) as (tx, record):
             await self._require(tx, None, by, "grantr:create_tenant", DEPLOYMENT)
             if await tx.tenant(tenant):
                 raise Invalid(f"{tenant} exists")
-            await tx.create_tenant(tenant)
-            for role in (MEMBER, "owner"):
-                await tx.add_grant(Grant(tenant=tenant, role=role, on=TENANT, to=User(id=owner)))
-            return await record(tenant, by, TenantCreated(owner=owner))
+            return await self._create(tx, record, tenant, owner, by)
+
+    async def provision_tenant(
+        self, tenant: TenantId, *, owner: UserId, admins: Iterable[UserId] = ()
+    ) -> list[AuditEntry]:
+        """Create a tenant, with its owner and admins, for the deployment's own tools.
+
+        ``make tenant`` and ``make migrate-tenants`` call it in process; no surface reaches it,
+        and its audit entries are made by no one. It changes nothing if the tenant exists.
+
+        Returns:
+            The audit entries, or none if the tenant exists.
+
+        Raises:
+            Invalid: If the tenant's id is empty or has a ``~``.
+        """
+        _tenant_id(tenant)
+        async with self._change(tenant) as (tx, record):
+            if await tx.tenant(tenant):
+                return []
+            entries = [await self._create(tx, record, tenant, owner, None)]
+            for admin in admins:
+                user = User(id=admin)
+                if not await self._is_member(tx, tenant, user):
+                    await tx.add_grant(Grant(tenant=tenant, role=MEMBER, on=TENANT, to=user))
+                    entries.append(await record(tenant, None, MemberAdded(member=user)))
+                grant = Grant(tenant=tenant, role="admin", on=TENANT, to=user)
+                await tx.add_grant(grant)
+                entries.append(await record(tenant, None, Granted(grant=grant)))
+            return entries
 
     async def delete_tenant(self, tenant: TenantId, *, by: Subject) -> AuditEntry:
         """Delete a tenant, and everything grantr holds for it but its audit log.
@@ -615,7 +663,15 @@ class Grants:
             return frozenset()
         scope = None if on.kind == "deployment" else tenant
         grants = await reads.grants(scope, subject, on=on.chain())
-        return held(grants, on, self._catalog, await self._custom(reads, scope, grants))
+        actions = held(grants, on, self._catalog, await self._custom(reads, scope, grants))
+        # ``application`` is the one deployment role that holds in every tenant.
+        if (
+            isinstance(subject, ServicePrincipal)
+            and scope is not None
+            and await reads.has(_application(subject))
+        ):
+            actions |= self._catalog.built_in["deployment", APPLICATION]
+        return actions
 
     async def _custom(
         self, reads: Reads, tenant: TenantId | None, grants: list[Grant]
@@ -664,6 +720,20 @@ class Grants:
         ):
             raise Invalid(f"{grant.to} isn't a member")
 
+    async def _create(
+        self,
+        tx: Transaction,
+        record: Record,
+        tenant: TenantId,
+        owner: UserId,
+        by: Subject | None,
+    ) -> AuditEntry:
+        """Create a tenant whose first owner is a member and its owner."""
+        await tx.create_tenant(tenant)
+        for role in (MEMBER, "owner"):
+            await tx.add_grant(Grant(tenant=tenant, role=role, on=TENANT, to=User(id=owner)))
+        return await record(tenant, by, TenantCreated(owner=owner))
+
     async def _is_member(self, reads: Reads, tenant: TenantId, member: Member) -> bool:
         return await reads.has(Grant(tenant=tenant, role=MEMBER, on=TENANT, to=member))
 
@@ -694,3 +764,13 @@ class Grants:
         owners = await tx.granted(tenant, TENANT, role="owner")
         if owners and set(owners) <= set(losing):
             raise Invalid(f"{owners[0].to} is the last owner")
+
+
+def _application(principal: ServicePrincipal) -> Grant:
+    """The grant of the ``application`` role to a service principal."""
+    return Grant(tenant=None, role=APPLICATION, on=DEPLOYMENT, to=principal)
+
+
+def _tenant_id(tenant: TenantId) -> None:
+    if not TENANT_ID.fullmatch(tenant):
+        raise Invalid("a tenant's id isn't empty, and has no ~")

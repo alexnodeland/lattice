@@ -61,6 +61,8 @@ EDITOR_COMMANDS: Final = frozenset(
         "artifactr:propose_change",
         "artifactr:archive_artifact",
         "artifactr:respond_to_proposal",
+        "artifactr:stop_run",
+        "artifactr:record",
         "reflexr:publish",
         "reflexr:retry_run",
         "reflexr:skip_run",
@@ -68,12 +70,38 @@ EDITOR_COMMANDS: Final = frozenset(
     }
 )
 """The commands an editor may send beyond a viewer's: post, create, edit, propose, archive,
-resolve proposals, and operate runs. Rule management is the workspace admin's alone."""
+resolve proposals, and operate runs, and ``artifactr:record``, which a turn that an editor's
+message starts asks as them. Rule management is the workspace admin's alone."""
+
+BOOKKEEPING: Final = frozenset(
+    {
+        "artifactr:claim_thread",
+        "artifactr:save_cursor",
+        "artifactr:read_cursors",
+        "reflexr:save_cursor",
+        "reflexr:read_cursors",
+    }
+)
+"""What the application's own machinery does, and no person's role holds: claiming threads, and
+keeping the log's consumers' cursors."""
+
+RUNTIME: Final = BOOKKEEPING | {
+    "artifactr:record",
+    "reflexr:publish",
+    "reflexr:checkpoint_run",
+}
+"""The commands the application's ``application`` role holds, beside every ``open`` and read:
+its bookkeeping, the runner's records, and its code rules' runs."""
+
+RULE: Final = frozenset({"reflexr:open", "reflexr:publish", "reflexr:checkpoint_run"})
+"""The commands a stored rule's ``rule`` role holds, beside reflexr's reads."""
 
 type Level = Literal["deployment", "tenant", "workspace", "item"]
 """Where a role is granted: a thread, an artifact and a rule are each an item."""
 
-BUILT_IN: Final = frozenset({"operator", "owner", "admin", "member", "editor", "viewer"})
+BUILT_IN: Final = frozenset(
+    {"operator", "application", "owner", "admin", "member", "editor", "viewer", "rule"}
+)
 """The built-in roles' names, which no custom role may take."""
 
 CUSTOM_LEVELS: Final[frozenset[Level]] = frozenset({"workspace", "item"})
@@ -81,6 +109,10 @@ CUSTOM_LEVELS: Final[frozenset[Level]] = frozenset({"workspace", "item"})
 
 MEMBER: Final = "member"
 """The role that makes a user or service principal a member of a tenant, and nothing more."""
+
+APPLICATION: Final = "application"
+"""The role of the application's own service principal: granted on the deployment, and the one
+deployment role that holds in every tenant."""
 
 
 LEVELS: Final[Mapping[ResourceKind, Level]] = {
@@ -122,25 +154,30 @@ class Catalog:
         if malformed := sorted(a for a in actions if not ACTION.fullmatch(a)):
             raise ValueError(f"actions are <library>:<name>, not {', '.join(malformed)}")
         libraries = actions - GRANTR_ACTIONS
-        viewer = FEEDBACK & libraries | {
+        reads = {
             action
             for action in libraries
             if action.partition(":")[2].startswith("read_") or action.endswith(":open")
         }
+        viewer = (FEEDBACK & libraries | reads) - BOOKKEEPING
         editor = viewer | EDITOR_COMMANDS & libraries
-        owner = actions - OPERATOR
+        rule = {a for a in reads - BOOKKEEPING if a.startswith("reflexr:")} | RULE & libraries
+        owner = actions - OPERATOR - BOOKKEEPING
         return cls(
             actions=actions,
             built_in={
                 ("deployment", "operator"): OPERATOR,
+                ("deployment", APPLICATION): frozenset(reads | RUNTIME & libraries),
                 ("tenant", "owner"): owner,
                 ("tenant", "admin"): owner - {"grantr:delete_tenant"},
                 ("tenant", MEMBER): frozenset(),
-                ("workspace", "admin"): libraries | WORKSPACE_GRANTS,
+                ("workspace", "admin"): libraries - BOOKKEEPING | WORKSPACE_GRANTS,
                 ("workspace", "editor"): editor,
                 ("workspace", "viewer"): viewer,
+                ("workspace", "rule"): frozenset(rule),
                 ("item", "editor"): editor,
                 ("item", "viewer"): viewer,
+                ("item", "rule"): frozenset(rule),
             },
         )
 

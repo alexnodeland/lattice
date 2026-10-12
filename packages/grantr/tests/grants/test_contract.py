@@ -621,22 +621,28 @@ async def test_no_one_grants_the_deployments_roles(
         await grants.grant("acme", "application", on=on, to=to, by=ALICE)
 
 
-async def test_the_deployments_tools_provision_a_tenant_once(grants: Grants) -> None:
+async def test_the_deployments_tools_provision_a_tenant_and_the_admins_it_lacks(
+    grants: Grants,
+) -> None:
     admins = [BOB.id, CAROL.id, CAROL.id]
     entries = await grants.provision_tenant("globex", owner=BOB.id, admins=admins)
     assert [(entry.by, type(entry.event)) for entry in entries] == [
         (None, TenantCreated),
-        (None, Granted),
         (None, MemberAdded),
         (None, Granted),
     ]
     assert await grants.member("globex", BOB.id) == Membership(
-        tenant="globex", user="bob", roles=("admin", "member", "owner")
+        tenant="globex", user="bob", roles=("member", "owner")
     )
     assert await grants.member("globex", CAROL.id) == Membership(
         tenant="globex", user="carol", roles=("admin", "member")
     )
-    assert await grants.provision_tenant("globex", owner=CAROL.id) == []
+    assert await grants.provision_tenant("globex", owner=CAROL.id) == [], "the owner stays"
+    again = await grants.provision_tenant("globex", owner=BOB.id, admins=[CAROL.id, "dave"])
+    assert [type(entry.event) for entry in again] == [MemberAdded, Granted]
+    assert await grants.member("globex", "dave") == Membership(
+        tenant="globex", user="dave", roles=("admin", "member")
+    )
     with pytest.raises(Invalid, match="has no ~"):
         await grants.provision_tenant("a~b", owner=BOB.id)
 

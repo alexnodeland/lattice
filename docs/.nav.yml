@@ -5,6 +5,7 @@ nav:
   - Proposals:
       - rfcs/README.md
       - rfcs/0001-grantr-identity-and-access.md
+      - rfcs/0002-portalr-the-portal.md
   - Decisions:
       - adr/README.md
       - adr/0001-lattices-brand.md

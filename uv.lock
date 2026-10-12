@@ -3218,6 +3218,7 @@ app = [
     { name = "artifactr-ai" },
     { name = "pyjwt" },
     { name = "uvicorn" },
+    { name = "websockets" },
 ]
 dev = [
     { name = "artifactr-ai" },
@@ -3229,6 +3230,7 @@ dev = [
     { name = "pytest-timeout" },
     { name = "ruff" },
     { name = "uvicorn" },
+    { name = "websockets" },
 ]
 lint = [
     { name = "pyright" },
@@ -3255,6 +3257,7 @@ app = [
     { name = "artifactr-ai", editable = "packages/artifactr" },
     { name = "pyjwt", specifier = ">=2.15" },
     { name = "uvicorn", specifier = ">=0.54" },
+    { name = "websockets", specifier = ">=15" },
 ]
 dev = [
     { name = "artifactr-ai", editable = "packages/artifactr" },
@@ -3266,6 +3269,7 @@ dev = [
     { name = "pytest-timeout", specifier = ">=2.4" },
     { name = "ruff", specifier = ">=0.16" },
     { name = "uvicorn", specifier = ">=0.54" },
+    { name = "websockets", specifier = ">=15" },
 ]
 lint = [
     { name = "pyright", specifier = ">=1.1.414" },

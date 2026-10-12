@@ -41,6 +41,14 @@ export class Signed {
     return this.auth.signOut({ scope: "local" });
   }
 
+  /** What a workspace's stream in `tenant` carries: the current token, and the tenant. */
+  streamSession(tenant: string): { readonly token: string; readonly tenant: string } {
+    if (this.current === null) {
+      throw new Error("no one is signed in");
+    }
+    return { token: this.current.token, tenant };
+  }
+
   /** The session a request carries now: REST reads name their tenant themselves. */
   session(): Session {
     return { token: this.current?.token ?? null, tenant: null };

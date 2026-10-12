@@ -1,7 +1,8 @@
 """portalr's test application, for its acceptance tests only: the router over the stack's tools.
 
-It mounts ``portalr_router``, and grantr's own router for the UIs' ``/me`` and ``/checks``, over
-grantr's ``Grants`` in memory, and invites without Supabase. acme's owner is alice, and bob is its
+It mounts ``portalr_router``, grantr's own router for the UIs' ``/me`` and ``/checks``, and
+artifactr's, with a scripted agent (``notes.py``), over grantr's ``Grants`` in memory, which checks
+every artifactr command and read; it invites without Supabase. acme's owner is alice, and bob is its
 member with no tenant role, an editor of its workspaces ``notes`` and ``plans``; globex's owner is
 carol; erin is a member of both, and edits acme's ``notes``; ops is the deployment's operator.
 
@@ -17,15 +18,19 @@ application the template generates, and this application's wiring of grantr goes
 """
 
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
 import jwt
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from starlette.requests import HTTPConnection
 
+from artifactr import UserActor
+from artifactr.core import Forbidden
+from artifactr.fastapi import Unauthorized as ArtifactrUnauthorized
+from artifactr.fastapi import artifactr_router
 from artifactr.workspace import ACTIONS as ARTIFACTR_ACTIONS
 from grantr.core import Resource, User
 from grantr.fastapi import Caller, Unauthorized, grantr_router
@@ -33,6 +38,7 @@ from grantr.grants import Grants, InMemoryStorage
 from portalr.actions import ACTIONS
 from portalr.fastapi import UI, Site, portalr_router
 from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
+from tests.app.notes import APPLICATION, collaboration
 
 OPS, ALICE, BOB, CAROL, ERIN = (User(id=name) for name in ("ops", "alice", "bob", "carol", "erin"))
 
@@ -84,14 +90,46 @@ def signed_in(token: str) -> User:
     return User(id=user)
 
 
-async def resolve_actor(connection: HTTPConnection) -> Caller:
-    """The caller a bearer token names, or else the ``x-user`` header, as docplan trusts it."""
+def person(connection: HTTPConnection) -> User:
+    """Who a request names: by a bearer token, in the query on a stream, which a browser opens
+    without headers; or else by the ``x-user`` header, as docplan trusts it.
+
+    Raises:
+        Unauthorized: If it names no one, or with a token that isn't valid.
+    """
     scheme, _, token = connection.headers.get("authorization", "").partition(" ")
+    if scheme.lower() != "bearer" and connection.scope["type"] == "websocket":
+        token = connection.query_params.get("access_token", "")
+        scheme = "bearer"
     if scheme.lower() == "bearer" and token:
-        return Caller(signed_in(token))
+        return signed_in(token)
     if user := connection.headers.get("x-user"):
-        return Caller(User(id=user))
-    raise Unauthorized
+        return User(id=user)
+    raise Unauthorized("sign in")
+
+
+async def resolve_actor(connection: HTTPConnection) -> Caller:
+    """The caller, to grantr's router and portalr's."""
+    return Caller(person(connection))
+
+
+def artifactr_actor(grants: Grants) -> Callable[[HTTPConnection], Awaitable[tuple[str, UserActor]]]:
+    """artifactr's caller: the person, a member of the tenant ``X-Tenant`` names, or a stream's
+    ``tenant``, as the template resolves one."""
+
+    async def resolve(connection: HTTPConnection) -> tuple[str, UserActor]:
+        try:
+            user = person(connection)
+        except Unauthorized as error:
+            raise ArtifactrUnauthorized(str(error)) from error
+        tenant = connection.headers.get("x-tenant") or connection.query_params.get("tenant")
+        if not tenant:
+            raise HTTPException(status_code=400, detail="name the tenant with X-Tenant")
+        if await grants.member(tenant, user.id) is None:
+            raise Forbidden(f"{user.id} isn't a member of {tenant}")
+        return tenant, UserActor(id=user.id, name=user.id)
+
+    return resolve
 
 
 async def invite(email: str) -> str:
@@ -114,18 +152,30 @@ def readers() -> Readers:
 
 def create_app(ui: Path = UI) -> FastAPI:
     """The test application."""
-    grants = Grants(InMemoryStorage(), catalogs=[ACTIONS, ARTIFACTR_ACTIONS])
+    grants = Grants(
+        InMemoryStorage(), catalogs=[ACTIONS, ARTIFACTR_ACTIONS], application=APPLICATION
+    )
+    workspaces, runner, seed_notes = collaboration(grants)
     gotrue = os.environ.get("PORTALR_GOTRUE_URL", "http://gotrue:9999")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        await grants.bootstrap()
         await seed(grants)
+        await seed_notes()
         async with httpx.AsyncClient(base_url=gotrue) as auth:
             app.state.auth = auth
-            yield
+            try:
+                yield
+            finally:
+                await runner.aclose()
 
     app = FastAPI(title="portalr's test application", lifespan=lifespan)
     app.include_router(grantr_router(grants, resolve_actor=resolve_actor), prefix="/grantr/v1")
+    app.include_router(
+        artifactr_router(workspaces, runner, resolve_actor=artifactr_actor(grants)),
+        prefix="/artifactr/v1",
+    )
     app.include_router(
         portalr_router(
             resolve_actor=resolve_actor,

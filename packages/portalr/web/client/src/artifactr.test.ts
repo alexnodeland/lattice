@@ -50,6 +50,7 @@ test("a thread holds its title, mode, focus and messages", () => {
         content: "Hello",
         kind: "message",
         runId: null,
+        feedback: [],
       },
       {
         id: "msg_2",
@@ -58,6 +59,7 @@ test("a thread holds its title, mode, focus and messages", () => {
         content: "FYI",
         kind: "notice",
         runId: null,
+        feedback: [],
       },
     ],
   });
@@ -103,29 +105,29 @@ test("a run streams its text until its message is posted, and keeps its status",
     status: "succeeded",
     tools: { t1: { name: "edit", status: "ok" } },
     text: "",
+    requests: [],
   });
 });
 
-test("a run pauses for an answer, and resumes when it gets one", () => {
+test("a run pauses on its requests, and resumes when every one is answered", () => {
+  const ask = { kind: "question", tool_call_id: "t1", tool_name: "ask", args: { q: "Which?" } };
+  const approve = { kind: "approval", tool_call_id: "t2", tool_name: "edit_artifact", args: {} };
   const paused = replay(
     { type: "run_started", run_id: "run_2", thread_id: "thr_1" },
-    { type: "run_paused", run_id: "run_2", thread_id: "thr_1", requests: [] },
+    { type: "run_paused", run_id: "run_2", thread_id: "thr_1", requests: [ask, approve] },
   );
-  expect(paused.runs.run_2?.status).toBe("paused");
-  const resumed = apply(
-    paused,
-    envelope(
-      {
-        type: "deferred_answered",
-        run_id: "run_2",
-        thread_id: "thr_1",
-        tool_call_id: "t2",
-        approved: true,
-      },
-      3,
-    ),
-  );
-  expect(resumed.runs.run_2?.status).toBe("running");
+  expect(paused.runs.run_2).toMatchObject({ status: "paused", requests: [ask, approve] });
+  const answered = (state: Workspace, tool: string, seq: number) =>
+    apply(
+      state,
+      envelope(
+        { type: "deferred_answered", run_id: "run_2", thread_id: "thr_1", tool_call_id: tool },
+        seq,
+      ),
+    );
+  const half = answered(paused, "t2", 3);
+  expect(half.runs.run_2).toMatchObject({ status: "paused", requests: [ask] });
+  expect(answered(half, "t1", 4).runs.run_2).toMatchObject({ status: "running", requests: [] });
 });
 
 test("a run that started before what the store read is left alone", () => {
@@ -161,13 +163,23 @@ test("artifacts keep their kind, latest version and whether they are archived", 
 });
 
 test("a proposal is open until it is accepted or rejected", () => {
+  const change = { type: "create_artifact", artifact_id: "plan_2", kind: "plan", data: {} };
   const open = replay({
     type: "proposal_created",
     proposal_id: "prop_1",
     thread_id: "thr_1",
-    change: {},
+    run_id: "run_1",
+    change,
+    rationale: "A plan to start from.",
   });
-  expect(open.proposals.prop_1?.status).toBe("open");
+  const proposal = {
+    id: "prop_1",
+    threadId: "thr_1",
+    runId: "run_1",
+    change,
+    rationale: "A plan to start from.",
+  };
+  expect(open.proposals.prop_1).toEqual({ ...proposal, status: "open" });
   const resolved = apply(
     open,
     envelope(
@@ -181,10 +193,44 @@ test("a proposal is open until it is accepted or rejected", () => {
       2,
     ),
   );
-  expect(resolved.proposals.prop_1).toEqual({ id: "prop_1", threadId: "thr_1", status: "accept" });
+  expect(resolved.proposals.prop_1).toEqual({ ...proposal, status: "accept" });
+  // One resolved before what the store read keeps what the resolution says.
+  const late = apply(
+    artifactr.initial(),
+    envelope({ type: "proposal_resolved", proposal_id: "prop_9", decision: "reject" }, 1),
+  );
+  expect(late.proposals.prop_9).toEqual({
+    id: "prop_9",
+    threadId: null,
+    runId: null,
+    change: null,
+    rationale: null,
+    status: "reject",
+  });
 });
 
-test("feedback, the application's events and unknown events change nothing", () => {
+test("feedback on a message is kept with it, oldest first", () => {
+  const thumbs = (up: boolean) => ({
+    type: "feedback_given",
+    feedback_type: "thumbs",
+    target: { kind: "message", thread_id: "thr_1", message_id: "msg_1" },
+    value: { up },
+  });
+  const state = replay(
+    { type: "message_posted", thread_id: "thr_1", message_id: "msg_1", content: "Done." },
+    { type: "message_posted", thread_id: "thr_1", message_id: "msg_2", content: "And this." },
+    thumbs(true),
+    thumbs(false),
+  );
+  const [first, second] = state.threads.thr_1?.messages ?? [];
+  expect(first?.feedback).toEqual([
+    { actor: { kind: "user", id: "alice" }, type: "thumbs", value: { up: true } },
+    { actor: { kind: "user", id: "alice" }, type: "thumbs", value: { up: false } },
+  ]);
+  expect(second?.feedback).toEqual([]);
+});
+
+test("feedback on anything but a message, the application's events and unknown events change nothing", () => {
   const state = artifactr.initial();
   for (const event of [
     {

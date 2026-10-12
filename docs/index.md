@@ -24,8 +24,9 @@ The family's packages, in one repository: libraries for applications in which pe
 | [evalr](evalr/index.md) | Typed evaluation of agent systems: judges that give typed verdicts, trained on people's feedback and measured against it |
 | [relayr](relayr/index.md) | The bridge between artifactr and reflexr: events from chats and artifacts become events for rules, and runs act back in the chat |
 | [stackr](stackr/index.md) | The infrastructure the libraries run on, and an application template |
+| [portalr](portalr/index.md) | The portal into an application: an app UI to chat with its agents and see their work, and an admin UI to run it. Planned: it holds only its version so far |
 
-Two more are planned: grantr, identity and access for artifactr and reflexr, and portalr, the portal into the system.
+One more is planned: grantr, identity and access for artifactr and reflexr.
 
 lattice's mark is one cell of the lattice that every mark in the family is drawn on. Its [brand page](assets/brand/README.md) has the mark, the colours and the family's brand system, and [ADR-0001](adr/0001-lattices-brand.md) records why.
 

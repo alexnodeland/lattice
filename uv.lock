@@ -17,6 +17,7 @@ members = [
     "evalr",
     "lattice",
     "oncall",
+    "portalr",
     "reflexr",
     "relayr-ai",
     "stackr",
@@ -3024,6 +3025,49 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/6c/d2/578712a979a50e9aba08ea173a38e7598461130d3c9899f176373bc03280/plumbum-2.0.2.tar.gz", hash = "sha256:233751d7819c9e6743ec1c2405927eb4fa52a284c7b894bd10e28106a9309a92", size = 390799, upload-time = "2026-07-22T04:13:12.157Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b5/55/fdd01894807d20fb6181f13590ae247585b10e909b42e6ada833379fe520/plumbum-2.0.2-py3-none-any.whl", hash = "sha256:a865771826c1d2cce0ca8b2a2c48aa0447ed7a518859e389a95f158e9c369547", size = 168804, upload-time = "2026-07-22T04:13:10.76Z" },
+]
+
+[[package]]
+name = "portalr"
+version = "0.1.0.dev0"
+source = { editable = "packages/portalr" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-timeout" },
+    { name = "ruff" },
+]
+lint = [
+    { name = "pyright" },
+    { name = "ruff" },
+]
+test = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-timeout" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pyright", specifier = ">=1.1.414" },
+    { name = "pytest", specifier = ">=9.1" },
+    { name = "pytest-cov", specifier = ">=7.1" },
+    { name = "pytest-timeout", specifier = ">=2.4" },
+    { name = "ruff", specifier = ">=0.16" },
+]
+lint = [
+    { name = "pyright", specifier = ">=1.1.414" },
+    { name = "ruff", specifier = ">=0.16" },
+]
+test = [
+    { name = "pytest", specifier = ">=9.1" },
+    { name = "pytest-cov", specifier = ">=7.1" },
+    { name = "pytest-timeout", specifier = ">=2.4" },
 ]
 
 [[package]]

@@ -28,8 +28,9 @@
 | [evalr](packages/evalr) | Typed evaluation of agent systems: judges that give typed verdicts, trained on people's feedback and measured against it | [evalr](https://lattice.alexnodeland.com/evalr/) | `evalr` |
 | [relayr](packages/relayr) | The bridge between artifactr and reflexr: events from chats and artifacts become events for rules, and runs act back in the chat | [relayr](https://lattice.alexnodeland.com/relayr/) | `relayr-ai` |
 | [stackr](packages/stackr) | The infrastructure the libraries run on (local Supabase, the LiteLLM gateway, OpenTelemetry, Grafana and Langfuse), and an application template | [stackr](https://lattice.alexnodeland.com/stackr/) | none: it ships no wheel |
+| [portalr](packages/portalr) | The portal into an application: an app UI to chat with its agents and see their artifacts, rules and runs, and an admin UI to manage access and see feedback, evaluations, traces and spend. Planned: it holds only its version so far | [portalr](https://lattice.alexnodeland.com/portalr/) | `portalr` |
 
-Two more are planned. **grantr** is identity and access for artifactr and reflexr: users, groups, roles and permissions, bound to tenants and workspaces and checked by their authorize hooks. **portalr** is the portal into the system: chat with your agents, see artifacts, rules and runs, and manage access, traces, feedback, evals and analytics.
+One more is planned. **grantr** is identity and access for artifactr and reflexr: users, groups, roles and permissions, bound to tenants and workspaces and checked by their authorize hooks.
 
 > **Status:** alpha. artifactr's [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) is the family's first release; the other packages haven't had one. APIs may still change before 1.0.
 

@@ -1,6 +1,6 @@
 # ADR-0020: Allowlists
 
-**Status:** Accepted
+**Status:** Accepted, amended on 2026-10-12: a namespace's allowlist, below
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 
@@ -27,6 +27,20 @@ artifactr checks a rule's writes to artifacts and proposals against their write 
 ## Consequences
 
 - Easier: what each rule may do beyond proposals and notices is one line beside it.
-- Harder: phase 5's chat rules need an allowlist of their own, which the install rule will set.
+- Harder: phase 5's chat rules need an allowlist of their own; the amendment below gives one to their namespace.
+
+## Amendment (2026-10-12): a namespace's allowlist
+
+Rules drafted in chat are installed at runtime, under names no one can list in advance, in the namespaces reflexr's `StoredRules` allows, such as `chat`. Their first action posts a notice in a thread the drafter named, which their chain doesn't hold.
+
+- **A key of `Outbound(allowlists=...)` may name a whole namespace,** as `"chat:*"`. It applies to every rule in that namespace that has no allowlist of its own; a rule's own name comes first.
+- **That is the only wildcard.** Any other key with a `*` is refused when `Outbound` is made: no globbing within a name, and no wildcard across namespaces.
+- **stackr's template** gives `chat:*` `Allowlist(threads="any")`: notices in any thread, and nothing more.
+
+| Option | For | Against |
+|---|---|---|
+| **A namespace's key, after the rule's own (chosen)** | Plain data still; one line covers every rule a namespace will hold | A rule in the namespace gets what the namespace has, unless named |
+| Patterns over names | Finer grouping | Matching rules no one reviews by name |
+| A callback from the rule to its allowlist | Anything can decide | The limit moves into code, as the original decision rejected |
 
 [rfc-0002-security]: ../../stackr/rfcs/0002-the-combined-system.md#security

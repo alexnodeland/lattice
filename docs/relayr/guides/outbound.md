@@ -69,6 +69,8 @@ Its tools are `read_artifact`, `create_artifact`, `edit_artifact`, `post_notice`
 
 artifactr's write policy and the thread's mode still apply: a direct edit to a kind whose policy is `propose` is still a proposal.
 
+A key may also name a whole namespace, as `"chat:*"`, for rules installed at runtime whose names aren't known in advance. A rule's own name comes first, and any other wildcard is refused ([ADR-0020](../adr/0020-allowlists.md)).
+
 ## Retries and failures
 
 Write as if every attempt were the first. Each write's ids are derived from the run and what the write is (the artifact and path of an edit, the kind and data of a create, the thread and text of a notice), so a retried attempt that makes the same writes, in any order, makes nothing twice. A notice worded differently, or an artifact with other data, is another write.

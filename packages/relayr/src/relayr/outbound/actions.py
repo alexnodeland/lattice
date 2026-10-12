@@ -17,6 +17,7 @@ continues the run's causal chain when it bridges the write back into reflexr.
 
 import hashlib
 import json
+import re
 import weakref
 from collections import Counter
 from collections.abc import Awaitable, Callable, Mapping
@@ -85,8 +86,13 @@ class Outbound:
     Args:
         artifactr: The workspaces runs act in: the same tenant and id as the run's.
         ledger: Where the run behind each write is recorded, for the follower.
-        allowlists: Each rule's allowlist, by name. A rule with none gets the default.
+        allowlists: Each rule's allowlist, by name, or by a whole namespace's, as ``"chat:*"``,
+            for rules installed at runtime. A rule's own name comes first; a rule with neither
+            gets the default.
         runner: Starts the turns that rules allowed to `send` ask for. Without one, no rule may.
+
+    Raises:
+        ValueError: If a key of ``allowlists`` has a wildcard other than a whole namespace's.
     """
 
     def __init__(
@@ -100,6 +106,8 @@ class Outbound:
         self._artifactr = artifactr
         self._ledger = ledger
         self._allowlists = dict(allowlists or {})
+        if wild := sorted(k for k in self._allowlists if "*" in k and not _NAMESPACE.fullmatch(k)):
+            raise ValueError(f"only a whole namespace may be a wildcard, as 'chat:*': {wild}")
         self._runner = runner
         self._acting: weakref.WeakKeyDictionary[Reaction[Any], RunActions] = (
             weakref.WeakKeyDictionary()
@@ -109,7 +117,9 @@ class Outbound:
         """Return what an attempt of a run may do in artifactr; the same for the whole attempt."""
         actions = self._acting.get(reaction)
         if actions is None:
-            allowlist = self._allowlists.get(reaction.run.rule, Allowlist())
+            rule = reaction.run.rule
+            namespace = f"{rule.partition(':')[0]}:*"
+            allowlist = self._allowlists.get(rule) or self._allowlists.get(namespace, Allowlist())
             actions = RunActions(reaction, self._artifactr, self._ledger, allowlist, self._runner)
             self._acting[reaction] = actions
         return actions
@@ -422,6 +432,9 @@ async def _used(_: artifactr.Workspace) -> bool:
     """
     return True
 
+
+_NAMESPACE: Final = re.compile(r"[a-z][a-z0-9_]*:\*")
+"""An allowlist's key for a whole rule namespace, as reflexr names namespaces."""
 
 _RETRIED: Final = frozenset({"validation_failed", "patch_failed", "not_found"})
 """The refusals a run can do otherwise about: an agent's model is told, and may retry."""

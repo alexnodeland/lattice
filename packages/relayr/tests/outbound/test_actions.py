@@ -17,7 +17,7 @@ import artifactr.workspace
 import reflexr
 import reflexr.workspace as r
 from relayr.events import ArtifactCreated, MessagePosted
-from relayr.ledger import Ledger
+from relayr.ledger import InMemoryLedger, Ledger
 from relayr.outbound import (
     Allowlist,
     NotAllowed,
@@ -298,18 +298,38 @@ async def test_a_run_allowed_threads_creates_and_acts_in_them(ledger: Ledger, st
     assert (await workspace.thread(str(thread))).title == "incident"
 
 
-async def test_a_run_allowed_any_thread_acts_anywhere(ledger: Ledger, stack: Stack) -> None:
+@pytest.mark.parametrize(
+    ("allowlists", "allowed"),
+    [
+        ({"app:act": Allowlist(threads="any")}, True),
+        ({"app:*": Allowlist(threads="any")}, True),
+        ({"app:act": Allowlist(), "app:*": Allowlist(threads="any")}, False),
+        ({"other:*": Allowlist(threads="any")}, False),
+    ],
+    ids=["its own", "its namespace's", "its own before its namespace's", "another namespace's"],
+)
+async def test_a_run_allowed_any_thread_acts_anywhere(
+    ledger: Ledger, stack: Stack, allowlists: dict[str, Allowlist], allowed: bool
+) -> None:
     async def body(acting: RunActions, reaction: r.Reaction[Outbound]) -> object:
         return await acting.notice("there", thread_id="thr_elsewhere")
 
-    acted = await act(
-        stack,
-        ledger,
-        body,
-        allowlists={"app:act": Allowlist(threads="any")},
-        trigger=elsewhere,
-    )
-    assert acted.errors == []
+    acted = await act(stack, ledger, body, allowlists=allowlists, trigger=elsewhere)
+    if allowed:
+        assert acted.errors == []
+    else:
+        [error] = acted.errors
+        assert isinstance(error, NotAllowed)
+
+
+@pytest.mark.parametrize("key", ["*", "app:act*", "app:*:x", "App:*"])
+def test_only_a_whole_namespace_is_a_wildcard(key: str) -> None:
+    with pytest.raises(ValueError, match="only a whole namespace"):
+        Outbound(
+            artifactr.Workspaces(artifactr.InMemoryStorage()),
+            InMemoryLedger(),
+            allowlists={key: Allowlist()},
+        )
 
 
 async def elsewhere(workspace: artifactr.Workspace) -> object:

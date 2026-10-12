@@ -12,11 +12,12 @@ Phase 2 also brings `ui`'s tokens, from portalr's brand ([lattice ADR-0014](../.
 
 ## Decision
 
-- **Browser mode works in Bun.** `bun x --bun --no-install vitest run` drives Chromium through `@vitest/browser-playwright`, with no Node.js on the path, locally and in CI. Node.js stays out of `.prototools`.
+- **Browser mode works in Bun.** `bun x --bun --no-install vitest run` drives Chromium through `@vitest/browser-playwright` under Bun's runtime (`--bun`), locally and in CI; Node.js isn't needed. It stays out of `.prototools`.
 - **Every test runs twice,** in two Chromium instances, `light` and `dark`, whose Playwright contexts set the system's colour scheme. A test reads the scheme it runs in from `matchMedia`.
-- **The tests check what the scheme decides:** each component's computed colours against the tokens, and the WCAG contrast of its text, at least 4.5:1, as well as its behaviour, such as a disabled button that can't be pressed.
+- **The tests check what the scheme decides:** each component's computed colours against the tokens, the WCAG contrast of its text, at least 4.5:1, and of the focus ring against every surface, at least 3:1; and its behaviour, such as a disabled button that can't be pressed, or a focus ring shown when the keyboard reaches it.
 - **No screenshots yet.** Vitest's screenshot baselines differ by platform, and contributors run macOS while CI runs Linux. Screenshots come when there is a component whose look a computed style can't pin, with baselines made in CI.
-- **The tokens are CSS custom properties,** `--portalr-*`, in `tokens.css`: light by default, dark when the system prefers it unless a page sets `data-theme="light"`, and dark whenever it sets `data-theme="dark"`. `styles.css` imports Tailwind 4 and hands the tokens to `@theme inline`, so `bg-accent` follows the scheme.
+- **The tokens are CSS custom properties** in `tokens.css`, each one `light-dark()` pair. `:root` takes the system's scheme, and `data-theme="light"` or `"dark"` sets it. The brand's inks keep their package's name (`--portalr-violet`); the roles the components use are brand-neutral (`--paper`, `--surface`, `--fg`, `--muted`, `--line`, `--accent`, `--on-accent`, `--focus`), so a screen can re-skin them, as `[data-brand="grantr"] { --accent: var(--grantr-gold) }` will. `styles.css` imports Tailwind 4 and makes the roles its whole colour theme (`--color-*: initial`), so `bg-accent` follows the scheme and the default palette's classes don't exist.
+- **Components merge classes with `cn()`,** shadcn's: `clsx` and `tailwind-merge`, so a caller's class overrides the component's own of its kind.
 - **The first primitives are Base UI's `Button` and `Switch`,** styled with the tokens in the shape of shadcn's copied components: a primary button in the working colour, a secondary one on the surface, and a switch whose track takes the working colour.
 - **Chromium is Playwright's headless shell,** installed by `make install`, the dev container and CI's Check, Tests and Nightly jobs (`playwright install --only-shell chromium`).
 

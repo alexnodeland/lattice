@@ -1,6 +1,6 @@
 # Brand
 
-[lattice ADR-0014](../../../adr/0014-portalrs-and-grantrs-marks.md) records portalr's identity. It prints in cyan, magenta and yellow together, the full-colour proof, and its mark is lattice's cell with one side open: a window onto the lattice the family is drawn on, opened. Where two sides cross is its overprint, a violet, which is its working colour. The mark has two versions: `app`'s opens to the upper right, outward, and `admin`'s to the lower left. [`tokens.json`](tokens.json) holds its colours, and `ui`'s `tokens.css` holds them as CSS custom properties.
+[lattice ADR-0014](../../../adr/0014-portalrs-and-grantrs-marks.md) records portalr's identity. It prints in cyan, magenta and yellow together, the full-colour proof, and its mark is lattice's cell with one side open: a window onto the lattice the family is drawn on, opened. Where two sides cross is its overprint, a violet, which is its working colour. The mark has two versions: `app`'s opens to the upper right, outward, and `admin`'s to the lower left. [`tokens.json`](tokens.json) holds its colours, and `ui`'s `tokens.css` holds them as CSS custom properties: the inks as `--portalr-*`, and the roles the components use, such as `--accent` and `--focus`, under brand-neutral names.
 
 <p>
   <img src="mark-light.svg#gh-light-mode-only" width="96" alt="portalr's mark, for app">
@@ -26,10 +26,10 @@
 
 | Name | Light | Dark | Role |
 |---|---|---|---|
-| Cyan | `#009FE3` | `#38C6F4` | The upper-left side; the UIs' focus ring |
+| Cyan | `#009FE3` | `#38C6F4` | The upper-left side; the UIs' focus ring on dark backgrounds |
 | Magenta | `#E4007C` | `#FF4DA6` | The lower-left side in `app`'s mark, the upper-right in `admin`'s |
 | Yellow | `#FFC400` | `#FFD54A` | The lower-right side. Never text |
-| Violet | `#6B2FA0` | `#E2CCF5` | The overprint, where two sides cross; the wordmark; the UIs' working colour, for actions and links |
+| Violet | `#6B2FA0` | `#E2CCF5` | The overprint, where two sides cross; the wordmark; the UIs' working colour, for actions and links, and their focus ring on light backgrounds, where cyan is too light (2.73:1 on the paper) |
 | Paper | `#F7F4FB` | `#17111F` | The banner's background, and the UIs' paper |
 | Graphite | `#5E5470` | `#BDB2CC` | Secondary text, such as the banner's tagline |
 

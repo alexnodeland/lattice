@@ -211,7 +211,7 @@ One, at the root, replaces the four per-repository ones, and supersedes artifact
 | Concern | Settled |
 |---|---|
 | Docker | Docker-in-Docker (`ghcr.io/devcontainers/features/docker-in-docker:4`), for stackr's Compose, Supabase and the smoke tests |
-| Egress | A firewall for unattended agent runs, from Anthropic's reference `init-firewall.sh`, which allows GitHub, npm, the Anthropic API and VS Code's endpoints. lattice's adds PyPI, Docker Hub, GHCR and `public.ecr.aws` (Supabase's images). It needs the `NET_ADMIN` and `NET_RAW` capabilities |
+| Egress | A firewall for unattended agent runs, from Anthropic's reference `init-firewall.sh`, which allows GitHub, npm, the Anthropic API and VS Code's endpoints. lattice's adds PyPI, Docker Hub, GHCR, `public.ecr.aws` (Supabase's images), and `cdn.playwright.dev` and `playwright.download.prss.microsoft.com` (Playwright's Chromium, for `ui`'s browser tests). It needs the `NET_ADMIN` and `NET_RAW` capabilities |
 | Tools | proto installs moon, uv and Bun from `.prototools`, and `uv python install` provides Python 3.12 to 3.14. Chromium and its dependencies for Playwright. The Claude Code feature (`ghcr.io/anthropics/devcontainer-features/claude-code:1.0`, whose tag pins the install script, not Claude Code's release) and Git AI at a pinned release. `devcontainer-lock.json` pins the features. Renovate bumps them in `devcontainer.json` but can't update the lockfile yet, so its pull requests also run `devcontainer upgrade`, and CI builds with `--frozen-lockfile` |
 | Caches | Named volumes for the uv, Bun, moon and proto caches, and for `.venv` |
 | Editor | The ty, ruff, Biome, moon, Playwright, Bruno and GitHub Actions extensions; format on save, and ty as the language server. Forwarded ports carry labels |

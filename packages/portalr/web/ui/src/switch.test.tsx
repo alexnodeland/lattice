@@ -11,3 +11,18 @@ test("a switch turns on, and its track takes the working colour", async () => {
   await expect.element(control).toBeChecked();
   expect(getComputedStyle(control.element()).backgroundColor).toBe(token("accent"));
 });
+
+test("a disabled switch doesn't turn", async () => {
+  const screen = await render(<Switch aria-label="Digest" disabled />);
+  const control = screen.getByRole("switch", { name: "Digest" });
+  await control.click({ force: true });
+  await expect.element(control).not.toBeChecked();
+});
+
+test("a caller's classes merge with the switch's", async () => {
+  const screen = await render(<Switch aria-label="Alerts" className="bg-surface" />);
+  const track = screen.getByRole("switch", { name: "Alerts" }).element();
+  expect(track.classList).toContain("bg-surface");
+  expect(track.classList).not.toContain("bg-paper");
+  expect(track.classList).toContain("rounded-full");
+});

@@ -58,11 +58,11 @@ Both are open-source (SIL Open Font License) and served by Google Fonts. The wor
 
 ## The family
 
-artifactr, reflexr, evalr, relayr, grantr, stackr and portalr share one brand system, and lattice, which holds them, is drawn in it too, so that they read as a family wherever they appear together: a README that links its siblings, a stack that runs them all, a system built from them.
+artifactr, reflexr, evalr, relayr, stackr, portalr and grantr share one brand system, and lattice, which holds them, is drawn in it too, so that they read as a family wherever they appear together: a README that links its siblings, a stack that runs them all, a system built from them.
 
 <p>
-  <img src="family-light.svg#gh-light-mode-only" width="100%" alt="The marks of artifactr, reflexr, evalr, relayr, stackr, lattice, portalr and grantr, over their names">
-  <img src="family-dark.svg#gh-dark-mode-only" width="100%" alt="The marks of artifactr, reflexr, evalr, relayr, stackr, lattice, portalr and grantr, over their names">
+  <img src="family-light.svg#gh-light-mode-only" width="100%" alt="The marks of artifactr, reflexr, evalr, relayr, stackr, portalr, grantr and lattice, over their names">
+  <img src="family-dark.svg#gh-dark-mode-only" width="100%" alt="The marks of artifactr, reflexr, evalr, relayr, stackr, portalr, grantr and lattice, over their names">
 </p>
 
 ### The system
@@ -70,7 +70,7 @@ artifactr, reflexr, evalr, relayr, grantr, stackr and portalr share one brand sy
 - **The inks are a printer's**: cyan, magenta, yellow and key. artifactr, reflexr and evalr each print with two of the three process inks and name their own meaning for each, and where the two overlap they overprint into a third colour: the library's working colour. Any two of those three share one ink, as neighbouring jobs on a press share a plate. stackr prints in key. relayr and lattice each print on one plate, magenta and cyan, and their working colour is where that plate prints twice. portalr prints in all three process inks together, and grantr in yellow and key, which [ADR-0001](../../adr/0001-lattices-brand.md#the-familys-inks) reserved for them; neither set overprints into a colour of its own, so each chose its working colour, as [ADR-0014](../../adr/0014-portalrs-and-grantrs-marks.md) records.
 - **One grid.** Every mark is drawn on a 64-unit square and sits in the same place on it in every file, so one mark can replace another without re-spacing a layout.
 - **One stroke.** A stroke is a band 14 units wide, measured horizontally, on artifactr's diagonal of 27 across for every 52 down (about 62.6°). Strokes end in flat cuts along the grid, and meet in points where one stroke's edge cuts the other. reflexr's diagonal, the caret's turned a quarter, runs 52 across for every 27 down and is square to artifactr's; a stroke on it is 14 units measured vertically.
-- **One overprint.** A mark's overlaps, and only those, are filled with its overprint colour. On paper the overprint is darker than both inks, and on screen lighter.
+- **One overprint.** A mark's overlaps, and only those, are filled with its overprint colour. On paper the overprint is darker than both inks, except grantr's, which is lighter than key ([lattice ADR-0014](../../adr/0014-portalrs-and-grantrs-marks.md)), and on screen lighter.
 - **One typographic layout.** The wordmark is Schibsted Grotesk Bold, lowercase, outlined and tracked 1.2% tight. In a lockup it is set at 64 units, with the mark's grid scaled so that 52 grid units (from line 6 to line 58, the height of artifactr's caret) are 0.8 of the type size, line 58 on the baseline, 0.16 of the type size between the mark and the word, and 8 units of padding. A banner is 1280 × 400 with 24-unit corners: the wordmark at 136 units (baseline 196, from x = 104), a two-line tagline in the same face at weight 420 and 32 units (baselines 272 and 316, from x = 108) in the graphite, and the mark at 7.2 times its grid from (845.6, 0.8), running off the panel.
 - **One site palette rule.** The overprint is the working colour (links, and the theme's primary colour; headings stay in the text colour), the darker ink marks interaction, and the lighter ink highlights code. The dark scheme's background is a near-black of the overprint's hue.
 
@@ -83,9 +83,9 @@ artifactr, reflexr, evalr, relayr, grantr, stackr and portalr share one brand sy
 | **[evalr](../../evalr/assets/brand/README.md)** | A tick: the caret turned over, one arm cut short at two thirds of its height | Yellow and cyan: a person's judgement and an evaluator's | Green `#00704F`: the verdict where they agree | A verdict; its arms meet in a point, as the caret's do |
 | **[relayr](../../relayr/assets/brand/README.md)** | Two strokes on the family's diagonal, each two thirds of the grid's height and half a stroke apart | Magenta alone: one plate, the ink artifactr and reflexr share | Deep magenta `#9E0A5E`, where the plate prints twice | The bridge between artifactr and reflexr, in the ink they share |
 | **[stackr](../../stackr/assets/brand/README.md)** | Three slabs, stacked along the family's diagonal, their ends cut at its angle | Key: one tint for every layer | Key `#1C1D26`, where two layers overlap | The layers the other libraries run on, and the key plate the others are printed in register to |
-| **lattice** | A cell of the lattice: four strokes on the family's two diagonals, meeting in points | Cyan alone: one plate, the ink artifactr and evalr share | Deep cyan `#005A87`, where the plate prints twice | The grid every mark is drawn on, and the repository that holds them |
 | **[portalr](../../portalr/assets/brand/README.md)** | lattice's cell with one side open: to the upper right for `app`, to the lower left for `admin` | Cyan, magenta and yellow together: the full-colour proof | Violet `#6B2FA0`, chosen, where two sides cross | A window onto the lattice, opened: the portal onto every library |
 | **[grantr](../../grantr/assets/brand/README.md)** | A shield: artifactr's caret turned over, in key, under a slab in yellow | Yellow and key: a nod to the key plate, since grants are keys | Dark gold `#6B5300`, yellow's own shade, where the slab and arms cross | What a grant guards |
+| **lattice** | A cell of the lattice: four strokes on the family's two diagonals, meeting in points | Cyan alone: one plate, the ink artifactr and evalr share | Deep cyan `#005A87`, where the plate prints twice | The grid every mark is drawn on, and the repository that holds them |
 
 portalr's tokens are also `ui`'s CSS custom properties, which the UIs' theme is built from.
 

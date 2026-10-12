@@ -5,7 +5,7 @@ export const dark = matchMedia("(prefers-color-scheme: dark)").matches;
 /** A token's value in the scheme the test runs in, as the browser computes it. */
 export function token(name: string): string {
   const probe = document.createElement("span");
-  probe.style.color = `var(--portalr-${name})`;
+  probe.style.color = `var(--${name})`;
   document.body.append(probe);
   const value = getComputedStyle(probe).color;
   probe.remove();

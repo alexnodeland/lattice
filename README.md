@@ -18,7 +18,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/family-dark.svg">
-  <img alt="The marks of artifactr, reflexr, evalr, relayr, stackr, lattice, portalr and grantr, over their names" src="docs/assets/brand/family-light.svg" width="100%">
+  <img alt="The marks of artifactr, reflexr, evalr, relayr, stackr, portalr, grantr and lattice, over their names" src="docs/assets/brand/family-light.svg" width="100%">
 </picture>
 
 | Package | What it is | Docs | Distribution |

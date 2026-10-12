@@ -1,20 +1,20 @@
-/* The kit's styles: Tailwind, with portalr's tokens as its theme. app and admin import this. */
+/*
+ * The kit's styles: Tailwind, with portalr's roles as its whole colour theme, so the default
+ * palette's classes (`bg-blue-500`) don't exist. app and admin import this.
+ */
 @import "tailwindcss";
 @import "./tokens.css";
 
 @theme inline {
-  --color-cyan: var(--portalr-cyan);
-  --color-magenta: var(--portalr-magenta);
-  --color-yellow: var(--portalr-yellow);
-  --color-violet: var(--portalr-violet);
-  --color-paper: var(--portalr-paper);
-  --color-surface: var(--portalr-surface);
-  --color-text: var(--portalr-text);
-  --color-graphite: var(--portalr-graphite);
-  --color-line: var(--portalr-line);
-  --color-accent: var(--portalr-accent);
-  --color-on-accent: var(--portalr-on-accent);
-  --color-focus: var(--portalr-focus);
+  --color-*: initial;
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-focus: var(--focus);
   --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Fragment Mono", ui-monospace, monospace;
 }

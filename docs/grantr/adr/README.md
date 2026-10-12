@@ -14,11 +14,11 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0006](0006-what-v0-1-includes.md) | What v0.1 includes | Accepted |
 | [0007](0007-an-append-only-audit-log.md) | An append-only audit log | Accepted |
 | [0008](0008-grantrs-own-model-with-openfga-shaped-ports.md) | grantr's own model, with OpenFGA-shaped ports | Accepted |
-| [0009](0009-a-deployment-wide-operator-role.md) | A deployment-wide operator role | Accepted; amended by 0014 |
+| [0009](0009-a-deployment-wide-operator-role.md) | A deployment-wide operator role | Accepted, amended by 0014 |
 | [0010](0010-commands-bounded-by-what-their-maker-holds.md) | Commands bounded by what their maker holds | Accepted |
 | [0011](0011-built-in-roles-over-the-catalogs.md) | Built-in roles over the catalogs | Accepted |
 | [0012](0012-every-item-an-access-names-and-hooks-typed-by-actor.md) | Every item an access names, and hooks typed by their actor | Accepted |
-| [0013](0013-transactions-by-tenant-and-one-audit-log.md) | Transactions by tenant, and one audit log | Accepted; amended by 0016 |
+| [0013](0013-transactions-by-tenant-and-one-audit-log.md) | Transactions by tenant, and one audit log | Accepted, amended by 0016 |
 | [0014](0014-an-operator-enters-a-tenant-by-granting-themselves.md) | An operator enters a tenant by granting themselves | Accepted |
 | [0015](0015-a-check-writes-nothing.md) | A check writes nothing | Accepted |
 | [0016](0016-the-sql-adapter.md) | The SQL adapter | Accepted |

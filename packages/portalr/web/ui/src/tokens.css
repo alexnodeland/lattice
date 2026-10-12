@@ -1,62 +1,35 @@
 /*
- * portalr's brand tokens (lattice ADR-0014), as CSS custom properties. The light values are the
- * default; the dark ones apply when the system prefers a dark scheme, unless the page asks for
- * light with data-theme="light", and whenever it asks for dark with data-theme="dark".
- * styles.css hands them to Tailwind's @theme.
+ * portalr's tokens (lattice ADR-0014), as CSS custom properties. The brand's inks keep their
+ * package's name; the roles the components use are brand-neutral, so a screen can re-skin them,
+ * as in `[data-brand="grantr"] { --accent: var(--grantr-gold) }`. Each token is one light-dark()
+ * pair: the system's scheme chooses, unless the page sets data-theme="light" or "dark".
+ * styles.css hands the roles to Tailwind's @theme.
  */
 
 :root {
+  color-scheme: light dark;
+
   /* The inks: the mark's three plates, and the overprint where they cross. */
-  --portalr-cyan: #009fe3;
-  --portalr-magenta: #e4007c;
-  --portalr-yellow: #ffc400;
-  --portalr-violet: #6b2fa0;
+  --portalr-cyan: light-dark(#009fe3, #38c6f4);
+  --portalr-magenta: light-dark(#e4007c, #ff4da6);
+  --portalr-yellow: light-dark(#ffc400, #ffd54a);
+  --portalr-violet: light-dark(#6b2fa0, #e2ccf5);
 
-  /* The UIs' surfaces and text. */
-  --portalr-paper: #f7f4fb;
-  --portalr-surface: #ffffff;
-  --portalr-text: #1c1d26;
-  --portalr-graphite: #5e5470;
-  --portalr-line: #dcd5e6;
+  /* The roles. */
+  --paper: light-dark(#f7f4fb, #17111f);
+  --surface: light-dark(#ffffff, #0d1920);
+  --fg: light-dark(#1c1d26, #f1eef6);
+  --muted: light-dark(#5e5470, #bdb2cc);
+  --line: light-dark(#dcd5e6, #3a3247);
+  --accent: var(--portalr-violet);
+  --on-accent: light-dark(#ffffff, #17111f);
+  --focus: light-dark(#6b2fa0, #38c6f4);
+}
 
-  /* The working colour, for actions and links, and the text set on it. */
-  --portalr-accent: #6b2fa0;
-  --portalr-on-accent: #ffffff;
-  --portalr-focus: #009fe3;
-
+:root[data-theme="light"] {
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --portalr-cyan: #38c6f4;
-    --portalr-magenta: #ff4da6;
-    --portalr-yellow: #ffd54a;
-    --portalr-violet: #e2ccf5;
-    --portalr-paper: #17111f;
-    --portalr-surface: #0d1920;
-    --portalr-text: #f1eef6;
-    --portalr-graphite: #bdb2cc;
-    --portalr-line: #3a3247;
-    --portalr-accent: #e2ccf5;
-    --portalr-on-accent: #17111f;
-    --portalr-focus: #38c6f4;
-    color-scheme: dark;
-  }
-}
-
 :root[data-theme="dark"] {
-  --portalr-cyan: #38c6f4;
-  --portalr-magenta: #ff4da6;
-  --portalr-yellow: #ffd54a;
-  --portalr-violet: #e2ccf5;
-  --portalr-paper: #17111f;
-  --portalr-surface: #0d1920;
-  --portalr-text: #f1eef6;
-  --portalr-graphite: #bdb2cc;
-  --portalr-line: #3a3247;
-  --portalr-accent: #e2ccf5;
-  --portalr-on-accent: #17111f;
-  --portalr-focus: #38c6f4;
   color-scheme: dark;
 }

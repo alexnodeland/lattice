@@ -42,7 +42,8 @@
 
 - **The files follow the family's layout,** in `docs/portalr/assets/brand/` and `docs/grantr/assets/brand/`: marks, lockups, banners, favicons and `tokens.json`. portalr's `admin` mark has its own files and favicon.
 - **A lockup ends 8 units below its descender.** The family's lockup ends 8 units below the baseline, which clips relayr's `y`. "portalr" and "grantr" descend too, so their lockups are taller by the descender.
-- **portalr's tokens become `ui`'s CSS custom properties,** in `packages/portalr/web/ui/src/tokens.css`, light and dark, which Tailwind's `@theme` takes as its theme.
+- **portalr's tokens become `ui`'s CSS custom properties,** in `packages/portalr/web/ui/src/tokens.css`, light and dark, which Tailwind's `@theme` takes as its theme. The inks keep the package's name, `--portalr-cyan`, `--portalr-magenta`, `--portalr-yellow` and `--portalr-violet`, and grantr's gold will be `--grantr-gold`. The roles are brand-neutral: `--paper`, `--surface`, `--fg`, `--muted`, `--line`, `--accent` (the violet), `--on-accent` and `--focus`, so `admin` can show a grantr screen in grantr's colours by setting `--accent` alone.
+- **The focus ring is violet on light backgrounds and cyan on dark.** Cyan on portalr's paper is 2.73:1, under WCAG's 3:1 for a focus indicator; the violet is 7.60:1.
 - **The family sheet shows eight marks,** and the brand page states both. This amends ADR-0001's reservations: the inks were reserved there, and the marks and working colours are recorded here.
 
 ## Options considered

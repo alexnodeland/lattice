@@ -50,6 +50,27 @@ function Unsent({ reason }: { reason: string | null }) {
   return reason && <p role="alert">{reason}</p>;
 }
 
+/** A button that sends one command, waits while it is in flight, and says why one wasn't done. */
+export function CommandButton({
+  onSend,
+  variant = "secondary",
+  children,
+}: {
+  onSend: () => Sent;
+  variant?: "primary" | "secondary";
+  children: ReactNode;
+}) {
+  const { pending, unsent, send } = useSending();
+  return (
+    <span className="inline-flex flex-col gap-1">
+      <Button variant={variant} disabled={pending} onClick={() => send(onSend)}>
+        {children}
+      </Button>
+      <Unsent reason={unsent} />
+    </span>
+  );
+}
+
 /** Give thumbs up or down, and why, if the person says. */
 export type GiveThumbs = (up: boolean, comment: string | null) => Sent;
 
@@ -73,7 +94,7 @@ export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: Giv
     }
   }
   return (
-    <div role="group" aria-label="Feedback" className="flex flex-col gap-1">
+    <fieldset aria-label="Feedback" className="m-0 flex min-w-0 flex-col gap-1 border-0 p-0">
       <span className="flex gap-1">
         <Button
           variant="secondary"
@@ -102,7 +123,7 @@ export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: Giv
         </form>
       )}
       <Unsent reason={unsent} />
-    </div>
+    </fieldset>
   );
 }
 

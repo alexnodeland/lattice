@@ -17,6 +17,7 @@ export {
 } from "./artifacts";
 export { Button } from "./button";
 export {
+  CommandButton,
   Composer,
   type GiveThumbs,
   Message,

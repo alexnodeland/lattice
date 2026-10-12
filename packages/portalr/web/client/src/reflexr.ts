@@ -17,6 +17,8 @@ export interface Run {
   readonly rule: string;
   readonly status: "running" | "retrying" | "succeeded" | "dead_lettered" | "cancelled" | "skipped";
   readonly attempt: number;
+  /** How many times a person retried it: each retry starts its attempts again. */
+  readonly retries: number;
   /** The `seq` it started at: the later, the newer. */
   readonly started: number;
   /** The feedback given on it, oldest first. */
@@ -58,6 +60,7 @@ function withRun(state: Workspace, id: string, change: Partial<Run>): Workspace 
     rule: "",
     status: "running",
     attempt: 1,
+    retries: 0,
     started: 0,
     feedback: [],
   };
@@ -98,7 +101,10 @@ const handlers: Readonly<Record<string, Handler>> = {
       status: "retrying",
       attempt: count(event, "attempt"),
     }),
-  "reflexr:run_requeued": ended("running"),
+  "reflexr:run_requeued": (state, event) => {
+    const id = text(event, "run_id");
+    return withRun(state, id, { status: "running", retries: (state.runs[id]?.retries ?? 0) + 1 });
+  },
   "reflexr:run_succeeded": ended("succeeded"),
   "reflexr:run_dead_lettered": ended("dead_lettered"),
   "reflexr:run_cancelled": ended("cancelled"),

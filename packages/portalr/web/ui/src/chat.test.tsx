@@ -3,6 +3,7 @@ import { expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import {
+  CommandButton,
   Composer,
   Message,
   Messages,
@@ -427,4 +428,13 @@ test("thumbs that weren't sent ask for no comment", async () => {
   await screen.getByRole("button", { name: "Helpful", exact: true }).click();
   await expect.element(screen.getByRole("alert")).toBeVisible();
   await expect.element(screen.getByRole("textbox")).not.toBeInTheDocument();
+});
+
+test("a command button waits for its command, and says why one wasn't done", async () => {
+  const onSend = sent("refused");
+  const screen = await render(<CommandButton onSend={onSend}>Retry</CommandButton>);
+  await screen.getByRole("button", { name: "Retry" }).click();
+  expect(onSend).toHaveBeenCalledOnce();
+  await expect.element(screen.getByRole("alert")).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
 });

@@ -53,6 +53,7 @@ test("a run moves through its statuses", () => {
     rule: "ops:page",
     status: "succeeded",
     attempt: 2,
+    retries: 1,
     started: 1,
     feedback: [],
   });

@@ -1,8 +1,8 @@
 import { Page, TextLink } from "@portalr/ui";
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
-import { WorkspaceStream } from "../../../../../workspace";
+import { WorkspaceStreams } from "../../../../../workspace";
 
-/** A workspace: its stream, open while any of its areas is, and the way back to the others. */
+/** A workspace: its streams, open while any of its areas is, and the way between its areas. */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace")({
   head: ({ params }) => ({ meta: [{ title: `${params.workspace} · ${params.tenant} · portalr` }] }),
   component: Workspace,
@@ -30,16 +30,21 @@ function Workspace() {
         >
           Proposals
         </TextLink>
+        <TextLink
+          render={<Link to="/t/$tenant/w/$workspace/runs" params={{ tenant, workspace }} />}
+        >
+          Runs
+        </TextLink>
       </nav>
-      <WorkspaceStream
+      <WorkspaceStreams
         key={`${tenant}/${workspace}`}
-        surface={config.surfaces.artifactr}
+        surfaces={config.surfaces}
         signed={signed}
         tenant={tenant}
         workspace={workspace}
       >
         <Outlet />
-      </WorkspaceStream>
+      </WorkspaceStreams>
     </Page>
   );
 }

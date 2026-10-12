@@ -31,6 +31,7 @@ tasks:
       - '/packages/portalr/src/**/*'
       - '/packages/grantr/src/**/*'
       - '/packages/artifactr/src/**/*'
+      - '/packages/reflexr/src/**/*'
     options:
       cache: false
 

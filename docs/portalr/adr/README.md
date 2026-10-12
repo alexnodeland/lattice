@@ -23,5 +23,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0015](0015-the-chat-components-and-streamdown.md) | The chat's components, and Markdown through Streamdown | Accepted |
 | [0016](0016-the-threads-area.md) | The Threads area: a workspace's stream, and a scripted agent to chat with | Accepted |
 | [0017](0017-the-artifacts-and-proposals-areas.md) | The Artifacts and Proposals areas: renderers by kind, and diffs by revision | Accepted |
+| [0018](0018-the-runs-area-and-feedback.md) | The Runs area, feedback on runs, and what a person may do | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

@@ -18,7 +18,7 @@ The planned portal into an application built on the family: an `app` UI for the 
 
 !!! note "In progress, not yet usable"
 
-    Built so far: its decisions and [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md), the Bun workspace, its brand with `ui`'s tokens and first primitives, the typed `client`, and the router with its readers, tested against the stack's tools for two tenants, as its [architecture](architecture.md) describes. The two UIs come with the plan's later phases.
+    Built so far: its decisions and [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md), the Bun workspace, its brand with `ui`'s tokens and first primitives, the typed `client`, and the router with its readers, tested against the stack's tools for two tenants, and the app's sign-in and its tenant and workspace pickers, as its [architecture](architecture.md) describes. The app's areas and the admin UI come with the plan's later phases.
 
 ## Why: the family has no face
 

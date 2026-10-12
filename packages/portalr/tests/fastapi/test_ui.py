@@ -1,6 +1,7 @@
 import httpx
 
-from portalr.fastapi.ui import IMMUTABLE, NO_CACHE
+from portalr.fastapi import Site
+from portalr.fastapi.ui import IMMUTABLE, NO_CACHE, policy
 
 
 async def test_a_hashed_asset_is_cached_for_good(client: httpx.AsyncClient) -> None:
@@ -29,6 +30,12 @@ async def test_every_ui_response_has_a_strict_policy(client: httpx.AsyncClient) 
     assert "frame-ancestors 'none'" in policy
     assert headers["x-content-type-options"] == "nosniff"
     assert headers["referrer-policy"] == "no-referrer"
+
+
+def test_supabase_on_the_applications_own_origin_is_already_self() -> None:
+    on_a_path = policy(Site(supabase_url="/", supabase_key="sb_publishable_x"))
+    assert "connect-src 'self';" in on_a_path
+    assert " /" not in on_a_path
 
 
 async def test_a_path_out_of_the_ui_gets_the_index_not_the_file(client: httpx.AsyncClient) -> None:

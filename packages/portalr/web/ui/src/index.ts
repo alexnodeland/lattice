@@ -8,3 +8,5 @@
 export { Button } from "./button";
 export { Page } from "./page";
 export { Switch } from "./switch";
+export { TextField } from "./text-field";
+export { TextLink } from "./text-link";

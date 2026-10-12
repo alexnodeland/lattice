@@ -25,3 +25,7 @@ Feature: Artifacts
     Then the note reads "Launch on Monday."
     When they accept it
     Then the note reads "Launch on Tuesday."
+
+  Scenario: An artifact that isn't there
+    When they open an artifact that isn't there
+    Then they are told it isn't found

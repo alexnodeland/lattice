@@ -1,8 +1,8 @@
 import { changes, keys, Refused } from "@portalr/client";
-import { ArtifactContent, Diff, ProposalCard, rendererFor } from "@portalr/ui";
+import { ArtifactContent, Diff, ProposalCard, proposedOn, rendererFor } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { RENDERERS } from "../../../../../../../renderers";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
 
@@ -18,9 +18,12 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/
   loader: async ({ context, params }) => {
     const { tenant, workspace, artifact } = params;
     try {
-      await context.queryClient.ensureQueryData(
+      const revisions = await context.queryClient.ensureQueryData(
         context.queries.artifactr.revisions(tenant, workspace, artifact),
       );
+      if (revisions.length === 0) {
+        throw notFound();
+      }
     } catch (error) {
       if (error instanceof Refused && error.status === 404) {
         throw notFound();
@@ -45,25 +48,37 @@ function Artifact() {
   const { data: revisions } = useSuspenseQuery(queries.artifactr.revisions(tenant, workspace, id));
   const stream = useStream();
   const snapshot = useWorkspace();
+  // The revisions in order, whatever order the server sent, each with what it changed: worked out
+  // once each time they are read, not on every event the workspace's stream brings.
+  const history = useMemo(() => {
+    const ordered = [...revisions].sort((a, b) => a.version - b.version);
+    const latest = ordered.at(-1);
+    if (latest === undefined) {
+      return null;
+    }
+    const renderer = rendererFor(latest.kind, RENDERERS);
+    const versions = ordered.map((revision, index) => {
+      const before = ordered[index - 1];
+      const was = before ? renderer.text(before.data) : "";
+      return { revision, changes: changes(was, renderer.text(revision.data), renderer.diff) };
+    });
+    return { latest, versions: versions.reverse() };
+  }, [revisions]);
   const logged = snapshot.state.artifacts[id]?.version;
-  const latest = revisions.at(-1);
+  const read = history?.latest.version;
   useEffect(() => {
-    if (logged !== undefined && latest !== undefined && logged > latest.version) {
+    if (logged !== undefined && read !== undefined && logged > read) {
       void queryClient.invalidateQueries({
         queryKey: keys.artifactr.revisions(tenant, workspace, id),
       });
     }
-  }, [logged, latest, queryClient, tenant, workspace, id]);
-  if (latest === undefined) {
-    return null;
+  }, [logged, read, queryClient, tenant, workspace, id]);
+  if (history === null) {
+    return null; // the loader found it; it can't have no revisions
   }
-  const renderer = rendererFor(latest.kind, RENDERERS);
+  const { latest, versions } = history;
   const open = Object.values(snapshot.state.proposals).filter(
-    (proposal) =>
-      proposal.status === "open" &&
-      proposal.change !== null &&
-      "artifact_id" in proposal.change &&
-      proposal.change.artifact_id === id,
+    (proposal) => proposal.status === "open" && proposedOn(proposal) === id,
   );
   return (
     <div className="flex flex-col gap-6">
@@ -99,25 +114,16 @@ function Artifact() {
           Revisions
         </h3>
         <ol aria-label="Revisions" className="flex flex-col gap-3">
-          {revisions
-            .map((revision, index) => ({ revision, before: revisions[index - 1] }))
-            .reverse()
-            .map(({ revision, before }) => (
-              <li
-                key={revision.version}
-                aria-label={`Version ${revision.version}`}
-                className="flex flex-col gap-1"
-              >
-                <span className="font-semibold text-sm">Version {revision.version}</span>
-                <Diff
-                  changes={changes(
-                    before ? renderer.text(before.data) : "",
-                    renderer.text(revision.data),
-                    renderer.diff,
-                  )}
-                />
-              </li>
-            ))}
+          {versions.map(({ revision, changes }) => (
+            <li
+              key={revision.version}
+              aria-label={`Version ${revision.version}`}
+              className="flex flex-col gap-1"
+            >
+              <span className="font-semibold text-sm">Version {revision.version}</span>
+              <Diff changes={changes} />
+            </li>
+          ))}
         </ol>
       </section>
     </div>

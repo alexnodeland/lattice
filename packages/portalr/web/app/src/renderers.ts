@@ -5,4 +5,4 @@
 
 import { markdown, type Renderers } from "@portalr/ui";
 
-export const RENDERERS: Renderers = { note: markdown() };
+export const RENDERERS: Renderers = new Map([["note", markdown()]]);

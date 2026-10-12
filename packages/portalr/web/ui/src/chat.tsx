@@ -242,6 +242,12 @@ export function Request({
   );
 }
 
+/** The artifact a proposal would change, if it names one: a new one's is chosen when accepted. */
+export function proposedOn(proposal: Artifactr.Proposal): string | null {
+  const { change } = proposal;
+  return change !== null && "artifact_id" in change ? (change.artifact_id ?? null) : null;
+}
+
 /** What a change would do, in words. */
 function describe(change: NonNullable<Artifactr.Proposal["change"]>): string {
   switch (change.type) {

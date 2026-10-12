@@ -14,9 +14,18 @@ export interface Change {
   readonly text: string;
 }
 
-/** The changes that make `after` from `before`, in order. */
-export function changes(before: string, after: string, by: Granularity): Change[] {
-  const parts = by === "words" ? diffWords(before, after) : diffLines(before, after);
+/**
+ * How far jsdiff looks before it gives up: an edit of more than this many words or lines, or a
+ * comparison of more than this many milliseconds, is too large to compare (portalr ADR-0017).
+ */
+export const BOUND = { maxEditLength: 2000, timeout: 200 } as const;
+
+/** The changes that make `after` from `before`, in order; null if they are too large to find. */
+export function changes(before: string, after: string, by: Granularity): Change[] | null {
+  const parts = by === "words" ? diffWords(before, after, BOUND) : diffLines(before, after, BOUND);
+  if (parts === undefined) {
+    return null;
+  }
   return parts.map((part) => ({
     kind: part.added ? "added" : part.removed ? "removed" : "same",
     text: part.value,

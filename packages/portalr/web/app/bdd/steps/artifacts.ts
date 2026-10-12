@@ -33,15 +33,15 @@ When("they open the note", async ({ page, scenario }) => {
 
 Then("the note reads {string}", async ({ page, scenario }, text: string) => {
   const note = page.getByRole("region", { name: kept(scenario.note) });
-  await expect(note.getByRole("paragraph").filter({ hasText: /^Launch/ })).toHaveText(text);
+  await expect(note.getByText(text, { exact: true })).toBeVisible();
 });
 
 Then(
   "its latest revision removed {string} and added {string}",
   async ({ page }, removed: string, added: string) => {
     const latest = page.getByRole("list", { name: "Revisions" }).getByRole("listitem").first();
-    await expect(latest.locator("del")).toHaveText(`removed: ${removed}`);
-    await expect(latest.locator("ins")).toHaveText(`added: ${added}`);
+    await expect(latest.getByRole("deletion")).toHaveText(`removed: ${removed}`);
+    await expect(latest.getByRole("insertion")).toHaveText(`added: ${added}`);
   },
 );
 
@@ -56,4 +56,14 @@ When("they reject the note's proposal there", async ({ page, scenario }) => {
 
 Then("the note's proposal is {string} there", async ({ page, scenario }, status: string) => {
   await expect(proposalOn(page, kept(scenario.note))).toContainText(status);
+});
+
+When("they open an artifact that isn't there", async ({ page }) => {
+  await page.goto("t/acme/w/notes/artifacts/art_0000000000000000");
+});
+
+Then("they are told it isn't found", async ({ page }) => {
+  await expect(page.getByRole("heading", { level: 2 })).toHaveText("Artifact not found", {
+    timeout: 2000,
+  });
 });

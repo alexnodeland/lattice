@@ -21,6 +21,7 @@ export {
   Message,
   Messages,
   ProposalCard,
+  proposedOn,
   Request,
   RunStatus,
   type Sent,

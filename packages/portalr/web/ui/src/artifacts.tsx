@@ -23,7 +23,7 @@ export interface Renderer {
 }
 
 /** The application's renderers, by artifact kind. */
-export type Renderers = Readonly<Record<string, Renderer>>;
+export type Renderers = ReadonlyMap<string, Renderer>;
 
 /** Any kind without a renderer: its data as JSON, changed line by line. */
 export const json: Renderer = {
@@ -47,7 +47,7 @@ export function markdown(field = "text"): Renderer {
 
 /** The renderer for a kind: the application's, or JSON. */
 export function rendererFor(kind: string, renderers: Renderers): Renderer {
-  return Object.hasOwn(renderers, kind) ? (renderers[kind] ?? json) : json;
+  return renderers.get(kind) ?? json;
 }
 
 /** An artifact's content, through its kind's renderer. */
@@ -63,8 +63,20 @@ export function ArtifactContent({
   return <>{rendererFor(kind, renderers).render(data)}</>;
 }
 
-/** What changed between two versions: what was added, and what was removed, marked as such. */
-export function Diff({ changes, className }: { changes: readonly Change[]; className?: string }) {
+/**
+ * What changed between two versions: what was added, and what was removed, marked as such; or,
+ * when `client` found them too large to compare, that.
+ */
+export function Diff({
+  changes,
+  className,
+}: {
+  changes: readonly Change[] | null;
+  className?: string;
+}) {
+  if (changes === null) {
+    return <p className={cn("text-muted text-sm italic", className)}>Too large to compare.</p>;
+  }
   return (
     <p className={cn("whitespace-pre-wrap text-fg text-sm", className)}>
       {changes.map((change, index) => {

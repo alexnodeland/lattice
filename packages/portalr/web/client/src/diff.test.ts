@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { changes } from "./diff";
+import { BOUND, changes } from "./diff";
 
 test("prose changes by word", () => {
   expect(changes("Launch on Monday.", "Launch on Tuesday.", "words")).toEqual([
@@ -20,4 +20,10 @@ test("structured text changes by line", () => {
 
 test("the same text is one kept run", () => {
   expect(changes("same", "same", "words")).toEqual([{ kind: "same", text: "same" }]);
+});
+
+test("changes too large to find are none, rather than a stall", () => {
+  const words = (prefix: string) =>
+    Array.from({ length: BOUND.maxEditLength + 10 }, (_, n) => `${prefix}${n}`).join(" ");
+  expect(changes(words("a"), words("b"), "words")).toBeNull();
 });

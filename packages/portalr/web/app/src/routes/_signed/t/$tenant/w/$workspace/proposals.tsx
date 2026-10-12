@@ -1,5 +1,4 @@
-import type { Artifactr } from "@portalr/client";
-import { ProposalCard, TextLink } from "@portalr/ui";
+import { ProposalCard, proposedOn, TextLink } from "@portalr/ui";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Connection, useStream, useWorkspace } from "../../../../../../workspace";
 
@@ -8,12 +7,6 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/proposals"
   head: ({ params }) => ({ meta: [{ title: `Proposals · ${params.workspace} · portalr` }] }),
   component: Proposals,
 });
-
-/** The artifact a proposal would change, if it names one: a new one's is chosen on accepting. */
-function changing(proposal: Artifactr.Proposal): string | null {
-  const change = proposal.change;
-  return change !== null && "artifact_id" in change ? (change.artifact_id ?? null) : null;
-}
 
 function Proposals() {
   const { tenant, workspace } = Route.useParams();
@@ -30,7 +23,7 @@ function Proposals() {
       <Connection snapshot={snapshot} waiting="the workspace" />
       {snapshot.status === "live" && listed.length === 0 && <p>No proposals yet.</p>}
       {listed.map((proposal) => {
-        const artifact = changing(proposal);
+        const artifact = proposedOn(proposal);
         return (
           <ProposalCard
             key={proposal.id}

@@ -68,7 +68,7 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 | `/t/$tenant` | The workspaces grantr says they can open there |
 | `/t/$tenant/w/$workspace` | A workspace's threads, and a new one; its artifactr stream is open while any of its routes is |
 | `/t/$tenant/w/$workspace/threads/$thread` | A thread's chat: its messages, its runs as they stream, what a paused run waits on, its proposals, and a message to post |
-| `/t/$tenant/w/$workspace/artifacts` | The workspace's artifacts, each by kind and latest version |
+| `/t/$tenant/w/$workspace/artifacts` | The workspace's artifacts that aren't archived, each by kind and latest version |
 | `/t/$tenant/w/$workspace/artifacts/$artifact` | An artifact through its kind's renderer, its revisions newest first with what each changed, and its open proposals |
 | `/t/$tenant/w/$workspace/proposals` | Every proposal in the workspace, the open ones first, to accept or reject |
 

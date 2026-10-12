@@ -2,9 +2,9 @@ import type { Change } from "@portalr/client";
 import { expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 import { ArtifactContent, Diff, json, markdown, rendererFor } from "./artifacts";
-import { token } from "./test/colours";
+import { contrast, token } from "./test/colours";
 
-const renderers = { note: markdown() };
+const renderers = new Map([["note", markdown()]]);
 
 test("a kind with a renderer renders through it: a note's Markdown", async () => {
   const screen = await render(
@@ -25,7 +25,7 @@ test("a kind without one shows its data as JSON, so it is never invisible", asyn
 
 test("a kind named for something every object has still falls back", () => {
   expect(rendererFor("toString", renderers)).toBe(json);
-  expect(rendererFor("constructor", {})).toBe(json);
+  expect(rendererFor("constructor", new Map())).toBe(json);
 });
 
 test("a Markdown field's HTML never renders", async () => {
@@ -56,8 +56,11 @@ test("a diff marks what was added and removed, for eyes and for screen readers",
   const removed = screen.container.querySelector("del");
   expect(added?.textContent).toBe("added: Tuesday");
   expect(removed?.textContent).toBe("removed: Monday");
-  expect(getComputedStyle(added as Element).color).toBe(token("accent"));
-  expect(getComputedStyle(removed as Element).textDecorationLine).toBe("line-through");
+  const style = (element: Element | null) => getComputedStyle(element as Element);
+  expect(style(added).color).toBe(token("accent"));
+  expect(contrast(style(added).color, style(added).backgroundColor)).toBeGreaterThanOrEqual(4.5);
+  expect(style(removed).textDecorationLine).toBe("line-through");
+  expect(contrast(style(removed).color, token("paper"))).toBeGreaterThanOrEqual(4.5);
   await expect.element(screen.getByText("Launch on")).toBeVisible();
 });
 
@@ -66,4 +69,9 @@ test("a diff takes a caller's classes", async () => {
   const diff = screen.container.querySelector("p");
   expect(diff?.classList).toContain("text-xs");
   expect(diff?.classList).not.toContain("text-sm");
+});
+
+test("changes too large to compare say so", async () => {
+  const screen = await render(<Diff changes={null} />);
+  await expect.element(screen.getByText("Too large to compare.")).toBeVisible();
 });

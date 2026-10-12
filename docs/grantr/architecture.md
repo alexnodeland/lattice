@@ -1,6 +1,6 @@
 # Architecture
 
-Decisions are recorded in [`adr/`](adr/README.md), and the plan that builds grantr in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). The design is [lattice RFC-0001](../rfcs/0001-grantr-identity-and-access.md). This page describes what exists: grantr's core, its storage port with in-memory and SQL adapters, the hooks, the admin API and telemetry, which are phases 2 and 3 of the plan.
+Decisions are recorded in [`adr/`](adr/README.md), and the plan that builds grantr in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). The design is [lattice RFC-0001](../rfcs/0001-grantr-identity-and-access.md). This page describes what exists: grantr's core, its storage port with in-memory and SQL adapters, the hooks, the admin API, telemetry, and how stackr's template wires it in. The [guides](guides/getting-started.md) show how to use it.
 
 ## What grantr is
 
@@ -91,7 +91,7 @@ An admin reads each list with the action of the command that changes it ([ADR-00
 
 ## Keys
 
-A service principal's key is `grantr_sk_<id>_<secret>`: an 8-byte public id and 32 random bytes, in hex. `issue_key` returns it once; grantr stores the id, the tenant, the principal and a SHA-256 digest of the secret. `authenticate` finds a key by its id and compares digests in constant time, and answers with the key's tenant and principal, so a key reaches only its own tenant.
+A service principal's id is a `PrincipalId` ([ADR-0028](adr/0028-a-principals-id-cant-pass-for-the-libraries-actors.md)). Its key is `grantr_sk_<id>_<secret>`: an 8-byte public id and 32 random bytes, in hex. `issue_key` returns it once; grantr stores the id, the tenant, the principal and a SHA-256 digest of the secret. `authenticate` finds a key by its id and compares digests in constant time, and answers with the key's tenant and principal, so a key reaches only its own tenant.
 
 ## The audit log
 
@@ -146,6 +146,15 @@ The contract test, `tests/grants/test_contract.py`, runs every behaviour on this
 | `/tenants/{tenant}/members`, `/groups`, `/roles`, `/grants`, `/revocations`, `/keys`, `/restrictions` | The lists and commands above |
 
 Refusals keep the libraries' shapes, `{"type", "message"}`: 401 `unauthorized` without a caller, 403 `forbidden`, 422 `invalid`, and 400 `tenant_required` when a caller in several tenants names none. Its OpenAPI document is committed in `packages/grantr/schemas/grantr.openapi.json`; `moon run grantr:schema` regenerates it, and a test fails when it drifts.
+
+## In stackr's template
+
+stackr's template, with `access=grantr`, is how an application wires grantr in ([stackr ADR-0019](../stackr/adr/0019-access-with-grantr-in-the-template.md)):
+
+- **Who each request is.** A token's user, in the tenant the request names (`X-Tenant`, a WebSocket's `tenant` parameter, or the user's only one), checked against grantr's memberships; or a key, in the `Authorization` header only, as its principal in its one tenant.
+- **Who each actor is,** for the hooks. A person, and a client or agent's turn acting for one, is checked as that person; a client acting for no one as its key's principal; the application's own work, its code rules' runs and relayr's bridge as the application; a stored rule's run as its `RulePrincipal`; and anything else as the agent, which holds nothing.
+- **Its own tools.** `make operator`, `make tenant` and `make migrate-tenants` set up tenants in process ([ADR-0021](adr/0021-the-deployments-own-tools.md)), and `make db-roles` makes the role row-level security holds ([row-level security](guides/row-level-security.md)).
+- **The permission matrix** in `access.md`, every role against every action, which a test keeps current.
 
 ## Telemetry
 

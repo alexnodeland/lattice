@@ -6,7 +6,7 @@ Outside this series, an RFC is named as "lattice RFC-0001".
 
 | RFC | Title | Status |
 |---|---|---|
-| [0001](0001-grantr-identity-and-access.md) | grantr, identity and access | Accepted |
+| [0001](0001-grantr-identity-and-access.md) | grantr, identity and access | Implemented |
 | [0002](0002-portalr-the-portal.md) | portalr, the portal | Accepted, amended by portalr ADR-0014 |
 
 To propose one, copy [`template.md`](template.md) to the next number. Each package's series uses the same template.

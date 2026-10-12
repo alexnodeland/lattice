@@ -1,6 +1,13 @@
 # grantr's section of the site, in order. Paths are from docs/grantr/.
 nav:
 - Home: index.md
+- Guides:
+  - guides/getting-started.md
+  - guides/roles-and-grants.md
+  - guides/restricted-items.md
+  - guides/keys.md
+  - guides/row-level-security.md
+  - guides/matrix.md
 - Architecture: architecture.md
 - Reference: reference.md
 - Decisions:

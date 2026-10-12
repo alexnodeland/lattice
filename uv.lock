@@ -3205,11 +3205,19 @@ wheels = [
 name = "portalr"
 version = "0.1.0.dev0"
 source = { editable = "packages/portalr" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "grantr", extra = ["fastapi"] },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "starlette" },
+]
 
 [package.dev-dependencies]
 dev = [
     { name = "pyright" },
     { name = "pytest" },
+    { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
     { name = "ruff" },
@@ -3220,16 +3228,25 @@ lint = [
 ]
 test = [
     { name = "pytest" },
+    { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
 ]
 
 [package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.141" },
+    { name = "grantr", extras = ["fastapi"], editable = "packages/grantr" },
+    { name = "httpx", specifier = ">=0.28" },
+    { name = "pydantic", specifier = ">=2.13" },
+    { name = "starlette", specifier = ">=0.46.0" },
+]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1" },
+    { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "pytest-cov", specifier = ">=7.1" },
     { name = "pytest-timeout", specifier = ">=2.4" },
     { name = "ruff", specifier = ">=0.16" },
@@ -3240,6 +3257,7 @@ lint = [
 ]
 test = [
     { name = "pytest", specifier = ">=9.1" },
+    { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "pytest-cov", specifier = ">=7.1" },
     { name = "pytest-timeout", specifier = ">=2.4" },
 ]

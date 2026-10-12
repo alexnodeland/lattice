@@ -3077,15 +3077,15 @@ source = { editable = "packages/portalr" }
 
 [package.dev-dependencies]
 dev = [
-    { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
     { name = "ruff" },
+    { name = "ty" },
 ]
 lint = [
-    { name = "pyright" },
     { name = "ruff" },
+    { name = "ty" },
 ]
 test = [
     { name = "pytest" },
@@ -3097,15 +3097,15 @@ test = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "pytest-cov", specifier = ">=7.1" },
     { name = "pytest-timeout", specifier = ">=2.4" },
     { name = "ruff", specifier = ">=0.16" },
+    { name = "ty", specifier = ">=0.0.86" },
 ]
 lint = [
-    { name = "pyright", specifier = ">=1.1.414" },
     { name = "ruff", specifier = ">=0.16" },
+    { name = "ty", specifier = ">=0.0.86" },
 ]
 test = [
     { name = "pytest", specifier = ">=9.1" },

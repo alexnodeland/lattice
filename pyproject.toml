@@ -85,6 +85,7 @@ root = [
     "packages/evalr/src",
     "packages/relayr/src",
     "packages/grantr/src",
+    "packages/portalr/src",
     "examples/docplan/src",
     "examples/oncall/src",
 ]

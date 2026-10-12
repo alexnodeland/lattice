@@ -238,6 +238,7 @@ class Workspaces:
             await self._on_open(tenant_id, workspace_id)
         return workspace
 
+    # Last in the class: below it, ``list`` in an annotation would name this method.
     async def list(
         self,
         tenant_id: TenantId,

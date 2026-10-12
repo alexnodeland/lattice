@@ -125,7 +125,7 @@ The default set:
 
 - **Not bridged:** tool calls and returns, run starts and pauses, deferred answers, and focus and mode changes. They are noisy, and tool arguments can hold data that rules have no need to see. Live frames never reach the log anyway.
 - **Failures:** if a projection raises, or an event fails validation, the envelope is dead-lettered in the ledger and the follower moves on, as reflexr does per rule. A continued chain that would exceed the depth limit (see [Loop control](#loop-control)) is recorded the same way.
-- **Starting followers:** a follower starts the first time a workspace is used, through the libraries' `authorize` hook, as the template's `Mirrors` does for feedback. At startup the bridge also resumes every workspace that has a cursor in the ledger. A workspace that has never been used since the bridge was installed would be found only once someone used it, but artifactr lists a tenant's workspaces (a prerequisite, now `Workspaces.list`: [artifactr ADR-0058](../../artifactr/adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md)), so at startup the bridge starts a follower for every listed workspace.
+- **Starting followers:** a follower starts the first time a workspace is used, through the libraries' `authorize` hook, as the template's `Mirrors` does for feedback. At startup the bridge also resumes every workspace that has a cursor in the ledger. At startup the bridge also starts a follower for every workspace `Workspaces.list` returns, for each tenant it serves ([artifactr ADR-0058](../../artifactr/adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md)). artifactr can't list tenants, so the bridge is told them.
 
 ### Outbound: reflexr to artifactr
 

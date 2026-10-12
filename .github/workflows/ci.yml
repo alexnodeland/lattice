@@ -57,8 +57,9 @@ jobs:
         run: psql -h localhost -U postgres -c 'CREATE DATABASE artifactr' -c 'CREATE DATABASE reflexr' -c 'CREATE DATABASE grantr'
       - run: uv sync --locked --all-packages --all-groups --all-extras
       - run: bun install --frozen-lockfile
-      # ui's tests run in Chromium, through Vitest's browser mode.
+      # ui's tests run in Chromium, through Vitest's browser mode; ui holds Playwright.
       - run: bun x --bun --no-install playwright install --with-deps --only-shell chromium
+        working-directory: packages/portalr/web/ui
       - run: uv run --no-project python scripts/affected.py check
 
   tests:
@@ -83,8 +84,9 @@ jobs:
           auto-install: true
       - run: uv sync --locked --all-packages --all-groups --all-extras
       - run: bun install --frozen-lockfile
-      # ui's tests run in Chromium, through Vitest's browser mode.
+      # ui's tests run in Chromium, through Vitest's browser mode; ui holds Playwright.
       - run: bun x --bun --no-install playwright install --with-deps --only-shell chromium
+        working-directory: packages/portalr/web/ui
       - run: uv run --no-project python scripts/affected.py test
 
   # docplan's and oncall's images, each built from the root and started on PostgreSQL.

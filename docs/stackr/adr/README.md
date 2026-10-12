@@ -6,7 +6,7 @@ Each record captures one decision: the context that forced it, the options consi
 |---|---|---|
 | [0001](0001-compose-first-with-profiles.md) | Docker Compose first, with profiles | Accepted, amended by [0023](0023-opentofu-for-aws-now.md) |
 | [0002](0002-local-supabase-through-its-cli.md) | Local Supabase, through its CLI | Accepted, amended by [0019](0019-access-with-grantr-in-the-template.md) |
-| [0003](0003-observability-and-gateway-services.md) | The observability and gateway services | Accepted, amended by [0016](0016-stackr-in-lattice.md) |
+| [0003](0003-observability-and-gateway-services.md) | The observability and gateway services | Accepted, amended by [0016](0016-stackr-in-lattice.md) and [0028](0028-local-supabase-on-the-loopback.md) |
 | [0004](0004-the-application-template.md) | The application template | Accepted |
 | [0005](0005-ports-and-adapters-for-the-stack.md) | Ports and adapters for the stack | Accepted |
 | [0006](0006-networks-and-published-ports.md) | Networks and published ports | Accepted |
@@ -30,5 +30,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0024](0024-rules-from-chat-in-the-template.md) | Rules from chat in the template | Accepted |
 | [0025](0025-what-the-floci-spike-found.md) | What the Floci spike found | Accepted |
 | [0026](0026-the-single-host.md) | The single host | Accepted |
+| [0028](0028-local-supabase-on-the-loopback.md) | Local Supabase on the loopback | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

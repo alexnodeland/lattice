@@ -66,7 +66,7 @@ Supabase's `postgres` role is not a superuser, and PostgreSQL 16 and later let a
 
 ## An application's own schema
 
-An application's tables belong in a schema of its own, never `public`. Supabase's Data API serves `public` to anyone with the project's publishable key, and Supabase's default privileges grant the `anon` and `authenticated` roles access to every table the `postgres` role creates there ([ADR-0011](../adr/0011-the-application-template-in-detail.md)). Locally, those keys are well known and the ports listen on every interface.
+An application's tables belong in a schema of its own, never `public`. Supabase's Data API serves `public` to anyone with the project's publishable key, and Supabase's default privileges grant the `anon` and `authenticated` roles access to every table the `postgres` role creates there ([ADR-0011](../adr/0011-the-application-template-in-detail.md)). Locally, those keys are well known; the ports listen at `STACKR_BIND`, this machine only unless you choose.
 
 The application template does this for you: `DATABASE_SCHEMA` (the package's name by default) is created at startup, before the libraries' migrations run, and is every connection's `search_path`. The libraries' tables are prefixed, so artifactr's and reflexr's share one schema without clashing.
 

@@ -1,6 +1,6 @@
 # ADR-0009: Local Supabase as the database adapter
 
-**Status:** Accepted, amended by [ADR-0016](0016-stackr-in-lattice.md)
+**Status:** Accepted, amended by [ADR-0016](0016-stackr-in-lattice.md) and [ADR-0028](0028-local-supabase-on-the-loopback.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

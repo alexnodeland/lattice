@@ -93,16 +93,15 @@ async def test_traces_link_across_the_bridge(
     await bridged(stack, 1)
     await app.reactor.settle()
 
-    async def ended() -> bool:
-        return any(e.event_type == "artifactr:turn_ended" for e in await stack.bridged())
-
-    await until(ended)
-    spans = exporter.get_finished_spans()
-    created = named(spans, "artifactr.commit create_artifact")
-    bridge = named(spans, "relayr.bridge artifact_created")
-    publish = named(spans, "reflexr.publish artifactr:artifact_created")
-    run = named(spans, "invoke_workflow app:act")
-    turn = named(spans, "invoke_workflow turn")
+    created, bridge, publish, run, turn = await finished(
+        exporter,
+        "artifactr.commit create_artifact",
+        "relayr.bridge artifact_created",
+        "reflexr.publish artifactr:artifact_created",
+        "invoke_workflow app:act",
+        # The turn's own events are bridged before its span ends, so it is waited on, too.
+        "invoke_workflow turn",
+    )
 
     # Tempo: each side's trace links to the other's.
     assert linked(turn) == [ids(run)], "the turn links to the run"
@@ -117,6 +116,18 @@ async def test_traces_link_across_the_bridge(
     assert f"thread:{thread.id}" in tags(run)
     assert attribute(turn, "session.id") == thread.id
     assert tags(turn) == ("tenant:acme", "workspace:prod", "rule:app:act", f"chain:{chain}")
+
+
+async def finished(exporter: InMemorySpanExporter, *names: str) -> list[ReadableSpan]:
+    """Each named span, once every one of them has ended."""
+
+    async def ended() -> bool:
+        spans = exporter.get_finished_spans()
+        return all(any(s.name == name for s in spans) for name in names)
+
+    await until(ended)
+    spans = exporter.get_finished_spans()
+    return [named(spans, name) for name in names]
 
 
 def ids(span: ReadableSpan) -> tuple[int, int]:

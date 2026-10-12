@@ -6,6 +6,7 @@
 import createClient, { type Client, type Middleware } from "openapi-fetch";
 import type { paths as ArtifactrPaths } from "./generated/artifactr.openapi";
 import type { paths as GrantrPaths } from "./generated/grantr.openapi";
+import type { components as Portalr, paths as PortalrPaths } from "./generated/portalr.openapi";
 import type { paths as ReflexrPaths } from "./generated/reflexr.openapi";
 import { type Session, sessionHeaders } from "./session";
 
@@ -42,4 +43,18 @@ export function createApi(surfaces: Surfaces, session: () => Session): Api {
     client.use(signed);
   }
   return { artifactr, reflexr, grantr };
+}
+
+/** What the UIs need of the deployment: its Supabase project, the surfaces and the tools. */
+export type Config = Portalr["schemas"]["Config"];
+
+/** Read `config.json`, which portalr's router serves at `/portalr/config.json` on `origin`. */
+export async function readConfig(origin: string): Promise<Config> {
+  const { data, response } = await createClient<PortalrPaths>({ baseUrl: origin }).GET(
+    "/portalr/config.json",
+  );
+  if (data === undefined) {
+    throw new Error(`config.json answered ${response.status}`);
+  }
+  return data;
 }

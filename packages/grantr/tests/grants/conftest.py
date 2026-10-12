@@ -1,7 +1,7 @@
 """Fixtures for the contract test, parametrized over storage implementations.
 
 Every test that takes ``storage`` runs against memory, SQLite and, when it is configured,
-PostgreSQL.
+PostgreSQL: as its owner, and as a role its row-level security holds.
 """
 
 from collections.abc import AsyncIterator, Callable
@@ -14,7 +14,7 @@ from grantr.core import User
 from grantr.grants import Grants, InMemoryStorage, Storage
 from grantr.sql import SqlStorage, create_schema
 from tests.catalogs import ARTIFACTR, PORTALR, REFLEXR
-from tests.databases import SQL_BACKENDS, empty_database
+from tests.databases import ROW_LEVEL_SECURITY, SQL_BACKENDS, empty_database, row_level_security
 
 ROOT = User(id="root")
 """The deployment's first operator."""
@@ -28,12 +28,18 @@ Clock = Callable[[], datetime]
 StorageFactory = Callable[[Clock], Storage]
 
 
-@pytest.fixture(params=["memory", *SQL_BACKENDS])
+@pytest.fixture(params=["memory", *SQL_BACKENDS, ROW_LEVEL_SECURITY])
 async def storage_factory(
     request: pytest.FixtureRequest, tmp_path: Path
 ) -> AsyncIterator[StorageFactory]:
     if request.param == "memory":
         yield lambda clock: InMemoryStorage(clock=clock)
+        return
+    if request.param == "postgres-rls":
+        async with row_level_security() as (owner, application):
+            yield lambda clock: SqlStorage(
+                application, clock=clock, row_level_security=True, across_tenants=owner
+            )
         return
     async with empty_database(request.param, tmp_path) as engine:
         await create_schema(engine)

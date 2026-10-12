@@ -570,6 +570,7 @@ async def test_a_storage_knows_the_resources_its_grants_name(storage: Storage) -
     async with storage.transaction("acme") as tx:
         await tx.add_grant(Grant(tenant="acme", role="viewer", on=THREAD, to=BOB))
         await tx.add_grant(Grant(tenant="acme", role="viewer", on=OTHER, to=BOB))
+    async with storage.transaction("globex") as tx:
         await tx.add_grant(Grant(tenant="globex", role="viewer", on=ARTIFACT, to=BOB))
     assert await storage.resources("acme", "workspace") == [WS, OTHER]
     assert await storage.resources("acme", "thread") == [THREAD]

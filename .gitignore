@@ -206,3 +206,7 @@ node_modules/
 
 # portalr's built UIs, which its wheel carries
 packages/portalr/src/portalr/static/
+# playwright-bdd generates its specs from the features, and Playwright writes its reports.
+packages/portalr/web/app/.features-gen/
+packages/portalr/web/app/test-results/
+packages/portalr/web/app/playwright-report/

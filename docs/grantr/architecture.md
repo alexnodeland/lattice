@@ -129,6 +129,7 @@ The contract test, `tests/grants/test_contract.py`, runs every behaviour on this
 - **A transaction locks its tenant's row** in `grantr_tenants`, inserting it first if needed; the row's `live` flag says whether the tenant exists.
 - **The audit log's sequence numbers are the database's.** A tenant's transactions run one at a time, so its entries are numbered in the order they commit.
 - **Every database call is awaited to its end,** even when its caller is cancelled, as in the libraries' SQL storage.
+- **Row-level security is an option** ([ADR-0026](adr/0026-row-level-security-under-the-scoping.md)). With `row_level_security=True`, each transaction names its tenant, or `~deployment`, in `lattice.tenant_id`, and the policies migration 0003 creates on PostgreSQL keep every command to its tenant's rows, and let it read the deployment's grants and group members besides. `migrate(application_role=...)` grants a role that owns nothing the tables. `tenant_grants`, `key` and `tenants`, which span tenants, go to `across_tenants`, an engine as the tables' owner, and nothing else does.
 
 ## The admin API
 

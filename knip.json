@@ -2,5 +2,10 @@
   "$schema": "https://unpkg.com/knip@6.41.0/schema.json",
   "moonrepo": true,
   "ignoreBinaries": ["noop", "uv"],
-  "ignoreDependencies": ["@usebruno/cli"]
+  "ignoreDependencies": ["@usebruno/cli"],
+  "workspaces": {
+    "packages/portalr/web/app": {
+      "entry": ["bdd/steps/*.ts"]
+    }
+  }
 }

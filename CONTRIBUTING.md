@@ -55,6 +55,7 @@ The packages' own tasks:
 | `artifactr:api`, `reflexr:api` | Start the reference implementation on PostgreSQL, run the package's Bruno collection and Schemathesis against it, and stop it, as CI's Acceptance job does. It needs Docker |
 | `docplan:image`, `oncall:image` | Build the reference implementation's image from the root, start it on PostgreSQL and stop it, as CI's Images job does |
 | `portalr:api` | Start portalr's test application beside Tempo, Loki, Prometheus and prom-label-proxy, seed two tenants, run its Bruno collection with the tools up and down and Schemathesis, and stop it, as CI's Acceptance job does. It needs Docker |
+| `app:bdd` | Build the UIs, start portalr's test application with Supabase Auth, sign up the scenarios' people, run the app's features through playwright-bdd, and stop it, as CI's Acceptance job does. It needs Docker, and installs Chromium for Playwright |
 | `client:api` | Start docplan and oncall, and run portalr's client against them, as CI's Acceptance job does. It needs Docker |
 | `client:types` | Regenerate the client's types from the packages' committed documents (a test fails if they drift) |
 | `lattice:knip` | Find unused files, exports and dependencies in the web packages |
@@ -94,7 +95,7 @@ The dev container (`.devcontainer/`) has uv, Bun, moon and Docker, so everything
 1. Branch from the latest `main`. Keep branches short-lived: hours to a day or two, not weeks.
 2. Keep pull requests small and focused on one change. Split large work into a sequence of PRs that each leave `main` green.
 3. CI must pass before merging: its two required checks are `CI`, which passes only when every job does, and `Title`.
-4. Pull requests are squash-merged, so the PR title becomes the commit on `main`. Write it as a [Conventional Commit](https://www.conventionalcommits.org/).
+4. Pull requests are squash-merged through the merge queue: once a pull request is reviewed, label it `queue`, and Mergify brings it up to date, waits for the checks and merges it ([lattice ADR-0016][lattice-adr-0016]). The PR title becomes the commit on `main`. Write it as a [Conventional Commit](https://www.conventionalcommits.org/).
 5. Delete the branch after merging. Don't stack branches on unmerged branches.
 
 A change that spans packages lands in one pull request, so the packages never disagree on `main`. Unfinished features land behind unexported code paths or not at all; never on a long-lived branch.
@@ -175,5 +176,6 @@ By contributing, you agree that your contributions are licensed under the [MIT L
 [lattice-adr-0010]: docs/adr/0010-every-projects-tests-run-in-a-random-order.md
 [lattice-adr-0011]: docs/adr/0011-codeql-and-scorecard.md
 [lattice-adr-0012]: docs/adr/0012-title-checks-the-breaks-in-the-public-apis.md
+[lattice-adr-0016]: docs/adr/0016-a-merge-queue-on-mergify.md
 [license]: LICENSE
 [security]: SECURITY.md

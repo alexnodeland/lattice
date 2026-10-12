@@ -1,6 +1,6 @@
 # RFC-0002: portalr, the portal
 
-**Status:** Accepted
+**Status:** Accepted, amended by [portalr ADR-0014](../portalr/adr/0014-the-apps-shell.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-12
 **Discussion:** [#44](https://github.com/alexnodeland/lattice/pull/44); accepted on 2026-10-12, with the decisions in [Decisions](#decisions)
@@ -117,7 +117,7 @@ Grafana's trace view (AGPL, inside Grafana's own code), Jaeger's (unpublished co
 
 ### Signing in, and the tenant
 
-- **The UIs sign in through Supabase Auth,** with `@supabase/supabase-js`'s auth client only: email and password, magic links and whatever providers the deployment configures. The client keeps the session and refreshes the token.
+- **The UIs sign in through Supabase Auth,** with `@supabase/supabase-js`'s auth client only: email and password, magic links and whatever providers the deployment configures. The client keeps the session and refreshes the token. [portalr ADR-0014](../portalr/adr/0014-the-apps-shell.md) amends this: the client is `@supabase/auth-js`, which supabase-js wraps, and a password alone signs in until phase 7.
 - **Every request carries the token,** as `Authorization: Bearer`, and the active tenant, as `X-Tenant`. On a WebSocket they go in the `access_token` and `tenant` query parameters (lattice RFC-0001's phase 4).
 - **The token stays out of logs.** The template redacts `access_token` from its access logs and from the URL attributes on its spans, since Tempo and Loki are shared.
 - **No CSRF or CORS to configure.** Tokens travel in a header, never a cookie, and the UIs share the API's origin. Vite's dev server proxies to the application. The Content-Security-Policy matters, because supabase-js keeps the session in `localStorage`.
@@ -272,7 +272,7 @@ The maintainer decided these on 2026-10-12.
 
 - **The working colours** for portalr and grantr, which ADR-0010 chooses in phase 2.
 - **Spend by workspace:** requests carry a `workspace:<id>` tag already; whether LiteLLM's open-source API reports spend by tag decides whether the admin UI can show it.
-- **Localization.** The UIs are English-only at first; whether strings go through a catalog from the start is for phase 1.
+- **Localization.** The UIs are English-only at first; whether strings go through a catalog from the start is for phase 1. Settled in [portalr ADR-0014](../portalr/adr/0014-the-apps-shell.md): English in the components, and a catalog with a second language.
 - **Mobile.** Both UIs are responsive, but the app's chat is the only part designed for a phone first.
 - **Analytics** beyond usage and spend, such as active users and threads over time, once the admin home shows what operators look for.
 

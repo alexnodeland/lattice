@@ -8,7 +8,7 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 |---|---|---|
 | [0001](0001-lattices-brand.md) | lattice's brand | Accepted, amended by [0014](0014-portalrs-and-grantrs-marks.md) |
 | [0002](0002-ci-runs-every-affected-project-and-its-dependents.md) | CI runs every affected project and its dependents | Accepted, amended by [stackr ADR-0018](../stackr/adr/0018-the-template-pins-the-libraries-at-its-own-commit.md) |
-| [0003](0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md) | CI on pull requests, Nightly on main, and a required Title check | Accepted, amended by [0012](0012-title-checks-the-breaks-in-the-public-apis.md) |
+| [0003](0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md) | CI on pull requests, Nightly on main, and a required Title check | Accepted, amended by [0012](0012-title-checks-the-breaks-in-the-public-apis.md) and [0016](0016-a-merge-queue-on-mergify.md) |
 | [0004](0004-one-github-app-for-release-please-and-renovate.md) | One GitHub App for release-please and Renovate | Accepted |
 | [0005](0005-renovate-runs-in-lattices-own-actions.md) | Renovate runs in lattice's own Actions | Accepted |
 | [0006](0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md) | release-please: first versions, pre-1.0 bumps, and what releases | Accepted |
@@ -21,5 +21,6 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0013](0013-pyright-stays-until-ty-can-replace-it.md) | pyright stays until ty can replace it | Accepted |
 | [0014](0014-portalrs-and-grantrs-marks.md) | portalr's and grantr's marks | Accepted |
 | [0015](0015-acceptance-tests-against-the-reference-applications.md) | Acceptance tests against the reference applications | Accepted, amended by artifactr 0061 and 0063, and reflexr 0060 and 0061 |
+| [0016](0016-a-merge-queue-on-mergify.md) | A merge queue on Mergify | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

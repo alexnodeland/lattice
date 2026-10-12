@@ -31,5 +31,6 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0023](0023-portalrs-admin-reads.md) | portalr's admin reads | Accepted |
 | [0024](0024-who-sees-a-restricted-item.md) | Who sees a restricted item | Accepted |
 | [0025](0025-the-application-lists-tenants-and-workspaces-and-writes-for-code-rules.md) | The application lists tenants and workspaces, and writes for its code rules | Accepted |
+| [0026](0026-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

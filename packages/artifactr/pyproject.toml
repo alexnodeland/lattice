@@ -127,6 +127,8 @@ markers = [
 branch = true
 # By path rather than package name, so the migrations Alembic loads from files are measured too.
 source = ["src/artifactr"]
+# SQLAlchemy runs run_sync callables in a greenlet, which coverage follows only when told.
+concurrency = ["greenlet", "thread"]
 
 [tool.coverage.report]
 fail_under = 100

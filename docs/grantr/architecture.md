@@ -43,7 +43,7 @@ The application hands `Grants` each library's catalog, its `ACTIONS`, and grantr
 | Role | On | Holds |
 |---|---|---|
 | `operator` | the deployment | `grantr:create_tenant`, `grantr:grant_operator`, and portalr's `portalr:read_deployment` |
-| `application` | the deployment, holding in every tenant | the bookkeeping, `artifactr:record`, `reflexr:publish`, `reflexr:checkpoint_run`, its evaluators' feedback, what its code rules write in artifactr through relayr (`propose_change`, `post_message`, `create_artifact`, `edit_artifact`, `create_thread`), and every `open` and read but portalr's admin reads ([ADR-0025](adr/0025-the-application-lists-tenants-and-workspaces-and-writes-for-code-rules.md)) |
+| `application` | the deployment, holding in every tenant | the bookkeeping, `artifactr:record`, `reflexr:publish`, `reflexr:checkpoint_run`, its evaluators' feedback, what its code rules write in artifactr through relayr (`propose_change`, `post_message`, `create_artifact`, `edit_artifact`, `create_thread`), the stored rules relayr installs for people who may (`install_rule`, `update_rule`, `archive_rule`, [ADR-0027](adr/0027-the-application-installs-the-rules-people-accept.md)), and every `open` and read but portalr's admin reads ([ADR-0025](adr/0025-the-application-lists-tenants-and-workspaces-and-writes-for-code-rules.md)) |
 | `owner` | a tenant | every action in every catalog but the operator's, the deployment's reads and the bookkeeping; portalr's `read_telemetry` and `read_spend` included |
 | `admin` | a tenant | the owner's, but `grantr:delete_tenant` |
 | `member` | a tenant | `artifactr:read_workspaces`: listing the tenant's workspaces, which artifactr filters by what the caller may open; it makes a user or service principal a member |

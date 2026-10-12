@@ -20,7 +20,7 @@ from reflexr.core import Predicates, StoredRules
 from reflexr.sql import SqlStorage, create_schema
 from reflexr.workspace import Authorize, InMemoryStorage, Storage, Workspace, Workspaces
 from tests.clock import FakeClock
-from tests.databases import SQL_BACKENDS, empty_database
+from tests.databases import ROW_LEVEL_SECURITY, SQL_BACKENDS, empty_database, row_level_security
 from tests.event_types import Deploy, Flag, Heartbeat, ServiceError
 
 
@@ -65,12 +65,18 @@ def telemetry() -> Iterator[Telemetry]:
     meter_provider.shutdown()
 
 
-@pytest.fixture(params=["memory", *SQL_BACKENDS])
+@pytest.fixture(params=["memory", *SQL_BACKENDS, ROW_LEVEL_SECURITY])
 async def storage(
     request: pytest.FixtureRequest, clock: FakeClock, tmp_path: Path
 ) -> AsyncIterator[Storage]:
     if request.param == "memory":
         yield InMemoryStorage(clock=clock)
+        return
+    if request.param == "postgres-rls":
+        async with row_level_security() as (owner, application):
+            yield SqlStorage(
+                application, clock=clock, row_level_security=True, across_tenants=owner
+            )
         return
     async with empty_database(request.param, tmp_path) as database:
         engine = database.engine()

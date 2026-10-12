@@ -13,7 +13,8 @@ from typing import Any, Final
 from sqlalchemy import Connection, event, text
 from sqlalchemy.orm import Session, SessionTransaction
 
-# The code below is shared verbatim with artifactr's src/artifactr/sql/tenancy.py; change both.
+# The code below is shared verbatim with artifactr's src/artifactr/sql/tenancy.py and reflexr's
+# src/reflexr/sql/tenancy.py; change all three.
 SETTING: Final = "lattice.tenant_id"
 """The PostgreSQL setting that holds a transaction's tenant."""
 

@@ -1,3 +1,4 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
@@ -5,6 +6,6 @@ import { defineConfig } from "vite";
 // carries it (lattice RFC-0002).
 export default defineConfig({
   base: "/portalr/admin/",
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   build: { outDir: "../../src/portalr/static/admin", emptyOutDir: true },
 });

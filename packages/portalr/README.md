@@ -44,4 +44,4 @@ See [CONTRIBUTING.md](https://github.com/alexnodeland/lattice/blob/main/CONTRIBU
 
 ## License
 
-[MIT](https://github.com/alexnodeland/lattice/blob/main/packages/portalr/LICENSE)
+[MIT](https://github.com/alexnodeland/lattice/blob/main/packages/portalr/LICENSE). The UIs carry lattice's typefaces, Schibsted Grotesk and Fragment Mono, under the [SIL Open Font License 1.1](https://github.com/alexnodeland/lattice/tree/main/packages/portalr/web/ui/src/fonts).

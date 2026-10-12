@@ -10,7 +10,7 @@ stackr's template gains `make tenant`, `make operator` and `make migrate-tenants
 
 ## Decision
 
-- **`Grants.provision_tenant(tenant, *, owner, admins=())`** creates a tenant with its owner, and makes each of `admins` a member and a tenant `admin`, in audit entries made by no one. It changes nothing if the tenant exists, so it can run again; it doesn't reconcile, so a changed list of admins on a second run changes nothing either. An admin listed twice is made an admin once. Only in-process tools call it: the router can't reach it.
+- **`Grants.provision_tenant(tenant, *, owner, admins=())`** creates a tenant with its owner, and makes each of `admins` a member and a tenant `admin`, in audit entries made by no one. It creates the tenant only if it is new, and makes each of the admins who isn't yet a member a member and an admin; it removes no one and changes no member's roles, so it can run again, and a second run adds the admins a tenant lacks. An admin listed twice is made an admin once. Only in-process tools call it: the router can't reach it.
 - **`make operator EMAIL=...`** calls `first_operator`.
 - **Each target takes an email, looked up through Supabase Auth's admin API, or a user's id,** so a test or a smoke test can pass the id without the service role's key.
 - **Migration keeps what users could do.** `make migrate-tenants` makes each tenant's earliest user its owner, and the rest its admins, and prints who got what; owners narrow it afterwards.

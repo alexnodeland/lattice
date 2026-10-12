@@ -34,6 +34,10 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"relayr.events", "relayr.ledger", "relayr.outbound"},
         {*LIBRARIES, "pydantic", "pydantic_ai"},
     ),
+    "evals": (
+        {"relayr.events", "relayr.ledger", "relayr.outbound", "relayr.rules", "relayr.evals"},
+        {*LIBRARIES, "evalr"},
+    ),
     "rules": (
         {"relayr.events", "relayr.outbound", "relayr.rules"},
         {*LIBRARIES, "pydantic", "pydantic_ai"},

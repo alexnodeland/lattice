@@ -51,6 +51,13 @@ The reference is generated from relayr's docstrings and type annotations. It doc
       show_root_heading: false
       show_root_toc_entry: false
 
+## relayr.evals
+
+::: relayr.evals
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## relayr.telemetry
 
 ::: relayr.telemetry

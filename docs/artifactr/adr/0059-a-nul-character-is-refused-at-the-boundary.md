@@ -13,6 +13,7 @@ Bodies are stored as JSON, not JSONB, and PostgreSQL's `json` does take an escap
 ## Decision
 
 - **Every `Workspaces` and `Workspace` method refuses a NUL character** in any string it is given, with `validation_failed` (`text cannot hold a NUL character`). This covers ids, names and actors, and every string a command or a fact carries, nested in models, mappings and collections.
+- **A command id with a NUL** is answered with a `validation_failed` command result by `Runner.execute`, as every rejection is there, and remembered under no key, since storage couldn't hold it.
 - **The rule is uniform.** It covers strings that would land in a JSON body as well as those in a text column, so what a client may send doesn't depend on where the library keeps it.
 - **It is checked before `authorize`.** The hook is a boundary too: grantr's SQL adapter would meet the same NUL in a tenant or workspace id. Counts and `seq` numbers are checked after the hook, since a number can't hurt it.
 - **One helper, `_check_text`,** shared verbatim with reflexr's workspace module, is called at the top of each method.

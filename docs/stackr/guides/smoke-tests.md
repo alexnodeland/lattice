@@ -63,7 +63,7 @@ It runs an application from the template beside the whole stack:
 6. For each agent, the turn or run must end successfully, and its trace must be in Tempo, with the gateway's spans in it, and in Langfuse.
 7. The completed turn and the succeeded run must be counted in Prometheus, as `artifactr_turns_total` and `reflexr_runs_total`, for the run's own workspace.
 
-At the end it removes the application, its image and volumes, the key, the user and the application's schema. It needs local Supabase, whose Auth signs the user in, so it fails on the `postgres` adapter. Building the application's image fetches the libraries from GitHub, so it needs the network.
+At the end it removes the application, its image and volumes, the key, the user and the application's schema. It needs local Supabase, whose Auth signs the user in, so it fails on the `postgres` adapter. Building the application's image fetches the libraries from GitHub at `HEAD`, the commit the application was rendered from, so it needs the network, and `HEAD` must be pushed. In CI, `HEAD` is the pull request's merge commit, so the application runs the pull request's libraries.
 
 ## In CI
 

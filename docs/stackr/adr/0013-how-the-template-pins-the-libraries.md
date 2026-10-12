@@ -1,6 +1,6 @@
 # ADR-0013: How the template pins the libraries
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-0018](0018-the-template-pins-the-libraries-at-its-own-commit.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 

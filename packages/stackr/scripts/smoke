@@ -19,7 +19,9 @@
 # spans continue the caller's trace in Tempo (and Langfuse, with langfuse).
 # app (with every profile, on local Supabase): an application generated from
 # the template (both libraries, with evals) runs in its app profile beside the
-# stack. A request without a token is refused. A user signed in with local
+# stack. Its image installs the libraries from GitHub at the commit it was
+# rendered from, HEAD, as an application generated from lattice does, so HEAD
+# must be pushed: in CI, it is the pull request's merge commit. A request without a token is refused. A user signed in with local
 # Supabase Auth sends a message (artifactr) and opens a ticket (reflexr); each
 # starts an agent whose model request goes through the gateway on a
 # stackr-smoke key, mocked so no provider is called. Each agent's trace, with
@@ -370,11 +372,11 @@ smoke_app() {
   trap cleanup_app EXIT
   log "app: generating $app_name from the template, and building it"
   # uv locks the application from here, inside lattice, where a version manager's shim (proto's,
-  # in CI) finds the .prototools that chooses it.
+  # in CI) finds the .prototools that chooses it. It fetches the libraries at HEAD from GitHub.
   if ! uv run copier copy --quiet --defaults --vcs-ref HEAD --data project_name="stackr smoke app" \
     --data libraries=both --data evals=true ../.. "$app_dir" 2>/dev/null ||
     ! uv lock --quiet --directory "$app_dir"; then
-    log "FAIL: app: generating it from the template"
+    log "FAIL: app: generating it from the template, with the libraries at HEAD, which must be pushed"
     return 1
   fi
 

@@ -40,8 +40,8 @@ versions.env        versions pinned outside compose.yaml: the Supabase CLI
 deploy/<service>/   each service's configuration, mounted read-only
 deploy/postgres/    init.sql: each service's role and database, created by db-init
 supabase/           the Supabase CLI project: config.toml (project id stackr-supabase) and seed.sql
-scripts/            setup-env, validate, smoke, create-tenant, bump-libraries, check-config, check-template,
-                    check-app and docs-reference, run by make, moon and CI; _env.py reads the settings files
+scripts/            setup-env, validate, smoke, create-tenant, check-config, check-template, check-app
+                    and docs-reference, run by make, moon and CI; _env.py reads the settings files
                     for the Python ones
 ```
 
@@ -198,7 +198,7 @@ cd my-app && git init && make install && make env && make check
 uvx copier update                                # later: the template's improvements
 ```
 
-It asks for the application's name, slug and description, which libraries it uses (`artifactr`, `reflexr` or `both`), whether to include evals, the Python version and the published port; [Template questions](reference/template.md) lists each, generated from `copier.yml`. The libraries' revisions aren't questions: the template pins artifactr and reflexr to commits, which `make bump-libraries` moves to each library's `main` and `copier update` carries to applications, and evalr comes with them at the commit their own sources pin ([ADR-0013](adr/0013-how-the-template-pins-the-libraries.md)). Until phase 4 of [RFC-0003](rfcs/0003-one-repository-lattice.md#phases), those commits are in the libraries' old repositories, which are frozen.
+It asks for the application's name, slug and description, which libraries it uses (`artifactr`, `reflexr` or `both`), whether to include evals, the Python version and the published port; [Template questions](reference/template.md) lists each, generated from `copier.yml`. The libraries' revisions aren't questions: an application installs artifactr, reflexr and evalr from lattice at the commit the template was rendered from, so `copier update` moves the template's code and the libraries together. CI's Template job installs them from the checkout instead (`libraries_path`), and runs when stackr or a library changes, so a library's change and the template's are checked in one pull request ([ADR-0018](adr/0018-the-template-pins-the-libraries-at-its-own-commit.md)).
 
 A generated application:
 
@@ -222,4 +222,4 @@ Every command is a `make` target, and `make` on its own lists them. [Makefile ta
 
 ## Validation
 
-CI checks the stack two ways on every pull request that changes stackr, with the same scripts you run locally. `make validate` checks every configuration without starting anything, with each service's own validator and with stackr's checks where a service has none. `make smoke` runs against a started stack, on each database adapter, and follows telemetry and a gateway request to where they land; `make smoke-app` follows an application generated from the template the same way. lattice's one docs build, `moon run lattice:docs`, builds this site with the other packages' sections ([ADR-0014](adr/0014-one-docs-build.md)). [Validation and CI](guides/validation.md) and [The smoke tests](guides/smoke-tests.md) describe each check.
+CI checks the stack two ways on every pull request that changes stackr or a library it generates applications on, with the same scripts you run locally. `make validate` checks every configuration without starting anything, with each service's own validator and with stackr's checks where a service has none. `make smoke` runs against a started stack, on each database adapter, and follows telemetry and a gateway request to where they land; `make smoke-app` follows an application generated from the template the same way. lattice's one docs build, `moon run lattice:docs`, builds this site with the other packages' sections ([ADR-0014](adr/0014-one-docs-build.md)). [Validation and CI](guides/validation.md) and [The smoke tests](guides/smoke-tests.md) describe each check.

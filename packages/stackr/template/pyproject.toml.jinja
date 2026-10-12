@@ -40,16 +40,21 @@ dev = [
 requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
 
-# The libraries are not on PyPI: each comes from its repository, pinned to a commit, and evalr
-# comes with them, at the commit their own sources pin. `copier update` moves the pins with the
-# template; to hold a library back, change its rev here, then `uv lock`.
+# The libraries are not on PyPI: each comes from lattice, at the commit the template was rendered
+# from, so `copier update` moves them with the template's code. To try another commit, change
+# every rev here to it, then `uv lock`.
 [tool.uv.sources]
-{%- if use_artifactr %}
-artifactr-ai = { git = "https://github.com/alexnodeland/artifactr", rev = "{{ artifactr_rev }}" }
+{%- for distribution, package, used in [
+    ("artifactr-ai", "artifactr", use_artifactr),
+    ("reflexr", "reflexr", use_reflexr),
+    ("evalr", "evalr", evals),
+] if used %}
+{%- if libraries_path %}
+{{ distribution }} = { path = "{{ libraries_path }}/{{ package }}", editable = true }
+{%- else %}
+{{ distribution }} = { git = "https://github.com/alexnodeland/lattice", subdirectory = "packages/{{ package }}", rev = "{{ _copier_conf.vcs_ref_hash }}" }
 {%- endif %}
-{%- if use_reflexr %}
-reflexr = { git = "https://github.com/alexnodeland/reflexr", rev = "{{ reflexr_rev }}" }
-{%- endif %}
+{%- endfor %}
 
 # ─── lint and format ──────────────────────────────────────────────────────────
 

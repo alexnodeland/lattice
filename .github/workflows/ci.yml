@@ -1,8 +1,7 @@
-# lattice's CI, on every pull request (stackr's RFC-0003, CI and tooling). Check, Tests and Images
-# run their task in every project the pull request affects, and in every project that depends on
-# one, all the way down (scripts/affected.py); Template and Smoke run when stackr's own inputs
-# change. nightly.yml runs everything on main. CI, the last job, and Title (title.yml) are the
-# required checks.
+# lattice's CI, on every pull request (stackr's RFC-0003, CI and tooling). Each job runs its task
+# in every project the pull request affects, and in every project that depends on one, all the way
+# down (scripts/affected.py). nightly.yml runs everything on main. CI, the last job, and Title
+# (title.yml) are the required checks.
 
 name: CI
 
@@ -99,8 +98,9 @@ jobs:
       - run: uv run --no-project python scripts/affected.py image
 
   # Each variant of the application template, generated and checked as its own CI would: lint,
-  # strict types, and the tests with 100% coverage. It runs only when stackr's inputs change: the
-  # template pins the libraries by revision, so a library's change can't reach what it generates.
+  # strict types, and the tests with 100% coverage. It installs the libraries from the checkout, so
+  # it runs when stackr or a library changes, and checks the two together (stackr ADR-0018). The
+  # matrix values aren't the task's inputs: moon counts a variable that is set as a change.
   template:
     name: Template (${{ matrix.libraries }}${{ matrix.evals && ', evals' || '' }}, Python ${{ matrix.python }})
     runs-on: ubuntu-latest
@@ -130,10 +130,11 @@ jobs:
         with:
           auto-install: true
       - run: uv sync --locked --all-packages --all-groups --all-extras
-      - run: moon ci stackr:template
+      - run: uv run --no-project python scripts/affected.py template
 
-  # The stack, started with each set of profiles, and telemetry sent through it. It runs only
-  # when stackr's inputs change.
+  # The stack, started with each set of profiles, and telemetry sent through it, when stackr or a
+  # library changes: the stack shows the libraries' dashboards, and its application runs the pull
+  # request's libraries, from its merge commit.
   smoke:
     name: Smoke (${{ matrix.name }})
     runs-on: ubuntu-latest
@@ -175,10 +176,10 @@ jobs:
         if: matrix.database == 'supabase' && matrix.profiles != 'observability'
         with:
           version: ${{ env.SUPABASE_CLI_VERSION }}
-      - run: moon ci stackr:smoke
+      - run: uv run --no-project python scripts/affected.py smoke
       # An application from the template, beside the whole stack (stackr ADR-0011).
       - if: matrix.app
-        run: moon ci stackr:smoke-app
+        run: uv run --no-project python scripts/affected.py smoke-app
       - name: Logs
         if: failure() && hashFiles('packages/stackr/.env') != ''
         working-directory: packages/stackr

@@ -27,7 +27,7 @@ make check          # lint, types and tests, as its CI runs them
 | `python_version` | 3.12 | 3.12, 3.13 or 3.14 |
 | `app_port` | 8800 | The port the application is published on, on this machine |
 
-The libraries' revisions aren't questions: the template pins each library to the commit its code was written for ([The libraries' revisions](#the-libraries-revisions)).
+The libraries' revisions aren't questions: an application installs them from the commit of lattice it was rendered from ([The libraries' revisions](#the-libraries-revisions)).
 
 Answer non-interactively with `--defaults` and `--data`, as CI does:
 
@@ -99,43 +99,30 @@ pulls in the template's improvements since the application was generated, keepin
 
 ### The libraries' revisions
 
-artifactr and reflexr are pinned to commits in `pyproject.toml`'s `[tool.uv.sources]` ([ADR-0013](../adr/0013-how-the-template-pins-the-libraries.md)). Until phase 4 of [RFC-0003](../rfcs/0003-one-repository-lattice.md#phases), which pins them to the commit of lattice the template is rendered from, they are commits of the libraries' old repositories, which are frozen. The pins are the template's, not answers, so `copier update` moves them with the template code written for them. evalr has no pin of its own: it comes with the libraries, at the commit their own `[tool.uv.sources]` pin.
+artifactr, reflexr and evalr come from lattice, at the commit of lattice the template was rendered from, in `pyproject.toml`'s `[tool.uv.sources]` ([ADR-0018](../adr/0018-the-template-pins-the-libraries-at-its-own-commit.md)):
 
-To hold a library back, or try another commit, edit its `rev` there, then `uv lock && make check`. `copier update` keeps the edit, and marks a conflict when the template moves that pin or the other library's, on the line beside it.
-
-### In stackr: bumping the template's pins
-
-The libraries install from GitHub rather than PyPI for now ([lattice#7](https://github.com/alexnodeland/lattice/issues/7)), so the template's pins, `artifactr_rev` and `reflexr_rev` in `copier.yml`, follow each library's `main` by hand. `make bump-libraries` does it. It still reads the libraries' old repositories, whose `main`s are frozen, until phase 4 of [RFC-0003](../rfcs/0003-one-repository-lattice.md#phases) retires it:
-
-```bash
-make bump-libraries                                  # every library, to the commit its main points to
-make bump-libraries BUMP_FLAGS=--check               # change nothing; fail if a pin is behind main
-make bump-libraries BUMP_FLAGS="artifactr=v0.1.0"    # artifactr only, to a tag, a branch or a commit SHA
+```toml
+[tool.uv.sources]
+artifactr-ai = { git = "https://github.com/alexnodeland/lattice", subdirectory = "packages/artifactr", rev = "<the rendered commit>" }
+reflexr = { git = "https://github.com/alexnodeland/lattice", subdirectory = "packages/reflexr", rev = "<the rendered commit>" }
+evalr = { git = "https://github.com/alexnodeland/lattice", subdirectory = "packages/evalr", rev = "<the rendered commit>" }
 ```
 
-It runs `scripts/bump-libraries`, which resolves each library's `main` with `git ls-remote`, rewrites the pins in `copier.yml`, regenerates the reference pages that show them (`make docs-reference`), and prints each pin it moved, with a link to what changed:
+Each library's own `evalr = { workspace = true }` becomes the same repository and commit, so evalr is one package at one commit. An application without evals has no evalr line, and gets evalr through the libraries.
 
-```text
-artifactr e890aca037c0 → 9c92a7f7685d  https://github.com/alexnodeland/artifactr/compare/e890aca037c0...9c92a7f7685d
-```
+`copier update` moves the template's code and the libraries together, to a combination lattice's CI checked together. To try another commit, change every `rev` to it, then `uv lock && make check`; the libraries must come from one commit, or `uv lock` fails, naming both. `copier update` keeps the edit, and marks a conflict when it moves the lines.
 
-Naming libraries moves only those; a commit SHA must be a full 40 characters, and is checked against the library's repository.
-
-evalr moves when the libraries move their pins of it. When artifactr and reflexr pin different commits of evalr, `uv lock` fails in the Template jobs, naming both.
-
-Then run `make validate`, and open a pull request with the output in its description: CI's template job generates every variant on the new revisions and runs its checks, and the smoke job runs an application on them beside the stack. When a library's `main` breaks the template, either fix the template in the same pull request, or pin that library to its last good commit.
-
-Nothing runs this on a schedule, and CI doesn't run `--check`, which would fail every pull request as soon as a library merged something. Applications move to the new pins with `copier update`.
+lattice's tags carry their package's name, so Copier records the application's `_commit` as `git describe --tags` of the nearest one, such as `evalr-v0.2.0-1-gf4e1841`. Updates read it correctly. An application rendered from a pull request's branch stays installable after a squash merge, since GitHub keeps the pull request's commits.
 
 ## How the template is checked
 
-- **`make validate`** renders all six variants (three choices of libraries, with and without evals) with `scripts/check-template`, under a name whose slug is the longest Copier accepts and whose package sorts before `conftest`, and checks that nothing is left unrendered, that the Python passes the generated project's own ruff settings, and that the YAML, shell scripts and Compose file pass their linters.
-- **CI's template job** generates each variant, and the largest again on Python 3.14, and runs its own `make check`: lint, strict types, and the tests with 100% coverage.
-- **`make smoke-app`** generates an application with both libraries and evals, runs it in its app profile beside the whole stack, and traces its agents through the gateway into Tempo and Langfuse ([The smoke tests](smoke-tests.md)).
+- **`make validate`** renders all six variants (three choices of libraries, with and without evals) with `scripts/check-template`, under a name whose slug is the longest Copier accepts and whose package sorts before `conftest`, and checks that nothing is left unrendered, that the libraries come from lattice at the commit it was rendered from, that the Python passes the generated project's own ruff settings, and that the YAML, shell scripts and Compose file pass their linters.
+- **CI's template job** generates each variant, and the largest again on Python 3.14, and runs its own `make check`: lint, strict types, and the tests with 100% coverage. `scripts/check-app` sets `libraries_path`, so the application installs the libraries from the checkout, and the job runs when stackr or any library changes. A library's change and the template's then land in one pull request, checked together.
+- **`make smoke-app`** generates an application with both libraries and evals, which installs them from GitHub at `HEAD`, as an application generated from lattice does (so `HEAD` must be pushed; in CI, it is the pull request's merge commit). It runs it in its app profile beside the whole stack, and traces its agents through the gateway into Tempo and Langfuse ([The smoke tests](smoke-tests.md)).
 
-To render and check one variant locally, from lattice's root, whose `copier.yml` points Copier at the template:
+To render and check one variant locally, from lattice's root, whose `copier.yml` points Copier at the template, with the libraries from the checkout:
 
 ```bash
-uv run copier copy --defaults --vcs-ref HEAD --data libraries=both . /tmp/my-app
+uv run copier copy --defaults --vcs-ref HEAD --data libraries=both --data libraries_path="$PWD/packages" . /tmp/my-app
 cd /tmp/my-app && git init && make install && make check
 ```

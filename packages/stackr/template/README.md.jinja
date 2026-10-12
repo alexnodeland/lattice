@@ -121,4 +121,4 @@ make evals-langfuse   # in Langfuse, with the gateway's model, as .env configure
 ## Updating
 
 - **The template:** `uvx copier update` pulls in stackr's improvements, keeping your answers and your changes.
-- **The libraries:** they are pinned to git revisions in `pyproject.toml`'s `[tool.uv.sources]`, and evalr comes with them, at the commit they pin. `copier update` moves the pins with the template's code. To hold a library back, change its `rev`, then `uv lock` and `make check`.
+- **The libraries:** they come from lattice, at the commit of lattice the template was rendered from, in `pyproject.toml`'s `[tool.uv.sources]`. `copier update` moves them with the template's code, to a combination lattice's CI checked together. To try another commit, change every `rev` to it, then `uv lock` and `make check`: the libraries must come from one commit, or `uv lock` fails.

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Generate one application from the template, from lattice's root, and run the checks its own CI
-# runs: lint, strict types, and the tests with 100% coverage. scripts/check-template checks every
-# variant without installing it; CI's Template job runs this once per variant.
+# runs: lint, strict types, and the tests with 100% coverage. It installs the libraries from this
+# checkout, so a change to a library is checked with the template's (ADR-0018).
+# scripts/check-template checks every variant without installing it; CI's Template job runs this
+# once per variant.
 #
 # Usage: scripts/check-app
 #   TEMPLATE_LIBRARIES   artifactr, reflexr or both (default: both)
@@ -16,6 +18,7 @@ uv run copier copy --quiet --defaults --vcs-ref HEAD \
   --data libraries="${TEMPLATE_LIBRARIES:-both}" \
   --data evals="${TEMPLATE_EVALS:-true}" \
   --data python_version="${TEMPLATE_PYTHON:-3.12}" \
+  --data libraries_path="$(dirname "$PWD")" \
   ../.. "$scratch/app"
 # The application is outside lattice, where a version manager's shim (proto's, in CI) finds no
 # .prototools to choose a uv by, so it runs the uv binary that runs here. uv run exports its path.

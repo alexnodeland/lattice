@@ -8,6 +8,8 @@ this checkout, working tree included, under the name in NAME, and checks each on
 
 - every Jinja expression was rendered: nothing is left of `{{ ... }}` or `{% ... %}`, apart
   from GitHub Actions' own `${{ ... }}`
+- the libraries come from lattice, each from its own directory, all at one commit: the one the
+  variant was rendered from (ADR-0018)
 - the Python is formatted and passes lint, with the generated project's own ruff settings
 - the YAML passes yamllint, and the shell scripts shellcheck
 - the Compose file is valid for the app profile
@@ -24,6 +26,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import tomllib
 import warnings
 from pathlib import Path
 
@@ -36,18 +39,20 @@ VARIANTS = list(itertools.product(["artifactr", "reflexr", "both"], [True, False
 LEFTOVER = re.compile(r"(?<!\$)\{\{|\{%|%\}")
 TEXT = {".py", ".toml", ".yaml", ".yml", ".md", ".json", ".sh", ".example", ""}
 ANSWERS = ".copier-answers.yml"
+REPOSITORY = "https://github.com/alexnodeland/lattice"
 NAME = "Acme Template Check At Max Len"
 """The name every variant is rendered with: its slug is 30 characters, the longest Copier
 accepts, and its package sorts before `conftest`, so line lengths and import order are
 checked at their limits."""
 
 
-def render(libraries: str, evals: bool, destination: Path) -> None:
-    """Render one variant, as `copier copy --defaults --vcs-ref HEAD` does."""
+def render(libraries: str, evals: bool, destination: Path) -> str:
+    """Render one variant, as `copier copy --defaults --vcs-ref HEAD` does; return its commit."""
     with warnings.catch_warnings():
-        # A checkout with uncommitted changes renders them, with a warning.
+        # A checkout with uncommitted changes renders them, from a commit Copier makes, with a
+        # warning.
         warnings.simplefilter("ignore")
-        run_copy(
+        worker = run_copy(
             str(LATTICE),
             destination,
             data={"project_name": NAME, "libraries": libraries, "evals": evals},
@@ -55,6 +60,19 @@ def render(libraries: str, evals: bool, destination: Path) -> None:
             vcs_ref="HEAD",
             quiet=True,
         )
+    return str(worker.template.commit_hash)
+
+
+def check_sources(app: Path, commit: str) -> list[str]:
+    """Check that the libraries come from lattice's packages/, at the rendered commit."""
+    sources = tomllib.loads((app / "pyproject.toml").read_text())["tool"]["uv"]["sources"]
+    return [
+        f"pyproject.toml: {name} isn't packages/<library> at {commit}: {source}"
+        for name, source in sources.items()
+        if source.get("git") != REPOSITORY
+        or not str(source.get("subdirectory")).startswith("packages/")
+        or source.get("rev") != commit
+    ]
 
 
 def run(label: str, command: list[str], cwd: Path) -> list[str]:
@@ -65,9 +83,9 @@ def run(label: str, command: list[str], cwd: Path) -> list[str]:
     return [f"{label}:\n{done.stdout}{done.stderr}".rstrip()]
 
 
-def check(app: Path) -> list[str]:
+def check(app: Path, commit: str) -> list[str]:
     """Check one rendered application; return the problems found."""
-    problems: list[str] = []
+    problems = check_sources(app, commit)
     files = [p for p in app.rglob("*") if p.is_file() and ".git" not in p.parts]
     for path in files:
         if path.suffix in TEXT or path.name.startswith("."):
@@ -98,8 +116,8 @@ def main() -> int:
         for libraries, evals in VARIANTS:
             name = f"{libraries}{'-evals' if evals else ''}"
             app = base / name
-            render(libraries, evals, app)
-            problems = check(app)
+            commit = render(libraries, evals, app)
+            problems = check(app, commit)
             for problem in problems:
                 print(f"FAIL: {name}: {problem}", file=sys.stderr)
             if problems:

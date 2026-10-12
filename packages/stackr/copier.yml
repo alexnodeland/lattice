@@ -70,17 +70,14 @@ app_port:
   validator: >-
     {% if app_port < 1024 or app_port > 65535 %}Choose a port from 1024 to 65535{% endif %}
 
-# Never asked, and not recorded in the answers. The libraries' commits are the template's, so
-# `copier update` moves them with its code; `make bump-libraries` moves them to each library's
-# main, and evalr comes with them (ADR-0013). The rest are derived from the answers.
-artifactr_rev:
+# Never asked, and not recorded in the answers. The application installs the libraries from
+# lattice at the commit the template is rendered from (ADR-0018), so `copier update` moves them
+# with the template's code. libraries_path, a path to lattice's packages/, installs them from a
+# checkout instead: scripts/check-app sets it, to check a library's change with the template's.
+# The rest are derived from the answers.
+libraries_path:
   type: str
-  default: 1a635ecb9800c2e414221e7293e8a2de2fdb600c
-  when: false
-
-reflexr_rev:
-  type: str
-  default: dc2d05916cd6d1bf36b7c2b26e29663dfdddc338
+  default: ""
   when: false
 
 package_name:

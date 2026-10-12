@@ -55,7 +55,7 @@ import logging
 import time
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Final, Literal, Protocol
 
@@ -544,9 +544,7 @@ class Runner[AppDepsT]:
                 if not replied:
                     return await self._plan(workspace, thread_id)  # answers came first
                 run = await workspace.run(run.id)
-                assert isinstance(reply.event, MessagePosted)
                 turn = _resume(run, taken, asked, reply.seq, [], reply)
-                turn = replace(turn, message_ids=(reply.event.message_id,))
                 return await self._allowed(workspace, thread_id, turn)
         elif untaken:
             first = untaken[0]
@@ -863,7 +861,8 @@ def _resume(
     It acts for whoever committed ``by``. The messages no turn has taken are its prompt, beside
     the answers, so they reach the model as the run resumes: up to the first from someone it
     does not act for, which the thread's next turn takes. Otherwise it takes the log through
-    ``through``.
+    ``through``. The messages it carries out are its prompt's, or, with no prompt, ``by``, when
+    that is the message that answered the run.
     """
     ours = (
         list(itertools.takewhile(lambda e: same_principal(e.actor, by.actor), untaken))
@@ -884,6 +883,7 @@ def _resume(
         },
     )
     messages = [e.event for e in ours if isinstance(e.event, MessagePosted)]
+    carried = [by.event] if not ours and by is not None else messages
     return _Turn(
         run_id=run.id,
         trigger="resume",
@@ -894,7 +894,7 @@ def _resume(
         asked=asked,
         on_behalf_of=None if by is None else acting_for(by.actor),
         traceparent=None if by is None else by.traceparent,
-        message_ids=tuple(message.message_id for message in messages),
+        message_ids=tuple(e.message_id for e in carried if isinstance(e, MessagePosted)),
     )
 
 

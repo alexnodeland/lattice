@@ -14,7 +14,7 @@ relayr continues a rule's causal chain into the agent turns a rule's message sta
   - a new run, the message that starts it;
   - a run resumed by a reply, that message;
   - a run resumed once its requests are answered, the messages it takes as its prompt, which may be none.
-- **Messages that reach the run later,** through its watcher, are not named: they steer a turn that has started.
+- **Messages that reach the run later,** through its watcher, are not named: they steer a turn that has started. A reader that finds no `run_started` naming a message reads it as one of two things: it steered the run that held the thread when it was posted, which the log's next `run_ended` of that run closes, or no turn will take it, because its author may not start one (ADR-0057) and the runner passed it over.
 - **`Session.message_ids`** carries them from the runner to the capability, which records `run_started`. A run started outside the runner names none.
 - **The field has a default,** so stored `run_started` envelopes load as before, with no migration.
 

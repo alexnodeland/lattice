@@ -92,7 +92,8 @@ class Outbound:
         runner: Starts the turns that rules allowed to `send` ask for. Without one, no rule may.
 
     Raises:
-        ValueError: If a key of ``allowlists`` has a wildcard other than a whole namespace's.
+        ValueError: If a key of ``allowlists`` is neither a rule's name nor a whole namespace's,
+            or names reflexr's own namespace.
     """
 
     def __init__(
@@ -100,14 +101,18 @@ class Outbound:
         artifactr: artifactr.Workspaces,
         ledger: Ledger,
         *,
-        allowlists: Mapping[RuleName, Allowlist] | None = None,
+        allowlists: Mapping[str, Allowlist] | None = None,
         runner: artifactr.agent.Runner[Any] | None = None,
     ) -> None:
         self._artifactr = artifactr
         self._ledger = ledger
         self._allowlists = dict(allowlists or {})
-        if wild := sorted(k for k in self._allowlists if "*" in k and not _NAMESPACE.fullmatch(k)):
-            raise ValueError(f"only a whole namespace may be a wildcard, as 'chat:*': {wild}")
+        for key in self._allowlists:
+            if not _KEY.fullmatch(key) or key.startswith("reflexr:"):
+                raise ValueError(
+                    f"an allowlist's key is a rule's name, as 'chat:deploys', or a whole "
+                    f"namespace's, as 'chat:*', and not reflexr's: not {key!r}"
+                )
         self._runner = runner
         self._acting: weakref.WeakKeyDictionary[Reaction[Any], RunActions] = (
             weakref.WeakKeyDictionary()
@@ -119,7 +124,10 @@ class Outbound:
         if actions is None:
             rule = reaction.run.rule
             namespace = f"{rule.partition(':')[0]}:*"
-            allowlist = self._allowlists.get(rule) or self._allowlists.get(namespace, Allowlist())
+            if rule in self._allowlists:
+                allowlist = self._allowlists[rule]
+            else:
+                allowlist = self._allowlists.get(namespace, Allowlist())
             actions = RunActions(reaction, self._artifactr, self._ledger, allowlist, self._runner)
             self._acting[reaction] = actions
         return actions
@@ -433,8 +441,8 @@ async def _used(_: artifactr.Workspace) -> bool:
     return True
 
 
-_NAMESPACE: Final = re.compile(r"[a-z][a-z0-9_]*:\*")
-"""An allowlist's key for a whole rule namespace, as reflexr names namespaces."""
+_KEY: Final = re.compile(r"[a-z][a-z0-9_]*:(\*|[a-z0-9][a-z0-9._-]*)")
+"""An allowlist's key: a rule's name, as reflexr names rules, or a whole namespace's."""
 
 _RETRIED: Final = frozenset({"validation_failed", "patch_failed", "not_found"})
 """The refusals a run can do otherwise about: an agent's model is told, and may retry."""

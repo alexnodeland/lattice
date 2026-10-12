@@ -12,8 +12,8 @@ Rules drafted in chat are installed at runtime, under names no one can list in a
 ## Decision
 
 - **A key of `Outbound(allowlists=...)` may name a whole namespace,** as `"chat:*"`. It applies to every rule in that namespace that has no allowlist of its own; a rule's own name comes first.
-- **That is the only wildcard.** Any other key with a `*` is refused when `Outbound` is made: no globbing within a name, and no wildcard across namespaces.
-- **stackr's template** gives `chat:*` `Allowlist(threads="any")`: notices in any thread, and nothing more.
+- **That is the only wildcard.** `Outbound` checks every key when it is made: a key is a rule's name, as reflexr names rules, or `<namespace>:*`. Anything else is refused, `reflexr`'s reserved namespace included: no globbing within a name, and no wildcard across namespaces.
+- **Phase 5b, rules from chat in stackr's template,** is to give `chat:*` `Allowlist(threads="any")`: notices in any thread, and nothing more.
 
 ## Options considered
 

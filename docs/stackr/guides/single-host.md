@@ -75,7 +75,7 @@ Then open <http://localhost:3000>, <http://localhost:3300> and <http://localhost
 
 ## Backups
 
-Set `BACKUP_S3_*` in `.env` to a bucket off the host, on any S3-compatible store reached over HTTPS, then `make up` again, so PostgreSQL starts archiving its WAL there, and `make backup` at once, for the first full backup ([ADR-0027](../adr/0027-the-single-hosts-backups.md)):
+Set `BACKUP_S3_*` in `.env` to a bucket off the host, on any S3-compatible store reached over HTTPS, then `make up` again, and `make backup` at once: it makes pgBackRest's stanza, starts PostgreSQL archiving its WAL there, and takes the first full backup ([ADR-0027](../adr/0027-the-single-hosts-backups.md)):
 
 | Setting | What it is |
 |---|---|

@@ -28,6 +28,8 @@ fi
 type=${BACKUP_TYPE:-$([[ $(date -u +%u) == 7 ]] && echo full || echo diff)}
 pgbackrest() { host exec -T -u postgres postgres pgbackrest --stanza=stackr --log-level-console=warn "$@"; }
 pgbackrest stanza-create
+# From here on, PostgreSQL archives its WAL (deploy/host/postgres/stackr-entrypoint).
+host exec -T -u postgres postgres sh -c "touch \"\$PGDATA/stackr-archiving\""
 pgbackrest check
 pgbackrest --type="$type" backup
 echo "backup: PostgreSQL, $type, with pgBackRest"

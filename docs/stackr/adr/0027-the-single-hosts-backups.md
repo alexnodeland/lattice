@@ -23,6 +23,7 @@ RFC-0004 backs up a single host with pgBackRest and ClickHouse's native `BACKUP 
 
 - **Built with pgBackRest** (`deploy/host/postgres`), at a pinned package version, from the image `compose.yaml` pins, which `scripts/check-config` holds it to.
 - **Its entrypoint** writes pgBackRest's configuration from the settings, readable by `postgres` alone, and turns on WAL archiving only when a bucket is set: without one, nothing would take the WAL, and it would fill the disk.
+- **Archiving starts with the first `make backup`,** which makes pgBackRest's stanza and then a marker in the data directory, `stackr-archiving`. Until the marker exists, the archive command lets each WAL file go at once: there is nothing yet to restore it onto. That also keeps the image's first start quick: its entrypoint runs a temporary server with the same settings, and PostgreSQL archives before it stops, which, against a bucket with no stanza, waited on every WAL file's retries until the health check gave up.
 - **A full backup each Sunday, before the drill, and a differential on the other nights.** pgBackRest keeps two full backups and the differentials and WAL they need, so it can restore to any point in the last one to two weeks. `pgbackrest check` runs first, so a backup fails when WAL archiving does.
 
 ### ClickHouse

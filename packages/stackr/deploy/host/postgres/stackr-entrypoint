@@ -1,10 +1,15 @@
 #!/usr/bin/env sh
 # PostgreSQL's own entrypoint, archiving its WAL with pgBackRest once a bucket is set: without
-# one, nothing would take the WAL, and it would fill the disk.
+# one, nothing would take the WAL, and it would fill the disk. Archiving starts with the first
+# `make backup`, which makes the stanza and then the marker, stackr-archiving: until then, the WAL
+# is let go, as there is nothing yet to restore it onto. That also keeps the image's first start,
+# whose temporary server must archive before it stops, from waiting on a bucket.
 set -eu
 if [ -n "${BACKUP_S3_BUCKET:-}" ] && [ "${1:-}" = postgres ]; then
   pgbackrest-conf
-  set -- "$@" -c archive_mode=on -c "archive_command=pgbackrest --stanza=stackr archive-push %p"
+  # PostgreSQL runs the archive command in its data directory.
+  set -- "$@" -c archive_mode=on \
+    -c "archive_command=test ! -e stackr-archiving || pgbackrest --stanza=stackr archive-push %p"
 fi
 # pgBackRest reads them from its configuration: PostgreSQL and its children don't inherit them.
 unset BACKUP_CIPHER_PASS BACKUP_S3_SECRET_ACCESS_KEY

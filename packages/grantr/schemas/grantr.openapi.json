@@ -1,0 +1,2109 @@
+{
+  "components": {
+    "schemas": {
+      "Agent": {
+        "description": "A turn's agent acting for no one. It holds nothing, and can't be granted a role.",
+        "properties": {
+          "kind": {
+            "const": "agent",
+            "default": "agent",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "title": "Agent",
+        "type": "object"
+      },
+      "AuditEntry": {
+        "description": "An event in the audit log, with its place in it.",
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Subject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "event": {
+            "$ref": "#/components/schemas/AuditEvent"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "tenant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TenantId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "seq",
+          "at",
+          "tenant",
+          "by",
+          "event"
+        ],
+        "title": "AuditEntry",
+        "type": "object"
+      },
+      "AuditEvent": {
+        "discriminator": {
+          "mapping": {
+            "granted": "#/components/schemas/Granted",
+            "group_defined": "#/components/schemas/GroupDefined",
+            "group_deleted": "#/components/schemas/GroupDeleted",
+            "key_issued": "#/components/schemas/KeyIssued",
+            "key_revoked": "#/components/schemas/KeyRevoked",
+            "member_added": "#/components/schemas/MemberAdded",
+            "member_removed": "#/components/schemas/MemberRemoved",
+            "revoked": "#/components/schemas/Revoked",
+            "role_defined": "#/components/schemas/RoleDefined",
+            "role_deleted": "#/components/schemas/RoleDeleted",
+            "tenant_created": "#/components/schemas/TenantCreated",
+            "tenant_deleted": "#/components/schemas/TenantDeleted"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TenantCreated"
+          },
+          {
+            "$ref": "#/components/schemas/TenantDeleted"
+          },
+          {
+            "$ref": "#/components/schemas/MemberAdded"
+          },
+          {
+            "$ref": "#/components/schemas/MemberRemoved"
+          },
+          {
+            "$ref": "#/components/schemas/GroupDefined"
+          },
+          {
+            "$ref": "#/components/schemas/GroupDeleted"
+          },
+          {
+            "$ref": "#/components/schemas/RoleDefined"
+          },
+          {
+            "$ref": "#/components/schemas/RoleDeleted"
+          },
+          {
+            "$ref": "#/components/schemas/Granted"
+          },
+          {
+            "$ref": "#/components/schemas/Revoked"
+          },
+          {
+            "$ref": "#/components/schemas/KeyIssued"
+          },
+          {
+            "$ref": "#/components/schemas/KeyRevoked"
+          }
+        ]
+      },
+      "Check": {
+        "description": "One question for ``/checks``: may the caller take this action on this resource?",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "resource": {
+            "$ref": "#/components/schemas/Resource"
+          }
+        },
+        "required": [
+          "action",
+          "resource"
+        ],
+        "title": "Check",
+        "type": "object"
+      },
+      "Grant": {
+        "description": "A role, on a resource, to a grantee: in a tenant, or on the deployment.",
+        "properties": {
+          "on": {
+            "$ref": "#/components/schemas/Resource"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "tenant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TenantId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "to": {
+            "$ref": "#/components/schemas/Grantee"
+          }
+        },
+        "required": [
+          "tenant",
+          "role",
+          "on",
+          "to"
+        ],
+        "title": "Grant",
+        "type": "object"
+      },
+      "GrantRequest": {
+        "description": "A role, on a resource, to a grantee: to grant, or to revoke.",
+        "properties": {
+          "on": {
+            "$ref": "#/components/schemas/Resource"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "to": {
+            "$ref": "#/components/schemas/Grantee"
+          }
+        },
+        "required": [
+          "role",
+          "on",
+          "to"
+        ],
+        "title": "GrantRequest",
+        "type": "object"
+      },
+      "Granted": {
+        "description": "A role was granted.",
+        "properties": {
+          "grant": {
+            "$ref": "#/components/schemas/Grant"
+          },
+          "type": {
+            "const": "granted",
+            "default": "granted",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grant"
+        ],
+        "title": "Granted",
+        "type": "object"
+      },
+      "Grantee": {
+        "discriminator": {
+          "mapping": {
+            "group": "#/components/schemas/Group",
+            "rule": "#/components/schemas/RulePrincipal",
+            "service_principal": "#/components/schemas/ServicePrincipal",
+            "user": "#/components/schemas/User"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/User"
+          },
+          {
+            "$ref": "#/components/schemas/ServicePrincipal"
+          },
+          {
+            "$ref": "#/components/schemas/RulePrincipal"
+          },
+          {
+            "$ref": "#/components/schemas/Group"
+          }
+        ]
+      },
+      "Group": {
+        "description": "A tenant's named set of users and service principals, granted roles like a subject.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "group",
+            "default": "group",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "Group",
+        "type": "object"
+      },
+      "GroupDefined": {
+        "description": "A group was created, or its members replaced.",
+        "properties": {
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            },
+            "title": "Members",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "type": {
+            "const": "group_defined",
+            "default": "group_defined",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group",
+          "members"
+        ],
+        "title": "GroupDefined",
+        "type": "object"
+      },
+      "GroupDeleted": {
+        "description": "A group was deleted, with its grants.",
+        "properties": {
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "type": {
+            "const": "group_deleted",
+            "default": "group_deleted",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group"
+        ],
+        "title": "GroupDeleted",
+        "type": "object"
+      },
+      "GroupMembers": {
+        "description": "A group's members.",
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            },
+            "title": "Members",
+            "type": "array"
+          }
+        },
+        "required": [
+          "members"
+        ],
+        "title": "GroupMembers",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IssuedKey": {
+        "description": "A key, shown once, and the audit entry that records it.",
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/AuditEntry"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "entry"
+        ],
+        "title": "IssuedKey",
+        "type": "object"
+      },
+      "KeyIssued": {
+        "description": "A key was issued to a service principal.",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "principal": {
+            "$ref": "#/components/schemas/ServicePrincipal"
+          },
+          "type": {
+            "const": "key_issued",
+            "default": "key_issued",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "principal",
+          "key"
+        ],
+        "title": "KeyIssued",
+        "type": "object"
+      },
+      "KeyRevoked": {
+        "description": "A key was revoked.",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "principal": {
+            "$ref": "#/components/schemas/ServicePrincipal"
+          },
+          "type": {
+            "const": "key_revoked",
+            "default": "key_revoked",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "principal",
+          "key"
+        ],
+        "title": "KeyRevoked",
+        "type": "object"
+      },
+      "KeyView": {
+        "description": "A key as listed: its public id and its principal.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "principal": {
+            "$ref": "#/components/schemas/ServicePrincipal"
+          }
+        },
+        "required": [
+          "id",
+          "principal"
+        ],
+        "title": "KeyView",
+        "type": "object"
+      },
+      "Me": {
+        "description": "The caller in one tenant: their roles on it, and the workspaces they can open.",
+        "properties": {
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/TenantId"
+          },
+          "workspaces": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            },
+            "title": "Workspaces",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tenant",
+          "roles",
+          "workspaces"
+        ],
+        "title": "Me",
+        "type": "object"
+      },
+      "Member": {
+        "discriminator": {
+          "mapping": {
+            "service_principal": "#/components/schemas/ServicePrincipal",
+            "user": "#/components/schemas/User"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/User"
+          },
+          {
+            "$ref": "#/components/schemas/ServicePrincipal"
+          }
+        ]
+      },
+      "MemberAdded": {
+        "description": "A user or service principal joined the tenant.",
+        "properties": {
+          "member": {
+            "$ref": "#/components/schemas/Member"
+          },
+          "type": {
+            "const": "member_added",
+            "default": "member_added",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "member"
+        ],
+        "title": "MemberAdded",
+        "type": "object"
+      },
+      "MemberRemoved": {
+        "description": "A member left the tenant, with its grants, its places in groups, and its keys.",
+        "properties": {
+          "member": {
+            "$ref": "#/components/schemas/Member"
+          },
+          "type": {
+            "const": "member_removed",
+            "default": "member_removed",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "member"
+        ],
+        "title": "MemberRemoved",
+        "type": "object"
+      },
+      "Membership": {
+        "description": "A user's place in a tenant: the roles granted to them on it.",
+        "properties": {
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/TenantId"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "required": [
+          "tenant",
+          "user",
+          "roles"
+        ],
+        "title": "Membership",
+        "type": "object"
+      },
+      "Memberships": {
+        "description": "Every tenant the caller is a member of, when they name none.",
+        "properties": {
+          "memberships": {
+            "items": {
+              "$ref": "#/components/schemas/Membership"
+            },
+            "title": "Memberships",
+            "type": "array"
+          }
+        },
+        "required": [
+          "memberships"
+        ],
+        "title": "Memberships",
+        "type": "object"
+      },
+      "NewKey": {
+        "description": "The service principal a key is issued to.",
+        "properties": {
+          "principal": {
+            "title": "Principal",
+            "type": "string"
+          }
+        },
+        "required": [
+          "principal"
+        ],
+        "title": "NewKey",
+        "type": "object"
+      },
+      "NewMember": {
+        "description": "A user or service principal to add to a tenant.",
+        "properties": {
+          "member": {
+            "$ref": "#/components/schemas/Member"
+          }
+        },
+        "required": [
+          "member"
+        ],
+        "title": "NewMember",
+        "type": "object"
+      },
+      "NewTenant": {
+        "description": "A tenant to create, with its first owner.",
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/TenantId"
+          }
+        },
+        "required": [
+          "tenant",
+          "owner"
+        ],
+        "title": "NewTenant",
+        "type": "object"
+      },
+      "Resource": {
+        "description": "A resource, by its kind, its workspace if it is in one, and its id if it is an item.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ResourceKind"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "Resource",
+        "type": "object"
+      },
+      "ResourceKind": {
+        "enum": [
+          "deployment",
+          "tenant",
+          "workspace",
+          "thread",
+          "artifact",
+          "rule"
+        ],
+        "type": "string"
+      },
+      "Revoked": {
+        "description": "A grant was revoked.",
+        "properties": {
+          "grant": {
+            "$ref": "#/components/schemas/Grant"
+          },
+          "type": {
+            "const": "revoked",
+            "default": "revoked",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grant"
+        ],
+        "title": "Revoked",
+        "type": "object"
+      },
+      "Role": {
+        "description": "A tenant's own role: a named set of the actions a workspace's admin holds.",
+        "properties": {
+          "actions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Actions",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "actions"
+        ],
+        "title": "Role",
+        "type": "object"
+      },
+      "RoleActions": {
+        "description": "A custom role's actions.",
+        "properties": {
+          "actions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Actions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "actions"
+        ],
+        "title": "RoleActions",
+        "type": "object"
+      },
+      "RoleDefined": {
+        "description": "A custom role was created, or its actions replaced.",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "type": {
+            "const": "role_defined",
+            "default": "role_defined",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "RoleDefined",
+        "type": "object"
+      },
+      "RoleDeleted": {
+        "description": "A custom role was deleted, with its grants.",
+        "properties": {
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "type": {
+            "const": "role_deleted",
+            "default": "role_deleted",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "RoleDeleted",
+        "type": "object"
+      },
+      "RulePrincipal": {
+        "description": "A reflexr rule, named by its workspace and rule: its runs act as it.",
+        "properties": {
+          "kind": {
+            "const": "rule",
+            "default": "rule",
+            "title": "Kind",
+            "type": "string"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          }
+        },
+        "required": [
+          "workspace",
+          "rule"
+        ],
+        "title": "RulePrincipal",
+        "type": "object"
+      },
+      "ServicePrincipal": {
+        "description": "A tenant's non-human principal: an integration, an MCP client or the application.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "service_principal",
+            "default": "service_principal",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "ServicePrincipal",
+        "type": "object"
+      },
+      "Subject": {
+        "discriminator": {
+          "mapping": {
+            "agent": "#/components/schemas/Agent",
+            "rule": "#/components/schemas/RulePrincipal",
+            "service_principal": "#/components/schemas/ServicePrincipal",
+            "user": "#/components/schemas/User"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/User"
+          },
+          {
+            "$ref": "#/components/schemas/ServicePrincipal"
+          },
+          {
+            "$ref": "#/components/schemas/RulePrincipal"
+          },
+          {
+            "$ref": "#/components/schemas/Agent"
+          }
+        ]
+      },
+      "TenantCreated": {
+        "description": "A tenant was created, with its first owner.",
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "type": {
+            "const": "tenant_created",
+            "default": "tenant_created",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner"
+        ],
+        "title": "TenantCreated",
+        "type": "object"
+      },
+      "TenantDeleted": {
+        "description": "A tenant was deleted, with everything grantr held for it but its audit log.",
+        "properties": {
+          "type": {
+            "const": "tenant_deleted",
+            "default": "tenant_deleted",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "TenantDeleted",
+        "type": "object"
+      },
+      "TenantId": {
+        "pattern": "^[^~]+$",
+        "type": "string"
+      },
+      "User": {
+        "description": "A person, by their identity provider's id.",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "kind": {
+            "const": "user",
+            "default": "user",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "User",
+        "type": "object"
+      },
+      "UserId": {
+        "type": "string"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WorkspaceId": {
+        "type": "string"
+      }
+    }
+  },
+  "info": {
+    "title": "grantr",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/grantr/v1/audit": {
+      "get": {
+        "description": "The deployment's audit log: its operators, granted and revoked.",
+        "operationId": "deployment_audit_grantr_v1_audit_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after_seq",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "After Seq",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntry"
+                  },
+                  "title": "Response Deployment Audit Grantr V1 Audit Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deployment Audit"
+      }
+    },
+    "/grantr/v1/checks": {
+      "post": {
+        "description": "Answer a batch of up to 100 checks for the caller, in order.\n\nEach command is checked again when it arrives.",
+        "operationId": "checks_grantr_v1_checks_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/Check"
+                },
+                "maxItems": 100,
+                "title": "Questions",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Checks Grantr V1 Checks Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Checks"
+      }
+    },
+    "/grantr/v1/me": {
+      "get": {
+        "description": "The caller in the tenant ``X-Tenant`` names, or every tenant they are a member of.\n\nIn a tenant: the caller's roles on it, and the workspaces they can open.",
+        "operationId": "me_grantr_v1_me_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Me"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Memberships"
+                    }
+                  ],
+                  "title": "Response Me Grantr V1 Me Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Me"
+      }
+    },
+    "/grantr/v1/operators/{user}": {
+      "delete": {
+        "description": "Stop a user being an operator.",
+        "operationId": "revoke_operator_grantr_v1_operators__user__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user",
+            "required": true,
+            "schema": {
+              "title": "User",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Operator"
+      },
+      "put": {
+        "description": "Make a user an operator of the deployment.",
+        "operationId": "grant_operator_grantr_v1_operators__user__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user",
+            "required": true,
+            "schema": {
+              "title": "User",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Grant Operator"
+      }
+    },
+    "/grantr/v1/tenants": {
+      "get": {
+        "description": "Every tenant, for an operator.",
+        "operationId": "list_tenants_grantr_v1_tenants_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TenantId"
+                  },
+                  "title": "Response List Tenants Grantr V1 Tenants Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Tenants"
+      },
+      "post": {
+        "description": "Create a tenant, with its first owner.",
+        "operationId": "create_tenant_grantr_v1_tenants_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTenant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Tenant"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}": {
+      "delete": {
+        "description": "Delete a tenant, and everything grantr holds for it but its audit log.",
+        "operationId": "delete_tenant_grantr_v1_tenants__tenant__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Tenant"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/audit": {
+      "get": {
+        "description": "A tenant's audit log after ``after_seq``, in order.",
+        "operationId": "tenant_audit_grantr_v1_tenants__tenant__audit_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after_seq",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "After Seq",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntry"
+                  },
+                  "title": "Response Tenant Audit Grantr V1 Tenants  Tenant  Audit Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tenant Audit"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/grants": {
+      "get": {
+        "description": "Every grant in a tenant, or on a workspace and the items in it.",
+        "operationId": "list_grants_grantr_v1_tenants__tenant__grants_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/WorkspaceId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Grant"
+                  },
+                  "title": "Response List Grants Grantr V1 Tenants  Tenant  Grants Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Grants"
+      },
+      "post": {
+        "description": "Grant a role on a resource.",
+        "operationId": "grant_grantr_v1_tenants__tenant__grants_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Grant"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/groups": {
+      "get": {
+        "description": "A tenant's groups, by id, with their members.",
+        "operationId": "list_groups_grantr_v1_tenants__tenant__groups_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "items": {
+                      "$ref": "#/components/schemas/Member"
+                    },
+                    "type": "array"
+                  },
+                  "title": "Response List Groups Grantr V1 Tenants  Tenant  Groups Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Groups"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/groups/{group}": {
+      "delete": {
+        "description": "Delete a group, with its grants.",
+        "operationId": "delete_group_grantr_v1_tenants__tenant__groups__group__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "group",
+            "required": true,
+            "schema": {
+              "title": "Group",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Group"
+      },
+      "put": {
+        "description": "Create a group, or replace its members.",
+        "operationId": "define_group_grantr_v1_tenants__tenant__groups__group__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "group",
+            "required": true,
+            "schema": {
+              "title": "Group",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupMembers"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Define Group"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/keys": {
+      "get": {
+        "description": "A tenant's keys: their ids and principals, never their secrets.",
+        "operationId": "list_keys_grantr_v1_tenants__tenant__keys_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/KeyView"
+                  },
+                  "title": "Response List Keys Grantr V1 Tenants  Tenant  Keys Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Keys"
+      },
+      "post": {
+        "description": "Issue a key for a service principal. The key is in this response, and nowhere else.",
+        "operationId": "issue_key_grantr_v1_tenants__tenant__keys_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewKey"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedKey"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Issue Key"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/keys/{key_id}": {
+      "delete": {
+        "description": "Revoke a key.",
+        "operationId": "revoke_key_grantr_v1_tenants__tenant__keys__key_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key_id",
+            "required": true,
+            "schema": {
+              "title": "Key Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Key"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/members": {
+      "get": {
+        "description": "A tenant's members.",
+        "operationId": "list_members_grantr_v1_tenants__tenant__members_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Member"
+                  },
+                  "title": "Response List Members Grantr V1 Tenants  Tenant  Members Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Members"
+      },
+      "post": {
+        "description": "Add a user or service principal to a tenant.",
+        "operationId": "add_member_grantr_v1_tenants__tenant__members_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewMember"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Member"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/members/{kind}/{member_id}": {
+      "delete": {
+        "description": "Remove a member, with its grants, its places in groups and its keys.",
+        "operationId": "remove_member_grantr_v1_tenants__tenant__members__kind___member_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "user",
+                "service_principal"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "member_id",
+            "required": true,
+            "schema": {
+              "title": "Member Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Member"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/revocations": {
+      "post": {
+        "description": "Revoke a grant.",
+        "operationId": "revoke_grantr_v1_tenants__tenant__revocations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/roles": {
+      "get": {
+        "description": "A tenant's custom roles.",
+        "operationId": "list_roles_grantr_v1_tenants__tenant__roles_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Role"
+                  },
+                  "title": "Response List Roles Grantr V1 Tenants  Tenant  Roles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Roles"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/roles/{name}": {
+      "delete": {
+        "description": "Delete a custom role, with its grants.",
+        "operationId": "delete_role_grantr_v1_tenants__tenant__roles__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Role"
+      },
+      "put": {
+        "description": "Create a custom role, or replace its actions.",
+        "operationId": "define_role_grantr_v1_tenants__tenant__roles__name__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleActions"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Define Role"
+      }
+    }
+  }
+}

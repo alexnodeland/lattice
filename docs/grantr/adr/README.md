@@ -18,8 +18,11 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0010](0010-commands-bounded-by-what-their-maker-holds.md) | Commands bounded by what their maker holds | Accepted |
 | [0011](0011-built-in-roles-over-the-catalogs.md) | Built-in roles over the catalogs | Accepted |
 | [0012](0012-every-item-an-access-names-and-hooks-typed-by-actor.md) | Every item an access names, and hooks typed by their actor | Accepted |
-| [0013](0013-transactions-by-tenant-and-one-audit-log.md) | Transactions by tenant, and one audit log | Accepted |
+| [0013](0013-transactions-by-tenant-and-one-audit-log.md) | Transactions by tenant, and one audit log | Accepted; amended by 0016 |
 | [0014](0014-an-operator-enters-a-tenant-by-granting-themselves.md) | An operator enters a tenant by granting themselves | Accepted |
 | [0015](0015-a-check-writes-nothing.md) | A check writes nothing | Accepted |
+| [0016](0016-the-sql-adapter.md) | The SQL adapter | Accepted |
+| [0017](0017-the-admin-api.md) | The admin API | Accepted |
+| [0018](0018-telemetry-through-the-api.md) | Telemetry through the OpenTelemetry API | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

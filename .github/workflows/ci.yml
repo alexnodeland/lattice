@@ -41,6 +41,7 @@ jobs:
     env:
       ARTIFACTR_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:lattice@localhost:5432/artifactr
       REFLEXR_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:lattice@localhost:5432/reflexr
+      GRANTR_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:lattice@localhost:5432/grantr
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -53,7 +54,7 @@ jobs:
       - name: One database per library
         env:
           PGPASSWORD: lattice
-        run: psql -h localhost -U postgres -c 'CREATE DATABASE artifactr' -c 'CREATE DATABASE reflexr'
+        run: psql -h localhost -U postgres -c 'CREATE DATABASE artifactr' -c 'CREATE DATABASE reflexr' -c 'CREATE DATABASE grantr'
       - run: uv sync --locked --all-packages --all-groups --all-extras
       - run: bun install --frozen-lockfile
       - run: uv run --no-project python scripts/affected.py check

@@ -1,17 +1,20 @@
 """Fixtures for the contract test, parametrized over storage implementations.
 
-Phase 3 adds SQLite and PostgreSQL to ``storage``'s parameters; every test that takes it then
-runs against each.
+Every test that takes ``storage`` runs against memory, SQLite and, when it is configured,
+PostgreSQL.
 """
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
 from grantr.core import User
 from grantr.grants import Grants, InMemoryStorage, Storage
+from grantr.sql import SqlStorage, create_schema
 from tests.catalogs import ARTIFACTR, PORTALR, REFLEXR
+from tests.databases import SQL_BACKENDS, empty_database
 
 ROOT = User(id="root")
 """The deployment's first operator."""
@@ -25,10 +28,16 @@ Clock = Callable[[], datetime]
 StorageFactory = Callable[[Clock], Storage]
 
 
-@pytest.fixture(params=["memory"])
-def storage_factory(request: pytest.FixtureRequest) -> StorageFactory:
-    assert request.param == "memory"
-    return lambda clock: InMemoryStorage(clock=clock)
+@pytest.fixture(params=["memory", *SQL_BACKENDS])
+async def storage_factory(
+    request: pytest.FixtureRequest, tmp_path: Path
+) -> AsyncIterator[StorageFactory]:
+    if request.param == "memory":
+        yield lambda clock: InMemoryStorage(clock=clock)
+        return
+    async with empty_database(request.param, tmp_path) as engine:
+        await create_schema(engine)
+        yield lambda clock: SqlStorage(engine, clock=clock)
 
 
 @pytest.fixture

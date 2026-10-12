@@ -11,7 +11,7 @@ Identity and access for the family: tenants, their members, groups, roles and se
 
 !!! note "In progress, not yet wired in"
 
-    grantr's core is built: its model, built-in and custom roles, groups, service principals and keys, checks, the libraries' hooks, the audit log, and in-memory storage, as its [architecture](architecture.md) describes. The libraries don't ask it yet, and its SQL storage and API come next; the rest of this page describes what the [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)'s phases build. Its mark is drawn later, in [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md)'s phase 2.
+    grantr's core, storage and admin API are built: its model, built-in and custom roles, groups, service principals and keys, checks, the libraries' hooks, the audit log, in-memory and SQL storage, the admin router and telemetry, as its [architecture](architecture.md) describes. The libraries don't ask it yet; the rest of this page describes what the [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)'s phases build. Its mark is drawn later, in [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md)'s phase 2.
 
 ## Why: one model of who may do what
 

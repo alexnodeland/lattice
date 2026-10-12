@@ -2,6 +2,9 @@
 nav:
   - Home: index.md
   - Architecture: architecture.md
+  - Proposals:
+      - rfcs/README.md
+      - rfcs/0001-grantr-identity-and-access.md
   - Decisions:
       - adr/README.md
       - adr/0001-lattices-brand.md

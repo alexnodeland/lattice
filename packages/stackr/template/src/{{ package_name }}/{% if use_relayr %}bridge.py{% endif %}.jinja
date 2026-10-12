@@ -15,7 +15,6 @@ import contextlib
 from collections.abc import AsyncGenerator
 
 from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import AsyncEngine
 
 {% if access == 'grantr' -%}
 from artifactr import Workspaces
@@ -33,6 +32,7 @@ from relayr.sql import SqlLedger, migrate
 
 from {{ package_name }}.automation import Automation
 from {{ package_name }}.collaboration import Collaboration
+from {{ package_name }}.database import Database
 from {{ package_name }}.incidents import ALLOWLISTS, incident_actions
 from {{ package_name }}.telemetry import TelemetryHandle
 
@@ -44,7 +44,8 @@ class Bridge:
     to the reactor, and then :meth:`connect` s the parts.
 
     Args:
-        engine: The database; without one, the ledger lives in memory.
+        database: The database; without one, the ledger lives in memory. The ledger is the
+            tables' owner's until relayr's SQL storage has row-level security.
         telemetry: OpenTelemetry, and Langfuse when it has a client.
 {%- if access == 'grantr' %}
         grants: grantr, which lists the tenants whose workspaces are followed at startup.
@@ -54,13 +55,13 @@ class Bridge:
     def __init__(
         self,
         *,
-        engine: AsyncEngine | None = None,
+        database: Database | None = None,
         telemetry: TelemetryHandle | None = None,
 {%- if access == 'grantr' %}
         grants: Grants,
 {%- endif %}
     ) -> None:
-        self.ledger: Ledger = SqlLedger(engine) if engine else InMemoryLedger()
+        self.ledger: Ledger = SqlLedger(database.owner) if database else InMemoryLedger()
         self._telemetry = telemetry
         langfuse = telemetry.langfuse if telemetry else None
         self.turn_context: TurnContext | None = bridged_turns(self.ledger) if langfuse else None
@@ -103,9 +104,9 @@ class Bridge:
         assert self._followers is not None, "create_app connects the bridge before anything opens"
         await self._followers.watch(tenant_id, workspace_id)
 
-    async def migrate(self, engine: AsyncEngine) -> None:
-        """Upgrade the database to relayr's schema: the ledger."""
-        await migrate(engine)
+    async def migrate(self, database: Database) -> None:
+        """Upgrade the database to relayr's schema: the ledger, as its owner."""
+        await migrate(database.owner)
 
     @contextlib.asynccontextmanager
     async def lifespan(self) -> AsyncGenerator[None]:

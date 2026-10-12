@@ -93,7 +93,7 @@ def test_a_restarted_application_follows_the_workspaces_it_knows(
 
 
 async def _write_while_stopped(url: str) -> None:
-    engine = open_database(url, schema="")
+    engine = open_database(url, schema="").engine
     try:
         workspaces = Workspaces(SqlStorage(engine))
         workspace = await workspaces.open(TENANT, "main", actor=UserActor(id="alice"))
@@ -103,7 +103,7 @@ async def _write_while_stopped(url: str) -> None:
 
 
 async def _followed(url: str) -> list[WorkspaceKey]:
-    engine = open_database(url, schema="")
+    engine = open_database(url, schema="").engine
     try:
         return await SqlLedger(engine).followed()
     finally:
@@ -111,7 +111,7 @@ async def _followed(url: str) -> list[WorkspaceKey]:
 
 
 async def _cursor(url: str) -> int:
-    engine = open_database(url, schema="")
+    engine = open_database(url, schema="").engine
     try:
         return await SqlLedger(engine).cursor(WorkspaceKey(TENANT, "main"))
     finally:

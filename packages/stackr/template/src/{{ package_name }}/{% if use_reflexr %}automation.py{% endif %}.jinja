@@ -15,7 +15,6 @@ from fastapi import FastAPI{% if access == 'grantr' %}, HTTPException{% endif %}
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.models import Model
-from sqlalchemy.ext.asyncio import AsyncEngine
 from starlette.requests import HTTPConnection
 
 from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
@@ -51,6 +50,7 @@ from relayr.inbound import SOURCE
 from {{ package_name }}.access import Refused
 {% endif -%}
 from {{ package_name }}.auth import Authenticate, RequireToken, Unauthenticated
+from {{ package_name }}.database import Database
 from {{ package_name }}.gateway import Guardrails, TenantKeys
 {%- if use_relayr %}
 from {{ package_name }}.incidents import EVENTS as INCIDENT_EVENTS
@@ -84,7 +84,7 @@ class Automation:
         authorize: Whether an actor may take an action; without one, everything is allowed.
         model: The agents' model.
         gateway: The gateway's settings: tenant keys and guardrails.
-        engine: The database; without one, workspaces live in memory.
+        database: The database; without one, workspaces live in memory.
         telemetry: OpenTelemetry, and Langfuse when it has a client.
         poll_interval: How often the reactor looks for work.
         grace: How long running actions have to end when the application stops.
@@ -105,7 +105,7 @@ class Automation:
         authorize: Authorize | None = None,
         model: Model,
         gateway: GatewaySettings,
-        engine: AsyncEngine | None = None,
+        database: Database | None = None,
         telemetry: TelemetryHandle | None = None,
         poll_interval: timedelta = timedelta(seconds=1),
         grace: timedelta = STOP_GRACE,
@@ -131,7 +131,13 @@ class Automation:
 
             self._mirrors = Mirrors(follow)
         self.workspaces = Workspaces(
-            SqlStorage(engine) if engine else InMemoryStorage(),
+            SqlStorage(
+                database.engine,
+                row_level_security=database.row_level_security,
+                across_tenants=database.owner,
+            )
+            if database
+            else InMemoryStorage(),
             events={% if use_relayr %}[*EVENTS, *BRIDGED, *INCIDENT_EVENTS]{% else %}EVENTS{% endif %},
             rules={% if use_relayr %}[*RULES, *(INCIDENT_RULES if actions else [])]{% else %}RULES{% endif %},
             authorize=authorize,
@@ -159,9 +165,9 @@ class Automation:
         )
         self.mcp = ReflexrMcp(self.workspaces, resolve=self._resolve_client, name=name)
 
-    async def migrate(self, engine: AsyncEngine) -> None:
-        """Upgrade the database to reflexr's schema."""
-        await migrate(engine)
+    async def migrate(self, database: Database) -> None:
+        """Upgrade the database to reflexr's schema, as its owner, granting the app's role it."""
+        await migrate(database.owner, application_role=database.role)
 
     @contextlib.asynccontextmanager
     async def lifespan(self) -> AsyncGenerator[None]:

@@ -18,7 +18,6 @@ from collections.abc import AsyncGenerator
 from typing import Final
 
 from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import AsyncEngine
 from starlette.requests import HTTPConnection
 
 {% if use_artifactr -%}
@@ -57,6 +56,7 @@ from {{ package_name }}.auth import (
     Unauthenticated,
     bearer_token,
 )
+from {{ package_name }}.database import Database
 {%- if use_relayr %}
 from {{ package_name }}.incidents import RULES as INCIDENT_RULES
 {%- endif %}
@@ -120,7 +120,7 @@ class Access:
     Args:
         name: The application's name, which its own service principal takes.
         verifier: Verifies access tokens.
-        engine: The database; without one, grants live in memory.
+        database: The database; without one, grants live in memory.
         grants: grantr itself, when the caller has built it, as the tests do.
         telemetry: OpenTelemetry.
     """
@@ -130,19 +130,27 @@ class Access:
         *,
         name: str,
         verifier: TokenVerifier,
-        engine: AsyncEngine | None = None,
+        database: Database | None = None,
         grants: Grants | None = None,
         telemetry: TelemetryHandle | None = None,
     ) -> None:
         self._verifier = verifier
         self.application = ServicePrincipal(id=name)
         """The application's own service principal: its runner, reactor, mirrors and rules."""
-        storage = SqlStorage(engine) if engine else InMemoryStorage()
+        storage = (
+            SqlStorage(
+                database.engine,
+                row_level_security=database.row_level_security,
+                across_tenants=database.owner,
+            )
+            if database
+            else InMemoryStorage()
+        )
         self.grants = grants or build_grants(storage, name=name, telemetry=telemetry)
 
-    async def migrate(self, engine: AsyncEngine) -> None:
-        """Upgrade the database to grantr's schema."""
-        await migrate(engine)
+    async def migrate(self, database: Database) -> None:
+        """Upgrade the database to grantr's schema, as its owner, granting the app's role it."""
+        await migrate(database.owner, application_role=database.role)
 
     @contextlib.asynccontextmanager
     async def lifespan(self) -> AsyncGenerator[None]:

@@ -51,6 +51,7 @@ from grantr.sql.tables import (
     GroupMemberRow,
     GroupRow,
     KeyRow,
+    ResourceRow,
     RoleRow,
     TenantRow,
 )
@@ -268,6 +269,30 @@ class _Reads:
         return {group: frozenset(members) for group, members in found.items()}
 
     @_awaited_to_the_end
+    async def restricted(
+        self, tenant: TenantId, workspace: WorkspaceId | None = None
+    ) -> list[Resource]:
+        rows = await self._session.execute(
+            select(
+                ResourceRow.resource_kind, ResourceRow.resource_workspace, ResourceRow.resource_id
+            )
+            .where(
+                ResourceRow.tenant_id == tenant,
+                ResourceRow.restricted,
+                *([] if workspace is None else [ResourceRow.resource_workspace == workspace]),
+            )
+            .order_by(
+                ResourceRow.resource_kind, ResourceRow.resource_workspace, ResourceRow.resource_id
+            )
+        )
+        return [resource(*columns) for columns in rows]
+
+    @_awaited_to_the_end
+    async def is_restricted(self, tenant: TenantId, on: Resource) -> bool:
+        row = await self._session.get(ResourceRow, (tenant, *resource_columns(on)))
+        return row is not None and row.restricted
+
+    @_awaited_to_the_end
     async def keys(self, tenant: TenantId) -> list[Key]:
         rows = await self._session.scalars(select(KeyRow).where(KeyRow.tenant_id == tenant))
         return [_stored_key(row) for row in rows]
@@ -276,8 +301,14 @@ class _Reads:
     async def resources(self, tenant: TenantId, kind: ListableKind) -> list[Resource]:
         named = await self._session.execute(
             select(GrantRow.resource_kind, GrantRow.resource_workspace, GrantRow.resource_id)
-            .distinct()
             .where(GrantRow.tenant_id == tenant)
+            .union(
+                select(
+                    ResourceRow.resource_kind,
+                    ResourceRow.resource_workspace,
+                    ResourceRow.resource_id,
+                ).where(ResourceRow.tenant_id == tenant)
+            )
         )
         found = frozenset(
             within
@@ -303,7 +334,7 @@ class _Transaction(_Reads):
 
     @_awaited_to_the_end
     async def delete_tenant(self, tenant: TenantId) -> None:
-        for model in (GrantRow, GroupRow, GroupMemberRow, RoleRow, KeyRow):
+        for model in (GrantRow, GroupRow, GroupMemberRow, RoleRow, KeyRow, ResourceRow):
             await self._session.execute(delete(model).where(model.tenant_id == tenant))
         await self._session.execute(
             update(TenantRow).where(TenantRow.id == tenant).values(live=False)
@@ -397,6 +428,20 @@ class _Transaction(_Reads):
             delete(RoleRow).where(RoleRow.tenant_id == tenant, RoleRow.name == name),
         ):
             await self._session.execute(statement)
+
+    @_awaited_to_the_end
+    async def set_restricted(self, tenant: TenantId, on: Resource, restricted: bool) -> None:
+        kind, workspace, id = resource_columns(on)
+        await self._session.merge(
+            ResourceRow(
+                tenant_id=tenant,
+                resource_kind=kind,
+                resource_workspace=workspace,
+                resource_id=id,
+                restricted=restricted,
+            )
+        )
+        await self._session.flush()
 
     @_awaited_to_the_end
     async def add_key(self, key: Key) -> None:
@@ -517,6 +562,16 @@ class SqlStorage:
     async def groups(self, tenant: TenantId) -> dict[str, frozenset[Member]]:
         """A tenant's groups, by id, with their members."""
         return await self._read(lambda reads: reads.groups(tenant))
+
+    async def restricted(
+        self, tenant: TenantId, workspace: WorkspaceId | None = None
+    ) -> list[Resource]:
+        """The threads and artifacts restricted in a workspace, or in the whole tenant."""
+        return await self._read(lambda reads: reads.restricted(tenant, workspace))
+
+    async def is_restricted(self, tenant: TenantId, on: Resource) -> bool:
+        """Whether a thread or artifact is restricted."""
+        return await self._read(lambda reads: reads.is_restricted(tenant, on))
 
     async def keys(self, tenant: TenantId) -> list[Key]:
         """A tenant's keys."""

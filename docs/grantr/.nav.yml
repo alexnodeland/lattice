@@ -28,6 +28,7 @@ nav:
   - adr/0021-the-deployments-own-tools.md
   - adr/0022-a-tenants-members-list-its-workspaces.md
   - adr/0023-portalrs-admin-reads.md
+  - adr/0024-who-sees-a-restricted-item.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

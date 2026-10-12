@@ -43,6 +43,9 @@ GRANTR_ACTIONS: Final = frozenset(
 OPERATOR: Final = frozenset({"grantr:create_tenant", "grantr:grant_operator"})
 """grantr's actions the deployment's operators hold, and no one else."""
 
+RESTRICT: Final = "grantr:restrict"
+"""Restricting a thread or artifact: whoever may, sees every restricted item where they may."""
+
 WORKSPACE_GRANTS: Final = frozenset({"grantr:grant", "grantr:revoke", "grantr:restrict"})
 """grantr's actions a workspace's admins hold within it."""
 

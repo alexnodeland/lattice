@@ -34,6 +34,8 @@ grantr decides who may do what in a tenant. artifactr and reflexr ask it, throug
 
 A subject holds an action on a resource when a grant to it, or to a group it is in, names a role with that action on the resource or on one it is in. An item is in its workspace and a workspace in the tenant; a tenant is not in the deployment, so an operator holds nothing inside a tenant until they grant themselves a role there. Everything else is refused: an action in no catalog, the agent acting for no one, a principal with no grant that applies, and a store that can't be read.
 
+A restricted thread or artifact is the exception to the chain ([ADR-0024](adr/0024-who-sees-a-restricted-item.md)): on it, a grant on its workspace or tenant holds only if its role holds `grantr:restrict`, as the workspace's `admin` and the tenant's `owner` and `admin` do. A grant on the item itself holds as ever.
+
 ### Built-in roles
 
 The application hands `Grants` each library's catalog, its `ACTIONS`, and grantr adds its own. The built-in roles are defined over them ([ADR-0011](adr/0011-built-in-roles-over-the-catalogs.md), [ADR-0019](adr/0019-runtime-actions-and-the-application-role.md), [ADR-0020](adr/0020-the-rule-role.md)). No person's role holds the bookkeeping: `artifactr:claim_thread`, and `save_cursor` and `read_cursors` in both libraries.
@@ -71,6 +73,7 @@ A custom role is a tenant's own set of actions, granted wherever `editor` can be
 | `define_role`, `delete_role` | `grantr:define_role` |
 | `grant`, `revoke` | `grantr:grant`, `grantr:revoke` on the resource; an operator granting themselves, or anyone revoking their own grant, needs neither |
 | `issue_key`, `revoke_key` | `grantr:issue_key`, `grantr:revoke_key` |
+| `restrict` | `grantr:restrict` on the thread or artifact; it sets or clears its restricted flag |
 | `audit` | `grantr:read_audit`, or `grantr:grant_operator` for the deployment's log |
 
 - **No one gives more than they hold.** A command that gives or takes access is refused unless its maker holds every action it gives or takes, where it applies: a grant's role on its resource; each grant a removed member loses; the grants a group's members gain or lose; and the grants a key acts with, when it is issued or revoked. A custom role needs no bound: whoever may define one holds every action it can hold.
@@ -82,7 +85,7 @@ A custom role is a tenant's own set of actions, granted wherever `editor` can be
 
 ## Lists
 
-An admin reads each list with the action of the command that changes it ([ADR-0017](adr/0017-the-admin-api.md)): `members` with `grantr:add_member`, `groups` with `grantr:manage_groups`, `roles` with `grantr:define_role`, `grants_in` with `grantr:grant` on the tenant or a workspace, `keys` with `grantr:issue_key`, and `tenants` with `grantr:create_tenant`.
+An admin reads each list with the action of the command that changes it ([ADR-0017](adr/0017-the-admin-api.md)): `members` with `grantr:add_member`, `groups` with `grantr:manage_groups`, `roles` with `grantr:define_role`, `grants_in` with `grantr:grant` on the tenant or a workspace, `keys` with `grantr:issue_key`, `restrictions` with `grantr:restrict` on the workspace, and `tenants` with `grantr:create_tenant`.
 
 ## Keys
 
@@ -102,7 +105,7 @@ Every command appends one typed event, such as `Granted` or `MemberRemoved`, to 
 | A thread, an artifact or a rule | Each of them, all of which must allow it |
 | None of them | The workspace |
 
-`hidden` hides nothing yet: no item can be restricted until phase 5.
+`hidden` returns the restricted threads and artifacts in a workspace on which the actor's subject holds nothing: the check's rule above. The application's own principal sees everything, and the agent acting for no one no restricted item.
 
 ## Storage
 
@@ -111,13 +114,13 @@ Every command appends one typed event, such as `Granted` or `MemberRemoved`, to 
 - **A transaction is in one tenant,** or on the deployment, and serialized with every other there. The in-memory adapter runs one at a time, on a copy it keeps only if the block exits normally.
 - **Every read is in one tenant, but three:** `tenant_grants` and `key` span tenants, since they are asked before the tenant is known, and `tenants` lists them for operators.
 - **`grants` answers for a grantee and its groups,** optionally on some resources: the one query a check makes. `has` looks up one grant, for membership and duplicates.
-- **grantr knows a workspace, thread, artifact or rule once a grant names it,** or something in it, and `resources` lists those. A check writes nothing ([ADR-0015](adr/0015-a-check-writes-nothing.md)).
+- **grantr knows a workspace, thread, artifact or rule once a grant names it,** or something in it, or once a thread or artifact is restricted, and `resources` lists those, leaving out restricted items the subject can't see. A check writes nothing ([ADR-0015](adr/0015-a-check-writes-nothing.md)).
 
 The contract test, `tests/grants/test_contract.py`, runs every behaviour on this page against memory, SQLite and PostgreSQL. The PostgreSQL tests run when `GRANTR_TEST_POSTGRES_URL` is set, as CI sets it, and `moon run grantr:pg-up` starts a database.
 
 ### SQL
 
-`SqlStorage` keeps grantr in the application's database, in seven `grantr_`-prefixed tables, with Alembic migrations that record their version in `grantr_alembic_version` ([ADR-0016](adr/0016-the-sql-adapter.md)).
+`SqlStorage` keeps grantr in the application's database, in eight `grantr_`-prefixed tables, with Alembic migrations that record their version in `grantr_alembic_version` ([ADR-0016](adr/0016-the-sql-adapter.md)).
 
 - **A subject and a resource are stored in typed columns,** their kind, workspace and id, with an empty string for a part they don't have. A grant's primary key, its tenant, resource, subject and role, is the index a check reads, and every other query has an index that leads with its filter.
 - **A check is one query, and one more when a grant names a custom role;** the subject's groups are a subquery of the first.
@@ -137,7 +140,7 @@ The contract test, `tests/grants/test_contract.py`, runs every behaviour on this
 | `GET`, `POST /tenants`; `DELETE /tenants/{tenant}` | List, create and delete tenants |
 | `PUT`, `DELETE /operators/{user}` | Grant and revoke the operator role |
 | `GET /audit`, `GET /tenants/{tenant}/audit` | The deployment's and a tenant's audit log, paged by `after_seq` |
-| `/tenants/{tenant}/members`, `/groups`, `/roles`, `/grants`, `/revocations`, `/keys` | The lists and commands above |
+| `/tenants/{tenant}/members`, `/groups`, `/roles`, `/grants`, `/revocations`, `/keys`, `/restrictions` | The lists and commands above |
 
 Refusals keep the libraries' shapes, `{"type", "message"}`: 401 `unauthorized` without a caller, 403 `forbidden`, 422 `invalid`, and 400 `tenant_required` when a caller in several tenants names none. Its OpenAPI document is committed in `packages/grantr/schemas/grantr.openapi.json`; `moon run grantr:schema` regenerates it, and a test fails when it drifts.
 

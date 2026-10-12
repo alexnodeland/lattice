@@ -29,5 +29,6 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0021](0021-the-deployments-own-tools.md) | The deployment's own tools | Accepted |
 | [0022](0022-a-tenants-members-list-its-workspaces.md) | A tenant's members list its workspaces | Accepted |
 | [0023](0023-portalrs-admin-reads.md) | portalr's admin reads | Accepted |
+| [0024](0024-who-sees-a-restricted-item.md) | Who sees a restricted item | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

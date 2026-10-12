@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from grantr.core.grants import Grant
 from grantr.core.ids import TenantId, UserId
+from grantr.core.resources import Resource
 from grantr.core.roles import Role
 from grantr.core.subjects import Member, ServicePrincipal, Subject
 
@@ -127,6 +128,24 @@ class KeyRevoked(BaseModel):
     key: str
 
 
+class Restricted(BaseModel):
+    """A thread or artifact was restricted to those granted a role on it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["restricted"] = "restricted"
+    on: Resource
+
+
+class Unrestricted(BaseModel):
+    """A thread or artifact's restriction was lifted: its workspace's roles hold on it again."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["unrestricted"] = "unrestricted"
+    on: Resource
+
+
 type AuditEvent = Annotated[
     TenantCreated
     | TenantDeleted
@@ -139,7 +158,9 @@ type AuditEvent = Annotated[
     | Granted
     | Revoked
     | KeyIssued
-    | KeyRevoked,
+    | KeyRevoked
+    | Restricted
+    | Unrestricted,
     Field(discriminator="type"),
 ]
 """A change to access."""

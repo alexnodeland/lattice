@@ -93,8 +93,17 @@ RUNTIME: Final = BOOKKEEPING | {
 """The commands the application's ``application`` role holds, beside every ``open``, every read
 and its evaluators' feedback: its bookkeeping, the runner's records, and its code rules' runs."""
 
-RULE: Final = frozenset({"reflexr:open", "reflexr:publish", "reflexr:checkpoint_run"})
-"""The commands a stored rule's ``rule`` role holds, beside reflexr's reads."""
+RULE: Final = frozenset(
+    {
+        "reflexr:open",
+        "reflexr:publish",
+        "reflexr:checkpoint_run",
+        "reflexr:read_events",
+        "reflexr:read_runs",
+    }
+)
+"""What a stored rule's ``rule`` role holds: opening its workspace, publishing events,
+checkpointing its runs, and reading the log and its runs, as its actions do."""
 
 type Level = Literal["deployment", "tenant", "workspace", "item"]
 """Where a role is granted: a thread, an artifact and a rule are each an item."""
@@ -148,11 +157,15 @@ class Catalog:
         """The catalog of the libraries' catalogs and grantr's.
 
         Raises:
-            ValueError: If an action isn't ``<library>:<name>``.
+            ValueError: If an action isn't ``<library>:<name>``, or a library's catalog lacks
+                a bookkeeping action, which would then not be kept out of people's roles.
         """
         actions = GRANTR_ACTIONS.union(*catalogs)
         if malformed := sorted(a for a in actions if not ACTION.fullmatch(a)):
             raise ValueError(f"actions are <library>:<name>, not {', '.join(malformed)}")
+        present = {action.partition(":")[0] for action in actions}
+        if missing := sorted(a for a in BOOKKEEPING - actions if a.partition(":")[0] in present):
+            raise ValueError(f"the catalogs lack the bookkeeping {', '.join(missing)}")
         libraries = actions - GRANTR_ACTIONS
         reads = {
             action
@@ -161,7 +174,6 @@ class Catalog:
         }
         viewer = (FEEDBACK & libraries | reads) - BOOKKEEPING
         editor = viewer | EDITOR_COMMANDS & libraries
-        rule = {a for a in reads - BOOKKEEPING if a.startswith("reflexr:")} | RULE & libraries
         owner = actions - OPERATOR - BOOKKEEPING
         return cls(
             actions=actions,
@@ -174,10 +186,9 @@ class Catalog:
                 ("workspace", "admin"): libraries - BOOKKEEPING | WORKSPACE_GRANTS,
                 ("workspace", "editor"): editor,
                 ("workspace", "viewer"): viewer,
-                ("workspace", "rule"): frozenset(rule),
+                ("workspace", "rule"): RULE & libraries,
                 ("item", "editor"): editor,
                 ("item", "viewer"): viewer,
-                ("item", "rule"): frozenset(rule),
             },
         )
 

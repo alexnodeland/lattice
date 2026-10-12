@@ -23,6 +23,7 @@ REFLEXR = frozenset(
         "reflexr:open",
         "reflexr:read_rules",
         "reflexr:read_runs",
+        "reflexr:read_events",
         "reflexr:give_feedback",
         "reflexr:cancel_run",
         "reflexr:install_rule",

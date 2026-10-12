@@ -32,6 +32,7 @@ def test_a_viewer_reads_opens_and_gives_feedback() -> None:
         "reflexr:open",
         "reflexr:read_rules",
         "reflexr:read_runs",
+        "reflexr:read_events",
         "reflexr:give_feedback",
         "portalr:read_telemetry",
     }
@@ -100,16 +101,18 @@ def test_a_custom_role_from_the_catalogs_passes() -> None:
 
 
 def test_no_persons_role_holds_the_bookkeeping() -> None:
-    people: list[tuple[str, ResourceKind]] = [
-        ("owner", "tenant"),
-        ("admin", "workspace"),
-        ("viewer", "artifact"),
-    ]
-    for name, kind in people:
-        assert _role(name, kind) & BOOKKEEPING == frozenset()
+    for (level, name), actions in CATALOG.built_in.items():
+        if name not in ("application", "operator"):
+            assert actions & BOOKKEEPING == frozenset(), f"{name} ({level})"
     assert "artifactr:read_cursors" not in _role("viewer")
     assert "reflexr:checkpoint_run" not in _role("editor")
     assert "reflexr:checkpoint_run" in _role("admin")
+
+
+def test_a_library_catalog_has_its_bookkeeping() -> None:
+    with pytest.raises(ValueError, match="lack the bookkeeping artifactr:claim_thread"):
+        Catalog.of(ARTIFACTR - {"artifactr:claim_thread"})
+    assert Catalog.of({"portalr:read_telemetry"}).actions >= {"portalr:read_telemetry"}
 
 
 def test_the_application_holds_the_runtime_and_every_read() -> None:
@@ -122,13 +125,13 @@ def test_the_application_holds_the_runtime_and_every_read() -> None:
     assert application & {"artifactr:edit_artifact", "reflexr:install_rule"} == frozenset()
 
 
-def test_a_rule_publishes_checkpoints_and_reads_reflexr() -> None:
+def test_a_rule_publishes_checkpoints_and_reads_its_workspace() -> None:
     assert _role("rule") == {
         "reflexr:open",
         "reflexr:publish",
         "reflexr:checkpoint_run",
-        "reflexr:read_rules",
+        "reflexr:read_events",
         "reflexr:read_runs",
     }
-    assert _role("rule", "rule") == _role("rule")
+    assert CATALOG.role("rule", "rule", {}) is None, "granted on a workspace only"
     assert _role("rule") <= _role("admin"), "so a workspace's admin may grant it"

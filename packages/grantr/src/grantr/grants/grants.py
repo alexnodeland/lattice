@@ -232,7 +232,9 @@ class Grants:
         """The tenant and service principal a key belongs to, or None if it isn't a valid key."""
         found = key_id(key)
         stored = await self._storage.key(found) if found else None
-        return (stored.tenant, stored.principal) if stored and verify(key, stored) else None
+        if stored is None or stored.principal == self._application or not verify(key, stored):
+            return None
+        return stored.tenant, stored.principal
 
     def hooks[A](self, subject_of: SubjectOf[A]) -> Hooks[A]:
         """The libraries' ``authorize`` and ``hidden`` hooks, for their ``Workspaces``.
@@ -347,11 +349,16 @@ class Grants:
             await tx.add_grant(grant)
             return await record(None, None, Granted(grant=grant))
 
-    async def bootstrap(self) -> AuditEntry | None:
-        """Grant the application's service principal the ``application`` role, if it hasn't it.
+    async def bootstrap(self) -> list[AuditEntry]:
+        """Make the configured principal the one that holds the ``application`` role.
 
-        The application calls it as it starts; no one else grants the role. It returns the
-        audit entry, made by no one, or None if the role was granted already.
+        The application calls it as it starts; nothing else grants the role. It grants the role
+        to the principal ``Grants`` was made with, if it hasn't it, and revokes it from any
+        other, as when the application's principal is renamed, each in an audit entry made by
+        no one. Replicas starting together grant it once.
+
+        Returns:
+            The audit entries; none if nothing changed.
 
         Raises:
             Invalid: If ``Grants`` was made with no ``application`` principal.
@@ -359,11 +366,17 @@ class Grants:
         if self._application is None:
             raise Invalid("no application principal is configured")
         grant = _application(self._application)
+        # The deployment's changes run one at a time, so replicas starting together grant once.
         async with self._change(None) as (tx, record):
-            if await tx.has(grant):
-                return None
-            await tx.add_grant(grant)
-            return await record(None, None, Granted(grant=grant))
+            entries: list[AuditEntry] = []
+            for other in await tx.granted(None, DEPLOYMENT, role=APPLICATION):
+                if other != grant:
+                    await tx.remove_grant(other)
+                    entries.append(await record(None, None, Revoked(grant=other)))
+            if not await tx.has(grant):
+                await tx.add_grant(grant)
+                entries.append(await record(None, None, Granted(grant=grant)))
+            return entries
 
     async def grant_operator(self, user: UserId, *, by: Subject) -> AuditEntry:
         """Make a user an operator of the deployment.
@@ -428,7 +441,7 @@ class Grants:
             if await tx.tenant(tenant):
                 return []
             entries = [await self._create(tx, record, tenant, owner, None)]
-            for admin in admins:
+            for admin in dict.fromkeys(admins):
                 user = User(id=admin)
                 if not await self._is_member(tx, tenant, user):
                     await tx.add_grant(Grant(tenant=tenant, role=MEMBER, on=TENANT, to=user))
@@ -454,8 +467,10 @@ class Grants:
 
         Raises:
             Forbidden: If ``by`` may not: ``grantr:add_member`` on the tenant.
-            Invalid: If it is a member already.
+            Invalid: If it is a member already, or the application's own principal.
         """
+        if member == self._application:
+            raise Invalid("the application's principal is no tenant's member")
         async with self._change(tenant) as (tx, record):
             await self._require(tx, tenant, by, "grantr:add_member", TENANT)
             if await self._is_member(tx, tenant, member):
@@ -560,8 +575,8 @@ class Grants:
                 every action the role holds there.
             Invalid: If there is no such group, the role can't be granted there, the grantee
                 isn't a member, or the grant exists; or, for an operator, no such tenant.
-                ``member`` is given by :meth:`add_member`, and the deployment's role by
-                :meth:`grant_operator`.
+                ``member`` is given by :meth:`add_member`, and the deployment's roles by
+                :meth:`grant_operator` and :meth:`bootstrap`.
         """
         grant = self._grant(tenant, role, on, to)
         async with self._change(tenant) as (tx, record):
@@ -587,8 +602,8 @@ class Grants:
             Forbidden: If ``by`` may not (``grantr:revoke`` on the resource), or doesn't hold
                 every action the role holds there.
             Invalid: If there is no such grant, or it is the tenant's last owner. ``member`` is
-                taken by :meth:`remove_member`, and the deployment's role by
-                :meth:`revoke_operator`.
+                taken by :meth:`remove_member`, and the deployment's roles by
+                :meth:`revoke_operator` and :meth:`bootstrap`.
         """
         grant = self._grant(tenant, role, on, to)
         async with self._change(tenant) as (tx, record):
@@ -667,6 +682,7 @@ class Grants:
         # ``application`` is the one deployment role that holds in every tenant.
         if (
             isinstance(subject, ServicePrincipal)
+            and subject == self._application
             and scope is not None
             and await reads.has(_application(subject))
         ):
@@ -699,8 +715,8 @@ class Grants:
 
     def _grant(self, tenant: TenantId, role: str, on: Resource, to: Grantee) -> Grant:
         """The grant :meth:`grant` and :meth:`revoke` name, if they may name it."""
-        if on.kind == "deployment":
-            raise Invalid("the deployment's role is given by grant_operator")
+        if on.kind == "deployment" or role == APPLICATION:
+            raise Invalid("the deployment's roles are given by grant_operator and bootstrap")
         if role == MEMBER:
             raise Invalid("member is given by add_member, and taken by remove_member")
         return Grant(tenant=tenant, role=role, on=on, to=to)

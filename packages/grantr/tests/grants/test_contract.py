@@ -4,6 +4,8 @@ Each test runs against every storage ``conftest.storage_factory`` makes. The fir
 exit criteria of grantr RFC-0001's phase 2.
 """
 
+import asyncio
+
 import pytest
 
 from grantr.core import (
@@ -13,6 +15,7 @@ from grantr.core import (
     Forbidden,
     Grant,
     Granted,
+    Grantee,
     Group,
     GroupDefined,
     GroupDeleted,
@@ -562,16 +565,47 @@ async def test_the_application_holds_its_runtime_in_every_tenant_and_operators_d
         await grants.provision_tenant(tenant, owner=ALICE.id)
     assert not await grants.check("acme", APP, "artifactr:claim_thread", THREAD)
 
-    entry = await grants.bootstrap()
-    assert entry is not None
+    [entry] = await grants.bootstrap()
     assert (entry.by, entry.tenant) == (None, None)
-    assert await grants.bootstrap() is None, "a second start grants nothing"
+    assert await grants.bootstrap() == [], "a second start changes nothing"
     for tenant in ("acme", "globex"):
         assert await grants.check(tenant, APP, "artifactr:claim_thread", THREAD)
-        assert await grants.check(tenant, APP, "reflexr:checkpoint_run", RULE)
+        # reflexr asks a run's checkpoint of its workspace.
+        assert await grants.check(tenant, APP, "reflexr:checkpoint_run", WS)
         assert not await grants.check(tenant, APP, "artifactr:edit_artifact", ARTIFACT)
         assert not await grants.check(tenant, ROOT, "artifactr:read_artifacts", WS)
     assert not await grants.check("acme", ServicePrincipal(id="other"), "artifactr:open", WS)
+
+
+async def test_a_tenant_cant_borrow_the_applications_identity(storage: Storage) -> None:
+    unconfigured = Grants(storage, catalogs=[ARTIFACTR])
+    await unconfigured.provision_tenant("acme", owner=ALICE.id)
+    await unconfigured.add_member("acme", APP, by=ALICE)
+    await unconfigured.grant("acme", "viewer", on=WS, to=APP, by=ALICE)
+    key, _ = await unconfigured.issue_key("acme", APP, by=ALICE)
+
+    grants = Grants(storage, catalogs=[ARTIFACTR], application=APP)
+    await grants.bootstrap()
+    assert await grants.authenticate(key) is None, "a key for the application's id is no key"
+    assert not await unconfigured.check("acme", APP, "artifactr:claim_thread", THREAD)
+    with pytest.raises(Invalid, match="no tenant's member"):
+        await grants.add_member("acme", APP, by=ALICE)
+
+
+async def test_bootstrap_moves_the_role_to_the_configured_principal(storage: Storage) -> None:
+    await Grants(storage, application=APP).bootstrap()
+    renamed = ServicePrincipal(id="app-2")
+    entries = await Grants(storage, application=renamed).bootstrap()
+    assert [type(entry.event) for entry in entries] == [Revoked, Granted]
+    assert await storage.granted(None, DEPLOYMENT, role="application") == [
+        Grant(tenant=None, role="application", on=DEPLOYMENT, to=renamed)
+    ]
+
+
+async def test_replicas_starting_together_bootstrap_once(storage: Storage) -> None:
+    replicas = [Grants(storage, application=APP) for _ in range(3)]
+    started = await asyncio.gather(*(replica.bootstrap() for replica in replicas))
+    assert sorted(len(entries) for entries in started) == [0, 0, 1]
 
 
 async def test_only_a_configured_application_is_bootstrapped(grants: Grants) -> None:
@@ -579,8 +613,17 @@ async def test_only_a_configured_application_is_bootstrapped(grants: Grants) -> 
         await grants.bootstrap()
 
 
+@pytest.mark.parametrize(("on", "to"), [(TENANT, BOB), (WS, BOB), (WS, TEAM), (DEPLOYMENT, BOB)])
+async def test_no_one_grants_the_deployments_roles(
+    grants: Grants, on: Resource, to: Grantee
+) -> None:
+    with pytest.raises(Invalid, match="given by grant_operator and bootstrap"):
+        await grants.grant("acme", "application", on=on, to=to, by=ALICE)
+
+
 async def test_the_deployments_tools_provision_a_tenant_once(grants: Grants) -> None:
-    entries = await grants.provision_tenant("globex", owner=BOB.id, admins=[BOB.id, CAROL.id])
+    admins = [BOB.id, CAROL.id, CAROL.id]
+    entries = await grants.provision_tenant("globex", owner=BOB.id, admins=admins)
     assert [(entry.by, type(entry.event)) for entry in entries] == [
         (None, TenantCreated),
         (None, Granted),
@@ -602,6 +645,10 @@ async def test_a_workspaces_admin_grants_a_stored_rule_its_role(grants: Grants) 
     await _members(grants, BOB)
     await grants.grant("acme", "admin", on=WS, to=BOB, by=ALICE)
     rule = RulePrincipal(workspace="w1", rule="ops:page")
-    await grants.grant("acme", "rule", on=RULE, to=rule, by=BOB)
-    assert await grants.check("acme", rule, "reflexr:checkpoint_run", RULE)
+    with pytest.raises(Invalid, match="rule can't be granted on a rule"):
+        await grants.grant("acme", "rule", on=RULE, to=rule, by=BOB)
+    await grants.grant("acme", "rule", on=WS, to=rule, by=BOB)
+    # reflexr asks a run's publishing and checkpoints of the workspace, naming no rule.
+    assert await grants.check("acme", rule, "reflexr:publish", WS)
+    assert await grants.check("acme", rule, "reflexr:checkpoint_run", WS)
     assert not await grants.check("acme", rule, "reflexr:install_rule", RULE)

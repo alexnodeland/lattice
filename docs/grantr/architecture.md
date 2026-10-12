@@ -48,9 +48,9 @@ The application hands `Grants` each library's catalog, its `ACTIONS`, and grantr
 | `admin` | a workspace | every library action but the bookkeeping, and `grantr:grant`, `revoke` and `restrict` |
 | `editor` | a workspace, thread, artifact or rule | a viewer's, and the commands that post, create, edit, propose, archive, resolve proposals, record a turn, and stop and operate runs |
 | `viewer` | a workspace, thread, artifact or rule | every `read_` action but the cursors, every `open`, and giving feedback |
-| `rule` | a workspace, or a rule | `reflexr:open`, `reflexr:publish`, `reflexr:checkpoint_run` and reflexr's reads: a stored rule's runs |
+| `rule` | a workspace | `reflexr:open`, `reflexr:publish`, `reflexr:checkpoint_run`, `reflexr:read_events` and `reflexr:read_runs`: a stored rule's runs |
 
-`application` is the one deployment role that holds in every tenant, and only the application's own service principal holds it: `Grants(application=...)` names it, and `Grants.bootstrap()` grants it at start, if it hasn't it. `grantr.testing.matrix(catalogs, roles)` prints every role against every action, for an application to commit and review.
+`application` is the one deployment role that holds in every tenant, and only the application's own service principal holds it: `Grants(application=...)` names it, and `Grants.bootstrap()` grants it at start, and revokes it from any other holder. That principal is no tenant's member, and no key of it is answered, so no tenant can borrow it. A catalog that names a library's actions must name all its bookkeeping, or `Catalog.of` refuses it. `grantr.testing.matrix(catalogs, roles)` prints every role against every action, for an application to commit and review.
 
 A custom role is a tenant's own set of actions, granted wherever `editor` can be. It holds only actions a workspace's admin holds, and can't take a built-in role's name.
 
@@ -61,7 +61,7 @@ A custom role is a tenant's own set of actions, granted wherever `editor` can be
 | Command | Requires |
 |---|---|
 | `first_operator` | No operator yet |
-| `bootstrap` | The application's configured principal: grants it `application` once |
+| `bootstrap` | The application's configured principal: grants it `application`, and revokes it from any other |
 | `provision_tenant` | The deployment's own tools, in process: a tenant, its owner and its admins, once ([ADR-0021](adr/0021-the-deployments-own-tools.md)) |
 | `grant_operator`, `revoke_operator` | `grantr:grant_operator` on the deployment |
 | `create_tenant` | `grantr:create_tenant` on the deployment; its owner is made a member and an owner |

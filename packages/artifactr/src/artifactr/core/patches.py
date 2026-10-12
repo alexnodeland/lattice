@@ -15,6 +15,7 @@ import jsonpointer
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from artifactr.core.errors import PatchFailed
+from artifactr.core.tagged import tag_required
 
 _PREVIEW = 60
 _MAX_DESCRIBED_OPS = 3
@@ -23,7 +24,7 @@ _MAX_DESCRIBED_OPS = 3
 class JsonPatch(BaseModel):
     """An RFC 6902 JSON Patch."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     kind: Literal["json_patch"] = "json_patch"
     ops: tuple[dict[str, JsonValue], ...]
@@ -45,7 +46,7 @@ class TextEdits(BaseModel):
     ``old`` is allowed only when the field is empty, to write its first content.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     kind: Literal["text_edits"] = "text_edits"
     field: str = "text"

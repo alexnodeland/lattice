@@ -38,6 +38,7 @@ from reflexr.core.actors import Actor
 from reflexr.core.errors import ValidationFailed
 from reflexr.core.feedback import FeedbackTarget
 from reflexr.core.ids import EventId, FiringId, RuleName, RunId, ScopeKey, WorkspaceId
+from reflexr.core.tagged import tag_required
 
 _NAMESPACE = r"[a-z][a-z0-9_]*"
 _LOCAL = r"[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*"
@@ -323,7 +324,7 @@ AnyEvent = Annotated[
     WithJsonSchema(
         {
             "type": "object",
-            "properties": {"type": {"type": "string"}},
+            "properties": {"type": {"type": "string", "pattern": _EVENT_NAME}},
             "required": ["type"],
             "additionalProperties": True,
         }
@@ -539,7 +540,7 @@ class Causation(BaseModel):
 class Envelope(BaseModel):
     """A stored event with its position and attribution. Its shape is also the wire shape."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     seq: int = Field(ge=1)
     """The event's position in its workspace's log, gap-free from 1."""

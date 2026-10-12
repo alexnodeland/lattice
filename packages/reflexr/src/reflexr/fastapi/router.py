@@ -1,9 +1,9 @@
 """The router: REST endpoints and the WebSocket stream, over one command handler."""
 
 from collections.abc import Awaitable, Callable
-from typing import Annotated
+from typing import Annotated, Any, Final
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, WebSocket
 from opentelemetry import trace
 from pydantic import BaseModel, ConfigDict
 from starlette.requests import HTTPConnection
@@ -54,6 +54,48 @@ STATUS_CODES: dict[str, int] = {
 Count = Annotated[int, Query(ge=0, le=MAX_COUNT)]
 """A ``seq`` or a count in a query: as many as storage holds, which the document states."""
 
+PathId = Annotated[str, Path(min_length=1)]
+"""An id in a path, which is never empty: ``.../runs/`` would be the list of runs."""
+
+
+# RejectionDetail, FieldError, Refused and REFUSALS are shared verbatim with artifactr's
+# src/artifactr/fastapi/router.py; change both.
+class RejectionDetail(BaseModel):
+    """A rejection, as REST sends it: its ``type``, its ``message`` and its typed details."""
+
+    model_config = ConfigDict(extra="allow")
+
+    type: str
+    message: str
+
+
+class FieldError(BaseModel):
+    """One problem FastAPI found with a request's parameters or body."""
+
+    model_config = ConfigDict(extra="allow")
+
+    loc: list[str | int]
+    msg: str
+    type: str
+
+
+class Refused(BaseModel):
+    """The body of a refused request (artifactr ADR-0063, reflexr ADR-0061).
+
+    ``detail`` is the rejection, the message of a resolver's refusal, or the problems FastAPI
+    found with the request.
+    """
+
+    detail: RejectionDetail | str | list[FieldError]
+
+
+REFUSALS: Final[dict[int | str, dict[str, Any]]] = {
+    status: {"model": Refused, "description": "Refused"}
+    for status in (400, 401, 403, 404, 409, 422)
+}
+"""The refused responses every route documents, each described in words of its own, since
+FastAPI's default is Python's phrase for the status, which changes between versions."""
+
 
 class Unauthorized(Exception):
     """Raise from ``resolve_actor`` to refuse a request (401) or connection (close 4401)."""
@@ -97,7 +139,7 @@ def reflexr_router(
     Each REST request's span (FastAPI's own, when it is instrumented) and each connection's
     ``reflexr.stream`` span are attributed to the tenant, workspace and actor.
     """
-    router = APIRouter()
+    router = APIRouter(responses=REFUSALS)
 
     async def open_workspace(connection: HTTPConnection, workspace_id: WorkspaceId) -> Workspace:
         """Authenticate a request or connection, and open its workspace if it may use it.
@@ -118,12 +160,18 @@ def reflexr_router(
         except Unauthorized as error:
             raise HTTPException(status_code=401, detail=str(error) or "unauthorized") from error
 
-    async def workspace_dependency(request: Request, workspace_id: WorkspaceId) -> Workspace:
+    async def workspace_dependency(request: Request, workspace_id: PathId) -> Workspace:
         return await _or_http(open_workspace(request, workspace_id))
 
     current_workspace = Depends(workspace_dependency)
 
-    @router.post("/workspaces/{workspace_id}/commands")
+    @router.post(
+        "/workspaces/{workspace_id}/commands",
+        responses={
+            status: {"model": CommandResult | Refused, "description": "Refused, or rejected"}
+            for status in STATUS_CODES.values()
+        },
+    )
     async def post_command(
         frame: CommandFrame, response: Response, workspace: Workspace = current_workspace
     ) -> CommandResult:
@@ -187,7 +235,7 @@ def reflexr_router(
         return await _or_http(workspace.rule_statuses())
 
     @router.get("/workspaces/{workspace_id}/rules/{rule}")
-    async def get_rule(rule: RuleName, workspace: Workspace = current_workspace) -> WorkspaceRule:
+    async def get_rule(rule: PathId, workspace: Workspace = current_workspace) -> WorkspaceRule:
         """Return one of the workspace's rules, with a stored rule's version and provenance."""
         return await _or_http(workspace.get_rule(rule))
 
@@ -205,7 +253,7 @@ def reflexr_router(
         )
 
     @router.get("/workspaces/{workspace_id}/runs/{run_id}")
-    async def get_run(run_id: str, workspace: Workspace = current_workspace) -> Run:
+    async def get_run(run_id: PathId, workspace: Workspace = current_workspace) -> Run:
         """Return a run, with its attempts, last error and checkpoint."""
         return await _or_http(workspace.run(run_id))
 

@@ -10,10 +10,11 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from artifactr.core.ids import ArtifactId, RunId
+from artifactr.core.tagged import tag_required
 
 
 class _LiveEvent(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
 
 class PartStarted(_LiveEvent):
@@ -83,7 +84,7 @@ LiveEvent = Annotated[
 class LiveFrame(BaseModel):
     """A live event of one run, as sent on the wire."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     type: Literal["live"] = "live"
     run_id: RunId

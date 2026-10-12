@@ -1,11 +1,12 @@
 """Actors, identifiers, patches, rejections and state helpers."""
 
 import pytest
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from artifactr.core import (
     Actor,
     AgentActor,
+    Command,
     DeferredAnswer,
     DeferredRequest,
     ExternalAgentActor,
@@ -155,3 +156,21 @@ class TestState:
         )
         assert done.all_answered
         assert not done.model_copy(update={"status": "running"}).all_answered
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        {"type": "create_artifact", "kind": "note", "data": {}, "artifact_id": ""},
+        {"type": "create_thread", "thread_id": ""},
+        {"type": "post_message", "thread_id": "t1", "content": "hi", "message_id": ""},
+        {
+            "type": "propose_change",
+            "change": {"type": "archive_artifact", "artifact_id": "a1", "base_version": 1},
+            "proposal_id": "",
+        },
+    ],
+)
+def test_an_id_a_command_creates_is_never_empty(command: dict[str, object]) -> None:
+    with pytest.raises(ValidationError, match="an id is never empty"):
+        TypeAdapter(Command).validate_python(command)

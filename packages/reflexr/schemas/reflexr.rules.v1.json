@@ -17,7 +17,8 @@
         }
       },
       "required": [
-        "within"
+        "within",
+        "kind"
       ],
       "title": "AbsencePattern",
       "type": "object"
@@ -65,7 +66,8 @@
         }
       },
       "required": [
-        "of"
+        "of",
+        "kind"
       ],
       "title": "AllFilter",
       "type": "object"
@@ -90,7 +92,8 @@
         }
       },
       "required": [
-        "of"
+        "of",
+        "kind"
       ],
       "title": "AnyFilter",
       "type": "object"
@@ -160,7 +163,8 @@
       },
       "required": [
         "at_least",
-        "within"
+        "within",
+        "kind"
       ],
       "title": "CountPattern",
       "type": "object"
@@ -201,6 +205,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "kind"
+      ],
       "title": "EachPattern",
       "type": "object"
     },
@@ -253,7 +260,8 @@
         }
       },
       "required": [
-        "filter"
+        "filter",
+        "kind"
       ],
       "title": "NotFilter",
       "type": "object"
@@ -279,7 +287,8 @@
         }
       },
       "required": [
-        "types"
+        "types",
+        "kind"
       ],
       "title": "OnFilter",
       "type": "object"
@@ -326,7 +335,8 @@
         }
       },
       "required": [
-        "name"
+        "name",
+        "kind"
       ],
       "title": "PredicateFilter",
       "type": "object"
@@ -410,7 +420,8 @@
       },
       "required": [
         "steps",
-        "within"
+        "within",
+        "kind"
       ],
       "title": "SequencePattern",
       "type": "object"
@@ -475,7 +486,8 @@
       },
       "required": [
         "field",
-        "op"
+        "op",
+        "kind"
       ],
       "title": "WhereFilter",
       "type": "object"

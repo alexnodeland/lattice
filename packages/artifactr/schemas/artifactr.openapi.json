@@ -44,7 +44,8 @@
           }
         },
         "required": [
-          "thread_id"
+          "thread_id",
+          "kind"
         ],
         "title": "AgentActor",
         "type": "object"
@@ -83,7 +84,8 @@
         },
         "required": [
           "run_id",
-          "tool_call_id"
+          "tool_call_id",
+          "type"
         ],
         "title": "AnswerDeferred",
         "type": "object"
@@ -126,7 +128,8 @@
           }
         },
         "required": [
-          "name"
+          "name",
+          "type"
         ],
         "title": "AppEvent",
         "type": "object"
@@ -161,7 +164,8 @@
         },
         "required": [
           "artifact_id",
-          "version"
+          "version",
+          "type"
         ],
         "title": "Applied",
         "type": "object"
@@ -200,7 +204,8 @@
         },
         "required": [
           "artifact_id",
-          "base_version"
+          "base_version",
+          "type"
         ],
         "title": "ArchiveArtifact",
         "type": "object"
@@ -259,7 +264,8 @@
         "required": [
           "artifact_id",
           "kind",
-          "version"
+          "version",
+          "type"
         ],
         "title": "ArtifactArchived",
         "type": "object"
@@ -342,7 +348,8 @@
           "kind",
           "version",
           "patch",
-          "summary"
+          "summary",
+          "type"
         ],
         "title": "ArtifactChanged",
         "type": "object"
@@ -409,7 +416,8 @@
           "artifact_id",
           "kind",
           "version",
-          "data"
+          "data",
+          "type"
         ],
         "title": "ArtifactCreated",
         "type": "object"
@@ -438,7 +446,8 @@
         },
         "required": [
           "artifact_id",
-          "version"
+          "version",
+          "kind"
         ],
         "title": "ArtifactTarget",
         "type": "object"
@@ -522,7 +531,8 @@
         },
         "required": [
           "command_id",
-          "command"
+          "command",
+          "type"
         ],
         "title": "CommandFrame",
         "type": "object"
@@ -594,7 +604,8 @@
         },
         "required": [
           "command_id",
-          "ok"
+          "ok",
+          "type"
         ],
         "title": "CommandResult",
         "type": "object"
@@ -639,7 +650,8 @@
         },
         "required": [
           "kind",
-          "data"
+          "data",
+          "type"
         ],
         "title": "CreateArtifact",
         "type": "object"
@@ -663,6 +675,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "type"
+        ],
         "title": "CreateThread",
         "type": "object"
       },
@@ -724,7 +739,8 @@
         "required": [
           "run_id",
           "thread_id",
-          "tool_call_id"
+          "tool_call_id",
+          "type"
         ],
         "title": "DeferredAnswered",
         "type": "object"
@@ -829,7 +845,8 @@
         "required": [
           "artifact_id",
           "base_version",
-          "patch"
+          "patch",
+          "type"
         ],
         "title": "EditArtifact",
         "type": "object"
@@ -1006,7 +1023,8 @@
         },
         "required": [
           "name",
-          "version"
+          "version",
+          "kind"
         ],
         "title": "EvaluatorActor",
         "type": "object"
@@ -1047,7 +1065,8 @@
           }
         },
         "required": [
-          "client_id"
+          "client_id",
+          "kind"
         ],
         "title": "ExternalAgentActor",
         "type": "object"
@@ -1099,7 +1118,8 @@
         "required": [
           "feedback_type",
           "target",
-          "value"
+          "value",
+          "type"
         ],
         "title": "FeedbackGiven",
         "type": "object"
@@ -1129,6 +1149,41 @@
           }
         ]
       },
+      "FieldError": {
+        "additionalProperties": true,
+        "description": "One problem FastAPI found with a request's parameters or body.",
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Msg",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "FieldError",
+        "type": "object"
+      },
       "FocusChanged": {
         "description": "The set of artifacts a thread is focused on changed.",
         "properties": {
@@ -1151,7 +1206,8 @@
         },
         "required": [
           "thread_id",
-          "artifact_ids"
+          "artifact_ids",
+          "type"
         ],
         "title": "FocusChanged",
         "type": "object"
@@ -1184,22 +1240,10 @@
         },
         "required": [
           "feedback_type",
-          "target"
+          "target",
+          "type"
         ],
         "title": "GiveFeedback",
-        "type": "object"
-      },
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "title": "Detail",
-            "type": "array"
-          }
-        },
-        "title": "HTTPValidationError",
         "type": "object"
       },
       "JsonPatch": {
@@ -1223,7 +1267,8 @@
           }
         },
         "required": [
-          "ops"
+          "ops",
+          "kind"
         ],
         "title": "JsonPatch",
         "type": "object"
@@ -1274,7 +1319,8 @@
         "required": [
           "thread_id",
           "message_id",
-          "content"
+          "content",
+          "type"
         ],
         "title": "MessagePosted",
         "type": "object"
@@ -1308,7 +1354,8 @@
         },
         "required": [
           "message_id",
-          "thread_id"
+          "thread_id",
+          "kind"
         ],
         "title": "MessageTarget",
         "type": "object"
@@ -1346,7 +1393,8 @@
         },
         "required": [
           "thread_id",
-          "content"
+          "content",
+          "type"
         ],
         "title": "PostMessage",
         "type": "object"
@@ -1517,7 +1565,8 @@
         },
         "required": [
           "proposal_id",
-          "change"
+          "change",
+          "type"
         ],
         "title": "ProposalCreated",
         "type": "object"
@@ -1650,7 +1699,8 @@
           "proposal_id",
           "decision",
           "proposed_by",
-          "artifact_id"
+          "artifact_id",
+          "type"
         ],
         "title": "ProposalResolved",
         "type": "object"
@@ -1703,7 +1753,8 @@
           }
         },
         "required": [
-          "change"
+          "change",
+          "type"
         ],
         "title": "ProposeChange",
         "type": "object"
@@ -1733,7 +1784,8 @@
           }
         },
         "required": [
-          "proposal_id"
+          "proposal_id",
+          "type"
         ],
         "title": "Proposed",
         "type": "object"
@@ -1769,7 +1821,57 @@
             "type": "string"
           }
         },
+        "required": [
+          "type"
+        ],
         "title": "Recorded",
+        "type": "object"
+      },
+      "Refused": {
+        "description": "The body of a refused request (artifactr ADR-0063, reflexr ADR-0061).\n\n``detail`` is the rejection, the message of a resolver's refusal, or the problems FastAPI\nfound with the request.",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RejectionDetail"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FieldError"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "Refused",
+        "type": "object"
+      },
+      "RejectionDetail": {
+        "additionalProperties": true,
+        "description": "A rejection, as REST sends it: its ``type``, its ``message`` and its typed details.",
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "title": "RejectionDetail",
         "type": "object"
       },
       "Resolved": {
@@ -1817,7 +1919,8 @@
         },
         "required": [
           "proposal_id",
-          "decision"
+          "decision",
+          "type"
         ],
         "title": "Resolved",
         "type": "object"
@@ -1882,7 +1985,8 @@
         },
         "required": [
           "proposal_id",
-          "decision"
+          "decision",
+          "type"
         ],
         "title": "RespondToProposal",
         "type": "object"
@@ -2112,7 +2216,8 @@
         "required": [
           "run_id",
           "thread_id",
-          "status"
+          "status",
+          "type"
         ],
         "title": "RunEnded",
         "type": "object"
@@ -2157,7 +2262,8 @@
         "required": [
           "run_id",
           "thread_id",
-          "requests"
+          "requests",
+          "type"
         ],
         "title": "RunPaused",
         "type": "object"
@@ -2200,7 +2306,8 @@
         },
         "required": [
           "run_id",
-          "thread_id"
+          "thread_id",
+          "type"
         ],
         "title": "RunStarted",
         "type": "object"
@@ -2250,7 +2357,8 @@
         },
         "required": [
           "thread_id",
-          "artifact_ids"
+          "artifact_ids",
+          "type"
         ],
         "title": "SetFocus",
         "type": "object"
@@ -2279,7 +2387,8 @@
         },
         "required": [
           "thread_id",
-          "mode"
+          "mode",
+          "type"
         ],
         "title": "SetThreadMode",
         "type": "object"
@@ -2299,7 +2408,8 @@
           }
         },
         "required": [
-          "run_id"
+          "run_id",
+          "type"
         ],
         "title": "StopRun",
         "type": "object"
@@ -2319,6 +2429,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "kind"
+        ],
         "title": "SystemActor",
         "type": "object"
       },
@@ -2365,7 +2478,8 @@
           }
         },
         "required": [
-          "edits"
+          "edits",
+          "kind"
         ],
         "title": "TextEdits",
         "type": "object"
@@ -2424,7 +2538,8 @@
         },
         "required": [
           "thread_id",
-          "title"
+          "title",
+          "type"
         ],
         "title": "ThreadCreated",
         "type": "object"
@@ -2455,7 +2570,8 @@
         },
         "required": [
           "thread_id",
-          "mode"
+          "mode",
+          "type"
         ],
         "title": "ThreadModeChanged",
         "type": "object"
@@ -2475,7 +2591,8 @@
           }
         },
         "required": [
-          "thread_id"
+          "thread_id",
+          "kind"
         ],
         "title": "ThreadTarget",
         "type": "object"
@@ -2513,7 +2630,8 @@
           "run_id",
           "thread_id",
           "tool_call_id",
-          "tool_name"
+          "tool_name",
+          "type"
         ],
         "title": "ToolCalled",
         "type": "object"
@@ -2561,7 +2679,8 @@
           "run_id",
           "thread_id",
           "tool_call_id",
-          "status"
+          "status",
+          "type"
         ],
         "title": "ToolReturned",
         "type": "object"
@@ -2585,7 +2704,8 @@
           }
         },
         "required": [
-          "run_id"
+          "run_id",
+          "kind"
         ],
         "title": "TurnTarget",
         "type": "object"
@@ -2595,6 +2715,27 @@
         "description": "An event type this version does not know, kept as-is so it round-trips.",
         "properties": {
           "type": {
+            "not": {
+              "enum": [
+                "app_event",
+                "artifact_archived",
+                "artifact_changed",
+                "artifact_created",
+                "deferred_answered",
+                "feedback_given",
+                "focus_changed",
+                "message_posted",
+                "proposal_created",
+                "proposal_resolved",
+                "run_ended",
+                "run_paused",
+                "run_started",
+                "thread_created",
+                "thread_mode_changed",
+                "tool_called",
+                "tool_returned"
+              ]
+            },
             "title": "Type",
             "type": "string"
           }
@@ -2631,49 +2772,10 @@
           }
         },
         "required": [
-          "id"
+          "id",
+          "kind"
         ],
         "title": "UserActor",
-        "type": "object"
-      },
-      "ValidationError": {
-        "properties": {
-          "ctx": {
-            "title": "Context",
-            "type": "object"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "title": "Location",
-            "type": "array"
-          },
-          "msg": {
-            "title": "Message",
-            "type": "string"
-          },
-          "type": {
-            "title": "Error Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError",
         "type": "object"
       },
       "WatchRun": {
@@ -2691,7 +2793,8 @@
           }
         },
         "required": [
-          "run_id"
+          "run_id",
+          "type"
         ],
         "title": "WatchRun",
         "type": "object"
@@ -2755,15 +2858,65 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "List Workspaces"
@@ -2779,6 +2932,7 @@
             "name": "workspace_id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "Workspace Id",
               "type": "string"
             }
@@ -2819,15 +2973,65 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "List Artifacts"
@@ -2843,6 +3047,7 @@
             "name": "artifact_id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "Artifact Id",
               "type": "string"
             }
@@ -2852,6 +3057,7 @@
             "name": "workspace_id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "Workspace Id",
               "type": "string"
             }
@@ -2866,15 +3072,65 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "Get Artifact"
@@ -2890,6 +3146,7 @@
             "name": "artifact_id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "Artifact Id",
               "type": "string"
             }
@@ -2899,6 +3156,7 @@
             "name": "workspace_id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "Workspace Id",
               "type": "string"
             }
@@ -2919,15 +3177,65 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "List Revisions"
@@ -2943,6 +3251,7 @@
             "name": "workspace_id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "Workspace Id",
               "type": "string"
             }
@@ -2969,15 +3278,105 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Refused"
+                    }
+                  ],
+                  "title": "Response 400 Post Command Workspaces  Workspace Id  Commands Post"
+                }
+              }
+            },
+            "description": "Refused, or rejected"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Refused"
+                    }
+                  ],
+                  "title": "Response 403 Post Command Workspaces  Workspace Id  Commands Post"
+                }
+              }
+            },
+            "description": "Refused, or rejected"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Refused"
+                    }
+                  ],
+                  "title": "Response 404 Post Command Workspaces  Workspace Id  Commands Post"
+                }
+              }
+            },
+            "description": "Refused, or rejected"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Refused"
+                    }
+                  ],
+                  "title": "Response 409 Post Command Workspaces  Workspace Id  Commands Post"
+                }
+              }
+            },
+            "description": "Refused, or rejected"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Refused"
+                    }
+                  ],
+                  "title": "Response 422 Post Command Workspaces  Workspace Id  Commands Post"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused, or rejected"
           }
         },
         "summary": "Post Command"
@@ -2993,6 +3392,7 @@
             "name": "workspace_id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "Workspace Id",
               "type": "string"
             }
@@ -3098,15 +3498,65 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "List Events"
@@ -3122,6 +3572,7 @@
             "name": "workspace_id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "Workspace Id",
               "type": "string"
             }
@@ -3164,15 +3615,65 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "List Proposals"
@@ -3188,6 +3689,7 @@
             "name": "run_id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "Run Id",
               "type": "string"
             }
@@ -3197,6 +3699,7 @@
             "name": "workspace_id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "Workspace Id",
               "type": "string"
             }
@@ -3213,15 +3716,65 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "Get Run"
@@ -3237,6 +3790,7 @@
             "name": "workspace_id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "Workspace Id",
               "type": "string"
             }
@@ -3257,15 +3811,65 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "List Threads"
@@ -3281,6 +3885,7 @@
             "name": "thread_id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "Thread Id",
               "type": "string"
             }
@@ -3290,6 +3895,7 @@
             "name": "workspace_id",
             "required": true,
             "schema": {
+              "minLength": 1,
               "title": "Workspace Id",
               "type": "string"
             }
@@ -3306,15 +3912,65 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "Get Thread"

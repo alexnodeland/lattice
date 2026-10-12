@@ -663,7 +663,10 @@ async def test_the_application_holds_its_runtime_in_every_tenant_and_operators_d
         assert await grants.check(tenant, APP, "artifactr:claim_thread", THREAD)
         # reflexr asks a run's checkpoint of its workspace.
         assert await grants.check(tenant, APP, "reflexr:checkpoint_run", WS)
-        assert not await grants.check(tenant, APP, "artifactr:edit_artifact", ARTIFACT)
+        # relayr's outbound adapter writes for its code rules, and its followers list workspaces.
+        assert await grants.check(tenant, APP, "artifactr:edit_artifact", ARTIFACT)
+        assert await grants.check(tenant, APP, "artifactr:read_workspaces", TENANT)
+        assert not await grants.check(tenant, APP, "artifactr:respond_to_proposal", ARTIFACT)
         assert not await grants.check(tenant, ROOT, "artifactr:read_artifacts", WS)
     assert not await grants.check("acme", ServicePrincipal(id="other"), "artifactr:open", WS)
 
@@ -749,3 +752,10 @@ async def test_a_workspaces_admin_grants_a_stored_rule_its_role(grants: Grants) 
     assert await grants.check("acme", rule, "reflexr:publish", WS)
     assert await grants.check("acme", rule, "reflexr:checkpoint_run", WS)
     assert not await grants.check("acme", rule, "reflexr:install_rule", RULE)
+
+
+async def test_the_deployments_own_tools_list_every_tenant(storage: Storage) -> None:
+    grants = Grants(storage, catalogs=[ARTIFACTR], application=APP)
+    for tenant in ("globex", "acme"):
+        await grants.provision_tenant(tenant, owner=ALICE.id)
+    assert await grants.served_tenants() == ["acme", "globex"]

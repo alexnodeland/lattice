@@ -285,6 +285,7 @@ portalr's own RFC series turns these phases into its plan, with a tracking issue
 - [x] Phase 2: the brand (2026-10-12), in lattice ADR-0014, since ADR-0010 had gone to another decision
 - [x] Phase 3: client (2026-10-12)
 - [ ] Phase 4: the router
+  - grantr places portalr's admin reads (grantr ADR-0023): `portalr:read_telemetry` and `portalr:read_spend` for a tenant's owners and admins, `portalr:read_deployment` for operators
 - [ ] Phase 5: app
 - [ ] Phase 6: admin
 - [ ] Phase 7: template and acceptance

@@ -1,4 +1,4 @@
-"""Stored rules: the configuration, the change an allow hook sees, and every problem listed."""
+"""Stored rules: the configuration, and every problem listed."""
 
 from typing import Any
 
@@ -8,13 +8,8 @@ from pydantic import BaseModel
 from reflexr.core import (
     MAX_STORED_BYTES,
     MAX_STORED_PROVENANCE,
-    Actor,
-    AgentActor,
     Rule,
-    RuleChange,
     StoredRules,
-    TenantId,
-    WorkspaceId,
     check_provenance,
     check_stored,
 )
@@ -44,15 +39,7 @@ class NotifyParams(BaseModel):
     thread_id: str
 
 
-async def allow(
-    tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor, change: RuleChange
-) -> bool:
-    return isinstance(actor, AgentActor) and actor.rule == "relayr:install-rule"
-
-
-CONFIG = StoredRules(
-    allow=allow, actions={"notify": NotifyParams, "page": None}, namespaces={"chat"}
-)
+CONFIG = StoredRules(actions={"notify": NotifyParams, "page": None}, namespaces={"chat"})
 
 
 def stored(**changes: Any) -> Rule:
@@ -232,14 +219,4 @@ def test_provenance_is_held_to_its_size() -> None:
 
 def test_the_reflexr_namespace_is_reserved() -> None:
     with pytest.raises(ValueError, match="the reflexr namespace is reserved"):
-        StoredRules(allow=allow, actions={}, namespaces={"chat", "reflexr"})
-
-
-def test_a_change_says_which_command_which_rule_and_the_new_rule() -> None:
-    install = RuleChange(kind="install", rule="chat:prod-deploy-failures", spec=stored())
-    assert (install.kind, install.rule, install.spec) == (
-        "install",
-        "chat:prod-deploy-failures",
-        stored(),
-    )
-    assert RuleChange(kind="archive", rule="chat:prod-deploy-failures").spec is None
+        StoredRules(actions={}, namespaces={"chat", "reflexr"})

@@ -16,6 +16,7 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0008](0008-one-resolution-litellm-held-at-1-83-0.md) | One resolution, with litellm held at 1.83.0 | Accepted |
 | [0009](0009-one-dev-container-at-the-root.md) | One dev container, at the root | Accepted |
 | [0010](0010-every-projects-tests-run-in-a-random-order.md) | Every project's tests run in a random order | Accepted |
+| [0013](0013-pyright-stays-until-ty-can-replace-it.md) | pyright stays until ty can replace it | Accepted |
 | [0014](0014-portalrs-and-grantrs-marks.md) | portalr's and grantr's marks | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

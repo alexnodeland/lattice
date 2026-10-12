@@ -2,7 +2,7 @@
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
-from typing import Any, cast
+from typing import Any, cast, override
 
 import pytest
 from pydantic import BaseModel
@@ -31,6 +31,7 @@ class Rewriting(InMemoryExperimentTracker):
         super().__init__()
         self.rewrite = rewrite
 
+    @override
     async def run_experiment[I: BaseModel, V: BaseModel, O: BaseModel](
         self,
         name: str,

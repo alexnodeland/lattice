@@ -137,7 +137,7 @@ uv run pytest examples/oncall/tests
 | `triage_rule`, `runbook_rule`, `silence_rule` | [Rules](guides/rules.md) |
 | `Oncall`, its `Workspaces` and `Reactor` | [Workspaces and the log](guides/workspaces.md), [The reactor](guides/reactor.md) |
 | The triage agent, the runbook graph, `page` and `notify` | [Actions](guides/actions.md) |
-| `STORED_RULES` and `allow_people` | [Stored rules](guides/rules.md#stored-rules) |
+| `STORED_RULES`, and `authorize`, which lets only people change them | [Stored rules](guides/rules.md#stored-rules) |
 | `heartbeat_check` | [Schedules](guides/schedules.md) |
 | The FastAPI app and `resolve_actor` | [Serving over REST and WebSocket](guides/serving.md) |
 | `ReflexrMcp` and `resolve_client` | [External agents over MCP](guides/mcp.md) |

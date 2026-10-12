@@ -7,8 +7,8 @@ ended run, which asserted the behaviour ADR-0055 removed; and a probe that only 
 
 import asyncio
 import contextlib
-from collections.abc import AsyncIterator
-from typing import Any
+from collections.abc import AsyncGenerator
+from typing import Any, override
 
 import pytest
 from pydantic_ai import DeferredToolRequests, ModelResponse, TextPart
@@ -44,7 +44,7 @@ async def test_probe_a_failure_before_wrap_run_replays_the_threads_first_message
     entered = 0
 
     @contextlib.asynccontextmanager
-    async def flaky(session: Session[Any]) -> AsyncIterator[None]:
+    async def flaky(session: Session[Any]) -> AsyncGenerator[None]:
         nonlocal entered
         entered += 1
         if entered == 2:
@@ -71,7 +71,7 @@ async def test_probe_a_persistent_failure_before_wrap_run_spawns_runs_forever(
     count = 0
 
     @contextlib.asynccontextmanager
-    async def broken(session: Session[Any]) -> AsyncIterator[None]:
+    async def broken(session: Session[Any]) -> AsyncGenerator[None]:
         nonlocal count
         count += 1
         if count >= 25:
@@ -131,6 +131,7 @@ class SlowPausedCheck(HeldStorage):
         super().__init__()
         self.held_runs: Gate | None = None
 
+    @override
     async def runs(
         self, scope: Scope, *, thread_id: Any = None, status: RunStatus | None = None
     ) -> Any:

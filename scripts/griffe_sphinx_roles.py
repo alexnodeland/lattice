@@ -13,7 +13,7 @@ inline code instead of a broken link.
 """
 
 import re
-from typing import Any
+from typing import Any, override
 
 import griffe
 
@@ -46,6 +46,7 @@ _PUBLIC_MODULES = frozenset(
 class SphinxRoles(griffe.Extension):
     """Rewrite Sphinx roles in every docstring of a package once it is loaded."""
 
+    @override
     def on_package(self, *, pkg: griffe.Module, **_kwargs: Any) -> None:
         """Rewrite the roles in the package's docstrings."""
         _rewrite(pkg, seen=set())

@@ -9,9 +9,9 @@ turn with the oldest message no turn has taken, so each message is carried out o
 import asyncio
 import contextlib
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 
 import pytest
 from pydantic_ai import (
@@ -49,6 +49,7 @@ class HeldEnd(AbstractCapability[Session[Gate]]):
 
     held: Gate
 
+    @override
     async def wrap_run(self, ctx: Any, *, handler: WrapRunHandler) -> AgentRunResult[Any]:
         result = await handler()
         await self.held.wait()
@@ -190,7 +191,7 @@ async def test_a_turn_that_fails_before_it_starts_leaves_its_message_to_the_next
     entered: list[str] = []
 
     @contextlib.asynccontextmanager
-    async def flaky(session: Session[Any]) -> AsyncIterator[None]:
+    async def flaky(session: Session[Any]) -> AsyncGenerator[None]:
         entered.append(session.run_id)
         if len(entered) == 2:
             raise RuntimeError("the tracing backend blinked")
@@ -215,7 +216,7 @@ async def test_a_turn_that_keeps_failing_is_one_turn_per_message(
     turns = 0
 
     @contextlib.asynccontextmanager
-    async def broken(session: Session[Any]) -> AsyncIterator[None]:
+    async def broken(session: Session[Any]) -> AsyncGenerator[None]:
         nonlocal turns
         turns += 1
         raise RuntimeError("the tracing backend is down")
@@ -236,7 +237,7 @@ async def test_a_message_whose_turn_failed_before_it_started_is_carried_out_once
     turns: list[str] = []
 
     @contextlib.asynccontextmanager
-    async def second_fails(session: Session[Any]) -> AsyncIterator[None]:
+    async def second_fails(session: Session[Any]) -> AsyncGenerator[None]:
         turns.append(session.run_id)
         if len(turns) == 2:
             raise RuntimeError("the tracing backend blinked")
@@ -263,7 +264,7 @@ async def test_a_resume_that_fails_before_it_starts_is_resumed_by_the_next_messa
     ws: Workspace, thread: Thread, runners: MakeRunner
 ) -> None:
     @contextlib.asynccontextmanager
-    async def resuming_fails_once(session: Session[Any]) -> AsyncIterator[None]:
+    async def resuming_fails_once(session: Session[Any]) -> AsyncGenerator[None]:
         if session.trigger == "resume" and not failed:
             failed.append(session.run_id)
             raise RuntimeError("the tracing backend blinked")

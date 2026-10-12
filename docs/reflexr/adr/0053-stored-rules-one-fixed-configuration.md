@@ -1,6 +1,6 @@
 # ADR-0053: Stored rules, under one fixed configuration
 
-**Status:** Accepted
+**Status:** Accepted; its `allow` folded into `authorize` by [ADR-0056](0056-access-asked-in-every-workspace-method.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 
@@ -70,3 +70,7 @@ With no scope fields, the one throttle bounds the whole rule. `matches` is refus
 
 1. [x] `StoredRules`, `RuleChange`, `check_stored`, `check_provenance` and the constants (alexnodeland/reflexr#86).
 2. [x] `Workspaces(stored_rules=)`, and the reactor's check of the allowlisted actions (alexnodeland/reflexr#88).
+
+## Amendment (2026-10-12): `allow` is folded into `authorize`
+
+[ADR-0056](0056-access-asked-in-every-workspace-method.md) removes `StoredRules.allow` and `RuleChange`. Installing, updating, archiving and replaying a stored rule are commands like any other, which the widened `authorize` hears with the rule's name in `Access.rule`. The concern behind "Reuse `authorize`" above, that anyone who may use a workspace could install behaviour in it, no longer holds: the hook hears the action, so an application, or grantr's workspace `admin` role, grants rule management apart from using the workspace. `StoredRules` keeps `actions` and `namespaces`, what a stored rule may do; without it, every change is still `forbidden`.

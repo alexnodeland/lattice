@@ -77,10 +77,23 @@ class Automation:
         self._verifier = verifier
         self._poll_interval = poll_interval
         self._grace = grace
+        langfuse = telemetry.langfuse if telemetry else None
+        self._langfuse = langfuse
+        self._mirrors: Mirrors | None = None
+        if langfuse is not None:
+            sink = LangfuseScoreSink(langfuse)
+
+            async def follow(tenant_id: str, workspace_id: str) -> None:
+                workspace = await self.workspaces.open(tenant_id, workspace_id, actor=SystemActor())
+                await FeedbackMirror(workspace, sink, cursor="langfuse").follow()
+
+            self._mirrors = Mirrors(follow)
+        # No authorize hook: every user of a tenant may use each of its workspaces.
         self.workspaces = Workspaces(
             SqlStorage(engine) if engine else InMemoryStorage(),
             events=EVENTS,
             rules=RULES,
+            on_open=self._mirrors.watch if self._mirrors else None,
             tracer_provider=telemetry.tracer_provider if telemetry else None,
             meter_provider=telemetry.meter_provider if telemetry else None,
         )
@@ -93,27 +106,13 @@ class Automation:
         ]
         if telemetry is not None:
             capabilities.append(telemetry.capability())
-        langfuse = telemetry.langfuse if telemetry else None
-        self._langfuse = langfuse
         agent = build_triage_agent(model, capabilities=capabilities)
         self.reactor = Reactor[None](
             self.workspaces,
             actions={"triage": triage_action(agent)},
             run_context=langfuse_run if langfuse else None,
         )
-        self._mirrors: Mirrors | None = None
-        if langfuse is not None:
-            sink = LangfuseScoreSink(langfuse)
-
-            async def follow(tenant_id: str, workspace_id: str) -> None:
-                workspace = await self.workspaces.open(tenant_id, workspace_id, actor=SystemActor())
-                await FeedbackMirror(workspace, sink, cursor="langfuse").follow()
-
-            self._mirrors = Mirrors(follow)
-        self._authorize = self._mirrors.authorize if self._mirrors else None
-        self.mcp = ReflexrMcp(
-            self.workspaces, resolve=self._resolve_client, authorize=self._authorize, name=name
-        )
+        self.mcp = ReflexrMcp(self.workspaces, resolve=self._resolve_client, name=name)
 
     async def migrate(self, engine: AsyncEngine) -> None:
         """Upgrade the database to reflexr's schema."""
@@ -145,11 +144,7 @@ class Automation:
 
     def mount(self, app: FastAPI) -> None:
         """Add the REST and WebSocket routes and the MCP server to the application."""
-        router = reflexr_router(
-            self.workspaces,
-            resolve_actor=self._resolve_actor,
-            authorize=self._authorize,
-        )
+        router = reflexr_router(self.workspaces, resolve_actor=self._resolve_actor)
         app.include_router(router, prefix=f"{PREFIX}/v1")
         mcp = self.mcp.http_app(streamable_http_path="/")
         app.mount(f"{PREFIX}/mcp", RequireToken(mcp, self._verifier))

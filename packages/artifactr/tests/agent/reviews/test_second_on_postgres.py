@@ -10,7 +10,7 @@ import random
 from collections import Counter
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import pytest
 from pydantic_ai import DeferredToolRequests, ModelMessage, ModelRequest, ModelResponse, TextPart
@@ -41,6 +41,7 @@ ASKING = [str, DeferredToolRequests]
 class Held(SqlStorage):
     held: Gate | None = None
 
+    @override
     async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
         if self.held is not None:
             await self.held.wait()

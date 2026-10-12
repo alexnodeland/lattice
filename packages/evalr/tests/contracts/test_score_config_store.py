@@ -1,5 +1,7 @@
 """Every score config store adapter meets the ScoreConfigStore contract."""
 
+from typing import override
+
 import pytest
 
 from evalr.contracts import ContractViolation, check_score_config_store
@@ -18,11 +20,13 @@ class Seeded(InMemoryScoreConfigStore):
 
 
 class Forgetful(InMemoryScoreConfigStore):
+    @override
     async def names(self) -> set[str]:
         return set(list(self.configs)[1:])
 
 
 class FirstOnly(InMemoryScoreConfigStore):
+    @override
     async def create(self, config: ScoreConfig, /) -> None:
         if not self.configs:
             await super().create(config)

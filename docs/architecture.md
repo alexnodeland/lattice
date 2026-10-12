@@ -109,7 +109,7 @@ The root `pyproject.toml` is a virtual project (`package = false`) whose members
 | The lock | One `uv.lock`, one resolution for every package, extra and group. `uv sync --all-packages --all-groups --all-extras` installs them all into one `.venv`, and CI adds `--locked` |
 | A sibling | A range in `[project]`, such as `evalr>=0.1.0.dev0`, and `{ workspace = true }` in `[tool.uv.sources]`, which only development sees. A built wheel carries the range and no path |
 | ruff | One configuration, at the root; stackr extends it for its scripts |
-| pyright | Per package, until ty replaces it with one root configuration (phase 6); the root's covers `scripts/` and `tests/` |
+| pyright | Per package; the root's covers `scripts/` and `tests/`. It stays until ty can replace it ([ADR-0013](adr/0013-pyright-stays-until-ty-can-replace-it.md)) |
 | pytest and coverage | Per project, since neither tool reads a parent directory's configuration |
 | The quality test | One, at the root ([`tests/test_quality.py`](https://github.com/alexnodeland/lattice/blob/main/tests/test_quality.py)), over every package, `examples/` and the root's Python, and portalr's TypeScript: no inline suppressions anywhere |
 

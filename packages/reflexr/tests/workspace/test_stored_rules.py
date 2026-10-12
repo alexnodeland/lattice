@@ -3,6 +3,7 @@
 import asyncio
 from dataclasses import dataclass, field
 from datetime import timedelta
+from typing import override
 
 import pytest
 from pydantic import BaseModel, JsonValue
@@ -17,7 +18,6 @@ from reflexr.core import (
     InvalidState,
     NotFound,
     RuleArchived,
-    RuleChange,
     RuleInstalled,
     RuleReset,
     RunCancelled,
@@ -29,6 +29,7 @@ from reflexr.core import (
 )
 from reflexr.telemetry import attributes as a
 from reflexr.workspace import (
+    Access,
     InMemoryStorage,
     Reaction,
     Reactor,
@@ -67,13 +68,7 @@ async def notify(reaction: Reaction[Notices], params: NotifyParams) -> None:
 ACTIONS = {"notify": with_params(notify, NotifyParams)}
 
 
-async def relayr_only(
-    tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor, change: RuleChange
-) -> bool:
-    return actor == RELAYR
-
-
-CONFIG = StoredRules(allow=relayr_only, actions={"notify": NotifyParams}, namespaces={"chat"})
+CONFIG = StoredRules(actions={"notify": NotifyParams}, namespaces={"chat"})
 
 code_rule = Rule(name="app:deploys", when=on(Deploy), then=run("notify", thread_id="thr_1"))
 
@@ -269,7 +264,7 @@ async def test_a_namespace_a_deploy_drops_is_hidden_and_its_runs_cancelled(
     await relayr.install_rule(deploys())
     await relayr.publish(Deploy(service="auth"))
     await Reactor(workspaces, actions=ACTIONS, deps=Notices()).evaluate()
-    ops = StoredRules(allow=relayr_only, actions={"notify": NotifyParams}, namespaces={"ops"})
+    ops = StoredRules(actions={"notify": NotifyParams}, namespaces={"ops"})
     redeployed = build(stored_rules=ops)
     assert await redeployed.rules_in(ACME) == {}
     assert await Reactor(redeployed, actions=ACTIONS, deps=Notices()).execute() == 0
@@ -288,37 +283,41 @@ async def test_a_namespace_a_deploy_drops_is_hidden_and_its_runs_cancelled(
     assert (await hidden.archive_rule("chat:deploys")).stored.status == "archived"
 
 
-async def test_changes_are_forbidden_without_the_configuration_or_its_allowance(
+async def test_changes_are_forbidden_without_the_configuration_or_authorize(
     build: Build,
 ) -> None:
     off = await build([code_rule]).open("acme", "prod", actor=RELAYR)
     with pytest.raises(Forbidden, match="stored rules are off in these workspaces"):
         await off.install_rule(deploys())
-    seen: list[RuleChange] = []
+    seen: list[Access] = []
 
-    async def allow(
-        tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor, change: RuleChange
+    async def authorize(
+        tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
     ) -> bool:
-        seen.append(change)
-        return actor == RELAYR
+        if access.rule is not None:
+            seen.append(access)
+        return actor == RELAYR or access.rule is None
 
-    config = StoredRules(allow=allow, actions={"notify": NotifyParams}, namespaces={"chat"})
-    relayr = await build([code_rule], stored_rules=config).open("acme", "prod", actor=RELAYR)
+    workspaces = build([code_rule], stored_rules=CONFIG, authorize=authorize)
+    relayr = await workspaces.open("acme", "prod", actor=RELAYR)
     with pytest.raises(Forbidden, match="rule app:deploys is registered in code"):
         await relayr.archive_rule("app:deploys")
     ada = relayr.as_actor(UserActor(id="ada"))
-    for change in (
-        ada.install_rule(deploys()),
-        ada.update_rule(deploys()),
-        ada.archive_rule("chat:deploys"),
+    for change, action in (
+        (ada.install_rule(deploys()), "install_rule"),
+        (ada.update_rule(deploys()), "update_rule"),
+        (ada.archive_rule("chat:deploys"), "archive_rule"),
+        (ada.replay_rule("chat:deploys"), "replay_rule"),
     ):
-        with pytest.raises(Forbidden, match="this change to rule chat:deploys is not yours"):
+        with pytest.raises(Forbidden, match=f"reflexr:{action} is refused in this workspace"):
             await change
     assert seen == [
-        RuleChange(kind="install", rule="chat:deploys", spec=deploys()),
-        RuleChange(kind="update", rule="chat:deploys", spec=deploys()),
-        RuleChange(kind="archive", rule="chat:deploys"),
-    ]
+        Access(action="reflexr:archive_rule", rule="app:deploys"),
+        Access(action="reflexr:install_rule", rule="chat:deploys"),
+        Access(action="reflexr:update_rule", rule="chat:deploys"),
+        Access(action="reflexr:archive_rule", rule="chat:deploys"),
+        Access(action="reflexr:replay_rule", rule="chat:deploys"),
+    ], "a rule command is asked about like any other, with its rule"
     assert await relayr.head_seq() == 0
 
 
@@ -438,7 +437,7 @@ async def test_stored_rules_are_checked_when_workspaces_and_reactors_are_built(
         Reactor(workspaces, actions={"notify": with_params(post, Other)})
     with pytest.raises(ValueError, match="'notify' NotifyParams, but it declares no params"):
         Reactor(workspaces, actions={"notify": page})
-    paging = build(stored_rules=StoredRules(relayr_only, {"page": None}, {"chat"}))
+    paging = build(stored_rules=StoredRules({"page": None}, {"chat"}))
     with pytest.raises(ValueError, match="'page' no params, but it declares Other"):
         Reactor(paging, actions={"page": with_params(post, Other)})
     Reactor(paging, actions={"page": page})
@@ -449,6 +448,7 @@ class ArchivesMidPass(InMemoryStorage):
 
     relayr: Workspace | None = None
 
+    @override
     async def stored_rules(self, workspace: WorkspaceRef) -> list[StoredRule]:
         found = await super().stored_rules(workspace)
         if self.relayr is not None and found:

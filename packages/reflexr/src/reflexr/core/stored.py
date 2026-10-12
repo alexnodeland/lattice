@@ -11,7 +11,7 @@ whether it is active, and where it came from.
 
 import json
 import math
-from collections.abc import Awaitable, Callable, Mapping, Set
+from collections.abc import Mapping, Set
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Literal
@@ -19,7 +19,6 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 from pydantic_core import to_json, to_jsonable_python
 
-from reflexr.core.actors import Actor
 from reflexr.core.conditions import (
     EachPattern,
     Filter,
@@ -29,7 +28,6 @@ from reflexr.core.conditions import (
     walk,
 )
 from reflexr.core.errors import InvalidRule
-from reflexr.core.ids import RuleName, TenantId, WorkspaceId
 from reflexr.core.rules import Rule, load_params
 
 MAX_STORED_FIRINGS_PER_HOUR = 60
@@ -68,21 +66,6 @@ on a dead letter. Archiving is the only way to stop it."""
 _HOUR = timedelta(hours=1)
 
 
-class RuleChange(BaseModel):
-    """A change to a stored rule, which the configuration's ``allow`` hook allows or refuses."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    kind: Literal["install", "update", "archive"]
-    """Which command makes the change: ``install_rule``, ``update_rule`` or ``archive_rule``."""
-
-    rule: RuleName
-    """The stored rule's name."""
-
-    spec: Rule | None = None
-    """The rule as installed or updated. None when archiving."""
-
-
 class StoredRule(BaseModel):
     """One stored rule as its workspace keeps it: the current version, and where it came from.
 
@@ -108,13 +91,13 @@ class StoredRule(BaseModel):
 
 @dataclass(frozen=True)
 class StoredRules:
-    """What stored rules may do: who may change them, the actions they run, their namespaces.
+    """What stored rules may do: the actions they run, and the namespaces they are named in.
 
-    Everything else is fixed by core's limits, the same for every tenant.
+    Everything else is fixed by core's limits, the same for every tenant. Who may change them is
+    not this configuration's to say: installing, updating, archiving and replaying a rule are
+    commands like any other, which ``authorize`` hears with the rule's name.
 
     Args:
-        allow: Decides whether an actor may make a change to a workspace's stored rules. Shaped
-            like :data:`~reflexr.workspace.Authorize`, with the change, and asked after it.
         actions: The only actions stored rules may run, by name, each mapped to the params
             model it declares, or to None if it declares none.
         namespaces: The rule namespaces stored rules may be named in, such as ``{"chat"}``.
@@ -123,7 +106,6 @@ class StoredRules:
         ValueError: If ``namespaces`` includes ``reflexr``, which is reserved.
     """
 
-    allow: Callable[[TenantId, WorkspaceId, Actor, RuleChange], Awaitable[bool]]
     actions: Mapping[str, type[BaseModel] | None]
     namespaces: Set[str]
 

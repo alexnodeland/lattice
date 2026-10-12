@@ -1,6 +1,6 @@
 """An OpenTelemetry logger provider that keeps its records in memory."""
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 
 from opentelemetry.sdk._logs import LoggerProvider, ReadableLogRecord
@@ -18,7 +18,7 @@ class Logs:
 
 
 @contextmanager
-def logs() -> Iterator[Logs]:
+def logs() -> Generator[Logs]:
     kept = Logs()
     try:
         yield kept

@@ -5,7 +5,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
-from typing import Any, Literal
+from typing import Any, Literal, override
 
 import pytest
 from mcp import Client
@@ -17,13 +17,13 @@ from reflexr import Actor, F, Feedback, Rule, by, on, run
 from reflexr.core import (
     EvaluationError,
     ExternalAgentActor,
-    RuleChange,
     StoredRules,
     TenantId,
     WorkspaceId,
 )
 from reflexr.mcp import McpContext, ReflexrMcp, run_uri
 from reflexr.workspace import (
+    Access,
     InMemoryStorage,
     Reaction,
     Reactor,
@@ -34,19 +34,13 @@ from reflexr.workspace import (
 from tests.event_types import Deploy, ServiceError
 
 CLAUDE = ExternalAgentActor(client_id="claude-code", name="Claude Code")
-FORBIDDEN = "this workspace is not yours to use"
+FORBIDDEN = "reflexr:open is refused in this workspace"
 deploys = Rule(name="app:deploys", when=on(Deploy), scope=by(F.service), then=run("note"))
 PROVENANCE = {"source": "artifactr", "artifact": "art_7", "version": 3}
 
 
-async def anyone(
-    tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor, change: RuleChange
-) -> bool:
-    return True
-
-
-CHAT = StoredRules(allow=anyone, actions={"note": None}, namespaces={"chat"})
-"""Stored rules in the ``chat`` namespace, which any client may change."""
+CHAT = StoredRules(actions={"note": None}, namespaces={"chat"})
+"""Stored rules in the ``chat`` namespace."""
 
 
 def chat_rule(service: str = "auth") -> dict[str, Any]:
@@ -70,6 +64,7 @@ class RecordingBus(InMemorySubscriptionBus):
         super().__init__()
         self.events: list[ResourceUpdated] = []
 
+    @override
     async def publish(self, event: ServerEvent) -> None:
         if isinstance(event, ResourceUpdated):
             self.events.append(event)
@@ -433,10 +428,13 @@ async def test_runs_are_resources_of_their_tenant_only(
 async def test_authorize_decides_which_workspaces_a_client_may_use(
     workspaces: Workspaces,
 ) -> None:
-    asked: list[tuple[TenantId, WorkspaceId, str]] = []
+    asked: list[tuple[TenantId, WorkspaceId | None, str]] = []
 
-    async def authorize(tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor) -> bool:
-        asked.append((tenant_id, workspace_id, actor.kind))
+    async def authorize(
+        tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
+    ) -> bool:
+        if access.action == "reflexr:open":
+            asked.append((tenant_id, workspace_id, actor.kind))
         return workspace_id != "secret"
 
     secret = await workspaces.open("acme", "secret", actor=CLAUDE)
@@ -445,7 +443,14 @@ async def test_authorize_decides_which_workspaces_a_client_may_use(
     [done] = await secret.runs()
     head = await secret.head_seq()
     bus = RecordingBus()
-    mcp = ReflexrMcp(workspaces, resolve=Identity().resolve, authorize=authorize, bus=bus)
+    guarded = Workspaces(
+        workspaces.storage,
+        events=[Deploy, ServiceError],
+        rules=[deploys],
+        stored_rules=CHAT,
+        authorize=authorize,
+    )
+    mcp = ReflexrMcp(guarded, resolve=Identity().resolve, bus=bus)
     run_id = {"run_id": done.id}
     rule = chat_rule()
     tools: dict[str, dict[str, Any]] = {

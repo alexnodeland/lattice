@@ -18,7 +18,7 @@ events are wrapped in an :class:`Envelope` with their position in the workspace'
 import re
 from collections.abc import Iterator, Mapping
 from functools import cached_property
-from typing import Annotated, Any, ClassVar, Literal, cast
+from typing import Annotated, Any, ClassVar, Literal, cast, override
 
 from pydantic import (
     AfterValidator,
@@ -81,15 +81,18 @@ class EventRegistry(Mapping[str, type["Event"]]):
                 )
             self._included.add(namespace)
 
+    @override
     def __getitem__(self, name: str) -> type["Event"]:
         event_type = _types[name]
         if event_type.event_namespace not in self._included:
             raise KeyError(name)
         return event_type
 
+    @override
     def __iter__(self) -> Iterator[str]:
         return (name for name, t in _types.items() if t.event_namespace in self._included)
 
+    @override
     def __len__(self) -> int:
         return sum(1 for _ in self)
 
@@ -174,6 +177,7 @@ class Event(BaseModel):
         super().__init_subclass__(**kwargs)
 
     @classmethod
+    @override
     def __pydantic_init_subclass__(
         cls,
         *,

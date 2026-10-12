@@ -28,7 +28,6 @@ from reflexr.core import (
 from reflexr.fastapi.stream import Stream
 from reflexr.telemetry import actor_attributes, workspace_attributes
 from reflexr.workspace import (
-    Authorize,
     RuleStatus,
     Schedule,
     ScheduleStatus,
@@ -77,7 +76,6 @@ def reflexr_router(
     workspaces: Workspaces,
     *,
     resolve_actor: ResolveActor,
-    authorize: Authorize | None = None,
     hello_timeout: float = 10.0,
     outbox_size: int = 1000,
 ) -> APIRouter:
@@ -85,9 +83,9 @@ def reflexr_router(
 
     Args:
         workspaces: Opens tenant-scoped workspaces, holds the rules and schedules, and carries
-            out commands, once per ``command_id``.
+            out commands, once per ``command_id``. Its ``authorize`` hook is asked about each
+            request, command and read.
         resolve_actor: Authenticates each request and connection.
-        authorize: Whether an actor may use a workspace; allows everything if omitted.
         hello_timeout: Seconds a new connection has to send ``hello``.
         outbox_size: Frames buffered for a slow connection before it is closed (4429).
 
@@ -101,13 +99,13 @@ def reflexr_router(
 
         Raises:
             HTTPException: 401, if ``resolve_actor`` refuses it.
-            Forbidden: If ``authorize`` refuses the actor this workspace.
+            Forbidden: If the workspaces' ``authorize`` refuses the actor this workspace.
         """
         tenant_id, actor = await _authenticate(connection)
         trace.get_current_span().set_attributes(
             {**workspace_attributes(tenant_id, workspace_id), **actor_attributes(actor)}
         )
-        return await workspaces.open(tenant_id, workspace_id, actor=actor, authorize=authorize)
+        return await workspaces.open(tenant_id, workspace_id, actor=actor)
 
     async def _authenticate(connection: HTTPConnection) -> tuple[TenantId, Actor]:
         try:
@@ -118,11 +116,7 @@ def reflexr_router(
     async def workspace_dependency(request: Request, workspace_id: WorkspaceId) -> Workspace:
         return await _or_http(open_workspace(request, workspace_id))
 
-    async def authenticated(request: Request) -> None:
-        await _authenticate(request)
-
     current_workspace = Depends(workspace_dependency)
-    signed_in = Depends(authenticated)
 
     @router.post("/workspaces/{workspace_id}/commands")
     async def post_command(
@@ -172,10 +166,11 @@ def reflexr_router(
             )
         )
 
-    @router.get("/rules", dependencies=[signed_in])
-    async def list_rules() -> list[Rule]:
+    @router.get("/rules")
+    async def list_rules(request: Request) -> list[Rule]:
         """Return the rules registered in code, which every workspace evaluates."""
-        return list(workspaces.rules.values())
+        tenant_id, actor = await _authenticate(request)
+        return await _or_http(workspaces.rules_for(tenant_id, actor=actor))
 
     @router.get("/workspaces/{workspace_id}/rules")
     async def list_rule_status(workspace: Workspace = current_workspace) -> list[RuleStatus]:
@@ -221,8 +216,8 @@ def reflexr_router(
         A schedule that targets particular workspaces lists only the tenant's own, so no
         tenant sees another's ids; one that targets none of them is left out.
         """
-        tenant_id, _ = await _authenticate(request)
-        return workspaces.schedules_for(tenant_id)
+        tenant_id, actor = await _authenticate(request)
+        return await _or_http(workspaces.schedules_for(tenant_id, actor=actor))
 
     @router.get("/workspaces/{workspace_id}/schedules")
     async def list_schedule_status(

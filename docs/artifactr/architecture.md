@@ -531,7 +531,7 @@ reflexr, the sibling library for event-driven agents, is released on its own, an
 | Convention | artifactr | reflexr |
 |---|---|---|
 | Tenancy | Tenants own workspaces; `workspaces.open(tenant, workspace, actor=)` | The same |
-| Authorization | `Workspaces(authorize=)`, asked with an `Access` in every `Workspace` method | `Workspaces.open(..., authorize=)` refuses a workspace, until lattice RFC-0001's phase 1 reaches it |
+| Authorization | `Workspaces(authorize=)`, asked with an `Access` in every `Workspace` method | The same, with the rule in `Access`, and no workspace for reads across a tenant |
 | Log | One per workspace, envelopes with a gap-free `seq` and a `traceparent` | The same |
 | Actors | user, agent, external agent, system, evaluator | The same, plus source |
 | Types | `Artifact` subclasses registered by name | `Event` subclasses registered by name |

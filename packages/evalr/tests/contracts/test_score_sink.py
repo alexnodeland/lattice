@@ -1,6 +1,7 @@
 """Every score sink adapter meets the ScoreSink contract."""
 
 from collections.abc import Sequence
+from typing import override
 
 import pytest
 
@@ -27,12 +28,14 @@ class Appending:
 
 
 class Stubborn(InMemoryScoreSink):
+    @override
     async def record(self, scores: Sequence[Score], /) -> None:
         for score in scores:
             self.scores.setdefault(score.id, score)
 
 
 class Lossy(InMemoryScoreSink):
+    @override
     async def record(self, scores: Sequence[Score], /) -> None:
         await super().record(scores[1:])
 
@@ -42,6 +45,7 @@ class Forgetful(InMemoryScoreSink):
         super().__init__()
         self.forgotten = forgotten
 
+    @override
     async def record(self, scores: Sequence[Score], /) -> None:
         await super().record([s.model_copy(update=self.forgotten) for s in scores])
 

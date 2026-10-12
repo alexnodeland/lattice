@@ -229,23 +229,30 @@ Code rules are registered when the application starts. `rule.definition()` is a 
 A stored rule is the same `Rule`, installed in one workspace at runtime rather than registered in code, as when a person accepts a rule drafted in chat ([ADR-0053](../adr/0053-stored-rules-one-fixed-configuration.md), [ADR-0054](../adr/0054-installing-updating-and-archiving-stored-rules.md)). Stored rules are off unless `Workspaces` is given a `StoredRules`:
 
 ```python
-from reflexr.core import Actor, AgentActor, RuleChange, StoredRules, TenantId, WorkspaceId
+from reflexr.core import Actor, AgentActor, StoredRules, TenantId, WorkspaceId
+from reflexr.workspace import Access
+
+RULE_CHANGES = {"reflexr:install_rule", "reflexr:update_rule", "reflexr:archive_rule"}
 
 
-async def allow(
-    tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor, change: RuleChange
+async def authorize(
+    tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
 ) -> bool:
-    return isinstance(actor, AgentActor) and actor.rule == "relayr:install-rule"
+    if access.action in RULE_CHANGES:
+        return isinstance(actor, AgentActor) and actor.rule == "relayr:install-rule"
+    return True
 
 
 workspaces = Workspaces(
     storage,
     rules=[...],
-    stored_rules=StoredRules(allow=allow, actions={"notify": NotifyParams}, namespaces={"chat"}),
+    stored_rules=StoredRules(actions={"notify": NotifyParams}, namespaces={"chat"}),
+    authorize=authorize,
 )
 ```
 
-- **`allow`** is asked about every change, as `authorize` is about a workspace, with the `RuleChange`: which command, which rule, and the new rule. A refusal is `forbidden`.
+`StoredRules` says what stored rules may do, not who may change them, and `authorize` no longer sees the rule itself, so it can't refuse one by its content. Installing, updating, archiving and replaying a rule are commands like any other: `authorize` hears each, with the rule's name in `Access.rule`, and a refusal is `forbidden` ([ADR-0056](../adr/0056-access-asked-in-every-workspace-method.md)).
+
 - **`actions`** are the only actions a stored rule may run, each with the params model it declares, or `None`. The reactor checks when it is built that each is among its actions and declares that model.
 - **`namespaces`** are the rule namespaces stored rules may use. `Workspaces` refuses a code rule in one of them, so a stored rule never shares a code rule's name. A deploy that drops a namespace hides its stored rules, as one without `StoredRules` hides them all, and the reactor cancels their runs; they can still be archived.
 
@@ -267,4 +274,4 @@ await relayr.archive_rule(rule.name, reason="the artifact was archived")
 
 Each returns a `RuleVersion`: the stored rule as the change left it, and the `seq` of its fact. A change that would leave the rule as it is appends nothing and is a `duplicate`, even with an out-of-date `expected_version`, so a retry of a change that succeeded is safe. Installing and updating check the rule as `Workspaces` checks code rules, then with `check_stored` and `check_provenance`, and a rule with problems is `validation_failed`, listing them all. The same commands, `install_rule`, `update_rule` and `archive_rule`, go through `Workspaces.execute` like every other ([Commands](../protocol.md#commands)), so clients make the same changes over [REST and the WebSocket](serving.md#stored-rules) and [MCP](mcp.md#stored-rules).
 
-`Workspaces.rules_in` is the one way to find a workspace's rules: its code rules, then its active stored rules in the configured namespaces. The reactor reads them for every pass, batch and claim, with no cache, so a rule installed while reactors serve fires on the next matching event, and a run executes the version its claim reads. `get_rule` returns one rule, with a stored rule's version and provenance, and `rule_statuses` reports each rule's `origin` and `version`. A rule never sees the facts about its own changes; other rules can watch them.
+`Workspaces.rules_in` is the one way to find a workspace's rules: its code rules, then its active stored rules in the configured namespaces. The reactor reads them for every pass, batch and claim, with no cache, so a rule installed while reactors serve fires on the next matching event, and a run executes the version its claim reads. `get_rule` returns one rule, with a stored rule's version and provenance, and `rule_statuses` reports each rule's `origin` and `version`, with its lag and dead-letter count, all under `reflexr:read_rules`. A rule never sees the facts about its own changes; other rules can watch them.

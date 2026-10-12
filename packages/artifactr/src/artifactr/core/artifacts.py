@@ -18,7 +18,7 @@ import json
 import re
 from collections.abc import Callable, Mapping
 from types import MappingProxyType
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, override
 
 from pydantic import (
     BaseModel,
@@ -65,6 +65,7 @@ class Artifact(BaseModel):
         super().__init_subclass__(**kwargs)
 
     @classmethod
+    @override
     def __pydantic_init_subclass__(
         cls, *, name: str | None = None, abstract: bool = False, **kwargs: Any
     ) -> None:
@@ -98,6 +99,7 @@ class MarkdownArtifact(Artifact, abstract=True):
 
     text: str = ""
 
+    @override
     def render_for_agent(self) -> str:
         """Return the Markdown text."""
         return self.text

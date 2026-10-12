@@ -21,5 +21,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0013](0013-the-apps-scenarios-against-the-test-application.md) | The app's scenarios, against the test application with Supabase Auth | Accepted |
 | [0014](0014-the-apps-shell.md) | The app's shell: English strings, a committed route tree, and Supabase Auth's client | Accepted |
 | [0015](0015-the-chat-components-and-streamdown.md) | The chat's components, and Markdown through Streamdown | Accepted |
+| [0016](0016-the-threads-area.md) | The Threads area: a workspace's stream, and a scripted agent to chat with | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

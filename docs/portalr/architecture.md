@@ -66,7 +66,8 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 | `/sign-in` | An email and a password |
 | `/` | The person's tenants, from grantr's `/me`: none is no access, and one goes straight to it |
 | `/t/$tenant` | The workspaces grantr says they can open there |
-| `/t/$tenant/w/$workspace` | A workspace, which the app's areas open into |
+| `/t/$tenant/w/$workspace` | A workspace's threads, and a new one; its artifactr stream is open while any of its routes is |
+| `/t/$tenant/w/$workspace/threads/$thread` | A thread's chat: its messages, its runs as they stream, what a paused run waits on, its proposals, and a message to post |
 
 TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test holds it to `src/routes/`. `moon run app:bdd` runs one feature per area through playwright-bdd, in Bun, against the test application with Supabase Auth (GoTrue, alone) in compose's `bdd` profile, served at `/auth/v1` on its origin ([ADR-0013](adr/0013-the-apps-scenarios-against-the-test-application.md)).
 

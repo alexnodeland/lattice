@@ -13,6 +13,7 @@ export {
   ProposalCard,
   Request,
   RunStatus,
+  type Sent,
   Streaming,
   ToolCall,
 } from "./chat";

@@ -158,6 +158,33 @@ def test_logs_are_exported_until_shutdown(captured: Captured) -> None:
     assert len(root.handlers) == len(before) - 1
 
 
+def test_a_record_logged_in_a_tenants_span_carries_its_tenant(captured: Captured) -> None:
+    handle = configure_telemetry(service_name="oncall", instrument=(), **captured.options())
+    tracer = handle.tracer_provider.get_tracer("test")
+    log = logging.getLogger("oncall")
+    with tracer.start_as_current_span("work", attributes={TENANT_ID: "acme"}):
+        with tracer.start_as_current_span("query"):
+            log.warning("inside")
+        log.warning("given", extra={TENANT_ID: "its own"})
+    with tracer.start_as_current_span("stream") as stream:
+        stream.set_attribute(TENANT_ID, "globex")  # named once it is known
+        log.warning("named later")
+    log.warning("outside")
+    assert handle.logger_provider is not None
+    handle.logger_provider.force_flush()
+    tenants = {
+        record.log_record.body: (record.log_record.attributes or {}).get(TENANT_ID)
+        for record in captured.logs.get_finished_logs()
+    }
+    assert tenants == {
+        "inside": "acme",
+        "given": "its own",
+        "named later": "globex",
+        "outside": None,
+    }
+    handle.shutdown()
+
+
 def test_without_logs_there_is_no_logger_provider(captured: Captured) -> None:
     with configure_telemetry(
         service_name="oncall", logs=False, instrument=(), **captured.options()

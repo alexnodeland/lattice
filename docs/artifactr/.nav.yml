@@ -91,6 +91,11 @@ nav:
     - adr/0053-one-site-for-the-family.md
     - adr/0054-dashboards-from-the-checkout.md
     - adr/0055-turns-from-the-log.md
+    - adr/0056-access-asked-in-every-workspace-method.md
+    - adr/0057-a-turn-acts-for-one-author.md
+    - adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md
+    - adr/0059-a-turn-starts-from-an-empty-context.md
+    - adr/0060-the-tenant-on-log-records.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

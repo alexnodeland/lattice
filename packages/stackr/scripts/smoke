@@ -4,7 +4,8 @@
 # Usage: scripts/smoke [PROFILE...]   (default: observability)
 #
 # observability: a trace, a metric and a log through the Collector, found in
-# Tempo, Prometheus and Loki; the span metrics Tempo's metrics generator
+# Tempo, Prometheus and Loki, each naming its tenant as tenant.id, which
+# prom-label-proxy keeps to that tenant; the span metrics Tempo's metrics generator
 # derives from the trace, and the Collector's own metrics, in Prometheus; and
 # Grafana's provisioned data sources and dashboards.
 # database: the database adapter (STACKR_DATABASE: supabase or postgres) has
@@ -47,6 +48,7 @@ setting() {
 host=$(setting STACKR_BIND)
 [[ $host == 0.0.0.0 ]] && host=127.0.0.1
 prometheus="http://$host:$(setting PROMETHEUS_PORT)"
+prom_label_proxy="http://$host:$(setting PROM_LABEL_PROXY_PORT)"
 tempo="http://$host:$(setting TEMPO_PORT)"
 loki="http://$host:$(setting LOKI_PORT)"
 grafana="http://$host:$(setting GRAFANA_PORT)"
@@ -55,6 +57,9 @@ langfuse="http://$host:$(setting LANGFUSE_PORT)"
 gateway="http://$host:$(setting LITELLM_PORT)"
 
 run_id="smoke-$(date +%s)-$RANDOM"
+# The tenant the smoke test's telemetry names, as artifactr does; the Collector
+# copies it to tenant.id.
+tenant="tenant-$run_id"
 service="stackr-smoke"
 timeout=${SMOKE_TIMEOUT:-120}
 
@@ -78,10 +83,13 @@ eventually() {
   log "ok: $description"
 }
 
+# Telemetry as a library sends it, naming the tenant with its attribute: artifactr's unless
+# LIBRARY says otherwise.
 telemetrygen() {
   docker compose --profile smoke run --rm --no-deps telemetrygen "$@" \
     --otlp-endpoint otel-collector:4317 --otlp-insecure \
-    --service "$service" --telemetry-attributes "smoke.run=\"$run_id\"" >/dev/null 2>&1
+    --service "$service" --telemetry-attributes "smoke.run=\"$run_id\"" \
+    --telemetry-attributes "${LIBRARY:-artifactr}.tenant.id=\"$tenant\"" >/dev/null 2>&1
 }
 
 # A query's JSON result has at least one element.
@@ -94,6 +102,35 @@ tempo_has_trace() {
     --data-urlencode "q={ resource.service.name = \"$service\" && span.smoke.run = \"$run_id\" }" \
     --data-urlencode "start=$(($(date +%s) - 3600))" --data-urlencode "end=$(($(date +%s) + 60))" |
     grep -q '"traceID"'
+}
+# The Collector named the tenant as tenant.id: portalr's filter finds the trace,
+# the log and the metric by it, and prom-label-proxy finds the metric for this
+# tenant only.
+tempo_has_tenants_trace() {
+  curl -fsS --get "$tempo/api/search" \
+    --data-urlencode "q={ span.tenant.id = \"$tenant\" && span.smoke.run = \"$run_id\" }" \
+    --data-urlencode "start=$(($(date +%s) - 3600))" --data-urlencode "end=$(($(date +%s) + 60))" |
+    grep -q '"traceID"'
+}
+loki_has_tenants_log() {
+  curl -fsS --get "$loki/loki/api/v1/query_range" \
+    --data-urlencode "query={service_name=\"$service\"} | tenant_id=\"$tenant\" |= \"$1\"" \
+    --data-urlencode "since=1h" |
+    grep -q '"values":\[\['
+}
+# tenant_id is structured metadata, not an index label: a label per tenant would multiply streams.
+loki_keeps_the_tenant_out_of_its_labels() {
+  ! curl -fsS "$loki/loki/api/v1/labels" | grep -q '"tenant_id"'
+}
+proxy_has() {
+  curl -fsS --get "$prom_label_proxy/api/v1/query" --data-urlencode "tenant_id=$1" \
+    --data-urlencode "query=stackr_smoke_total{smoke_run=\"$run_id\"}" |
+    grep -q '"result":\[{'
+}
+proxy_hides_from_another_tenant() {
+  curl -fsS --get "$prom_label_proxy/api/v1/query" --data-urlencode "tenant_id=another-$tenant" \
+    --data-urlencode "query=stackr_smoke_total{smoke_run=\"$run_id\"}" |
+    grep -q '"result":\[\]'
 }
 loki_has_log() {
   curl -fsS --get "$loki/loki/api/v1/query_range" \
@@ -121,11 +158,20 @@ smoke_observability() {
   telemetrygen metrics --metrics 1 --metric-type Sum --aggregation-temporality cumulative \
     --otlp-metric-name stackr.smoke
   telemetrygen logs --logs 1 --body "stackr smoke test $run_id"
+  LIBRARY=reflexr telemetrygen logs --logs 1 --body "stackr smoke test $run_id from reflexr"
 
   eventually "the trace is in Tempo" tempo_has_trace
   eventually "the metric is in Prometheus as stackr_smoke_total" \
     prometheus_has "stackr_smoke_total{job=\"$service\", smoke_run=\"$run_id\"}"
   eventually "the log is in Loki" loki_has_log
+  eventually "the trace names its tenant as tenant.id in Tempo" tempo_has_tenants_trace
+  eventually "artifactr's log names its tenant as tenant_id in Loki" \
+    loki_has_tenants_log "smoke test $run_id"
+  eventually "reflexr's log names its tenant as tenant_id in Loki" \
+    loki_has_tenants_log "from reflexr"
+  eventually "Loki keeps tenant_id out of its index labels" loki_keeps_the_tenant_out_of_its_labels
+  eventually "prom-label-proxy finds the metric for its tenant" proxy_has "$tenant"
+  eventually "prom-label-proxy finds nothing for another tenant" proxy_hides_from_another_tenant
   eventually "Tempo's span metrics are in Prometheus" \
     prometheus_has "traces_spanmetrics_calls_total{service=\"$service\"}"
   eventually "the Collector's own metrics are in Prometheus" \

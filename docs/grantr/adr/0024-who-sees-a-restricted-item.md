@@ -4,7 +4,7 @@
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 
-Builds on [ADR-0003](0003-visible-to-the-workspace-unless-restricted.md) and amends [ADR-0015](0015-a-check-writes-nothing.md) and [ADR-0016](0016-the-sql-adapter.md).
+Amends [ADR-0003](0003-visible-to-the-workspace-unless-restricted.md), generalizing who sees a restricted item from its roles to `grantr:restrict`, and [ADR-0015](0015-a-check-writes-nothing.md) and [ADR-0016](0016-the-sql-adapter.md).
 
 ## Context
 
@@ -16,6 +16,7 @@ ADR-0003 makes a thread or artifact visible to its workspace unless it is restri
 - **`hidden` is the check's rule over a workspace's restricted items:** each one on which the subject holds nothing. The application's own principal, holding `application`, sees everything, as relayr and reflexr act for the whole deployment; the agent acting for no one sees no restricted item.
 - **`resources` follows the same rule,** so a listing of threads or artifacts leaves out those the subject can't see.
 - **`Grants.restrict(tenant, on, restricted=..., by=...)`** sets or clears the flag, and needs `grantr:restrict` on the item. Only a thread or artifact is restricted, and a change that changes nothing is `Invalid`. It records `Restricted` or `Unrestricted`. `restrictions(tenant, workspace, by=...)` lists a workspace's restricted items, with `grantr:restrict` on it.
+- **grantr doesn't know whether an item exists,** so the application checks it with artifactr, reading the thread or artifact as the caller, before it restricts one.
 - **The flag is a row in `grantr_resources`,** keyed by the tenant and the item, which makes the item known to grantr ([ADR-0015](0015-a-check-writes-nothing.md)). A check on a thread or artifact reads it by primary key; `hidden` reads a workspace's by an index on the tenant, workspace and flag. Deleting a tenant deletes its rows.
 
 ## Options considered
@@ -30,4 +31,6 @@ ADR-0003 makes a thread or artifact visible to its workspace unless it is restri
 ## Consequences
 
 - Easier: the matrix says who sees restricted items, in the `grantr:restrict` column.
-- Harder: a check on a thread or artifact reads one more row, by primary key.
+- Harder: a check on a thread or artifact reads one more row, by primary key, when some grant that applies is around it rather than on it.
+- Harder: `hidden` reads a workspace's restricted items on every read, and the subject's grants only when there are any.
+- Harder: a stored rule, which holds `rule` on its workspace, and a service principal acting with a key, don't see a restricted item unless granted a role on it.

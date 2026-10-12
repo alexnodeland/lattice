@@ -751,8 +751,12 @@ class Grants:
             return frozenset()
         scope = None if on.kind == "deployment" else tenant
         grants = await reads.grants(scope, subject, on=on.chain())
+        # The flag matters only to a grant around the item, so it is read only if there is one.
         restricted = (
-            tenant is not None and on.kind in RESTRICTABLE and await reads.is_restricted(tenant, on)
+            tenant is not None
+            and on.kind in RESTRICTABLE
+            and any(grant.on != on for grant in grants)
+            and await reads.is_restricted(tenant, on)
         )
         custom = await self._custom(reads, scope, grants)
         actions = held(grants, on, self._catalog, custom, restricted=restricted)

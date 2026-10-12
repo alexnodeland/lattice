@@ -113,7 +113,7 @@ Every command appends one typed event, such as `Granted` or `MemberRemoved`, to 
 
 - **A transaction is in one tenant,** or on the deployment, and serialized with every other there. The in-memory adapter runs one at a time, on a copy it keeps only if the block exits normally.
 - **Every read is in one tenant, but three:** `tenant_grants` and `key` span tenants, since they are asked before the tenant is known, and `tenants` lists them for operators.
-- **`grants` answers for a grantee and its groups,** optionally on some resources: the one query a check makes. `has` looks up one grant, for membership and duplicates.
+- **`grants` answers for a grantee and its groups,** optionally on some resources: the grants query a check makes. `has` looks up one grant, for membership and duplicates.
 - **grantr knows a workspace, thread, artifact or rule once a grant names it,** or something in it, or once a thread or artifact is restricted, and `resources` lists those, leaving out restricted items the subject can't see. A check writes nothing ([ADR-0015](adr/0015-a-check-writes-nothing.md)).
 
 The contract test, `tests/grants/test_contract.py`, runs every behaviour on this page against memory, SQLite and PostgreSQL. The PostgreSQL tests run when `GRANTR_TEST_POSTGRES_URL` is set, as CI sets it, and `moon run grantr:pg-up` starts a database.
@@ -123,7 +123,7 @@ The contract test, `tests/grants/test_contract.py`, runs every behaviour on this
 `SqlStorage` keeps grantr in the application's database, in eight `grantr_`-prefixed tables, with Alembic migrations that record their version in `grantr_alembic_version` ([ADR-0016](adr/0016-the-sql-adapter.md)).
 
 - **A subject and a resource are stored in typed columns,** their kind, workspace and id, with an empty string for a part they don't have. A grant's primary key, its tenant, resource, subject and role, is the index a check reads, and every other query has an index that leads with its filter.
-- **A check is one query, and one more when a grant names a custom role;** the subject's groups are a subquery of the first.
+- **A check is one query, one more when a grant names a custom role, and one more, by primary key, on a thread or artifact** when a grant around it applies; the subject's groups are a subquery of the first.
 - **The deployment is the tenant `~deployment`,** which no tenant id can be: a tenant id is not empty and has no `~`.
 - **A transaction locks its tenant's row** in `grantr_tenants`, inserting it first if needed; the row's `live` flag says whether the tenant exists.
 - **The audit log's sequence numbers are the database's.** A tenant's transactions run one at a time, so its entries are numbered in the order they commit.

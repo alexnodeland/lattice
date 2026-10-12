@@ -226,7 +226,7 @@ Code rules are registered when the application starts. `rule.definition()` is a 
 
 ## Stored rules
 
-A stored rule is the same `Rule`, installed in one workspace at runtime rather than registered in code, as when a person accepts a rule drafted in chat ([RFC-0003](../rfcs/0003-managing-rules-at-runtime.md)). Stored rules are off unless `Workspaces` is given a `StoredRules`:
+A stored rule is the same `Rule`, installed in one workspace at runtime rather than registered in code, as when a person accepts a rule drafted in chat ([ADR-0053](../adr/0053-stored-rules-one-fixed-configuration.md), [ADR-0054](../adr/0054-installing-updating-and-archiving-stored-rules.md)). Stored rules are off unless `Workspaces` is given a `StoredRules`:
 
 ```python
 from reflexr.core import Actor, AgentActor, RuleChange, StoredRules, TenantId, WorkspaceId
@@ -263,6 +263,7 @@ await relayr.archive_rule(rule.name, reason="the artifact was archived")
 - **`install_rule`** stores version 1, or the next version of an archived rule. The rule starts at its own `reflexr:rule_installed` fact, which carries the whole rule and its provenance, so it acts only on what is logged after it.
 - **`update_rule`** stores the next version of an active rule. A new condition or scope resets it at its fact, with `reflexr:rule_reset`, as a changed code rule is reset; any other change keeps its state. With `expected_version`, a rule someone else changed first is `invalid_state`, naming its version.
 - **`archive_rule`** is the only way to stop one. In one transaction it cancels the rule's unfinished runs, clears its state, and appends `reflexr:rule_archived`, which counts the runs it cancelled. Its progress stays, so a rule installed again under the name starts afresh in its next generation and never reuses a firing id.
+- **`replay_rule`** works on a stored rule as on a code rule. A stored rule starts cold, at its own fact, and replaying it in `"rebuild"` mode from an earlier `from_seq` gives it the state it would have had from there, without firing ([Replaying a rule](reactor.md#replaying-a-rule)). Replaying changes no version, so `authorize` is asked and `allow` is not.
 
 Each returns a `RuleVersion`: the stored rule as the change left it, and the `seq` of its fact. A change that would leave the rule as it is appends nothing and is a `duplicate`, even with an out-of-date `expected_version`, so a retry of a change that succeeded is safe. Installing and updating check the rule as `Workspaces` checks code rules, then with `check_stored` and `check_provenance`, and a rule with problems is `validation_failed`, listing them all. The same commands, `install_rule`, `update_rule` and `archive_rule`, go through `Workspaces.execute` like every other ([Commands](../protocol.md#commands)), so clients make the same changes over [REST and the WebSocket](serving.md#stored-rules) and [MCP](mcp.md#stored-rules).
 

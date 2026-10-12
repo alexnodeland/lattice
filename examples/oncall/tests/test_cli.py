@@ -190,6 +190,23 @@ FRAMES: list[dict[str, Any]] = [
     ),
     event(19, ALICE, type="reflexr:feedback_given", feedback_type="useful", value={"ok": True}),
     event(20, {"kind": "source"}, type="custom", data=1),
+    event(
+        21,
+        ALICE,
+        type="reflexr:rule_installed",
+        rule="team:checkout-deploys",
+        version=1,
+        spec={"name": "team:checkout-deploys"},
+        provenance={},
+    ),
+    event(
+        22,
+        ALICE,
+        type="reflexr:rule_archived",
+        rule="team:checkout-deploys",
+        version=2,
+        cancelled=0,
+    ),
     {"type": "command_result", "command_id": "cmd_1", "ok": True, "outcome": {}},
     {"type": "command_result", "command_id": "cmd_2", "ok": False, "rejection": {"message": "no"}},
     {"type": "error", "message": "not a command frame"},
@@ -222,6 +239,8 @@ def test_frames_render_one_line_per_event() -> None:
         "  19 09:00:05 reflexr:feedback_given "
         '{"feedback_type": "useful", "value": {"ok": true}} · alice',
         '  20 09:00:05 custom {"data": 1} · source',
+        "  21 09:00:05 rule team:checkout-deploys installed, version 1 · alice",
+        "  22 09:00:05 rule team:checkout-deploys archived, version 2 · alice",
         "✗ no",
         "✗ not a command frame",
     ]

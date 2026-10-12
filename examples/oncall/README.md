@@ -4,7 +4,8 @@ reflexr's reference implementation: incident response. Monitoring fires alerts, 
 deploys, and services send heartbeats. Rules watch the log and run workflows. A burst of
 severe alerts runs a triage agent, which opens an incident. An opened incident runs a runbook
 graph, which rolls back a recent deploy or pages a person, then resolves the incident. A service
-that stops sending heartbeats is paged.
+that stops sending heartbeats is paged. People add rules of their own at runtime, which page a
+service's person on call.
 
 It is a small, complete application built only on reflexr's public API:
 
@@ -14,9 +15,9 @@ It is a small, complete application built only on reflexr's public API:
 | Rules | [`rules.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/rules.py) | A count within a window, an event, and an absence, each scoped by service; a `Schedule` whose ticks keep time moving |
 | Triage agent | [`triage.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/triage.py) | A pydantic-ai `Agent` over `Reaction[OncallDeps]` with the `EventContext` capability, allowed to emit `oncall:incident.opened`, and a structured verdict |
 | Runbook graph | [`runbook.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/runbook.py) | A pydantic-graph `GraphBuilder` graph with a decision, checkpointed after every step, that reads the log and emits through the `Reaction` |
-| Paging | [`actions.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/actions.py) | A plain async function, idempotent by its run id |
+| Paging | [`actions.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/actions.py) | Plain async functions, idempotent by their run id: `page`, and `notify`, which takes params |
 | Services | [`services.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/services.py) | The pager and deployer the workflows act on: in-memory fakes, given to every action as `reaction.deps` |
-| Server | [`app.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/app.py) | FastAPI with REST and the WebSocket stream at `/v1` and MCP at `/mcp`, running the `Reactor` in its lifespan, over in-memory or SQL storage, with OpenTelemetry, Langfuse and a LiteLLM proxy when configured |
+| Server | [`app.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/app.py) | FastAPI with REST and the WebSocket stream at `/v1` and MCP at `/mcp`, running the `Reactor` in its lifespan, over in-memory or SQL storage, with OpenTelemetry, Langfuse and a LiteLLM proxy when configured, and the `StoredRules` that let people install rules |
 | Terminal client | [`cli.py`](https://github.com/alexnodeland/lattice/blob/main/examples/oncall/src/oncall/cli.py) | Publishes events, follows the stream live, and operates runs |
 
 ## How it fits together
@@ -191,6 +192,32 @@ Every command takes `--url` (default `http://127.0.0.1:8000`), `--workspace` (de
   ```
 
   See the [protocol](https://lattice.alexnodeland.com/reflexr/protocol/) for commands and reads.
+- **Rules at runtime:** a person can install a rule in the `team` namespace that runs `notify`,
+  which pages the person on call for the service its params name. This one pages checkout's
+  whenever checkout is deployed:
+
+  ```sh
+  curl -H 'x-user: alice' -H 'content-type: application/json' \
+    localhost:8000/v1/workspaces/prod/commands -d '{
+    "type": "command", "command_id": "install-checkout-deploys",
+    "command": {"type": "install_rule", "provenance": {"requested_by": "alice"}, "rule": {
+      "name": "team:checkout-deploys",
+      "description": "Tell the person on call for checkout whenever it is deployed.",
+      "when": {
+        "filter": {"kind": "all", "of": [
+          {"kind": "on", "types": ["oncall:deploy.completed"]},
+          {"kind": "where", "field": "service", "op": "eq", "value": "checkout"}
+        ]},
+        "throttle": {"at_most": 1, "per": "PT15M"}
+      },
+      "then": {"action": "notify", "params": {"service": "checkout"}},
+      "ordering": "none",
+      "timeout": "PT1M"
+    }}}'
+  ```
+
+  `update_rule` replaces it and `archive_rule` stops it. MCP clients may read rules but not
+  change them. See [stored rules](https://lattice.alexnodeland.com/reflexr/guides/rules/#stored-rules).
 - **MCP:** point an MCP client at `http://127.0.0.1:8000/mcp/`. It can publish events, read the
   log, and list, retry, skip and cancel runs, like any other participant.
 

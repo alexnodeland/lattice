@@ -1,6 +1,6 @@
 # ADR-0031: The reference implementation's events and rules
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0051](0051-qualified-rule-names.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

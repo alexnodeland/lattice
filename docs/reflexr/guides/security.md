@@ -20,7 +20,9 @@ The reactor works the same way: it evaluates each workspace under its own lease,
 
 A workspace is also the unit of access. Anyone who may use a workspace reads its whole log, over REST, the WebSocket or MCP, so put events with different audiences in different workspaces.
 
-Rules, schedules and the event allowlist are your application's code, not a tenant's data. They belong to the `Workspaces` object, and every tenant's workspaces evaluate the same rules. So, by design, **every authenticated client of any tenant can read every rule and schedule definition**: `GET /rules`, `GET /schedules` and the MCP `list_rules` tool return them, with their names, descriptions, conditions, scopes, action names and timetables, and `authorize` is not asked, since they name no workspace. The one exception is a schedule's targets, which name workspaces: `GET /schedules` narrows a schedule that targets particular workspaces to the caller's tenant's, and leaves out a schedule that targets none of them, so no tenant sees another's ids. Keep secrets and anything tenant-specific out of rules and schedules, such as a customer's name in a rule's description or condition. If some clients must not see them, do not mount those routes for them, or put them behind a check of your own.
+Code rules, schedules and the event allowlist are your application's code, not a tenant's data. They belong to the `Workspaces` object, and every tenant's workspaces evaluate the same code rules. So, by design, **every authenticated client of any tenant can read every code rule and schedule definition**: `GET /rules`, `GET /schedules` and the MCP `list_rules` tool return them, with their names, descriptions, conditions, scopes, action names and timetables, and `authorize` is not asked, since they name no workspace. The one exception is a schedule's targets, which name workspaces: `GET /schedules` narrows a schedule that targets particular workspaces to the caller's tenant's, and leaves out a schedule that targets none of them, so no tenant sees another's ids. Keep secrets and anything tenant-specific out of code rules and schedules, such as a customer's name in a rule's description or condition. If some clients must not see them, do not mount those routes for them, or put them behind a check of your own.
+
+[Stored rules](rules.md#stored-rules) are a tenant's data. Each belongs to the one workspace it was installed in, and is keyed by its tenant and workspace like the log, so **a stored rule is never listed to another tenant**, nor to another workspace of its own tenant. `GET /rules` and `list_rules` leave stored rules out. A workspace's own reads, `GET /workspaces/{workspace_id}/rules`, `GET /workspaces/{workspace_id}/rules/{rule}`, and MCP's `rule_status` and `get_rule`, show its stored rules, with their versions and provenance, to whoever may use the workspace; another tenant's workspace of the same id has no rule of that name ([ADR-0055](../adr/0055-reading-stored-rules.md)).
 
 Reading or writing another tenant's data through the public API is a vulnerability; please [report it](../../project/security.md) if you find a way.
 
@@ -41,6 +43,8 @@ Return the actor kind that says who is calling: `UserActor` for a person, `Sourc
 ## Authorization
 
 Within a tenant, decide who may use which workspace with an `authorize(tenant_id, workspace_id, actor)` hook, which the router and `ReflexrMcp` both take. Over REST, `False` answers 403, and over the WebSocket it closes the connection with 4403; over MCP, it is asked on every tool call, resource read and resource subscription that names a workspace, and a refusal is a tool error, or a failed read or subscription, carrying the `forbidden` rejection's message. Without it, any authenticated actor may use every workspace of its own tenant. Pass the same function to both surfaces, so a client cannot reach over one what the other refuses it.
+
+Changing a stored rule is behaviour that runs in the workspace, so `authorize` alone doesn't decide it. `install_rule`, `update_rule` and `archive_rule` also ask the `allow` hook of `StoredRules`, after `authorize`, with the `RuleChange`; without `StoredRules`, every change is `forbidden`, and so is any change to a code rule's name ([ADR-0053](../adr/0053-stored-rules-one-fixed-configuration.md)). Admit as few actors as you can, such as only the bridge's run that installs a rule a person accepted. lattice's [RFC-0001](../../rfcs/0001-grantr-identity-and-access.md) plans to fold `allow` into a widened `authorize`.
 
 Every operation a client can perform is a command, and every command is attributed to the handle's actor in the log: who retried, skipped or cancelled a run, who replayed a rule, and who gave feedback ([ADR-0024](../adr/0024-causal-chains-and-operator-actions.md)). If some actors may publish but not operate runs, check the command in your own route before handing it on, or give those actors a surface that only publishes, such as the events endpoint behind its own resolver.
 
@@ -65,6 +69,17 @@ Rules run agents on events that the outside world wrote, so treat event data as 
 - **Least privilege in actions.** Actions run with your application's dependencies (`reaction.deps`). Give them only what they need, and check permissions in the action or tool, not only in the prompt.
 - **The model gateway.** Model spend and content controls, such as per-tenant keys, budgets and guardrails, live in the [LLM gateway](gateway.md). Keys come from your secret store and never appear in the log or on spans.
 
+## Stored rules
+
+A stored rule is behaviour a tenant adds at runtime, so reflexr bounds what one can do whatever `allow` admits:
+
+- **Only registered code runs.** A stored rule may name only the actions in `StoredRules.actions`, with params checked against their models, and has no predicates and no `matches` operator, whose regular expressions could run without a timeout while the workspace's lock is held.
+- **Its cost is bounded.** A throttle of at most 60 firings an hour is required, over the whole rule, since a stored rule has no scope fields; retries, the timeout, windows, the description and the rule's size are bounded, and a workspace has at most 50 active stored rules. The action's usage limits and the tenant's gateway budget apply as for any run.
+- **Its loops are bounded.** No rule field can raise the depth limit, and `reflexr:rule_installed` continues the causal chain of whatever installed the rule.
+- **Its text is untrusted.** A rule's description reaches agents' prompts, so treat it as you treat event data, and keep the gateway's guardrails on.
+- **Provenance is a claim.** reflexr records it unread, beside the actor that made the change, which your application authenticated. Check what it says before acting on it, as relayr re-reads artifactr before it installs a rule.
+- **Operators see the names.** A stored rule's name reaches spans, Langfuse and LiteLLM metadata, which are operators' tools, not tenants'. Metrics record its namespace, such as `chat:*`, not its name.
+
 ## Limits
 
 Events that set off workflows can loop and can spend. The library bounds both, and [Loop and spend safety](safety.md) covers each limit in detail ([ADR-0010](../adr/0010-loop-and-spend-safety.md)):
@@ -77,6 +92,7 @@ Events that set off workflows can loop and can spend. The library bounds both, a
 | How long one attempt may take | `Rule(timeout=...)` | None |
 | Runs executing at once, per reactor | `Reactor(concurrency=...)` | 10 |
 | Requests and tokens per agent attempt | `AgentAction(usage_limits=UsageLimits(...))` | None |
+| What a stored rule may be: its throttle, retries, timeout, windows, size, and how many a workspace has | Constants in `reflexr.core`, checked by `check_stored` | Fixed ([Stored rules](rules.md#stored-rules)) |
 
 A rule whose action triggers itself stops at the depth limit: with `max_depth=3`, a rule that answers each `oncall:incident.opened` by emitting another fires three times, and the firing that would go deeper is refused and dead-lettered for that rule, with the reason `the firing would be at causation depth 4, beyond the limit of 3`. A run's handle that tries to publish beyond the limit is rejected with `depth_exceeded`.
 

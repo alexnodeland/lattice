@@ -14,7 +14,34 @@ from mcp.types import TextContent
 
 import oncall.app
 from oncall.app import Oncall, create_app, open_database
-from oncall.services import Rollback
+from oncall.services import Page, Rollback
+
+CHECKOUT_DEPLOYS: dict[str, Any] = {
+    "name": "team:checkout-deploys",
+    "description": "Tell the person on call for checkout whenever it is deployed.",
+    "when": {
+        "filter": {
+            "kind": "all",
+            "of": [
+                {"kind": "on", "types": ["oncall:deploy.completed"]},
+                {"kind": "where", "field": "service", "op": "eq", "value": "checkout"},
+            ],
+        },
+        "throttle": {"at_most": 1, "per": "PT15M"},
+    },
+    "then": {"action": "notify", "params": {"service": "checkout"}},
+    "ordering": "none",
+    "timeout": "PT1M",
+}
+"""A rule a person installs at runtime, as JSON."""
+
+
+async def command(client: httpx.AsyncClient, command_id: str, **body: Any) -> dict[str, Any]:
+    """Send one command over REST and return its result."""
+    frame = {"type": "command", "command_id": command_id, "command": body}
+    response = await client.post(f"{BASE}/commands", json=frame)
+    assert response.status_code == 200, response.text
+    return response.json()
 
 
 async def test_severe_alerts_are_triaged_and_the_incident_resolved(
@@ -188,6 +215,59 @@ async def test_mcp_clients_publish_into_the_same_workspace(server: str) -> None:
     async with httpx.AsyncClient(base_url=server) as http:
         [deploy] = await log(http, "oncall:deploy.completed")
     assert deploy["actor"] == {"kind": "external_agent", "client_id": "mcp", "name": "MCP client"}
+
+
+async def test_a_rule_installed_over_rest_fires_until_it_is_archived(
+    client: httpx.AsyncClient, oncall: Oncall, clock: FakeClock
+) -> None:
+    installed = await command(
+        client,
+        "install-1",
+        type="install_rule",
+        rule=CHECKOUT_DEPLOYS,
+        provenance={"requested_by": "alice"},
+    )
+    assert installed["outcome"] == {
+        "type": "rule_version",
+        "rule": "team:checkout-deploys",
+        "version": 1,
+        "seq": 1,
+        "duplicate": False,
+    }
+    stored = (await client.get(f"{BASE}/rules/team:checkout-deploys")).json()
+    assert (stored["origin"], stored["version"]) == ("stored", 1)
+    assert stored["provenance"] == {"requested_by": "alice"}
+
+    await publish(client, type="oncall:deploy.completed", service="api", version="v2")
+    await publish(client, type="oncall:deploy.completed", service="checkout", version="v7")
+    assert (await oncall.reactor.settle()).firings == 1
+    [run] = (await client.get(f"{BASE}/runs")).json()
+    assert (run["rule"], run["status"], run["output"]) == (
+        "team:checkout-deploys",
+        "succeeded",
+        {"paged": "checkout"},
+    )
+    assert oncall.deps.pager.pages == [Page("checkout", CHECKOUT_DEPLOYS["description"])]
+    [fact] = await log(client, "reflexr:rule_installed")
+    assert fact["actor"] == {"kind": "user", "id": "alice", "name": "alice"}
+
+    archived = await command(client, "archive-1", type="archive_rule", rule="team:checkout-deploys")
+    assert archived["outcome"]["version"] == 2
+    clock.advance(3600)
+    await publish(client, type="oncall:deploy.completed", service="checkout", version="v8")
+    assert (await oncall.reactor.settle()).firings == 0
+    assert len(oncall.deps.pager.pages) == 1
+
+
+async def test_only_people_change_rules_at_runtime(server: str) -> None:
+    async with Client(f"{server}/mcp/") as mcp:
+        result = await mcp.call_tool(
+            "install_rule", {"workspace_id": "prod", "rule": CHECKOUT_DEPLOYS}
+        )
+    assert result.is_error
+    [content] = result.content
+    assert isinstance(content, TextContent)
+    assert "not yours to make" in content.text
 
 
 async def test_workspaces_can_live_in_a_database(

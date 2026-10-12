@@ -1,6 +1,6 @@
 # RFC-0003: Managing rules at runtime
 
-**Status:** Accepted
+**Status:** Implemented
 **Author:** Alex Nodeland
 **Created:** 2026-09-29
 **Discussion:** [#75](https://github.com/alexnodeland/reflexr/pull/75), from [issue #21][issue-21]; accepted on 2026-09-29, with the decisions in [Decisions](#decisions)
@@ -397,9 +397,9 @@ Each phase is a series of small pull requests to `main`.
 - [x] Phase 2: storage and migration 0006
 - [x] Phase 3: workspace and reactor, and the commands in the protocol
 - [x] Phase 4: surfaces, the REST read and the MCP tools
-- [ ] Phase 5: docs, ADRs and oncall
+- [x] Phase 5: docs, ADRs ([ADR-0051](../adr/0051-qualified-rule-names.md) to [ADR-0055](../adr/0055-reading-stored-rules.md)) and oncall
 - [x] [stackr#37][s-37]: "archives", in RFC-0002
-- [ ] stackr RFC-0002's prerequisite row for #21 marked done, unblocking its phase 5
+- [x] stackr RFC-0002's prerequisite row for #21 marked done, unblocking its phase 5
 
 [adr-0003]: ../adr/0003-independent-sibling-of-artifactr.md
 [adr-0006]: ../adr/0006-rules-as-typed-serializable-data.md

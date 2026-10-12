@@ -28,10 +28,10 @@ Bodies are stored as JSON, not JSONB, and PostgreSQL's `json` does take an escap
 
 ## Consequences
 
-- Easier: every storage answers a NUL alike, and Schemathesis runs with NUL characters allowed.
+- Easier: every storage answers a NUL alike, and a NUL is a client's mistake, not a server error.
 - Harder: a string with a NUL that SQLite or the in-memory storage took before is now refused.
 
 ## Action items
 
 1. [x] `_check_text` in every `Workspaces` and `Workspace` method, with a table of calls run against every storage.
-2. [x] `allow-x00` dropped from the root `schemathesis.toml`.
+2. [x] The root `schemathesis.toml` keeps `allow-x00 = false`, with this reason: the document can't say of every string that it refuses a NUL, so a NUL would fail `positive_data_acceptance`.

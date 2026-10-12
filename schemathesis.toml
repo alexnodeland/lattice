@@ -1,6 +1,11 @@
 # Schemathesis, as the `api` tasks run it (scripts/api, lattice ADR-0015). A server error, and every
 # check not turned off here, fails.
 
+[generation]
+# The libraries refuse a NUL character in any string as `validation_failed` (#67), which the
+# document doesn't say of every string, so a NUL would fail `positive_data_acceptance`.
+allow-x00 = false
+
 [checks]
 # The routers don't document their rejections yet (#66).
 status_code_conformance.enabled = false

@@ -55,6 +55,7 @@ The packages' own tasks:
 | `artifactr:api`, `reflexr:api` | Start the reference implementation on PostgreSQL, run the package's Bruno collection and Schemathesis against it, and stop it, as CI's Acceptance job does. It needs Docker |
 | `docplan:image`, `oncall:image` | Build the reference implementation's image from the root, start it on PostgreSQL and stop it, as CI's Images job does |
 | `portalr:api` | Start portalr's test application beside Tempo, Loki, Prometheus and prom-label-proxy, seed two tenants, run its Bruno collection with the tools up and down and Schemathesis, and stop it, as CI's Acceptance job does. It needs Docker |
+| `app:bdd` | Build the UIs, start portalr's test application with Supabase Auth, sign up the scenarios' people, run the app's features through playwright-bdd, and stop it, as CI's Acceptance job does. It needs Docker, and Chromium for Playwright |
 | `client:api` | Start docplan and oncall, and run portalr's client against them, as CI's Acceptance job does. It needs Docker |
 | `client:types` | Regenerate the client's types from the packages' committed documents (a test fails if they drift) |
 | `lattice:knip` | Find unused files, exports and dependencies in the web packages |

@@ -42,8 +42,9 @@ test = [
     "pytest-timeout>=2.4",
 ]
 lint = ["ruff>=0.16", "pyright>=1.1.414"]
-# The acceptance tests' application (tests/app/), which its image serves.
-app = ["uvicorn>=0.54"]
+# The acceptance tests' application (tests/app/), which its image serves: it verifies Supabase
+# Auth's tokens, and names artifactr's actions to grantr, so that it lists workspaces.
+app = ["uvicorn>=0.54", "pyjwt>=2.15", "artifactr-ai"]
 dev = [
     { include-group = "test" },
     { include-group = "lint" },
@@ -53,6 +54,7 @@ dev = [
 # In lattice, grantr is the checkout's. A built wheel keeps the range in [project] alone.
 [tool.uv.sources]
 grantr = { workspace = true }
+artifactr-ai = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]

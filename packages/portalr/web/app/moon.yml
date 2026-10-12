@@ -2,10 +2,8 @@
 language: 'typescript'
 layer: 'application'
 dependsOn:
+  - 'client'
   - 'ui'
-workspace:
-  inheritedTasks:
-    exclude: ['test'] # it has no code of its own to test until phase 5
 
 tasks:
   build:
@@ -13,3 +11,25 @@ tasks:
       - '/packages/portalr/src/portalr/static/app/**/*'
     options:
       mergeOutputs: 'replace'
+
+  # The app's scenarios against portalr's test application, with Supabase Auth (portalr ADR-0013),
+  # in CI's Acceptance job. It needs Docker, and Chromium for Playwright.
+  bdd:
+    description: "Run the app's scenarios against portalr's test application"
+    command: 'scripts/bdd'
+    deps:
+      - 'app:build'
+      - 'admin:build'
+    inputs:
+      - 'bdd/**/*'
+      - 'src/**/*'
+      - 'scripts/bdd'
+      - 'playwright.config.ts'
+      - '/packages/portalr/compose.yaml'
+      - '/packages/portalr/tests/app/**/*'
+      - '/packages/portalr/src/**/*'
+      - '/packages/grantr/src/**/*'
+      - '/packages/artifactr/src/**/*'
+    options:
+      cache: false
+

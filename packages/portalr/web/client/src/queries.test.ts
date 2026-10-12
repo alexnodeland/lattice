@@ -14,6 +14,9 @@ interface Seen {
 }
 
 const seen: Seen[] = [];
+const ME = { tenant: "acme", roles: ["owner"], workspaces: ["ws_1"] };
+const MEMBERSHIPS = [{ tenant: "acme", user: "alice", roles: ["owner"] }];
+let origin: string;
 let server: Server<unknown>;
 let queries: ReturnType<typeof createQueries>;
 
@@ -27,10 +30,13 @@ beforeAll(() => {
       if (url.pathname.endsWith("/missing")) {
         return Response.json({ detail: "not found" }, { status: 404 });
       }
+      if (url.pathname === "/grantr/v1/me") {
+        return Response.json(request.headers.has("x-tenant") ? ME : { memberships: MEMBERSHIPS });
+      }
       return Response.json(url.pathname.endsWith("/checks") ? [true, false] : []);
     },
   });
-  const origin = `http://127.0.0.1:${server.port}`;
+  origin = `http://127.0.0.1:${server.port}`;
   const api = createApi(
     { artifactr: `${origin}/artifactr/v1`, reflexr: `${origin}/reflexr/v1`, grantr: origin },
     () => ({ token: "t0k3n", tenant: "acme" }),
@@ -66,12 +72,26 @@ test("every read has its own path", async () => {
     [queries.artifactr.proposals("ws_1"), "/artifactr/v1/workspaces/ws_1/proposals"],
     [queries.reflexr.rules("ws_1"), "/reflexr/v1/workspaces/ws_1/rules"],
     [queries.reflexr.runs("ws_1"), "/reflexr/v1/workspaces/ws_1/runs"],
-    [queries.grantr.me("acme"), "/grantr/v1/me"],
   ] as const;
   for (const [options, path] of reads) {
     await client.fetchQuery(options as unknown as Parameters<QueryClient["fetchQuery"]>[0]);
     expect(seen.at(-1)?.url.pathname).toBe(path);
   }
+});
+
+test("grantr says who the caller is in the session's tenant, or lists every one without it", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const signedIn = createQueries(
+    createApi({ artifactr: "", reflexr: "", grantr: origin }, () => ({ token: "t", tenant: null })),
+  );
+  expect(await client.fetchQuery(queries.grantr.me("acme"))).toEqual(ME);
+  expect(seen.at(-1)?.headers.get("x-tenant")).toBe("acme");
+  expect(await client.fetchQuery(signedIn.grantr.memberships())).toEqual(MEMBERSHIPS);
+  expect(seen.at(-1)?.headers.get("x-tenant")).toBeNull();
+  // Each is the wrong question for the other session.
+  await expect(client.fetchQuery(signedIn.grantr.me("acme"))).rejects.toThrow(/every tenant/);
+  client.clear();
+  await expect(client.fetchQuery(queries.grantr.memberships())).rejects.toThrow(/one tenant/);
 });
 
 test("checks are asked in one call, and answered in order", async () => {

@@ -20,6 +20,7 @@ tasks:
       - '/packages/artifactr/schemas/*.json'
       - '/packages/reflexr/schemas/*.json'
       - '/packages/grantr/schemas/*.json'
+      - '/packages/portalr/schemas/*.json'
     options:
       mergeArgs: 'replace'
 

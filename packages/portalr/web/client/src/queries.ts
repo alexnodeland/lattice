@@ -38,6 +38,7 @@ export const keys = {
     runs: (ws: string) => ["reflexr", "workspace", ws, "runs", "list"] as const,
   },
   grantr: {
+    memberships: () => ["grantr", "memberships"] as const,
     me: (tenant: string) => ["grantr", tenant, "me"] as const,
     checks: (tenant: string, checks: readonly Check[]) =>
       ["grantr", tenant, "checks", checks] as const,
@@ -128,10 +129,29 @@ export function createQueries(api: Api) {
         }),
     },
     grantr: {
+      /** Every tenant the caller is a member of; asked while the session names no tenant. */
+      memberships: () =>
+        queryOptions({
+          queryKey: keys.grantr.memberships(),
+          queryFn: async () => {
+            const me = await body(api.grantr.GET("/grantr/v1/me"));
+            if (!("memberships" in me)) {
+              throw new Error("grantr answered for one tenant: the session names one");
+            }
+            return me.memberships;
+          },
+        }),
+      /** The caller in the session's tenant: their roles, and the workspaces they can open. */
       me: (tenant: string) =>
         queryOptions({
           queryKey: keys.grantr.me(tenant),
-          queryFn: () => body(api.grantr.GET("/grantr/v1/me")),
+          queryFn: async () => {
+            const me = await body(api.grantr.GET("/grantr/v1/me"));
+            if ("memberships" in me) {
+              throw new Error("grantr answered for every tenant: the session names none");
+            }
+            return me;
+          },
         }),
       /** Whether the caller may take each action, in the order asked (lattice RFC-0002). */
       checks: (tenant: string, checks: readonly Check[]) =>

@@ -11,6 +11,7 @@ export { type ArtifactrStream, artifactr } from "./artifactr";
 export type * as ArtifactrApi from "./generated/artifactr.openapi";
 export type * as ArtifactrV1 from "./generated/artifactr.v1";
 export type * as GrantrApi from "./generated/grantr.openapi";
+export type * as PortalrApi from "./generated/portalr.openapi";
 export type * as ReflexrApi from "./generated/reflexr.openapi";
 export type * as ReflexrRulesV1 from "./generated/reflexr.rules.v1";
 export type * as ReflexrV1 from "./generated/reflexr.v1";

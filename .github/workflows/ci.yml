@@ -129,6 +129,11 @@ jobs:
       # library is affected.
       - run: bun install --frozen-lockfile
       - run: uv run --no-project python scripts/affected.py api
+      # app's scenarios, through playwright-bdd in Chromium, against portalr's test application
+      # with Supabase Auth (portalr ADR-0013); ui holds Playwright.
+      - run: bun x --bun --no-install playwright install --with-deps --only-shell chromium
+        working-directory: packages/portalr/web/ui
+      - run: uv run --no-project python scripts/affected.py bdd
       # Schemathesis's JUnit report for each library, to read what failed.
       - name: Upload the reports
         if: failure() && hashFiles('.api-reports/**') != ''

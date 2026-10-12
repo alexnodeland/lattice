@@ -4,20 +4,25 @@
 export interface Session {
   /** The access token Supabase Auth issued. */
   readonly token: string;
-  /** The active tenant's id. */
-  readonly tenant: string;
+  /** The active tenant's id, or null before one is chosen: grantr then answers for every one. */
+  readonly tenant: string | null;
 }
 
-/** The headers every REST request carries: the token, and the active tenant. */
+/** The headers every REST request carries: the token, and the active tenant once there is one. */
 export function sessionHeaders(session: Session): Record<string, string> {
-  return { Authorization: `Bearer ${session.token}`, "X-Tenant": session.tenant };
+  const token = { Authorization: `Bearer ${session.token}` };
+  return session.tenant === null ? token : { ...token, "X-Tenant": session.tenant };
 }
 
 /**
  * A workspace stream's URL: the surface's base, `http(s)://` or `ws(s)://`, and the session in
  * the query, since a browser's WebSocket can't send headers (lattice RFC-0002).
  */
-export function streamUrl(base: string, workspace: string, session: Session): string {
+export function streamUrl(
+  base: string,
+  workspace: string,
+  session: Session & { readonly tenant: string },
+): string {
   const url = new URL(
     `${base.replace(/\/$/, "")}/workspaces/${encodeURIComponent(workspace)}/stream`,
   );

@@ -1,0 +1,70 @@
+import { expect } from "@playwright/test";
+import { createBdd } from "playwright-bdd";
+import { email, password } from "./people";
+
+const { Given, When, Then } = createBdd();
+
+async function signIn(page: import("@playwright/test").Page, person: string, secret: string) {
+  await page.goto("sign-in");
+  await page.getByLabel("Email").fill(email(person));
+  await page.getByLabel("Password").fill(secret);
+  await page.getByRole("button", { name: "Sign in" }).click();
+}
+
+When("{word} signs in", async ({ page }, person: string) => {
+  await signIn(page, person, password(person));
+});
+
+Given("{word} has signed in", async ({ page }, person: string) => {
+  await signIn(page, person, password(person));
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+});
+
+When(
+  "{word} signs in with the password {string}",
+  async ({ page }, person: string, secret: string) => {
+    await signIn(page, person, secret);
+  },
+);
+
+When("they choose the tenant {string}", async ({ page }, tenant: string) => {
+  await page
+    .getByRole("navigation", { name: "Tenants" })
+    .getByRole("link", { name: tenant })
+    .click();
+});
+
+When("they open the workspace {string}", async ({ page }, workspace: string) => {
+  await page
+    .getByRole("navigation", { name: "Workspaces" })
+    .getByRole("link", { name: workspace })
+    .click();
+});
+
+When("they go back to every workspace in {string}", async ({ page }, tenant: string) => {
+  await page.getByRole("link", { name: `Every workspace in ${tenant}` }).click();
+});
+
+When("they sign out", async ({ page }) => {
+  await page.getByRole("button", { name: "Sign out" }).click();
+});
+
+Then("they see the page {string}", async ({ page }, title: string) => {
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
+});
+
+Then(
+  "they see the workspaces {string} and {string}",
+  async ({ page }, one: string, other: string) => {
+    const workspaces = page.getByRole("navigation", { name: "Workspaces" }).getByRole("link");
+    await expect(workspaces).toHaveText([one, other]);
+  },
+);
+
+Then("they see {string}", async ({ page }, text: string) => {
+  await expect(page.getByText(text)).toBeVisible();
+});
+
+Then("they are told {string}", async ({ page }, text: string) => {
+  await expect(page.getByRole("alert")).toHaveText(text);
+});

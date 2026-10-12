@@ -4,7 +4,7 @@
 **Author:** Alex Nodeland
 **Created:** 2026-10-12
 **Discussion:** [#43](https://github.com/alexnodeland/lattice/pull/43); accepted on 2026-10-12, with the decisions in [Decisions](#decisions) (D9 taken with lattice RFC-0002's)
-**Amended by:** [grantr ADR-0015](../grantr/adr/0015-a-check-writes-nothing.md): a check writes nothing, so grantr knows a workspace from its grants
+**Amended by:** [grantr ADR-0015](../grantr/adr/0015-a-check-writes-nothing.md): a check writes nothing, so grantr knows a workspace from its grants; [relayr ADR-0017](../relayr/adr/0017-the-follower-acts-as-the-application.md): `subject_of` maps the source `artifactr` to the application's own principal
 **Siblings:**
 
 - [artifactr ADR-0012][a-adr-0012] and [ADR-0048][a-adr-0048] put authorization within a tenant behind one hook, asked in one place. This RFC widens that hook, and amends both.

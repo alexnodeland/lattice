@@ -5,3 +5,31 @@ tags: ['distribution']
 dependsOn:
   - 'artifactr'
   - 'reflexr'
+
+tasks:
+  pg-up:
+    description: 'Start PostgreSQL for the SQL tests, from compose.yaml, on port 54332'
+    command: 'docker compose up -d --wait postgres'
+    options:
+      cache: false
+      runInCI: false
+
+  pg-down:
+    description: 'Stop PostgreSQL'
+    command: 'docker compose down'
+    options:
+      cache: false
+      runInCI: false
+
+  # $RELAYR_TEST_POSTGRES_URL isn't an input: moon counts a variable that is set as a change, and CI
+  # always sets it, so every pull request would run these tests. CI never restores moon's cache;
+  # locally, `moon run relayr:test --force` runs the PostgreSQL tests past a cached run without
+  # them.
+  test-pg:
+    description: 'Run the tests on PostgreSQL as well as SQLite (after pg-up)'
+    command: 'uv run pytest --cov --cov-report=term-missing'
+    env:
+      RELAYR_TEST_POSTGRES_URL: 'postgresql+asyncpg://postgres:relayr@localhost:54332/postgres'
+    options:
+      cache: false
+      runInCI: false

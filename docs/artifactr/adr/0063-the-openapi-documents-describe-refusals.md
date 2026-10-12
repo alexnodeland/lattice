@@ -1,4 +1,4 @@
-# ADR-0062: The OpenAPI documents describe refusals
+# ADR-0063: The OpenAPI documents describe refusals
 
 **Status:** Accepted
 **Date:** 2026-10-12
@@ -17,7 +17,7 @@ Schemathesis found that artifactr's router answers statuses and bodies its OpenA
 - **Every route documents its refusals.** The router is built with `responses=REFUSALS`: 400, 401, 403, 404, 409 and 422, each answering `Refused`, whose `detail` is a `RejectionDetail` (`type`, `message` and the rejection's typed details), a string, or a list of `FieldError`s. `POST .../commands` answers a `CommandResult` or a `Refused` at each rejection's status. Each is described in words of its own, since FastAPI's default description, Python's phrase for the status, changed in 3.13 (`Unprocessable Content`). The models are shared verbatim with reflexr's router.
 - **Every protocol model's tags are required in its JSON Schema.** `tag_required`, in `artifactr.core.tagged` and shared verbatim with reflexr, marks a model's fields fixed to one value required. Every frame, command, outcome, event, envelope, actor, target and union member names it in its config, so the committed protocol schemas and the OpenAPI document say what every frame on the wire carries, and portalr's client no longer adds it ([lattice #82](https://github.com/alexnodeland/lattice/issues/82)). A test holds the OpenAPI document and every `*.v1.json` schema to it. The document asks a REST body for its `type` too, as the WebSocket does; the server still fills it in when it is left out.
 - **An unknown event's `type` is none of the known ones** in its JSON Schema, so no event matches two members of the union.
-- **A path's ids are never empty** (`minLength: 1`).
+- **A path's ids are never empty** (`minLength: 1`), and neither is an id a command gives what it creates: an artifact, a proposal, a thread or a message. One created with an empty id could only be reached through the list route's redirect.
 - **Schemathesis checks conformance.** The root's `schemathesis.toml` turns `status_code_conformance` and `response_schema_conformance` on. `positive_data_acceptance` stays off for the commands, which can be well formed and still not apply, and for the log's reads, whose `limit` and `last` exclude each other.
 
 ## Options considered

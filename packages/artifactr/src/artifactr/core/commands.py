@@ -6,9 +6,9 @@ REST, WebSocket and MCP, turns its input into one of these and submits it throug
 deterministic.
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, JsonValue
 
 from artifactr.core.feedback import FeedbackTarget
 from artifactr.core.ids import (
@@ -33,6 +33,17 @@ MessageKind = Literal["message", "notice"]
 people and starts or steers no turn (ADR-0051)."""
 
 
+def _not_empty(value: str) -> str:
+    if not value:
+        raise ValueError("an id is never empty")
+    return value
+
+
+_NOT_EMPTY: Final = AfterValidator(_not_empty)
+"""What an id a command gives a new item must be: not empty, so the item's route reaches it
+(ADR-0063). It is checked, not documented, so the id keeps its schema."""
+
+
 class _Command(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
@@ -45,11 +56,11 @@ class CreateArtifact(_Command):
     """
 
     type: Literal["create_artifact"] = "create_artifact"
-    artifact_id: ArtifactId = Field(default_factory=new_artifact_id, min_length=1)
+    artifact_id: Annotated[ArtifactId, _NOT_EMPTY] = Field(default_factory=new_artifact_id)
     kind: str
     data: dict[str, JsonValue]
     thread_id: ThreadId | None = None
-    proposal_id: ProposalId = Field(default_factory=new_proposal_id, min_length=1)
+    proposal_id: Annotated[ProposalId, _NOT_EMPTY] = Field(default_factory=new_proposal_id)
 
 
 class EditArtifact(_Command):
@@ -65,7 +76,7 @@ class EditArtifact(_Command):
     patch: Patch
     summary: str | None = None
     thread_id: ThreadId | None = None
-    proposal_id: ProposalId = Field(default_factory=new_proposal_id, min_length=1)
+    proposal_id: Annotated[ProposalId, _NOT_EMPTY] = Field(default_factory=new_proposal_id)
 
 
 class ArchiveArtifact(_Command):
@@ -75,7 +86,7 @@ class ArchiveArtifact(_Command):
     artifact_id: ArtifactId
     base_version: int = Field(ge=1)
     thread_id: ThreadId | None = None
-    proposal_id: ProposalId = Field(default_factory=new_proposal_id, min_length=1)
+    proposal_id: Annotated[ProposalId, _NOT_EMPTY] = Field(default_factory=new_proposal_id)
 
 
 ProposedChange = Annotated[
@@ -88,7 +99,7 @@ class ProposeChange(_Command):
     """Propose a change for someone else to accept, whatever the write policy."""
 
     type: Literal["propose_change"] = "propose_change"
-    proposal_id: ProposalId = Field(default_factory=new_proposal_id, min_length=1)
+    proposal_id: Annotated[ProposalId, _NOT_EMPTY] = Field(default_factory=new_proposal_id)
     change: ProposedChange
     rationale: str | None = None
 
@@ -111,7 +122,7 @@ class CreateThread(_Command):
     """Create a thread."""
 
     type: Literal["create_thread"] = "create_thread"
-    thread_id: ThreadId = Field(default_factory=new_thread_id, min_length=1)
+    thread_id: Annotated[ThreadId, _NOT_EMPTY] = Field(default_factory=new_thread_id)
     title: str = ""
 
 
@@ -120,7 +131,7 @@ class PostMessage(_Command):
 
     type: Literal["post_message"] = "post_message"
     thread_id: ThreadId
-    message_id: MessageId = Field(default_factory=new_message_id, min_length=1)
+    message_id: Annotated[MessageId, _NOT_EMPTY] = Field(default_factory=new_message_id)
     content: str = Field(min_length=1)
     kind: MessageKind = "message"
 

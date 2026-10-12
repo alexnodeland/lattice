@@ -74,7 +74,7 @@ class FieldError(BaseModel):
 
 
 class Refused(BaseModel):
-    """The body of a refused request (artifactr ADR-0062, reflexr ADR-0061).
+    """The body of a refused request (artifactr ADR-0063, reflexr ADR-0061).
 
     ``detail`` is the rejection, the message of a resolver's refusal, or the problems FastAPI
     found with the request.

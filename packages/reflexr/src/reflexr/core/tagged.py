@@ -4,7 +4,7 @@ A member of a discriminated union, such as a command, gives its tag (``type`` or
 default, so Python code can leave it out. A client can't: the discriminator needs the tag to
 tell the members apart. Pydantic's schema calls a field with a default optional, so each
 member's config names :func:`tag_required`, which says what the discriminator does (artifactr
-ADR-0062, reflexr ADR-0061).
+ADR-0063, reflexr ADR-0061).
 """
 
 from typing import cast

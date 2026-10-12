@@ -17,11 +17,11 @@ from collections.abc import Mapping
 
 from pydantic import BaseModel, Field
 
-from artifactr import Artifact, SystemActor, Workspaces
+from artifactr import Artifact, Workspaces
 from reflexr import Event, F, Rule, on, run
 from reflexr.workspace import Action, Reaction
 from relayr.events import MessagePosted
-from relayr.outbound import Allowlist, Outbound
+from relayr.outbound import Allowlist, Outbound, rule_actor
 
 from {{ package_name }}.tickets import AppEvent
 
@@ -102,7 +102,7 @@ def incident_actions(outbound: Outbound, workspaces: Workspaces) -> dict[str, Ac
         workspace = await workspaces.open(
             reaction.workspace.tenant_id,
             reaction.workspace.workspace_id,
-            actor=SystemActor(name="incidents"),
+            actor=rule_actor(reaction.run.rule),
         )
         acting = outbound.acting(reaction)
         for timeline in await workspace.artifacts(Timeline):

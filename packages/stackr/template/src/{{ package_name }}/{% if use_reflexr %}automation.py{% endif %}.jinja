@@ -44,6 +44,7 @@ from reflexr.workspace import (
 )
 {%- if use_relayr %}
 from relayr.events import BRIDGED
+from relayr.inbound import SOURCE
 {%- endif %}
 
 {% if access == 'grantr' -%}
@@ -134,6 +135,9 @@ class Automation:
             events={% if use_relayr %}[*EVENTS, *BRIDGED, *INCIDENT_EVENTS]{% else %}EVENTS{% endif %},
             rules={% if use_relayr %}[*RULES, *(INCIDENT_RULES if actions else [])]{% else %}RULES{% endif %},
             authorize=authorize,
+{%- if use_relayr %}
+            publishers={"artifactr": [SOURCE]},
+{%- endif %}
             on_open=opened(self._mirrors.watch if self._mirrors else None{% if use_relayr %}, on_open{% endif %}),
             tracer_provider=telemetry.tracer_provider if telemetry else None,
             meter_provider=telemetry.meter_provider if telemetry else None,

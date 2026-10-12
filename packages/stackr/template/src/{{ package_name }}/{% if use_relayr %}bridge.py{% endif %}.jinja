@@ -17,13 +17,15 @@ from collections.abc import AsyncGenerator
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from artifactr import SystemActor{% if access == 'grantr' %}, Workspaces{% endif %}
+{% if access == 'grantr' -%}
+from artifactr import Workspaces
+{% endif -%}
 from artifactr.agent import TurnContext
 {%- if access == 'grantr' %}
 from grantr import Grants
 {%- endif %}
 from reflexr.workspace import Action, RunContext
-from relayr.inbound import Followers
+from relayr.inbound import {% if access == 'grantr' %}FOLLOWER, {% endif %}Followers
 from relayr.langfuse import bridged_run, bridged_turns
 from relayr.ledger import InMemoryLedger, Ledger
 from relayr.outbound import Outbound
@@ -33,9 +35,6 @@ from {{ package_name }}.automation import Automation
 from {{ package_name }}.collaboration import Collaboration
 from {{ package_name }}.incidents import ALLOWLISTS, incident_actions
 from {{ package_name }}.telemetry import TelemetryHandle
-
-STARTUP: SystemActor = SystemActor(name="relayr")
-"""Who lists each tenant's workspaces when the application starts."""
 
 
 class Bridge:
@@ -116,21 +115,27 @@ class Bridge:
         follower lets go of its lease while the libraries are up.
         """
         assert self._followers is not None, "create_app connects the bridge"
-        await self._followers.resume()
+        try:
+            await self._followers.resume()
 {%- if access == 'grantr' %}
+            await self._follow_every_tenant()
+{%- endif %}
+            yield
+        finally:
+            await self._followers.aclose()
+
+{%- if access == 'grantr' %}
+
+    async def _follow_every_tenant(self) -> None:
         workspaces = self._workspaces
         assert workspaces is not None, "create_app connects the bridge"
         for tenant in await self._grants.served_tenants():
             after: str | None = None
-            while page := await workspaces.list(tenant, actor=STARTUP, after=after):
+            while page := await workspaces.list(tenant, actor=FOLLOWER, after=after):
                 for workspace in page:
                     await self.watch(tenant, workspace)
                 after = page[-1]
 {%- endif %}
-        try:
-            yield
-        finally:
-            await self._followers.aclose()
 
     def mount(self, app: FastAPI) -> None:
         """The bridge has no routes of its own."""

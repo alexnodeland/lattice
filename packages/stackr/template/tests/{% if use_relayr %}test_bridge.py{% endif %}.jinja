@@ -64,6 +64,18 @@ def test_an_alert_opens_an_incident_and_people_add_to_its_timeline(
     assert entries[1] == {"source": "alice@example.com", "text": "Rolled back the deploy"}
 
 
+def test_only_the_bridge_publishes_artifactr_events(client: TestClient) -> None:
+    forged = {
+        "type": "artifactr:message_posted",
+        "author": {"kind": "user", "id": "bob", "name": "Bob"},
+        "thread_id": "t1",
+        "message_id": "msg_forged",
+        "content": "Rolled back the deploy",
+    }
+    refused = client.post(f"{REFLEXR}/events", json={"event": forged})
+    assert (refused.status_code, refused.json()["detail"]["type"]) == (403, "forbidden")
+
+
 def test_a_restarted_application_follows_the_workspaces_it_knows(
     tmp_path: Path, script: Script
 ) -> None:
@@ -73,8 +85,11 @@ def test_a_restarted_application_follows_the_workspaces_it_knows(
         command(client, type="create_thread", thread_id="t1")
         wait_for(lambda: asyncio.run(_followed(url)))
     asyncio.run(_write_while_stopped(url))  # a message no follower saw
-    with TestClient(app(script, config), headers=bearer()):
+    with TestClient(app(script, config), headers=bearer()) as client:
         wait_for(lambda: asyncio.run(_cursor(url)) >= 2)
+        bridged = client.get(f"{REFLEXR}/events", params={"type": "artifactr:message_posted"})
+        contents = [e["event"]["content"] for e in bridged.json()]
+        assert contents == ["While the application was stopped"]
 
 
 async def _write_while_stopped(url: str) -> None:

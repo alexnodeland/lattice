@@ -16,12 +16,13 @@ relayr bridges artifactr and reflexr in one application's process: followers tha
 - **`bridge.py` is one more part, after the libraries'.** It holds relayr's ledger, in the application's database, its followers and its outbound adapter.
   - Its `watch` is both parts' `on_open`, composed with the feedback mirrors' through `scores.opened`.
   - Its lifespan starts after the parts', so the reactor serves, and stops before them, so each follower lets go of its lease while the libraries are up.
-  - At startup it follows every workspace the ledger knows, and, with grantr, every workspace of every tenant: `Grants.served_tenants()`, then artifactr's `Workspaces.list` as `SystemActor(name="relayr")`, page by page.
+  - At startup it follows every workspace the ledger knows, and, with grantr, every workspace of every tenant: `Grants.served_tenants()`, then artifactr's `Workspaces.list` as relayr's `FOLLOWER`, page by page. If startup fails, the followers it started are closed.
 - **reflexr accepts relayr's bridged types,** `BRIDGED`, so the follower never stops on a type it refuses.
+- **reflexr reserves the `artifactr` namespace to relayr's source** ([reflexr ADR-0057](../../reflexr/adr/0057-reserved-publishers.md)): `publishers={"artifactr": [SOURCE]}`. Any other client is refused, so no one can forge an author and drive a rule's direct writes.
 - **With Langfuse, the parts take relayr's contexts:** `bridged_turns(ledger)` for the runner, `bridged_run` for the reactor, and relayr's contribution to `configure_telemetry`.
 - **The example is RFC-0002's incident timeline (`incidents.py`).**
   - An `alert.fired` event fires `open-incident`, whose run creates an incident thread, a `timeline` artifact in it, and a notice.
-  - A person's message in the thread fires `timeline-entry`, whose run adds it to the timeline, keyed by its event. It finds the thread's timeline through artifactr's workspaces, as `SystemActor(name="incidents")`.
+  - A person's message in the thread fires `timeline-entry`, whose run adds it to the timeline, keyed by its event. It finds the thread's timeline through artifactr's workspaces, as the rule's own actor, `rule_actor(...)`.
   - The two rules' allowlists grant `create_threads` and the `timeline` kind directly; everything else is a proposal or a notice.
 - **With grantr, a code rule's actor in artifactr is the application's principal.** `access.py` maps `reflexr:<code rule>`, and a turn acting for it, there, as reflexr's actor for the same run already is.
 - **`make smoke-app` sees an event cross each way.** An alert crosses into artifactr as an incident timeline, and the user's message in its thread crosses back onto the timeline.

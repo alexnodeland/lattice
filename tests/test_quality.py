@@ -13,6 +13,7 @@ FOLDERS = ("packages", "examples", "scripts", "tests")
 SUPPRESSION = re.compile(r"#\s*(type:\s*ignore|pyright:\s*ignore|noqa|pragma:\s*no\s*cover)")
 TS_SUPPRESSION = re.compile(r"@ts-(ignore|expect-error|nocheck)|biome-ignore")
 WEB = ROOT / "packages" / "portalr" / "web"
+CLIENT_IMPORT = re.compile(r"^(?:import|export)\b[^;]*?\bfrom\s+\"@portalr/client\"", re.MULTILINE)
 
 
 def _is_python(path: Path) -> bool:
@@ -71,3 +72,26 @@ def test_no_inline_suppressions_in_typescript(path: Path) -> None:
         if TS_SUPPRESSION.search(line)
     ]
     assert not found, "\n".join(found)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [path for path in _web_sources() if path.is_relative_to(WEB / "ui")],
+    ids=lambda path: str(path.relative_to(ROOT)),
+)
+def test_ui_imports_only_the_clients_types(path: Path) -> None:
+    # ui renders what client's stores hold, and never calls the server (portalr ADR-0015): it
+    # imports client's types alone, which leave nothing behind when it is built.
+    found = [
+        statement.group(0)
+        for statement in CLIENT_IMPORT.finditer(path.read_text())
+        if not statement.group(0).startswith(("import type ", "export type "))
+    ]
+    assert not found, "\n".join(found)
+
+
+def test_the_gate_on_uis_imports_finds_a_value_import() -> None:
+    value = 'import { type Session, createApi } from "@portalr/client";'
+    statements = [statement.group(0) for statement in CLIENT_IMPORT.finditer(value)]
+    assert statements == [value.removesuffix(";")]
+    assert not statements[0].startswith(("import type ", "export type "))

@@ -118,8 +118,9 @@ proposals and notices, and the artifacts, keyed edits and threads their allowlis
 RULE_INSTALLS: Final = frozenset(
     {"reflexr:install_rule", "reflexr:update_rule", "reflexr:archive_rule"}
 )
-"""What relayr's ``install-rule`` code rule does in reflexr: install, update and archive the
-stored rules people accepted in chat, once relayr has checked that the person may."""
+"""Changing stored rules, for the application's code rules: relayr's rules from chat are to
+install, update and archive the rules people accept, once relayr has checked that each person
+may make that change."""
 
 RUNTIME: Final = (
     BOOKKEEPING

@@ -6,7 +6,6 @@ from grantr.core.roles import (
     CODE_RULE_WRITES,
     DEPLOYMENT_READS,
     LEVELS,
-    RULE_INSTALLS,
     TENANT_ADMIN_READS,
 )
 from tests.catalogs import ARTIFACTR, PORTALR, REFLEXR
@@ -133,7 +132,8 @@ def test_the_application_holds_the_runtime_and_every_read() -> None:
     bridge = {"artifactr:open", "artifactr:read_events", "reflexr:open", "reflexr:publish"}
     assert bridge <= application, "what relayr's bridge does, as the application"
     assert application >= CODE_RULE_WRITES & CATALOG.actions, "its code rules write via relayr"
-    assert application >= RULE_INSTALLS & CATALOG.actions, "relayr installs accepted rules"
+    rules = {"reflexr:install_rule", "reflexr:update_rule", "reflexr:archive_rule"}
+    assert application >= rules, "relayr installs the rules people accept"
     assert "artifactr:respond_to_proposal" not in application, "a person accepts, not the app"
     assert "artifactr:read_workspaces" in application, "it lists a tenant's workspaces"
     assert application & (TENANT_ADMIN_READS | DEPLOYMENT_READS) == frozenset()

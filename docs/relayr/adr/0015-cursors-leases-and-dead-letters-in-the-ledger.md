@@ -1,6 +1,6 @@
 # ADR-0015: Cursors, leases and dead letters in the ledger
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0021](0021-chains-continue-across-the-bridge.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

@@ -24,6 +24,7 @@ dependencies = [
     "artifactr-ai>=0.1.0",
     "reflexr>=0.1.0.dev0",
     "pydantic>=2.13",
+    "pydantic-ai-slim>=2.51",
 ]
 
 [project.optional-dependencies]

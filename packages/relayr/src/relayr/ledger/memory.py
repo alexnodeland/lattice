@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from relayr.ledger.ledger import Clock, DeadLetter, WorkspaceKey, utc_now
+from relayr.ledger.ledger import Cause, CauseKind, Clock, DeadLetter, WorkspaceKey, utc_now
 
 
 @dataclass
@@ -24,6 +24,7 @@ class InMemoryLedger:
         self._clock = clock
         self._followed: dict[WorkspaceKey, _Followed] = {}
         self._dead_letters: dict[WorkspaceKey, dict[int, DeadLetter]] = {}
+        self._causes: dict[tuple[WorkspaceKey, CauseKind, str], Cause] = {}
 
     async def acquire_lease(self, workspace: WorkspaceKey, holder: str, ttl: timedelta) -> bool:
         """Take or renew the workspace's lease for `ttl`. Return False if another holder has it."""
@@ -59,6 +60,16 @@ class InMemoryLedger:
         """Return the workspace's dead letters, in `seq` order."""
         letters = self._dead_letters.get(workspace, {})
         return [letters[seq] for seq in sorted(letters)]
+
+    async def record_cause(
+        self, workspace: WorkspaceKey, kind: CauseKind, key: str, cause: Cause
+    ) -> None:
+        """Record the run behind a write, by what the follower will find it by; the first kept."""
+        self._causes.setdefault((workspace, kind, key), cause)
+
+    async def cause(self, workspace: WorkspaceKey, kind: CauseKind, key: str) -> Cause | None:
+        """Return the run behind a write, or None if no run of a rule made it."""
+        return self._causes.get((workspace, kind, key))
 
     async def followed(self) -> list[WorkspaceKey]:
         """Return every workspace a follower has held a lease on or saved a cursor for, in order."""

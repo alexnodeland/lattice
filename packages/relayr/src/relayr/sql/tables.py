@@ -41,6 +41,24 @@ class FollowerRow(Base):
     """When the lease lapses unless it is renewed."""
 
 
+class CauseRow(Base):
+    """The reflexr run behind an artifactr write, by what the follower finds it by."""
+
+    __tablename__ = "relayr_causes"
+
+    tenant_id: Mapped[str] = mapped_column(primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(primary_key=True)
+    """What the key is: a `proposal`, `artifact`, `edit`, `message` or `turn`."""
+
+    key: Mapped[str] = mapped_column(primary_key=True)
+
+    correlation_id: Mapped[str]
+    firing_id: Mapped[str]
+    run_id: Mapped[str]
+    depth: Mapped[int]
+
+
 class DeadLetterRow(Base):
     """An artifactr envelope the follower could not bridge."""
 

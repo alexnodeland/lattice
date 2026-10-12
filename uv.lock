@@ -4112,6 +4112,7 @@ source = { editable = "packages/relayr" }
 dependencies = [
     { name = "artifactr-ai" },
     { name = "pydantic" },
+    { name = "pydantic-ai-slim" },
     { name = "reflexr" },
 ]
 
@@ -4162,6 +4163,7 @@ requires-dist = [
     { name = "artifactr-ai", editable = "packages/artifactr" },
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.31" },
     { name = "pydantic", specifier = ">=2.13" },
+    { name = "pydantic-ai-slim", specifier = ">=2.51" },
     { name = "reflexr", editable = "packages/reflexr" },
     { name = "relayr-ai", extras = ["sql"], marker = "extra == 'postgres'" },
     { name = "relayr-ai", extras = ["sql"], marker = "extra == 'sqlite'" },

@@ -7,8 +7,13 @@ event with the envelope's id, and only then moves its cursor. reflexr's `publish
 once, so an envelope delivered again, after a restart or by another process, publishes nothing
 new: delivery is at least once, and the effect exactly once.
 
+A rule's run that wrote an envelope, or started the turn that did, continues its causal chain
+into reflexr one step deeper, so rules that answer each other stop at reflexr's depth limit. A
+person's answer to a rule's proposal joins the proposal's chain without going deeper.
+
 An envelope is dead-lettered in the ledger, and the follower moves on, when its projection raises,
-an invalid event included, or returns one of reflexr's own events. Anything else
+an invalid event included, returns one of reflexr's own events, or would continue its chain past
+the depth limit. Anything else
 stops the follower, a type reflexr doesn't accept included, since that is the application's
 configuration and every later envelope would meet it too. A stopped follower starts again, at its
 cursor, the next time its workspace is opened.
@@ -23,11 +28,13 @@ import artifactr
 import artifactr.core
 import reflexr.workspace
 from reflexr import SourceActor, new_id
-from reflexr.core import Forbidden
+from reflexr.core import Causation, DepthExceeded, Forbidden
 from relayr.events import Projections
-from relayr.ledger import DeadLetter, Ledger, WorkspaceKey
+from relayr.ledger import CauseKind, DeadLetter, Ledger, WorkspaceKey
+from relayr.outbound import is_rule_actor
 
 logger = logging.getLogger("relayr.inbound")
+
 
 FOLLOWER: Final = artifactr.SystemActor(name="relayr")
 """Who a follower reads artifactr's log as."""
@@ -56,6 +63,8 @@ class Followers:
             that, and a process that dies holding one lets another take it once it lapses.
         save_every: How many envelopes that bridge nothing a follower reads before it saves its
             cursor anyway, so a restarted follower reads at most this many again.
+        read_back: How many envelopes a follower reads back at a time, looking for the message
+            of a rule's that an agent turn carries out.
     """
 
     def __init__(
@@ -68,6 +77,7 @@ class Followers:
         holder: str | None = None,
         lease_ttl: timedelta = timedelta(seconds=30),
         save_every: int = 500,
+        read_back: int = 100,
     ) -> None:
         self._artifactr = artifactr
         self._reflexr = reflexr
@@ -76,6 +86,7 @@ class Followers:
         self._holder = holder or new_id("relayr")
         self._ttl = lease_ttl
         self._save_every = save_every
+        self._read_back = read_back
         self._tasks: dict[WorkspaceKey, asyncio.Task[None]] = {}
         self._closed = False
 
@@ -168,10 +179,50 @@ class Followers:
     ) -> None:
         saved = await self._ledger.cursor(workspace)
         async for envelope in source.subscribe(after_seq=saved):
+            await self._trace_turn(workspace, source, envelope)
             bridged = await self._bridge(workspace, target, envelope)
             if bridged or envelope.seq - saved >= self._save_every:
                 await self._ledger.save_cursor(workspace, envelope.seq)
                 saved = envelope.seq
+
+    async def _trace_turn(
+        self,
+        workspace: WorkspaceKey,
+        source: artifactr.Workspace,
+        envelope: artifactr.core.Envelope,
+    ) -> None:
+        """Record the run behind an agent turn that a rule's message started, as it starts.
+
+        A turn acts for the author of the messages it carries out, one author per turn, and
+        carries out the oldest messages no turn has taken. So a turn that acts for a rule carries
+        out the rule's messages since the rule's last turn in the thread, whatever turns for
+        others came between: it continues the chain of the run that posted the last of them.
+        Notices start no turn, and are passed over.
+        """
+        match envelope:
+            case artifactr.core.Envelope(
+                event=artifactr.core.RunStarted(run_id=turn, thread_id=thread),
+                actor=artifactr.core.AgentActor(on_behalf_of=rule),
+            ) if rule is not None and is_rule_actor(rule):
+                pass
+            case _:
+                return
+        before = envelope.seq
+        while page := await source.read(before_seq=before, threads={thread}, last=self._read_back):
+            for earlier in reversed(page):
+                match earlier.event:
+                    case artifactr.core.MessagePosted(kind="message", message_id=message_id) if (
+                        earlier.actor == rule
+                    ):
+                        cause = await self._ledger.cause(workspace, "message", message_id)
+                        if cause is not None:
+                            await self._ledger.record_cause(workspace, "turn", turn, cause)
+                        return
+                    case artifactr.core.RunStarted() if _acts_for(earlier.actor, rule):
+                        return  # an earlier turn for the rule took what came before it
+                    case _:
+                        pass
+            before = page[0].seq
 
     async def _bridge(
         self,
@@ -191,8 +242,40 @@ class Followers:
             refused = Forbidden(f"{event.event_type} events are recorded by reflexr, not published")
             await self._dead_letter(workspace, envelope, refused)
             return True
-        await target.publish(event, id=envelope.id)
+        publishing, correlation_id = await self._chain(workspace, target, envelope)
+        try:
+            await publishing.publish(event, id=envelope.id, correlation_id=correlation_id)
+        except DepthExceeded as deep:
+            await self._dead_letter(workspace, envelope, deep)
         return True
+
+    async def _chain(
+        self,
+        workspace: WorkspaceKey,
+        target: reflexr.workspace.Workspace,
+        envelope: artifactr.core.Envelope,
+    ) -> tuple[reflexr.workspace.Workspace, str | None]:
+        """The handle an envelope's event is published through, and the chain it joins.
+
+        A rule's run behind the envelope (a write it made, or a turn its message started)
+        continues its chain, as the run's own events do. A person's answer to a rule's proposal
+        joins the proposal's chain without going deeper. Anything else starts a chain of its own.
+        """
+        cause = None
+        if envelope.run_id is not None:
+            cause = await self._ledger.cause(workspace, "turn", envelope.run_id)
+        written = _written(envelope)
+        if cause is None and written is not None:
+            cause = await self._ledger.cause(workspace, *written)
+        if cause is not None:
+            causation = Causation(firing_id=cause.firing_id, run_id=cause.run_id, depth=cause.depth)
+            return target.caused_by(causation, correlation_id=cause.correlation_id), None
+        answered = _answered(envelope.event)
+        if answered is not None:
+            proposed = await self._ledger.cause(workspace, "proposal", answered)
+            if proposed is not None:
+                return target, proposed.correlation_id
+        return target, None
 
     async def _dead_letter(
         self, workspace: WorkspaceKey, envelope: artifactr.core.Envelope, error: Exception
@@ -208,3 +291,44 @@ class Followers:
             error=f"{type(error).__name__}: {error}",
         )
         await self._ledger.dead_letter(workspace, letter)
+
+
+def _written(envelope: artifactr.core.Envelope) -> tuple[CauseKind, str] | None:
+    """What a rule's run would have recorded this write by, if it made it."""
+    match envelope:
+        case artifactr.core.Envelope(event=artifactr.core.MessagePosted(message_id=message_id)):
+            return "message", message_id
+        case artifactr.core.Envelope(event=artifactr.core.ProposalCreated(proposal_id=proposal_id)):
+            return "proposal", proposal_id
+        case artifactr.core.Envelope(
+            event=artifactr.core.ArtifactCreated(proposal_id=None, artifact_id=artifact_id)
+        ):
+            return "artifact", artifact_id
+        case artifactr.core.Envelope(
+            event=artifactr.core.ArtifactChanged(
+                proposal_id=None, artifact_id=artifact_id, version=version
+            ),
+            actor=artifactr.core.ExternalAgentActor(client_id=client_id) as actor,
+        ) if is_rule_actor(actor):
+            return "edit", f"{client_id}/{artifact_id}@{version}"
+        case _:
+            return None
+
+
+def _acts_for(actor: artifactr.core.Actor, rule: artifactr.core.Actor) -> bool:
+    """Whether an actor is an agent's turn acting for a rule's actor."""
+    return isinstance(actor, artifactr.core.AgentActor) and actor.on_behalf_of == rule
+
+
+def _answered(event: artifactr.core.Event) -> str | None:
+    """The proposal an accepted or rejected proposal's events are about."""
+    match event:
+        case (
+            artifactr.core.ProposalResolved(proposal_id=proposal_id)
+            | artifactr.core.ArtifactCreated(proposal_id=str() as proposal_id)
+            | artifactr.core.ArtifactChanged(proposal_id=str() as proposal_id)
+            | artifactr.core.ArtifactArchived(proposal_id=str() as proposal_id)
+        ):
+            return proposal_id
+        case _:
+            return None

@@ -1,6 +1,6 @@
 # ADR-0015: A check writes nothing
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0024](0024-who-sees-a-restricted-item.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

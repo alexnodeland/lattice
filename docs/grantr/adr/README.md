@@ -8,7 +8,7 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 |---|---|---|
 | [0001](0001-the-hook-hears-the-action.md) | The hook hears the action | Accepted |
 | [0002](0002-grants-down-to-threads-and-artifacts.md) | Grants down to threads and artifacts | Accepted |
-| [0003](0003-visible-to-the-workspace-unless-restricted.md) | Visible to the workspace unless restricted | Accepted |
+| [0003](0003-visible-to-the-workspace-unless-restricted.md) | Visible to the workspace unless restricted | Accepted, amended by 0024 |
 | [0004](0004-an-agent-turn-acts-for-its-user.md) | An agent turn acts for its user | Accepted |
 | [0005](0005-a-users-tenants-from-grantrs-memberships.md) | A user's tenants from grantr's memberships | Accepted |
 | [0006](0006-what-v0-1-includes.md) | What v0.1 includes | Accepted |
@@ -20,8 +20,8 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0012](0012-every-item-an-access-names-and-hooks-typed-by-actor.md) | Every item an access names, and hooks typed by their actor | Accepted |
 | [0013](0013-transactions-by-tenant-and-one-audit-log.md) | Transactions by tenant, and one audit log | Accepted, amended by 0016 |
 | [0014](0014-an-operator-enters-a-tenant-by-granting-themselves.md) | An operator enters a tenant by granting themselves | Accepted |
-| [0015](0015-a-check-writes-nothing.md) | A check writes nothing | Accepted |
-| [0016](0016-the-sql-adapter.md) | The SQL adapter | Accepted |
+| [0015](0015-a-check-writes-nothing.md) | A check writes nothing | Accepted, amended by 0024 |
+| [0016](0016-the-sql-adapter.md) | The SQL adapter | Accepted, amended by 0024 |
 | [0017](0017-the-admin-api.md) | The admin API | Accepted |
 | [0018](0018-telemetry-through-the-api.md) | Telemetry through the OpenTelemetry API | Accepted |
 | [0019](0019-runtime-actions-and-the-application-role.md) | Runtime actions, and the application role | Accepted, amended by 0022 |
@@ -29,5 +29,6 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0021](0021-the-deployments-own-tools.md) | The deployment's own tools | Accepted |
 | [0022](0022-a-tenants-members-list-its-workspaces.md) | A tenant's members list its workspaces | Accepted |
 | [0023](0023-portalrs-admin-reads.md) | portalr's admin reads | Accepted |
+| [0024](0024-who-sees-a-restricted-item.md) | Who sees a restricted item | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

@@ -118,6 +118,13 @@ class GrantRequest(BaseModel):
     to: Grantee
 
 
+class Restriction(BaseModel):
+    """A thread or artifact, and whether it is restricted to those granted a role on it."""
+
+    on: Resource
+    restricted: bool = True
+
+
 class NewKey(BaseModel):
     """The service principal a key is issued to."""
 
@@ -347,6 +354,20 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         """Revoke a grant."""
         return await _or_http(
             grants.revoke(tenant, body.role, on=body.on, to=body.to, by=by(tenant, who))
+        )
+
+    @router.get("/tenants/{tenant}/restrictions")
+    async def list_restrictions(
+        tenant: TenantId, workspace: WorkspaceId, who: Caller = current
+    ) -> list[Resource]:
+        """The threads and artifacts restricted in a workspace."""
+        return await _or_http(grants.restrictions(tenant, workspace, by=by(tenant, who)))
+
+    @router.post("/tenants/{tenant}/restrictions")
+    async def restrict(tenant: TenantId, body: Restriction, who: Caller = current) -> AuditEntry:
+        """Restrict a thread or artifact, or lift its restriction."""
+        return await _or_http(
+            grants.restrict(tenant, body.on, restricted=body.restricted, by=by(tenant, who))
         )
 
     @router.get("/tenants/{tenant}/keys")

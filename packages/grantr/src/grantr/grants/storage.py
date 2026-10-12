@@ -83,7 +83,21 @@ class Reads(Protocol):
         ...
 
     async def resources(self, tenant: TenantId, kind: ListableKind) -> list[Resource]:
-        """The workspaces, threads, artifacts or rules a grant in the tenant names, or is in."""
+        """The workspaces, threads, artifacts or rules grantr knows in the tenant.
+
+        Those a grant names, or is in; and the threads and artifacts ever restricted, and their
+        workspaces.
+        """
+        ...
+
+    async def restricted(
+        self, tenant: TenantId, workspace: WorkspaceId | None = None
+    ) -> list[Resource]:
+        """The threads and artifacts restricted in a workspace, or in the whole tenant."""
+        ...
+
+    async def is_restricted(self, tenant: TenantId, on: Resource) -> bool:
+        """Whether a thread or artifact is restricted."""
         ...
 
 
@@ -127,6 +141,10 @@ class Transaction(Reads, Protocol):
 
     async def remove_role(self, tenant: TenantId, name: str) -> None:
         """Remove a custom role and its grants."""
+        ...
+
+    async def set_restricted(self, tenant: TenantId, on: Resource, restricted: bool) -> None:
+        """Restrict a thread or artifact, or lift its restriction."""
         ...
 
     async def add_key(self, key: Key) -> None:

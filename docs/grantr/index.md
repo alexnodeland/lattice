@@ -18,7 +18,7 @@ Identity and access for the family: tenants, their members, groups, roles and se
 
 !!! note "In progress"
 
-    grantr's core, storage and admin API are built: its model, built-in and custom roles, groups, service principals and keys, checks, the libraries' hooks, the audit log, in-memory and SQL storage, the admin router and telemetry, as its [architecture](architecture.md) describes. stackr's template wires it in by default: each library asks it before every command and read. Restricted threads and artifacts, and row-level security, come next; the rest of this page describes what the [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)'s phases build.
+    grantr's core, storage and admin API are built: its model, built-in and custom roles, groups, service principals and keys, checks, the libraries' hooks, the audit log, in-memory and SQL storage, the admin router and telemetry, as its [architecture](architecture.md) describes. stackr's template wires it in by default: each library asks it before every command and read. It restricts threads and artifacts and says who sees them; artifactr's filtering by it, and row-level security, come next; the rest of this page describes what the [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)'s phases build.
 
 ## Why: one model of who may do what
 

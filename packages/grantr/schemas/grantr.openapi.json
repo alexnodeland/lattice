@@ -70,11 +70,13 @@
             "key_revoked": "#/components/schemas/KeyRevoked",
             "member_added": "#/components/schemas/MemberAdded",
             "member_removed": "#/components/schemas/MemberRemoved",
+            "restricted": "#/components/schemas/Restricted",
             "revoked": "#/components/schemas/Revoked",
             "role_defined": "#/components/schemas/RoleDefined",
             "role_deleted": "#/components/schemas/RoleDeleted",
             "tenant_created": "#/components/schemas/TenantCreated",
-            "tenant_deleted": "#/components/schemas/TenantDeleted"
+            "tenant_deleted": "#/components/schemas/TenantDeleted",
+            "unrestricted": "#/components/schemas/Unrestricted"
           },
           "propertyName": "type"
         },
@@ -114,6 +116,12 @@
           },
           {
             "$ref": "#/components/schemas/KeyRevoked"
+          },
+          {
+            "$ref": "#/components/schemas/Restricted"
+          },
+          {
+            "$ref": "#/components/schemas/Unrestricted"
           }
         ]
       },
@@ -632,6 +640,43 @@
         ],
         "type": "string"
       },
+      "Restricted": {
+        "description": "A thread or artifact was restricted to those granted a role on it.",
+        "properties": {
+          "on": {
+            "$ref": "#/components/schemas/Resource"
+          },
+          "type": {
+            "const": "restricted",
+            "default": "restricted",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "on"
+        ],
+        "title": "Restricted",
+        "type": "object"
+      },
+      "Restriction": {
+        "description": "A thread or artifact, and whether it is restricted to those granted a role on it.",
+        "properties": {
+          "on": {
+            "$ref": "#/components/schemas/Resource"
+          },
+          "restricted": {
+            "default": true,
+            "title": "Restricted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "on"
+        ],
+        "title": "Restriction",
+        "type": "object"
+      },
       "Revoked": {
         "description": "A grant was revoked.",
         "properties": {
@@ -834,6 +879,25 @@
       "TenantId": {
         "pattern": "^[^~]+$",
         "type": "string"
+      },
+      "Unrestricted": {
+        "description": "A thread or artifact's restriction was lifted: its workspace's roles hold on it again.",
+        "properties": {
+          "on": {
+            "$ref": "#/components/schemas/Resource"
+          },
+          "type": {
+            "const": "unrestricted",
+            "default": "unrestricted",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "on"
+        ],
+        "title": "Unrestricted",
+        "type": "object"
       },
       "User": {
         "description": "A person, by their identity provider's id.",
@@ -1899,6 +1963,109 @@
           }
         },
         "summary": "Remove Member"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/restrictions": {
+      "get": {
+        "description": "The threads and artifacts restricted in a workspace.",
+        "operationId": "list_restrictions_grantr_v1_tenants__tenant__restrictions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "title": "Workspace",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Resource"
+                  },
+                  "title": "Response List Restrictions Grantr V1 Tenants  Tenant  Restrictions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Restrictions"
+      },
+      "post": {
+        "description": "Restrict a thread or artifact, or lift its restriction.",
+        "operationId": "restrict_grantr_v1_tenants__tenant__restrictions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Restriction"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restrict"
       }
     },
     "/grantr/v1/tenants/{tenant}/revocations": {

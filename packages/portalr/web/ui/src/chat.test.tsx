@@ -14,13 +14,11 @@ import {
 } from "./chat";
 import { token } from "./test/colours";
 
-const alice = { kind: "user", id: "alice" } as ArtifactrV1.Actor;
-
 function message(change: Partial<Artifactr.Message> = {}): Artifactr.Message {
   return {
     id: "msg_1",
     seq: 1,
-    actor: alice,
+    actor: { kind: "user", id: "alice" },
     content: "The plan is **ready**.",
     kind: "message",
     runId: null,
@@ -29,69 +27,50 @@ function message(change: Partial<Artifactr.Message> = {}): Artifactr.Message {
   };
 }
 
-const thumbs = (up: boolean): Artifactr.Feedback => ({
-  actor: alice,
-  type: "thumbs",
-  value: { up },
-});
-
-test("a message shows who posted it, and its Markdown", async () => {
+test("a message shows who posted it, and its Markdown, in the thread's log", async () => {
   const screen = await render(
     <Messages>
-      <Message message={message()} author="Alice" me="alice" />
+      <Message message={message()} author="Alice" />
     </Messages>,
   );
-  const list = screen.getByRole("list", { name: "Messages" });
-  await expect.element(list.getByText("Alice")).toBeVisible();
-  await expect.element(list.getByText("ready")).toBeVisible();
+  const log = screen.getByRole("log", { name: "Messages" });
+  await expect.element(log.getByText("Alice")).toBeVisible();
+  await expect.element(log.getByText("ready")).toBeVisible();
 });
 
-test("thumbs show the reader's latest, and send theirs", async () => {
+test("thumbs show the reader's, and send theirs", async () => {
   const onThumbs = vi.fn();
   const screen = await render(
     <Messages>
-      <Message
-        message={message({ feedback: [thumbs(false), thumbs(true)] })}
-        author="Agent"
-        me="alice"
-        onThumbs={onThumbs}
-      />
+      <Message message={message()} author="Agent" thumbs={true} onThumbs={onThumbs} />
     </Messages>,
   );
-  const up = screen.getByRole("button", { name: "Helpful" });
+  const up = screen.getByRole("button", { name: "Helpful", exact: true });
+  const down = screen.getByRole("button", { name: "Not helpful" });
   await expect.element(up).toHaveAttribute("aria-pressed", "true");
-  await expect
-    .element(screen.getByRole("button", { name: "Not helpful" }))
-    .toHaveAttribute("aria-pressed", "false");
-  await screen.getByRole("button", { name: "Not helpful" }).click();
+  await expect.element(down).toHaveAttribute("aria-pressed", "false");
+  await down.click();
   expect(onThumbs).toHaveBeenCalledWith(false);
 });
 
-test("someone else's thumbs aren't the reader's", async () => {
-  const bob = { ...thumbs(true), actor: { kind: "user", id: "bob" } as ArtifactrV1.Actor };
+test("without thumbs given, neither is pressed; without a handler, there are none", async () => {
   const screen = await render(
     <Messages>
-      <Message
-        message={message({ feedback: [bob] })}
-        author="Agent"
-        me="alice"
-        onThumbs={vi.fn()}
-      />
+      <Message message={message()} author="Agent" onThumbs={vi.fn()} />
+      <Message message={message({ id: "msg_2" })} author="Alice" />
     </Messages>,
   );
-  await expect
-    .element(screen.getByRole("button", { name: "Helpful" }))
-    .toHaveAttribute("aria-pressed", "false");
+  const buttons = screen.getByRole("button").elements();
+  expect(buttons).toHaveLength(2);
+  for (const button of buttons) {
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+  }
 });
 
 test("a notice is set apart from messages", async () => {
   const screen = await render(
     <Messages>
-      <Message
-        message={message({ kind: "notice", content: "Run stopped" })}
-        author="System"
-        me="alice"
-      />
+      <Message message={message({ kind: "notice", content: "Run stopped" })} author="System" />
     </Messages>,
   );
   const notice = screen.getByRole("listitem").element();
@@ -127,9 +106,26 @@ test("the composer sends what is written, on Enter or with the button, and clear
   expect(onSend).toHaveBeenCalledTimes(2);
 });
 
-test("a disabled composer sends nothing", async () => {
+test("Enter while an input method composes doesn't send", async () => {
+  const onSend = vi.fn();
+  const screen = await render(<Composer onSend={onSend} />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("日本");
+  const composing = new KeyboardEvent("keydown", {
+    key: "Enter",
+    isComposing: true,
+    bubbles: true,
+  });
+  box.element().dispatchEvent(composing);
+  expect(onSend).not.toHaveBeenCalled();
+  await expect.element(box).toHaveValue("日本");
+});
+
+test("a disabled composer sends nothing, and looks it", async () => {
   const screen = await render(<Composer onSend={vi.fn()} disabled />);
-  await expect.element(screen.getByRole("textbox", { name: "Message" })).toBeDisabled();
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await expect.element(box).toBeDisabled();
+  expect(getComputedStyle(box.element()).opacity).toBe("0.5");
 });
 
 test("the composer reached by the keyboard shows the focus ring", async () => {
@@ -151,48 +147,78 @@ test("a tool call says it is running until it returns", async () => {
   await expect.element(screen.getByText("ok")).toBeVisible();
 });
 
-test("a call to approve is approved or denied", async () => {
+test("a call to approve takes the focus, and is approved or denied once", async () => {
   const onAnswer = vi.fn();
-  const request = {
+  const request: ArtifactrV1.DeferredRequest = {
     kind: "approval",
     tool_call_id: "t1",
     tool_name: "archive_artifact",
     args: { artifact_id: "plan_1" },
-  } as ArtifactrV1.DeferredRequest;
+  };
   const screen = await render(<Request request={request} onAnswer={onAnswer} />);
   const card = screen.getByRole("region", { name: "Approve archive_artifact?" });
   await expect.element(card.getByText(/"artifact_id": "plan_1"/)).toBeVisible();
-  await card.getByRole("button", { name: "Approve" }).click();
-  await card.getByRole("button", { name: "Deny" }).click();
-  expect(onAnswer.mock.calls).toEqual([[{ approved: true }], [{ approved: false }]]);
+  const approve = card.getByRole("button", { name: "Approve" });
+  await expect.element(approve).toHaveFocus();
+  await approve.click();
+  await expect.element(approve).toBeDisabled();
+  await expect.element(card.getByRole("button", { name: "Deny" })).toBeDisabled();
+  expect(onAnswer.mock.calls).toEqual([[{ approved: true }]]);
 });
 
-test("a question is answered", async () => {
+test("a call can be denied", async () => {
   const onAnswer = vi.fn();
-  const request = {
+  const request: ArtifactrV1.DeferredRequest = {
+    kind: "approval",
+    tool_call_id: "t1",
+    tool_name: "publish",
+  };
+  const screen = await render(<Request request={request} onAnswer={onAnswer} />);
+  await screen.getByRole("button", { name: "Deny" }).click();
+  expect(onAnswer).toHaveBeenCalledWith({ approved: false });
+});
+
+test("a question takes the focus, and is answered once", async () => {
+  const onAnswer = vi.fn();
+  const request: ArtifactrV1.DeferredRequest = {
     kind: "question",
     tool_call_id: "t2",
     tool_name: "ask_user",
     args: { question: "Which week?" },
-  } as ArtifactrV1.DeferredRequest;
+  };
   const screen = await render(<Request request={request} onAnswer={onAnswer} />);
   await expect.element(screen.getByText("Which week?")).toBeVisible();
-  await screen.getByRole("textbox", { name: "Answer" }).fill("The next");
+  const field = screen.getByRole("textbox", { name: "Answer" });
+  await expect.element(field).toHaveFocus();
+  await field.fill("The next");
   await screen.getByRole("button", { name: "Answer" }).click();
   expect(onAnswer).toHaveBeenCalledWith({ answer: "The next" });
+  await expect.element(screen.getByRole("button", { name: "Answer" })).toBeDisabled();
 });
+
+test("a question without its words names the tool that asks", async () => {
+  const request: ArtifactrV1.DeferredRequest = {
+    kind: "question",
+    tool_call_id: "t3",
+    tool_name: "confirm",
+  };
+  const screen = await render(<Request request={request} onAnswer={vi.fn()} />);
+  await expect.element(screen.getByText("The agent asks, through confirm.")).toBeVisible();
+});
+
+const edit: Artifactr.Proposal["change"] = {
+  type: "edit_artifact",
+  artifact_id: "plan_1",
+  base_version: 1,
+  patch: { kind: "text_edits", edits: [{ old: "a long plan", new: "a plan" }] },
+  summary: "Tighten the launch plan",
+};
 
 const proposal = (change: Partial<Artifactr.Proposal> = {}): Artifactr.Proposal => ({
   id: "prop_1",
   threadId: "thr_1",
   runId: "run_1",
-  change: {
-    type: "edit_artifact",
-    artifact_id: "plan_1",
-    base_version: 1,
-    patch: { kind: "text_edits", edits: [] },
-    summary: "Tighten the launch plan",
-  } as unknown as Artifactr.Proposal["change"],
+  change: edit,
   rationale: "It was long.",
   status: "open",
   ...change,
@@ -223,24 +249,28 @@ test("a resolved proposal says how, without buttons", async () => {
   expect(screen.getByRole("button").elements()).toHaveLength(0);
 });
 
-test("a proposal to create or archive names the artifact", async () => {
-  const create = {
-    type: "create_artifact",
-    kind: "plan",
-    data: {},
-  } as Artifactr.Proposal["change"];
-  const archive = {
+test("a proposal to create, edit without a summary, or archive names the artifact", async () => {
+  const create: Artifactr.Proposal["change"] = { type: "create_artifact", kind: "plan", data: {} };
+  const unsummed: Artifactr.Proposal["change"] = {
+    type: "edit_artifact",
+    artifact_id: "plan_1",
+    base_version: 1,
+    patch: { kind: "text_edits", edits: [{ old: "a", new: "b" }] },
+  };
+  const archive: Artifactr.Proposal["change"] = {
     type: "archive_artifact",
     artifact_id: "plan_1",
     base_version: 2,
-  } as Artifactr.Proposal["change"];
+  };
   const screen = await render(
     <>
       <ProposalCard proposal={proposal({ change: create })} />
+      <ProposalCard proposal={proposal({ id: "prop_2", change: unsummed })} />
       <ProposalCard proposal={proposal({ id: "prop_3", change: archive })} />
     </>,
   );
   await expect.element(screen.getByText("Create a plan")).toBeVisible();
+  await expect.element(screen.getByText("Edit plan_1")).toBeVisible();
   await expect.element(screen.getByText("Archive plan_1")).toBeVisible();
 });
 
@@ -248,17 +278,17 @@ test("a run's status is announced in words", async () => {
   const screen = await render(
     <>
       <RunStatus status="paused" />
-      <RunStatus status="interrupted" />
+      <RunStatus status="completed" />
     </>,
   );
-  const [paused, other] = screen.getByRole("status").elements();
+  const [paused, done] = screen.getByRole("status").elements();
   expect(paused?.textContent).toBe("Waiting for you");
-  expect(other?.textContent).toBe("interrupted");
+  expect(done?.textContent).toBe("Done");
 });
 
 test("the message list takes a caller's classes", async () => {
   const screen = await render(<Messages className="gap-8">{null}</Messages>);
-  const list = screen.getByRole("list", { name: "Messages" }).element();
+  const list = screen.getByRole("list").element();
   expect(list.classList).toContain("gap-8");
   expect(list.classList).not.toContain("gap-4");
 });

@@ -17,6 +17,14 @@
   --color-accent: var(--accent);
   --color-on-accent: var(--on-accent);
   --color-focus: var(--focus);
+  /* The names Streamdown's own classes use, as portalr's roles. */
+  --color-foreground: var(--fg);
+  --color-background: var(--paper);
+  --color-border: var(--line);
+  --color-muted-foreground: var(--muted);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--on-accent);
+  --color-sidebar: var(--surface);
   --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Fragment Mono", ui-monospace, monospace;
 }

@@ -7,7 +7,7 @@
  */
 
 export type * as Artifactr from "./artifactr";
-export { type ArtifactrStream, artifactr } from "./artifactr";
+export { type ArtifactrStream, artifactr, thumbs } from "./artifactr";
 export type * as ArtifactrApi from "./generated/artifactr.openapi";
 export type * as ArtifactrV1 from "./generated/artifactr.v1";
 export type * as GrantrApi from "./generated/grantr.openapi";

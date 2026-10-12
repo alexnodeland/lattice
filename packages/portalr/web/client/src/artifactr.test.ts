@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { apply, artifactr, type Workspace } from "./artifactr";
+import { apply, artifactr, thumbs, type Workspace } from "./artifactr";
 import type * as v1 from "./generated/artifactr.v1";
 
 function envelope(event: Record<string, unknown>, seq: number): v1.EventFrame {
@@ -95,14 +95,14 @@ test("a run streams its text until its message is posted, and keeps its status",
       content: "Drafting done",
       run_id: "run_1",
     },
-    { type: "run_ended", run_id: "run_1", thread_id: "thr_1", status: "succeeded" },
+    { type: "run_ended", run_id: "run_1", thread_id: "thr_1", status: "completed" },
   ]
     .map((event, index) => envelope(event, 3 + index))
     .reduce(apply, state);
   expect(state.runs.run_1).toEqual({
     id: "run_1",
     threadId: "thr_1",
-    status: "succeeded",
+    status: "completed",
     tools: { t1: { name: "edit", status: "ok" } },
     text: "",
     requests: [],
@@ -253,4 +253,79 @@ test("only a create with an id the client chose counts as a create", () => {
     artifactr.creates({ type: "post_message", thread_id: "thr_1", content: "x", message_id: "m" }),
   ).toBe(true);
   expect(artifactr.creates({ type: "stop_run", run_id: "run_1" })).toBe(false);
+});
+
+test("a run that ends waits on nothing more, and an answer to a running run doesn't resume it", () => {
+  const ask = { kind: "question", tool_call_id: "t1", tool_name: "ask_user", args: {} };
+  const paused = replay(
+    { type: "run_started", run_id: "run_3", thread_id: "thr_1" },
+    { type: "run_paused", run_id: "run_3", thread_id: "thr_1", requests: [ask] },
+  );
+  const ended = apply(
+    paused,
+    envelope({ type: "run_ended", run_id: "run_3", thread_id: "thr_1", status: "stopped" }, 3),
+  );
+  expect(ended.runs.run_3).toMatchObject({ status: "stopped", requests: [] });
+  const running = replay({ type: "run_started", run_id: "run_4", thread_id: "thr_1" });
+  const late = apply(
+    running,
+    envelope(
+      { type: "deferred_answered", run_id: "run_4", thread_id: "thr_1", tool_call_id: "t9" },
+      2,
+    ),
+  );
+  expect(late.runs.run_4?.status).toBe("running");
+  const after = apply(
+    ended,
+    envelope(
+      { type: "deferred_answered", run_id: "run_3", thread_id: "thr_1", tool_call_id: "t1" },
+      4,
+    ),
+  );
+  expect(after.runs.run_3?.status).toBe("stopped");
+});
+
+test("feedback on a message the store hasn't read has nowhere to go", () => {
+  const state = replay({
+    type: "message_posted",
+    thread_id: "thr_1",
+    message_id: "msg_1",
+    content: "Hi",
+  });
+  for (const target of [
+    { kind: "message", thread_id: "thr_9", message_id: "msg_1" },
+    { kind: "message", thread_id: "thr_1", message_id: "msg_9" },
+  ]) {
+    const feedback = {
+      type: "feedback_given",
+      feedback_type: "thumbs",
+      target,
+      value: { up: true },
+    };
+    expect(apply(state, envelope(feedback, 2))).toBe(state);
+  }
+});
+
+test("a person's thumbs are their latest, and nobody else's", () => {
+  const given = (id: string, value: Record<string, unknown>, type = "thumbs") => ({
+    actor: { kind: "user", id } as v1.Actor,
+    type,
+    value,
+  });
+  const message = (...feedback: ReturnType<typeof given>[]) => ({
+    id: "msg_1",
+    seq: 1,
+    actor: { kind: "user", id: "alice" } as v1.Actor,
+    content: "Hi",
+    kind: "message" as const,
+    runId: null,
+    feedback,
+  });
+  expect(
+    thumbs(message(given("alice", { up: true }), given("alice", { up: false })), "alice"),
+  ).toBe(false);
+  expect(thumbs(message(given("bob", { up: true })), "alice")).toBeNull();
+  expect(thumbs(message(given("alice", { up: "yes" })), "alice")).toBeNull();
+  expect(thumbs(message(given("alice", { stars: 5 }, "rating")), "alice")).toBeNull();
+  expect(thumbs(message(), "alice")).toBeNull();
 });

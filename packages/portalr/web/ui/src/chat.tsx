@@ -4,7 +4,14 @@
  */
 
 import type { Artifactr, ArtifactrV1 } from "@portalr/client";
-import { type FormEvent, type KeyboardEvent, useState } from "react";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { Markdown } from "./markdown";
@@ -12,43 +19,30 @@ import { TextField } from "./text-field";
 
 const card = "flex flex-col gap-2 rounded-md border border-line bg-surface p-3 text-sm";
 
-/** Whether a message's latest thumbs from this person was up, down, or not given. */
-function thumbs(message: Artifactr.Message, me: string): boolean | null {
-  const mine = message.feedback.filter(
-    (given) => given.type === "thumbs" && "id" in given.actor && given.actor.id === me,
-  );
-  const up = mine.at(-1)?.value.up;
-  return typeof up === "boolean" ? up : null;
-}
-
 type MessageProps = {
   message: Artifactr.Message;
   /** How to name who posted it. */
   author: string;
-  /** The signed-in person's id, whose thumbs the buttons show. */
-  me: string;
+  /** The reader's thumbs on it, as `client`'s `thumbs` reads them: up, down, or none. */
+  thumbs?: boolean | null;
   /** Give thumbs up or down; without it, there are no buttons. */
   onThumbs?: (up: boolean) => void;
 };
 
-/** One message: who posted it, its Markdown, and thumbs for the person reading it. */
-export function Message({ message, author, me, onThumbs }: MessageProps) {
-  const given = thumbs(message, me);
+/** One message: who posted it, its Markdown, and the reader's thumbs on it. */
+export function Message({ message, author, thumbs = null, onThumbs }: MessageProps) {
   return (
-    <li
-      className={cn("flex flex-col gap-1", message.kind === "notice" && "text-muted italic")}
-      aria-label={`${author}: ${message.content}`}
-    >
+    <li className={cn("flex flex-col gap-1", message.kind === "notice" && "text-muted italic")}>
       <span className="font-semibold text-xs">{author}</span>
       <Markdown>{message.content}</Markdown>
       {onThumbs && (
         <span className="flex gap-1">
-          <Button variant="secondary" aria-pressed={given === true} onClick={() => onThumbs(true)}>
+          <Button variant="secondary" aria-pressed={thumbs === true} onClick={() => onThumbs(true)}>
             Helpful
           </Button>
           <Button
             variant="secondary"
-            aria-pressed={given === false}
+            aria-pressed={thumbs === false}
             onClick={() => onThumbs(false)}
           >
             Not helpful
@@ -69,22 +63,16 @@ export function Streaming({ text, author }: { text: string; author: string }) {
   );
 }
 
-/** A thread's messages, oldest first, and what is streaming after them. */
-export function Messages({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
+/** A thread's messages, oldest first, and what is streaming after them, announced as they come. */
+export function Messages({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <ol aria-label="Messages" className={cn("flex flex-col gap-4", className)}>
-      {children}
-    </ol>
+    <div role="log" aria-label="Messages">
+      <ol className={cn("flex flex-col gap-4", className)}>{children}</ol>
+    </div>
   );
 }
 
-/** Write a message: Enter sends it, Shift+Enter starts a new line. */
+/** Write a message: Enter sends it, Shift+Enter starts a new line, and composing text waits. */
 export function Composer({
   onSend,
   disabled = false,
@@ -104,24 +92,24 @@ export function Composer({
     event.preventDefault();
     send();
   }
-  function key(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey) {
+  function key(event: KeyboardEvent<HTMLElement>) {
+    // An input method's Enter chooses its candidate; it doesn't send.
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       send();
     }
   }
   return (
     <form className="flex items-end gap-2" onSubmit={submit}>
-      <label className="flex flex-1 flex-col gap-1 font-semibold text-sm">
-        Message
-        <textarea
-          className="min-h-16 rounded-md border border-line bg-surface px-3 py-1.5 font-normal text-fg text-sm outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus"
-          value={text}
-          disabled={disabled}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={key}
-        />
-      </label>
+      <TextField
+        label="Message"
+        className="flex-1"
+        render={<textarea className="min-h-16" />}
+        value={text}
+        disabled={disabled}
+        onValueChange={(value) => setText(String(value))}
+        onKeyDown={key}
+      />
       <Button type="submit" disabled={disabled || !text.trim()}>
         Send
       </Button>
@@ -139,19 +127,30 @@ export function ToolCall({ tool }: { tool: Artifactr.Tool }) {
   );
 }
 
+type Answer = { approved: boolean } | { answer: string };
+
 /**
- * What a paused run waits on: a call to approve or deny, or a question to answer. Answering one
- * sends `answer_deferred`.
+ * What a paused run waits on: a call to approve or deny, or a question to answer. It takes the
+ * focus when it appears, and answers once, with `answer_deferred`.
  */
 export function Request({
   request,
   onAnswer,
 }: {
   request: ArtifactrV1.DeferredRequest;
-  onAnswer: (answer: { approved: boolean } | { answer: string }) => void;
+  onAnswer: (answer: Answer) => void;
 }) {
-  const args = Object.keys(request.args ?? {}).length > 0;
+  const [answered, setAnswered] = useState(false);
+  const first = useRef<HTMLButtonElement & HTMLInputElement>(null);
+  useEffect(() => {
+    first.current?.focus();
+  }, []);
+  function answer(given: Answer) {
+    setAnswered(true);
+    onAnswer(given);
+  }
   if (request.kind === "approval") {
+    const args = Object.keys(request.args ?? {}).length > 0;
     return (
       <section className={card} aria-label={`Approve ${request.tool_name}?`}>
         <p>
@@ -163,34 +162,32 @@ export function Request({
           </pre>
         )}
         <span className="flex gap-2">
-          <Button onClick={() => onAnswer({ approved: true })}>Approve</Button>
-          <Button variant="secondary" onClick={() => onAnswer({ approved: false })}>
+          <Button ref={first} disabled={answered} onClick={() => answer({ approved: true })}>
+            Approve
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={answered}
+            onClick={() => answer({ approved: false })}
+          >
             Deny
           </Button>
         </span>
       </section>
     );
   }
-  return <Question request={request} onAnswer={(answer) => onAnswer({ answer })} />;
-}
-
-function Question({
-  request,
-  onAnswer,
-}: {
-  request: ArtifactrV1.DeferredRequest;
-  onAnswer: (answer: string) => void;
-}) {
   const asked = request.args?.question;
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onAnswer(String(new FormData(event.currentTarget).get("answer")));
+    answer({ answer: String(new FormData(event.currentTarget).get("answer")) });
   }
   return (
     <form className={card} aria-label="The agent asks" onSubmit={submit}>
       <p>{typeof asked === "string" ? asked : `The agent asks, through ${request.tool_name}.`}</p>
-      <TextField label="Answer" name="answer" required />
-      <Button type="submit">Answer</Button>
+      <TextField label="Answer" name="answer" ref={first} disabled={answered} required />
+      <Button type="submit" disabled={answered}>
+        Answer
+      </Button>
     </form>
   );
 }
@@ -238,7 +235,7 @@ export function ProposalCard({
   );
 }
 
-const STATUS: Record<string, string> = {
+const STATUS: Record<Artifactr.Run["status"], string> = {
   running: "Working",
   paused: "Waiting for you",
   completed: "Done",
@@ -247,10 +244,10 @@ const STATUS: Record<string, string> = {
 };
 
 /** How a run is going, announced as it changes. */
-export function RunStatus({ status }: { status: string }) {
+export function RunStatus({ status }: { status: Artifactr.Run["status"] }) {
   return (
     <p role="status" className="text-muted text-xs">
-      {STATUS[status] ?? status}
+      {STATUS[status]}
     </p>
   );
 }

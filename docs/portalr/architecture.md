@@ -82,7 +82,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Request` | What a paused run waits on: a call to approve, or a question | An approval, a denial or an answer |
 | `ProposalCard` | A proposed change, its rationale and how it was resolved | Accept or reject |
 | `RunStatus` | How a run is going | Nothing |
-| `Markdown` | Markdown through Streamdown: no raw HTML, links to the web and mail alone, images from this origin alone | Nothing |
+| `Markdown` | Markdown through Streamdown: no raw HTML, links to the web, mail, the page and the application alone, images from this origin alone | Nothing |
 
 `ui` imports `client`'s types alone, which a root test holds it to.
 

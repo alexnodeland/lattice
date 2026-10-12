@@ -31,27 +31,41 @@ const SCHEMAS = {
 } as const;
 
 /** Keywords that describe a value without constraining it. */
-const ANNOTATIONS = new Set(["default", "description", "title", "examples"]);
+const ANNOTATIONS = new Set([
+  "$comment",
+  "default",
+  "deprecated",
+  "description",
+  "examples",
+  "readOnly",
+  "title",
+  "writeOnly",
+]);
 
 /**
  * The schema with the annotations beside each `$ref` dropped. json-schema-to-typescript inlines a
  * `$ref` that has keywords beside it, so `{"$ref": JsonValue, "default": null}` would be typed as
- * an object rather than as `JsonValue`, any JSON at all.
+ * an object rather than as `JsonValue`, any JSON at all. A constraint beside a `$ref` would be
+ * inlined the same way, so it fails here instead, to be typed on purpose.
  */
-export function bareRefs(schema: unknown): unknown {
+export function bareRefs(schema: unknown, at = "#"): unknown {
   if (Array.isArray(schema)) {
-    return schema.map(bareRefs);
+    return schema.map((item, index) => bareRefs(item, `${at}/${index}`));
   }
   if (schema === null || typeof schema !== "object") {
     return schema;
   }
-  const entries = Object.entries(schema);
-  const annotatedRef =
-    "$ref" in schema && entries.every(([key]) => key === "$ref" || ANNOTATIONS.has(key));
+  if ("$ref" in schema) {
+    const beside = Object.keys(schema).filter((key) => key !== "$ref" && !ANNOTATIONS.has(key));
+    if (beside.length > 0) {
+      throw new Error(
+        `${at}: a $ref with ${beside.join(", ")} beside it would be typed as an object`,
+      );
+    }
+    return { $ref: schema.$ref };
+  }
   return Object.fromEntries(
-    entries
-      .filter(([key]) => !(annotatedRef && key !== "$ref"))
-      .map(([key, value]) => [key, bareRefs(value)]),
+    Object.entries(schema).map(([key, value]) => [key, bareRefs(value, `${at}/${key}`)]),
   );
 }
 

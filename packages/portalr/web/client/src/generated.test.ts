@@ -12,9 +12,13 @@ test("the generated types match the committed documents", async () => {
 });
 
 test("a reference keeps its type when annotations sit beside it", () => {
-  const annotated = { $ref: "#/$defs/JsonValue", default: null, description: "Any JSON" };
-  const constrained = { $ref: "#/$defs/Id", minLength: 1 };
-  expect(bareRefs({ properties: { answer: annotated, id: constrained } })).toEqual({
-    properties: { answer: { $ref: "#/$defs/JsonValue" }, id: constrained },
+  const annotated = { $ref: "#/$defs/JsonValue", default: null, deprecated: true, $comment: "x" };
+  expect(bareRefs({ properties: { answer: annotated, list: [annotated] } })).toEqual({
+    properties: { answer: { $ref: "#/$defs/JsonValue" }, list: [{ $ref: "#/$defs/JsonValue" }] },
   });
+});
+
+test("a reference with a constraint beside it fails, rather than becoming an object", () => {
+  const constrained = { properties: { id: { $ref: "#/$defs/Id", minLength: 1 } } };
+  expect(() => bareRefs(constrained)).toThrow("#/properties/id: a $ref with minLength beside it");
 });

@@ -13,7 +13,9 @@ FOLDERS = ("packages", "examples", "scripts", "tests")
 SUPPRESSION = re.compile(r"#\s*(type:\s*ignore|pyright:\s*ignore|noqa|pragma:\s*no\s*cover)")
 TS_SUPPRESSION = re.compile(r"@ts-(ignore|expect-error|nocheck)|biome-ignore")
 WEB = ROOT / "packages" / "portalr" / "web"
-CLIENT_IMPORT = re.compile(r"^(?:import|export)\b[^;]*?\bfrom\s+\"@portalr/client\"", re.MULTILINE)
+CLIENT = r"""(?P<quote>['"])@portalr/client(?:/[^'"]*)?(?P=quote)"""
+CLIENT_STATEMENT = re.compile(rf"\b(?:import|export)\b[^;'\"]*?(?:\bfrom\s*)?{CLIENT}")
+CLIENT_DYNAMIC = re.compile(rf"\bimport\s*\(\s*{CLIENT}")
 
 
 def _is_python(path: Path) -> bool:
@@ -74,6 +76,20 @@ def test_no_inline_suppressions_in_typescript(path: Path) -> None:
     assert not found, "\n".join(found)
 
 
+def client_value_imports(source: str) -> list[str]:
+    """Every import from ``@portalr/client`` in ``source`` that isn't of its types alone.
+
+    A statement is fine only as a whole ``import type`` or ``export type``: an inline ``type`` in
+    braces still imports the module, and so does a bare import, for its effects, and ``import()``.
+    """
+    statements = [
+        found.group(0)
+        for found in CLIENT_STATEMENT.finditer(source)
+        if not found.group(0).startswith(("import type ", "export type "))
+    ]
+    return statements + [found.group(0) for found in CLIENT_DYNAMIC.finditer(source)]
+
+
 @pytest.mark.parametrize(
     "path",
     [path for path in _web_sources() if path.is_relative_to(WEB / "ui")],
@@ -82,16 +98,34 @@ def test_no_inline_suppressions_in_typescript(path: Path) -> None:
 def test_ui_imports_only_the_clients_types(path: Path) -> None:
     # ui renders what client's stores hold, and never calls the server (portalr ADR-0015): it
     # imports client's types alone, which leave nothing behind when it is built.
-    found = [
-        statement.group(0)
-        for statement in CLIENT_IMPORT.finditer(path.read_text())
-        if not statement.group(0).startswith(("import type ", "export type "))
-    ]
+    found = client_value_imports(path.read_text())
     assert not found, "\n".join(found)
 
 
-def test_the_gate_on_uis_imports_finds_a_value_import() -> None:
-    value = 'import { type Session, createApi } from "@portalr/client";'
-    statements = [statement.group(0) for statement in CLIENT_IMPORT.finditer(value)]
-    assert statements == [value.removesuffix(";")]
-    assert not statements[0].startswith(("import type ", "export type "))
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import { type Session, createApi } from "@portalr/client";',
+        "import { artifactr } from '@portalr/client';",
+        'import "@portalr/client";',
+        'export { thumbs } from "@portalr/client";',
+        'import * as client from "@portalr/client/queries";',
+        'const client = await import("@portalr/client");',
+        "const client = await import( '@portalr/client/rest' );",
+    ],
+)
+def test_the_gate_on_uis_imports_finds_each_kind_of_value_import(source: str) -> None:
+    assert client_value_imports(source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import type { Artifactr, ArtifactrV1 } from "@portalr/client";',
+        "export type { Session } from '@portalr/client';",
+        'import type * as Client from "@portalr/client/queries";',
+        'import { Button } from "./button";',
+    ],
+)
+def test_the_gate_on_uis_imports_passes_types_alone(source: str) -> None:
+    assert client_value_imports(source) == []

@@ -21,8 +21,8 @@ export type Known = v1.Event extends infer E
 /** Feedback someone gave on a message: its type, such as `thumbs`, and its value. */
 export interface Feedback {
   readonly actor: v1.Actor;
-  readonly type: string;
-  readonly value: Readonly<Record<string, v1.JsonValue>>;
+  readonly type: v1.FeedbackGiven["feedback_type"];
+  readonly value: Readonly<v1.FeedbackGiven["value"]>;
 }
 
 export interface Message {
@@ -72,8 +72,8 @@ export interface Tool {
 export interface Run {
   readonly id: v1.RunId;
   readonly threadId: v1.ThreadId;
-  /** `running`, `paused`, or how it ended: `succeeded`, `failed`, `stopped` and the like. */
-  readonly status: string;
+  /** `running`, `paused`, or how it ended. */
+  readonly status: "running" | "paused" | v1.RunEnded["status"];
   readonly tools: Readonly<Record<string, Tool>>;
   /** The text the run is streaming, until its message is posted or it ends. */
   readonly text: string;
@@ -220,27 +220,30 @@ const handlers: Handlers = {
   run_paused: (state, event) =>
     withRun(state, event.run_id, { status: "paused", requests: event.requests }),
   deferred_answered: (state, event) => {
-    const requests = (state.runs[event.run_id]?.requests ?? []).filter(
+    const run = state.runs[event.run_id];
+    const requests = (run?.requests ?? []).filter(
       (request) => request.tool_call_id !== event.tool_call_id,
     );
-    // The run resumes once every request it paused on has its answer.
-    return withRun(state, event.run_id, {
-      requests,
-      ...(requests.length === 0 && { status: "running" }),
-    });
+    // A paused run resumes once every request it paused on has its answer.
+    const resumes = run?.status === "paused" && requests.length === 0;
+    return withRun(state, event.run_id, { requests, ...(resumes && { status: "running" }) });
   },
-  run_ended: (state, event) => withRun(state, event.run_id, { status: event.status, text: "" }),
+  run_ended: (state, event) =>
+    withRun(state, event.run_id, { status: event.status, text: "", requests: [] }),
   feedback_given: (state, event, envelope) => {
     const { target } = event;
     if (target.kind !== "message") {
       return state; // feedback on a thread, a turn or an artifact isn't shown with messages
+    }
+    const messages = state.threads[target.thread_id]?.messages ?? [];
+    if (!messages.some(({ id }) => id === target.message_id)) {
+      return state; // a message before what the store read: its feedback has nowhere to go
     }
     const feedback: Feedback = {
       actor: envelope.actor,
       type: event.feedback_type,
       value: event.value,
     };
-    const { messages } = thread(state, target.thread_id);
     return withThread(state, target.thread_id, {
       messages: messages.map((message) =>
         message.id === target.message_id
@@ -252,6 +255,18 @@ const handlers: Handlers = {
   // The application's own events change nothing the store shows.
   app_event: ignore,
 };
+
+/**
+ * Whether a person's latest thumbs on a message was up, down, or not given: `me` is the id the
+ * server attributes their feedback to.
+ */
+export function thumbs(message: Message, me: string): boolean | null {
+  const mine = message.feedback.filter(
+    (given) => given.type === "thumbs" && "id" in given.actor && given.actor.id === me,
+  );
+  const up = mine.at(-1)?.value.up;
+  return typeof up === "boolean" ? up : null;
+}
 
 /** Whether this version knows the event's type. */
 export function isKnown(event: v1.Event): event is Known {

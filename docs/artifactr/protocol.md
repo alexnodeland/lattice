@@ -222,9 +222,9 @@ Beyond the memory, core refuses a command that creates something with an id alre
 |---|---|---|
 | `1000` | Normal closure | none |
 | `1001` | Server going away | reconnect and resume |
-| `4400` | The first frame was not a valid `hello`, asked for an unsupported protocol version, or asked both to start at the head and to resume | fix or upgrade the client |
+| `4400` | The first frame was not a valid `hello`, asked for an unsupported protocol version, or asked both to start at the head and to resume; or `resolve_actor` refused it with a 400 | fix or upgrade the client |
 | `4401` | Unauthenticated | re-authenticate |
-| `4403` | The actor may not open this workspace, or read its log or runs | stop |
+| `4403` | The actor may not open this workspace, or read its log or runs; or `resolve_actor` refused it with `Forbidden` | stop |
 | `4408` | `hello` not received in time | reconnect |
 | `4429` | The client did not read frames fast enough and its outbox overflowed | reconnect and resume |
 

@@ -117,8 +117,8 @@ class Stream:
     async def _session(self) -> None:
         try:
             workspace = await self._open_workspace(self._ws, self._workspace_id)
-        except HTTPException as refused:  # not authenticated
-            await self._close(4401, str(refused.detail))
+        except HTTPException as refused:  # by the resolver: 4401 unauthenticated, 4400, 4403
+            await self._close(4000 + refused.status_code, str(refused.detail))
             return
         except Forbidden as refused:
             await self._close(4403, refused.message)

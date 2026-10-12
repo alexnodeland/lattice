@@ -1,0 +1,1566 @@
+{
+  "components": {
+    "schemas": {
+      "Config": {
+        "description": "``config.json``: what the UIs need of the deployment they run in.",
+        "properties": {
+          "readers": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Readers",
+            "type": "object"
+          },
+          "supabase": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Supabase",
+            "type": "object"
+          },
+          "surfaces": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Surfaces",
+            "type": "object"
+          }
+        },
+        "required": [
+          "supabase",
+          "surfaces",
+          "readers"
+        ],
+        "title": "Config",
+        "type": "object"
+      },
+      "DeploymentTenants": {
+        "description": "Every tenant, and their spend, as one LiteLLM team list reads it.",
+        "properties": {
+          "spend": {
+            "discriminator": {
+              "mapping": {
+                "ok": "#/components/schemas/Ok_list_TenantSpend__",
+                "unavailable": "#/components/schemas/Unavailable",
+                "unconfigured": "#/components/schemas/Unconfigured"
+              },
+              "propertyName": "status"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Ok_list_TenantSpend__"
+              },
+              {
+                "$ref": "#/components/schemas/Unavailable"
+              },
+              {
+                "$ref": "#/components/schemas/Unconfigured"
+              }
+            ],
+            "title": "Spend"
+          },
+          "tenants": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tenants",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tenants",
+          "spend"
+        ],
+        "title": "DeploymentTenants",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "Id": {
+        "type": "string"
+      },
+      "Invited": {
+        "description": "The member an invitation made, by the user id their tokens carry.",
+        "properties": {
+          "tenant": {
+            "title": "Tenant",
+            "type": "string"
+          },
+          "user": {
+            "title": "User",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "user"
+        ],
+        "title": "Invited",
+        "type": "object"
+      },
+      "Links": {
+        "description": "Deep links into the stack's own tools, which only operators get.",
+        "properties": {
+          "grafana_logs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grafana Logs"
+          },
+          "grafana_trace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grafana Trace"
+          },
+          "langfuse_session": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Langfuse Session"
+          },
+          "langfuse_trace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Langfuse Trace"
+          }
+        },
+        "title": "Links",
+        "type": "object"
+      },
+      "LogLine": {
+        "description": "One log record.",
+        "properties": {
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "type": "object"
+          },
+          "line": {
+            "title": "Line",
+            "type": "string"
+          },
+          "time_ns": {
+            "title": "Time Ns",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "time_ns",
+          "line",
+          "labels"
+        ],
+        "title": "LogLine",
+        "type": "object"
+      },
+      "Metric": {
+        "enum": [
+          "turn_latency",
+          "failed_runs"
+        ],
+        "type": "string"
+      },
+      "NewInvite": {
+        "description": "Whom to invite to the tenant ``X-Tenant`` names.",
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "NewInvite",
+        "type": "object"
+      },
+      "Ok_Union_Spend__NoneType__": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Spend"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[Union[Spend, NoneType]]",
+        "type": "object"
+      },
+      "Ok_Union_Trace__NoneType__": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Trace"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[Union[Trace, NoneType]]",
+        "type": "object"
+      },
+      "Ok_list_LogLine__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/LogLine"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[list[LogLine]]",
+        "type": "object"
+      },
+      "Ok_list_Point__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Point"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[list[Point]]",
+        "type": "object"
+      },
+      "Ok_list_Score__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Score"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[list[Score]]",
+        "type": "object"
+      },
+      "Ok_list_TenantSpend__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/TenantSpend"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[list[TenantSpend]]",
+        "type": "object"
+      },
+      "Ok_list_TraceSummary__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/TraceSummary"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[list[TraceSummary]]",
+        "type": "object"
+      },
+      "Point": {
+        "description": "A value at a moment.",
+        "properties": {
+          "time": {
+            "title": "Time",
+            "type": "number"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "time",
+          "value"
+        ],
+        "title": "Point",
+        "type": "object"
+      },
+      "Score": {
+        "description": "A score: a person's feedback, or an evaluator's verdict, on a trace.",
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "string_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "String Value"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "timestamp"
+        ],
+        "title": "Score",
+        "type": "object"
+      },
+      "Span": {
+        "description": "One span of a trace, with its attributes flattened to values.",
+        "properties": {
+          "attributes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "title": "Attributes",
+            "type": "object"
+          },
+          "end_ns": {
+            "title": "End Ns",
+            "type": "integer"
+          },
+          "error": {
+            "title": "Error",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "span_id": {
+            "title": "Span Id",
+            "type": "string"
+          },
+          "start_ns": {
+            "title": "Start Ns",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "span_id",
+          "parent_id",
+          "name",
+          "start_ns",
+          "end_ns",
+          "attributes",
+          "error"
+        ],
+        "title": "Span",
+        "type": "object"
+      },
+      "Spend": {
+        "description": "What a tenant has spent, against its budget, if it has one.",
+        "properties": {
+          "budget_duration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Duration"
+          },
+          "max_budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Budget"
+          },
+          "spend": {
+            "title": "Spend",
+            "type": "number"
+          }
+        },
+        "required": [
+          "spend"
+        ],
+        "title": "Spend",
+        "type": "object"
+      },
+      "TenantId": {
+        "pattern": "^[^~]+$",
+        "type": "string"
+      },
+      "TenantSpend": {
+        "description": "A tenant's spend, for operators.",
+        "properties": {
+          "budget_duration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Duration"
+          },
+          "max_budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Budget"
+          },
+          "spend": {
+            "title": "Spend",
+            "type": "number"
+          },
+          "tenant": {
+            "title": "Tenant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "spend",
+          "tenant"
+        ],
+        "title": "TenantSpend",
+        "type": "object"
+      },
+      "Trace": {
+        "description": "A trace and its spans.",
+        "properties": {
+          "spans": {
+            "items": {
+              "$ref": "#/components/schemas/Span"
+            },
+            "title": "Spans",
+            "type": "array"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id",
+          "spans"
+        ],
+        "title": "Trace",
+        "type": "object"
+      },
+      "TraceSummary": {
+        "description": "A trace Tempo found.",
+        "properties": {
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "root_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Name"
+          },
+          "root_service": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Service"
+          },
+          "start_ns": {
+            "title": "Start Ns",
+            "type": "integer"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trace_id",
+          "start_ns"
+        ],
+        "title": "TraceSummary",
+        "type": "object"
+      },
+      "Unavailable": {
+        "description": "The tool didn't answer, or answered with an error; ``reason`` says which.",
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "const": "unavailable",
+            "default": "unavailable",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "Unavailable",
+        "type": "object"
+      },
+      "Unconfigured": {
+        "description": "The application runs without this tool.",
+        "properties": {
+          "status": {
+            "const": "unconfigured",
+            "default": "unconfigured",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "Unconfigured",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "portalr",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/portalr/config.json": {
+      "get": {
+        "description": "What the UIs need of this deployment: Supabase, the surfaces, and the tools it runs.",
+        "operationId": "config_portalr_config_json_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Config"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Config"
+      }
+    },
+    "/portalr/v1/deployment/links": {
+      "get": {
+        "description": "Deep links into Langfuse and Grafana, which aren't tenant-scoped, for operators.",
+        "operationId": "links_portalr_v1_deployment_links_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "trace_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trace Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Links"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Links"
+      }
+    },
+    "/portalr/v1/deployment/tenants": {
+      "get": {
+        "description": "Every tenant, with its spend from one LiteLLM team list, for operators.",
+        "operationId": "deployment_tenants_portalr_v1_deployment_tenants_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentTenants"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Deployment Tenants"
+      }
+    },
+    "/portalr/v1/invites": {
+      "post": {
+        "description": "Invite someone to the tenant: Supabase Auth creates or finds them, grantr adds them.\n\nIt needs ``grantr:add_member``, which is checked before Supabase is asked, and again\nwhen grantr adds the member.",
+        "operationId": "invite_member_portalr_v1_invites_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewInvite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invited"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Invite Member"
+      }
+    },
+    "/portalr/v1/logs": {
+      "get": {
+        "description": "The tenant's logs, a thread's or a run's, from Loki.",
+        "operationId": "logs_portalr_v1_logs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "thread",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Thread"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "ok": "#/components/schemas/Ok_list_LogLine__",
+                      "unavailable": "#/components/schemas/Unavailable",
+                      "unconfigured": "#/components/schemas/Unconfigured"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Ok_list_LogLine__"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unavailable"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unconfigured"
+                    }
+                  ],
+                  "title": "Response Logs Portalr V1 Logs Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Logs"
+      }
+    },
+    "/portalr/v1/metrics": {
+      "get": {
+        "description": "The tenant's latency or errors over time, from Prometheus, through prom-label-proxy.",
+        "operationId": "metrics_portalr_v1_metrics_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "metric",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Metric"
+            }
+          },
+          {
+            "in": "query",
+            "name": "step",
+            "required": false,
+            "schema": {
+              "default": "PT5M",
+              "format": "duration",
+              "title": "Step",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "ok": "#/components/schemas/Ok_list_Point__",
+                      "unavailable": "#/components/schemas/Unavailable",
+                      "unconfigured": "#/components/schemas/Unconfigured"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Ok_list_Point__"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unavailable"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unconfigured"
+                    }
+                  ],
+                  "title": "Response Metrics Portalr V1 Metrics Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Metrics"
+      }
+    },
+    "/portalr/v1/scores": {
+      "get": {
+        "description": "The tenant's feedback and evaluation scores, from Langfuse.",
+        "operationId": "scores_portalr_v1_scores_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "ok": "#/components/schemas/Ok_list_Score__",
+                      "unavailable": "#/components/schemas/Unavailable",
+                      "unconfigured": "#/components/schemas/Unconfigured"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Ok_list_Score__"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unavailable"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unconfigured"
+                    }
+                  ],
+                  "title": "Response Scores Portalr V1 Scores Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Scores"
+      }
+    },
+    "/portalr/v1/spend": {
+      "get": {
+        "description": "The tenant's usage and spend, against its budget, from its LiteLLM team.",
+        "operationId": "spend_portalr_v1_spend_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "ok": "#/components/schemas/Ok_Union_Spend__NoneType__",
+                      "unavailable": "#/components/schemas/Unavailable",
+                      "unconfigured": "#/components/schemas/Unconfigured"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Ok_Union_Spend__NoneType__"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unavailable"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unconfigured"
+                    }
+                  ],
+                  "title": "Response Spend Portalr V1 Spend Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Spend"
+      }
+    },
+    "/portalr/v1/traces": {
+      "get": {
+        "description": "The tenant's traces, a session's or a run's, from Tempo.",
+        "operationId": "traces_portalr_v1_traces_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "ok": "#/components/schemas/Ok_list_TraceSummary__",
+                      "unavailable": "#/components/schemas/Unavailable",
+                      "unconfigured": "#/components/schemas/Unconfigured"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Ok_list_TraceSummary__"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unavailable"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unconfigured"
+                    }
+                  ],
+                  "title": "Response Traces Portalr V1 Traces Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Traces"
+      }
+    },
+    "/portalr/v1/traces/{trace_id}": {
+      "get": {
+        "description": "A trace, if it is the tenant's: its spans, for its waterfall.",
+        "operationId": "trace_portalr_v1_traces__trace_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trace_id",
+            "required": true,
+            "schema": {
+              "title": "Trace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "ok": "#/components/schemas/Ok_Union_Trace__NoneType__",
+                      "unavailable": "#/components/schemas/Unavailable",
+                      "unconfigured": "#/components/schemas/Unconfigured"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Ok_Union_Trace__NoneType__"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unavailable"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unconfigured"
+                    }
+                  ],
+                  "title": "Response Trace Portalr V1 Traces  Trace Id  Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Trace"
+      }
+    }
+  }
+}

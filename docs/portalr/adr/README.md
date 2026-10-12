@@ -2,7 +2,7 @@
 
 Each record captures one decision: the context that forced it, the options considered, and the consequences we accepted. Records are immutable once accepted; a changed decision gets a new record that amends or supersedes the old one. Proposals that precede decisions live in [`../rfcs/`](../rfcs/README.md).
 
-ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../rfcs/0002-portalr-the-portal.md), the design portalr implements. ADR-0007 and ADR-0008 are phase 1's, ADR-0009 phase 2's, and ADR-0010 phase 3's.
+ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../rfcs/0002-portalr-the-portal.md), the design portalr implements. ADR-0007 and ADR-0008 are phase 1's, ADR-0009 phase 2's, ADR-0010 phase 3's, and ADR-0011 phase 4's.
 
 | ADR | Title | Status |
 |---|---|---|
@@ -16,5 +16,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0008](0008-the-bun-workspace-runs-in-bun.md) | The Bun workspace runs in Bun | Accepted |
 | [0009](0009-ui-tested-in-chromium-in-both-schemes-under-bun.md) | `ui` tested in Chromium, in both schemes, under Bun | Accepted |
 | [0010](0010-the-client-generated-types-and-resumable-stores.md) | The client: generated types, and resumable stores | Accepted |
+| [0011](0011-the-router-and-its-readers.md) | The router and its readers | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

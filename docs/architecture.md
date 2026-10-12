@@ -70,7 +70,7 @@ moon knows fourteen projects: the thirteen below, and `lattice`, the root, which
 | relayr | `packages/relayr` | The bridge between artifactr and reflexr; distributed as `relayr-ai` | Library | artifactr, reflexr |
 | grantr | `packages/grantr` | Identity and access for artifactr and reflexr; its core, storage and admin API so far ([its plan](grantr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
 | stackr | `packages/stackr` | The stack the libraries run on, and the application template | Tool (shell), ships no wheel | artifactr, reflexr, evalr |
-| portalr | `packages/portalr` | The portal: the router that serves the app and admin UIs. Planned: it holds only its version ([RFC-0001](portalr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
+| portalr | `packages/portalr` | The portal: the router that serves the app and admin UIs, and reads the stack's tools for one tenant ([its architecture](portalr/architecture.md)) | Library | grantr |
 | client | `packages/portalr/web/client` | `@portalr/client`, the only code in the UIs that talks to the server | Library (TypeScript) | |
 | ui | `packages/portalr/web/ui` | `@portalr/ui`, the kit app and admin build from | Library (TypeScript) | |
 | app | `packages/portalr/web/app` | The people's UI, a single-page app | Application (TypeScript) | ui |
@@ -91,6 +91,7 @@ graph TD
     artifactr --> evalr
     reflexr --> evalr
     grantr
+    portalr --> grantr
     app --> ui
     admin --> ui
 ```

@@ -25,9 +25,9 @@ The family's packages, in one repository: libraries for applications in which pe
 | [relayr](relayr/index.md) | The bridge between artifactr and reflexr: events from chats and artifacts become events for rules, and runs act back in the chat |
 | [grantr](grantr/index.md) | Identity and access for artifactr and reflexr: tenants, members, groups, roles and service principals, checked before every command and read |
 | [stackr](stackr/index.md) | The infrastructure the libraries run on, and an application template |
-| [portalr](portalr/index.md) | The portal into an application: an app UI to chat with its agents and see their work, and an admin UI to run it. Planned: it holds only its version so far |
+| [portalr](portalr/index.md) | The portal into an application: an app UI to chat with its agents and see their work, and an admin UI to run it. In progress: its router and readers are built |
 
-grantr's core, storage and admin API are built, and [its plan](grantr/rfcs/0001-v0.1-implementation-plan.md) wires it into the libraries and the template. portalr holds only its version so far, and [its plan](portalr/rfcs/0001-v0.1-implementation-plan.md) builds it.
+grantr's core, storage and admin API are built, and [its plan](grantr/rfcs/0001-v0.1-implementation-plan.md) wires it into the libraries and the template. portalr's router and readers are built, and [its plan](portalr/rfcs/0001-v0.1-implementation-plan.md) builds the UIs on them.
 
 lattice's mark is one cell of the lattice that every mark in the family is drawn on. Its [brand page](assets/brand/README.md) has the mark, the colours and the family's brand system, and [ADR-0001](adr/0001-lattices-brand.md) records why.
 

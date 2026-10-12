@@ -1,0 +1,42 @@
+# checkov over stackr's AWS recipe (RFC-0004), run by deploy/aws/check. Each check it skips is
+# here with its reason; nothing is skipped inline.
+framework:
+  - terraform
+compact: true
+quiet: true
+skip-check:
+  # Settled by RFC-0004: one zone and one copy, with Multi-AZ, replication and cross-region
+  # copies in its "What comes later".
+  - CKV_AWS_157 # RDS Multi-AZ
+  - CKV2_AWS_50 # ElastiCache automatic failover across zones
+  - CKV_AWS_144 # S3 cross-region replication
+  # AWS-managed keys encrypt everything at rest; a customer-managed key per deployment comes later.
+  - CKV_AWS_145 # S3 with a customer-managed key
+  - CKV_AWS_149 # Secrets Manager with a customer-managed key
+  - CKV_AWS_158 # CloudWatch Logs with a customer-managed key
+  - CKV_AWS_191 # ElastiCache with a customer-managed key
+  - CKV_AWS_354 # Performance Insights with a customer-managed key
+  # The secrets that encrypt data never rotate (RFC-0004), and the rest rotate by a new version.
+  - CKV2_AWS_57
+  # Nothing consumes bucket events, or access logs yet; RDS has Performance Insights and its logs.
+  - CKV2_AWS_62 # S3 event notifications
+  - CKV_AWS_18 # S3 access logging
+  - CKV_AWS_118 # RDS enhanced monitoring
+  # Flow logs keep their days by a variable (30 by default), not a year.
+  - CKV_AWS_338
+  # The ALB takes 80 from anywhere, only to redirect it to 443.
+  - CKV_AWS_260
+  # The scan of the modules' HCL doesn't follow these, which the tests check (tests/): the
+  # security groups' sources are other groups, never an address range; the groups are attached
+  # in the services' modules; each bucket's versioning, public access block and lifecycle are
+  # resources of their own; RDS's backups and deletion protection, and Valkey's auth token, come
+  # from variables and a write-only argument.
+  - CKV_AWS_24
+  - CKV_AWS_25
+  - CKV2_AWS_5
+  - CKV_AWS_21
+  - CKV2_AWS_6
+  - CKV2_AWS_61
+  - CKV_AWS_133
+  - CKV_AWS_293
+  - CKV_AWS_31

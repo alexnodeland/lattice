@@ -158,6 +158,30 @@ jobs:
           path: packages/portalr/web/app/test-results/
           retention-days: 7
 
+  # stackr's AWS recipe, tier 1 (stackr RFC-0004): OpenTofu, TFLint, checkov, and the modules'
+  # tests against a mocked AWS. Never AWS, and no Floci: tier 2 starts Floci.
+  aws:
+    name: AWS (tier 1)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+        with:
+          auto-install: true
+      # OpenTofu's and TFLint's plugins are lattice's own, which proto loads from a trusted file.
+      - run: proto trust .prototools && proto install tofu tflint
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: opentofu-providers-${{ hashFiles('packages/stackr/deploy/aws/**/versions.tf') }}
+      - run: uv run --no-project python scripts/affected.py aws
+
   # Each variant of the application template, generated and checked as its own CI would: lint,
   # strict types, and the tests with 100% coverage. It installs the libraries from the checkout, so
   # it runs when stackr or a library changes, and checks the two together (stackr ADR-0018). The
@@ -348,7 +372,7 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [check, tests, images, acceptance, template, smoke, dependency-review, osv]
+    needs: [check, tests, images, acceptance, aws, template, smoke, dependency-review, osv]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}

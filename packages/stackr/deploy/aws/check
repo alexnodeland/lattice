@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Tier 1 of the AWS recipe's checks (RFC-0004): everything that needs neither AWS nor Floci.
+#
+# Usage: deploy/aws/check   (OpenTofu and TFLint from lattice's .prototools; uv for checkov)
+#
+# OpenTofu's format and validation of every module, TFLint with AWS's ruleset, checkov with the
+# skips and reasons in .checkov.yaml, and the modules' tests, each planned against a mocked AWS
+# (tests/). The providers download once, into TF_PLUGIN_CACHE_DIR.
+
+set -euo pipefail
+cd "$(dirname "$0")"
+
+export TF_PLUGIN_CACHE_DIR=${TF_PLUGIN_CACHE_DIR:-$HOME/.terraform.d/plugin-cache}
+mkdir -p "$TF_PLUGIN_CACHE_DIR"
+CHECKOV_VERSION=3.3.27
+status=0
+step() { printf '\n==> %s\n' "$*"; }
+fail() {
+  echo "FAIL: $*" >&2
+  status=1
+}
+
+step "Format"
+tofu fmt -check -recursive -diff . || fail "tofu fmt: run tofu fmt -recursive deploy/aws"
+
+step "Validate"
+for module in modules/*/; do
+  if (cd "$module" && tofu init -backend=false -input=false >/dev/null && tofu validate -no-color); then
+    echo "ok: $module"
+  else
+    fail "tofu validate: $module"
+  fi
+done
+
+step "TFLint"
+tflint --init --config "$PWD/.tflint.hcl" >/dev/null
+tflint --recursive --config "$PWD/.tflint.hcl" || fail "tflint"
+
+step "checkov"
+uvx --quiet "checkov==$CHECKOV_VERSION" -d . --config-file .checkov.yaml || fail "checkov"
+
+step "Tests, against a mocked AWS"
+(tofu init -backend=false -input=false >/dev/null && tofu test -no-color) || fail "tofu test"
+
+exit $status

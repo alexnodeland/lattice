@@ -102,6 +102,13 @@ async def test_the_first_operator_and_a_tenant(config: Settings) -> None:
     assert await run(["tenant", "acme", "u-carol"], config) == "acme exists, and is unchanged"
 
 
+async def test_the_admin_api_is_asked_where_admin_url_says(config: Settings, issuer: str) -> None:
+    auth = replace(config.auth, issuer="https://auth.example.com", admin_url=issuer)
+    assert await run(["operator", "alice@example.com"], replace(config, auth=auth)) == (
+        "alice@example.com is the deployment's operator"
+    )
+
+
 async def test_migrating_keeps_what_each_user_could_do(config: Settings) -> None:
     assert await run(["migrate-tenants"], config) == (
         "acme: owner alice@example.com; admins bob@example.com\n"

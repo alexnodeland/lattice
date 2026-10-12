@@ -15,6 +15,7 @@ The application template's questions are in stackr's `copier.yml`, which the `co
 | `evals` | bool | yes |  | always | Include evaluation with evalr (an evals/ directory and a starter experiment)? |
 | `bridge` | bool | yes |  | `libraries == 'both'` | Bridge them with relayr (chats and artifacts become events for rules, and rules' runs act back as proposals and notices; with an incident timeline example)? |
 | `access` | str | `grantr` | `grantr`, `none` | always | Who may do what |
+| `hosting` | str | `none` | `none`, `host` | always | Where it is hosted, beside stackr's recipe for it (stackr RFC-0004) |
 | `python_version` | str | `3.12` | `3.12`, `3.13`, `3.14` | always | The Python version it runs on |
 | `app_port` | int | `8800` |  | always | The port it is published on, on this machine |
 
@@ -103,6 +104,7 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `evals/__init__.py` | `evals` | copied |
 | `evals/__main__.py` | `evals` | copied |
 | `evals/experiments.py` | `evals` | rendered |
+| `deploy/host/compose.prod.yaml` | `hosting == 'host'` | rendered |
 
 <!-- end generated -->
 

@@ -28,5 +28,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0022](0022-row-level-security-in-the-template.md) | Row-level security in the template | Accepted |
 | [0023](0023-opentofu-for-aws-now.md) | OpenTofu for AWS, now | Accepted |
 | [0025](0025-what-the-floci-spike-found.md) | What the Floci spike found | Accepted |
+| [0026](0026-the-single-host.md) | The single host | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

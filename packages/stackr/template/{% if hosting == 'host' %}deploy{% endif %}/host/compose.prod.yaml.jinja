@@ -1,0 +1,27 @@
+# {{ project_name }} on a single host, beside stackr's stack behind its edge (stackr RFC-0004): an
+# overlay on compose.yaml, for the app profile.
+#
+#   docker compose -f compose.yaml -f deploy/host/compose.prod.yaml --profile app up --detach --wait
+#
+# It runs the image APP_IMAGE names, as this application's CI publishes it, publishes no port,
+# since stackr's Caddy reaches it as app:8000 on the stackr network, and joins only that network:
+# on a single host, PostgreSQL and GoTrue are stackr's own services.
+{%- if access == 'grantr' %} Before it first starts, and when
+# DATABASE_URL's password changes, create the role it works as:
+#
+#   docker compose -f compose.yaml -f deploy/host/compose.prod.yaml --profile app \
+#     run --rm app {{ project_slug }}-admin db-roles
+{%- endif %}
+
+services:
+  app:
+    build: !reset null
+    image: ${APP_IMAGE:?set APP_IMAGE in .env, the image to run}
+    ports: !reset []
+    networks: !override [stackr]
+    # GoTrue on the stack's network: its key set, and{% if access == 'grantr' %} its admin API, which the edge refuses{% else %} nothing else{% endif %}.
+    environment:
+      AUTH_JWKS_URL: http://gotrue:9999/.well-known/jwks.json
+{%- if access == 'grantr' %}
+      AUTH_ADMIN_URL: http://gotrue:9999
+{%- endif %}

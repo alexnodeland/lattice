@@ -35,6 +35,11 @@ function Workspace() {
         >
           Runs
         </TextLink>
+        <TextLink
+          render={<Link to="/t/$tenant/w/$workspace/rules" params={{ tenant, workspace }} />}
+        >
+          Rules
+        </TextLink>
       </nav>
       <WorkspaceStreams
         key={`${tenant}/${workspace}`}

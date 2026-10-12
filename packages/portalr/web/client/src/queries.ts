@@ -41,6 +41,10 @@ export const keys = {
     workspace: (tenant: string, ws: string) => ["reflexr", tenant, "workspace", ws] as const,
     rules: (tenant: string, ws: string) =>
       [...keys.reflexr.workspace(tenant, ws), "rules", "list"] as const,
+    rule: (tenant: string, ws: string, rule: string) =>
+      [...keys.reflexr.workspace(tenant, ws), "rules", "detail", rule] as const,
+    schedules: (tenant: string, ws: string) =>
+      [...keys.reflexr.workspace(tenant, ws), "schedules", "list"] as const,
     runs: (tenant: string, ws: string) =>
       [...keys.reflexr.workspace(tenant, ws), "runs", "list"] as const,
   },
@@ -166,6 +170,25 @@ export function createQueries(api: Api) {
           queryFn: () =>
             body(api.reflexr.GET("/workspaces/{workspace_id}/rules", workspace(tenant, ws))),
         }),
+      /** One of the workspace's rules: a code rule, or an active stored one's current version. */
+      rule: (tenant: string, ws: string, rule: string) =>
+        queryOptions({
+          queryKey: keys.reflexr.rule(tenant, ws, rule),
+          queryFn: () =>
+            body(
+              api.reflexr.GET("/workspaces/{workspace_id}/rules/{rule}", {
+                ...named(tenant),
+                params: { path: { workspace_id: ws, rule } },
+              }),
+            ),
+        }),
+      /** When each schedule that ticks into the workspace last ticked, and ticks next. */
+      schedules: (tenant: string, ws: string) =>
+        queryOptions({
+          queryKey: keys.reflexr.schedules(tenant, ws),
+          queryFn: () =>
+            body(api.reflexr.GET("/workspaces/{workspace_id}/schedules", workspace(tenant, ws))),
+        }),
       runs: (tenant: string, ws: string) =>
         queryOptions({
           queryKey: keys.reflexr.runs(tenant, ws),
@@ -268,10 +291,16 @@ export const stale = {
   reflexr(tenant: string, ws: string, envelope: reflexrV1.EventFrame) {
     const { type } = envelope.event;
     if (type.startsWith("reflexr:rule_")) {
-      return [keys.reflexr.rules(tenant, ws)];
+      const rule = envelope.event.rule;
+      return typeof rule === "string"
+        ? [keys.reflexr.rules(tenant, ws), keys.reflexr.rule(tenant, ws, rule)]
+        : [keys.reflexr.rules(tenant, ws)];
     }
     if (type.startsWith("reflexr:run_")) {
       return [keys.reflexr.runs(tenant, ws)];
+    }
+    if (type === "reflexr:tick") {
+      return [keys.reflexr.schedules(tenant, ws)];
     }
     return [];
   },

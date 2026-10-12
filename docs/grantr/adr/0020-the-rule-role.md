@@ -1,6 +1,6 @@
 # ADR-0020: The rule role
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0029](0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

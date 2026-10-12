@@ -139,15 +139,18 @@ def test_the_application_holds_the_runtime_and_every_read() -> None:
     assert application & (TENANT_ADMIN_READS | DEPLOYMENT_READS) == frozenset()
 
 
-def test_a_rule_publishes_checkpoints_and_reads_its_workspace() -> None:
+def test_a_rule_publishes_checkpoints_reads_its_workspace_and_posts_notices() -> None:
     assert _role("rule") == {
         "reflexr:open",
         "reflexr:publish",
         "reflexr:checkpoint_run",
         "reflexr:read_events",
         "reflexr:read_runs",
+        "artifactr:open",
+        "artifactr:post_message",
     }
     assert CATALOG.role("rule", "rule", {}) is None, "granted on a workspace only"
+    assert Catalog.of(ARTIFACTR).role("rule", "workspace", {}) == frozenset(), "reflexr's rules"
     assert _role("rule") <= _role("admin"), "so a workspace's admin may grant it"
 
 

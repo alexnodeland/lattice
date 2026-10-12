@@ -309,6 +309,14 @@ class Grants:
         await self._require(self._storage, tenant, by, RESTRICT, on)
         return await self._storage.restricted(tenant, workspace)
 
+    async def served_tenants(self) -> list[TenantId]:
+        """Every tenant, for the deployment's own in-process tools, such as a startup task.
+
+        It checks no one: no surface reaches it, as none reaches :meth:`provision_tenant`.
+        Surfaces list tenants with :meth:`tenants`, for an operator.
+        """
+        return await self._storage.tenants()
+
     async def tenants(self, *, by: Subject) -> list[TenantId]:
         """Every tenant, for an operator.
 

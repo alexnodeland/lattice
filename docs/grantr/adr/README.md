@@ -24,11 +24,12 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0016](0016-the-sql-adapter.md) | The SQL adapter | Accepted, amended by 0024 |
 | [0017](0017-the-admin-api.md) | The admin API | Accepted |
 | [0018](0018-telemetry-through-the-api.md) | Telemetry through the OpenTelemetry API | Accepted |
-| [0019](0019-runtime-actions-and-the-application-role.md) | Runtime actions, and the application role | Accepted, amended by 0022 |
+| [0019](0019-runtime-actions-and-the-application-role.md) | Runtime actions, and the application role | Accepted, amended by 0022 and 0025 |
 | [0020](0020-the-rule-role.md) | The rule role | Accepted |
-| [0021](0021-the-deployments-own-tools.md) | The deployment's own tools | Accepted |
+| [0021](0021-the-deployments-own-tools.md) | The deployment's own tools | Accepted, amended by 0025 |
 | [0022](0022-a-tenants-members-list-its-workspaces.md) | A tenant's members list its workspaces | Accepted |
 | [0023](0023-portalrs-admin-reads.md) | portalr's admin reads | Accepted |
 | [0024](0024-who-sees-a-restricted-item.md) | Who sees a restricted item | Accepted |
+| [0025](0025-the-application-lists-tenants-and-workspaces-and-writes-for-code-rules.md) | The application lists tenants and workspaces, and writes for its code rules | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

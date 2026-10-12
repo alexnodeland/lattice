@@ -1,6 +1,6 @@
 # ADR-0019: Runtime actions, and the application role
 
-**Status:** Accepted, amended by [ADR-0022](0022-a-tenants-members-list-its-workspaces.md)
+**Status:** Accepted, amended by [ADR-0022](0022-a-tenants-members-list-its-workspaces.md) and [ADR-0025](0025-the-application-lists-tenants-and-workspaces-and-writes-for-code-rules.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

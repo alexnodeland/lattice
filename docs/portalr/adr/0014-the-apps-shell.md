@@ -11,10 +11,13 @@ Phase 5 builds the app's first screens: signing in, and choosing a tenant and a 
 ## Decision
 
 - **The strings are English, in the components.** There is no catalog until a second language is wanted, when one goes in with it, and the strings move then.
-- **The route tree is committed.** `src/routeTree.gen.ts` is what TanStack Router's Vite plugin writes from `src/routes/`, so the typecheck and knip see the routes without a build. A test generates it again beside the committed one and fails if they differ, as each package's drift test does; `moon run app:build` rewrites it. Biome leaves it alone.
-- **Signing in is `@supabase/auth-js`,** the auth client `@supabase/supabase-js` wraps, without the rest. It keeps the session in `localStorage` under `portalr`, refreshes the token, and every request carries the current one, with the tenant the route names (`client`'s `Session`, whose tenant is null before one is chosen).
+- **The route tree is committed.** `src/routeTree.gen.ts` is what TanStack Router's Vite plugin writes from `src/routes/`, so the typecheck and knip see the routes without a build. A test generates it again beside the committed one and fails if they differ, as each package's drift test does; `moon run app:build` rewrites it. Biome leaves it alone, and the typecheck reads it. Each route is a chunk of its own, loaded when it is first visited.
+- **Signing in is `@supabase/auth-js`,** the auth client `@supabase/supabase-js` wraps, without the rest. It keeps the session in `localStorage` under `portalr`, refreshes the token, and every request carries the current one; signing out ends the session in this browser alone. A read the server refuses as unsigned (401) ends it too, and the app goes back to signing in; neither a 401 nor a 403 is retried.
+- **Every read names its tenant,** in `X-Tenant` and in its cache key, from the route it is made for, so a navigation that is preloaded or abandoned can't cache one tenant's answer as another's. A person's tenants are cached by who they are. `Session`'s tenant is for a workspace's stream alone, whose URL carries it.
 - **The shell's routes:** `/sign-in`; then, signed in, `/`, which lists a person's tenants from grantr's `/me` (they have no access with none, and go straight to their only one); `/t/$tenant`, the workspaces grantr says they can open there; and `/t/$tenant/w/$workspace`, which the app's areas open into.
 - **A password signs in, for now.** Magic links and the deployment's own providers come with phase 7, where the template's Supabase can send mail and its scenarios can follow a link.
+
+The last two amend lattice RFC-0002, which named `@supabase/supabase-js` and magic links.
 
 ## Options considered
 

@@ -20,6 +20,7 @@ tasks:
     deps:
       - 'app:build'
       - 'admin:build'
+      - 'app:chromium'
     inputs:
       - 'bdd/**/*'
       - 'src/**/*'
@@ -30,6 +31,14 @@ tasks:
       - '/packages/portalr/src/**/*'
       - '/packages/grantr/src/**/*'
       - '/packages/artifactr/src/**/*'
+    options:
+      cache: false
+
+  # Chromium's headless shell for Playwright, with what it needs of the system, only when the
+  # scenarios run.
+  chromium:
+    description: 'Install Chromium for the scenarios'
+    command: 'bun x --bun --no-install playwright install --with-deps --only-shell chromium'
     options:
       cache: false
 

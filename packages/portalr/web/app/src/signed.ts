@@ -1,19 +1,18 @@
 /**
- * Who is signed in, through Supabase Auth's client alone (lattice RFC-0002), and the session
- * every request carries: the current access token, and the tenant the route names.
+ * Who is signed in, through Supabase Auth's client alone (portalr ADR-0014), and the token every
+ * request carries.
  */
 
-import type { Session } from "@portalr/client";
+import type { Config, Session } from "@portalr/client";
 import { GoTrueClient } from "@supabase/auth-js";
-import { authUrl, type Config } from "./deployment";
+import { authUrl } from "./deployment";
 
 export class Signed {
   readonly auth: GoTrueClient;
-  private token: string | null = null;
-  /** The tenant the current route works in, or null outside one. */
-  tenant: string | null = null;
+  private current: { readonly token: string; readonly user: string } | null = null;
 
-  constructor(config: Config) {
+  /** `onSignedOut` runs when the session ends: here, in another tab, or as it expires. */
+  constructor(config: Config, onSignedOut: () => void) {
     this.auth = new GoTrueClient({
       url: authUrl(config.supabase.url, location.origin),
       headers: { apikey: config.supabase.key },
@@ -21,20 +20,29 @@ export class Signed {
       persistSession: true,
       autoRefreshToken: true,
     });
-    this.auth.onAuthStateChange((_event, session) => {
-      this.token = session?.access_token ?? null;
+    this.auth.onAuthStateChange((event, session) => {
+      this.current = session && { token: session.access_token, user: session.user.id };
+      if (event === "SIGNED_OUT") {
+        onSignedOut();
+      }
     });
   }
 
-  /** Whether someone is signed in, once the stored session has been read. */
-  async signedIn(): Promise<boolean> {
+  /** Who is signed in, by Supabase Auth's id for them, once the stored session is read; or null. */
+  async signedIn(): Promise<string | null> {
     const { data } = await this.auth.getSession();
-    this.token = data.session?.access_token ?? null;
-    return this.token !== null;
+    const { session } = data;
+    this.current = session && { token: session.access_token, user: session.user.id };
+    return this.current?.user ?? null;
   }
 
-  /** The session a request carries now. */
+  /** End the session in this browser alone: another tab's or device's stays. */
+  signOut(): Promise<unknown> {
+    return this.auth.signOut({ scope: "local" });
+  }
+
+  /** The session a request carries now: REST reads name their tenant themselves. */
   session(): Session {
-    return { token: this.token ?? "", tenant: this.tenant };
+    return { token: this.current?.token ?? null, tenant: null };
   }
 }

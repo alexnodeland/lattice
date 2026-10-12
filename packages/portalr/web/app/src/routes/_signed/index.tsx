@@ -1,26 +1,25 @@
-import { Page } from "@portalr/ui";
+import { Page, TextLink } from "@portalr/ui";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { landing } from "../../landing";
 
 /** Where a signed-in person lands: their one tenant, a choice of several, or no access. */
 export const Route = createFileRoute("/_signed/")({
-  beforeLoad: ({ context }) => {
-    context.signed.tenant = null;
-  },
+  head: () => ({ meta: [{ title: "Tenants · portalr" }] }),
   loader: async ({ context }) => {
-    const lands = landing(
-      await context.queryClient.ensureQueryData(context.queries.grantr.memberships()),
-    );
+    const memberships = context.queries.grantr.memberships(context.user);
+    const lands = landing(await context.queryClient.ensureQueryData(memberships));
     if (lands.kind === "tenant") {
       throw redirect({ to: "/t/$tenant", params: { tenant: lands.tenant } });
     }
-    return lands;
   },
   component: Tenants,
 });
 
 function Tenants() {
-  const lands = Route.useLoaderData();
+  const { queries, user } = Route.useRouteContext();
+  const { data } = useSuspenseQuery(queries.grantr.memberships(user));
+  const lands = landing(data);
   if (lands.kind !== "choose") {
     return (
       <Page title="No access">
@@ -34,9 +33,7 @@ function Tenants() {
         <ul className="flex flex-col gap-2">
           {lands.tenants.map((tenant) => (
             <li key={tenant}>
-              <Link to="/t/$tenant" params={{ tenant }} className="text-accent underline">
-                {tenant}
-              </Link>
+              <TextLink render={<Link to="/t/$tenant" params={{ tenant }} />}>{tenant}</TextLink>
             </li>
           ))}
         </ul>

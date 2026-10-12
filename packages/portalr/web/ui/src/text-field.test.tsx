@@ -32,3 +32,15 @@ test("a caller's classes go on the field, around its label", async () => {
   expect(field?.classList).toContain("w-64");
   expect(field?.classList).toContain("flex");
 });
+
+test("a refused field is marked invalid, and says why beneath it", async () => {
+  const screen = await render(<TextField label="Password" error="Invalid login credentials" />);
+  const input = screen.getByLabelText("Password");
+  await expect.element(input).toHaveAttribute("aria-invalid", "true");
+  await expect.element(input).toHaveAccessibleDescription("Invalid login credentials");
+});
+
+test("a field that wasn't refused says nothing more", async () => {
+  const screen = await render(<TextField label="Email" />);
+  await expect.element(screen.getByLabelText("Email")).not.toHaveAttribute("aria-invalid");
+});

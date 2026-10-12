@@ -66,5 +66,5 @@ Then("they see {string}", async ({ page }, text: string) => {
 });
 
 Then("they are told {string}", async ({ page }, text: string) => {
-  await expect(page.getByRole("alert")).toHaveText(text);
+  await expect(page.getByLabel("Password")).toHaveAccessibleDescription(text);
 });

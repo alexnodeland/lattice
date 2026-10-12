@@ -4,18 +4,23 @@ import { cn } from "./cn";
 
 type Props = Omit<ComponentProps<typeof Field.Control>, "className"> & {
   label: string;
+  /** Why what was entered was refused: it marks the field invalid, and says so beneath it. */
+  error?: string | null;
   className?: string;
 };
 
 /** A labelled text field: Base UI's, whose input names itself by its label. */
-export function TextField({ label, className, ...props }: Props) {
+export function TextField({ label, error = null, className, ...props }: Props) {
   return (
-    <Field.Root className={cn("flex flex-col gap-1", className)}>
+    <Field.Root className={cn("flex flex-col gap-1", className)} invalid={error !== null}>
       <Field.Label className="font-semibold text-fg text-sm">{label}</Field.Label>
       <Field.Control
-        className="rounded-md border border-line bg-surface px-3 py-1.5 text-fg text-sm outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
+        className="rounded-md border border-line bg-surface px-3 py-1.5 text-fg text-sm outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus data-[disabled]:cursor-not-allowed data-[invalid]:border-fg data-[disabled]:opacity-50"
         {...props}
       />
+      <Field.Error className="text-fg text-sm" match={error !== null}>
+        {error}
+      </Field.Error>
     </Field.Root>
   );
 }

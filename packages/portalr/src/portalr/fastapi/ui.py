@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import Final
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse, Response
@@ -21,8 +22,13 @@ NO_CACHE: Final = "no-cache"
 def policy(site: Site) -> str:
     """The UIs' Content-Security-Policy: their own origin, and Supabase Auth for signing in.
 
-    It matters because supabase-js keeps the session in ``localStorage`` (lattice RFC-0002).
+    It matters because supabase-js keeps the session in ``localStorage`` (lattice RFC-0002). A
+    Supabase project on a path of the application's own origin is already ``'self'``.
     """
+    supabase = urlsplit(site.supabase_url)
+    connect = " ".join(
+        ["'self'", *([site.supabase_url] if supabase.scheme in ("http", "https") else [])]
+    )
     return "; ".join(
         (
             "default-src 'self'",
@@ -30,7 +36,7 @@ def policy(site: Site) -> str:
             "style-src 'self'",
             "img-src 'self' data:",
             "font-src 'self'",
-            f"connect-src 'self' {site.supabase_url}",
+            f"connect-src {connect}",
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",

@@ -15,10 +15,10 @@ export type * as PortalrApi from "./generated/portalr.openapi";
 export type * as ReflexrApi from "./generated/reflexr.openapi";
 export type * as ReflexrRulesV1 from "./generated/reflexr.rules.v1";
 export type * as ReflexrV1 from "./generated/reflexr.v1";
-export { createQueries, keys, stale } from "./queries";
+export { createQueries, keys, Refused, stale } from "./queries";
 export type * as Reflexr from "./reflexr";
 export { type ReflexrStream, reflexr } from "./reflexr";
-export { type Api, createApi, type Surfaces } from "./rest";
+export { type Api, type Config, createApi, readConfig, type Surfaces } from "./rest";
 export { type Session, sessionHeaders, streamUrl } from "./session";
 export {
   type Classified,

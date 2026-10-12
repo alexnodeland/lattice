@@ -36,6 +36,9 @@ from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Reader
 
 OPS, ALICE, BOB, CAROL, ERIN = (User(id=name) for name in ("ops", "alice", "bob", "carol", "erin"))
 
+PEOPLE = "portalr.test"
+"""The domain of the people the scenarios sign up: no one else's email names a user here."""
+
 FORWARDED: tuple[str, ...] = ("content-type", "cache-control")
 """The headers of Supabase Auth's answers the application passes on."""
 
@@ -62,8 +65,8 @@ def signed_in(token: str) -> User:
     """The user a Supabase Auth access token names, by its email's local part.
 
     Raises:
-        Unauthorized: If the token isn't signed with the project's secret, has expired, or is
-            for another audience.
+        Unauthorized: If the token isn't signed with the project's secret, has expired, is for
+            another audience, or names someone outside the scenarios' domain.
     """
     try:
         claims = jwt.decode(
@@ -75,7 +78,10 @@ def signed_in(token: str) -> User:
         )
     except (KeyError, jwt.InvalidTokenError) as error:
         raise Unauthorized("the access token is not valid") from error
-    return User(id=str(claims["email"]).partition("@")[0])
+    user, _, domain = str(claims["email"]).partition("@")
+    if domain != PEOPLE:
+        raise Unauthorized(f"only the scenarios' people sign in here, at {PEOPLE}")
+    return User(id=user)
 
 
 async def resolve_actor(connection: HTTPConnection) -> Caller:
@@ -132,7 +138,9 @@ def create_app(ui: Path = UI) -> FastAPI:
         prefix="/portalr",
     )
 
-    @app.api_route("/auth/v1/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+    @app.api_route(
+        "/auth/v1/{path:path}", methods=["GET", "POST", "PUT", "DELETE"], include_in_schema=False
+    )
     async def supabase_auth(path: str, request: Request) -> Response:
         """Supabase Auth, as Supabase's gateway serves it: GoTrue, at ``/auth/v1``."""
         auth: httpx.AsyncClient = request.app.state.auth

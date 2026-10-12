@@ -1,15 +1,5 @@
 {
   "extends": "../../../../tsconfig.base.json",
-  "compilerOptions": {
-    "types": ["vite/client"],
-    "allowImportingTsExtensions": true
-  },
-  "include": [
-    "src",
-    "bdd",
-    "vite.config.ts",
-    "vitest.config.ts",
-    "routes.config.ts",
-    "playwright.config.ts"
-  ]
+  "compilerOptions": { "types": ["vite/client"] },
+  "include": ["src", "bdd", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
 }

@@ -3,7 +3,7 @@ import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { Generator, getConfig } from "@tanstack/router-generator";
 import { expect, test } from "vitest";
-import { ROUTES } from "../routes.config";
+import { ROUTES } from "../vite.config";
 
 const app = join(import.meta.dirname, "..");
 

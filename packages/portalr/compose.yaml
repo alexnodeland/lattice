@@ -18,7 +18,7 @@ services:
     ports:
       - "127.0.0.1::8000"
     environment:
-      PORTALR_JWT_SECRET: &secret portalr-test-only-jwt-secret-of-32-chars
+      PORTALR_JWT_SECRET: &secret portalr-test-only-jwt-secret-not-for-use
       PORTALR_GOTRUE_URL: http://gotrue:9999
     # Loki's image has no shell or probe of its own, so the application's check waits for it too.
     healthcheck:
@@ -108,7 +108,8 @@ services:
     environment:
       GOTRUE_DB_DRIVER: postgres
       DATABASE_URL: postgres://supabase_auth_admin:auth@auth-db:5432/postgres
-      API_EXTERNAL_URL: http://localhost:9999
+      # Where people reach it: through the test application, at /auth/v1.
+      API_EXTERNAL_URL: http://localhost/auth/v1
       GOTRUE_API_HOST: 0.0.0.0
       PORT: "9999"
       GOTRUE_SITE_URL: http://localhost
@@ -117,8 +118,12 @@ services:
       GOTRUE_JWT_EXP: "3600"
       GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
       GOTRUE_MAILER_AUTOCONFIRM: "true"
-    ports:
-      - "127.0.0.1::9999"
+    # Its migrations have run once it answers.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9999/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
     depends_on:
       auth-db:
         condition: service_healthy

@@ -177,6 +177,7 @@ from artifactr.core.state import (
     State,
     Thread,
 )
+from artifactr.core.visibility import Hides, Visibility
 
 __all__ = [
     "PROTOCOL",
@@ -224,6 +225,7 @@ __all__ = [
     "FrameCommand",
     "GiveFeedback",
     "Hello",
+    "Hides",
     "InvalidState",
     "JsonPatch",
     "KnownEvent",
@@ -297,6 +299,7 @@ __all__ = [
     "ValidationFailed",
     "VersionConflict",
     "Versioned",
+    "Visibility",
     "WatchRun",
     "Welcome",
     "WorkspaceId",

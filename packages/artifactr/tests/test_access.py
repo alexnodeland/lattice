@@ -161,6 +161,7 @@ METHODS: dict[str, tuple[Call, str]] = {
 OPEN_METHODS = {
     "as_actor": "derives a handle for another actor, whose methods ask as that actor",
     "check": "is the asking itself: what every other method calls",
+    "hidden": "is what every read leaves out, which a surface asks of the handle it was given",
 }
 """Public ``Workspace`` methods that ask for no action of their own, and why."""
 
@@ -234,7 +235,7 @@ FRAMES: dict[str, tuple[dict[str, Any], list[str]]] = {
     ),
     "respond_to_proposal": (
         {"proposal_id": PROPOSAL, "decision": "reject"},
-        ["artifactr:respond_to_proposal"],
+        ["artifactr:respond_to_proposal"] * 2,  # of the workspace, then of the artifact
     ),
     "create_thread": ({}, ["artifactr:create_thread"]),
     "post_message": ({"thread_id": THREAD, "content": "hi"}, ["artifactr:post_message"]),
@@ -242,7 +243,7 @@ FRAMES: dict[str, tuple[dict[str, Any], list[str]]] = {
     "set_thread_mode": ({"thread_id": THREAD, "mode": "suggest"}, ["artifactr:set_thread_mode"]),
     "answer_deferred": (
         {"run_id": RUN, "tool_call_id": "q1", "answer": "Monday"},
-        ["artifactr:answer_deferred"],
+        ["artifactr:answer_deferred"] * 2,  # of the workspace, then of the run's thread
     ),
     "give_feedback": (
         {"feedback_type": "helpfulness", "target": {"kind": "thread", "thread_id": THREAD}},
@@ -263,9 +264,10 @@ CONNECT = [
     "artifactr:read_events",
     "artifactr:read_runs",
     "artifactr:read_events",
+    "artifactr:read_events",
 ]
 """What a WebSocket connection is asked for as it opens: its workspace, the log's head and the
-runs in progress (welcome), then the log it follows."""
+runs in progress (welcome), then the log it replays, here in one page, and the log it follows."""
 
 ROUTES: dict[tuple[str, str], tuple[str, list[str]]] = {
     ("POST", "/workspaces/{workspace_id}/commands"): ("", ["artifactr:create_thread"]),
@@ -407,7 +409,7 @@ TOOLS: dict[str, tuple[dict[str, Any], list[str]]] = {
     "list_proposals": ({}, ["artifactr:read_proposals"]),
     "respond_to_proposal": (
         {"proposal_id": PROPOSAL, "decision": "reject"},
-        ["artifactr:respond_to_proposal"],
+        ["artifactr:respond_to_proposal"] * 2,  # of the workspace, then of the artifact
     ),
     "give_feedback": (
         {"feedback_type": "helpfulness", "target": {"kind": "thread", "thread_id": THREAD}},
@@ -478,6 +480,9 @@ async def test_every_tool_and_resource_asks_for_the_actions_of_the_methods_it_ca
         uri = artifact_uri(TENANT, WORKSPACE, ARTIFACT)
         await client.read_resource(uri)
         assert recorder.by(CLIENT) == ["artifactr:open", "artifactr:read_artifacts"]
+        ws = await workspaces.open(TENANT, WORKSPACE, actor=ALICE)
+        await ws.create(Note(), artifact_id="n2")
+        recorder.by(ALICE)
         another = artifact_uri(TENANT, WORKSPACE, "n2")
         async with client.listen(resource_subscriptions=[uri, another]):
             pass

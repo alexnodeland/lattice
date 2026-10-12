@@ -15,7 +15,7 @@ from mcp.types import INVALID_PARAMS, TextContent, TextResourceContents
 from starlette.requests import Request
 
 from artifactr.agent import Runner
-from artifactr.core import Actor, ExternalAgentActor, TenantId, UserActor, WorkspaceId
+from artifactr.core import Actor, ExternalAgentActor, TenantId, UserActor, Visibility, WorkspaceId
 from artifactr.mcp import ArtifactrMcp, McpContext, artifact_uri
 from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces
 from tests.agent.conftest import Gate, Script, make_agent, say
@@ -522,3 +522,32 @@ async def test_a_nul_character_is_a_tool_error(mcp: ArtifactrMcp) -> None:
     async with Client(mcp.server) as client:
         error, text = await _call(client, "get_thread", thread_id="\x00")
     assert (error, text.endswith("text cannot hold a NUL character")) == (True, True)
+
+
+async def _hide_n1(tenant_id: TenantId, workspace_id: str, actor: Actor) -> Visibility:
+    return Visibility(artifacts=frozenset(() if actor == ALICE else {"n1"}))
+
+
+async def test_a_hidden_artifact_is_refused_as_a_missing_one(
+    storage: InMemoryStorage, identity: Identity, bus: RecordingBus, gate: Gate
+) -> None:
+    workspaces = Workspaces(storage, types=[Note], hidden=_hide_n1)
+    alice = await workspaces.open("tenant", "w1", actor=ALICE)
+    await alice.create(Note(), artifact_id="n1")
+    runner = Runner(make_agent(Script()), app=gate)
+    server = ArtifactrMcp(workspaces, runner, resolve=identity.resolve, bus=bus)
+    try:
+        async with Client(server.server) as client:
+            refusals: list[object] = []
+            for artifact_id in ("n1", "n9"):
+                uri = artifact_uri("tenant", "w1", artifact_id)
+                with pytest.raises(MCPError) as read:
+                    await client.read_resource(uri)
+                with pytest.raises(MCPError) as listen:
+                    async with client.listen(resource_subscriptions=[uri]):
+                        pass
+                assert listen.value.data == read.value.data
+                refusals.append(str(read.value).replace(artifact_id, "<id>"))
+            assert refusals[0] == refusals[1], "hidden, or made up"
+    finally:
+        await server.aclose()

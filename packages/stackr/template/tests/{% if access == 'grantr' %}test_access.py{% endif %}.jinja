@@ -1,6 +1,12 @@
 """Access, with grantr: tenants from memberships, keys, the hooks, and the role matrix."""
 
+{% if use_artifactr -%}
+import asyncio
+{% endif -%}
 import io
+{% if use_artifactr -%}
+import json
+{% endif -%}
 import runpy
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -12,10 +18,17 @@ import pytest
 from fastapi.testclient import TestClient
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
+{%- if use_artifactr %}
+from pydantic_ai import RetryPromptPart, ToolReturnPart
+{%- endif %}
 from starlette.requests import HTTPConnection
+{%- if use_artifactr %}
+from websockets.asyncio.client import connect
+{%- endif %}
 
 {% if use_artifactr -%}
 import artifactr.core as artifactr
+from artifactr import new_id
 {% endif -%}
 from grantr import TENANT as ON_TENANT
 from grantr import Agent, Grants, Resource, {% if use_reflexr %}RulePrincipal, {% endif %}ServicePrincipal, User
@@ -27,9 +40,13 @@ from {{ package_name }}.access import CATALOGS, Access, Refused
 from {{ package_name }}.auth import Principal, TokenVerifier, Unauthenticated
 from {{ package_name }}.settings import Settings
 
-from conftest import OTHER, SECRET, TENANT, {% if use_reflexr %}TRIAGE, {% endif %}Script, app, seeded, serving, token
+from conftest import OTHER, SECRET, TENANT, {% if use_reflexr %}TRIAGE, {% endif %}Script, app, {% if use_artifactr %}call, say, {% endif %}seeded, serving, token
 
 ROOT = Path(__file__).parent.parent
+{%- if use_artifactr %}
+WORKSPACE = "/artifactr/v1/workspaces/main"
+MAIN = Resource(kind="workspace", workspace="main")
+{%- endif %}
 APPLICATION = ServicePrincipal(id=Settings().service_name)
 RUNTIME = "{% if use_artifactr %}artifactr:claim_thread{% else %}reflexr:checkpoint_run{% endif %}"
 """An action of the application's own, which no person's role holds."""
@@ -158,6 +175,103 @@ def test_artifactrs_actors_are_checked_as_who_they_act_for(
     actor: artifactr.Actor, subject: Any
 ) -> None:
     assert access(seeded()).artifactr_subject(TENANT, "main", actor) == subject
+
+
+async def test_a_restricted_thread_is_absent_from_every_surface_for_a_non_member() -> None:
+    """lattice RFC-0001's phase 5: erin edits main, but not alice's restricted thread.
+
+    Nothing of the thread, or of the note restricted with it, reaches erin over REST, the
+    WebSocket's replay and live frames, MCP, or the agent's tools in her own turn.
+    """
+    grants = seeded()
+    alice, erin = User(id="alice"), User(id="erin")
+    await grants.add_member(TENANT, erin, by=alice)
+    await grants.grant(TENANT, "editor", on=MAIN, to=erin, by=alice)
+    reading = call("read_artifact", artifact_id="plan")
+    script = Script(reading, say("ok"), call("list_artifacts"), reading, say("ok"))
+    async with (
+        serving(app(script, grants=grants)) as server,
+        httpx.AsyncClient(base_url=f"{server}{WORKSPACE}") as client,
+    ):
+        as_alice, as_erin = signed(), signed("erin")
+        await post(client, as_alice, type="create_thread", thread_id="private")
+        note = {"kind": "note", "data": {"title": "Secret plan"}, "thread_id": "private"}
+        await post(client, as_alice, type="create_artifact", artifact_id="plan", **note)
+        await post(client, as_erin, type="create_thread", thread_id="mine")
+        private = Resource(kind="thread", workspace="main", id="private")
+        await grants.restrict(TENANT, private, by=alice)
+        plan = Resource(kind="artifact", workspace="main", id="plan")
+        await grants.restrict(TENANT, plan, by=alice)
+
+        threads = await client.get("/threads", headers=as_erin)
+        assert [t["id"] for t in threads.json()] == ["mine"]
+        assert (await client.get("/artifacts", headers=as_erin)).json() == []
+        for read in ("/threads/private", "/artifacts/plan", "/artifacts/plan/revisions"):
+            missing = await client.get(read, headers=as_erin)
+            assert (missing.status_code, missing.json()["detail"]["type"]) == (404, "not_found")
+        assert not secret((await client.get("/events", headers=as_erin)).text)
+        assert len((await client.get("/threads", headers=as_alice)).json()) == 2, "alice owns it"
+
+        stream = f"{server.replace('http', 'ws')}{WORKSPACE}/stream?access_token={token('erin')}"
+        async with connect(stream) as ws:
+            await ws.send(json.dumps({"type": "hello", "protocol": "artifactr.v1"}))
+            frames = [json.loads(await ws.recv())]
+            while frames[-1]["type"] != "replay_complete":
+                frames.append(json.loads(await ws.recv()))
+            await post(client, as_alice, type="post_message", thread_id="private", content="Plan?")
+            await runs_ended(client, as_alice, 1)
+            await post(client, as_erin, type="set_thread_mode", thread_id="mine", mode="suggest")
+            frames.append(json.loads(await ws.recv()))
+            assert frames[-1]["event"]["type"] == "thread_mode_changed", "the post isn't sent"
+            assert not secret(json.dumps(frames))
+
+        async with (
+            httpx2.AsyncClient(headers=as_erin) as http,
+            Client(streamable_http_client(f"{server}/artifactr/mcp/", http_client=http)) as mcp,
+        ):
+            listed = await mcp.call_tool("list_artifacts", {"workspace_id": "main"})
+            assert not secret(str(listed.content))
+            reading = {"workspace_id": "main", "artifact_id": "plan"}
+            assert (await mcp.call_tool("read_artifact", reading)).is_error
+
+        await post(client, as_erin, type="post_message", thread_id="mine", content="What's next?")
+        await runs_ended(client, as_alice, 2)
+        assert len(script.requests) == 5, "alice's turn read; erin's listed, read and answered"
+        assert "Secret plan" in str(answers(script.requests[1])), "alice's turn reads the note"
+        assert answers(script.requests[-1]) == [
+            "There are no artifacts yet.",
+            "artifact plan does not exist",
+        ]
+
+
+def answers(messages: list[Any]) -> list[Any]:
+    """What a turn's tools answered, in a request to its model."""
+    return [
+        part.content
+        for message in messages
+        for part in message.parts
+        if isinstance(part, ToolReturnPart | RetryPromptPart)
+    ]
+
+
+async def runs_ended(client: httpx.AsyncClient, headers: dict[str, str], count: int) -> None:
+    """Wait until the log, as one user reads it, holds ``count`` ended runs."""
+    for _ in range(3000):  # thirty seconds at most
+        if (await client.get("/events", headers=headers)).text.count("run_ended") >= count:
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError("timed out")
+
+
+def secret(text: str) -> bool:
+    """Whether a text names the restricted thread or note, or says what they hold."""
+    return any(word in text for word in ("private", "plan", "Secret", "Plan"))
+
+
+async def post(client: httpx.AsyncClient, headers: dict[str, str], **command: Any) -> None:
+    frame = {"type": "command", "command_id": new_id("cmd"), "command": command}
+    answer = await client.post("/commands", json=frame, headers=headers)
+    assert answer.json()["ok"], answer.json()
 {%- endif %}
 {%- if use_reflexr %}
 

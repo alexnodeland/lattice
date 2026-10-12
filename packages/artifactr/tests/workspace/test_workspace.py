@@ -640,6 +640,7 @@ method it reaches, and what it is when a method takes more than one."""
 TEXTLESS = {
     "check": "takes an Access, which every other method builds from text already checked",
     "head_seq": "takes nothing",
+    "hidden": "takes nothing",
     "threads": "takes nothing",
     "proposals": "takes a status, one of a few literals",
 }

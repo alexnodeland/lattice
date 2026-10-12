@@ -25,7 +25,7 @@ make check          # lint, types and tests, as its CI runs them
 | `libraries` | `both` | `artifactr`, `reflexr`, or both side by side on one database and one telemetry setup |
 | `evals` | Yes | An `evals/` directory with starter evalr experiments |
 | `bridge` | Yes | With both libraries: relayr's bridge between them, its incident timeline example, and rules from chat |
-| `access` | `grantr` | `grantr`: tenants, members, roles and keys, and every command and read checked; or `none`: the tenant from the token, and every user of a tenant may do anything in it |
+| `access` | `grantr` | `grantr`: tenants, members, roles and keys, and every command and read checked; or `none`: the tenant from the token, and every user of a tenant may do anything in it, including, with `bridge`, installing rules from chat, or `chat:` rules directly through reflexr's REST and MCP, with no review |
 | `hosting` | `none` | `none`, or `host`: an overlay, `deploy/host/compose.prod.yaml`, that runs the application's published image behind stackr's edge on a [single host](single-host.md) |
 | `python_version` | 3.12 | 3.12, 3.13 or 3.14 |
 | `app_port` | 8800 | The port the application is published on, on this machine |

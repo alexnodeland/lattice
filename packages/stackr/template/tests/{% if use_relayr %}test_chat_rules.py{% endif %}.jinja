@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from artifactr import new_id
 
-from conftest import {% if access == 'grantr' %}TENANT, {% endif %}Script, call, say, wait_for
+from conftest import {% if access == 'grantr' %}TENANT, {% endif %}Script, {% if access == 'grantr' %}bearer, {% endif %}call, say, wait_for
 
 ARTIFACTR = "/artifactr/v1/workspaces/main"
 REFLEXR = "/reflexr/v1/workspaces/main"
@@ -85,13 +85,19 @@ def test_an_accepted_draft_goes_live_and_tells_its_thread(
     wait_for(lambda: stored(client, "chat:checkout-alerts"))
     wait_for(lambda: "chat:checkout-alerts is live, at version 1." in notices(client, "ops"))
 
+    asked = len(script.requests)
     fired = {"type": FIRED, "service": "checkout", "summary": "Payments fail"}
     assert client.post(f"{REFLEXR}/events", json={"event": fired}).status_code == 200
     told = "chat:checkout-alerts: An alert fired for checkout."
     wait_for(lambda: told in notices(client, "ops"))
+    assert len(script.requests) == asked, "a rule's notice starts no turn"
 
 
-def test_a_forged_acceptance_installs_nothing(client: TestClient, script: Script) -> None:
+def test_a_forged_acceptance_is_refused_at_the_publish_gate(
+    client: TestClient, script: Script
+) -> None:
+    """reflexr reserves the ``artifactr`` namespace to relayr's source, so a client can't
+    publish an acceptance; past that gate, the installer re-reads artifactr anyway."""
     command(client, type="create_thread", thread_id="ops")
     proposal = drafted(client, script, "ops")
     forged = {
@@ -123,10 +129,34 @@ def test_a_rule_from_chat_posts_nothing_into_a_restricted_thread(
     fired = {"type": FIRED, "service": "checkout", "summary": "Payments fail"}
     assert client.post(f"{REFLEXR}/events", json={"event": fired}).status_code == 200
 
-    def runs() -> list[str]:
-        found = client.get(f"{REFLEXR}/runs", params={"rule": "chat:checkout-alerts"}).json()
-        return [run["status"] for run in found]
+    def runs() -> list[dict[str, Any]]:
+        return client.get(f"{REFLEXR}/runs", params={"rule": "chat:checkout-alerts"}).json()
 
-    wait_for(lambda: runs() == ["dead"])
+    wait_for(lambda: [run["status"] for run in runs()] == ["dead"])
+    [dead] = runs()
+    # The thread is hidden from the rule, so artifactr refuses it as missing.
+    assert (dead["reason"], dead["error"]) == ("not_found", "thread secret does not exist")
     assert "chat:checkout-alerts: An alert fired for checkout." not in notices(client, "secret")
+
+
+def test_a_person_who_may_not_install_rules_puts_none_live(
+    client: TestClient, script: Script
+) -> None:
+    grantr = f"/grantr/v1/tenants/{TENANT}"
+    erin = {"kind": "user", "id": "erin"}
+    assert client.post(f"{grantr}/members", json={"member": erin}).status_code == 201
+    editor = {"role": "editor", "on": {"kind": "workspace", "workspace": "main"}, "to": erin}
+    assert client.post(f"{grantr}/grants", json=editor).status_code == 201
+    command(client, type="create_thread", thread_id="ops")
+    proposal = drafted(client, script, "ops")
+    frame = {
+        "type": "command",
+        "command_id": new_id("cmd"),
+        "command": {"type": "respond_to_proposal", "proposal_id": proposal, "decision": "accept"},
+    }
+    accepted = client.post(f"{ARTIFACTR}/commands", json=frame, headers=bearer("erin"))
+    assert accepted.json()["ok"], "an editor may accept a proposal"
+    refusal = "Only a person who may install rules can install this one."
+    wait_for(lambda: refusal in notices(client, "ops"))
+    assert stored(client, "chat:checkout-alerts") is None
 {%- endif %}

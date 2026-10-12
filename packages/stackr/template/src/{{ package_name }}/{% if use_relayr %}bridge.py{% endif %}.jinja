@@ -19,6 +19,7 @@ import contextlib
 from collections.abc import AsyncGenerator
 
 from fastapi import FastAPI
+from pydantic import BaseModel
 
 {% if access == 'grantr' -%}
 import artifactr.core as a
@@ -33,12 +34,13 @@ from relayr.inbound import {% if access == 'grantr' %}FOLLOWER, {% endif %}Follo
 from relayr.langfuse import bridged_run, bridged_turns
 from relayr.ledger import InMemoryLedger, Ledger
 from relayr.outbound import Outbound
-from relayr.rules import RULES_FROM_CHAT, Installer, {% if access == 'grantr' %}RuleChange, RuleDrafting{% else %}RuleDrafting, anyone{% endif %}
+from relayr.rules import RULES as CHAT_RULES
+from relayr.rules import Installer, {% if access == 'grantr' %}RuleChange, RuleDrafting{% else %}RuleDrafting, anyone{% endif %}
 from relayr.sql import SqlLedger, migrate
 
 from {{ package_name }}.automation import Automation
 from {{ package_name }}.chat_rules import ALLOWLISTS as CHAT_ALLOWLISTS
-from {{ package_name }}.chat_rules import NotifyParams, chat_rule_actions
+from {{ package_name }}.chat_rules import STORED_RULES, StoredAction, chat_rule_actions
 from {{ package_name }}.collaboration import Collaboration
 from {{ package_name }}.database import Database
 from {{ package_name }}.incidents import ALLOWLISTS as INCIDENT_ALLOWLISTS
@@ -87,6 +89,7 @@ class Bridge:
         """The reactor's run context: Langfuse's, with the threads and person behind a run."""
         self._followers: Followers | None = None
         self._actions: dict[str, Action[None]] | None = None
+        self._stored: dict[str, StoredAction] | None = None
 {%- if access == 'grantr' %}
         self._grants = grants
         self._workspaces: Workspaces | None = None
@@ -103,13 +106,27 @@ class Bridge:
             assert self._actions is not None, "create_app connects the bridge before it serves"
             await self._actions[reaction.rule.then.action](reaction)
 
-        async def notify(reaction: Reaction[None], _params: NotifyParams) -> None:
-            await act(reaction)
+        def stored(name: str, params: type[BaseModel]) -> Action[None]:
+            """A delegate for an action rules from chat run, declaring its params.
 
-        rules = [*INCIDENT_RULES, RULES_FROM_CHAT]
+            reflexr checks the params at startup, and the delegate hands them on as validated.
+            """
+
+            async def delegate(reaction: Reaction[None], given: BaseModel) -> None:
+                assert self._stored is not None, "create_app connects the bridge before it serves"
+                await self._stored[name](reaction, given)
+
+            return with_params(delegate, params)
+
+        rules = [*INCIDENT_RULES, *CHAT_RULES]
         return {
             **{rule.then.action: act for rule in rules},
-            "notify": with_params(notify, NotifyParams),
+            # Every action rules from chat run declares its params.
+            **{
+                name: stored(name, params)
+                for name, params in STORED_RULES.actions.items()
+                if params
+            },
         }
 
     def drafting(self, automation: Automation) -> RuleDrafting:
@@ -134,9 +151,9 @@ class Bridge:
             collaboration.workspaces,
             may_change={% if access == 'grantr' %}self._may_change{% else %}anyone{% endif %},
         )
+        self._stored = chat_rule_actions(outbound)
         self._actions = {
             **incident_actions(outbound, collaboration.workspaces),
-            **chat_rule_actions(outbound),
             **installer.actions,
         }
         self._followers = Followers(

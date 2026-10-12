@@ -391,8 +391,8 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 
 ## Unresolved questions
 
-- **Who may accept a rule?** An application callback. The template's default could be any user of the tenant, as with workspaces, or a role claim in the token.
-- **How far does a chat rule reach?** The bridge would ask for the workspace it was drafted in. #21 decides whether stored rules can be scoped to one workspace or only to a tenant.
+- **Who may accept a rule?** Settled by [ADR-0024](../adr/0024-rules-from-chat-in-the-template.md): a person who holds the change's own action in the workspace, as grantr says, through relayr's `may_change`; without access control, any person.
+- **How far does a chat rule reach?** Settled by [ADR-0024](../adr/0024-rules-from-chat-in-the-template.md), on reflexr RFC-0003: one workspace, the one it was drafted in, where its principal acts and nowhere else.
 - **A combined session measure** in evalr, covering a thread and the chains it started.
 - **Should `thread_created` be in the default set?** Rules that greet or file new threads would want it.
 - **How do clients show a notice** differently from a message? This depends on the notices prerequisite.

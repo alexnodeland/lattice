@@ -47,8 +47,11 @@ Finer rules come from the library itself:
 - **Least privilege in your tools.** Application tools run with your application's dependencies (`ctx.deps.app`). Give them only what they need, and check permissions in the tool, not only in the prompt.
 - **Artifacts are untrusted input to the model.** Anything a person or another agent writes into an artifact reaches your agent's context, through its instructions, change notes and reads. Treat it like any user message when you decide what the agent's tools may do.
 
-## Resource limits
+## A NUL character
 
+Text can't hold a NUL character. Every `Workspaces` and `Workspace` method refuses one in an id, a name or a command's text with `validation_failed`, before `authorize` hears it, so a client can't reach PostgreSQL, or your hook, with a string neither can take ([ADR-0061](../adr/0061-a-nul-character-is-refused-at-the-boundary.md)).
+
+## Resource limits
 The WebSocket surface closes connections that do not say `hello` within `hello_timeout` (10 seconds), and disconnects clients whose outbox exceeds `outbox_size` frames (1,000) instead of buffering without bound. A disconnected client resumes from the log without losing anything. The library does not limit request sizes, message lengths or command rates; enforce those in your application or at your proxy.
 
 ## Reporting vulnerabilities

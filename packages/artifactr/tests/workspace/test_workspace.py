@@ -1,6 +1,8 @@
 """Workspace behaviour, independent of the storage implementation."""
 
 import asyncio
+import inspect
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -14,6 +16,7 @@ from artifactr.core import (
     Artifact,
     ArtifactTarget,
     CreateArtifact,
+    CreateThread,
     EditArtifact,
     EvaluatorActor,
     ExternalAgentActor,
@@ -32,6 +35,7 @@ from artifactr.core import (
     SetFocus,
     ThreadTarget,
     TurnTarget,
+    UserActor,
     ValidationFailed,
     VersionConflict,
 )
@@ -584,3 +588,90 @@ async def test_feedback_is_recorded_in_the_log_of_its_thread(ws: Workspace) -> N
     followers_of_one = await ws.read(after_seq=4, threads={one.id})
     assert followers_of_one == [turn, artifact]
     assert thread.thread_id == two.id
+
+
+NUL = "a\x00b"
+
+type NulCall = Callable[[Workspaces, Workspace], Awaitable[object]]
+
+
+async def _claim_with_nul(workspaces: Workspaces, ws: Workspace) -> None:
+    async with ws.claim_thread("thr_1", holder=NUL):
+        pass
+
+
+async def _as_actor_with_nul(workspaces: Workspaces, ws: Workspace) -> None:
+    ws.as_actor(UserActor(id=NUL))
+
+
+NUL_CALLS: dict[str, NulCall] = {
+    "open: tenant": lambda w, ws: w.open(NUL, "ws_1", actor=ALICE),
+    "open: workspace": lambda w, ws: w.open("tenant_a", NUL, actor=ALICE),
+    "open: actor": lambda w, ws: w.open("tenant_a", "ws_1", actor=UserActor(id=NUL)),
+    "list: tenant": lambda w, ws: w.list(NUL, actor=ALICE),
+    "list: after": lambda w, ws: w.list("tenant_a", actor=ALICE, after=NUL),
+    "as_actor": _as_actor_with_nul,
+    "commit: text": lambda w, ws: ws.commit(CreateThread(title=NUL)),
+    "commit: cursor": lambda w, ws: ws.commit(CreateThread(), cursor=(NUL, 1)),
+    "create": lambda w, ws: ws.create(Note(text=NUL)),
+    "create_thread": lambda w, ws: ws.create_thread(NUL),
+    "post_message": lambda w, ws: ws.post_message("thr_1", NUL),
+    "record: data": lambda w, ws: ws.record(AppEvent(name="noted", data={"note": [NUL]})),
+    "record: cursor": lambda w, ws: ws.record(AppEvent(name="noted"), cursor=(NUL, 1)),
+    "get": lambda w, ws: ws.get(Note, NUL),
+    "artifact": lambda w, ws: ws.artifact(NUL),
+    "artifacts": lambda w, ws: ws.artifacts(kind=NUL),
+    "revisions": lambda w, ws: ws.revisions(NUL),
+    "thread": lambda w, ws: ws.thread(NUL),
+    "proposal": lambda w, ws: ws.proposal(NUL),
+    "run": lambda w, ws: ws.run(NUL),
+    "runs": lambda w, ws: ws.runs(thread_id=NUL),
+    "history": lambda w, ws: ws.history(NUL),
+    "read": lambda w, ws: ws.read(threads=[NUL]),
+    "subscribe": lambda w, ws: anext(aiter(ws.subscribe(threads=[NUL]))),
+    "change_notes": lambda w, ws: ws.change_notes(after_seq=0, focus={NUL}),
+    "cursor": lambda w, ws: ws.cursor(NUL),
+    "save_cursor": lambda w, ws: ws.save_cursor(NUL, 1),
+    "claim_thread": _claim_with_nul,
+}
+"""Each way a string reaches a workspace, with a NUL character in it (ADR-0061), named by the
+method it reaches, and what it is when a method takes more than one."""
+
+TEXTLESS = {
+    "check": "takes an Access, which every other method builds from text already checked",
+    "head_seq": "takes nothing",
+    "threads": "takes nothing",
+    "proposals": "takes a status, one of a few literals",
+}
+"""Public methods that take no text of their own, and why."""
+
+
+def test_every_public_method_that_takes_text_refuses_a_nul() -> None:
+    public = {
+        name
+        for cls in (Workspaces, Workspace)
+        for name, member in inspect.getmembers(cls)
+        if not name.startswith("_") and inspect.isfunction(member)
+    }
+    assert {call.split(":")[0] for call in NUL_CALLS} | set(TEXTLESS) == public
+
+
+@pytest.mark.parametrize("call", sorted(NUL_CALLS))
+async def test_a_nul_character_is_refused_before_authorize_hears_it(
+    storage: Storage, call: str
+) -> None:
+    asked: list[str] = []
+
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: Actor, access: Access
+    ) -> bool:
+        asked.append(access.action)
+        return True
+
+    workspaces = Workspaces(storage, authorize=authorize)
+    ws = await workspaces.open("tenant_a", "ws_1", actor=ALICE)
+    asked.clear()
+    with pytest.raises(ValidationFailed, match="text cannot hold a NUL character"):
+        await NUL_CALLS[call](workspaces, ws)
+    assert asked == []
+    assert await workspaces.list("tenant_a", actor=ALICE) == [], "nothing was written"

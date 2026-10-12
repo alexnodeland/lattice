@@ -21,6 +21,7 @@ from collections.abc import (
     Callable,
     Collection,
     Iterable,
+    Mapping,
     Sequence,
 )
 from datetime import timedelta
@@ -236,6 +237,7 @@ class Workspaces:
         Raises:
             Forbidden: If ``authorize`` refuses the actor this workspace.
         """
+        _check_text(tenant_id, workspace_id, actor)
         workspace = Workspace(self._context, Scope(tenant_id, workspace_id), actor)
         await workspace.check(_OPEN)
         if self._on_open is not None:
@@ -263,6 +265,7 @@ class Workspaces:
             Forbidden: If ``authorize`` refuses the actor the list.
             ValidationFailed: If ``limit`` is below 1.
         """
+        _check_text(tenant_id, actor, after)
         context = self._context
         await context.check(tenant_id, None, actor, Access(action="artifactr:read_workspaces"))
         if limit < 1:
@@ -343,6 +346,7 @@ class Workspace:
 
     def as_actor(self, actor: Actor) -> "Workspace":
         """Return a handle on the same workspace that acts as ``actor``, checked as it."""
+        _check_text(actor)
         return Workspace(self._context, self._scope, actor)
 
     async def check(self, access: Access) -> None:
@@ -411,6 +415,7 @@ class Workspace:
             set_status_on_exception=False,
         ) as span:
             try:
+                _check_text(command, cursor)
                 await self.check(_access(command))
                 self._check_kind(command)
                 outcome = await self._transact(
@@ -459,6 +464,7 @@ class Workspace:
             cursor: A named cursor, ``(name, seq)``, to save in the same transaction, as with
                 :meth:`save_cursor`: it moves only if the fact is recorded.
         """
+        _check_text(fact, cursor)
         await self.check(Access(action="artifactr:record", thread_id=fact.thread_id))
         outcome = await self._transact(
             fact,
@@ -555,6 +561,7 @@ class Workspace:
         Raises:
             NotFound: If there is no such artifact of that type.
         """
+        _check_text(artifact_id)
         await self.check(Access(action="artifactr:read_artifacts", artifact_id=artifact_id))
         artifact = await self._storage.artifact(self._scope, artifact_id)
         if artifact is None or not isinstance(artifact.data, artifact_type):
@@ -583,6 +590,7 @@ class Workspace:
             kind: Only artifacts registered under this kind.
             include_archived: Archived artifacts too.
         """
+        _check_text(kind)
         await self.check(Access(action="artifactr:read_artifacts"))
         artifacts = await self._storage.artifacts(
             self._scope, kind=kind, include_archived=include_archived
@@ -599,6 +607,7 @@ class Workspace:
         Raises:
             NotFound: If there is no such artifact: every artifact has a revision.
         """
+        _check_text(artifact_id)
         await self.check(Access(action="artifactr:read_artifacts", artifact_id=artifact_id))
         revisions = await self._storage.revisions(self._scope, artifact_id)
         if not revisions:
@@ -611,6 +620,7 @@ class Workspace:
         Raises:
             NotFound: If there is no such thread.
         """
+        _check_text(thread_id)
         await self.check(Access(action="artifactr:read_threads", thread_id=thread_id))
         thread = await self._storage.thread(self._scope, thread_id)
         if thread is None:
@@ -628,6 +638,7 @@ class Workspace:
         Raises:
             NotFound: If there is no such proposal.
         """
+        _check_text(proposal_id)
         await self.check(Access(action="artifactr:read_proposals"))
         proposal = await self._storage.proposal(self._scope, proposal_id)
         if proposal is None:
@@ -647,6 +658,7 @@ class Workspace:
         Raises:
             NotFound: If there is no such run.
         """
+        _check_text(run_id)
         await self.check(Access(action="artifactr:read_runs"))
         run = await self._storage.run(self._scope, run_id)
         if run is None:
@@ -657,11 +669,13 @@ class Workspace:
         self, *, thread_id: ThreadId | None = None, status: RunStatus | None = None
     ) -> list[Run]:
         """Return runs, optionally of one thread and with one status, oldest first."""
+        _check_text(thread_id)
         await self.check(Access(action="artifactr:read_runs", thread_id=thread_id))
         return await self._storage.runs(self._scope, thread_id=thread_id, status=status)
 
     async def history(self, thread_id: ThreadId) -> Sequence[HistoryChunk]:
         """Return a thread's history: serialized model messages, one chunk per run segment."""
+        _check_text(thread_id)
         await self.check(Access(action="artifactr:read_history", thread_id=thread_id))
         return await self._storage.history(self._scope, thread_id)
 
@@ -697,6 +711,7 @@ class Workspace:
             ValidationFailed: If both ``limit`` and ``last`` are given, or a number is negative
                 or more than storage holds.
         """
+        _check_text(threads)
         await self.check(Access(action="artifactr:read_events"))
         _check_page(after_seq=after_seq, before_seq=before_seq, limit=limit, last=last)
         return await self._storage.read(
@@ -717,6 +732,7 @@ class Workspace:
         the log is untraced, so a subscription that polls storage makes no trace per poll
         (ADR-0046); what the subscriber does with each envelope is traced as usual.
         """
+        _check_text(threads)
         await self.check(Access(action="artifactr:read_events"))
         stream = self._storage.subscribe(self._scope, after_seq=after_seq)
         async with contextlib.aclosing(stream) as envelopes:
@@ -747,6 +763,7 @@ class Workspace:
             notices: Include the notices others posted in the viewer's thread, when the viewer
                 is a thread's agent.
         """
+        _check_text(focus, viewer)
         await self.check(Access(action="artifactr:read_events"))
         envelopes = await self._storage.read(
             self._scope, after_seq=after_seq, before_seq=before_seq
@@ -759,6 +776,7 @@ class Workspace:
         A consumer, such as a feedback mirror, saves its cursor with :meth:`save_cursor` and
         carries on after it when it starts again.
         """
+        _check_text(name)
         await self.check(Access(action="artifactr:read_cursors"))
         return await self._storage.cursor(self._scope, name)
 
@@ -768,6 +786,7 @@ class Workspace:
         A cursor only moves forward: saving a ``seq`` below the saved one leaves it, so a
         consumer that runs in several processes, each at its own pace, cannot move it back.
         """
+        _check_text(name)
         await self.check(Access(action="artifactr:save_cursor"))
         await self._storage.save_cursor(self._scope, name, seq)
 
@@ -792,6 +811,7 @@ class Workspace:
         Raises:
             ThreadBusy: If another holder has the thread.
         """
+        _check_text(thread_id, holder)
         await self.check(Access(action="artifactr:claim_thread", thread_id=thread_id))
         key = f"thread:{thread_id}"
         lapses = asyncio.get_running_loop().time() + ttl.total_seconds()
@@ -865,6 +885,29 @@ def _access(command: Command) -> Access:
             return Access(action=action, thread_id=thread_id)
         case _:
             return Access(action=action)
+
+
+# Shared verbatim with reflexr's src/reflexr/workspace/workspace.py; change both.
+def _check_text(*values: object) -> None:
+    """Refuse a NUL character in any string ``values`` hold, as models, mappings or collections.
+
+    PostgreSQL's text can't hold one, so every storage refuses it alike, before ``authorize``
+    hears it (artifactr ADR-0061, reflexr ADR-0060).
+
+    Raises:
+        ValidationFailed: If a string holds a NUL character.
+    """
+    pending: list[object] = list(values)  # a stack, so deep data can't exhaust recursion
+    while pending:
+        value = pending.pop()
+        found = value.model_dump() if isinstance(value, BaseModel) else value
+        if isinstance(found, str):
+            if "\x00" in found:
+                raise ValidationFailed("text cannot hold a NUL character", [])
+        elif isinstance(found, Mapping):
+            pending += cast("Mapping[object, object]", found).items()
+        elif isinstance(found, Collection) and not isinstance(found, bytes):
+            pending += cast("Collection[object]", found)
 
 
 def _check_page(

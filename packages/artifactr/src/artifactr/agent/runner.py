@@ -101,6 +101,7 @@ from artifactr.core import (
     SystemActor,
     ThreadId,
     UserActor,
+    ValidationFailed,
     acting_for,
     new_id,
     new_message_id,
@@ -276,6 +277,9 @@ class Runner[AppDepsT]:
         remembered. A repeated id returns the remembered result and carries nothing out,
         whatever command it comes with, so a retry is safe on every surface.
         """
+        if "\x00" in command_id:  # remembered under no key: storage can't hold it (ADR-0061)
+            refused = ValidationFailed("text cannot hold a NUL character", [])
+            return CommandResult(command_id=command_id, ok=False, rejection=refused.payload())
         key = CommandKey(
             tenant_id=workspace.tenant_id,
             workspace_id=workspace.workspace_id,

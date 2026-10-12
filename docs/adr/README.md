@@ -20,6 +20,6 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0012](0012-title-checks-the-breaks-in-the-public-apis.md) | The Title check holds each break in a public API to its marking | Accepted |
 | [0013](0013-pyright-stays-until-ty-can-replace-it.md) | pyright stays until ty can replace it | Accepted |
 | [0014](0014-portalrs-and-grantrs-marks.md) | portalr's and grantr's marks | Accepted |
-| [0015](0015-acceptance-tests-against-the-reference-applications.md) | Acceptance tests against the reference applications | Accepted |
+| [0015](0015-acceptance-tests-against-the-reference-applications.md) | Acceptance tests against the reference applications | Accepted, amended by artifactr 0061 and reflexr 0060 |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

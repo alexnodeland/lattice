@@ -597,3 +597,10 @@ def test_building_the_server_leaves_logging_as_it_was(
     monkeypatch.setattr(root, "level", logging.WARNING)
     ReflexrMcp(workspaces, resolve=Identity().resolve)
     assert (root.handlers, root.level) == ([], logging.WARNING)
+
+
+async def test_a_nul_character_is_a_tool_error(server: Server) -> None:
+    mcp, _, _ = server
+    async with Client(mcp.server) as client:
+        error, text = await call(client, "get_run", workspace_id="prod", run_id="\x00")
+    assert (error, text.endswith("text cannot hold a NUL character")) == (True, True)

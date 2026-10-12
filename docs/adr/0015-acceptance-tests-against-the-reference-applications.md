@@ -1,6 +1,6 @@
 # ADR-0015: Acceptance tests against the reference applications
 
-**Status:** Accepted
+**Status:** Accepted, amended by [artifactr ADR-0061](../artifactr/adr/0061-a-nul-character-is-refused-at-the-boundary.md) and [reflexr ADR-0060](../reflexr/adr/0060-a-nul-character-is-refused-at-the-boundary.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 
@@ -46,7 +46,7 @@ The rehearsal left gaps:
   - `positive_data_acceptance`, for the commands and reflexr's events only: a `type` with a default isn't required by the document, but the discriminator requires it (#66).
   - `negative_data_rejection`, for the reads that take string ids in their query only: a value Schemathesis means as a boolean, such as `true`, is a valid string id.
   - `allow_header_conformance`, for good: Starlette's 405 names only the first matching route's methods.
-  - It generates no NUL bytes, which PostgreSQL can't store, until the libraries refuse them ([#67](https://github.com/alexnodeland/lattice/issues/67)).
+  - It generates no NUL bytes. The libraries refuse one in any string as `validation_failed` ([#67](https://github.com/alexnodeland/lattice/issues/67)), which the document can't say of every string, so a NUL would fail `positive_data_acceptance`.
   - The "errored" cases its summary can count are stateful steps it generated and never sent, such as a link that would leave a path parameter empty: they have no response to check, and aren't failures.
 - **What the acceptance tests found and this change fixes:**
   - reflexr answered 500 to a negative `limit` on its run listing.
@@ -83,4 +83,4 @@ Schemathesis:
 1. [x] The OpenAPI documents and their drift tests.
 2. [x] The Bruno collections, the `api` tasks and the Acceptance job.
 3. [x] Schemathesis, with what it found fixed or recorded.
-4. [ ] The rejections documented ([#66](https://github.com/alexnodeland/lattice/issues/66)), and NUL bytes refused ([#67](https://github.com/alexnodeland/lattice/issues/67)).
+4. [ ] The rejections documented ([#66](https://github.com/alexnodeland/lattice/issues/66)), and NUL bytes refused (done: [#67](https://github.com/alexnodeland/lattice/issues/67)).

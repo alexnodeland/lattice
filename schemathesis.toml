@@ -2,7 +2,8 @@
 # check not turned off here, fails.
 
 [generation]
-# PostgreSQL can't store a NUL byte, and the libraries don't refuse one yet (#67).
+# The libraries refuse a NUL character in any string as `validation_failed` (#67), which the
+# document doesn't say of every string, so a NUL would fail `positive_data_acceptance`.
 allow-x00 = false
 
 [checks]

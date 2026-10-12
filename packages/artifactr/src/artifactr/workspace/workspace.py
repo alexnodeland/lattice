@@ -892,7 +892,7 @@ def _check_text(*values: object) -> None:
     """Refuse a NUL character in any string ``values`` hold, as models, mappings or collections.
 
     PostgreSQL's text can't hold one, so every storage refuses it alike, before ``authorize``
-    hears it (ADR-0059).
+    hears it (artifactr ADR-0061, reflexr ADR-0060).
 
     Raises:
         ValidationFailed: If a string holds a NUL character.

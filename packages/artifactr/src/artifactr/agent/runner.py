@@ -277,7 +277,7 @@ class Runner[AppDepsT]:
         remembered. A repeated id returns the remembered result and carries nothing out,
         whatever command it comes with, so a retry is safe on every surface.
         """
-        if "\x00" in command_id:  # remembered under no key: storage can't hold it (ADR-0059)
+        if "\x00" in command_id:  # remembered under no key: storage can't hold it (ADR-0061)
             refused = ValidationFailed("text cannot hold a NUL character", [])
             return CommandResult(command_id=command_id, ok=False, rejection=refused.payload())
         key = CommandKey(

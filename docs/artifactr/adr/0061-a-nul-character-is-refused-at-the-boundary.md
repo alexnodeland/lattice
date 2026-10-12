@@ -1,4 +1,4 @@
-# ADR-0059: A NUL character is refused at the boundary
+# ADR-0061: A NUL character is refused at the boundary
 
 **Status:** Accepted
 **Date:** 2026-10-12

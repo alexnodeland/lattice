@@ -662,7 +662,7 @@ NUL_CALLS: dict[str, NulCall] = {
     "dead_letters": lambda w, ws: ws.dead_letters(rule=NUL),
     "get_rule": lambda w, ws: ws.get_rule(NUL),
 }
-"""Each way a string reaches a workspace, with a NUL character in it (ADR-0059), named by the
+"""Each way a string reaches a workspace, with a NUL character in it (ADR-0060), named by the
 method it reaches, and what it is when a method takes more than one."""
 
 TEXTLESS = {

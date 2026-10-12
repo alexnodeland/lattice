@@ -634,7 +634,7 @@ NUL_CALLS: dict[str, NulCall] = {
     "save_cursor": lambda w, ws: ws.save_cursor(NUL, 1),
     "claim_thread": _claim_with_nul,
 }
-"""Each way a string reaches a workspace, with a NUL character in it (ADR-0059), named by the
+"""Each way a string reaches a workspace, with a NUL character in it (ADR-0061), named by the
 method it reaches, and what it is when a method takes more than one."""
 
 TEXTLESS = {

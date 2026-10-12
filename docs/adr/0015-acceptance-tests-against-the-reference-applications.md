@@ -1,6 +1,6 @@
 # ADR-0015: Acceptance tests against the reference applications
 
-**Status:** Accepted, amended by [artifactr ADR-0059](../artifactr/adr/0059-a-nul-character-is-refused-at-the-boundary.md) and [reflexr ADR-0059](../reflexr/adr/0059-a-nul-character-is-refused-at-the-boundary.md)
+**Status:** Accepted, amended by [artifactr ADR-0061](../artifactr/adr/0061-a-nul-character-is-refused-at-the-boundary.md) and [reflexr ADR-0060](../reflexr/adr/0060-a-nul-character-is-refused-at-the-boundary.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

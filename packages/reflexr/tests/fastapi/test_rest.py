@@ -8,11 +8,20 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
-from reflexr import Rule, on, run
+from reflexr import Rule, SourceActor, on, run
 from reflexr.core import Event, PredicateFilter
-from reflexr.workspace import Reactor, Schedule, Workspaces
+from reflexr.fastapi import reflexr_router
+from reflexr.workspace import InMemoryStorage, Reactor, Schedule, Workspaces
 from tests.event_types import Deploy
-from tests.fastapi.conftest import STORED_RULES, build, chat_rule, command, heartbeat, spike
+from tests.fastapi.conftest import (
+    STORED_RULES,
+    build,
+    chat_rule,
+    command,
+    heartbeat,
+    resolve_actor,
+    spike,
+)
 
 ERROR = {"type": "app:service.error", "service": "auth"}
 COMMANDS = "/workspaces/prod/commands"
@@ -64,6 +73,21 @@ async def test_producers_publish_events_one_at_a_time_or_in_batches(app: App) ->
     assert (unknown.status_code, unknown.json()["detail"]["type"]) == (404, "not_found")
     bare = await client.post("/workspaces/prod/events", json={"event": {"type": "pager"}})
     assert (bare.status_code, bare.json()["detail"]["type"]) == (422, "validation_failed")
+
+
+async def test_a_reserved_event_is_forbidden_to_other_publishers() -> None:
+    publishers = {"app:deploy.finished": [SourceActor(name="ci")]}
+    workspaces = Workspaces(InMemoryStorage(), publishers=publishers)
+    application = FastAPI()
+    application.include_router(reflexr_router(workspaces, resolve_actor=resolve_actor))
+    transport = httpx.ASGITransport(app=application)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        deploy = {"type": "app:deploy.finished", "service": "auth"}
+        refused = await client.post("/workspaces/prod/events", json={"event": deploy})
+    assert (refused.status_code, refused.json()["detail"]) == (
+        403,
+        {"type": "forbidden", "message": "app:deploy.finished events are reserved to source:ci"},
+    )
 
 
 async def test_reads_filter_the_log_and_list_rules_runs_and_schedules(app: App) -> None:

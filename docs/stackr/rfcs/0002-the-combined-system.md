@@ -251,9 +251,9 @@ One gap has no home yet. evalr's `Session` is "a conversation or a causal chain"
 ### Security
 
 - **Forged bridged events.**
-  - The risk: bridged types are registered in reflexr like any other type, so any client allowed to publish could send a fake `artifactr:proposal_resolved`. `Workspaces(emitted=[...])` reserves types to runs, but nothing reserves a type to one source (a prerequisite).
-  - Until that exists, bridge rules check that the envelope's actor is `SourceActor("artifactr")`, and the application must never resolve a client to that source.
-  - Either way, anything that matters re-reads artifactr before acting. The install rule never acts on a bridged event alone.
+  - The risk: bridged types are registered in reflexr like any other type, so any client allowed to publish could send a fake `artifactr:proposal_resolved`. `Workspaces(emitted=[...])` reserves types to runs, and reserving a type to one source was a prerequisite.
+  - reflexr now reserves them: `Workspaces(publishers={"artifactr": [SourceActor(name="artifactr")]})` refuses `artifactr:*` from anyone else, runs included ([reflexr ADR-0057](../../reflexr/adr/0057-reserved-publishers.md)). The application must never resolve a client to that source.
+  - Even so, anything that matters re-reads artifactr before acting. The install rule never acts on a bridged event alone.
 - **Actor permissions.**
   - artifactr checks actors on writes to artifacts, proposals and run facts. An evaluator may only give feedback.
   - It does not check `CreateThread`, `PostMessage` or `GiveFeedback`. For those, the bridge's per-rule allowlist is the only limit, so it is required rather than optional, and it defaults to proposals and notices in the chain's own thread.
@@ -356,7 +356,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 | Telemetry setup that composes across both libraries, polling without a trace per poll, and mirror cursors | reflexr, artifactr | [reflexr #62][r-62], [artifactr #50][a-50] | phase 4 | links and tags, without the combined setup |
 | `traceparent` on artifactr envelopes | artifactr | [#60][a-60] | phase 4, for links in the artifactr-to-reflexr direction | tags only, in that direction |
 | Durable message idempotency: core checks `message_id` | artifactr | [#61][a-61] | phase 2 | the ledger's read-back |
-| Reserved publishers: a type only one source (or runs) may publish | reflexr | [#72][r-72] | phase 5 | bridge rules check the envelope's actor, and re-read artifactr |
+| Reserved publishers: a type only one source (or runs) may publish | reflexr | [#72][r-72], now [lattice #8](https://github.com/alexnodeland/lattice/issues/8), decided in [reflexr ADR-0057](../../reflexr/adr/0057-reserved-publishers.md) and implemented | phase 5 | done |
 | Workspace discovery: list a tenant's workspaces | artifactr | [lattice #5](https://github.com/alexnodeland/lattice/issues/5), was [#62][a-62] | phase 3 | followers start on first use, and resume from the ledger |
 | Notices that don't start or steer a turn, marked as notices | artifactr | [#63][a-63] | phase 2 | direct commits, which start no turn but still reach a running one |
 

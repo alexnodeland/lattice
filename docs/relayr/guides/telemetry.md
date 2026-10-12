@@ -55,4 +55,4 @@ Both should be zero. Alert on either: a stopped follower bridges nothing until i
 
 ## Causes
 
-The ledger keeps the run behind each of the outbound adapter's writes for a week, by default. Each follower forgets older ones as it takes its lease, and hourly while it holds it. `Followers(cause_ttl=...)` sets how long; a write bridged after its cause is forgotten starts a chain of its own.
+The ledger keeps the run behind each of the outbound adapter's writes for a week, by default. Each follower forgets older ones at most hourly while it holds its lease, once it has caught up with the log; a failure to forget is logged and changes nothing else. `Followers(cause_ttl=...)` sets how long; a write bridged after its cause is forgotten starts a chain of its own.

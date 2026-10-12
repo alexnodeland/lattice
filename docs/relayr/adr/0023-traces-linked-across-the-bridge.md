@@ -12,7 +12,8 @@
 
 - **The follower publishes each bridged event in a span of its own,** `relayr.bridge <type>`, a consumer span at the root of a new trace, linked to the span that committed the artifactr envelope. reflexr's publish span is its child, and the run links to that. So in Tempo, a run links to the bridge, and the bridge to the turn or request behind the event.
 - **A run's message starts a turn linked to the run's span:** `RunActions.send` calls artifactr's `Runner.send` inside the run's span, and the turn links to it.
-- **A turn starts from an empty context.** artifactr's runner started a turn's span with no parent, but attached the turn's context on top of its caller's, so the run's Langfuse attributes and baggage reached the turn. This PR fixes that in artifactr: the turn attaches an empty context first. That is what ADR-0035's "a turn is its own trace" meant, and artifactr's test of it now checks it.
+- **A turn starts from an empty context:** artifactr's `Runner` attaches an empty context before it starts a turn's span ([artifactr ADR-0059](../../artifactr/adr/0059-a-turn-starts-from-an-empty-context.md)), so a run's Langfuse attributes and baggage stay with the run.
+- **So does a follower.** It is started by whatever opens its workspace first, such as a request, and attaches an empty context as it starts, so its bridge spans are never children of that request, and carry none of its attributes.
 - **Attributes are relayr's own,** named as the libraries name theirs: `relayr.tenant.id`, `relayr.workspace.id`, `relayr.event.type` and `relayr.envelope.seq`, under the instrumentation scope `relayr`.
 
 ## Options considered

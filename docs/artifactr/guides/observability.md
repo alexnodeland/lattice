@@ -67,7 +67,7 @@ telemetry = configure_telemetry(reflexr.otel.telemetry(), service_name="app")
 
 ## Traces
 
-A **turn** is one trace ([ADR-0035](../adr/0035-a-turn-is-its-own-trace.md)). When a message starts a run, or answers resume one, the `Runner` starts an `invoke_workflow turn` span as the root of a new trace, linked to the span that was current when the message arrived (the REST request, say). It starts from an empty context, so nothing the caller propagated, such as its baggage or a rule's run's Langfuse tags, reaches the turn. Inside it:
+A **turn** is one trace ([ADR-0035](../adr/0035-a-turn-is-its-own-trace.md)). When a message starts a run, or answers resume one, the `Runner` starts an `invoke_workflow turn` span as the root of a new trace, linked to the span that was current when the message arrived (the REST request, say). It starts from an empty context, so nothing the caller propagated, such as its baggage, a request's Langfuse attributes or a rule's run's tags, reaches the turn: attributes for a turn go in the `Runner`'s `turn_context` ([ADR-0059](../adr/0059-a-turn-starts-from-an-empty-context.md)). Inside it:
 
 ```text
 invoke_workflow turn                  the Runner

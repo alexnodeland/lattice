@@ -13,7 +13,7 @@
 
 - **Two counters,** through the OpenTelemetry API: `relayr.followers.stopped`, with the tenant, workspace and `error.type`, and `relayr.dead_letters`, with the tenant, workspace and `relayr.event.type`. `Followers(meter_provider=...)` and `tracer_provider=` choose the providers; the global ones by default.
 - **`relayr.otel.telemetry()` is relayr's contribution** to either library's `configure_telemetry`, behind the `otel` extra. Its span filter keeps the `relayr` scope's spans, and its views drop the workspace, or the tenant too, at the libraries' `MetricsDetail`.
-- **Causes are kept a week by default.** `Followers(cause_ttl=...)` sets it. Each cause records when it was recorded (migration `0003`, with an index). A follower forgets its workspace's older causes as it takes the lease, and at most hourly while it holds it, through `Ledger.forget_causes(workspace, older_than=...)`, by the ledger's clock.
+- **Causes are kept a week by default.** `Followers(cause_ttl=...)` sets it. Each cause records when it was recorded (migration `0003`, with an index). A follower forgets its workspace's older causes at most hourly while it holds the lease, and only once it has caught up with the log, so a backlog's causes are kept until it is bridged, however long the follower was stopped. It calls `Ledger.forget_causes(workspace, older_than=...)`, which goes by the ledger's clock. A failure to forget is logged, and the follower carries on.
 - **A write bridged after its cause is forgotten starts a chain of its own.** A week is far longer than any write waits to be bridged.
 
 ## Options considered

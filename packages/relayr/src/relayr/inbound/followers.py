@@ -21,9 +21,11 @@ cursor, the next time its workspace is opened.
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Final
 
+from opentelemetry import context as otel_context
 from opentelemetry.metrics import MeterProvider
 from opentelemetry.trace import SpanKind, TracerProvider
 
@@ -82,8 +84,9 @@ class Followers:
         read_back: How many envelopes a follower reads back at a time, looking for the message
             of a rule's that an agent turn carries out.
         cause_ttl: How long the ledger keeps the run behind each of the outbound adapter's
-            writes. A follower forgets older ones as it takes its lease, and hourly while it
-            holds it; a write bridged after its cause is forgotten starts a chain of its own.
+            writes. A follower forgets older ones at most hourly while it holds its lease, once
+            it has caught up with the log; a write bridged after its cause is forgotten starts a
+            chain of its own.
         tracer_provider: Where the bridge's spans go. Defaults to the global provider.
         meter_provider: Where its counters go. Defaults to the global provider.
     """
@@ -151,16 +154,25 @@ class Followers:
             self._telemetry.count(FOLLOWERS_STOPPED, attributes)
 
     async def _follow(self, workspace: WorkspaceKey) -> None:
-        """Follow a workspace whenever this process holds its lease, until cancelled."""
-        source = await self._artifactr.open(*workspace, actor=FOLLOWER)
-        target = await self._reflexr.open(*workspace, actor=SOURCE)
-        while True:
-            if await self._ledger.acquire_lease(workspace, self._holder, self._ttl):
-                try:
-                    await self._hold(workspace, source, target)
-                finally:
-                    await self._ledger.release_lease(workspace, self._holder)
-            await asyncio.sleep(self._ttl.total_seconds() / 3)
+        """Follow a workspace whenever this process holds its lease, until cancelled.
+
+        It runs in an empty context: it was started by whatever opened the workspace first, such
+        as a request, whose span, baggage and Langfuse attributes are that request's, not the
+        follower's (ADR-0023).
+        """
+        detached = otel_context.attach(otel_context.Context())
+        try:
+            source = await self._artifactr.open(*workspace, actor=FOLLOWER)
+            target = await self._reflexr.open(*workspace, actor=SOURCE)
+            while True:
+                if await self._ledger.acquire_lease(workspace, self._holder, self._ttl):
+                    try:
+                        await self._hold(workspace, source, target)
+                    finally:
+                        await self._ledger.release_lease(workspace, self._holder)
+                await asyncio.sleep(self._ttl.total_seconds() / 3)
+        finally:
+            otel_context.detach(detached)
 
     async def _hold(
         self,
@@ -175,10 +187,10 @@ class Followers:
         """
         relaying = asyncio.current_task()
         assert relaying is not None, "a follower runs as a task"
-        await self._ledger.forget_causes(workspace, older_than=self._cause_ttl)
-        renewal = asyncio.create_task(self._renew(workspace, relaying))
+        relayed = _Relayed(await self._ledger.cursor(workspace))
+        renewal = asyncio.create_task(self._renew(workspace, source, relayed, relaying))
         try:
-            await self._relay(workspace, source, target)
+            await self._relay(workspace, source, target, relayed)
         except asyncio.CancelledError:
             if not renewal.done() or relaying.uncancel():
                 raise  # cancelled from outside
@@ -187,8 +199,18 @@ class Followers:
             renewal.cancel()
             await asyncio.gather(renewal, return_exceptions=True)
 
-    async def _renew(self, workspace: WorkspaceKey, relaying: asyncio.Task[None]) -> None:
-        """Renew the lease every third of its life; cancel the relaying once it is lost or fails."""
+    async def _renew(
+        self,
+        workspace: WorkspaceKey,
+        source: artifactr.Workspace,
+        relayed: "_Relayed",
+        relaying: asyncio.Task[None],
+    ) -> None:
+        """Renew the lease every third of its life; cancel the relaying once it is lost or fails.
+
+        At most hourly, once the follower has caught up with the log, it forgets old causes, so
+        a backlog's causes are kept until it is bridged.
+        """
         loop = asyncio.get_running_loop()
         forgot = loop.time()
         forget_every = min(_FORGET_EVERY, self._cause_ttl).total_seconds()
@@ -197,8 +219,9 @@ class Followers:
                 await asyncio.sleep(self._ttl.total_seconds() / 3)
                 if not await self._ledger.acquire_lease(workspace, self._holder, self._ttl):
                     break
-                if loop.time() - forgot >= forget_every:
-                    await self._ledger.forget_causes(workspace, older_than=self._cause_ttl)
+                if loop.time() - forgot >= forget_every and await self._forget(
+                    workspace, source, relayed
+                ):
                     forgot = loop.time()
         except Exception:
             relaying.cancel()
@@ -206,16 +229,33 @@ class Followers:
         logger.info("the lease on %s/%s went to another holder", *workspace)
         relaying.cancel()
 
+    async def _forget(
+        self, workspace: WorkspaceKey, source: artifactr.Workspace, relayed: "_Relayed"
+    ) -> bool:
+        """Forget old causes if the follower has caught up; return whether it tried.
+
+        A failure is logged, and the follower carries on: forgetting can wait.
+        """
+        if relayed.seq < await source.head_seq():
+            return False
+        try:
+            await self._ledger.forget_causes(workspace, older_than=self._cause_ttl)
+        except Exception:
+            logger.exception("forgetting the old causes of %s/%s failed", *workspace)
+        return True
+
     async def _relay(
         self,
         workspace: WorkspaceKey,
         source: artifactr.Workspace,
         target: reflexr.workspace.Workspace,
+        relayed: "_Relayed",
     ) -> None:
-        saved = await self._ledger.cursor(workspace)
+        saved = relayed.seq
         async for envelope in source.subscribe(after_seq=saved):
             await self._trace_turn(workspace, source, envelope)
             bridged = await self._bridge(workspace, target, envelope)
+            relayed.seq = envelope.seq
             if bridged or envelope.seq - saved >= self._save_every:
                 await self._ledger.save_cursor(workspace, envelope.seq)
                 saved = envelope.seq
@@ -318,6 +358,13 @@ class Followers:
         )
         await self._ledger.dead_letter(workspace, letter)
         self._telemetry.count(DEAD_LETTERS, {**workspace_attributes(*workspace), EVENT_TYPE: kind})
+
+
+@dataclass
+class _Relayed:
+    """How far a follower has relayed the log, this hold: the last envelope it read."""
+
+    seq: int
 
 
 def _written(envelope: artifactr.core.Envelope) -> tuple[CauseKind, str] | None:

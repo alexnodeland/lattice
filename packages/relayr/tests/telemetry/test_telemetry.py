@@ -1,5 +1,6 @@
 """relayr's counters, its contribution to an application's telemetry, and its Langfuse tags."""
 
+import asyncio
 import logging
 from datetime import timedelta
 from typing import Any
@@ -11,8 +12,9 @@ from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 
 import artifactr.core as a
 import reflexr
+import reflexr.workspace as r
 from relayr.events import BRIDGED, MessagePosted, Projections
-from relayr.ledger import Cause, Ledger
+from relayr.ledger import Cause, InMemoryLedger, Ledger, WorkspaceKey
 from relayr.otel import MetricsDetail, metric_views, telemetry
 from relayr.telemetry import (
     DEAD_LETTERS,
@@ -26,7 +28,7 @@ from relayr.telemetry import (
 )
 from tests.app_types import Note
 from tests.clock import FakeClock
-from tests.stack import ALICE, KEY, Stack, until
+from tests.stack import ALICE, KEY, Stack, bridged, until
 
 
 def counted(reader: InMemoryMetricReader) -> dict[str, list[dict[str, Any]]]:
@@ -134,3 +136,56 @@ def test_relayrs_views_keep_as_much_tenancy_as_asked(detail: MetricsDetail, kept
     )
     [point] = counted(reader)["relayr.dead_letters"]
     assert set(point) == kept
+
+
+async def test_a_follower_keeps_a_backlogs_causes_until_it_has_caught_up(
+    ledger: Ledger, stack: Stack, clock: FakeClock
+) -> None:
+    hold = asyncio.Event()
+
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: reflexr.Actor, access: r.Access
+    ) -> bool:
+        if access.action == "reflexr:publish":
+            await hold.wait()  # the follower is stuck behind the log's head
+        return True
+
+    cause = Cause(correlation_id="evt_1", firing_id="fir_1", run_id="fir_1", depth=1)
+    await ledger.record_cause(KEY, "message", "msg_backlog", cause)
+    clock.advance(timedelta(seconds=1))
+    app = stack.process(ledger, cause_ttl=timedelta(0), authorize=authorize)
+    alice = await app.collaboration.open(*KEY, actor=ALICE)
+    thread = await alice.create_thread()
+    await alice.post_message(thread.id, "hello")
+    await asyncio.sleep(0.1)  # renewals come and go
+    assert await ledger.cause(KEY, "message", "msg_backlog") == cause
+    hold.set()
+
+    async def forgotten() -> bool:
+        return await ledger.cause(KEY, "message", "msg_backlog") is None
+
+    await until(forgotten)
+
+
+class Unforgetting(InMemoryLedger):
+    """A ledger that fails to forget."""
+
+    async def forget_causes(self, workspace: WorkspaceKey, *, older_than: timedelta) -> None:
+        raise ConnectionError("the ledger is down")
+
+
+async def test_a_follower_that_fails_to_forget_carries_on(
+    stack: Stack, caplog: pytest.LogCaptureFixture
+) -> None:
+    app = stack.process(Unforgetting(), cause_ttl=timedelta(0))
+    with caplog.at_level(logging.ERROR, logger="relayr.inbound"):
+        alice = await app.collaboration.open(*KEY, actor=ALICE)
+
+        async def failed() -> bool:
+            return "forgetting the old causes of acme/prod failed" in caplog.text
+
+        await until(failed)
+        thread = await alice.create_thread()
+        await alice.post_message(thread.id, "hello")
+        await bridged(stack, 1)
+    assert "stopped" not in caplog.text

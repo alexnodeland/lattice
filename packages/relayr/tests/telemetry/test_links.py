@@ -8,6 +8,7 @@ from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
 import pytest
+from langfuse import propagate_attributes
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -181,3 +182,22 @@ async def test_a_turn_not_started_by_a_rules_run_has_no_chain(
     turn = named(exporter.get_finished_spans(), "invoke_workflow turn")
     expected = ["tenant:acme", "workspace:prod", *([f"rule:{rule}"] if rule else [])]
     assert list(tags(turn)) == expected
+
+
+async def test_a_follower_traces_nothing_of_what_first_opened_its_workspace(
+    ledger: Ledger, stack: Stack, exporter: InMemorySpanExporter, provider: TracerProvider
+) -> None:
+    app = stack.process(ledger, tracer_provider=provider)
+    request = provider.get_tracer("the application")
+    with (
+        request.start_as_current_span("POST /artifactr/v1/commands"),
+        propagate_attributes(tags=["request:tag"], user_id="bob"),
+    ):
+        alice = await app.collaboration.open(*KEY, actor=ALICE)  # starts the follower
+        thread = await alice.create_thread()
+        await alice.post_message(thread.id, "hello")
+    await bridged(stack, 1)
+    bridge = named(exporter.get_finished_spans(), "relayr.bridge message_posted")
+    assert bridge.parent is None, "a trace of its own"
+    assert not any(key.startswith("langfuse.") for key in bridge.attributes or {})
+    assert "user.id" not in (bridge.attributes or {})

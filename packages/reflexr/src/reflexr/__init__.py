@@ -19,7 +19,7 @@ or a plain async function::
         then=run("triage"),
     )
 
-See ``docs/architecture.md`` for the design.
+reflexr's design is at <https://lattice.alexnodeland.com/reflexr/architecture/>.
 """
 
 from importlib.metadata import version

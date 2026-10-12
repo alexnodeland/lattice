@@ -9,4 +9,4 @@ Outside this series, an RFC is named as "lattice RFC-0001".
 | [0001](0001-grantr-identity-and-access.md) | grantr, identity and access | Accepted |
 | [0002](0002-portalr-the-portal.md) | portalr, the portal | Accepted |
 
-A new RFC starts from a package's [template](../relayr/rfcs/template.md), until [#40](https://github.com/alexnodeland/lattice/issues/40) makes the templates one.
+To propose one, copy [`template.md`](template.md) to the next number. Each package's series uses the same template.

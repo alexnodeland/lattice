@@ -15,7 +15,7 @@ verdict = await evaluator.evaluate(transcript)  # Verdict[Helpfulness]
 ```
 
 The top level re-exports every type in ``evalr.core``, and the functions most applications call.
-See ``docs/architecture.md`` for the design.
+evalr's design is at <https://lattice.alexnodeland.com/evalr/architecture/>.
 """
 
 from importlib.metadata import version

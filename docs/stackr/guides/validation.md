@@ -13,7 +13,7 @@ stackr is configuration, and most of what can go wrong with configuration shows 
 | Grafana dashboards | Every dashboard is valid JSON with a title and a unique uid, and refers only to the provisioned data sources' uids |
 | The Supabase project | Its project id differs from the Compose project's name, the Makefile and `compose.yaml` use it, and every Supabase container or network name in a tracked file, the template's and the documentation's included, is the one it gives |
 | The gateway's configuration | Every model group a fallback names exists, guardrails use integrations that need no licence and valid modes, every `os.environ/` reference is set on the `litellm` service in `compose.yaml`, and no key is written into the file. LiteLLM has no validator of its own, and starts without a guardrail it can't load |
-| The application template | Every variant rendered, under a 30-character slug whose package sorts before `conftest`, with nothing left unrendered, and its Python, YAML, shell scripts and Compose file through their linters (`scripts/check-template`) |
+| The application template | Every variant rendered, under a 30-character slug whose package sorts before `conftest`, with nothing left unrendered, its libraries from lattice at the commit it was rendered from, and its Python, YAML, shell scripts and Compose file through their linters (`scripts/check-template`) |
 | Service configurations | Each with its own validator, run from the image `compose.yaml` pins, offline: `otelcol-contrib validate` for the Collector, `promtool check config` for Prometheus, `-config.verify` for Tempo and `-verify-config` for Loki |
 | Shell scripts | shellcheck |
 | Python scripts | ruff's formatter and linter |
@@ -31,15 +31,15 @@ stackr's pages are its section of lattice's site. `moon run lattice:docs` builds
 
 ## CI
 
-lattice's `.github/workflows/ci.yml` runs on every pull request, and runs stackr's checks when the pull request changes what they read:
+lattice's `.github/workflows/ci.yml` runs on every pull request, and runs stackr's checks when the pull request changes what they read, or a library the template generates applications on:
 
 | Job | What it runs |
 |---|---|
 | Check | `stackr:check`: `stackr:validate`, which is `make validate`, after `make` generates a throwaway `.env`, which also tests `scripts/setup-env`; and `stackr:reference` |
-| Template | Each of the six variants of the application template (three choices of libraries, with and without evals) on Python 3.12, and the largest on Python 3.14: generated from the pull request's commit, then its own `make check`, which is lint, strict types and the tests with 100% coverage |
+| Template | Each of the six variants of the application template (three choices of libraries, with and without evals) on Python 3.12, and the largest on Python 3.14: generated from the pull request's commit, with the libraries installed from the checkout, then its own `make check`, which is lint, strict types and the tests with 100% coverage |
 | Smoke | The stack started three ways, with `make up` and `make smoke`, and `make smoke-app` beside the whole stack on local Supabase ([The smoke tests](smoke-tests.md)) |
 
-The Template and Smoke jobs run `moon ci stackr:template` and `moon ci stackr:smoke`. Every job installs the tools from `uv.lock` with `uv sync --locked`, so CI runs the versions you run. lattice's nightly workflow runs every project's checks, stackr's included, on `main`.
+Like Check, the Template and Smoke jobs choose with lattice's `scripts/affected.py`, which runs a task in every project a change affects and in every project that depends on one, so a change to artifactr, reflexr or evalr runs them too ([lattice ADR-0002](../../adr/0002-ci-runs-every-affected-project-and-its-dependents.md), [ADR-0018](../adr/0018-the-template-pins-the-libraries-at-its-own-commit.md)). Every job installs the tools from `uv.lock` with `uv sync --locked`, so CI runs the versions you run. lattice's nightly workflow runs every project's checks, stackr's included, on `main`.
 
 ## Building and publishing the site
 
@@ -47,7 +47,7 @@ lattice's `.github/workflows/docs.yml` builds the site on every push to `main` a
 
 ## Dependencies
 
-Every image is pinned to a version, and where a registry publishes only `latest`, by digest as well. Renovate proposes updates for the images in `compose.yaml`, lattice's GitHub Actions and the tools in `uv.lock`, and CI's smoke tests run on each update to stackr's images. `versions.env` is bumped by hand, and the template's library revisions by `make bump-libraries` ([Pinned versions](../reference/versions.md)).
+Every image is pinned to a version, and where a registry publishes only `latest`, by digest as well. Renovate proposes updates for the images in `compose.yaml`, lattice's GitHub Actions and the tools in `uv.lock`, and CI's smoke tests run on each update to stackr's images. `versions.env` is bumped by hand ([Pinned versions](../reference/versions.md)).
 
 ## Git hooks
 

@@ -22,14 +22,13 @@ Copier checks each answer: the name can't be empty; the slug is lowercase letter
 
 ## Derived values
 
-These are computed from the answers, or fixed by the template, as the libraries' revisions are ([ADR-0013](../adr/0013-how-the-template-pins-the-libraries.md)). They are never asked, and not recorded in `.copier-answers.yml`, so `copier update` moves them with the template.
+These are computed from the answers, apart from `libraries_path`, which `scripts/check-app`, CI's Template job, sets to lattice's `packages/` directory so that a generated application installs the libraries from the checkout ([ADR-0018](../adr/0018-the-template-pins-the-libraries-at-its-own-commit.md)). They are never asked, and not recorded in `.copier-answers.yml`.
 
 <!-- generated: template-derived -->
 
 | Value | Type | Derived as |
 |---|---|---|
-| `artifactr_rev` | str | `1a635ecb9800c2e414221e7293e8a2de2fdb600c` |
-| `reflexr_rev` | str | `dc2d05916cd6d1bf36b7c2b26e29663dfdddc338` |
+| `libraries_path` | str | empty |
 | `package_name` | str | `{{ project_slug | replace('-', '_') }}` |
 | `use_artifactr` | bool | `{{ libraries in ['artifactr', 'both'] }}` |
 | `use_reflexr` | bool | `{{ libraries in ['reflexr', 'both'] }}` |

@@ -51,7 +51,7 @@ Keep one `Workspaces` per process and share it between the router, the reactor a
 
 ## Authentication
 
-Authentication is the application's. `resolve_actor` receives the `HTTPConnection` of each REST request, and of each WebSocket connection before its `hello`, and returns the tenant and the actor. Raise `Unauthorized` to refuse: REST answers 401, and the WebSocket is closed with code 4401. The tenant and actor never come from the request body or the client's frames, so a client cannot act as someone else or reach another tenant ([Multi-tenancy and security](security.md)).
+Authentication is the application's. `resolve_actor` receives the `HTTPConnection` of each REST request, and of each WebSocket connection before its `hello`, and returns the tenant and the actor. Raise `Unauthorized` to refuse: REST answers 401, and the WebSocket is closed with code 4401. Raise `Forbidden` for a caller who is signed in but may not be served, such as one outside the tenant it names: 403, and 4403, on every route, the tenant-wide reads included. An `HTTPException` it raises answers with its status, and closes the WebSocket with 4000 and the status. The tenant and actor never come from the request body or the client's frames, so a client cannot act as someone else or reach another tenant ([Multi-tenancy and security](security.md)).
 
 Producers are actors too. A monitoring system that publishes alerts is a `SourceActor`, and a person in a browser a `UserActor`, so one resolver can tell them apart by their credentials:
 
@@ -272,9 +272,9 @@ The server closes a connection with a code that says what to do next:
 
 | Code | Meaning | The client should |
 |---|---|---|
-| 4400 | The first frame was not a valid `hello`, asked for another protocol, or asked both to start at the head and to resume | Fix it and reconnect |
+| 4400 | The first frame was not a valid `hello`, asked for another protocol, or asked both to start at the head and to resume; or `resolve_actor` answered 400 | Fix it and reconnect |
 | 4401 | `resolve_actor` raised `Unauthorized` | Authenticate again |
-| 4403 | `authorize` refused the workspace, or reading its log | Stop |
+| 4403 | `authorize` refused the workspace, or reading its log; or `resolve_actor` raised `Forbidden` | Stop |
 | 4408 | No `hello` arrived within `hello_timeout` | Reconnect |
 | 4429 | The client did not read frames fast enough | Reconnect and resume from its last `seq` |
 

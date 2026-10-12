@@ -425,27 +425,31 @@ class Grants:
     async def provision_tenant(
         self, tenant: TenantId, *, owner: UserId, admins: Iterable[UserId] = ()
     ) -> list[AuditEntry]:
-        """Create a tenant, with its owner and admins, for the deployment's own tools.
+        """Create a tenant with its owner, and give it the admins it lacks: the deployment's tools.
 
-        ``make tenant`` and ``make migrate-tenants`` call it in process; no surface reaches it,
-        and its audit entries are made by no one. It changes nothing if the tenant exists.
+        A tenant is created only if it is new, and each of ``admins`` who isn't yet a member is
+        made a member and an admin. ``make tenant`` and ``make migrate-tenants`` call it in
+        process; no surface reaches it, and its audit entries are made by no one. It removes no
+        one and changes no member's roles, so it can run again: a tenant that exists keeps its
+        owner, and gains the admins it lacks.
 
         Returns:
-            The audit entries, or none if the tenant exists.
+            The audit entries; none if nothing changed.
 
         Raises:
             Invalid: If the tenant's id is empty or has a ``~``.
         """
         _tenant_id(tenant)
         async with self._change(tenant) as (tx, record):
-            if await tx.tenant(tenant):
-                return []
-            entries = [await self._create(tx, record, tenant, owner, None)]
+            entries: list[AuditEntry] = []
+            if not await tx.tenant(tenant):
+                entries.append(await self._create(tx, record, tenant, owner, None))
             for admin in dict.fromkeys(admins):
                 user = User(id=admin)
-                if not await self._is_member(tx, tenant, user):
-                    await tx.add_grant(Grant(tenant=tenant, role=MEMBER, on=TENANT, to=user))
-                    entries.append(await record(tenant, None, MemberAdded(member=user)))
+                if await self._is_member(tx, tenant, user):
+                    continue
+                await tx.add_grant(Grant(tenant=tenant, role=MEMBER, on=TENANT, to=user))
+                entries.append(await record(tenant, None, MemberAdded(member=user)))
                 grant = Grant(tenant=tenant, role="admin", on=TENANT, to=user)
                 await tx.add_grant(grant)
                 entries.append(await record(tenant, None, Granted(grant=grant)))

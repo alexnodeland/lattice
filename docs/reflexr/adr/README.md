@@ -59,5 +59,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0055](0055-reading-stored-rules.md) | Reading stored rules: every pass, in their workspace, by namespace in metrics | Accepted |
 | [0056](0056-access-asked-in-every-workspace-method.md) | Access asked in every workspace method | Accepted |
 | [0057](0057-reserved-publishers.md) | Reserved publishers | Accepted |
+| [0058](0058-an-mcp-client-acts-for-its-person.md) | An MCP client acts for its person | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

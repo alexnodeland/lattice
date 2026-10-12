@@ -115,9 +115,9 @@ reflexr's own events, alongside the application's:
 
 | Code | Meaning | Client should |
 |---|---|---|
-| `4400` | Bad `hello` or unsupported protocol | fix and reconnect |
+| `4400` | Bad `hello` or unsupported protocol; or `resolve_actor` refused it with a 400 | fix and reconnect |
 | `4401` | Not authenticated | re-authenticate |
-| `4403` | The actor may not open this workspace, or read its log | stop |
+| `4403` | The actor may not open this workspace, or read its log; or `resolve_actor` refused it with `Forbidden` | stop |
 | `4408` | `hello` not received in time | reconnect |
 | `4429` | The client did not read frames fast enough | reconnect and resume |
 

@@ -214,7 +214,12 @@ async def test_mcp_clients_publish_into_the_same_workspace(server: str) -> None:
         assert '"name":"oncall:silence"' in content.text.replace(" ", "")
     async with httpx.AsyncClient(base_url=server) as http:
         [deploy] = await log(http, "oncall:deploy.completed")
-    assert deploy["actor"] == {"kind": "external_agent", "client_id": "mcp", "name": "MCP client"}
+    assert deploy["actor"] == {
+        "kind": "external_agent",
+        "client_id": "mcp",
+        "name": "MCP client",
+        "on_behalf_of": None,
+    }
 
 
 async def test_a_rule_installed_over_rest_fires_until_it_is_archived(

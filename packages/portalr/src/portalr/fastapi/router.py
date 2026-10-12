@@ -1,0 +1,312 @@
+"""portalr's router: the two UIs, their ``config.json``, and the routes no library has.
+
+An application mounts it at ``/portalr``, beside the libraries' routers. The browser calls each
+library's own routes; portalr adds only reading the stack's tools for one tenant, inviting users,
+and, for operators, the deployment's tenants and deep links (lattice RFC-0002).
+"""
+
+from collections.abc import Awaitable, Callable
+from importlib.resources import files
+from pathlib import Path
+from typing import Annotated, Any, Final, Protocol
+
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+from grantr.core import (
+    DEPLOYMENT,
+    TENANT,
+    AuditEntry,
+    Forbidden,
+    GrantrError,
+    Invalid,
+    Member,
+    Membership,
+    Resource,
+    Subject,
+    TenantId,
+    User,
+    UserId,
+)
+from grantr.fastapi import STATUS_CODES, Caller, ResolveActor, Unauthorized
+from portalr.actions import READ_DEPLOYMENT, READ_SPEND, READ_TELEMETRY
+from portalr.fastapi.site import Site
+from portalr.fastapi.ui import ui_router
+from portalr.invites import Invite, InviteFailed
+from portalr.readers import (
+    LogLine,
+    LogQuery,
+    MetricQuery,
+    Ok,
+    Point,
+    Readers,
+    Score,
+    Spend,
+    TenantSpend,
+    Trace,
+    TraceQuery,
+    TraceSummary,
+    Unavailable,
+    Unconfigured,
+    Window,
+    reading,
+)
+from portalr.readers.query import Id
+from portalr.tenant import Tenant, allowed
+
+UI: Final = Path(str(files("portalr") / "static"))
+"""Where portalr's wheel carries the built UIs: ``static/app`` and ``static/admin``."""
+
+
+class Grants(Protocol):
+    """What portalr asks of grantr: its checks, its members, and its tenants.
+
+    grantr's ``Grants`` is one. The protocol exists so that the router's tests can answer
+    portalr's actions as lattice RFC-0002 intends until grantr's roles place them.
+    """
+
+    async def check(self, tenant: TenantId, subject: Subject, action: str, on: Resource) -> bool:
+        """Whether a subject may take an action on a resource in a tenant."""
+        ...
+
+    async def add_member(self, tenant: TenantId, member: Member, *, by: Subject) -> AuditEntry:
+        """Add a user to a tenant, if ``by`` may."""
+        ...
+
+    async def tenants(self, *, by: Subject) -> list[TenantId]:
+        """Every tenant, if ``by`` may list them."""
+        ...
+
+    async def member(self, tenant: TenantId, user: UserId) -> Membership | None:
+        """A user's membership of a tenant, or None if they aren't a member."""
+        ...
+
+
+class Config(BaseModel):
+    """``config.json``: what the UIs need of the deployment they run in."""
+
+    model_config = ConfigDict(frozen=True)
+
+    supabase: dict[str, str]
+    surfaces: dict[str, str]
+    readers: dict[str, bool]
+
+
+class NewInvite(BaseModel):
+    """Whom to invite to the tenant ``X-Tenant`` names."""
+
+    model_config = ConfigDict(frozen=True)
+
+    email: Annotated[str, StringConstraints(pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$", max_length=254)]
+
+
+class Invited(BaseModel):
+    """The member an invitation made, by the user id their tokens carry."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tenant: str
+    user: str
+
+
+class DeploymentTenants(BaseModel):
+    """Every tenant, and their spend, as one LiteLLM team list reads it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tenants: list[str]
+    spend: Annotated[
+        Ok[list[TenantSpend]] | Unavailable | Unconfigured, Field(discriminator="status")
+    ]
+
+
+class Links(BaseModel):
+    """Deep links into the stack's own tools, which only operators get."""
+
+    model_config = ConfigDict(frozen=True)
+
+    langfuse_trace: str | None = None
+    langfuse_session: str | None = None
+    grafana_trace: str | None = None
+    grafana_logs: str | None = None
+
+
+TenantHeader = Annotated[TenantId | None, Header(alias="X-Tenant")]
+"""The tenant a request reads, which grantr checks."""
+
+DEPLOYMENT_CHECK: Final = "deployment"
+"""The tenant a deployment-wide check names: grantr reads none of its grants for one."""
+
+
+def _refusal(code: str, message: str) -> HTTPException:
+    return HTTPException(status_code=STATUS_CODES[code], detail={"type": code, "message": message})
+
+
+def portalr_router(
+    *,
+    resolve_actor: ResolveActor,
+    grants: Grants,
+    readers: Readers,
+    invite: Invite | None,
+    site: Site,
+    ui: Path = UI,
+) -> APIRouter:
+    """Build portalr's router, for an application to mount at ``/portalr``.
+
+    Args:
+        resolve_actor: Authenticates each request, as grantr's router does.
+        grants: What decides each read, and adds invited members.
+        readers: The stack's tools, each optional.
+        invite: Supabase Auth's admin API, from the application's settings; without it,
+            there is no invitation route.
+        site: The application's Supabase project and surfaces, for ``config.json``.
+        ui: Where the built UIs are; the wheel's own, unless a test says otherwise.
+    """
+    router = APIRouter()
+    router.include_router(ui_router(site, ui))
+
+    async def caller(request: Request) -> Caller:
+        try:
+            return await resolve_actor(request)
+        except Unauthorized as error:
+            raise _refusal("unauthorized", str(error) or "no caller") from error
+
+    current = Depends(caller)
+
+    def tenant_read(action: str) -> Callable[..., Awaitable[Tenant]]:
+        async def tenant(x_tenant: TenantHeader = None, who: Caller = current) -> Tenant:
+            named = x_tenant or who.tenant
+            if named is None:
+                raise _refusal("tenant_required", "name the tenant with X-Tenant")
+            if who.tenant is not None and who.tenant != named:
+                raise _refusal("forbidden", "this caller's key is for another tenant")
+            if not await grants.check(named, who.subject, action, TENANT):
+                raise _refusal("forbidden", f"the caller may not {action} in {named}")
+            return allowed(named)
+
+        return tenant
+
+    telemetry = Depends(tenant_read(READ_TELEMETRY))
+    spending = Depends(tenant_read(READ_SPEND))
+
+    async def operator(who: Caller = current) -> Subject:
+        if not await grants.check(DEPLOYMENT_CHECK, who.subject, READ_DEPLOYMENT, DEPLOYMENT):
+            raise _refusal("forbidden", f"the caller may not {READ_DEPLOYMENT}")
+        return who.subject
+
+    operating = Depends(operator)
+
+    @router.get("/config.json")
+    async def config() -> Config:
+        """What the UIs need of this deployment: Supabase, the surfaces, and the tools it runs."""
+        return Config(
+            supabase={"url": site.supabase_url, "key": site.supabase_key},
+            surfaces=site.surfaces.model_dump(),
+            readers=readers.configured(),
+        )
+
+    @router.get("/v1/traces", response_model=reading(list[TraceSummary]))
+    async def traces(
+        query: Annotated[TraceQuery, Query()], tenant: Tenant = telemetry
+    ) -> Ok[list[TraceSummary]] | Unavailable | Unconfigured:
+        """The tenant's traces, a session's or a run's, from Tempo."""
+        return await readers.tempo.search(tenant, query) if readers.tempo else Unconfigured()
+
+    @router.get("/v1/traces/{trace_id}", response_model=reading(Trace | None))
+    async def trace(
+        trace_id: Id, tenant: Tenant = telemetry
+    ) -> Ok[Trace | None] | Unavailable | Unconfigured:
+        """A trace, if it is the tenant's: its spans, for its waterfall."""
+        return await readers.tempo.trace(tenant, trace_id) if readers.tempo else Unconfigured()
+
+    @router.get("/v1/logs", response_model=reading(list[LogLine]))
+    async def logs(
+        query: Annotated[LogQuery, Query()], tenant: Tenant = telemetry
+    ) -> Ok[list[LogLine]] | Unavailable | Unconfigured:
+        """The tenant's logs, a thread's or a run's, from Loki."""
+        return await readers.loki.logs(tenant, query) if readers.loki else Unconfigured()
+
+    @router.get("/v1/metrics", response_model=reading(list[Point]))
+    async def metrics(
+        query: Annotated[MetricQuery, Query()], tenant: Tenant = telemetry
+    ) -> Ok[list[Point]] | Unavailable | Unconfigured:
+        """The tenant's latency or errors over time, from Prometheus, through prom-label-proxy."""
+        if readers.prometheus is None:
+            return Unconfigured()
+        return await readers.prometheus.series(tenant, query)
+
+    @router.get("/v1/scores", response_model=reading(list[Score]))
+    async def scores(
+        window: Annotated[Window, Query()], tenant: Tenant = telemetry
+    ) -> Ok[list[Score]] | Unavailable | Unconfigured:
+        """The tenant's feedback and evaluation scores, from Langfuse."""
+        return await readers.langfuse.scores(tenant, window) if readers.langfuse else Unconfigured()
+
+    @router.get("/v1/spend", response_model=reading(Spend | None))
+    async def spend(tenant: Tenant = spending) -> Ok[Spend | None] | Unavailable | Unconfigured:
+        """The tenant's usage and spend, against its budget, from its LiteLLM team."""
+        return await readers.litellm.spend(tenant) if readers.litellm else Unconfigured()
+
+    @router.get("/v1/deployment/tenants")
+    async def deployment_tenants(by: Subject = operating) -> DeploymentTenants:
+        """Every tenant, with its spend from one LiteLLM team list, for operators."""
+        tenants = await grants.tenants(by=by)
+        spent = await readers.litellm.every_tenant() if readers.litellm else Unconfigured()
+        return DeploymentTenants(tenants=tenants, spend=spent)
+
+    @router.get("/v1/deployment/links")
+    async def links(
+        trace_id: Id | None = None,
+        session_id: Id | None = None,
+        run_id: Id | None = None,
+        _by: Subject = operating,
+    ) -> Links:
+        """Deep links into Langfuse and Grafana, which aren't tenant-scoped, for operators."""
+        langfuse, grafana = readers.langfuse, readers.grafana
+        return Links(
+            langfuse_trace=langfuse.trace_link(trace_id) if langfuse and trace_id else None,
+            langfuse_session=langfuse.session_link(session_id) if langfuse and session_id else None,
+            grafana_trace=grafana.trace_link(trace_id) if grafana and trace_id else None,
+            grafana_logs=grafana.run_logs_link(run_id) if grafana and run_id else None,
+        )
+
+    if invite is not None:
+        _invitations(router, grants, invite, current)
+
+    return router
+
+
+def _refused(error: GrantrError) -> HTTPException:
+    return _refusal("forbidden" if isinstance(error, Forbidden) else "invalid", str(error))
+
+
+def _invitations(router: APIRouter, grants: Grants, invite: Invite, current: Any) -> None:
+    failed = {"description": "Supabase Auth didn't invite or find the person: `invite_failed`"}
+
+    @router.post("/v1/invites", status_code=201, responses={502: failed})
+    async def invite_member(
+        body: Annotated[NewInvite, Body()], x_tenant: TenantHeader = None, who: Caller = current
+    ) -> Invited:
+        """Invite someone to the tenant: Supabase Auth creates or finds them, grantr adds them.
+
+        It needs ``grantr:add_member``, which is checked before Supabase is asked, and again
+        when grantr adds the member. Inviting a member again succeeds, and changes nothing.
+        """
+        tenant = x_tenant or who.tenant
+        if tenant is None:
+            raise _refusal("tenant_required", "name the tenant with X-Tenant")
+        if who.tenant is not None and who.tenant != tenant:
+            raise _refusal("forbidden", "this caller's key is for another tenant")
+        if not await grants.check(tenant, who.subject, "grantr:add_member", TENANT):
+            raise _refusal("forbidden", f"the caller may not add members to {tenant}")
+        try:
+            user = await invite(body.email)
+        except InviteFailed as error:
+            detail = {"type": "invite_failed", "message": str(error)}
+            raise HTTPException(status_code=502, detail=detail) from error
+        if await grants.member(tenant, user) is None:
+            try:
+                await grants.add_member(tenant, User(id=user), by=who.subject)
+            except (Forbidden, Invalid) as error:
+                raise _refused(error) from error
+        return Invited(tenant=tenant, user=user)

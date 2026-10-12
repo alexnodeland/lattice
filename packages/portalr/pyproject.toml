@@ -19,7 +19,13 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Application Frameworks",
     "Typing :: Typed",
 ]
-dependencies = []
+dependencies = [
+    "grantr[fastapi]>=0.1.0.dev0",
+    "fastapi>=0.141",
+    "httpx>=0.28",
+    "pydantic>=2.13",
+    "starlette>=0.46.0",
+]
 
 [project.urls]
 Homepage = "https://lattice.alexnodeland.com/portalr/"
@@ -31,6 +37,7 @@ Changelog = "https://github.com/alexnodeland/lattice/blob/main/packages/portalr/
 [dependency-groups]
 test = [
     "pytest>=9.1",
+    "pytest-asyncio>=1.4",
     "pytest-cov>=7.1",
     "pytest-timeout>=2.4",
 ]
@@ -39,6 +46,10 @@ dev = [
     { include-group = "test" },
     { include-group = "lint" },
 ]
+
+# In lattice, grantr is the checkout's. A built wheel keeps the range in [project] alone.
+[tool.uv.sources]
+grantr = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]
@@ -62,6 +73,8 @@ addopts = ["--strict-markers", "--strict-config", "-ra"]
 # A test that runs for a minute is stuck: fail it, with every thread's stack.
 timeout = 60
 timeout_method = "thread"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 filterwarnings = ["error"]
 
 [tool.coverage.run]

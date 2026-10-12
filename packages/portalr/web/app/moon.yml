@@ -7,6 +7,11 @@ dependsOn:
 
 tasks:
   build:
+    # Its own files, and the packages it bundles, whose sources and styles it builds from.
+    inputs:
+      - '**/*'
+      - '/packages/portalr/web/client/src/**/*'
+      - '/packages/portalr/web/ui/src/**/*'
     outputs:
       - '/packages/portalr/src/portalr/static/app/**/*'
     options:

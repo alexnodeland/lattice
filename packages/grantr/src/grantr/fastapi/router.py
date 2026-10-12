@@ -4,7 +4,7 @@ Tenants, members, groups, roles, grants, keys and the audit log; and ``/me`` and
 """
 
 from collections.abc import Awaitable, Callable
-from typing import Annotated, Any, Final, Literal, NamedTuple
+from typing import Annotated, Any, Final, NamedTuple
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict
@@ -20,6 +20,7 @@ from grantr.core import (
     Invalid,
     Member,
     Membership,
+    PrincipalId,
     Resource,
     Role,
     ServicePrincipal,
@@ -128,7 +129,7 @@ class Restriction(BaseModel):
 class NewKey(BaseModel):
     """The service principal a key is issued to."""
 
-    principal: str
+    principal: PrincipalId
 
 
 class IssuedKey(BaseModel):
@@ -282,15 +283,18 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         """Add a user or service principal to a tenant."""
         return await _or_http(grants.add_member(tenant, body.member, by=by(tenant, who)))
 
-    @router.delete("/tenants/{tenant}/members/{kind}/{member_id}")
-    async def remove_member(
-        tenant: TenantId,
-        kind: Literal["user", "service_principal"],
-        member_id: str,
-        who: Caller = current,
+    @router.delete("/tenants/{tenant}/members/user/{member_id}")
+    async def remove_user(tenant: TenantId, member_id: UserId, who: Caller = current) -> AuditEntry:
+        """Remove a user, with their grants and their places in groups."""
+        member = User(id=member_id)
+        return await _or_http(grants.remove_member(tenant, member, by=by(tenant, who)))
+
+    @router.delete("/tenants/{tenant}/members/service_principal/{member_id}")
+    async def remove_principal(
+        tenant: TenantId, member_id: PrincipalId, who: Caller = current
     ) -> AuditEntry:
-        """Remove a member, with its grants, its places in groups and its keys."""
-        member = User(id=member_id) if kind == "user" else ServicePrincipal(id=member_id)
+        """Remove a service principal, with its grants, its places in groups and its keys."""
+        member = ServicePrincipal(id=member_id)
         return await _or_http(grants.remove_member(tenant, member, by=by(tenant, who)))
 
     @router.get("/tenants/{tenant}/groups")

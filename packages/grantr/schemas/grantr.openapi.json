@@ -555,8 +555,7 @@
         "description": "The service principal a key is issued to.",
         "properties": {
           "principal": {
-            "title": "Principal",
-            "type": "string"
+            "$ref": "#/components/schemas/PrincipalId"
           }
         },
         "required": [
@@ -594,6 +593,10 @@
         ],
         "title": "NewTenant",
         "type": "object"
+      },
+      "PrincipalId": {
+        "pattern": "^[^:~\\s]+$",
+        "type": "string"
       },
       "Resource": {
         "description": "A resource, by its kind, its workspace if it is in one, and its id if it is an item.",
@@ -803,8 +806,7 @@
         "description": "A tenant's non-human principal: an integration, an MCP client or the application.",
         "properties": {
           "id": {
-            "title": "Id",
-            "type": "string"
+            "$ref": "#/components/schemas/PrincipalId"
           },
           "kind": {
             "const": "service_principal",
@@ -1902,10 +1904,10 @@
         "summary": "Add Member"
       }
     },
-    "/grantr/v1/tenants/{tenant}/members/{kind}/{member_id}": {
+    "/grantr/v1/tenants/{tenant}/members/service_principal/{member_id}": {
       "delete": {
-        "description": "Remove a member, with its grants, its places in groups and its keys.",
-        "operationId": "remove_member_grantr_v1_tenants__tenant__members__kind___member_id__delete",
+        "description": "Remove a service principal, with its grants, its places in groups and its keys.",
+        "operationId": "remove_principal_grantr_v1_tenants__tenant__members_service_principal__member_id__delete",
         "parameters": [
           {
             "in": "path",
@@ -1919,14 +1921,52 @@
           },
           {
             "in": "path",
-            "name": "kind",
+            "name": "member_id",
             "required": true,
             "schema": {
-              "enum": [
-                "user",
-                "service_principal"
-              ],
-              "title": "Kind",
+              "pattern": "^[^:~\\s]+$",
+              "title": "Member Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Principal"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/members/user/{member_id}": {
+      "delete": {
+        "description": "Remove a user, with their grants and their places in groups.",
+        "operationId": "remove_user_grantr_v1_tenants__tenant__members_user__member_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
               "type": "string"
             }
           },
@@ -1962,7 +2002,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Remove Member"
+        "summary": "Remove User"
       }
     },
     "/grantr/v1/tenants/{tenant}/restrictions": {

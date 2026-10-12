@@ -77,9 +77,13 @@ graph LR
     internet["the internet"] -- "80, 443" --> caddy["caddy<br/>(ACME certificates)"]
     caddy -- "app host" --> app["the application"]
     caddy -- "/auth/v1/* (stripped)" --> gotrue["gotrue"]
-    operator["an operator"] -- "SSH tunnel" --> uis["grafana, langfuse-web,<br/>litellm's admin UI<br/>(127.0.0.1)"]
-    app --> litellm["litellm"] & collector["otel-collector"]
-    app & gotrue & litellm & langfuse["langfuse"] --> postgres[("postgres 17")]
+    operator["an operator"] -- "SSH tunnel" --> uis["grafana, langfuse-web,<br/>litellm's admin UI, minio<br/>(127.0.0.1)"]
+    litellm["litellm"]
+    collector["otel-collector"]
+    langfuse["langfuse"]
+    postgres[("postgres 17")]
+    app --> litellm & collector
+    app & gotrue & litellm & langfuse --> postgres
     langfuse --> clickhouse[("clickhouse")] & minio[("minio")]
     collector --> backends["tempo, prometheus,<br/>loki, langfuse"]
     postgres -. "pgBackRest" .-> bucket[("an S3 bucket")]
@@ -88,7 +92,7 @@ graph LR
 
 The host runs stackr's `compose.yaml` with the `observability`, `langfuse`, `gateway`, `postgres` and `auth` profiles, the application's own Compose file, and an overlay, `deploy/host/compose.prod.yaml`:
 
-- **Only Caddy publishes on a public interface,** on 80 and 443. The overlay uses Compose's `!reset` to remove the ports nothing outside the host needs: the Collector's, Tempo's, Loki's, Pyroscope's, Prometheus's, prom-label-proxy's, MinIO's and PostgreSQL's. Grafana, Langfuse and LiteLLM keep theirs on `127.0.0.1`, for SSH tunnels. Langfuse's `NEXTAUTH_URL`, `http://localhost:3300`, works through a tunnel unchanged.
+- **Only Caddy publishes on a public interface,** on 80 and 443. The overlay uses Compose's `!reset` to remove the ports nothing outside the host needs: the Collector's, Tempo's, Loki's, Pyroscope's, Prometheus's, prom-label-proxy's and PostgreSQL's. Grafana, Langfuse, LiteLLM and MinIO keep theirs on `127.0.0.1`, for SSH tunnels. Langfuse's `NEXTAUTH_URL`, `http://localhost:3300`, and its media uploads to `http://localhost:9000` work through a tunnel unchanged.
 - **Images become the thin ones,** with `!override` on the services' `image` and `!reset` on their configuration mounts.
 - **Local Supabase's network goes.** `db-init`, Langfuse and LiteLLM join only `stackr`, since PostgreSQL is the `postgres` service there, and so does the application.
 - **Caddy** gets certificates from Let's Encrypt with ACME, sends the application's host to the application, sends `/auth/v1/*` to GoTrue with the prefix stripped, and refuses `/auth/v1/admin/*`.
@@ -103,19 +107,27 @@ graph LR
     alb -- "app host" --> app["application<br/>(Fargate)"]
     alb -- "/auth/v1/* (rewritten)" --> gotrue["gotrue<br/>(Fargate)"]
     subgraph private["private subnets"]
-        app --> litellm["litellm"] & collector["otel-collector"]
-        collector --> tempo["tempo"] & loki["loki"] & langfuse["langfuse web, worker"]
-        app & gotrue & litellm & langfuse --> rds[("RDS PostgreSQL 17")]
-        litellm & langfuse --> valkey[("ElastiCache Valkey")]
+        litellm["litellm"]
+        collector["otel-collector"]
+        tempo["tempo"]
+        loki["loki"]
+        pyroscope["pyroscope"]
+        langfuse["langfuse web, worker"]
+        rds[("RDS PostgreSQL 17")]
+        valkey[("ElastiCache Valkey")]
         subgraph state["state host (EC2, EBS)"]
             clickhouse[("clickhouse")]
             prometheus[("prometheus,<br/>prom-label-proxy")]
         end
-        collector --> prometheus
+        app --> litellm & collector
+        collector --> tempo & loki & langfuse & prometheus
+        app & gotrue & litellm & langfuse --> rds
+        litellm & langfuse --> valkey
         langfuse --> clickhouse
     end
-    tempo & loki & langfuse & pyroscope["pyroscope"] --> s3[("S3")]
-    operator["an operator"] -- "SSM port forwarding" --> state
+    s3[("S3")]
+    tempo & loki & langfuse & pyroscope --> s3
+    operator["an operator"] -- "SSM port forwarding,<br/>through the state host" --> prometheus
 ```
 
 `packages/stackr/deploy/aws/` holds the modules and two roots:
@@ -159,7 +171,7 @@ Where each service runs:
 
 ### Security
 
-- **No admin UI faces the internet.** Grafana, Langfuse, LiteLLM's admin UI and MinIO's console are reached by an SSH tunnel on the host, and by SSM through the state host on AWS. The edge refuses GoTrue's `/auth/v1/admin/*`: the application's admin commands reach GoTrue on the private network, with `AUTH_ISSUER` set to its private address, since they verify no tokens.
+- **No admin UI faces the internet.** Grafana, Langfuse, LiteLLM's admin UI, and MinIO's console on the host, are reached by an SSH tunnel on the host, and by SSM through the state host on AWS. The edge refuses GoTrue's `/auth/v1/admin/*`: the application's admin commands reach GoTrue on the private network, with `AUTH_ISSUER` set to its private address, since they verify no tokens.
 - **A firewall on the host,** ufw, allows 22, 80 and 443. Docker writes its own iptables rules for published ports, which ufw doesn't see, so a port published on every interface would bypass it. That is why the overlay publishes nothing but Caddy's ports, and binds the rest to `127.0.0.1`.
 - **Security groups on AWS:** the ALB takes 443 and 80 from anywhere, and each task takes traffic only from the services that call it. RDS, ElastiCache and the state host take nothing from outside the VPC.
 - **Row-level security.** The application connects with `DATABASE_URL`, as a role that doesn't own its tables. `db-roles` creates that role using `DATABASE_ADMIN_URL`, the owner's, which only the one-off tasks receive.

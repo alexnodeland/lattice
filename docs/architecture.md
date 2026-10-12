@@ -147,7 +147,7 @@ moon runs every task, and only those a change affects; uv and Bun manage the dep
 | `.moon/workspace.yml` | The thirteen projects, by path; `main` as the default branch; moon's version constraint |
 | `.moon/tasks/python.yml` | For every Python project: `lint`, `typecheck`, `test`, `format` and `check`. The root's `pyproject.toml` and `uv.lock` are inputs of every task |
 | `.moon/tasks/distribution.yml` | For every project tagged `distribution`: `build`, `standalone` and `deptry` |
-| `.moon/toolchains.yml` | JavaScript, with Bun as its package manager, Bun, and TypeScript. Every setting that would install dependencies or rewrite a `package.json` or `tsconfig.json` is off |
+| `.moon/toolchains.yml` | JavaScript, with Bun as its package manager, Bun, and TypeScript. Every setting that would install dependencies or rewrite a `package.json` or `tsconfig.json` is off, and moon installs no Bun of its own: proto does, from `.prototools` |
 | `.moon/tasks/typescript.yml` | For every web package: `lint` (Biome), `typecheck` (`tsc`), `test` (Vitest), `build` (Vite), `format` and `check`. The root's `package.json`, `bun.lock`, `biome.json` and `tsconfig.base.json` are inputs of every task. `client` and `ui` have no `build`, and `app` and `admin` no `test` until they have code to test |
 | `<project>/moon.yml` | The project's language, layer, tags and `dependsOn`, and tasks of its own |
 | `moon.yml` | The root project, `lattice`: lint, types and tests for the root's Python and the family's tests; `docs` and `docs-serve`; `workflows`, which runs actionlint and zizmor; `knip`, over the Bun workspace; and `check`. It inherits no task, which would check every package again |

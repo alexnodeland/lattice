@@ -16,7 +16,7 @@ The tools' executables start with `#!/usr/bin/env node`, and moon runs them that
 - **`client` and `ui` are consumed as source.** Their `exports` point at `src/index.ts`, and Vite builds them into `app` and `admin`. So they have no `build` task, and `app` and `admin` have no `test` task until they have code of their own; `check` runs whichever of `test` and `build` a package has.
 - **A web package's edges are its workspace dependencies.** `app` and `admin` depend on `ui` alone until they use `client`, and the root's edges test holds each web package's `dependsOn` to its `package.json`, as it holds the Python packages' to their `pyproject.toml`.
 - **The web packages are private and carry no version.** portalr's one version is its `pyproject.toml`'s, which release-please moves.
-- **moon edits nothing.** `.moon/toolchains.yml` turns off every setting that would install, dedupe, or rewrite a `package.json` or `tsconfig.json`.
+- **moon edits and installs nothing.** `.moon/toolchains.yml` turns off every setting that would install, dedupe, or rewrite a `package.json` or `tsconfig.json`. proto installs Bun from `.prototools`, as it installs moon and uv, and moon doesn't take Bun's version from there: when it did, it installed a proto of its own in CI, mid-run, and a concurrent `uv` shim failed.
 
 ## Options considered
 

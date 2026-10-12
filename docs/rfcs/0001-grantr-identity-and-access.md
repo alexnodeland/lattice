@@ -10,7 +10,7 @@
 - [reflexr ADR-0016][r-adr-0016] and [reflexr RFC-0003][r-rfc-0003] scope reflexr to tenants and workspaces, and give stored rules their own `allow` hook, which this RFC folds into the widened one.
 - [stackr ADR-0002][s-adr-0002] and [ADR-0011][s-adr-0011] verify Supabase Auth tokens in the template, with the tenant in a claim. This RFC moves the tenant out of the token.
 - [stackr RFC-0002][s-rfc-0002] leaves open who may accept a rule drafted in chat. grantr answers it.
-- lattice RFC-0002 is portalr, whose admin UI manages access through grantr's API.
+- [lattice RFC-0002](0002-portalr-the-portal.md) is portalr, whose admin UI manages access through grantr's API.
 
 ## Summary
 

@@ -56,6 +56,9 @@ class Forgetful:
     async def cause(self, workspace: WorkspaceKey, kind: CauseKind, key: str) -> Cause | None:
         return await self._ledger.cause(workspace, kind, key)
 
+    async def forget_causes(self, workspace: WorkspaceKey, *, older_than: timedelta) -> None:
+        await self._ledger.forget_causes(workspace, older_than=older_than)
+
     async def followed(self) -> list[WorkspaceKey]:
         return await self._ledger.followed()
 

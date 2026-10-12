@@ -7,7 +7,7 @@ the libraries'.
 from datetime import datetime
 from typing import Final
 
-from sqlalchemy import BigInteger, DateTime, MetaData
+from sqlalchemy import BigInteger, DateTime, Index, MetaData
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 VERSION_TABLE: Final = "relayr_alembic_version"
@@ -45,6 +45,9 @@ class CauseRow(Base):
     """The reflexr run behind an artifactr write, by what the follower finds it by."""
 
     __tablename__ = "relayr_causes"
+    __table_args__ = (
+        Index("ix_relayr_causes_recorded", "tenant_id", "workspace_id", "recorded_at"),
+    )
 
     tenant_id: Mapped[str] = mapped_column(primary_key=True)
     workspace_id: Mapped[str] = mapped_column(primary_key=True)
@@ -57,6 +60,8 @@ class CauseRow(Base):
     firing_id: Mapped[str]
     run_id: Mapped[str]
     depth: Mapped[int]
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    """When it was recorded, which it is forgotten by."""
 
 
 class DeadLetterRow(Base):

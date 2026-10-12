@@ -1,6 +1,6 @@
 # ADR-0013: relayr in lattice
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0024](0024-langfuse-sessions-tagged-with-each-other.md)
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 

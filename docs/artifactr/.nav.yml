@@ -94,7 +94,8 @@ nav:
     - adr/0056-access-asked-in-every-workspace-method.md
     - adr/0057-a-turn-acts-for-one-author.md
     - adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md
-    - adr/0059-the-tenant-on-log-records.md
+    - adr/0059-a-turn-starts-from-an-empty-context.md
+    - adr/0060-the-tenant-on-log-records.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

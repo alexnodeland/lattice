@@ -1,4 +1,4 @@
-# ADR-0059: The tenant on log records
+# ADR-0060: The tenant on log records
 
 **Status:** Accepted
 **Date:** 2026-10-12

@@ -4,6 +4,7 @@ layer: 'library'
 tags: ['distribution']
 dependsOn:
   - 'artifactr'
+  - 'evalr'
   - 'reflexr'
 
 tasks:

@@ -97,3 +97,16 @@ async def test_a_cause_is_kept_once_per_key(ledger: Ledger) -> None:
     assert await ledger.cause(PROD, "turn", "7") is None
     assert await ledger.cause(STAGING, "message", "7") is None
     assert await ledger.followed() == [], "a cause follows no workspace"
+
+
+async def test_causes_are_forgotten_once_older_than_a_time(
+    ledger: Ledger, clock: FakeClock
+) -> None:
+    await ledger.record_cause(PROD, "message", "old", CAUSE)
+    await ledger.record_cause(STAGING, "message", "old", CAUSE)
+    clock.advance(timedelta(hours=1))
+    await ledger.record_cause(PROD, "message", "new", CAUSE)
+    await ledger.forget_causes(PROD, older_than=timedelta(minutes=30))
+    assert await ledger.cause(PROD, "message", "old") is None
+    assert await ledger.cause(PROD, "message", "new") == CAUSE
+    assert await ledger.cause(STAGING, "message", "old") == CAUSE, "only that workspace's"

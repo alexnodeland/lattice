@@ -28,6 +28,7 @@ from relayr.outbound.actions import (
 )
 from relayr.outbound.allowlist import Allowlist
 from relayr.outbound.capability import ArtifactrCapability
+from relayr.outbound.turns import turn_cause
 
 __all__ = [
     "RULES",
@@ -39,4 +40,5 @@ __all__ = [
     "RunActions",
     "is_rule_actor",
     "rule_actor",
+    "turn_cause",
 ]

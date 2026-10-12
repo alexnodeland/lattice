@@ -6,8 +6,10 @@ imports it or the other.
 
 Its adapters are built: [`relayr.events`][relayr.events], the bridged types and the projections;
 [`relayr.ledger`][relayr.ledger] and [`relayr.sql`][relayr.sql], its storage;
-[`relayr.inbound`][relayr.inbound], the followers; and [`relayr.outbound`][relayr.outbound], what
-rules' runs do in artifactr. Its documentation, with its decisions and the
+[`relayr.inbound`][relayr.inbound], the followers; [`relayr.outbound`][relayr.outbound], what
+rules' runs do in artifactr; and [`relayr.telemetry`][relayr.telemetry], with
+[`relayr.otel`][relayr.otel] and [`relayr.langfuse`][relayr.langfuse], their traces, tags and
+counters. Its documentation, with its decisions and the
 plan that builds the rest, is at <https://lattice.alexnodeland.com/relayr/>.
 """
 

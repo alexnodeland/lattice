@@ -31,7 +31,7 @@ An application can mount [artifactr](../artifactr/index.md) and [reflexr](../ref
 - **Inbound: chats and artifacts become events (built).** One follower per workspace, with a lease, a cursor and dead letters, publishes selected artifactr events into reflexr under the `artifactr` namespace, such as `artifactr:message_posted`, `artifactr:artifact_changed` and `artifactr:proposal_resolved`, so that a message fires a rule exactly once, across a restart and a redelivery ([ADR-0006](adr/0006-bridged-types-in-the-artifactr-namespace.md), [the guide](guides/inbound.md)).
 - **Outbound: runs act as participants (built).** A pydantic-ai capability and helpers let a run act in artifactr as its rule's own external agent, `reflexr:<rule>`, so artifactr's rules apply to it: under a `propose` write policy its edits are proposals, and relayr never resolves one ([ADR-0002](adr/0002-the-outbound-actor-an-external-agent-per-rule.md)).
 - **Notices by default (built).** A rule's messages start no turn in the thread, unless the rule's allowlist grants it ([ADR-0007](adr/0007-notices-by-default.md)).
-- **Chains and sessions kept apart, and linked.** A thread is never a causal chain, and a chain never joins a thread's session or model history; traces are linked, and Langfuse sessions tagged, across the two ([ADR-0003](adr/0003-a-thread-is-never-a-chain.md), [ADR-0004](adr/0004-sessions-linked-not-continued.md)).
+- **Chains and sessions kept apart, and linked (built).** A thread is never a causal chain, and a chain never joins a thread's session or model history; traces are linked, and Langfuse sessions tagged, across the two ([ADR-0003](adr/0003-a-thread-is-never-a-chain.md), [ADR-0004](adr/0004-sessions-linked-not-continued.md)).
 - **Rules from chat.** A rule drafted in a thread is a `rule` artifact, reviewed as a proposal, and goes live in reflexr's stored rules only when a person accepts it, with provenance recorded both ways ([ADR-0005](adr/0005-where-a-rules-source-of-truth-lives.md)).
 - **Evaluation.** Proposal outcomes become feedback on the runs that proposed them, with measures of acceptance, rewrites and time to resolution.
 - **A ledger of its own (built)**, in memory or in SQL, behind the `sql`, `sqlite` and `postgres` extras.
@@ -44,6 +44,7 @@ An application can mount [artifactr](../artifactr/index.md) and [reflexr](../ref
 |---|---|
 | Bridge artifactr's events into reflexr | [Bridging artifactr into reflexr](guides/inbound.md) |
 | Let rules act in artifactr | [Acting in artifactr from rules](guides/outbound.md) |
+| Follow a story across the bridge in Tempo and Langfuse | [Tracing across the bridge](guides/telemetry.md) |
 | See how it works | The [architecture](architecture.md), and the [API reference](reference.md) |
 | Understand why each part will be the way it is | The [decision records](adr/README.md) |
 | See the plan, its phases and what each waits on | [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and the [RFCs](rfcs/README.md) |

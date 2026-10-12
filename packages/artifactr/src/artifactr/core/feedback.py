@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 
 from artifactr.core.errors import NotFound, ValidationFailed
 from artifactr.core.ids import ArtifactId, MessageId, RunId, ThreadId
+from artifactr.core.tagged import tag_required
 
 type TargetKind = Literal["artifact", "thread", "turn", "message"]
 """What feedback can be about: an artifact version, a thread, a turn (a run) or a message."""
@@ -33,7 +34,7 @@ TARGET_KINDS: frozenset[TargetKind] = frozenset({"artifact", "thread", "turn", "
 class ArtifactTarget(BaseModel):
     """Feedback on one version of an artifact."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
     kind: Literal["artifact"] = "artifact"
     artifact_id: ArtifactId
@@ -43,7 +44,7 @@ class ArtifactTarget(BaseModel):
 class ThreadTarget(BaseModel):
     """Feedback on a whole thread: the session."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
     kind: Literal["thread"] = "thread"
     thread_id: ThreadId
@@ -52,7 +53,7 @@ class ThreadTarget(BaseModel):
 class TurnTarget(BaseModel):
     """Feedback on the agent's turn: its run, which may span pauses."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
     kind: Literal["turn"] = "turn"
     run_id: RunId
@@ -66,7 +67,7 @@ class MessageTarget(BaseModel):
     ``message_posted``), which links the feedback to the run's trace.
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
     kind: Literal["message"] = "message"
     message_id: MessageId

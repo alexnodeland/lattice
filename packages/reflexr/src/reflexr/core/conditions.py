@@ -24,6 +24,7 @@ from typing import Annotated, Any, Literal, Self, cast, get_args, get_origin, ov
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from reflexr.core.events import DEFAULT_REGISTRY, Event, EventName
+from reflexr.core.tagged import tag_required
 
 Op = Literal["eq", "ne", "lt", "le", "gt", "ge", "in", "contains", "matches", "exists"]
 """How a :class:`WhereFilter` compares a field with its value."""
@@ -47,7 +48,7 @@ type Admitted = tuple[str, ...] | None
 
 
 class _Stage(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
 
 # ─── filters ─────────────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from reflexr import Rule, SourceActor, on, run
 from reflexr.core import Event, PredicateFilter
 from reflexr.fastapi import reflexr_router
+from reflexr.fastapi.router import Refused, RejectionDetail
 from reflexr.workspace import InMemoryStorage, Reactor, Schedule, Workspaces
 from tests.event_types import Deploy
 from tests.fastapi.conftest import (
@@ -550,3 +551,17 @@ async def test_a_nul_character_is_a_validation_failure(app: App) -> None:
         422,
         {"type": "validation_failed", "message": "text cannot hold a NUL character", "errors": []},
     )
+
+
+async def test_refusals_answer_as_the_document_says(app: App) -> None:
+    client, _, _ = app
+    missing = Refused.model_validate((await client.get("/workspaces/prod/runs/nope")).json())
+    assert isinstance(missing.detail, RejectionDetail)
+    assert (missing.detail.type, missing.detail.model_extra) == (
+        "not_found",
+        {"entity": "run", "id": "nope"},
+    )
+    invalid = await client.get("/workspaces/prod/events", params={"limit": -1})
+    detail = Refused.model_validate(invalid.json()).detail
+    assert isinstance(detail, list)
+    assert [error.loc for error in detail] == [["query", "limit"]]

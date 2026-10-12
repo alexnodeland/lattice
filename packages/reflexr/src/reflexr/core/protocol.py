@@ -18,13 +18,14 @@ from reflexr.core.ids import EventId, RuleName, RunId, WorkspaceId
 from reflexr.core.rules import Rule
 from reflexr.core.runs import Run
 from reflexr.core.state import RuleProgress
+from reflexr.core.tagged import tag_required
 
 PROTOCOL: Final = "reflexr.v1"
 """The protocol version this library speaks."""
 
 
 class _Model(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
 
 # ─── commands ─────────────────────────────────────────────────────────────────

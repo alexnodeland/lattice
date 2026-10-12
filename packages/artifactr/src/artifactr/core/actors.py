@@ -10,12 +10,13 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from artifactr.core.ids import RunId, ThreadId
+from artifactr.core.tagged import tag_required
 
 
 class UserActor(BaseModel):
     """A person, identified by the host application's user id."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     kind: Literal["user"] = "user"
     id: str
@@ -40,7 +41,7 @@ class ExternalAgentActor(BaseModel):
     for no one.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     kind: Literal["external_agent"] = "external_agent"
     client_id: str
@@ -66,7 +67,7 @@ class AgentActor(BaseModel):
     check sees. A run started by the system, or by another agent, acts for no one.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     kind: Literal["agent"] = "agent"
     thread_id: ThreadId
@@ -89,7 +90,7 @@ class AgentActor(BaseModel):
 class SystemActor(BaseModel):
     """The application itself, for automated changes."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     kind: Literal["system"] = "system"
     name: str = "system"
@@ -111,7 +112,7 @@ class EvaluatorActor(BaseModel):
     Evaluators only give feedback; every other command from one is forbidden.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     kind: Literal["evaluator"] = "evaluator"
     name: str

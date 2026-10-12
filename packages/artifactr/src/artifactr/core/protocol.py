@@ -16,6 +16,7 @@ from artifactr.core.events import Envelope
 from artifactr.core.ids import RunId, ThreadId, WorkspaceId
 from artifactr.core.live import LiveFrame
 from artifactr.core.state import Outcome
+from artifactr.core.tagged import tag_required
 
 PROTOCOL: Final = "artifactr.v1"
 """The protocol version this library speaks."""
@@ -24,7 +25,7 @@ PROTOCOL: Final = "artifactr.v1"
 class Hello(BaseModel):
     """The first frame a client sends on a connection."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     type: Literal["hello"] = "hello"
     protocol: str
@@ -42,7 +43,7 @@ class Hello(BaseModel):
 class ResumePlan(BaseModel):
     """Where a connection's replay starts."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     replay_after: int
     """Replay every event with a ``seq`` greater than this."""
@@ -84,7 +85,7 @@ def resume(hello: Hello, *, head_seq: int, first_retained_seq: int = 1) -> Resum
 class StopRun(BaseModel):
     """Cancel a run. Handled by the transport, not by core's rules."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
     type: Literal["stop_run"] = "stop_run"
     run_id: RunId
@@ -93,7 +94,7 @@ class StopRun(BaseModel):
 class WatchRun(BaseModel):
     """Receive a run's live frames on this connection. WebSocket only."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
     type: Literal["watch_run"] = "watch_run"
     run_id: RunId
@@ -109,7 +110,7 @@ class CommandFrame(BaseModel):
     ``command_id`` is also an idempotency key: the server deduplicates repeated ids.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     type: Literal["command"] = "command"
     command_id: str = Field(min_length=1)
@@ -123,7 +124,7 @@ ClientFrame = Annotated[Hello | CommandFrame, Field(discriminator="type")]
 class ActiveRun(BaseModel):
     """A run in progress, as listed in ``welcome``."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     run_id: RunId
     thread_id: ThreadId
@@ -132,7 +133,7 @@ class ActiveRun(BaseModel):
 class Welcome(BaseModel):
     """The server's answer to ``hello``."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     type: Literal["welcome"] = "welcome"
     protocol: str = PROTOCOL
@@ -151,7 +152,7 @@ class EventFrame(Envelope):
 class ReplayComplete(BaseModel):
     """Every event up to ``up_to_seq`` has been replayed; what follows is live."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     type: Literal["replay_complete"] = "replay_complete"
     up_to_seq: int
@@ -160,7 +161,7 @@ class ReplayComplete(BaseModel):
 class CommandResult(BaseModel):
     """The result of one command frame."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     type: Literal["command_result"] = "command_result"
     command_id: str
@@ -172,7 +173,7 @@ class CommandResult(BaseModel):
 class ErrorFrame(BaseModel):
     """A frame the server could not understand, or a failure it could not attribute."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     type: Literal["error"] = "error"
     message: str

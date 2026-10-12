@@ -62,7 +62,8 @@
         }
       },
       "required": [
-        "thread_id"
+        "thread_id",
+        "kind"
       ],
       "title": "AgentActor",
       "type": "object"
@@ -103,7 +104,8 @@
       },
       "required": [
         "run_id",
-        "tool_call_id"
+        "tool_call_id",
+        "type"
       ],
       "title": "AnswerDeferred",
       "type": "object"
@@ -149,7 +151,8 @@
         }
       },
       "required": [
-        "name"
+        "name",
+        "type"
       ],
       "title": "AppEvent",
       "type": "object"
@@ -173,7 +176,8 @@
         }
       },
       "required": [
-        "name"
+        "name",
+        "type"
       ],
       "title": "AppLive",
       "type": "object"
@@ -209,7 +213,8 @@
       },
       "required": [
         "artifact_id",
-        "version"
+        "version",
+        "type"
       ],
       "title": "Applied",
       "type": "object"
@@ -249,7 +254,8 @@
       },
       "required": [
         "artifact_id",
-        "base_version"
+        "base_version",
+        "type"
       ],
       "title": "ArchiveArtifact",
       "type": "object"
@@ -311,7 +317,8 @@
       "required": [
         "artifact_id",
         "kind",
-        "version"
+        "version",
+        "type"
       ],
       "title": "ArtifactArchived",
       "type": "object"
@@ -397,7 +404,8 @@
         "kind",
         "version",
         "patch",
-        "summary"
+        "summary",
+        "type"
       ],
       "title": "ArtifactChanged",
       "type": "object"
@@ -467,7 +475,8 @@
         "artifact_id",
         "kind",
         "version",
-        "data"
+        "data",
+        "type"
       ],
       "title": "ArtifactCreated",
       "type": "object"
@@ -496,7 +505,8 @@
       },
       "required": [
         "artifact_id",
-        "version"
+        "version",
+        "kind"
       ],
       "title": "ArtifactTarget",
       "type": "object"
@@ -580,7 +590,8 @@
       },
       "required": [
         "command_id",
-        "command"
+        "command",
+        "type"
       ],
       "title": "CommandFrame",
       "type": "object"
@@ -654,7 +665,8 @@
       },
       "required": [
         "command_id",
-        "ok"
+        "ok",
+        "type"
       ],
       "title": "CommandResult",
       "type": "object"
@@ -700,7 +712,8 @@
       },
       "required": [
         "kind",
-        "data"
+        "data",
+        "type"
       ],
       "title": "CreateArtifact",
       "type": "object"
@@ -724,6 +737,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "type"
+      ],
       "title": "CreateThread",
       "type": "object"
     },
@@ -766,7 +782,8 @@
       "required": [
         "run_id",
         "thread_id",
-        "tool_call_id"
+        "tool_call_id",
+        "type"
       ],
       "title": "DeferredAnswered",
       "type": "object"
@@ -841,7 +858,8 @@
       },
       "required": [
         "kind",
-        "data"
+        "data",
+        "type"
       ],
       "title": "Draft",
       "type": "object"
@@ -912,7 +930,8 @@
       "required": [
         "artifact_id",
         "base_version",
-        "patch"
+        "patch",
+        "type"
       ],
       "title": "EditArtifact",
       "type": "object"
@@ -932,7 +951,8 @@
         }
       },
       "required": [
-        "message"
+        "message",
+        "type"
       ],
       "title": "ErrorFrame",
       "type": "object"
@@ -957,7 +977,8 @@
       },
       "required": [
         "name",
-        "version"
+        "version",
+        "kind"
       ],
       "title": "EvaluatorActor",
       "type": "object"
@@ -1118,7 +1139,8 @@
         "ts",
         "workspace_id",
         "actor",
-        "event"
+        "event",
+        "type"
       ],
       "title": "EventFrame",
       "type": "object"
@@ -1161,7 +1183,8 @@
         }
       },
       "required": [
-        "client_id"
+        "client_id",
+        "kind"
       ],
       "title": "ExternalAgentActor",
       "type": "object"
@@ -1215,7 +1238,8 @@
       "required": [
         "feedback_type",
         "target",
-        "value"
+        "value",
+        "type"
       ],
       "title": "FeedbackGiven",
       "type": "object"
@@ -1267,7 +1291,8 @@
       },
       "required": [
         "thread_id",
-        "artifact_ids"
+        "artifact_ids",
+        "type"
       ],
       "title": "FocusChanged",
       "type": "object"
@@ -1300,7 +1325,8 @@
       },
       "required": [
         "feedback_type",
-        "target"
+        "target",
+        "type"
       ],
       "title": "GiveFeedback",
       "type": "object"
@@ -1346,7 +1372,8 @@
         }
       },
       "required": [
-        "protocol"
+        "protocol",
+        "type"
       ],
       "title": "Hello",
       "type": "object"
@@ -1372,7 +1399,8 @@
         }
       },
       "required": [
-        "ops"
+        "ops",
+        "kind"
       ],
       "title": "JsonPatch",
       "type": "object"
@@ -1431,7 +1459,8 @@
       },
       "required": [
         "run_id",
-        "event"
+        "event",
+        "type"
       ],
       "title": "LiveFrame",
       "type": "object"
@@ -1482,7 +1511,8 @@
       "required": [
         "thread_id",
         "message_id",
-        "content"
+        "content",
+        "type"
       ],
       "title": "MessagePosted",
       "type": "object"
@@ -1517,7 +1547,8 @@
       },
       "required": [
         "message_id",
-        "thread_id"
+        "thread_id",
+        "kind"
       ],
       "title": "MessageTarget",
       "type": "object"
@@ -1537,7 +1568,8 @@
         }
       },
       "required": [
-        "part"
+        "part",
+        "type"
       ],
       "title": "PartEnded",
       "type": "object"
@@ -1579,7 +1611,8 @@
       },
       "required": [
         "part",
-        "part_kind"
+        "part_kind",
+        "type"
       ],
       "title": "PartStarted",
       "type": "object"
@@ -1617,7 +1650,8 @@
       },
       "required": [
         "thread_id",
-        "content"
+        "content",
+        "type"
       ],
       "title": "PostMessage",
       "type": "object"
@@ -1693,7 +1727,8 @@
       },
       "required": [
         "proposal_id",
-        "change"
+        "change",
+        "type"
       ],
       "title": "ProposalCreated",
       "type": "object"
@@ -1831,7 +1866,8 @@
         "proposal_id",
         "decision",
         "proposed_by",
-        "artifact_id"
+        "artifact_id",
+        "type"
       ],
       "title": "ProposalResolved",
       "type": "object"
@@ -1885,7 +1921,8 @@
         }
       },
       "required": [
-        "change"
+        "change",
+        "type"
       ],
       "title": "ProposeChange",
       "type": "object"
@@ -1916,7 +1953,8 @@
         }
       },
       "required": [
-        "proposal_id"
+        "proposal_id",
+        "type"
       ],
       "title": "Proposed",
       "type": "object"
@@ -1954,6 +1992,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "type"
+      ],
       "title": "Recorded",
       "type": "object"
     },
@@ -1972,7 +2013,8 @@
         }
       },
       "required": [
-        "up_to_seq"
+        "up_to_seq",
+        "type"
       ],
       "title": "ReplayComplete",
       "type": "object"
@@ -2024,7 +2066,8 @@
       },
       "required": [
         "proposal_id",
-        "decision"
+        "decision",
+        "type"
       ],
       "title": "Resolved",
       "type": "object"
@@ -2091,7 +2134,8 @@
       },
       "required": [
         "proposal_id",
-        "decision"
+        "decision",
+        "type"
       ],
       "title": "RespondToProposal",
       "type": "object"
@@ -2159,7 +2203,8 @@
       "required": [
         "run_id",
         "thread_id",
-        "status"
+        "status",
+        "type"
       ],
       "title": "RunEnded",
       "type": "object"
@@ -2205,7 +2250,8 @@
       "required": [
         "run_id",
         "thread_id",
-        "requests"
+        "requests",
+        "type"
       ],
       "title": "RunPaused",
       "type": "object"
@@ -2249,7 +2295,8 @@
       },
       "required": [
         "run_id",
-        "thread_id"
+        "thread_id",
+        "type"
       ],
       "title": "RunStarted",
       "type": "object"
@@ -2299,7 +2346,8 @@
       },
       "required": [
         "thread_id",
-        "artifact_ids"
+        "artifact_ids",
+        "type"
       ],
       "title": "SetFocus",
       "type": "object"
@@ -2328,7 +2376,8 @@
       },
       "required": [
         "thread_id",
-        "mode"
+        "mode",
+        "type"
       ],
       "title": "SetThreadMode",
       "type": "object"
@@ -2348,7 +2397,8 @@
         }
       },
       "required": [
-        "run_id"
+        "run_id",
+        "type"
       ],
       "title": "StopRun",
       "type": "object"
@@ -2368,6 +2418,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "kind"
+      ],
       "title": "SystemActor",
       "type": "object"
     },
@@ -2391,7 +2444,8 @@
       },
       "required": [
         "part",
-        "delta"
+        "delta",
+        "type"
       ],
       "title": "TextDelta",
       "type": "object"
@@ -2439,7 +2493,8 @@
         }
       },
       "required": [
-        "edits"
+        "edits",
+        "kind"
       ],
       "title": "TextEdits",
       "type": "object"
@@ -2464,7 +2519,8 @@
       },
       "required": [
         "part",
-        "delta"
+        "delta",
+        "type"
       ],
       "title": "ThinkingDelta",
       "type": "object"
@@ -2488,7 +2544,8 @@
       },
       "required": [
         "thread_id",
-        "title"
+        "title",
+        "type"
       ],
       "title": "ThreadCreated",
       "type": "object"
@@ -2519,7 +2576,8 @@
       },
       "required": [
         "thread_id",
-        "mode"
+        "mode",
+        "type"
       ],
       "title": "ThreadModeChanged",
       "type": "object"
@@ -2539,7 +2597,8 @@
         }
       },
       "required": [
-        "thread_id"
+        "thread_id",
+        "kind"
       ],
       "title": "ThreadTarget",
       "type": "object"
@@ -2564,7 +2623,8 @@
       },
       "required": [
         "part",
-        "delta"
+        "delta",
+        "type"
       ],
       "title": "ToolArgsDelta",
       "type": "object"
@@ -2602,7 +2662,8 @@
         "run_id",
         "thread_id",
         "tool_call_id",
-        "tool_name"
+        "tool_name",
+        "type"
       ],
       "title": "ToolCalled",
       "type": "object"
@@ -2650,7 +2711,8 @@
         "run_id",
         "thread_id",
         "tool_call_id",
-        "status"
+        "status",
+        "type"
       ],
       "title": "ToolReturned",
       "type": "object"
@@ -2674,7 +2736,8 @@
         }
       },
       "required": [
-        "run_id"
+        "run_id",
+        "kind"
       ],
       "title": "TurnTarget",
       "type": "object"
@@ -2684,6 +2747,27 @@
       "description": "An event type this version does not know, kept as-is so it round-trips.",
       "properties": {
         "type": {
+          "not": {
+            "enum": [
+              "app_event",
+              "artifact_archived",
+              "artifact_changed",
+              "artifact_created",
+              "deferred_answered",
+              "feedback_given",
+              "focus_changed",
+              "message_posted",
+              "proposal_created",
+              "proposal_resolved",
+              "run_ended",
+              "run_paused",
+              "run_started",
+              "thread_created",
+              "thread_mode_changed",
+              "tool_called",
+              "tool_returned"
+            ]
+          },
           "title": "Type",
           "type": "string"
         }
@@ -2721,7 +2805,8 @@
         }
       },
       "required": [
-        "id"
+        "id",
+        "kind"
       ],
       "title": "UserActor",
       "type": "object"
@@ -2741,7 +2826,8 @@
         }
       },
       "required": [
-        "run_id"
+        "run_id",
+        "type"
       ],
       "title": "WatchRun",
       "type": "object"
@@ -2783,7 +2869,8 @@
       },
       "required": [
         "workspace_id",
-        "head_seq"
+        "head_seq",
+        "type"
       ],
       "title": "Welcome",
       "type": "object"

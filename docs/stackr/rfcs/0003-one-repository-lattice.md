@@ -397,6 +397,7 @@ In lattice, this list becomes a tracking issue with a sub-issue per phase (phase
   - The timeouts, on the day ([#4](https://github.com/alexnodeland/lattice/pull/4), [lattice ADR-0007](../../adr/0007-a-timeout-on-every-test-and-every-job.md)).
   - pytest-randomly ([#55](https://github.com/alexnodeland/lattice/pull/55), [lattice ADR-0010](../../adr/0010-every-projects-tests-run-in-a-random-order.md)): no test depended on its order.
   - CodeQL and Scorecard, in one pull request since each is one short workflow ([#56](https://github.com/alexnodeland/lattice/pull/56), [lattice ADR-0011](../../adr/0011-codeql-and-scorecard.md)).
+  - `griffe check`, in the Title check ([#57](https://github.com/alexnodeland/lattice/pull/57), [lattice ADR-0012](../../adr/0012-title-checks-the-breaks-in-the-public-apis.md)): only artifactr has a release to compare with.
   - ty: decided against, for now. Its trial ([#58](https://github.com/alexnodeland/lattice/pull/58)) kept its real findings ([#62](https://github.com/alexnodeland/lattice/pull/62)), and pyright strict stays until ty can replace it ([lattice ADR-0013](../../adr/0013-pyright-stays-until-ty-can-replace-it.md)).
 - [ ] Phase 7: agents and process
 

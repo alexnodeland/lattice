@@ -3,6 +3,7 @@
 import asyncio
 from dataclasses import dataclass, field
 from datetime import timedelta
+from typing import override
 
 import pytest
 from pydantic import BaseModel, JsonValue
@@ -447,6 +448,7 @@ class ArchivesMidPass(InMemoryStorage):
 
     relayr: Workspace | None = None
 
+    @override
     async def stored_rules(self, workspace: WorkspaceRef) -> list[StoredRule]:
         found = await super().stored_rules(workspace)
         if self.relayr is not None and found:

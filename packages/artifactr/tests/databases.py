@@ -7,7 +7,7 @@ schema, dropped afterwards.
 
 import os
 import uuid
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -46,7 +46,7 @@ class Database:
 
 
 @asynccontextmanager
-async def empty_database(backend: str, directory: Path) -> AsyncIterator[Database]:
+async def empty_database(backend: str, directory: Path) -> AsyncGenerator[Database]:
     """Yield an empty database, and dispose of its engines (and it) afterwards."""
     if backend == "sqlite":
         url = f"sqlite+aiosqlite:///{directory / 'artifactr.db'}"

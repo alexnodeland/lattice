@@ -1,7 +1,7 @@
 """Artifact and feedback types shared by the tests and the conformance fixtures."""
 
 from enum import StrEnum
-from typing import Annotated, ClassVar, Literal, Self
+from typing import Annotated, ClassVar, Literal, Self, override
 
 from pydantic import BaseModel, Field
 
@@ -27,6 +27,7 @@ class Checklist(Artifact, name="checklist"):
     title: str = ""
     items: dict[str, Item] = Field(default_factory=dict)
 
+    @override
     def describe_change(self, before: Self) -> str | None:
         checked = [
             item.title

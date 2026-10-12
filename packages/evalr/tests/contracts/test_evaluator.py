@@ -1,6 +1,6 @@
 """Every evaluator and optimizer meets its port's contract."""
 
-from typing import cast
+from typing import cast, override
 
 import pytest
 from pydantic import BaseModel
@@ -52,30 +52,34 @@ async def test_an_evaluator_may_hand_off_some_inputs() -> None:
 
 
 class Untraced(Scripted):
+    @override
     async def evaluate(self, input: Thread, /) -> Verdict[Helpfulness]:
         verdict = await super().evaluate(input)
         return verdict.model_copy(update={"trace_id": None})
 
 
 class Anonymous(Scripted):
+    @override
     async def evaluate(self, input: Thread, /) -> Verdict[Helpfulness]:
         verdict = await super().evaluate(input)
         return verdict.model_copy(update={"evaluator": ""})
 
 
 class Restless(Scripted):
+    @override
     async def evaluate(self, input: Thread, /) -> Verdict[Helpfulness]:
         self.version = str(self.calls)
         return await super().evaluate(input)
 
 
 class Mistyped(Scripted):
+    @override
     async def evaluate(self, input: Thread, /) -> Verdict[Helpfulness]:
         class Other(BaseModel):
             x: int = 1
 
         verdict = await super().evaluate(input)
-        return cast(Verdict[Helpfulness], verdict.model_copy(update={"value": Other()}))
+        return verdict.model_copy(update={"value": Other()})
 
 
 ANSWERS = {str(i): (Helpfulness(rating=3, resolved=False), {}) for i in range(4)}
@@ -120,6 +124,7 @@ async def test_best_of_meets_the_optimizer_contract() -> None:
 
 
 class Meddling(BestOf[Thread, Helpfulness]):
+    @override
     async def optimize(
         self,
         evaluator: Evaluator[Thread, Helpfulness],
@@ -134,6 +139,7 @@ class Meddling(BestOf[Thread, Helpfulness]):
 
 
 class Switching(BestOf[Thread, Helpfulness]):
+    @override
     async def optimize(
         self,
         evaluator: Evaluator[Thread, Helpfulness],

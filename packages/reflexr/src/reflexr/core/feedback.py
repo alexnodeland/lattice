@@ -15,7 +15,7 @@ rules can watch it. An evaluator's verdict is feedback too, given by an :class:`
 import re
 from collections.abc import Iterable, Mapping
 from types import MappingProxyType
-from typing import Annotated, Any, ClassVar, Literal
+from typing import Annotated, Any, ClassVar, Literal, override
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 
@@ -88,6 +88,7 @@ class Feedback(BaseModel):
         super().__init_subclass__(**kwargs)
 
     @classmethod
+    @override
     def __pydantic_init_subclass__(
         cls,
         *,

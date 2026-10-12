@@ -64,7 +64,7 @@ class FunctionEvaluator[InputT: BaseModel, VerdictT: BaseModel]:
         verdict_fields(verdict_type)
         self._function = function
         self._verdict_type = verdict_type
-        self._name = name or function.__name__
+        self._name = name or getattr(function, "__name__", type(function).__name__)
         self._version = version
         self._tracer = get_tracer(tracer_provider)
 

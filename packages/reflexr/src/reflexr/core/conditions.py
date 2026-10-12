@@ -19,7 +19,7 @@ when the condition is built against the event types that can reach them: those g
 import re
 from collections.abc import Iterator, Mapping
 from datetime import timedelta
-from typing import Annotated, Any, Literal, Self, cast, get_args, get_origin
+from typing import Annotated, Any, Literal, Self, cast, get_args, get_origin, override
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
@@ -197,9 +197,11 @@ class FieldRef:
             raise AttributeError(name)
         return FieldRef((*self._path, name))
 
+    @override
     def __str__(self) -> str:
         return ".".join(self._path)
 
+    @override
     def __repr__(self) -> str:
         return f"F.{self}"
 

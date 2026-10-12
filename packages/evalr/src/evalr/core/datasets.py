@@ -5,7 +5,7 @@ import json
 from collections import Counter
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from functools import cached_property
-from typing import Annotated, Self
+from typing import Annotated, Self, override
 
 from pydantic import BaseModel, Field, JsonValue
 
@@ -161,6 +161,7 @@ class Dataset[InputT: BaseModel, VerdictT: BaseModel]:
     def __getitem__(self, example_id: str) -> Example[InputT, VerdictT]:
         return self._by_id[example_id]
 
+    @override
     def __repr__(self) -> str:
         return (
             f"Dataset({self.name!r}, {len(self)} examples, "

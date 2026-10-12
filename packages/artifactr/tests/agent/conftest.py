@@ -3,7 +3,7 @@
 import asyncio
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Collection, Sequence
 from datetime import timedelta
-from typing import Any
+from typing import Any, override
 
 import pytest
 from pydantic_ai import (
@@ -152,11 +152,13 @@ class HeldStorage(InMemoryStorage):
         self.held_log: Gate | None = None
         self.claims = 0
 
+    @override
     async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
         if self.held is not None:
             await self.held.wait()
         await super().release_lease(scope, key, holder)
 
+    @override
     async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
         self.claims += 1
         if self.claims > self.MAX_CLAIMS:
@@ -166,18 +168,21 @@ class HeldStorage(InMemoryStorage):
             await gate.wait()
         return await super().acquire_lease(scope, key, holder, ttl)
 
+    @override
     async def cursor(self, scope: Scope, name: str) -> int:
         if (gate := self.held_read) is not None:
             self.held_read = None
             await gate.wait()
         return await super().cursor(scope, name)
 
+    @override
     async def head_seq(self, scope: Scope) -> int:
         if (gate := self.held_head) is not None:
             self.held_head = None
             await gate.wait()
         return await super().head_seq(scope)
 
+    @override
     async def read(
         self,
         scope: Scope,
@@ -201,12 +206,14 @@ class HeldStorage(InMemoryStorage):
             await gate.wait()
         return found
 
+    @override
     async def thread(self, scope: Scope, thread_id: ThreadId) -> Thread | None:
         if (gate := self.held_thread) is not None:
             self.held_thread = None
             await gate.wait()
         return await super().thread(scope, thread_id)
 
+    @override
     async def runs(
         self, scope: Scope, *, thread_id: ThreadId | None = None, status: RunStatus | None = None
     ) -> list[Run]:
@@ -215,12 +222,14 @@ class HeldStorage(InMemoryStorage):
             await gate.wait()
         return await super().runs(scope, thread_id=thread_id, status=status)
 
+    @override
     async def history(self, scope: Scope, thread_id: ThreadId) -> Sequence[HistoryChunk]:
         if (gate := self.held_history) is not None:
             self.held_history = None
             await gate.wait()
         return await super().history(scope, thread_id)
 
+    @override
     async def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncGenerator[Envelope]:
         if (gate := self.held_subscribe) is not None:
             self.held_subscribe = None

@@ -15,7 +15,7 @@ evalr's check against a real Langfuse found (issue #26):
 
 import json
 import uuid
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
@@ -200,7 +200,7 @@ def as_javascript(value: Any) -> Any:
 
 
 @contextmanager
-def connected(server: FakeLangfuse) -> Iterator[tuple[Langfuse, InMemorySpanExporter]]:
+def connected(server: FakeLangfuse) -> Generator[tuple[Langfuse, InMemorySpanExporter]]:
     """A real Langfuse client on the fake server, exporting its spans to memory."""
     exporter = InMemorySpanExporter()
     provider = TracerProvider()

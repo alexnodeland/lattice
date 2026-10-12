@@ -1,11 +1,11 @@
 """The reactor's execution: runs attempted at least once, under leases, in order per scope."""
 
 import asyncio
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncGenerator, Iterable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any
+from typing import Any, override
 
 import pytest
 from opentelemetry import baggage
@@ -400,6 +400,7 @@ class SlowToLetGo(InMemoryStorage):
         self.holding = asyncio.Event()
         self.let_go = asyncio.Event()
 
+    @override
     async def release_lease(self, workspace: WorkspaceRef, key: str, holder: str) -> None:
         if holder == "slow" and key.startswith(RUN_LEASE_PREFIX):
             self.holding.set()
@@ -449,6 +450,7 @@ class StaleDue(InMemoryStorage):
 
     stale: list[tuple[WorkspaceRef, Run]] | None = None
 
+    @override
     async def due_runs(
         self, *, now: object, limit: int, policy: RunPolicy
     ) -> list[tuple[WorkspaceRef, Run]]:
@@ -666,7 +668,7 @@ async def test_each_attempt_runs_inside_the_run_context_with_its_chain_in_baggag
     seen: list[object] = []
 
     @asynccontextmanager
-    async def attribute(reaction: Reaction[Any]) -> AsyncIterator[None]:
+    async def attribute(reaction: Reaction[Any]) -> AsyncGenerator[None]:
         entered.append((reaction.run_id, reaction.attempt))
         yield
 
@@ -768,6 +770,7 @@ class BlinksOnce(InMemoryStorage):
         super().__init__(clock=clock)
         self.blinked = False
 
+    @override
     async def workspaces(self) -> list[WorkspaceRef]:
         if not self.blinked:
             self.blinked = True
@@ -859,6 +862,7 @@ class RenewalFails(InMemoryStorage):
         self.taken: set[str] = set()
         self.failed = asyncio.Event()
 
+    @override
     async def acquire_lease(
         self, workspace: WorkspaceRef, key: str, holder: str, ttl: timedelta
     ) -> bool:

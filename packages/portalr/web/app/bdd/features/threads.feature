@@ -27,17 +27,19 @@ Feature: Threads
 
   Scenario: Accepting a proposal
     When they start the thread "Accepting"
-    And they post "propose an edit to launch-accept"
+    And they post "propose an edit"
     Then they see the proposal "Move the launch to Tuesday"
     When they accept it
     Then the proposal is "Accepted"
+    And the note says "Launch on Tuesday."
 
   Scenario: Rejecting a proposal
     When they start the thread "Rejecting"
-    And they post "propose an edit to launch-reject"
+    And they post "propose an edit"
     Then they see the proposal "Move the launch to Tuesday"
     When they reject it
     Then the proposal is "Rejected"
+    And the note says "Launch on Monday."
 
   Scenario: Thumbs on the agent's answer
     When they start the thread "Thumbs"

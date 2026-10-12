@@ -1,17 +1,14 @@
 """artifactr in portalr's test application: notes, thumbs on messages, and a scripted agent.
 
-The agent answers from a script, so the app's scenarios choose its path by what they post: a
-message that mentions ``ask`` makes it ask a question, ``publish`` makes it call a tool that
-waits for approval, ``propose ... to <note>`` makes it propose an edit to that note, and
-anything else gets its words back. Each run streams, as every run does. acme's ``notes``
-workspace starts with two notes for proposals, ``launch-accept`` and ``launch-reject``, one for
-each scenario that resolves one.
+The agent answers from a script, so the app's scenarios choose its path by the first word they
+post: ``ask`` makes it ask a question, ``publish`` makes it call a tool that waits for approval,
+and ``propose`` makes it write a note of its own and propose an edit to it, which it names in its
+answer, so each scenario resolves a proposal of its own. Anything else gets its words back. Each
+run streams, as every run does.
 """
 
 import re
-from collections.abc import Awaitable, Callable
 
-from pydantic import JsonValue
 from pydantic_ai import (
     Agent,
     DeferredToolRequests,
@@ -40,17 +37,13 @@ from artifactr import (
     Workspaces,
 )
 from artifactr.agent import function_model
-from artifactr.core import Actor, CreateArtifact
-from artifactr.workspace import Storage
+from artifactr.core import Actor
 from grantr.core import Agent as AgentSubject
 from grantr.core import ServicePrincipal, Subject, User
 from grantr.grants import Grants
 
-PROPOSE = re.compile(r"propose .* to (?P<note>[\w-]+)")
-"""What makes the agent propose an edit, to the note it names."""
-
-NOTES = ("launch-accept", "launch-reject")
-"""The notes acme's ``notes`` workspace starts with, one per scenario that resolves a proposal."""
+CREATED = re.compile(r"^Done: (?P<note>\S+) is now at version")
+"""What artifactr tells the agent when it has written a note: which note."""
 
 
 class Note(MarkdownArtifact):
@@ -69,11 +62,27 @@ def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
     parts = given.parts if isinstance(given, ModelRequest) else []
     returned = [part for part in parts if isinstance(part, ToolReturnPart)]
     if returned:
-        return ModelResponse(parts=[TextPart(f"Done: {returned[-1].model_response_str()}")])
+        return after(returned[-1], messages)
     prompt = " ".join(str(part.content) for part in parts if isinstance(part, UserPromptPart))
-    if proposal := PROPOSE.search(prompt):
+    match prompt.split(maxsplit=1)[:1]:
+        case ["propose"]:
+            note = {"kind": "note", "data": {"text": "Launch on Monday."}}
+            return ModelResponse(parts=[ToolCallPart("create_artifact", note)])
+        case ["publish"]:
+            return ModelResponse(parts=[ToolCallPart("publish", {"note": "the notes"})])
+        case ["ask"]:
+            return ModelResponse(parts=[ToolCallPart("ask_user", {"question": "Which week?"})])
+        case _:
+            return ModelResponse(parts=[TextPart(f"You said: **{prompt}**")])
+
+
+def after(returned: ToolReturnPart, messages: list[ModelMessage]) -> ModelResponse:
+    """What the agent does when a tool returns: propose an edit to a note it just wrote, or say
+    how the tool went."""
+    told = returned.model_response_str()
+    if returned.tool_name == "create_artifact" and (created := CREATED.search(told)):
         edit = {
-            "artifact_id": proposal["note"],
+            "artifact_id": created["note"],
             "old": "Monday",
             "new": "Tuesday",
             "summary": "Move the launch to Tuesday",
@@ -81,11 +90,16 @@ def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
             "rationale": "Monday is a holiday.",
         }
         return ModelResponse(parts=[ToolCallPart("edit_text", edit)])
-    if "publish" in prompt:
-        return ModelResponse(parts=[ToolCallPart("publish", {"note": "the notes"})])
-    if "ask" in prompt:
-        return ModelResponse(parts=[ToolCallPart("ask_user", {"question": "Which week?"})])
-    return ModelResponse(parts=[TextPart(f"You said: **{prompt}**")])
+    if returned.tool_name == "edit_text":
+        calls = (
+            part
+            for message in messages
+            for part in message.parts
+            if isinstance(part, ToolCallPart) and part.tool_call_id == returned.tool_call_id
+        )
+        note = next(calls).args_as_dict()["artifact_id"]
+        return ModelResponse(parts=[TextPart(f"Done: proposed an edit to {note}")])
+    return ModelResponse(parts=[TextPart(f"Done: {told}")])
 
 
 def publish(note: str) -> str:
@@ -109,14 +123,14 @@ APPLICATION = ServicePrincipal(id="portalr-test")
 ``application`` role."""
 
 
-def subject_of(_tenant: str, _workspace: str | None, actor: Actor) -> Subject:
+def subject_of(tenant: str, workspace: str | None, actor: Actor) -> Subject:
     """Who grantr checks for an artifactr actor, as the template maps them: the person a run or
     client acts for, and the application for its own system."""
     match actor:
         case UserActor():
             return User(id=actor.id)
         case AgentActor(on_behalf_of=acting) if acting is not None:
-            return subject_of(_tenant, _workspace, acting)
+            return subject_of(tenant, workspace, acting)
         case ExternalAgentActor(on_behalf_of=person) if person is not None:
             return User(id=person.id)
         case SystemActor():
@@ -125,20 +139,10 @@ def subject_of(_tenant: str, _workspace: str | None, actor: Actor) -> Subject:
             return AgentSubject()
 
 
-def collaboration(
-    grants: Grants,
-) -> tuple[Workspaces, Runner[None], Callable[[], Awaitable[None]]]:
-    """artifactr's workspaces, checked by grantr, its runner, and how to seed acme's notes."""
-    storage: Storage = InMemoryStorage()
+def collaboration(grants: Grants) -> tuple[Workspaces, Runner[None]]:
+    """artifactr's workspaces, checked by grantr, and its runner."""
     hooks = grants.hooks(subject_of)
-    workspaces = Workspaces(storage, types=[Note], authorize=hooks.authorize, hidden=hooks.hidden)
-    runner = Runner[None](build_agent(), app=None, agent_name="assistant")
-
-    async def seed() -> None:
-        unchecked = Workspaces(storage, types=[Note])
-        workspace = await unchecked.open("acme", "notes", actor=SystemActor())
-        for note in NOTES:
-            data: dict[str, JsonValue] = {"text": "Launch on Monday."}
-            await workspace.commit(CreateArtifact(artifact_id=note, kind="note", data=data))
-
-    return workspaces, runner, seed
+    workspaces = Workspaces(
+        InMemoryStorage(), types=[Note], authorize=hooks.authorize, hidden=hooks.hidden
+    )
+    return workspaces, Runner[None](build_agent(), app=None, agent_name="assistant")

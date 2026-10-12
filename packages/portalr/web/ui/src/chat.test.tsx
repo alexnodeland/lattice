@@ -14,6 +14,9 @@ import {
 } from "./chat";
 import { token } from "./test/colours";
 
+/** A command handler whose commands end as `outcome`. */
+const sent = (outcome: "done" | "refused" | "closed" = "done") => vi.fn(async () => ({ outcome }));
+
 function message(change: Partial<Artifactr.Message> = {}): Artifactr.Message {
   return {
     id: "msg_1",
@@ -39,7 +42,7 @@ test("a message shows who posted it, and its Markdown, in the thread's log", asy
 });
 
 test("thumbs show the reader's, and send theirs", async () => {
-  const onThumbs = vi.fn();
+  const onThumbs = sent();
   const screen = await render(
     <Messages>
       <Message message={message()} author="Agent" thumbs={true} onThumbs={onThumbs} />
@@ -56,7 +59,7 @@ test("thumbs show the reader's, and send theirs", async () => {
 test("without thumbs given, neither is pressed; without a handler, there are none", async () => {
   const screen = await render(
     <Messages>
-      <Message message={message()} author="Agent" onThumbs={vi.fn()} />
+      <Message message={message()} author="Agent" onThumbs={sent()} />
       <Message message={message({ id: "msg_2" })} author="Alice" />
     </Messages>,
   );
@@ -73,7 +76,7 @@ test("a notice is set apart from messages", async () => {
       <Message message={message({ kind: "notice", content: "Run stopped" })} author="System" />
     </Messages>,
   );
-  const notice = screen.getByRole("listitem").element();
+  const notice = screen.getByRole("listitem", { name: "System" }).element();
   expect(getComputedStyle(notice).fontStyle).toBe("italic");
   expect(getComputedStyle(notice).color).toBe(token("muted"));
 });
@@ -90,7 +93,7 @@ test("streaming text shows as it arrives, marked busy", async () => {
 });
 
 test("the composer sends what is written, on Enter or with the button, and clears", async () => {
-  const onSend = vi.fn();
+  const onSend = sent();
   const screen = await render(<Composer onSend={onSend} />);
   const box = screen.getByRole("textbox", { name: "Message" });
   await expect.element(screen.getByRole("button", { name: "Send" })).toBeDisabled();
@@ -107,7 +110,7 @@ test("the composer sends what is written, on Enter or with the button, and clear
 });
 
 test("Enter while an input method composes doesn't send", async () => {
-  const onSend = vi.fn();
+  const onSend = sent();
   const screen = await render(<Composer onSend={onSend} />);
   const box = screen.getByRole("textbox", { name: "Message" });
   await box.fill("日本");
@@ -122,14 +125,14 @@ test("Enter while an input method composes doesn't send", async () => {
 });
 
 test("a disabled composer sends nothing, and looks it", async () => {
-  const screen = await render(<Composer onSend={vi.fn()} disabled />);
+  const screen = await render(<Composer onSend={sent()} disabled />);
   const box = screen.getByRole("textbox", { name: "Message" });
   await expect.element(box).toBeDisabled();
   expect(getComputedStyle(box.element()).opacity).toBe("0.5");
 });
 
 test("the composer reached by the keyboard shows the focus ring", async () => {
-  const screen = await render(<Composer onSend={vi.fn()} />);
+  const screen = await render(<Composer onSend={sent()} />);
   await userEvent.tab();
   const box = screen.getByRole("textbox", { name: "Message" }).element();
   expect(box.matches(":focus-visible")).toBe(true);
@@ -148,7 +151,7 @@ test("a tool call says it is running until it returns", async () => {
 });
 
 test("a call to approve takes the focus, and is approved or denied once", async () => {
-  const onAnswer = vi.fn();
+  const onAnswer = sent();
   const request: ArtifactrV1.DeferredRequest = {
     kind: "approval",
     tool_call_id: "t1",
@@ -167,7 +170,7 @@ test("a call to approve takes the focus, and is approved or denied once", async 
 });
 
 test("a call can be denied", async () => {
-  const onAnswer = vi.fn();
+  const onAnswer = sent();
   const request: ArtifactrV1.DeferredRequest = {
     kind: "approval",
     tool_call_id: "t1",
@@ -179,7 +182,7 @@ test("a call can be denied", async () => {
 });
 
 test("a question takes the focus, and is answered once", async () => {
-  const onAnswer = vi.fn();
+  const onAnswer = sent();
   const request: ArtifactrV1.DeferredRequest = {
     kind: "question",
     tool_call_id: "t2",
@@ -202,7 +205,7 @@ test("a question without its words names the tool that asks", async () => {
     tool_call_id: "t3",
     tool_name: "confirm",
   };
-  const screen = await render(<Request request={request} onAnswer={vi.fn()} />);
+  const screen = await render(<Request request={request} onAnswer={sent()} />);
   await expect.element(screen.getByText("The agent asks, through confirm.")).toBeVisible();
 });
 
@@ -225,7 +228,7 @@ const proposal = (change: Partial<Artifactr.Proposal> = {}): Artifactr.Proposal 
 });
 
 test("an open proposal says what it would change, and is accepted or rejected", async () => {
-  const onRespond = vi.fn();
+  const onRespond = sent();
   const screen = await render(<ProposalCard proposal={proposal()} onRespond={onRespond} />);
   const card = screen.getByRole("region", { name: "Proposal: Tighten the launch plan" });
   await expect.element(card.getByText("It was long.")).toBeVisible();
@@ -237,7 +240,7 @@ test("an open proposal says what it would change, and is accepted or rejected", 
 test("a resolved proposal says how, without buttons", async () => {
   const screen = await render(
     <>
-      <ProposalCard proposal={proposal({ status: "accept" })} onRespond={vi.fn()} />
+      <ProposalCard proposal={proposal({ status: "accept" })} onRespond={sent()} />
       <ProposalCard
         proposal={proposal({ id: "prop_2", status: "reject", change: null, rationale: null })}
       />
@@ -291,4 +294,75 @@ test("the message list takes a caller's classes", async () => {
   const list = screen.getByRole("list").element();
   expect(list.classList).toContain("gap-8");
   expect(list.classList).not.toContain("gap-4");
+});
+
+test("a message is named for who posted it", async () => {
+  const screen = await render(
+    <Messages>
+      <Message message={message()} author="Alice" />
+      <Message message={message({ id: "msg_2" })} author="Assistant" />
+    </Messages>,
+  );
+  await expect.element(screen.getByRole("listitem", { name: "Assistant" })).toBeVisible();
+  await expect.element(screen.getByRole("listitem", { name: "Alice" })).toBeVisible();
+});
+
+test("a refused post keeps its text, and says it wasn't done", async () => {
+  const screen = await render(<Composer onSend={sent("refused")} />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("Draft the plan");
+  await screen.getByRole("button", { name: "Send" }).click();
+  await expect
+    .element(screen.getByRole("alert"))
+    .toHaveTextContent("That wasn't done: the server refused it.");
+  await expect.element(box).toHaveValue("Draft the plan");
+});
+
+test("a post waits for its answer before another can be sent", async () => {
+  let done: (value: { outcome: "done" }) => void = () => undefined;
+  const onSend = vi.fn(() => new Promise<{ outcome: "done" }>((resolve) => (done = resolve)));
+  const screen = await render(<Composer onSend={onSend} />);
+  await screen.getByRole("textbox", { name: "Message" }).fill("One");
+  await screen.getByRole("button", { name: "Send" }).click();
+  await expect.element(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+  await userEvent.keyboard("{Enter}");
+  expect(onSend).toHaveBeenCalledOnce();
+  done({ outcome: "done" });
+  await expect.element(screen.getByRole("textbox", { name: "Message" })).toHaveValue("");
+});
+
+test("an answer that wasn't sent can be given again", async () => {
+  const onAnswer = sent("closed");
+  const request: ArtifactrV1.DeferredRequest = {
+    kind: "approval",
+    tool_call_id: "t1",
+    tool_name: "publish",
+  };
+  const screen = await render(<Request request={request} onAnswer={onAnswer} />);
+  await screen.getByRole("button", { name: "Approve" }).click();
+  await expect
+    .element(screen.getByRole("alert"))
+    .toHaveTextContent("That wasn't sent: the connection closed.");
+  await expect.element(screen.getByRole("button", { name: "Approve" })).toBeEnabled();
+});
+
+test("a refused response to a proposal says so, and can be given again", async () => {
+  const screen = await render(<ProposalCard proposal={proposal()} onRespond={sent("refused")} />);
+  await screen.getByRole("button", { name: "Accept" }).click();
+  await expect
+    .element(screen.getByRole("alert"))
+    .toHaveTextContent("That wasn't done: the server refused it.");
+  await expect.element(screen.getByRole("button", { name: "Accept" })).toBeEnabled();
+});
+
+test("refused thumbs say so", async () => {
+  const screen = await render(
+    <Messages>
+      <Message message={message()} author="Agent" onThumbs={sent("refused")} />
+    </Messages>,
+  );
+  await screen.getByRole("button", { name: "Helpful", exact: true }).click();
+  await expect
+    .element(screen.getByRole("alert"))
+    .toHaveTextContent("That wasn't done: the server refused it.");
 });

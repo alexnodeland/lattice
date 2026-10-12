@@ -124,7 +124,9 @@ def artifactr_actor(grants: Grants) -> Callable[[HTTPConnection], Awaitable[tupl
             raise ArtifactrUnauthorized(str(error)) from error
         tenant = connection.headers.get("x-tenant") or connection.query_params.get("tenant")
         if not tenant:
-            raise HTTPException(status_code=400, detail="name the tenant with X-Tenant")
+            raise HTTPException(
+                status_code=400, detail="name the tenant with X-Tenant, or a stream's ?tenant="
+            )
         if await grants.member(tenant, user.id) is None:
             raise Forbidden(f"{user.id} isn't a member of {tenant}")
         return tenant, UserActor(id=user.id, name=user.id)
@@ -155,14 +157,13 @@ def create_app(ui: Path = UI) -> FastAPI:
     grants = Grants(
         InMemoryStorage(), catalogs=[ACTIONS, ARTIFACTR_ACTIONS], application=APPLICATION
     )
-    workspaces, runner, seed_notes = collaboration(grants)
+    workspaces, runner = collaboration(grants)
     gotrue = os.environ.get("PORTALR_GOTRUE_URL", "http://gotrue:9999")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await grants.bootstrap()
         await seed(grants)
-        await seed_notes()
         async with httpx.AsyncClient(base_url=gotrue) as auth:
             app.state.auth = auth
             try:

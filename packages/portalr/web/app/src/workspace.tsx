@@ -1,12 +1,14 @@
 /**
  * A workspace's artifactr stream, open while the workspace's routes are, and its store for the
- * routes under it: its threads, messages, runs and proposals, as the log builds them.
+ * routes under it: its threads, messages, runs and proposals, as the log builds them, and where
+ * the connection is.
  */
 
 import {
   type Artifactr,
   type ArtifactrStream,
   artifactr,
+  type Snapshot,
   Stream,
   streamUrl,
 } from "@portalr/client";
@@ -22,7 +24,10 @@ import type { Signed } from "./signed";
 
 const Current = createContext<ArtifactrStream | null>(null);
 
-/** Open the workspace's stream for what is inside, and close it when they go. */
+/**
+ * Open the workspace's stream for what is inside, and close it when they go. It connects again
+ * with each refreshed token, and closes when the session ends.
+ */
 export function WorkspaceStream({
   surface,
   signed,
@@ -50,8 +55,14 @@ export function WorkspaceStream({
   );
   useEffect(() => {
     stream.open();
-    return () => stream.close();
-  }, [stream]);
+    const unwatch = signed.watch((change) =>
+      change === "refreshed" ? stream.reconnect() : stream.close(),
+    );
+    return () => {
+      unwatch();
+      stream.close();
+    };
+  }, [stream, signed]);
   return <Current value={stream}>{children}</Current>;
 }
 
@@ -64,8 +75,34 @@ export function useStream(): ArtifactrStream {
   return stream;
 }
 
-/** The workspace as its log has built it so far, rendered again as it changes. */
-export function useWorkspace(): Artifactr.Workspace {
+/** The workspace as its log has built it so far, and the connection's state, rendered as they change. */
+export function useWorkspace(): Snapshot<Artifactr.Workspace> {
   const stream = useStream();
-  return useSyncExternalStore(stream.subscribe, stream.snapshot).state;
+  return useSyncExternalStore(stream.subscribe, stream.snapshot);
+}
+
+/**
+ * What a workspace's area shows before its log has been read, or once its connection has ended:
+ * `null` when it is live, or still has its log to show.
+ */
+export function Connection({
+  snapshot,
+  waiting,
+}: {
+  snapshot: Snapshot<Artifactr.Workspace>;
+  /** What is being read, such as "the workspace". */
+  waiting: string;
+}) {
+  if (snapshot.status === "closed") {
+    return (
+      <p role="alert">
+        The connection to this workspace ended{snapshot.error ? `: ${snapshot.error}` : ""}. Reload
+        the page to connect again.
+      </p>
+    );
+  }
+  if (snapshot.status !== "live") {
+    return <p role="status">Reading {waiting}…</p>;
+  }
+  return null;
 }

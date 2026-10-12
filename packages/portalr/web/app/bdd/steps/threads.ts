@@ -3,9 +3,12 @@ import { createBdd } from "playwright-bdd";
 
 const { Then, When } = createBdd();
 
-const messages = (page: Page) => page.getByRole("log", { name: "Messages" });
-const assistant = (page: Page) =>
-  messages(page).getByRole("listitem").filter({ hasText: "Assistant" }).last();
+/** Each message is named for who posted it: the reader's are "You", the agent's "Assistant". */
+const posted = (page: Page, by: "You" | "Assistant") =>
+  page
+    .getByRole("log", { name: "Messages" })
+    .getByRole("listitem", { name: by, exact: true })
+    .last();
 
 When("they start the thread {string}", async ({ page }, title: string) => {
   await page.getByLabel("New thread").fill(title);
@@ -16,13 +19,11 @@ When("they start the thread {string}", async ({ page }, title: string) => {
 When("they post {string}", async ({ page }, message: string) => {
   await page.getByRole("textbox", { name: "Message" }).fill(message);
   await page.getByRole("button", { name: "Send" }).click();
-  // The person's message is a paragraph of its own; the agent's echo says more around it.
-  const posted = messages(page).getByRole("paragraph").filter({ hasText: message }).first();
-  await expect(posted).toHaveText(message);
+  await expect(posted(page, "You")).toContainText(message);
 });
 
 Then("the assistant says {string}", async ({ page }, text: string) => {
-  await expect(assistant(page)).toContainText(text);
+  await expect(posted(page, "Assistant")).toContainText(text);
 });
 
 Then("the agent asks {string}", async ({ page }, question: string) => {
@@ -59,12 +60,30 @@ Then("the proposal is {string}", async ({ page }, status: string) => {
   await expect(page.getByRole("region", { name: /^Proposal:/ })).toContainText(status);
 });
 
+Then("the note says {string}", async ({ page }, text: string) => {
+  // The agent names the note it proposed an edit to; artifactr's REST surface reads it, as the
+  // signed-in person, in acme.
+  await expect(posted(page, "Assistant")).toContainText("proposed an edit to");
+  const said = (await posted(page, "Assistant").textContent()) ?? "";
+  const note = /proposed an edit to (art_[0-9a-f]+)/.exec(said)?.[1];
+  const read = await page.evaluate(async (id) => {
+    const session = JSON.parse(localStorage.getItem("portalr") ?? "{}") as {
+      access_token?: string;
+    };
+    const response = await fetch(`/artifactr/v1/workspaces/notes/artifacts/${id}`, {
+      headers: { Authorization: `Bearer ${session.access_token}`, "X-Tenant": "acme" },
+    });
+    return ((await response.json()) as { data: { text: string } }).data.text;
+  }, note);
+  expect(read).toBe(text);
+});
+
 When("they find the assistant's answer helpful", async ({ page }) => {
-  await assistant(page).getByRole("button", { name: "Helpful", exact: true }).click();
+  await posted(page, "Assistant").getByRole("button", { name: "Helpful", exact: true }).click();
 });
 
 Then("the answer shows them finding it helpful", async ({ page }) => {
   await expect(
-    assistant(page).getByRole("button", { name: "Helpful", exact: true }),
+    posted(page, "Assistant").getByRole("button", { name: "Helpful", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
 });

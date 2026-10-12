@@ -23,6 +23,7 @@ from typing import Any, Literal
 from sqlalchemy import ColumnElement, Select, delete, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import Session
 
 from artifactr.core import (
     WORKSPACE_SCOPED,
@@ -62,6 +63,7 @@ from artifactr.sql.tables import (
     ThreadRow,
     WorkspaceRow,
 )
+from artifactr.sql.tenancy import TENANT, TenantSession
 from artifactr.workspace import HistoryChunk, Scope, seal
 
 Clock = Callable[[], datetime]
@@ -319,6 +321,10 @@ class SqlStorage:
             to the system clock in UTC.
         poll_interval: How often a subscription checks the log for envelopes committed by
             other processes. Commits made through this storage wake its subscriptions at once.
+        row_level_security: Whether each transaction names its tenant to PostgreSQL, whose
+            policies, which the migrations create, then show it only that tenant's rows
+            (:mod:`artifactr.sql.tenancy`). Every read is in one tenant, so it needs no other
+            engine.
     """
 
     def __init__(
@@ -327,13 +333,21 @@ class SqlStorage:
         *,
         clock: Clock = _utc_now,
         poll_interval: timedelta = timedelta(seconds=0.5),
+        row_level_security: bool = False,
     ) -> None:
-        self._engine = engine
-        self._sessions = async_sessionmaker(engine, expire_on_commit=False)
+        self._sessions = async_sessionmaker(
+            engine,
+            expire_on_commit=False,
+            sync_session_class=TenantSession if row_level_security else Session,
+        )
         self._clock = clock
         self._poll_interval = poll_interval.total_seconds()
         self._heads: dict[Scope, int] = {}
         self._committed = asyncio.Condition()
+
+    def _session(self, tenant_id: TenantId) -> AsyncSession:
+        """A session in a tenant."""
+        return self._sessions(info={TENANT: tenant_id})
 
     @asynccontextmanager
     async def transaction(self, scope: Scope) -> AsyncGenerator[_Transaction]:
@@ -341,7 +355,7 @@ class SqlStorage:
 
         Closing the session rolls back whatever it did not commit, and returns its connection.
         """
-        session = self._sessions()
+        session = self._session(scope.tenant_id)
         try:
             workspace = await _to_the_end(_lock_workspace(session, scope))
             transaction = _Transaction(session, scope, workspace, self._clock)
@@ -367,7 +381,7 @@ class SqlStorage:
         )
         if after is not None:
             query = query.where(WorkspaceRow.workspace_id > after)
-        async with self._sessions() as session:
+        async with self._session(tenant_id) as session:
             return list(await session.scalars(query))
 
     async def artifact(self, scope: Scope, artifact_id: ArtifactId) -> Versioned[Artifact] | None:
@@ -383,7 +397,7 @@ class SqlStorage:
             query = query.where(ArtifactRow.kind == kind)
         if not include_archived:
             query = query.where(ArtifactRow.archived.is_(False))
-        return [_versioned(row) for row in await self._all(query)]
+        return [_versioned(row) for row in await self._all(scope, query)]
 
     async def revisions(self, scope: Scope, artifact_id: ArtifactId) -> list[Revision]:
         """Return an artifact's revisions, oldest first."""
@@ -392,7 +406,7 @@ class SqlStorage:
             .where(RevisionRow.artifact_id == artifact_id)
             .order_by(RevisionRow.version)
         )
-        return [Revision.model_validate(row.body) for row in await self._all(query)]
+        return [Revision.model_validate(row.body) for row in await self._all(scope, query)]
 
     async def thread(self, scope: Scope, thread_id: ThreadId) -> Thread | None:
         """Return a thread, or None."""
@@ -400,7 +414,7 @@ class SqlStorage:
 
     async def threads(self, scope: Scope) -> list[Thread]:
         """Return every thread, oldest first."""
-        return [_thread(row) for row in await self._all(_entities(ThreadRow, scope))]
+        return [_thread(row) for row in await self._all(scope, _entities(ThreadRow, scope))]
 
     async def proposal(self, scope: Scope, proposal_id: ProposalId) -> Proposal | None:
         """Return a proposal, or None."""
@@ -416,7 +430,7 @@ class SqlStorage:
         query = _entities(ProposalRow, scope)
         if status is not None:
             query = query.where(ProposalRow.status == status)
-        return [_proposal(row) for row in await self._all(query)]
+        return [_proposal(row) for row in await self._all(scope, query)]
 
     async def run(self, scope: Scope, run_id: RunId) -> Run | None:
         """Return a run, or None."""
@@ -435,12 +449,12 @@ class SqlStorage:
             query = query.where(RunRow.thread_id == thread_id)
         if status is not None:
             query = query.where(RunRow.status == status)
-        return [_run(row) for row in await self._all(query)]
+        return [_run(row) for row in await self._all(scope, query)]
 
     @_awaited_to_the_end
     async def head_seq(self, scope: Scope) -> int:
         """Return the log's latest ``seq``, or 0 if it is empty."""
-        async with self._sessions() as session:
+        async with self._session(scope.tenant_id) as session:
             head = await session.scalar(
                 select(WorkspaceRow.head_seq).where(
                     WorkspaceRow.tenant_id == scope.tenant_id,
@@ -474,7 +488,7 @@ class SqlStorage:
             query = query.order_by(EventRow.seq.desc()).limit(last)
         else:
             query = query.order_by(EventRow.seq).limit(limit)
-        envelopes = [Envelope.model_validate(row.envelope) for row in await self._all(query)]
+        envelopes = [Envelope.model_validate(row.envelope) for row in await self._all(scope, query)]
         return envelopes if last is None else envelopes[::-1]
 
     async def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncGenerator[Envelope]:
@@ -508,7 +522,10 @@ class SqlStorage:
             .where(HistoryRow.thread_id == thread_id)
             .order_by(HistoryRow.position)
         )
-        return [HistoryChunk(seq=row.seq, messages=row.messages) for row in await self._all(query)]
+        return [
+            HistoryChunk(seq=row.seq, messages=row.messages)
+            for row in await self._all(scope, query)
+        ]
 
     @_awaited_to_the_end
     async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
@@ -517,7 +534,8 @@ class SqlStorage:
         now = self._clock().astimezone(UTC)
         lease = _lease(scope, key)
         try:
-            async with self._engine.begin() as connection:
+            async with self._session(scope.tenant_id) as session, session.begin():
+                connection = await session.connection()
                 taken = await connection.execute(
                     update(LeaseRow)
                     .where(*lease, or_(LeaseRow.holder == holder, LeaseRow.expires_at <= now))
@@ -541,15 +559,15 @@ class SqlStorage:
     @_awaited_to_the_end
     async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
         """Release a lease if ``holder`` has it."""
-        async with self._engine.begin() as connection:
-            await connection.execute(
+        async with self._session(scope.tenant_id) as session, session.begin():
+            await session.execute(
                 delete(LeaseRow).where(*_lease(scope, key), LeaseRow.holder == holder)
             )
 
     @_awaited_to_the_end
     async def cursor(self, scope: Scope, name: str) -> int:
         """Return how far a named consumer of the log has got: the ``seq`` saved, or 0."""
-        async with self._sessions() as session:
+        async with self._session(scope.tenant_id) as session:
             cursor = await session.get(CursorRow, (scope.tenant_id, scope.workspace_id, name))
         return 0 if cursor is None else cursor.seq
 
@@ -564,7 +582,7 @@ class SqlStorage:
         new = CursorRow(
             tenant_id=scope.tenant_id, workspace_id=scope.workspace_id, name=name, seq=seq
         )
-        async with self._sessions() as session, session.begin():
+        async with self._session(scope.tenant_id) as session, session.begin():
             cursor = await _locked(session, CursorRow, key, new)
             cursor.seq = max(cursor.seq, seq)
 
@@ -572,13 +590,13 @@ class SqlStorage:
     async def _one[R: EntityRow, T](
         self, model: type[R], scope: Scope, entity_id: str, convert: Callable[[R], T]
     ) -> T | None:
-        async with self._sessions() as session:
+        async with self._session(scope.tenant_id) as session:
             row = await session.get(model, (scope.tenant_id, scope.workspace_id, entity_id))
         return None if row is None else convert(row)
 
     @_awaited_to_the_end
-    async def _all[R: ScopedRow](self, query: Select[R]) -> Sequence[R]:
-        async with self._sessions() as session:
+    async def _all[R: ScopedRow](self, scope: Scope, query: Select[R]) -> Sequence[R]:
+        async with self._session(scope.tenant_id) as session:
             return (await session.scalars(query)).all()
 
 

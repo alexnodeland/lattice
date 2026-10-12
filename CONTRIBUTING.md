@@ -95,7 +95,7 @@ The dev container (`.devcontainer/`) has uv, Bun, moon and Docker, so everything
 1. Branch from the latest `main`. Keep branches short-lived: hours to a day or two, not weeks.
 2. Keep pull requests small and focused on one change. Split large work into a sequence of PRs that each leave `main` green.
 3. CI must pass before merging: its two required checks are `CI`, which passes only when every job does, and `Title`.
-4. Pull requests are squash-merged, so the PR title becomes the commit on `main`. Write it as a [Conventional Commit](https://www.conventionalcommits.org/).
+4. Pull requests are squash-merged through the merge queue: once a pull request is reviewed, label it `queue`, and Mergify brings it up to date, waits for the checks and merges it ([lattice ADR-0016][lattice-adr-0016]). The PR title becomes the commit on `main`. Write it as a [Conventional Commit](https://www.conventionalcommits.org/).
 5. Delete the branch after merging. Don't stack branches on unmerged branches.
 
 A change that spans packages lands in one pull request, so the packages never disagree on `main`. Unfinished features land behind unexported code paths or not at all; never on a long-lived branch.
@@ -176,5 +176,6 @@ By contributing, you agree that your contributions are licensed under the [MIT L
 [lattice-adr-0010]: docs/adr/0010-every-projects-tests-run-in-a-random-order.md
 [lattice-adr-0011]: docs/adr/0011-codeql-and-scorecard.md
 [lattice-adr-0012]: docs/adr/0012-title-checks-the-breaks-in-the-public-apis.md
+[lattice-adr-0016]: docs/adr/0016-a-merge-queue-on-mergify.md
 [license]: LICENSE
 [security]: SECURITY.md

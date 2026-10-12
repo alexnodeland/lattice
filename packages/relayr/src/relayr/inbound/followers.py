@@ -81,8 +81,6 @@ class Followers:
             that, and a process that dies holding one lets another take it once it lapses.
         save_every: How many envelopes that bridge nothing a follower reads before it saves its
             cursor anyway, so a restarted follower reads at most this many again.
-        read_back: How many envelopes a follower reads back at a time, looking for the message
-            of a rule's that an agent turn carries out.
         cause_ttl: How long the ledger keeps the run behind each of the outbound adapter's
             writes. A follower forgets older ones at most hourly while it holds its lease, once
             it has caught up with the log; a write bridged after its cause is forgotten starts a
@@ -101,7 +99,6 @@ class Followers:
         holder: str | None = None,
         lease_ttl: timedelta = timedelta(seconds=30),
         save_every: int = 500,
-        read_back: int = 100,
         cause_ttl: timedelta = timedelta(days=7),
         tracer_provider: TracerProvider | None = None,
         meter_provider: MeterProvider | None = None,
@@ -113,7 +110,6 @@ class Followers:
         self._holder = holder or new_id("relayr")
         self._ttl = lease_ttl
         self._save_every = save_every
-        self._read_back = read_back
         self._cause_ttl = cause_ttl
         self._telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
         self._tasks: dict[WorkspaceKey, asyncio.Task[None]] = {}
@@ -253,28 +249,21 @@ class Followers:
     ) -> None:
         saved = relayed.seq
         async for envelope in source.subscribe(after_seq=saved):
-            await self._trace_turn(workspace, source, envelope)
+            await self._trace_turn(workspace, envelope)
             bridged = await self._bridge(workspace, target, envelope)
             relayed.seq = envelope.seq
             if bridged or envelope.seq - saved >= self._save_every:
                 await self._ledger.save_cursor(workspace, envelope.seq)
                 saved = envelope.seq
 
-    async def _trace_turn(
-        self,
-        workspace: WorkspaceKey,
-        source: artifactr.Workspace,
-        envelope: artifactr.core.Envelope,
-    ) -> None:
+    async def _trace_turn(self, workspace: WorkspaceKey, envelope: artifactr.core.Envelope) -> None:
         """Record the run behind an agent turn that acts for a rule, as it starts."""
         match envelope:
             case artifactr.core.Envelope(
-                event=artifactr.core.RunStarted(run_id=turn),
-                actor=artifactr.core.AgentActor(on_behalf_of=rule) as agent,
+                event=artifactr.core.RunStarted(run_id=turn, message_ids=message_ids),
+                actor=artifactr.core.AgentActor(on_behalf_of=rule),
             ) if rule is not None and is_rule_actor(rule):
-                cause = await turn_cause(
-                    self._ledger, source, agent, before_seq=envelope.seq, read_back=self._read_back
-                )
+                cause = await turn_cause(self._ledger, workspace, message_ids)
                 if cause is not None:
                     await self._ledger.record_cause(workspace, "turn", turn, cause)
             case _:

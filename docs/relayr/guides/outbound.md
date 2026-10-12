@@ -73,6 +73,7 @@ artifactr's write policy and the thread's mode still apply: a direct edit to a k
 
 Write as if every attempt were the first. Each write's ids are derived from the run and what the write is (the artifact and path of an edit, the kind and data of a create, the thread and text of a notice), so a retried attempt that makes the same writes, in any order, makes nothing twice. A notice worded differently, or an artifact with other data, is another write.
 
+- **A message an earlier attempt sent** isn't sent again. `send` asks for the thread's turn instead, in case that attempt stopped before it did. It starts the turn, or does nothing if a turn took the message.
 - **A version conflict** re-reads the artifact and edits again, up to three times, then fails the attempt to be retried.
 - **A missing artifact, invalid data or a patch that doesn't apply** is `Refused`, with artifactr's code as its reason. An agent's tools hand it back to the model; from a function action it fails the attempt, which is retried.
 - **Anything else artifactr refuses**, such as `forbidden`, or an edit of an archived artifact, fails the run for good.

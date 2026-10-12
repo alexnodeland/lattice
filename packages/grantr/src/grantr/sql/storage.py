@@ -16,12 +16,13 @@ from collections.abc import AsyncGenerator, Awaitable, Callable, Collection
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from types import CoroutineType
-from typing import Any
+from typing import Any, Final
 
 from pydantic import TypeAdapter
 from sqlalchemy import ColumnElement, and_, delete, false, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import Session
 
 from grantr.core import (
     TENANT,
@@ -55,6 +56,8 @@ from grantr.sql.tables import (
     RoleRow,
     TenantRow,
 )
+from grantr.sql.tenancy import TENANT as TENANT_KEY
+from grantr.sql.tenancy import TenantSession
 
 Clock = Callable[[], datetime]
 """Returns the current time; injectable so tests control it."""
@@ -490,6 +493,11 @@ async def _lock(session: AsyncSession, scope: str) -> None:
                 session.add(TenantRow(id=scope, live=False))
 
 
+ACROSS_TENANTS: Final = frozenset({"tenant_grants", "key", "tenants"})
+"""The reads that span tenants, asked before the tenant is known: the only ones that use the
+``across_tenants`` engine."""
+
+
 class SqlStorage:
     """Storage in a SQL database, through SQLAlchemy's asyncio extension.
 
@@ -497,15 +505,44 @@ class SqlStorage:
     PostgreSQL (with its default ``READ COMMITTED`` isolation) and on SQLite, whose engines
     must come from :func:`~grantr.sql.create_sqlite_engine`.
 
+    With ``row_level_security``, each transaction tells PostgreSQL its tenant, and the
+    policies the migrations create show it only that tenant's rows, and the deployment's
+    (:mod:`grantr.sql.tenancy`). The three reads that span tenants, ``ACROSS_TENANTS``, go
+    to ``across_tenants`` instead: an engine whose role the policies don't hold, such as the
+    tables' owner.
+
     Args:
         engine: The database to use. The storage does not dispose of it.
         clock: Returns the time each audit entry is stamped with. Defaults to the system
             clock in UTC.
+        row_level_security: Whether each transaction names its tenant to PostgreSQL.
+        across_tenants: The engine for the reads that span tenants; required with
+            ``row_level_security``, and ``engine`` without it.
+
+    Raises:
+        ValueError: If ``row_level_security`` is on without ``across_tenants``.
     """
 
-    def __init__(self, engine: AsyncEngine, *, clock: Clock = _utc_now) -> None:
-        self._sessions = async_sessionmaker(engine, expire_on_commit=False)
+    def __init__(
+        self,
+        engine: AsyncEngine,
+        *,
+        clock: Clock = _utc_now,
+        row_level_security: bool = False,
+        across_tenants: AsyncEngine | None = None,
+    ) -> None:
+        if row_level_security and across_tenants is None:
+            raise ValueError("row-level security needs an engine for the reads across tenants")
+        session_class = TenantSession if row_level_security else Session
+        self._sessions = async_sessionmaker(
+            engine, expire_on_commit=False, sync_session_class=session_class
+        )
+        self._across = async_sessionmaker(across_tenants or engine, expire_on_commit=False)
         self._clock = clock
+
+    def _session(self, tenant: TenantId | None) -> AsyncSession:
+        """A session in a tenant, or on the deployment with None."""
+        return self._sessions(info={TENANT_KEY: _scope(tenant)})
 
     @asynccontextmanager
     async def transaction(self, tenant: TenantId | None) -> AsyncGenerator[_Transaction]:
@@ -513,7 +550,7 @@ class SqlStorage:
 
         Closing the session rolls back whatever it did not commit, and returns its connection.
         """
-        session = self._sessions()
+        session = self._session(tenant)
         try:
             await _to_the_end(_lock(session, _scope(tenant)))
             yield _Transaction(session, self._clock)
@@ -521,65 +558,65 @@ class SqlStorage:
         finally:
             await _to_the_end(session.close())
 
-    async def _read[T](self, read: Callable[[_Reads], Awaitable[T]]) -> T:
-        async with self._sessions() as session:
+    async def _read[T](self, tenant: TenantId | None, read: Callable[[_Reads], Awaitable[T]]) -> T:
+        async with self._session(tenant) as session:
             return await read(_Reads(session))
 
     async def tenant(self, tenant: TenantId) -> bool:
         """Whether the tenant exists."""
-        return await self._read(lambda reads: reads.tenant(tenant))
+        return await self._read(tenant, lambda reads: reads.tenant(tenant))
 
     async def grants(
         self, tenant: TenantId | None, to: Grantee, *, on: Collection[Resource] | None = None
     ) -> list[Grant]:
         """The grants that apply to a grantee: made to it, or to a group it is in."""
-        return await self._read(lambda reads: reads.grants(tenant, to, on=on))
+        return await self._read(tenant, lambda reads: reads.grants(tenant, to, on=on))
 
     async def has(self, grant: Grant) -> bool:
         """Whether this grant was made, exactly."""
-        return await self._read(lambda reads: reads.has(grant))
+        return await self._read(grant.tenant, lambda reads: reads.has(grant))
 
     async def granted(
         self, tenant: TenantId | None, on: Resource, *, role: str | None = None
     ) -> list[Grant]:
         """Every grant on a resource, to anyone, as it was made; only of one role, if given."""
-        return await self._read(lambda reads: reads.granted(tenant, on, role=role))
+        return await self._read(tenant, lambda reads: reads.granted(tenant, on, role=role))
 
     async def grants_in(
         self, tenant: TenantId, *, workspace: WorkspaceId | None = None
     ) -> list[Grant]:
         """Every grant in a tenant, or only those on a workspace and the items in it."""
-        return await self._read(lambda reads: reads.grants_in(tenant, workspace=workspace))
+        return await self._read(tenant, lambda reads: reads.grants_in(tenant, workspace=workspace))
 
     async def roles(self, tenant: TenantId) -> dict[str, Role]:
         """A tenant's custom roles, by name."""
-        return await self._read(lambda reads: reads.roles(tenant))
+        return await self._read(tenant, lambda reads: reads.roles(tenant))
 
     async def group(self, tenant: TenantId, group: Group) -> frozenset[Member] | None:
         """A group's members, or None if there is no such group."""
-        return await self._read(lambda reads: reads.group(tenant, group))
+        return await self._read(tenant, lambda reads: reads.group(tenant, group))
 
     async def groups(self, tenant: TenantId) -> dict[str, frozenset[Member]]:
         """A tenant's groups, by id, with their members."""
-        return await self._read(lambda reads: reads.groups(tenant))
+        return await self._read(tenant, lambda reads: reads.groups(tenant))
 
     async def restricted(
         self, tenant: TenantId, workspace: WorkspaceId | None = None
     ) -> list[Resource]:
         """The threads and artifacts restricted in a workspace, or in the whole tenant."""
-        return await self._read(lambda reads: reads.restricted(tenant, workspace))
+        return await self._read(tenant, lambda reads: reads.restricted(tenant, workspace))
 
     async def is_restricted(self, tenant: TenantId, on: Resource) -> bool:
         """Whether a thread or artifact is restricted."""
-        return await self._read(lambda reads: reads.is_restricted(tenant, on))
+        return await self._read(tenant, lambda reads: reads.is_restricted(tenant, on))
 
     async def keys(self, tenant: TenantId) -> list[Key]:
         """A tenant's keys."""
-        return await self._read(lambda reads: reads.keys(tenant))
+        return await self._read(tenant, lambda reads: reads.keys(tenant))
 
     async def resources(self, tenant: TenantId, kind: ListableKind) -> list[Resource]:
         """The workspaces, threads, artifacts or rules a grant in the tenant names, or is in."""
-        return await self._read(lambda reads: reads.resources(tenant, kind))
+        return await self._read(tenant, lambda reads: reads.resources(tenant, kind))
 
     async def tenant_grants(self, user: UserId) -> list[Grant]:
         """The grants on tenants made to a user directly, in every tenant."""
@@ -588,18 +625,18 @@ class SqlStorage:
             _on_one(TENANT),
             _to(User(id=user)),
         )
-        async with self._sessions() as session:
+        async with self._across() as session:
             return [_grant(row) for row in await _to_the_end(session.scalars(query))]
 
     async def key(self, key_id: str) -> Key | None:
         """A key, by its public id, in any tenant."""
-        async with self._sessions() as session:
+        async with self._across() as session:
             row = await _to_the_end(session.get(KeyRow, key_id))
             return None if row is None else _stored_key(row)
 
     async def tenants(self) -> list[TenantId]:
         """Every tenant, in order."""
-        async with self._sessions() as session:
+        async with self._across() as session:
             ids = await _to_the_end(
                 session.scalars(select(TenantRow.id).where(TenantRow.live).order_by(TenantRow.id))
             )
@@ -615,7 +652,7 @@ class SqlStorage:
             .order_by(AuditRow.seq)
             .limit(limit)
         )
-        async with self._sessions() as session:
+        async with self._session(tenant) as session:
             rows = await _to_the_end(session.scalars(query))
             return [
                 AuditEntry.model_validate({**row.body, "seq": row.seq, "tenant": tenant})

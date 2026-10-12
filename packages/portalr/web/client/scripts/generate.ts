@@ -30,6 +30,31 @@ const SCHEMAS = {
   "reflexr.rules.v1.ts": "packages/reflexr/schemas/reflexr.rules.v1.json",
 } as const;
 
+/** Keywords that describe a value without constraining it. */
+const ANNOTATIONS = new Set(["default", "description", "title", "examples"]);
+
+/**
+ * The schema with the annotations beside each `$ref` dropped. json-schema-to-typescript inlines a
+ * `$ref` that has keywords beside it, so `{"$ref": JsonValue, "default": null}` would be typed as
+ * an object rather than as `JsonValue`, any JSON at all.
+ */
+export function bareRefs(schema: unknown): unknown {
+  if (Array.isArray(schema)) {
+    return schema.map(bareRefs);
+  }
+  if (schema === null || typeof schema !== "object") {
+    return schema;
+  }
+  const entries = Object.entries(schema);
+  const annotatedRef =
+    "$ref" in schema && entries.every(([key]) => key === "$ref" || ANNOTATIONS.has(key));
+  return Object.fromEntries(
+    entries
+      .filter(([key]) => !(annotatedRef && key !== "$ref"))
+      .map(([key, value]) => [key, bareRefs(value)]),
+  );
+}
+
 /** Every generated file, by name, as it should read. */
 export async function generate(): Promise<Record<string, string>> {
   const files: Record<string, string> = {};
@@ -38,7 +63,7 @@ export async function generate(): Promise<Record<string, string>> {
     files[name] = `${HEADER}// ${source}\n\n${astToString(await openapiTS(document))}`;
   }
   for (const [name, source] of Object.entries(SCHEMAS)) {
-    const schema = JSON.parse(await readFile(join(root, source), "utf8"));
+    const schema = bareRefs(JSON.parse(await readFile(join(root, source), "utf8")));
     const types = await compile(schema as Parameters<typeof compile>[0], name.replace(".ts", ""), {
       bannerComment: "",
       additionalProperties: false,

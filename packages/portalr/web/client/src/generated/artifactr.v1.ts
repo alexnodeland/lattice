@@ -469,9 +469,7 @@ export interface SetThreadMode {
  * via the `definition` "AnswerDeferred".
  */
 export interface AnswerDeferred {
-  answer?: {
-    [k: string]: unknown;
-  };
+  answer?: JsonValue;
   approved?: Approved;
   run_id: RunId;
   tool_call_id: ToolCallId;
@@ -889,9 +887,7 @@ export interface RunUsage {
  * via the `definition` "DeferredAnswered".
  */
 export interface DeferredAnswered {
-  answer?: {
-    [k: string]: unknown;
-  };
+  answer?: JsonValue;
   approved?: Approved1;
   run_id: RunId;
   thread_id: ThreadId;
@@ -940,9 +936,7 @@ export interface Value1 {
  * via the `definition` "AppEvent".
  */
 export interface AppEvent {
-  data?: {
-    [k: string]: unknown;
-  };
+  data?: JsonValue;
   name: Name5;
   run_id?: RunId | null;
   thread_id?: ThreadId | null;
@@ -1056,9 +1050,7 @@ export interface Data2 {
  * via the `definition` "AppLive".
  */
 export interface AppLive {
-  data?: {
-    [k: string]: unknown;
-  };
+  data?: JsonValue;
   name: Name6;
   type: Type42;
 }

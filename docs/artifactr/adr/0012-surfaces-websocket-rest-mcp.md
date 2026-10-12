@@ -1,6 +1,6 @@
 # ADR-0012: Surfaces: WebSocket thread protocol, REST commands, MCP
 
-**Status:** Superseded by [ADR-0048](0048-surfaces-over-the-runner.md)
+**Status:** Superseded by [ADR-0048](0048-surfaces-over-the-runner.md); its authorization amended by [ADR-0056](0056-access-asked-in-every-workspace-method.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 
@@ -112,3 +112,7 @@ MCP clients could read artifacts and pending proposals, but not revisions, threa
 1. [x] Implement the WebSocket endpoint and REST routes in `artifactr.fastapi`.
 2. [x] Implement `artifactr.mcp` with resources, tools and a log-fed `SubscriptionBus`.
 3. [x] Generate and check in `schemas/artifactr.v1.json`.
+
+## Amendment (2026-10-12): the hook moves onto `Workspaces`
+
+[ADR-0056](0056-access-asked-in-every-workspace-method.md) replaces the amendment above. The surfaces no longer take `authorize`: `Workspaces` holds it, and every `Workspace` method asks it with the action it takes, so the router, the MCP server and in-process calls cannot be given different hooks. MCP's subscription check asks `artifactr:read_artifacts` for each artifact a stream names, and a refusal's message names the action, as `artifactr:open is refused in this workspace`.

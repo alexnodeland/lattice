@@ -25,12 +25,16 @@ The [reference implementation](../reference-implementation.md) trusts an `x-user
 
 ## Authorization
 
-Within a tenant, decide who may use which workspace with an `authorize(tenant_id, workspace_id, actor)` hook, which the router and `ArtifactrMcp` both take. Over REST, `False` answers 403, and over the WebSocket it closes the connection with 4403. Over MCP, it is asked on every tool call, resource read and resource subscription that names a workspace, and a refusal is a tool error, or a read or subscription failing with `INVALID_PARAMS`, with the same message. Without it, any authenticated actor may use every workspace of its own tenant. Pass the same function to both surfaces, so a client cannot reach over one what the other refuses it.
+Within a tenant, decide who may do what with an `authorize(tenant_id, workspace_id, actor, access)` hook, which `Workspaces` holds ([ADR-0056](../adr/0056-access-asked-in-every-workspace-method.md)). Every `Workspace` method asks it before it reads or writes anything, with the action it takes (`access.action`, one of `artifactr.workspace.ACTIONS`) and the thread or artifact it names. Every surface reaches storage through those methods, so every REST request, WebSocket command, MCP tool call, resource read and subscription, and in-process call is asked by the same hook; none takes a hook of its own. Over REST, a refusal answers 403; the WebSocket closes with 4403 if it may not open the workspace or read its log, and answers a refused command with a `forbidden` result; MCP fails the tool call, or the read or subscription with `INVALID_PARAMS`, with the same message. Without it, any authenticated actor may do anything in every workspace of its own tenant.
+
+A subscription, the WebSocket's or an MCP client's, is asked when it opens. Each command on it is asked as it arrives, so a revoked actor's next command is refused, but events keep flowing until the subscription closes.
+
+An agent's run acts for the person whose message or answer started it, `AgentActor.on_behalf_of`, and a turn takes messages from one author only, so one person's message never rides on another's rights ([ADR-0057](../adr/0057-a-turn-acts-for-one-author.md)). An MCP client that carries a person's token should act for them: set `ExternalAgentActor(on_behalf_of=UserActor(...))` in `resolve`. `authorize` can then decide on the person. The runner's own work is asked as `SystemActor(name="runner")`.
 
 Finer rules come from the library itself:
 
 - **Type allowlist.** `Workspaces(storage, types=[...])` rejects creating any artifact type not listed, even one registered elsewhere in the process.
-- **Proposals need a second participant.** A proposal must be answered by someone other than its author, so an agent cannot approve its own change.
+- **Proposals need a second participant.** A proposal must be answered by someone other than its author, so an agent cannot approve its own change, a person cannot approve their own through an agent's run or an MCP client acting for them, and cannot approve in person what their own client proposed.
 - **Run facts belong to the agent.** Only a thread's own agent, or the system, may record facts about that thread's runs; clients cannot forge `run_started` or `tool_returned`.
 - **Attribution cannot be borrowed.** A handle acts as the actor it was opened for. The agent's handle is derived from yours with `as_actor`, and only your code chooses the actor.
 

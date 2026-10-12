@@ -48,6 +48,12 @@ Who did something. See [Opening a workspace](../guides/workspaces.md#opening-a-w
 
 ::: artifactr.core.same_participant
 
+::: artifactr.core.same_principal
+
+::: artifactr.core.acting_for
+
+::: artifactr.core.acts_as
+
 ## Commands
 
 Intents to change a workspace. See [Commands and outcomes](../guides/workspaces.md#commands-and-outcomes).

@@ -3,8 +3,8 @@
 Add it to an agent whose ``deps_type`` is :class:`~artifactr.agent.Session`. It contributes
 the generic artifact tools and instructions, and its hooks make every run a participant in the
 workspace: runs and tool calls are recorded, what others did is told to the agent, and messages
-sent during a run steer it. Notices are for people, so the agent is not told of them unless it
-asks (ADR-0051).
+sent during a run steer it, up to the first from someone the run does not act for (ADR-0057).
+Notices are for people, so the agent is not told of them unless it asks (ADR-0051).
 
 Its hooks run inside pydantic-ai's spans when the agent is instrumented: ``wrap_run`` inside
 ``invoke_agent`` and ``wrap_tool_execute`` inside ``execute_tool``. They add artifactr's
@@ -57,6 +57,7 @@ from artifactr.core import (
     change_notes,
     render_notes,
     same_participant,
+    same_principal,
 )
 from artifactr.telemetry import annotate, attribution, current_trace_id
 from artifactr.telemetry.attributes import ARTIFACT_ID
@@ -208,7 +209,11 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         return result
 
     async def _watch(self, ctx: Context, after_seq: int, focus: set[ArtifactId]) -> None:
-        """Deliver what others do into the run, and note in the session how far it got."""
+        """Deliver what others do into the run, and note in the session how far it got.
+
+        A turn acts for one author (ADR-0057): it stops at the first message from someone the
+        run does not act for, before noting it delivered, so the thread's next turn takes it.
+        """
         session = ctx.deps
         workspace = session.workspace
         try:
@@ -221,6 +226,8 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
                 elif same_participant(envelope.actor, workspace.actor):
                     pass
                 elif isinstance(event, MessagePosted) and event.kind == "message":
+                    if not same_principal(envelope.actor, workspace.actor):
+                        return  # one author per turn: the next turn acts for this one's
                     ctx.enqueue(event.content)
                 elif notes := change_notes(
                     [envelope], viewer=workspace.actor, focus=focus, notices=self.notices
@@ -406,7 +413,7 @@ def _attribution(session: Session[Any]) -> dict[str, Any]:
         thread_id=session.thread_id,
         run_id=session.run_id,
         actor=workspace.actor,
-        user=session.requested_by,
+        user=session.on_behalf_of,
     )
 
 

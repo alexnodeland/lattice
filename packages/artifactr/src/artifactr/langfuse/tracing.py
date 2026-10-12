@@ -62,7 +62,7 @@ async def turn_attributes(session: Session[Any]) -> dict[str, Any]:
     workspace = session.workspace
     thread = await workspace.thread(session.thread_id)
     kinds = sorted({(await workspace.artifact(a)).kind for a in thread.focus})
-    person = session.requested_by
+    person = session.on_behalf_of
     return {
         "session_id": _limit(session.thread_id),
         "user_id": _limit(person.id) if isinstance(person, UserActor) else None,

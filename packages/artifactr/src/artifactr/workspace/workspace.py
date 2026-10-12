@@ -1,8 +1,9 @@
 """Workspaces: tenant-scoped handles over artifacts, threads and the log (ADR-0011).
 
-Every read and write goes through a :class:`Workspace`, and every write goes through
-:meth:`Workspace.commit` or :meth:`Workspace.record`, which run core's rules inside one storage
-transaction (ADR-0002, ADR-0018). Each commit is traced as an ``artifactr.commit {type}``
+Every read and write goes through a :class:`Workspace`, each of whose methods asks the
+application's ``authorize`` hook first, with the action it takes (ADR-0056). Every write goes
+through :meth:`Workspace.commit` or :meth:`Workspace.record`, which run core's rules inside one
+storage transaction (ADR-0002, ADR-0018). Each commit is traced as an ``artifactr.commit {type}``
 span, and what commits and facts do is counted in artifactr's metrics. Every envelope records
 the W3C trace context of the span it was committed in, and every revision that span's trace
 (ADR-0033).
@@ -23,10 +24,11 @@ from collections.abc import (
     Sequence,
 )
 from datetime import timedelta
-from typing import Literal, cast, overload
+from typing import Final, Literal, cast, overload
 
 from opentelemetry.metrics import MeterProvider
 from opentelemetry.trace import StatusCode, TracerProvider
+from pydantic import BaseModel, ConfigDict
 
 from artifactr.core import (
     Actor,
@@ -34,6 +36,7 @@ from artifactr.core import (
     ArchiveArtifact,
     Artifact,
     ArtifactId,
+    ArtifactTarget,
     Command,
     CommitResult,
     CreateArtifact,
@@ -46,6 +49,7 @@ from artifactr.core import (
     InvalidState,
     MessageId,
     MessageKind,
+    MessageTarget,
     Note,
     NotFound,
     Outcome,
@@ -66,6 +70,7 @@ from artifactr.core import (
     TenantId,
     Thread,
     ThreadId,
+    ThreadTarget,
     ValidationFailed,
     Versioned,
     WorkspaceId,
@@ -101,12 +106,72 @@ from artifactr.workspace.storage import HistoryChunk, Scope, Storage
 
 logger = logging.getLogger("artifactr.workspace")
 
-Authorize = Callable[[TenantId, WorkspaceId, Actor], Awaitable[bool]]
-"""Decides whether an actor may use a workspace of its tenant.
+ACTIONS: Final = frozenset(
+    {
+        "artifactr:open",
+        # commands, by their type
+        "artifactr:create_artifact",
+        "artifactr:edit_artifact",
+        "artifactr:archive_artifact",
+        "artifactr:propose_change",
+        "artifactr:respond_to_proposal",
+        "artifactr:create_thread",
+        "artifactr:post_message",
+        "artifactr:set_focus",
+        "artifactr:set_thread_mode",
+        "artifactr:answer_deferred",
+        "artifactr:give_feedback",
+        "artifactr:stop_run",
+        # the agent's runs, and consumers of the log
+        "artifactr:record",
+        "artifactr:claim_thread",
+        "artifactr:save_cursor",
+        # reads
+        "artifactr:read_artifacts",
+        "artifactr:read_threads",
+        "artifactr:read_proposals",
+        "artifactr:read_runs",
+        "artifactr:read_history",
+        "artifactr:read_events",
+        "artifactr:read_cursors",
+    }
+)
+"""Every action a :class:`Workspace` asks ``authorize`` about: the complete catalog.
 
-The surfaces that serve workspaces, the FastAPI router and the MCP server, take one as their
-``authorize`` hook, and pass it to :meth:`Workspaces.open` for every request that names a
-workspace.
+An action is ``artifactr:`` and a name. A command's is its ``type``, a read's is ``read_`` and
+what it reads, and opening a workspace is ``artifactr:open``.
+"""
+
+
+class Access(BaseModel):
+    """What an actor is about to do in a workspace, as ``authorize`` hears it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    action: str
+    """One of :data:`ACTIONS`."""
+
+    thread_id: ThreadId | None = None
+    """The thread it is about, when it names one."""
+
+    artifact_id: ArtifactId | None = None
+    """The artifact it is about, when it names one."""
+
+
+Authorize = Callable[[TenantId, WorkspaceId | None, Actor, Access], Awaitable[bool]]
+"""Decides whether an actor may take an action in a workspace of its tenant.
+
+:class:`Workspaces` holds it, and every :class:`Workspace` it opens asks it in each method,
+before anything is read or written: so every REST request, WebSocket command, MCP tool call
+and in-process call is checked alike. A refusal raises :class:`~artifactr.core.Forbidden`.
+artifactr always names the workspace; the ``None`` is for a library whose reads span a tenant.
+"""
+
+OnOpen = Callable[[TenantId, WorkspaceId], Awaitable[None]]
+"""Called each time :meth:`Workspaces.open` opens a workspace, after ``authorize`` allows it.
+
+It starts a workspace's background work, such as a feedback mirror, so it must be idempotent:
+a permission check has no side effects.
 """
 
 
@@ -122,6 +187,9 @@ class Workspaces:
         types: The artifact types this application accepts. Others are rejected even if they
             are registered, so clients cannot create arbitrary types. ``None`` accepts every
             registered type.
+        authorize: Whether an actor may take an action, asked by every handle in each of its
+            methods; allows everything if omitted.
+        on_open: Called each time a workspace is opened, once ``authorize`` allows it.
         tracer_provider: Where commit spans go. Defaults to the global tracer provider.
         meter_provider: Where artifactr's metrics go. Defaults to the global meter provider.
     """
@@ -131,55 +199,63 @@ class Workspaces:
         storage: Storage,
         *,
         types: Iterable[type[Artifact]] | None = None,
+        authorize: Authorize | None = None,
+        on_open: OnOpen | None = None,
         tracer_provider: TracerProvider | None = None,
         meter_provider: MeterProvider | None = None,
     ) -> None:
-        self._storage = storage
-        self._kinds = None if types is None else frozenset(t.kind for t in types)
-        self._telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
+        self._context = _Context(
+            storage=storage,
+            kinds=None if types is None else frozenset(t.kind for t in types),
+            authorize=authorize,
+            telemetry=Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider),
+        )
+        self._on_open = on_open
 
     async def open(
-        self,
-        tenant_id: TenantId,
-        workspace_id: WorkspaceId,
-        *,
-        actor: Actor,
-        authorize: Authorize | None = None,
+        self, tenant_id: TenantId, workspace_id: WorkspaceId, *, actor: Actor
     ) -> "Workspace":
         """Return a handle on a tenant's workspace, acting as ``actor``.
 
         This is the only place a tenant id enters; nothing on the handle can reach another
-        tenant. The surfaces pass their ``authorize`` hook, so each refuses a workspace alike.
+        tenant. Opening asks ``authorize`` for ``artifactr:open``, then calls ``on_open``.
 
         Raises:
-            Forbidden: If ``authorize`` is given and refuses the actor this workspace.
+            Forbidden: If ``authorize`` refuses the actor this workspace.
         """
-        if authorize is not None and not await authorize(tenant_id, workspace_id, actor):
-            raise Forbidden("this workspace is not yours to use")
-        scope = Scope(tenant_id, workspace_id)
-        return Workspace(self._storage, scope, actor, self._kinds, self._telemetry)
+        workspace = Workspace(self._context, Scope(tenant_id, workspace_id), actor)
+        await workspace.check(Access(action="artifactr:open"))
+        if self._on_open is not None:
+            await self._on_open(tenant_id, workspace_id)
+        return workspace
+
+
+@dataclasses.dataclass(frozen=True)
+class _Context:
+    """What every handle of one :class:`Workspaces` shares."""
+
+    storage: Storage
+    kinds: frozenset[str] | None
+    authorize: Authorize | None
+    telemetry: Telemetry
 
 
 class Workspace:
     """A handle on one tenant's workspace, bound to the actor it acts as.
 
     Create handles with :meth:`Workspaces.open`, and derive handles for other actors (such as
-    the agent) with :meth:`as_actor`.
+    the agent) with :meth:`as_actor`. Each method asks the ``authorize`` hook first, as the
+    handle's actor, with the action it takes; a refusal raises
+    :class:`~artifactr.core.Forbidden`.
     """
 
-    def __init__(
-        self,
-        storage: Storage,
-        scope: Scope,
-        actor: Actor,
-        kinds: frozenset[str] | None,
-        telemetry: Telemetry | None = None,
-    ) -> None:
-        self._storage = storage
+    def __init__(self, context: _Context, scope: Scope, actor: Actor) -> None:
+        self._context = context
+        self._storage = context.storage
         self._scope = scope
         self._actor = actor
-        self._kinds = kinds
-        self._telemetry = telemetry or Telemetry()
+        self._kinds = context.kinds
+        self._telemetry = context.telemetry
         self._tenancy = {TENANT_ID: scope.tenant_id, WORKSPACE_ID: scope.workspace_id}
 
     @property
@@ -198,8 +274,24 @@ class Workspace:
         return self._actor
 
     def as_actor(self, actor: Actor) -> "Workspace":
-        """Return a handle on the same workspace that acts as ``actor``."""
-        return Workspace(self._storage, self._scope, actor, self._kinds, self._telemetry)
+        """Return a handle on the same workspace that acts as ``actor``, checked as it."""
+        return Workspace(self._context, self._scope, actor)
+
+    async def check(self, access: Access) -> None:
+        """Ask ``authorize`` whether this handle's actor may take an action here.
+
+        Every method asks it first. A surface asks it itself only for what it does beside the
+        workspace, as the runner does to stop a run.
+
+        Raises:
+            Forbidden: If ``authorize`` refuses it.
+        """
+        authorize = self._context.authorize
+        scope = self._scope
+        if authorize is not None and not await authorize(
+            scope.tenant_id, scope.workspace_id, self._actor, access
+        ):
+            raise Forbidden(f"{access.action} is refused in this workspace")
 
     # ─── writes ───────────────────────────────────────────────────────────────
 
@@ -255,6 +347,7 @@ class Workspace:
             set_status_on_exception=False,
         ) as span:
             try:
+                await self.check(_access(command))
                 self._check_kind(command)
                 outcome = await self._transact(
                     command, lambda state: commit(command, state, actor=self._actor), cursor=cursor
@@ -302,6 +395,7 @@ class Workspace:
             cursor: A named cursor, ``(name, seq)``, to save in the same transaction, as with
                 :meth:`save_cursor`: it moves only if the fact is recorded.
         """
+        await self.check(Access(action="artifactr:record", thread_id=fact.thread_id))
         outcome = await self._transact(
             fact,
             lambda state: record(fact, state, actor=self._actor),
@@ -326,7 +420,9 @@ class Workspace:
         """Create a thread and return it."""
         command = CreateThread(title=title)
         await self.commit(command)
-        return await self.thread(command.thread_id)
+        thread = await self._storage.thread(self._scope, command.thread_id)
+        assert thread is not None, "a thread is there once it is created"
+        return thread
 
     async def post_message(
         self,
@@ -395,6 +491,7 @@ class Workspace:
         Raises:
             NotFound: If there is no such artifact of that type.
         """
+        await self.check(Access(action="artifactr:read_artifacts", artifact_id=artifact_id))
         artifact = await self._storage.artifact(self._scope, artifact_id)
         if artifact is None or not isinstance(artifact.data, artifact_type):
             raise NotFound(getattr(artifact_type, "kind", "artifact"), artifact_id)
@@ -422,6 +519,7 @@ class Workspace:
             kind: Only artifacts registered under this kind.
             include_archived: Archived artifacts too.
         """
+        await self.check(Access(action="artifactr:read_artifacts"))
         artifacts = await self._storage.artifacts(
             self._scope, kind=kind, include_archived=include_archived
         )
@@ -437,6 +535,7 @@ class Workspace:
         Raises:
             NotFound: If there is no such artifact: every artifact has a revision.
         """
+        await self.check(Access(action="artifactr:read_artifacts", artifact_id=artifact_id))
         revisions = await self._storage.revisions(self._scope, artifact_id)
         if not revisions:
             raise NotFound("artifact", artifact_id)
@@ -448,6 +547,7 @@ class Workspace:
         Raises:
             NotFound: If there is no such thread.
         """
+        await self.check(Access(action="artifactr:read_threads", thread_id=thread_id))
         thread = await self._storage.thread(self._scope, thread_id)
         if thread is None:
             raise NotFound("thread", thread_id)
@@ -455,6 +555,7 @@ class Workspace:
 
     async def threads(self) -> list[Thread]:
         """Return every thread, oldest first."""
+        await self.check(Access(action="artifactr:read_threads"))
         return await self._storage.threads(self._scope)
 
     async def proposal(self, proposal_id: ProposalId) -> Proposal:
@@ -463,6 +564,7 @@ class Workspace:
         Raises:
             NotFound: If there is no such proposal.
         """
+        await self.check(Access(action="artifactr:read_proposals"))
         proposal = await self._storage.proposal(self._scope, proposal_id)
         if proposal is None:
             raise NotFound("proposal", proposal_id)
@@ -472,6 +574,7 @@ class Workspace:
         self, *, status: Literal["pending", "accepted", "rejected"] | None = "pending"
     ) -> list[Proposal]:
         """Return proposals with a status (pending by default; None for all), oldest first."""
+        await self.check(Access(action="artifactr:read_proposals"))
         return await self._storage.proposals(self._scope, status=status)
 
     async def run(self, run_id: RunId) -> Run:
@@ -480,6 +583,7 @@ class Workspace:
         Raises:
             NotFound: If there is no such run.
         """
+        await self.check(Access(action="artifactr:read_runs"))
         run = await self._storage.run(self._scope, run_id)
         if run is None:
             raise NotFound("run", run_id)
@@ -489,16 +593,19 @@ class Workspace:
         self, *, thread_id: ThreadId | None = None, status: RunStatus | None = None
     ) -> list[Run]:
         """Return runs, optionally of one thread and with one status, oldest first."""
+        await self.check(Access(action="artifactr:read_runs", thread_id=thread_id))
         return await self._storage.runs(self._scope, thread_id=thread_id, status=status)
 
     async def history(self, thread_id: ThreadId) -> Sequence[HistoryChunk]:
         """Return a thread's history: serialized model messages, one chunk per run segment."""
+        await self.check(Access(action="artifactr:read_history", thread_id=thread_id))
         return await self._storage.history(self._scope, thread_id)
 
     # ─── the log ──────────────────────────────────────────────────────────────
 
     async def head_seq(self) -> int:
         """Return the log's latest ``seq``, or 0 if it is empty."""
+        await self.check(Access(action="artifactr:read_events"))
         return await self._storage.head_seq(self._scope)
 
     async def read(
@@ -525,6 +632,7 @@ class Workspace:
         Raises:
             ValidationFailed: If both ``limit`` and ``last`` are given, or a number is negative.
         """
+        await self.check(Access(action="artifactr:read_events"))
         _check_page(after_seq=after_seq, before_seq=before_seq, limit=limit, last=last)
         return await self._storage.read(
             self._scope,
@@ -544,6 +652,7 @@ class Workspace:
         the log is untraced, so a subscription that polls storage makes no trace per poll
         (ADR-0046); what the subscriber does with each envelope is traced as usual.
         """
+        await self.check(Access(action="artifactr:read_events"))
         stream = self._storage.subscribe(self._scope, after_seq=after_seq)
         async with contextlib.aclosing(stream) as envelopes:
             while True:
@@ -573,6 +682,7 @@ class Workspace:
             notices: Include the notices others posted in the viewer's thread, when the viewer
                 is a thread's agent.
         """
+        await self.check(Access(action="artifactr:read_events"))
         envelopes = await self._storage.read(
             self._scope, after_seq=after_seq, before_seq=before_seq
         )
@@ -584,6 +694,7 @@ class Workspace:
         A consumer, such as a feedback mirror, saves its cursor with :meth:`save_cursor` and
         carries on after it when it starts again.
         """
+        await self.check(Access(action="artifactr:read_cursors"))
         return await self._storage.cursor(self._scope, name)
 
     async def save_cursor(self, name: str, seq: int) -> None:
@@ -592,6 +703,7 @@ class Workspace:
         A cursor only moves forward: saving a ``seq`` below the saved one leaves it, so a
         consumer that runs in several processes, each at its own pace, cannot move it back.
         """
+        await self.check(Access(action="artifactr:save_cursor"))
         await self._storage.save_cursor(self._scope, name, seq)
 
     # ─── runs ─────────────────────────────────────────────────────────────────
@@ -615,6 +727,7 @@ class Workspace:
         Raises:
             ThreadBusy: If another holder has the thread.
         """
+        await self.check(Access(action="artifactr:claim_thread", thread_id=thread_id))
         key = f"thread:{thread_id}"
         lapses = asyncio.get_running_loop().time() + ttl.total_seconds()
         if not await self._storage.acquire_lease(self._scope, key, holder, ttl):
@@ -665,6 +778,28 @@ def _lose(key: str, lost: asyncio.Event) -> None:
     """Mark a thread claim lost: it lapsed, or another holder has the thread."""
     logger.warning("the claim %s lapsed, so it is lost", key)
     lost.set()
+
+
+def _access(command: Command) -> Access:
+    """What a command asks ``authorize`` for: its type, and the thread and artifact it names."""
+    action = f"artifactr:{command.type}"
+    match command:
+        case ProposeChange(change=change):
+            return Access(action=action, thread_id=change.thread_id, artifact_id=change.artifact_id)
+        case CreateArtifact() | EditArtifact() | ArchiveArtifact():
+            return Access(
+                action=action, thread_id=command.thread_id, artifact_id=command.artifact_id
+            )
+        case PostMessage() | SetFocus() | SetThreadMode():
+            return Access(action=action, thread_id=command.thread_id)
+        case GiveFeedback(target=ArtifactTarget(artifact_id=artifact_id)):
+            return Access(action=action, artifact_id=artifact_id)
+        case GiveFeedback(
+            target=ThreadTarget(thread_id=thread_id) | MessageTarget(thread_id=thread_id)
+        ):
+            return Access(action=action, thread_id=thread_id)
+        case _:
+            return Access(action=action)
 
 
 def _check_page(

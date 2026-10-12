@@ -59,9 +59,22 @@ class Collaboration:
         self._verifier = verifier
         tracer_provider = telemetry.tracer_provider if telemetry else None
         meter_provider = telemetry.meter_provider if telemetry else None
+        langfuse = telemetry.langfuse if telemetry else None
+        self._langfuse = langfuse
+        self._mirrors: Mirrors | None = None
+        if langfuse is not None:
+            sink = LangfuseScoreSink(langfuse)
+
+            async def follow(tenant_id: str, workspace_id: str) -> None:
+                workspace = await self.workspaces.open(tenant_id, workspace_id, actor=SystemActor())
+                await FeedbackMirror(workspace, sink, cursor="langfuse").follow()
+
+            self._mirrors = Mirrors(follow)
+        # No authorize hook: every user of a tenant may use each of its workspaces.
         self.workspaces = Workspaces(
             SqlStorage(engine) if engine else InMemoryStorage(),
             types=[Note],
+            on_open=self._mirrors.watch if self._mirrors else None,
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,
         )
@@ -74,8 +87,6 @@ class Collaboration:
         ]
         if telemetry is not None:
             capabilities.append(telemetry.capability())
-        langfuse = telemetry.langfuse if telemetry else None
-        self._langfuse = langfuse
         self.runner = Runner[None](
             build_note_agent(model, capabilities=capabilities),
             app=None,
@@ -84,21 +95,10 @@ class Collaboration:
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,
         )
-        self._mirrors: Mirrors | None = None
-        if langfuse is not None:
-            sink = LangfuseScoreSink(langfuse)
-
-            async def follow(tenant_id: str, workspace_id: str) -> None:
-                workspace = await self.workspaces.open(tenant_id, workspace_id, actor=SystemActor())
-                await FeedbackMirror(workspace, sink, cursor="langfuse").follow()
-
-            self._mirrors = Mirrors(follow)
-        self._authorize = self._mirrors.authorize if self._mirrors else None
         self.mcp = ArtifactrMcp(
             self.workspaces,
             self.runner,
             resolve=self._resolve_client,
-            authorize=self._authorize,
             name=name,
         )
         self._tracer_provider = tracer_provider
@@ -132,7 +132,6 @@ class Collaboration:
             self.workspaces,
             self.runner,
             resolve_actor=self._resolve_actor,
-            authorize=self._authorize,
             tracer_provider=self._tracer_provider,
             meter_provider=self._meter_provider,
         )
@@ -153,5 +152,7 @@ class Collaboration:
             raise ToolError("connect over HTTP")
         principal = await self._verifier.authenticate(request)
         return principal.tenant_id, ExternalAgentActor(
-            client_id=principal.user_id, name=f"{principal.name} (MCP)"
+            client_id=principal.user_id,
+            name=f"{principal.name} (MCP)",
+            on_behalf_of=UserActor(id=principal.user_id, name=principal.name),
         )

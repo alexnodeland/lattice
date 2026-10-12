@@ -121,13 +121,16 @@ class Stream:
         hello = await self._hello()
         if hello is None:
             return
-        head = await workspace.head_seq()
         try:
+            head = await workspace.head_seq()
             plan = resume(hello, head_seq=head)
+            running = await workspace.runs(status="running")
+        except Forbidden as refused:  # it may not read the log, or the runs
+            await self._close(4403, refused.message)
+            return
         except (UnsupportedProtocol, ValidationFailed) as refused:
             await self._close(4400, refused.message)
             return
-        running = await workspace.runs(status="running")
         self._put(
             Welcome(
                 workspace_id=workspace.workspace_id,

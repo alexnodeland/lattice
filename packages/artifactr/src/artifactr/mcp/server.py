@@ -5,7 +5,7 @@ import contextlib
 import logging
 import re
 from collections.abc import AsyncGenerator, Awaitable, Callable, Generator, Sequence
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 
 from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
 from mcp.server.mcpserver import Context, MCPServer
@@ -37,12 +37,13 @@ from artifactr.core import (
     Recorded,
     Rejection,
     RespondToProposal,
+    SystemActor,
     TenantId,
     WorkspaceId,
     new_id,
 )
 from artifactr.telemetry import annotate, attribution
-from artifactr.workspace import Authorize, Workspace, Workspaces
+from artifactr.workspace import Access, Workspace, Workspaces
 
 type McpContext = Context[Any, Request]
 """The context a :data:`ResolveClient` receives: the MCP SDK's ``Context`` of one request.
@@ -88,7 +89,12 @@ _NO_PROPOSALS = {
     None: "No proposals have been made.",
 }
 
-_ARTIFACT_URI = re.compile(r"artifactr://(?P<tenant>[^/]+)/(?P<workspace>[^/]+)/artifacts/[^/]+")
+_NOTIFIER: Final = SystemActor(name="mcp")
+"""Who follows a workspace's log for resource notifications: the server, not a client."""
+
+_ARTIFACT_URI = re.compile(
+    r"artifactr://(?P<tenant>[^/]+)/(?P<workspace>[^/]+)/artifacts/(?P<artifact>[^/]+)"
+)
 
 
 def artifact_uri(tenant_id: TenantId, workspace_id: WorkspaceId, artifact_id: str) -> str:
@@ -131,15 +137,13 @@ class ArtifactrMcp:
     that, so logging stays the application's.
 
     Args:
-        workspaces: Opens tenant-scoped workspaces.
+        workspaces: Opens tenant-scoped workspaces, whose ``authorize`` hook is asked on every
+            tool call, resource read and resource subscription, as on the router. A refusal is
+            a tool error, or a resource read or subscription failing with ``INVALID_PARAMS``,
+            carrying the ``forbidden`` rejection's message.
         runner: Carries out every tool's command, once per ``command_id``, so a message reaches
             the thread's agent and a retry is safe, as on REST.
         resolve: Authenticates each request.
-        authorize: Whether a client may use a workspace of its tenant: the router's hook, asked
-            on every tool call, resource read and resource subscription that names a workspace;
-            allows everything if omitted. A refusal is a tool error, or a resource read or
-            subscription failing with ``INVALID_PARAMS``, carrying the ``forbidden`` rejection's
-            message.
         name: The server's name.
         bus: Where resource-change notifications go; in-process by default.
     """
@@ -150,14 +154,12 @@ class ArtifactrMcp:
         runner: Runner[Any],
         *,
         resolve: ResolveClient,
-        authorize: Authorize | None = None,
         name: str = "artifactr",
         bus: SubscriptionBus | None = None,
     ) -> None:
         self._workspaces = workspaces
         self._runner = runner
         self._resolve = resolve
-        self._authorize = authorize
         self._bus = bus or InMemorySubscriptionBus()
         self._watchers: dict[tuple[TenantId, WorkspaceId], asyncio.Task[None]] = {}
         with _logging_left_alone():
@@ -198,16 +200,15 @@ class ArtifactrMcp:
         """Open a workspace for the request's client, resolving it unless it is given.
 
         Raises:
-            Forbidden: If ``authorize`` refuses the client this workspace.
+            Forbidden: If the workspaces' ``authorize`` refuses the client this workspace.
         """
         tenant_id, actor = client or await self._resolve(ctx)
         annotate(attribution(tenant_id=tenant_id, workspace_id=workspace_id, actor=actor))
-        workspace = await self._workspaces.open(
-            tenant_id, workspace_id, actor=actor, authorize=self._authorize
-        )
+        workspace = await self._workspaces.open(tenant_id, workspace_id, actor=actor)
         key = (tenant_id, workspace_id)
         if key not in self._watchers:
-            self._watchers[key] = asyncio.create_task(self._notify(tenant_id, workspace))
+            watcher = workspace.as_actor(_NOTIFIER)  # the server's own work, not the client's
+            self._watchers[key] = asyncio.create_task(self._notify(tenant_id, watcher))
         return workspace
 
     async def _notify(self, tenant_id: TenantId, workspace: Workspace) -> None:
@@ -246,8 +247,9 @@ class ArtifactrMcp:
         """Check a subscription to artifacts as a read of them is checked.
 
         The MCP SDK serves ``subscriptions/listen`` itself, so this middleware asks, when a
-        stream opens, what reading each artifact it names would: its tenant, and ``authorize``.
-        A refusal fails the request, with the resource read's message.
+        stream opens, what reading each artifact it names would: its tenant, and ``authorize``
+        for opening its workspace and for ``artifactr:read_artifacts``. A refusal fails the
+        request, with the resource read's message.
         """
         if ctx.method == "subscriptions/listen":
             params = SubscriptionsListenRequestParams.model_validate(ctx.params, by_name=False)
@@ -255,23 +257,25 @@ class ArtifactrMcp:
         return await call_next(ctx)
 
     async def _check_uris(self, ctx: ServerRequestContext[Any, Any], uris: Sequence[str]) -> None:
-        scopes: dict[tuple[str, str], str] = {}
-        for uri in uris:
-            if (match := _ARTIFACT_URI.fullmatch(uri)) is not None:
-                scopes.setdefault((match["tenant"], match["workspace"]), uri)
-        if not scopes:
+        artifacts = [match for uri in uris if (match := _ARTIFACT_URI.fullmatch(uri)) is not None]
+        if not artifacts:
             return  # no artifact, so nothing of a workspace's to refuse
         context = Context(request_context=ctx, mcp_server=self.server, subscriptions=self._bus)
         tenant_id, actor = await self._resolve(context)
-        for (tenant, workspace_id), uri in scopes.items():
-            if tenant != tenant_id:
-                raise _refused(uri, Forbidden(_unavailable(tenant)))
+        opened: dict[str, Workspace] = {}
+        for match in artifacts:
             try:
-                await self._workspaces.open(
-                    tenant_id, workspace_id, actor=actor, authorize=self._authorize
-                )
+                if match["tenant"] != tenant_id:
+                    raise Forbidden(_unavailable(match["tenant"]))
+                workspace_id = match["workspace"]
+                if workspace_id not in opened:
+                    opened[workspace_id] = await self._workspaces.open(
+                        tenant_id, workspace_id, actor=actor
+                    )
+                read = Access(action="artifactr:read_artifacts", artifact_id=match["artifact"])
+                await opened[workspace_id].check(read)
             except Forbidden as refused:
-                raise _refused(uri, refused) from refused
+                raise _refused(match.string, refused) from refused
 
     def _register(self) -> None:
         server = self.server

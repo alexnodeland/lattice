@@ -190,7 +190,12 @@ class Access:
     def reflexr_subject(
         self, _tenant: str, _workspace: str | None, actor: reflexr.Actor
     ) -> Subject:
-        """Who grantr checks for a reflexr actor; the application's code rules run as it."""
+        """Who grantr checks for a reflexr actor.
+
+        A person, and a client acting for one, is checked as them; a client with a key as its
+        principal. Everything else runs in the application, and is checked as its principal: its
+        code rules, its system and evaluators, and a source it runs, which publishes in process.
+        """
         match actor:
             case reflexr.UserActor():
                 return User(id=actor.id)
@@ -198,9 +203,9 @@ class Access:
                 return (
                     ServicePrincipal(id=actor.client_id) if person is None else User(id=person.id)
                 )
-            case reflexr.SourceActor():
-                return ServicePrincipal(id=f"source:{actor.name}")
-            case _:  # the application's code rules, the system, and evaluators
+            case _:
+                # The application's code rules, its system and evaluators, and the sources it
+                # runs in process, such as relayr's bridge from artifactr.
                 return self.application
 {%- endif %}
 

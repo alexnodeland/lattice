@@ -110,8 +110,8 @@ async def test_a_key_is_its_tenants_and_no_others() -> None:
     elsewhere = request(Authorization=f"Bearer {key}", **{"X-Tenant": OTHER})
     with pytest.raises(Refused, match="another tenant"):
         await access(grants).authenticate(elsewhere)
+    forged = key[:-1] + ("1" if key.endswith("0") else "0")
     with pytest.raises(Unauthenticated, match="key is not valid"):
-        forged = key[:-1] + ("1" if key.endswith("0") else "0")
         await access(grants).identify(request(Authorization=f"Bearer {forged}"))
 {%- if use_artifactr %}
 
@@ -156,7 +156,7 @@ def test_artifactrs_actors_are_checked_as_who_they_act_for(
             reflexr.ExternalAgentActor(client_id="x", on_behalf_of=reflexr.UserActor(id="bob")),
             User(id="bob"),
         ),
-        (reflexr.SourceActor(name="monitor"), ServicePrincipal(id="source:monitor")),
+        (reflexr.SourceActor(name="artifactr"), APPLICATION),
         (reflexr.AgentActor(rule="app:triage", run_id="r1", name="triage"), APPLICATION),
         (reflexr.SystemActor(), APPLICATION),
         (reflexr.EvaluatorActor(name="judge", version="1"), APPLICATION),

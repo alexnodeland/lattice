@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Prepare a single host for stackr (RFC-0004): Docker, the firewall, and .env for the host recipe.
+#
+# Usage, as root, from packages/stackr in a checkout of lattice at a stackr tag, on Ubuntu 24.04:
+#   deploy/host/bootstrap example.com
+#
+# It installs Docker with Compose, make, jq and uv (at the version lattice's .prototools pins);
+# lets in only SSH, HTTP and HTTPS through ufw; and writes .env with fresh secrets, the host
+# recipe, the postgres adapter, and GoTrue at auth.<domain>. Point app.<domain> and auth.<domain>
+# at this machine before `make up`, so Caddy can get their certificates. Running it again keeps
+# every secret in .env.
+
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+
+domain=${1:?usage: deploy/host/bootstrap DOMAIN}
+if ((EUID != 0)); then
+  echo "bootstrap: run as root" >&2
+  exit 1
+fi
+
+apt-get update -q
+DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker.io docker-compose-v2 make jq ufw pipx
+uv_version=$(sed -n 's/^uv = "\(.*\)"$/\1/p' ../../.prototools)
+PIPX_BIN_DIR=/usr/local/bin pipx install --force "uv==$uv_version"
+
+# Docker writes its own iptables rules for published ports, which ufw doesn't see: the host
+# recipe publishes only Caddy's 80 and 443 on a public interface, and the rest on 127.0.0.1.
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow OpenSSH
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw --force enable
+
+uv run scripts/setup-env
+set_setting() { sed -i "s|^$1=.*|$1=$2|" .env; }
+set_setting STACKR_RECIPE host
+set_setting STACKR_DATABASE postgres
+set_setting STACKR_DOMAIN "$domain"
+set_setting AUTH_PUBLIC_URL "https://auth.$domain"
+set_setting AUTH_SITE_URL "https://app.$domain"
+
+cat <<NEXT
+bootstrap: ready. Keep a copy of .env off this machine: it holds every secret. Then
+  make up PROFILES="observability langfuse gateway auth"
+and reach Grafana, Langfuse and LiteLLM's admin UI through an SSH tunnel, such as
+  ssh -L 3000:127.0.0.1:3000 -L 3300:127.0.0.1:3300 -L 4400:127.0.0.1:4400 <this host>
+NEXT

@@ -14,6 +14,10 @@
 # auth: GoTrue's database exists; it serves an ES256 key set; its admin API
 # takes the service role's key and refuses a request without one; a user it
 # creates signs in, with a token signed by that key, from AUTH_PUBLIC_URL.
+# edge (on a single host, STACKR_RECIPE=host): only Caddy publishes on a public
+# interface; it redirects HTTP to HTTPS, serves GoTrue at auth.<domain> with a
+# certificate the probe trusts, and refuses GoTrue's admin API there. The auth
+# and app checks then go through it.
 # langfuse (with observability): a trace with a known id, sent to the
 # Collector, is found in Langfuse through its public API, and in Tempo.
 # gateway: its guardrails and model groups are loaded; a request through a
@@ -54,18 +58,46 @@ setting() {
   [[ -n $value ]] || value=$(sed -n "s/^$1=//p" .env.example | tail -n 1)
   printf '%s' "$value"
 }
-# The published ports, at STACKR_BIND, or on this machine when that is every interface.
+# Compose, with the files `make` chose (STACKR_COMPOSE_FILES): stackr's, and on a single host
+# its overlay (deploy/host).
+read -ra compose_files <<<"${STACKR_COMPOSE_FILES:-}"
+# (The expansion guards an empty array, which bash before 4.4 calls unset.)
+stack_compose() { docker compose ${compose_files[@]+"${compose_files[@]}"} "$@"; }
+
+# The checks' requests run in the probe container, on the stack's networks, so they reach each
+# service by name and need no published port: a single host publishes only Caddy's.
+probe() { stack_compose --profile smoke run --rm --no-deps -T ${edge_ca[@]+"${edge_ca[@]}"} probe "$@"; }
+prometheus=http://prometheus:9090
+prom_label_proxy=http://prom-label-proxy:8080
+tempo=http://tempo:3200
+loki=http://loki:3100
+grafana=http://grafana:3000
+collector_http=http://otel-collector:4318
+langfuse=http://langfuse-web:3000
+gateway=http://litellm:4000
+gotrue=http://gotrue:9999
+supabase_kong=http://supabase_kong_stackr-supabase:8000
+# Where users reach the application and GoTrue: at the edge on a single host, else in the stack.
+if [[ ${STACKR_RECIPE:-local} == host ]]; then
+  domain=$(setting STACKR_DOMAIN)
+  app_url=https://app.$domain
+  gotrue_public=https://auth.$domain
+  # With certificates from Caddy's own CA (CADDY_TLS), the probe trusts its root, and only that.
+  if [[ $(setting CADDY_TLS) == "tls internal" ]]; then
+    edge_dir=$(mktemp -d)
+    stack_compose exec -T caddy cat /data/caddy/pki/authorities/local/root.crt >"$edge_dir/root.crt"
+    edge_ca=(-v "$edge_dir/root.crt:/edge-ca.crt:ro" -e CURL_CA_BUNDLE=/edge-ca.crt)
+  fi
+else
+  app_url=http://app:8000
+  gotrue_public=$gotrue
+fi
+# portalr's readers run on this machine, at the ports Langfuse and the gateway publish to it, on
+# a single host too, where their UIs stay on 127.0.0.1.
 host=$(setting STACKR_BIND)
 [[ $host == 0.0.0.0 ]] && host=127.0.0.1
-prometheus="http://$host:$(setting PROMETHEUS_PORT)"
-prom_label_proxy="http://$host:$(setting PROM_LABEL_PROXY_PORT)"
-tempo="http://$host:$(setting TEMPO_PORT)"
-loki="http://$host:$(setting LOKI_PORT)"
-grafana="http://$host:$(setting GRAFANA_PORT)"
-collector_http="http://$host:$(setting OTLP_HTTP_PORT)"
-langfuse="http://$host:$(setting LANGFUSE_PORT)"
-gateway="http://$host:$(setting LITELLM_PORT)"
-gotrue="http://$host:$(setting AUTH_PORT)"
+langfuse_here="http://$host:$(setting LANGFUSE_PORT)"
+gateway_here="http://$host:$(setting LITELLM_PORT)"
 
 run_id="smoke-$(date +%s)-$RANDOM"
 # The tenant the smoke test's telemetry names, as artifactr does; the Collector
@@ -97,7 +129,7 @@ eventually() {
 # Telemetry as a library sends it, naming the tenant with its attribute: artifactr's unless
 # LIBRARY says otherwise.
 telemetrygen() {
-  docker compose --profile smoke run --rm --no-deps telemetrygen "$@" \
+  stack_compose --profile smoke run --rm --no-deps telemetrygen "$@" \
     --otlp-endpoint otel-collector:4317 --otlp-insecure \
     --service "$service" --telemetry-attributes "smoke.run=\"$run_id\"" \
     --telemetry-attributes "${LIBRARY:-artifactr}.tenant.id=\"$tenant\"" >/dev/null 2>&1
@@ -105,11 +137,11 @@ telemetrygen() {
 
 # A query's JSON result has at least one element.
 prometheus_has() {
-  curl -fsS --get "$prometheus/api/v1/query" --data-urlencode "query=$1" |
+  probe -fsS --get "$prometheus/api/v1/query" --data-urlencode "query=$1" |
     grep -q '"result":\[{'
 }
 tempo_has_trace() {
-  curl -fsS --get "$tempo/api/search" \
+  probe -fsS --get "$tempo/api/search" \
     --data-urlencode "q={ resource.service.name = \"$service\" && span.smoke.run = \"$run_id\" }" \
     --data-urlencode "start=$(($(date +%s) - 3600))" --data-urlencode "end=$(($(date +%s) + 60))" |
     grep -q '"traceID"'
@@ -118,33 +150,33 @@ tempo_has_trace() {
 # the log and the metric by it, and prom-label-proxy finds the metric for this
 # tenant only.
 tempo_has_tenants_trace() {
-  curl -fsS --get "$tempo/api/search" \
+  probe -fsS --get "$tempo/api/search" \
     --data-urlencode "q={ span.tenant.id = \"$tenant\" && span.smoke.run = \"$run_id\" }" \
     --data-urlencode "start=$(($(date +%s) - 3600))" --data-urlencode "end=$(($(date +%s) + 60))" |
     grep -q '"traceID"'
 }
 loki_has_tenants_log() {
-  curl -fsS --get "$loki/loki/api/v1/query_range" \
+  probe -fsS --get "$loki/loki/api/v1/query_range" \
     --data-urlencode "query={service_name=\"$service\"} | tenant_id=\"$tenant\" |= \"$1\"" \
     --data-urlencode "since=1h" |
     grep -q '"values":\[\['
 }
 # tenant_id is structured metadata, not an index label: a label per tenant would multiply streams.
 loki_keeps_the_tenant_out_of_its_labels() {
-  ! curl -fsS "$loki/loki/api/v1/labels" | grep -q '"tenant_id"'
+  ! probe -fsS "$loki/loki/api/v1/labels" | grep -q '"tenant_id"'
 }
 proxy_has() {
-  curl -fsS --get "$prom_label_proxy/api/v1/query" --data-urlencode "tenant_id=$1" \
+  probe -fsS --get "$prom_label_proxy/api/v1/query" --data-urlencode "tenant_id=$1" \
     --data-urlencode "query=stackr_smoke_total{smoke_run=\"$run_id\"}" |
     grep -q '"result":\[{'
 }
 proxy_hides_from_another_tenant() {
-  curl -fsS --get "$prom_label_proxy/api/v1/query" --data-urlencode "tenant_id=another-$tenant" \
+  probe -fsS --get "$prom_label_proxy/api/v1/query" --data-urlencode "tenant_id=another-$tenant" \
     --data-urlencode "query=stackr_smoke_total{smoke_run=\"$run_id\"}" |
     grep -q '"result":\[\]'
 }
 loki_has_log() {
-  curl -fsS --get "$loki/loki/api/v1/query_range" \
+  probe -fsS --get "$loki/loki/api/v1/query_range" \
     --data-urlencode "query={service_name=\"$service\"} | smoke_run=\"$run_id\"" \
     --data-urlencode "since=1h" |
     grep -q '"values":\[\['
@@ -154,7 +186,7 @@ loki_has_log() {
 # arguments, where other processes could read it.
 grafana_get() {
   printf 'user = "admin:%s"\n' "$(setting GRAFANA_ADMIN_PASSWORD)" |
-    curl -fsS --config - "$grafana$1"
+    probe -fsS --config - "$grafana$1"
 }
 grafana_datasource_ok() {
   grafana_get "/api/datasources/uid/$1/health" | grep -q '"status":"OK"'
@@ -200,7 +232,7 @@ random_hex() { od -An -N"$1" -tx1 /dev/urandom | tr -d ' \n'; }
 send_trace() {
   local now
   now=$(date +%s)
-  curl -fsS -o /dev/null -H 'Content-Type: application/json' --data @- "$collector_http/v1/traces" <<JSON
+  probe -fsS -o /dev/null -H 'Content-Type: application/json' --data @- "$collector_http/v1/traces" <<JSON
 {"resourceSpans": [{
   "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "$service"}}]},
   "scopeSpans": [{"scope": {"name": "stackr.smoke"}, "spans": [{
@@ -215,21 +247,21 @@ JSON
 # Langfuse's public API with the project's keys, passed to curl on stdin.
 langfuse_get() {
   printf 'user = "%s:%s"\n' "$(setting LANGFUSE_PUBLIC_KEY)" "$(setting LANGFUSE_SECRET_KEY)" |
-    curl -fsS --config - "$langfuse$1"
+    probe -fsS --config - "$langfuse$1"
 }
 langfuse_has_trace() {
   langfuse_get "/api/public/v2/observations?traceId=$trace_id&fields=core" | grep -q "$trace_id"
 }
 tempo_has_trace_id() {
-  curl -fsS -o /dev/null "$tempo/api/v2/traces/$trace_id"
+  probe -fsS -o /dev/null "$tempo/api/v2/traces/$trace_id"
 }
 langfuse_database_ok() {
-  curl -fsS -o /dev/null "$langfuse/api/public/health?failIfDatabaseUnavailable=true"
+  probe -fsS -o /dev/null "$langfuse/api/public/health?failIfDatabaseUnavailable=true"
 }
 # A query over db-init's connection to the adapter: its host, admin role and
 # networks, as `make` configures them.
 database_has() {
-  docker compose run --rm --no-deps -T db-init psql --no-psqlrc -Atc \
+  stack_compose run --rm --no-deps -T db-init psql --no-psqlrc -Atc \
     "SELECT 1 FROM pg_database WHERE datname = '$1'" 2>/dev/null | grep -q 1
 }
 # Local Supabase's API URL and keys, from its CLI (SUPABASE, as make runs it).
@@ -242,7 +274,7 @@ supabase_status() {
   supabase_publishable=$(jq -er .PUBLISHABLE_KEY <<<"$settings")
 }
 supabase_api_ok() {
-  curl -fsS -o /dev/null "$supabase_api/auth/v1/health"
+  probe -fsS -o /dev/null "$supabase_kong/auth/v1/health"
 }
 
 has_profile() {
@@ -257,15 +289,15 @@ gateway_call() {
   local key=$1 path=$2
   shift 2
   printf 'header = "Authorization: Bearer %s"\nurl = "%s"\n' "$key" "$gateway$path" |
-    curl -fsS --config - "$@"
+    probe -fsS --config - "$@"
 }
 master_key() { setting LITELLM_MASTER_KEY; }
 gateway_lists() {
   gateway_call "$(master_key)" "$1" | grep -q "\"$2\""
 }
-gateway_ready() { curl -fsS -o /dev/null "$gateway/health/readiness"; }
+gateway_ready() { probe -fsS -o /dev/null "$gateway/health/readiness"; }
 tempo_trace_has_service() {
-  curl -fsS "$tempo/api/v2/traces/$trace_id" | grep -q "\"stringValue\":\"$1\""
+  probe -fsS "$tempo/api/v2/traces/$trace_id" | grep -q "\"stringValue\":\"$1\""
 }
 key_spend_recorded() {
   gateway_call "$(master_key)" "/key/info?key=$gateway_key" |
@@ -356,13 +388,13 @@ gotrue_admin() {
   shift
   printf 'header = "Authorization: Bearer %s"\nurl = "%s"\n' \
     "$(setting AUTH_SERVICE_ROLE_KEY)" "$gotrue$path" |
-    curl -fsS --config - -H 'Content-Type: application/json' "$@"
+    probe -fsS --config - -H 'Content-Type: application/json' "$@"
 }
-gotrue_ready() { curl -fsS -o /dev/null "$gotrue/health"; }
+gotrue_ready() { probe -fsS -o /dev/null "$gotrue/health"; }
 gotrue_serves_its_key() {
   local kid
   kid=$(setting AUTH_JWT_KEYS | jq -r '.[0].kid')
-  curl -fsS "$gotrue/.well-known/jwks.json" |
+  probe -fsS "$gotrue/.well-known/jwks.json" |
     jq -e --arg kid "$kid" 'any(.keys[]; .kid == $kid and .alg == "ES256" and (has("d") | not))' >/dev/null
 }
 # A JWT's header or claims (1 or 2), decoded.
@@ -377,7 +409,7 @@ smoke_auth() {
   eventually "GoTrue is ready" gotrue_ready || return 1
   eventually "GoTrue serves its ES256 key, without the private part" gotrue_serves_its_key
   local code
-  code=$(curl -s -o /dev/null -w '%{http_code}' "$gotrue/admin/users")
+  code=$(probe -s -o /dev/null -w '%{http_code}' "$gotrue/admin/users")
   if [[ $code == 401 ]]; then
     log "ok: GoTrue's admin API refuses a request without the service role's key"
   else
@@ -392,8 +424,8 @@ smoke_auth() {
     return 1
   fi
   log "ok: GoTrue's admin API creates a user with the service role's key"
-  if token=$(curl -fsS -H 'Content-Type: application/json' --data "$user}" \
-    "$gotrue/token?grant_type=password" | jq -er .access_token) &&
+  if token=$(probe -fsS -H 'Content-Type: application/json' --data "$user}" \
+    "$gotrue_public/token?grant_type=password" | jq -er .access_token) &&
     jwt_part "$token" 1 | jq -e '.alg == "ES256"' >/dev/null &&
     jwt_part "$token" 2 | jq -e --arg iss "$(setting AUTH_PUBLIC_URL)" '.iss == $iss' >/dev/null; then
     log "ok: the user signs in, with an ES256 token from $(setting AUTH_PUBLIC_URL)"
@@ -402,6 +434,35 @@ smoke_auth() {
     status=1
   fi
   gotrue_admin "/admin/users/$id" -X DELETE -o /dev/null || true
+}
+
+# The containers that publish a port on an interface other than the loopback.
+publishers_outside_loopback() {
+  stack_compose --profile '*' ps --format json |
+    jq -rs '[.[] | (if type == "array" then .[] else . end)
+      | select(any(.Publishers[]?; .PublishedPort > 0 and (.URL | test("^(127\\.|::1$)") | not)))
+      | .Service] | unique | join(" ")'
+}
+edge_answers() {
+  local code
+  code=$(probe -s -o /dev/null -w '%{http_code}' "$2") || return 1
+  [[ $code == "$1" ]]
+}
+
+smoke_edge() {
+  local outside
+  outside=$(publishers_outside_loopback)
+  if [[ $outside == caddy ]]; then
+    log "ok: only Caddy publishes on a public interface"
+  else
+    log "FAIL: services publishing on a public interface: ${outside:-none}, not only caddy"
+    status=1
+  fi
+  eventually "Caddy redirects HTTP to HTTPS" edge_answers 308 "http://auth.$domain/health"
+  eventually "Caddy serves GoTrue at auth.$domain, with a certificate the probe trusts" \
+    edge_answers 200 "$gotrue_public/health"
+  eventually "Caddy refuses GoTrue's admin API at the edge" \
+    edge_answers 404 "$gotrue_public/admin/users"
 }
 
 # portalr's readers for the tools its Acceptance job doesn't run, as the stackr-smoke tenant.
@@ -414,7 +475,7 @@ smoke_portalr() {
   master=$(master_key)
   if (
     cd ../portalr &&
-      PORTALR_LANGFUSE_URL=$langfuse PORTALR_LITELLM_URL=$gateway \
+      PORTALR_LANGFUSE_URL=$langfuse_here PORTALR_LITELLM_URL=$gateway_here \
       LANGFUSE_PUBLIC_KEY=$public LANGFUSE_SECRET_KEY=$secret LITELLM_MASTER_KEY=$master \
       uv run --locked scripts/smoke_readers.py stackr-smoke
   ); then
@@ -430,7 +491,6 @@ app_name=stackr-smoke-app
 # Its package: the name of its database schema and of its reflexr namespace.
 app_package=${app_name//-/_}
 app_port=${SMOKE_APP_PORT:-8800}
-app_url="http://127.0.0.1:$app_port"
 # The role the application works as, which owns nothing: row-level security holds it.
 app_role=${app_package}_app
 # The database's host and owner, as db-init has them: local Supabase's by default.
@@ -444,7 +504,7 @@ app_call() {
   shift
   printf 'header = "Authorization: Bearer %s"\nheader = "X-Tenant: %s"\nurl = "%s"\n' \
     "$app_token" "${APP_TENANT:-stackr-smoke}" "$app_url$path" |
-    curl -fsS --config - "$@"
+    probe -fsS --config - "$@"
 }
 app_json() { app_call "$1" -H 'Content-Type: application/json' --data "$2" -o /dev/null; }
 
@@ -461,7 +521,7 @@ auth_sign_in() {
   if [[ $auth == supabase ]]; then
     supabase_auth "$supabase_publishable" "/token?grant_type=password" --data "$1}"
   else
-    curl -fsS -H 'Content-Type: application/json' --data "$1}" "$gotrue/token?grant_type=password"
+    probe -fsS -H 'Content-Type: application/json' --data "$1}" "$gotrue_public/token?grant_type=password"
   fi | jq -er .access_token
 }
 auth_delete_user() {
@@ -477,11 +537,12 @@ supabase_auth() {
   local key=$1 path=$2
   shift 2
   printf 'header = "apikey: %s"\nheader = "Authorization: Bearer %s"\nurl = "%s"\n' \
-    "$key" "$key" "$supabase_api/auth/v1$path" |
-    curl -fsS --config - -H 'Content-Type: application/json' "$@"
+    "$key" "$key" "$supabase_kong/auth/v1$path" |
+    probe -fsS --config - -H 'Content-Type: application/json' "$@"
 }
 
-app_compose() { docker compose --project-directory "$app_dir" --profile app "$@"; }
+# On a single host, the application runs with its own overlay too (the template's hosting: host).
+app_compose() { docker compose --project-directory "$app_dir" ${app_files[@]+"${app_files[@]}"} --profile app "$@"; }
 
 # The application's own commands, in its container, on its database.
 app_admin() { app_compose exec -T app "$app_name-admin" "$@" >/dev/null; }
@@ -501,7 +562,7 @@ cleanup_app() {
   # two statements, so a schema that can't be dropped still lets the role go.
   local statement
   for statement in "DROP SCHEMA IF EXISTS $app_package CASCADE" "DROP ROLE IF EXISTS $app_role"; do
-    docker compose run --rm --no-deps -T db-init psql --no-psqlrc -qc "$statement" >/dev/null 2>&1 || true
+    stack_compose run --rm --no-deps -T db-init psql --no-psqlrc -qc "$statement" >/dev/null 2>&1 || true
   done
 }
 
@@ -512,9 +573,9 @@ app_sql() {
   local who=$1 query=$2 setting=""
   [[ -n ${TENANT:-} ]] && setting="SET lattice.tenant_id = '$TENANT';"
   if [[ $who == owner ]]; then
-    docker compose run --rm --no-deps -T db-init psql --no-psqlrc -tAqc "$setting $query"
+    stack_compose run --rm --no-deps -T db-init psql --no-psqlrc -tAqc "$setting $query"
   else
-    PGPASSWORD=$app_password docker compose run --rm --no-deps -T -e PGUSER="$app_role" \
+    PGPASSWORD=$app_password stack_compose run --rm --no-deps -T -e PGUSER="$app_role" \
       -e PGPASSWORD db-init psql --no-psqlrc -tAqc "$setting $query"
   fi
 }
@@ -613,12 +674,17 @@ smoke_app() {
   unset DOCKER_DEFAULT_PLATFORM
 
   app_dir="$(mktemp -d)/$app_name"
-  trap cleanup_app EXIT
   log "app: generating $app_name from the template, and building it"
   # uv locks the application from here, inside lattice, where a version manager's shim (proto's,
   # in CI) finds the .prototools that chooses it. It fetches the libraries at HEAD from GitHub.
+  local hosting=none
+  app_files=()
+  if [[ ${STACKR_RECIPE:-local} == host ]]; then
+    hosting=host
+    app_files=(-f compose.yaml -f deploy/host/compose.prod.yaml)
+  fi
   if ! uv run copier copy --quiet --defaults --vcs-ref HEAD --data project_name="stackr smoke app" \
-    --data libraries=both --data evals=true ../.. "$app_dir" 2>/dev/null ||
+    --data libraries=both --data evals=true --data hosting=$hosting ../.. "$app_dir" 2>/dev/null ||
     ! uv lock --quiet --directory "$app_dir"; then
     log "FAIL: app: generating it from the template, with the libraries at HEAD, which must be pushed, with a clean working tree"
     return 1
@@ -640,14 +706,19 @@ AUTH_ISSUER=$issuer
 STACK_AUTH_JWKS_URL=$jwks
 LITELLM_API_KEY=$app_key
 LITELLM_MOCK_RESPONSE="stackr smoke ok"
+APP_IMAGE=$app_name:local
 ENV
   )
+  if ! docker compose --project-directory "$app_dir" --profile app build >/dev/null; then
+    log "FAIL: app: building its image"
+    return 1
+  fi
   # Row-level security: the role the application works as, made before it first starts.
-  if ! app_compose run --rm --build --no-deps -T app "$app_name-admin" db-roles >/dev/null; then
+  if ! app_compose run --rm --no-deps -T app "$app_name-admin" db-roles >/dev/null; then
     log "FAIL: app: creating the role it works as"
     return 1
   fi
-  if ! app_compose up --detach --build --wait --wait-timeout 300 >/dev/null; then
+  if ! app_compose up --detach --wait --wait-timeout 300 >/dev/null; then
     log "FAIL: app: starting it in the app profile"
     app_compose logs --no-color --tail=100 >&2 || true
     return 1
@@ -655,7 +726,7 @@ ENV
   log "ok: the application runs in the app profile"
 
   local code
-  code=$(curl -s -o /dev/null -w '%{http_code}' "$app_url/artifactr/v1/workspaces/$run_id/artifacts")
+  code=$(probe -s -o /dev/null -w '%{http_code}' "$app_url/artifactr/v1/workspaces/$run_id/artifacts")
   if [[ $code == 401 ]]; then
     log "ok: a request without a token is refused"
   else
@@ -728,6 +799,13 @@ ENV
     timeline_has 2
 }
 
+# Whatever the checks left behind: the application, and the edge's CA.
+cleanup() {
+  cleanup_app
+  if [[ -n ${edge_dir:-} ]]; then rm -rf "$edge_dir"; fi
+}
+trap cleanup EXIT
+
 profiles=("$@")
 ((${#profiles[@]} > 0)) || profiles=(observability)
 for profile in "${profiles[@]}"; do
@@ -737,6 +815,7 @@ for profile in "${profiles[@]}"; do
     langfuse) smoke_langfuse || status=1 ;;
     gateway) smoke_gateway || status=1 ;;
     auth) smoke_auth || status=1 ;;
+    edge) smoke_edge || status=1 ;;
     app) smoke_app || status=1 ;;
     *)
       log "smoke: no checks for profile '$profile'"

@@ -39,6 +39,19 @@ for profile in $(docker compose config --profiles); do
   check_compose "$profile" --profile "$profile"
 done
 check_compose "all profiles" --profile '*'
+# A single host (RFC-0004): the overlay, on every profile, with the domain it serves.
+STACKR_DOMAIN=example.com check_compose "a single host" \
+  -f compose.yaml -f deploy/host/compose.prod.yaml --profile '*'
+
+step "The single host's edge"
+if docker run --rm -v "$PWD/deploy/host/Caddyfile:/etc/caddy/Caddyfile:ro" -e STACKR_DOMAIN=example.com \
+  "$(STACKR_DOMAIN=example.com docker compose -f compose.yaml -f deploy/host/compose.prod.yaml \
+    config --format json | jq -r .services.caddy.image)" \
+  caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1; then
+  echo "ok: deploy/host/Caddyfile"
+else
+  fail "deploy/host/Caddyfile"
+fi
 
 step "Grafana dashboards"
 uv run scripts/check-config dashboards || fail "dashboards"
@@ -93,7 +106,7 @@ check_service "Loki" \
 step "Shell scripts"
 shell_scripts=()
 while IFS= read -r file; do shell_scripts+=("$file"); done \
-  < <(grep -rlE '^#!/usr/bin/env (bash|sh)' scripts .devcontainer template | sort)
+  < <(grep -rlE '^#!/usr/bin/env (bash|sh)' scripts deploy .devcontainer template | sort)
 if uv run shellcheck "${shell_scripts[@]}"; then
   echo "ok: ${shell_scripts[*]}"
 else

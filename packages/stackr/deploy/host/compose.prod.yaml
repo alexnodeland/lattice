@@ -1,0 +1,67 @@
+# stackr on a single host, behind Caddy (RFC-0004): an overlay on compose.yaml, which `make`
+# adds when STACKR_RECIPE=host. Run it with the postgres adapter and the auth profile.
+#
+# Only Caddy publishes on a public interface, on 80 and 443. The admin UIs (Grafana, Langfuse,
+# LiteLLM's, MinIO's console) keep their ports on STACKR_BIND, 127.0.0.1, for SSH tunnels; the
+# rest publish nothing. Docker's own iptables rules bypass ufw, which is why nothing else may
+# bind a public interface.
+
+name: stackr
+
+services:
+  # The edge: certificates from Let's Encrypt (CADDY_TLS empty), or from Caddy's own local CA
+  # (CADDY_TLS="tls internal", as CI runs it). deploy/host/Caddyfile routes the hosts.
+  caddy:
+    image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    restart: unless-stopped
+    environment:
+      STACKR_DOMAIN: ${STACKR_DOMAIN:?set STACKR_DOMAIN in .env}
+      CADDY_TLS: ${CADDY_TLS:-}
+    volumes:
+      - ./deploy/host/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    ports:
+      - 80:80
+      - 443:443
+    networks:
+      default:
+        # The stack's containers reach the public names at the edge too.
+        aliases:
+          - app.${STACKR_DOMAIN}
+          - auth.${STACKR_DOMAIN}
+
+  otel-collector:
+    ports: !reset []
+  tempo:
+    ports: !reset []
+  prometheus:
+    ports: !reset []
+  prom-label-proxy:
+    ports: !reset []
+  loki:
+    ports: !reset []
+  pyroscope:
+    ports: !reset []
+  postgres:
+    ports: !reset []
+  # Reached at the edge, as auth.<domain>.
+  gotrue:
+    ports: !reset []
+
+  # PostgreSQL is the postgres service, on the stack's own network: local Supabase's goes.
+  db-init:
+    networks: !override [default]
+  langfuse-worker:
+    networks: !override [default]
+  langfuse-web:
+    networks: !override [default]
+  litellm:
+    networks: !override [default]
+
+  probe:
+    networks: !override [default]
+
+volumes:
+  caddy-data:
+  caddy-config:

@@ -1,0 +1,18 @@
+# stackr's edge on a single host (RFC-0004): the application at app.<domain>, and GoTrue at
+# auth.<domain>, each at its own root. CADDY_TLS is empty for certificates from Let's Encrypt,
+# or `tls internal` for Caddy's own CA.
+
+app.{$STACKR_DOMAIN} {
+	{$CADDY_TLS}
+	# The template's app service, in its app profile on the stackr network.
+	reverse_proxy app:8000
+}
+
+auth.{$STACKR_DOMAIN} {
+	{$CADDY_TLS}
+	# GoTrue's admin API is for the application's admin commands, on the private network.
+	handle /admin/* {
+		respond 404
+	}
+	reverse_proxy gotrue:9999
+}

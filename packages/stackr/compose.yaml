@@ -10,7 +10,7 @@
 #   postgres       plain PostgreSQL, the alternative database adapter
 #   auth           GoTrue, Supabase's auth server alone (the identity port), on
 #                  the postgres adapter: local Supabase runs its own
-#   smoke          telemetrygen, for scripts/smoke
+#   smoke          telemetrygen and curl, for scripts/smoke
 # The database adapter is local Supabase by default, run beside this project
 # by its CLI (supabase/). `make up` starts both; see docs/architecture.md.
 #
@@ -495,3 +495,10 @@ services:
   telemetrygen:
     image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.162.0@sha256:5350f77dbc914034321dc7629058e141996c8dc2cdde076d281e573efee1a67e
     profiles: [smoke]
+
+  # Runs scripts/smoke's requests from inside the stack's networks, so the
+  # checks need no published port; not a service.
+  probe:
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+    profiles: [smoke]
+    networks: [default, supabase]

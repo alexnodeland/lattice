@@ -31,6 +31,31 @@ The deployment environment telemetry is labelled with (deployment.environment.na
 |---|---|
 | `STACKR_ENVIRONMENT` | `local` |
 
+### The recipe: this machine, or a single host
+
+How `make` runs the stack:
+
+- `local`: on this machine, for development (default)
+- `host`: a single host, behind Caddy (deploy/host/compose.prod.yaml), on the
+
+postgres adapter with the auth profile: `deploy/host/bootstrap` sets it
+
+| Setting | In `.env.example` |
+|---|---|
+| `STACKR_RECIPE` | `local` |
+
+On a single host, the domain Caddy serves: app.<domain> and auth.<domain>.
+
+| Setting | In `.env.example` |
+|---|---|
+| `STACKR_DOMAIN` | Empty |
+
+Empty for certificates from Let's Encrypt; `tls internal` for Caddy's own CA.
+
+| Setting | In `.env.example` |
+|---|---|
+| `CADDY_TLS` | Empty |
+
 ### Observability
 
 Grafana signs in as `admin` with this password.
@@ -71,6 +96,35 @@ The plain PostgreSQL adapter's admin password and published port. Local Supabase
 |---|---|
 | `POSTGRES_ADMIN_PASSWORD` | Generated: 64 hex characters |
 | `POSTGRES_PORT` | `55432` |
+
+### Identity: GoTrue, the auth profile
+
+Supabase's auth server alone, on the postgres adapter (local Supabase runs its own). AUTH_PUBLIC_URL is where users and applications reach it, and its tokens' issuer; on a single host, https://auth.<your host>.
+
+| Setting | In `.env.example` |
+|---|---|
+| `AUTH_PORT` | `9999` |
+| `AUTH_PUBLIC_URL` | `http://localhost:9999` |
+
+Where its emails send people back to: the application.
+
+| Setting | In `.env.example` |
+|---|---|
+| `AUTH_SITE_URL` | `http://localhost:8800` |
+| `AUTH_DB_PASSWORD` | Generated: 64 hex characters |
+
+The ES256 key set it signs tokens with, and the service role's key, a JWT signed with it for the admin API. Made together: to replace them, delete both.
+
+| Setting | In `.env.example` |
+|---|---|
+| `AUTH_JWT_KEYS` | Generated: an ES256 key set, as JSON |
+| `AUTH_SERVICE_ROLE_KEY` | Generated: a JWT signed with `AUTH_JWT_KEYS`'s key |
+
+GoTrue requires a shared secret too, though nothing is signed with it.
+
+| Setting | In `.env.example` |
+|---|---|
+| `AUTH_JWT_SECRET` | Generated: 64 hex characters |
 
 ### The Redis protocol, with Valkey
 

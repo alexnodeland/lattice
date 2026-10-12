@@ -177,7 +177,7 @@ A change to evalr runs the checks of evalr and of every project above it; a chan
 | Workflow | Runs | Jobs |
 |---|---|---|
 | `ci.yml` | On pull requests | **Check** (Python 3.12): `check` in every affected project and its dependents, with PostgreSQL 17 and a database per library. **Tests** (Python 3.13 and 3.14): `test`, the same way. **Images**: `image`, the same way. **Template**: the application template's seven variants, each generated and checked as its own CI would. **Smoke**: the stack, started three ways, with telemetry sent through it, and in one of them an application from the template beside it. **Dependency review**. **OSV**: the advisories a change adds to `uv.lock` or `bun.lock`. **CI**: passes only when every other job does |
-| `title.yml` | When a pull request is opened, edited, pushed to or reopened | **Title**: the title is a Conventional Commit |
+| `title.yml` | When a pull request is opened, edited, pushed to or reopened | **Title**: the title is a Conventional Commit, and it, or the description, marks every break the pull request adds to a package's public API against its last release ([ADR-0012](adr/0012-title-checks-the-breaks-in-the-public-apis.md)) |
 | `nightly.yml` | On every push to `main`, every night, and by hand | Every project's `check`, whatever changed; the images; osv-scanner over `uv.lock` and `bun.lock`; lychee over every Markdown file's links |
 | `docs.yml` | On every push to `main`, and by hand | Builds the site and deploys it to GitHub Pages |
 | `release.yml` | On every push to `main` | release-please; then each released package's wheel, built, attested and attached |

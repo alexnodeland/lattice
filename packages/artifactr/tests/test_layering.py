@@ -1,4 +1,4 @@
-"""The package layering in docs/architecture.md, enforced.
+"""The package layering in <https://lattice.alexnodeland.com/artifactr/architecture/>, enforced.
 
 Each layer may import the standard library, the artifactr layers below it, and an explicit list
 of third-party modules. Dependencies point one way, so each layer is usable without the ones

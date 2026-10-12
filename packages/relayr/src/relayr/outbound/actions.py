@@ -276,9 +276,12 @@ class RunActions:
         workspace = await self._open()
         await self._caused(("message", message_id))
         try:
-            await runner.send(workspace, thread, content, message_id=message_id)
-        except a.InvalidState:
-            pass  # the message id is used: an earlier attempt sent it, as `_used` says
+            try:
+                await runner.send(workspace, thread, content, message_id=message_id)
+            except a.InvalidState:
+                # The message id is used (see `_used`): an earlier attempt sent it, and may have
+                # stopped before it asked for the turn. Asking starts the turn, or does nothing.
+                await runner.ask(workspace, thread)
         except a.Rejection as rejection:
             raise _refused(rejection) from rejection
         return message_id

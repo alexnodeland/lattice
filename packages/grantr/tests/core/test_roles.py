@@ -1,7 +1,7 @@
 import pytest
 
 from grantr.core import GRANTR_ACTIONS, OPERATOR, Catalog, Invalid, ResourceKind, Role
-from grantr.core.roles import BOOKKEEPING, LEVELS
+from grantr.core.roles import BOOKKEEPING, DEPLOYMENT_READS, LEVELS, TENANT_ADMIN_READS
 from tests.catalogs import ARTIFACTR, PORTALR, REFLEXR
 
 CATALOG = Catalog.of(ARTIFACTR, REFLEXR, PORTALR)
@@ -34,7 +34,6 @@ def test_a_viewer_reads_opens_and_gives_feedback() -> None:
         "reflexr:read_runs",
         "reflexr:read_events",
         "reflexr:give_feedback",
-        "portalr:read_telemetry",
     }
 
 
@@ -57,13 +56,14 @@ def test_rule_management_is_the_workspace_admins_alone() -> None:
 
 
 def test_the_tenant_roles_cover_every_catalog_but_the_operators_actions() -> None:
-    assert _role("owner", "tenant") == CATALOG.actions - OPERATOR - BOOKKEEPING
+    deployment = {"portalr:read_deployment"}
+    assert _role("owner", "tenant") == CATALOG.actions - OPERATOR - BOOKKEEPING - deployment
     assert _role("owner", "tenant") - _role("admin", "tenant") == {"grantr:delete_tenant"}
     assert _role("member", "tenant") == {"artifactr:read_workspaces"}, "listing what they open"
     assert "artifactr:read_workspaces" in _role("application", "deployment")
     for workspace_role in ("viewer", "editor", "admin"):
         assert "artifactr:read_workspaces" not in _role(workspace_role), "asked of the tenant"
-    assert _role("operator", "deployment") == OPERATOR
+    assert _role("operator", "deployment") == OPERATOR | deployment
 
 
 def test_a_role_is_granted_only_at_its_levels() -> None:
@@ -138,3 +138,15 @@ def test_a_rule_publishes_checkpoints_and_reads_its_workspace() -> None:
     }
     assert CATALOG.role("rule", "rule", {}) is None, "granted on a workspace only"
     assert _role("rule") <= _role("admin"), "so a workspace's admin may grant it"
+
+
+def test_portalrs_admin_reads_are_its_tenants_owners_and_admins_and_operators() -> None:
+    tenant_admins = {
+        name for (_, name), actions in CATALOG.built_in.items() if actions >= TENANT_ADMIN_READS
+    }
+    assert tenant_admins == {"owner", "admin"}
+    assert _role("admin") & TENANT_ADMIN_READS == frozenset(), "not a workspace's admin"
+    holders = {
+        name for (_, name), actions in CATALOG.built_in.items() if DEPLOYMENT_READS & actions
+    }
+    assert holders == {"operator"}

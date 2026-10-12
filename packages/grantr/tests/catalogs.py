@@ -35,4 +35,4 @@ REFLEXR = frozenset(
     }
 )
 
-PORTALR = frozenset({"portalr:read_telemetry"})
+PORTALR = frozenset({"portalr:read_telemetry", "portalr:read_spend", "portalr:read_deployment"})

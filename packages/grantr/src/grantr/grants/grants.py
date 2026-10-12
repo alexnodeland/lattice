@@ -816,10 +816,14 @@ class Grants:
 
         Its tenant does: a subject that holds ``grantr:grant`` in it holds a grant in it.
         """
-        if self._catalog.role(grant.role, grant.on.kind, await tx.roles(tenant)) is None:
+        actions = self._catalog.role(grant.role, grant.on.kind, await tx.roles(tenant))
+        if actions is None:
             raise Invalid(f"{grant.role} can't be granted on a {grant.on.kind}")
-        if isinstance(grant.to, RulePrincipal) and grant.on.workspace != grant.to.workspace:
-            raise Invalid(f"{grant.to} acts in its own workspace only")
+        if isinstance(grant.to, RulePrincipal):
+            if grant.on.workspace != grant.to.workspace:
+                raise Invalid(f"{grant.to} acts in its own workspace only")
+            if any(action.startswith("grantr:") for action in actions):
+                raise Invalid(f"a rule manages no access, so it can't hold {grant.role}")
         if isinstance(grant.to, Group):
             if await tx.group(tenant, grant.to) is None:
                 raise Invalid(f"there is no group {grant.to.id}")
@@ -887,9 +891,11 @@ def _tenant_id(tenant: TenantId) -> None:
 def _implied(tenant: TenantId | None, subject: Subject, grants: list[Grant]) -> list[Grant]:
     """A subject's grants, with the one it holds without a grant: a stored rule's ``rule`` role.
 
-    A stored rule's principal holds ``rule`` in its own workspace and nowhere else (ADR-0029).
+    A stored rule's principal holds ``rule`` in its own workspace and nowhere else, and a grant
+    to it anywhere else, which no grant now makes, counts for nothing (ADR-0029).
     """
     if tenant is None or not isinstance(subject, RulePrincipal):
         return grants
     own = Resource(kind="workspace", workspace=subject.workspace)
-    return [*grants, Grant(tenant=tenant, role=RULE_ROLE, on=own, to=subject)]
+    within = [grant for grant in grants if grant.on.workspace == subject.workspace]
+    return [*within, Grant(tenant=tenant, role=RULE_ROLE, on=own, to=subject)]

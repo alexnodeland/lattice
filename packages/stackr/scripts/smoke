@@ -23,8 +23,8 @@
 # tenant's team, which the gateway's check created (portalr's
 # scripts/smoke_readers.py; portalr ADR-0011).
 # app (with every profile, on local Supabase): an application generated from
-# the template (both libraries, with evals) runs in its app profile beside the
-# stack. Its image installs the libraries from GitHub at the commit it was
+# the template (both libraries, bridged by relayr, with evals) runs in its app
+# profile beside the stack. Its image installs the libraries from GitHub at the commit it was
 # rendered from, HEAD, as an application generated from lattice does, so HEAD
 # must be pushed and the working tree clean: Copier renders uncommitted
 # changes from a commit of its own, which GitHub doesn't have. In CI, HEAD is
@@ -35,7 +35,9 @@
 # opens a ticket (reflexr); each starts an agent whose model request goes
 # through the gateway on a stackr-smoke key, mocked so no provider is called.
 # Each agent's trace, with the gateway's spans in it, is in Tempo and
-# Langfuse, and the application's metrics are in Prometheus.
+# Langfuse, and the application's metrics are in Prometheus. An alert crosses
+# into artifactr through relayr, as an incident thread with its timeline, and
+# the user's message in that thread crosses back, onto the timeline.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -425,7 +427,8 @@ artifactr_turn_trace() {
 reflexr_run_trace() {
   local run
   run=$(app_call "/reflexr/v1/workspaces/$run_id/runs" |
-    jq -r 'first(.[] | select(.status == "succeeded" or .status == "dead") |
+    jq -r --arg rule "$app_package:triage" 'first(.[] | select(.rule == $rule) |
+      select(.status == "succeeded" or .status == "dead") |
       "\(.status) \(.trace_ids[-1] // "none")")')
   [[ -n $run ]] || return 1
   if [[ ${run% *} != succeeded ]]; then
@@ -433,6 +436,19 @@ reflexr_run_trace() {
     status=1
   fi
   trace_id=${run#* }
+}
+
+# The incident timeline an alert opened, through relayr's bridge; its thread, in incident_thread.
+incident_timeline() {
+  incident_thread=$(app_call "/artifactr/v1/workspaces/$run_id/artifacts" |
+    jq -er 'first(.[] | select(.kind == "timeline") | .data.thread_id)')
+}
+
+# The timeline has this many entries.
+timeline_has() {
+  app_call "/artifactr/v1/workspaces/$run_id/artifacts" |
+    jq -e --argjson n "$1" 'first(.[] | select(.kind == "timeline") | .data.entries | length) == $n' \
+      >/dev/null
 }
 
 # The trace has the application's spans and the gateway's.
@@ -544,6 +560,16 @@ ENV
     "artifactr_turns_total{job=\"$app_name\", artifactr_workspace_id=\"$run_id\", artifactr_turn_outcome=\"completed\"}"
   eventually "the application's succeeded run is counted in Prometheus" prometheus_has \
     "reflexr_runs_total{job=\"$app_name\", reflexr_workspace_id=\"$run_id\", reflexr_run_status=\"succeeded\"}"
+
+  log "app: an alert crosses into artifactr through relayr, and a person's message crosses back"
+  app_json "/reflexr/v1/workspaces/$run_id/events" \
+    "{\"event\": {\"type\": \"$app_package:alert.fired\", \"service\": \"checkout\", \"summary\": \"Smoke\"}}"
+  eventually "the alert opened an incident timeline, in a thread of its own" incident_timeline ||
+    return 1
+  app_json "/artifactr/v1/workspaces/$run_id/commands" \
+    "{\"type\": \"command\", \"command_id\": \"c3\", \"command\": {\"type\": \"post_message\", \"thread_id\": \"$incident_thread\", \"content\": \"Rolled back.\"}}"
+  eventually "the person's message reached reflexr, and its rule added it to the timeline" \
+    timeline_has 2
 }
 
 profiles=("$@")

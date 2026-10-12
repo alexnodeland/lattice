@@ -17,6 +17,9 @@ dependencies = [
 {%- if access == 'grantr' %}
     "grantr[sql,postgres,fastapi]",
 {%- endif %}
+{%- if use_relayr %}
+    "relayr-ai[sql,postgres,otel,langfuse]",
+{%- endif %}
     "pyjwt[crypto]>=2.10",
     "uvicorn[standard]>=0.54",
 ]
@@ -55,6 +58,7 @@ build-backend = "uv_build"
     ("reflexr", "reflexr", use_reflexr),
     ("evalr", "evalr", evals),
     ("grantr", "grantr", access == 'grantr'),
+    ("relayr-ai", "relayr", use_relayr),
 ] if used %}
 {%- if libraries_path %}
 {{ distribution }} = { path = "{{ libraries_path }}/{{ package }}", editable = true }
@@ -97,7 +101,7 @@ known-third-party = ["fastapi", "mcp", "langfuse"]
 section-order = ["future", "standard-library", "third-party", "family", "first-party", "local-folder"]
 
 [tool.ruff.lint.isort.sections]
-family = [{% if use_artifactr %}"artifactr", {% endif %}{% if use_reflexr %}"reflexr", {% endif %}"evalr"{% if access == 'grantr' %}, "grantr"{% endif %}]
+family = [{% if use_artifactr %}"artifactr", {% endif %}{% if use_reflexr %}"reflexr", {% endif %}"evalr"{% if access == 'grantr' %}, "grantr"{% endif %}{% if use_relayr %}, "relayr"{% endif %}]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D", "ARG"]

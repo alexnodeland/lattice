@@ -10,6 +10,7 @@
 #   TEMPLATE_EVALS       true or false (default: true)
 #   TEMPLATE_ACCESS      grantr or none (default: grantr)
 #   TEMPLATE_PYTHON      the application's Python version (default: 3.12)
+#   TEMPLATE_BRIDGE      true or false, for both libraries: relayr's bridge (default: true)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -19,6 +20,7 @@ uv run copier copy --quiet --defaults --vcs-ref HEAD \
   --data libraries="${TEMPLATE_LIBRARIES:-both}" \
   --data evals="${TEMPLATE_EVALS:-true}" \
   --data access="${TEMPLATE_ACCESS:-grantr}" \
+  --data bridge="${TEMPLATE_BRIDGE:-true}" \
   --data python_version="${TEMPLATE_PYTHON:-3.12}" \
   --data libraries_path="$(dirname "$PWD")" \
   ../.. "$scratch/app"

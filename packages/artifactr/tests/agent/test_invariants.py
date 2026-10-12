@@ -6,8 +6,8 @@
   without a hand-over that reads the asks after the release.
 - I4: a turn that fails or is stopped before it starts consumes nothing, and hands over if
   more was asked meanwhile.
-- I5: a message committed directly starts no turn, and the next turn consumes it. A notice is
-  never a prompt or a reply.
+- I5: a message committed directly starts no turn, and the next turn consumes it, as does one
+  asked for with ``Runner.ask``. A notice is never a prompt or a reply.
 - I6: a message is a message: in a paused thread, the oldest message not consumed is the reply,
   however it was committed.
 - I7, the upgrade point, is in ``test_upgrade.py``.
@@ -529,6 +529,22 @@ async def test_i5_a_message_committed_directly_starts_no_turn_and_the_next_consu
     started(await runner.send(ws, thread.id, "Anything else?"))
     await settled(thread.id, runner)
     assert script.conversation() == ["Plan the launch", "FYI: the venue changed", "Anything else?"]
+
+
+async def test_i5_a_message_whose_ask_was_lost_is_consumed_once_its_thread_is_asked(
+    ws: Workspace, there: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    script = Script(say("Noted."), *[say("ok")] * 3)
+    runner = runners(make_agent(script))
+    await ws.post_message(thread.id, "CI is green", kind="notice")
+    assert await runner.ask(there, thread.id) is None, "a notice asks for nothing"
+    await ws.post_message(thread.id, "The venue changed")  # the send stopped before it asked
+    handle = await runner.ask(there, thread.id)
+    assert handle is not None
+    await handle.wait()
+    await settled(thread.id, runner)
+    assert await runner.ask(ws, thread.id) is None, "consumed, so asking again starts nothing"
+    assert script.conversation() == ["The venue changed"]
 
 
 async def test_i5_a_notice_in_a_paused_thread_is_never_its_reply(

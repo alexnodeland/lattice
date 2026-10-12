@@ -18,9 +18,14 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from starlette.requests import HTTPConnection
 
 from artifactr import InMemoryStorage, Runner, Session, SystemActor, UserActor, Workspaces
+{%- if use_relayr %}
+from artifactr.agent import TurnContext
+{%- endif %}
 from artifactr.core import Actor, ExternalAgentActor, {% if access == 'grantr' %}Forbidden, {% endif %}TenantId
 from artifactr.fastapi import Unauthorized, artifactr_router
+{% if not use_relayr -%}
 from artifactr.langfuse import langfuse_turn
+{% endif -%}
 from artifactr.litellm import LiteLLMGateway
 from artifactr.mcp import ArtifactrMcp, McpContext
 from artifactr.scores import FeedbackMirror, sync_score_configs
@@ -33,8 +38,11 @@ from {{ package_name }}.access import Refused
 {% endif -%}
 from {{ package_name }}.auth import Authenticate, RequireToken, Unauthenticated
 from {{ package_name }}.gateway import Guardrails, TenantKeys
+{%- if use_relayr %}
+from {{ package_name }}.incidents import Timeline
+{%- endif %}
 from {{ package_name }}.notes import Note, Rating, build_note_agent
-from {{ package_name }}.scores import Mirrors, sync_configs
+from {{ package_name }}.scores import Mirrors, {% if use_relayr %}OnOpen, {% endif %}opened, sync_configs
 from {{ package_name }}.settings import GatewaySettings
 from {{ package_name }}.telemetry import TelemetryHandle
 
@@ -54,6 +62,10 @@ class Collaboration:
         gateway: The gateway's settings: tenant keys and guardrails.
         engine: The database; without one, workspaces live in memory.
         telemetry: OpenTelemetry, and Langfuse when it has a client.
+{%- if use_relayr %}
+        on_open: Called each time a workspace is opened, after the mirrors': relayr's followers.
+        turn_context: Entered around each turn: relayr's Langfuse context, when Langfuse is on.
+{%- endif %}
     """
 
     def __init__(
@@ -68,6 +80,10 @@ class Collaboration:
         gateway: GatewaySettings,
         engine: AsyncEngine | None = None,
         telemetry: TelemetryHandle | None = None,
+{%- if use_relayr %}
+        on_open: OnOpen | None = None,
+        turn_context: TurnContext | None = None,
+{%- endif %}
     ) -> None:
         self._authenticate = authenticate
         self._identify = identify
@@ -86,10 +102,10 @@ class Collaboration:
             self._mirrors = Mirrors(follow)
         self.workspaces = Workspaces(
             SqlStorage(engine) if engine else InMemoryStorage(),
-            types=[Note],
+            types=[Note{% if use_relayr %}, Timeline{% endif %}],
             authorize=authorize,
             hidden=hidden,
-            on_open=self._mirrors.watch if self._mirrors else None,
+            on_open=opened(self._mirrors.watch if self._mirrors else None{% if use_relayr %}, on_open{% endif %}),
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,
         )
@@ -106,7 +122,7 @@ class Collaboration:
             build_note_agent(model, capabilities=capabilities),
             app=None,
             agent_name="assistant",
-            turn_context=langfuse_turn if langfuse else None,
+            turn_context={% if use_relayr %}turn_context{% else %}langfuse_turn if langfuse else None{% endif %},
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,
         )

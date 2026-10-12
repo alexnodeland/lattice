@@ -145,7 +145,7 @@ def test_telemetry_is_configured_only_with_an_endpoint(monkeypatch: pytest.Monke
     configure(Settings(telemetry=True, environment="staging"))
     configure(Settings(telemetry=True, langfuse=True))
     [(contributions, options), (_, with_langfuse)] = configured
-    assert contributions == [{% if libraries == 'both' %}"reflexr"{% endif %}]
+    assert contributions == [{% if libraries == 'both' %}"reflexr"{% endif %}{% if use_relayr %}, "relayr"{% endif %}]
     assert options["service_name"] == "{{ project_slug }}"
     assert options["environment"] == "staging"
     # Langfuse gets scores only: stackr's Collector sends it the traces.

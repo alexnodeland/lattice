@@ -57,6 +57,14 @@ evals:
   help: Include evaluation with evalr (an evals/ directory and a starter experiment)?
   default: true
 
+bridge:
+  type: bool
+  help: >-
+    Bridge them with relayr (chats and artifacts become events for rules, and rules' runs act
+    back as proposals and notices; with an incident timeline example)?
+  default: true
+  when: "{{ libraries == 'both' }}"
+
 access:
   type: str
   help: Who may do what
@@ -101,4 +109,9 @@ use_artifactr:
 use_reflexr:
   type: bool
   default: "{{ libraries in ['reflexr', 'both'] }}"
+  when: false
+
+use_relayr:
+  type: bool
+  default: "{{ libraries == 'both' and bridge }}"
   when: false

@@ -2,6 +2,10 @@
 
 This guide wires relayr's inbound adapter into an application that uses both libraries, so that what people and agents do in a workspace can fire rules. The [architecture](../architecture.md) says how it works.
 
+## In an application from stackr's template
+
+Answer yes to the template's `bridge` question, with both libraries, and its `bridge.py` does everything below, with an incident timeline example ([stackr ADR-0021](../../stackr/adr/0021-the-bridge-in-the-template.md)). The rest of this guide is what it does, for an application wired by hand.
+
 ## Install
 
 relayr is distributed as `relayr-ai` and imported as `relayr`. Its ledger needs SQL in production: install `relayr-ai[postgres]`, or `relayr-ai[sqlite]`.

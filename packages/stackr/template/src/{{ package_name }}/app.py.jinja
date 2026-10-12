@@ -44,6 +44,9 @@ from {{ package_name }}.auth import TokenVerifier
 {%- if use_reflexr %}
 from {{ package_name }}.automation import STOP_GRACE, Automation
 {%- endif %}
+{%- if use_relayr %}
+from {{ package_name }}.bridge import Bridge
+{%- endif %}
 {%- if use_artifactr %}
 from {{ package_name }}.collaboration import Collaboration
 {%- endif %}
@@ -129,46 +132,73 @@ def create_app(
     artifactr_hooks = access.grants.hooks(access.artifactr_subject)
 {%- endif %}
 {%- endif %}
+{%- if use_relayr %}
+    bridge = Bridge(engine=engine, telemetry=telemetry{% if access == 'grantr' %}, grants=access.grants{% endif %})
+{%- endif %}
+{%- if use_artifactr %}
+    collaboration = Collaboration(
+        name=settings.service_name,
+{%- if access == 'grantr' %}
+        authenticate=access.authenticate,
+        identify=access.identify,
+        authorize=artifactr_hooks.authorize,
+        hidden=artifactr_hooks.hidden,
+{%- else %}
+        authenticate=verifier.authenticate,
+        identify=verifier.authenticate,
+{%- endif %}
+        model=model,
+        gateway=settings.gateway,
+        engine=engine,
+        telemetry=telemetry,
+{%- if use_relayr %}
+        on_open=bridge.watch,
+        turn_context=bridge.turn_context,
+{%- endif %}
+    )
+{%- endif %}
+{%- if use_reflexr %}
+    automation = Automation(
+        name=settings.service_name,
+{%- if access == 'grantr' %}
+        authenticate=access.authenticate,
+        identify=access.identify,
+        authorize=access.grants.hooks(access.reflexr_subject).authorize,
+{%- else %}
+        authenticate=verifier.authenticate,
+        identify=verifier.authenticate,
+{%- endif %}
+        model=model,
+        gateway=settings.gateway,
+        engine=engine,
+        telemetry=telemetry,
+        poll_interval=poll_interval,
+        grace=grace,
+{%- if use_relayr %}
+        on_open=bridge.watch,
+        run_context=bridge.run_context,
+        actions=bridge.actions(collaboration),
+{%- endif %}
+    )
+{%- endif %}
+{%- if use_relayr %}
+    bridge.connect(collaboration, automation)
+{%- endif %}
+{%- if use_relayr %}
+    # The bridge starts after the libraries' parts, and stops before them.
+{%- endif %}
     parts: list[Part] = [
 {%- if access == 'grantr' %}
         access,
 {%- endif %}
 {%- if use_artifactr %}
-        Collaboration(
-            name=settings.service_name,
-{%- if access == 'grantr' %}
-            authenticate=access.authenticate,
-            identify=access.identify,
-            authorize=artifactr_hooks.authorize,
-            hidden=artifactr_hooks.hidden,
-{%- else %}
-            authenticate=verifier.authenticate,
-            identify=verifier.authenticate,
-{%- endif %}
-            model=model,
-            gateway=settings.gateway,
-            engine=engine,
-            telemetry=telemetry,
-        ),
+        collaboration,
 {%- endif %}
 {%- if use_reflexr %}
-        Automation(
-            name=settings.service_name,
-{%- if access == 'grantr' %}
-            authenticate=access.authenticate,
-            identify=access.identify,
-            authorize=access.grants.hooks(access.reflexr_subject).authorize,
-{%- else %}
-            authenticate=verifier.authenticate,
-            identify=verifier.authenticate,
+        automation,
 {%- endif %}
-            model=model,
-            gateway=settings.gateway,
-            engine=engine,
-            telemetry=telemetry,
-            poll_interval=poll_interval,
-            grace=grace,
-        ),
+{%- if use_relayr %}
+        bridge,
 {%- endif %}
     ]
 

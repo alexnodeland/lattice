@@ -61,5 +61,5 @@ Reserving by participant lets one entry cover a source, a system component or a 
 ## Action items
 
 1. [x] `Workspaces(publishers=)`, checked at startup and in `publish`, with tests on handles and REST.
-2. [ ] relayr's wiring passes `publishers={"artifactr": [SourceActor(name="artifactr")]}` (stackr RFC-0002, phases 3 and 5).
+2. [x] relayr's wiring passes `publishers={"artifactr": [SourceActor(name="artifactr")]}` (stackr RFC-0002, phases 3 and 5).
 3. [ ] relayr's rules drop their own check of the envelope's actor (stackr RFC-0002, phase 5).

@@ -4,6 +4,8 @@
  */
 @import "tailwindcss";
 @import "./tokens.css";
+/* Streamdown renders with Tailwind classes of its own, which Tailwind finds here. */
+@source "../node_modules/streamdown/dist/*.js";
 
 @theme inline {
   --color-*: initial;

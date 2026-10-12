@@ -20,8 +20,8 @@ repos:
         exclude: ^\.devcontainer/ # JSON with comments
       - id: check-merge-conflict
       - id: check-added-large-files
-        # The lockfile pins the extras' large dependency trees (DSPy, LiteLLM, datasets).
-        exclude: ^uv\.lock$
+        # The lockfiles pin large dependency trees (DSPy, LiteLLM, datasets; Vite and Vitest).
+        exclude: ^(uv|bun)\.lock$
       - id: check-executables-have-shebangs
       - id: detect-private-key
 
@@ -43,6 +43,14 @@ repos:
         entry: uv run ruff check --fix
         language: system
         types: [python]
+      # Biome formats and lints the web packages and the Bun workspace's configuration, at the
+      # version bun.lock pins.
+      - id: biome
+        name: biome
+        entry: bun x --bun --no-install biome check --write --no-errors-on-unmatched
+        language: system
+        types_or: [ts, tsx, javascript, json]
+        files: ^(packages/portalr/web/|package\.json$|biome\.json$|knip\.json$|tsconfig\.base\.json$)
       # yamllint and shellcheck check stackr's files, as they did in stackr.
       - id: yamllint
         name: yamllint
@@ -66,11 +74,11 @@ repos:
         entry: uv run zizmor
         language: system
         files: ^\.github/workflows/
-      # pyright, in every project, as each package's hook ran it; moon's cache skips the projects
-      # the change doesn't affect.
+      # pyright, and TypeScript in the web packages, in every project, as each package's hook ran
+      # it; moon's cache skips the projects the change doesn't affect.
       - id: typecheck
         name: typecheck
         entry: moon run :typecheck
         language: system
-        types: [python]
+        types_or: [python, ts, tsx]
         pass_filenames: false

@@ -188,7 +188,7 @@ The admin UI shows a tenant its own traces and logs, but doesn't rebuild Grafana
 stackr RFC-0003 fixes most of it; this RFC fills in the rest.
 
 - **The Bun workspace** at lattice's root: `package.json` with `"workspaces": ["packages/portalr/web/*"]`, `bun.lock`, `biome.json` and `tsconfig.base.json`, and `.moon/toolchains.yml` with Bun and TypeScript, which stackr RFC-0003 held back until portalr.
-- **TypeScript 7** for type checking. It has no programmatic API until 7.1, and `openapi-typescript` and knip load `typescript` as a library, so those tools get TypeScript 6 under an alias until they support 7. Phase 1 confirms each tool. This amends stackr RFC-0003, which expected nothing to need the API.
+- **TypeScript 7** for type checking. It has no programmatic API until 7.1, and `openapi-typescript` and knip load `typescript` as a library, so those tools get TypeScript 6 under an alias until they support 7. Phase 1 confirms each tool. This amends stackr RFC-0003, which expected nothing to need the API. Phase 1 found only `openapi-typescript` needs it ([portalr ADR-0007](../portalr/adr/0007-typescript-7-and-6-only-where-a-tool-needs-its-api.md)).
 - **Vite 8,** React 19, TanStack Router (file-based routes), Query, Table and Virtual, Base UI, Tailwind 4 and `openapi-fetch`. Frames are validated only by the generated types and the reducers' exhaustive matches; there is no second schema.
 - **moon's TypeScript tasks** for each web package: `lint` (Biome), `typecheck`, `test` (Vitest), `build` (Vite) and `check`. One `knip` run over the workspace from the root project. `size-limit` budgets for `app` and `admin`, set in phase 7 from what the first builds weigh.
 - **The Acceptance job** starts docplan, oncall and an application with portalr. portalr is tagged `api`, so its Bruno collection runs as `portalr:api`, and Schemathesis runs over its document. Its `bdd` task runs `.feature` files through Playwright (playwright-bdd), one per row of the app's and admin's tables, against the running stack. The dev container's firewall allows Playwright's browser downloads, or the tests use the container's Chromium.
@@ -281,7 +281,7 @@ The maintainer decided these on 2026-10-12.
 portalr's own RFC series turns these phases into its plan, with a tracking issue.
 
 - [x] Sign-off on P1 to P6 (2026-10-12)
-- [ ] Phase 1: the workspace
+- [x] Phase 1: the workspace (2026-10-12)
 - [ ] Phase 2: the brand
 - [ ] Phase 3: client
 - [ ] Phase 4: the router

@@ -11,7 +11,7 @@ The planned portal into an application built on the family: an `app` UI for the 
 
 !!! note "Planned, not yet usable"
 
-    portalr's foundation is done: the package, its decisions and its [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md). The package holds only its version so far, and everything below describes what the plan's phases build. Its mark is drawn in the plan's phase 2.
+    portalr's foundation and its workspace are done: the package, its decisions, its [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md), and the Bun workspace of its four web packages, which build but hold almost nothing yet. Everything below describes what the plan's phases build. Its mark is drawn in the plan's phase 2.
 
 ## Why: the family has no face
 

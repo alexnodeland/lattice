@@ -1,0 +1,48 @@
+# The tasks of every web package (`language: typescript`). The root's package.json, lockfile and
+# shared configuration are inputs of every one. A package without code to build or to test
+# excludes that task, and `check` runs what remains.
+inheritedBy:
+  language: 'typescript'
+
+implicitInputs:
+  - '/package.json'
+  - '/bun.lock'
+  - '/biome.json'
+  - '/tsconfig.base.json'
+
+tasks:
+  lint:
+    description: 'Check formatting and lint rules with Biome'
+    command: 'bun x --bun --no-install biome check .'
+
+  typecheck:
+    description: 'Type-check with TypeScript 7'
+    command: 'bun x --bun --no-install tsc'
+
+  test:
+    description: 'Run the tests with Vitest'
+    command: 'bun x --bun --no-install vitest run'
+
+  build:
+    description: 'Build the app with Vite'
+    command: 'bun x --bun --no-install vite build'
+    outputs:
+      - 'dist/**/*'
+
+  check:
+    description: "Run the project's checks, as CI does"
+    command: 'noop'
+    deps:
+      - 'lint'
+      - 'typecheck'
+      - target: 'test'
+        optional: true
+      - target: 'build'
+        optional: true
+
+  format:
+    description: 'Format the code and apply safe lint fixes'
+    command: 'bun x --bun --no-install biome check --write .'
+    options:
+      cache: false
+      runInCI: false

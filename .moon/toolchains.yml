@@ -1,0 +1,24 @@
+# portalr's web packages are a Bun workspace (stackr's RFC-0003, The Bun workspace). Bun installs
+# the dependencies and moon never edits a manifest, a lockfile or a tsconfig.json, so every
+# setting that would is off. proto installs Bun from .prototools, as it installs moon and uv, so
+# moon doesn't install a toolchain of its own, which would replace proto mid-run in CI.
+javascript:
+  packageManager: 'bun'
+  installDependencies: false
+  inferTasksFromScripts: false
+  dedupeOnLockfileChange: false
+  syncPackageManagerField: false
+  syncProjectWorkspaceDependencies: false
+
+bun:
+  versionFromPrototools: false
+
+typescript:
+  rootOptionsConfigFileName: 'tsconfig.base.json'
+  createMissingConfig: false
+  includeProjectReferenceSources: false
+  includeSharedTypes: false
+  pruneProjectReferences: false
+  routeOutDirToCache: false
+  syncProjectReferences: false
+  syncProjectReferencesToPaths: false

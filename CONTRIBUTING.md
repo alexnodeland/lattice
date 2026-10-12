@@ -4,18 +4,18 @@ Thanks for helping. lattice holds the family's packages, and this guide covers a
 
 ## Set up
 
-You need [uv](https://docs.astral.sh/uv/), `make`, and [moon](https://moonrepo.dev/moon) at the version in `.prototools` ([proto](https://moonrepo.dev/proto) installs moon and uv from it: `proto use`). Everything else is installed from `uv.lock`. Docker runs the PostgreSQL tests and stackr's stack.
+You need [uv](https://docs.astral.sh/uv/), [Bun](https://bun.sh), `make`, and [moon](https://moonrepo.dev/moon), at the versions in `.prototools` ([proto](https://moonrepo.dev/proto) installs moon, uv and Bun from it: `proto use`). Everything else is installed from `uv.lock` and `bun.lock`; Bun also runs the web tools, so you don't need Node.js. Docker runs the PostgreSQL tests and stackr's stack.
 
 ```bash
 git clone git@github.com:alexnodeland/lattice.git
 cd lattice
-make install        # every package, example, dependency group and extra, in one environment
+make install        # every package, example, dependency group and extra, in one environment, and the web packages
 make check          # every project's checks, as CI runs them
 ```
 
 ## Commands
 
-moon runs every task, from any directory: `moon run <project>:<task>`, or `moon run :<task>` for every project that has it. It runs only what a change affects, and caches the rest. `moon project <project>` lists a project's tasks. The projects are the packages (`artifactr`, `reflexr`, `evalr`, `relayr`, `grantr`, `stackr`, `portalr`), the reference implementations (`docplan`, `oncall`), and `lattice`, the root.
+moon runs every task, from any directory: `moon run <project>:<task>`, or `moon run :<task>` for every project that has it. It runs only what a change affects, and caches the rest. `moon project <project>` lists a project's tasks. The projects are the packages (`artifactr`, `reflexr`, `evalr`, `relayr`, `grantr`, `stackr`, `portalr`), portalr's web packages (`client`, `ui`, `app`, `admin`), the reference implementations (`docplan`, `oncall`), and `lattice`, the root.
 
 Every Python project has these:
 
@@ -25,6 +25,17 @@ Every Python project has these:
 | `typecheck` | Type-check with pyright (strict for `src/` and `scripts/`) |
 | `test` | Run the tests with the 100% branch-coverage gate |
 | `format` | Format the code and apply safe lint fixes |
+| `check` | Everything CI runs for the project |
+
+Every web package has these, each run by Bun from `bun.lock`:
+
+| Task | What it does |
+|---|---|
+| `lint` | Check formatting and lint rules with Biome |
+| `typecheck` | Type-check with TypeScript 7, strict |
+| `test` | Run the tests with Vitest (`client` and `ui`) |
+| `build` | Build the app with Vite (`app` and `admin`) |
+| `format` | Format the code and apply safe lint fixes with Biome |
 | `check` | Everything CI runs for the project |
 
 Every package that ships a wheel also has `build`, which builds it as it is published; `standalone`, which installs the wheel with its extras, and its siblings' wheels, outside the workspace, then imports every module; and `deptry`, which fails on an import the package doesn't declare. `check` runs both.
@@ -40,6 +51,7 @@ The packages' own tasks:
 | `artifactr:app-up`, `reflexr:app-up` | Build and start the reference implementation on PostgreSQL, at <http://localhost:8000> |
 | `artifactr:pg-down`, `reflexr:pg-down` | Stop the package's contributor stack |
 | `docplan:image`, `oncall:image` | Build the reference implementation's image from the root, start it on PostgreSQL and stop it, as CI's Images job does |
+| `lattice:knip` | Find unused files, exports and dependencies in the web packages |
 | `lattice:docs` | Build the documentation site in strict mode, and check that its lists rendered |
 | `lattice:docs-serve` | Serve the documentation site with live reload at <http://localhost:8000> |
 
@@ -66,7 +78,7 @@ cd packages/artifactr
 docker compose -f compose.yaml -f compose.stackr.yaml --profile app up -d --build
 ```
 
-The dev container (`.devcontainer/`) has uv, moon and Docker, so everything above runs inside it too.
+The dev container (`.devcontainer/`) has uv, Bun, moon and Docker, so everything above runs inside it too.
 
 ## How work flows: trunk-based development
 
@@ -96,7 +108,9 @@ Each package's `CHANGELOG.md` is written from these messages by release-please, 
 
 ## Dependencies
 
-Each package's `pyproject.toml` states the **oldest** versions it supports, as wide as correctness allows, so applications can resolve it alongside their own dependencies. A package names a sibling with a normal range in `[project]`, and `[tool.uv.sources]` takes the sibling from the workspace, which only development sees. `uv.lock` pins what CI and contributors run, one resolution for every package, and Renovate keeps the lockfile (not the ranges) current. Raise a lower bound only when the code needs a newer feature or fix, in the same pull request as that code.
+Each Python package's `pyproject.toml` states the **oldest** versions it supports, as wide as correctness allows, so applications can resolve it alongside their own dependencies. A package names a sibling with a normal range in `[project]`, and `[tool.uv.sources]` takes the sibling from the workspace, which only development sees. `uv.lock` pins what CI and contributors run, one resolution for every package, and Renovate keeps the lockfile (not the ranges) current. Raise a lower bound only when the code needs a newer feature or fix, in the same pull request as that code.
+
+The web packages are private and pin exact versions, which `bun.lock` records and Renovate moves. A web package names a sibling as `"@portalr/ui": "workspace:*"`, and its `moon.yml` names it in `dependsOn`, which the root's tests check.
 
 ## Design: RFCs, ADRs and evergreen docs
 
@@ -119,7 +133,8 @@ These are enforced by CI, for every package, and described in each package's qua
 - **100% branch coverage** of each package's `src/`, and of each reference implementation's, each measured by its own tests. The only exclusions are configured in each `pyproject.toml` (type-checking blocks, protocol stubs, overloads, `assert_never`).
 - **pyright strict** for `src/` and `scripts/`, standard for `tests/`.
 - **ruff** for formatting and linting, with one configuration at the root, and Google-style docstrings on public API.
-- **No inline suppressions** in any Python in the repository: no `# type: ignore`, `# pyright: ignore`, `# noqa` or `# pragma: no cover`. Restructure the code instead; the root's `tests/test_quality.py` fails on any. Per-file ignores in the root `pyproject.toml` are configuration, reviewed as such.
+- **TypeScript strict,** from `tsconfig.base.json`, and **Biome** for formatting and linting, in the web packages; **knip** fails on an unused file, export or dependency.
+- **No inline suppressions** in any Python in the repository: no `# type: ignore`, `# pyright: ignore`, `# noqa` or `# pragma: no cover`; nor in the TypeScript: no `@ts-expect-error`, `@ts-ignore`, `@ts-nocheck` or `biome-ignore`. Restructure the code instead; the root's `tests/test_quality.py` fails on any. Per-file ignores in the root `pyproject.toml` are configuration, reviewed as such.
 - **Warnings are errors** in the test suites.
 - **The libraries stay independent.** Each library's layering test lists what each of its modules may import, deptry fails on an import a package doesn't declare, and each package's `standalone` task installs it outside the workspace.
 

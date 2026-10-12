@@ -20,6 +20,12 @@
       "matchDatasources": ["docker"],
       "matchPackageNames": ["postgres"],
       "allowedVersions": "/^17(\\..*)?$/"
+    },
+    {
+      "description": "Bun's version is in .prototools and in package.json's packageManager field: they move together, after the same three days.",
+      "matchDepNames": ["bun"],
+      "groupName": "Bun",
+      "minimumReleaseAge": "3 days"
     }
   ]
 }

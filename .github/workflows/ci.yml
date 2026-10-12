@@ -55,6 +55,7 @@ jobs:
           PGPASSWORD: lattice
         run: psql -h localhost -U postgres -c 'CREATE DATABASE artifactr' -c 'CREATE DATABASE reflexr'
       - run: uv sync --locked --all-packages --all-groups --all-extras
+      - run: bun install --frozen-lockfile
       - run: uv run --no-project python scripts/affected.py check
 
   tests:
@@ -78,6 +79,7 @@ jobs:
         with:
           auto-install: true
       - run: uv sync --locked --all-packages --all-groups --all-extras
+      - run: bun install --frozen-lockfile
       - run: uv run --no-project python scripts/affected.py test
 
   # docplan's and oncall's images, each built from the root and started on PostgreSQL.
@@ -203,8 +205,9 @@ jobs:
           persist-credentials: false
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
 
-  # GitHub's dependency graph doesn't read uv.lock, so osv-scanner compares the pull request's
-  # lockfile with its base's.
+  # GitHub's dependency graph doesn't read uv.lock or bun.lock, so osv-scanner compares the pull
+  # request's lockfiles with its base's. It finds every lockfile git doesn't ignore, uv.lock and
+  # bun.lock, on either side, even one the pull request adds.
   osv:
     name: OSV
     permissions:
@@ -214,7 +217,8 @@ jobs:
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
     with:
       scan-args: |-
-        --lockfile=uv.lock
+        --recursive
+        ./
 
   ci:
     name: CI

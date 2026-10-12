@@ -1,4 +1,47 @@
-# portalr: the portal. Its Python side, the router that serves the two UIs.
+# portalr: the portal. Its Python side, the router that serves the two UIs. The web packages
+# under web/ are projects of their own, so its Python tasks read only the Python package's files.
 language: 'python'
 layer: 'library'
 tags: ['distribution']
+
+fileGroups:
+  python:
+    - 'src/**/*'
+    - 'tests/**/*'
+    - 'pyproject.toml'
+    - 'README.md'
+    - 'LICENSE'
+
+tasks:
+  lint:
+    inputs: ['@group(python)']
+    options:
+      mergeInputs: 'replace'
+  typecheck:
+    inputs: ['@group(python)']
+    options:
+      mergeInputs: 'replace'
+  test:
+    inputs: ['@group(python)']
+    options:
+      mergeInputs: 'replace'
+  build:
+    inputs: ['@group(python)']
+    options:
+      mergeInputs: 'replace'
+  standalone:
+    inputs: ['@group(python)', '/scripts/standalone.py']
+    options:
+      mergeInputs: 'replace'
+  deptry:
+    inputs: ['@group(python)']
+    options:
+      mergeInputs: 'replace'
+  format:
+    inputs: ['@group(python)']
+    options:
+      mergeInputs: 'replace'
+  check:
+    inputs: ['@group(python)']
+    options:
+      mergeInputs: 'replace'

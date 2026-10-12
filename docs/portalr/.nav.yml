@@ -9,6 +9,8 @@ nav:
   - adr/0004-native-views-of-a-tenants-observability.md
   - adr/0005-operators-see-across-tenants.md
   - adr/0006-shared-stores-every-read-filtered.md
+  - adr/0007-typescript-7-and-6-only-where-a-tool-needs-its-api.md
+  - adr/0008-the-bun-workspace-runs-in-bun.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

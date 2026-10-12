@@ -1,9 +1,11 @@
-"""moon's edges agree with the workspace.
+"""moon's edges agree with the workspaces.
 
 moon infers no edge from a requirement with a range, so each project's moon.yml states its
-dependsOn, and this test holds it to the siblings its pyproject.toml requires.
+dependsOn, and this test holds it to the siblings its pyproject.toml requires, or, for a web
+package, to the workspace packages its package.json depends on.
 """
 
+import json
 import re
 import tomllib
 from pathlib import Path
@@ -13,7 +15,19 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).parent.parent
-SOURCES: dict[str, str] = yaml.safe_load((ROOT / ".moon" / "workspace.yml").read_text())["projects"]
+WORKSPACE: dict[str, str] = yaml.safe_load((ROOT / ".moon" / "workspace.yml").read_text())[
+    "projects"
+]
+SOURCES = {
+    project: path
+    for project, path in WORKSPACE.items()
+    if (ROOT / path / "pyproject.toml").exists()
+}
+"""The uv workspace's members."""
+WEB = {
+    project: path for project, path in WORKSPACE.items() if (ROOT / path / "package.json").exists()
+}
+"""The Bun workspace's packages."""
 REQUIREMENT = re.compile(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
 
 NOT_IN_PYPROJECT = {"stackr": {"artifactr", "reflexr", "evalr"}}
@@ -55,11 +69,35 @@ def _siblings(project: str) -> set[str]:
     return {PROJECTS[name] for name in _required(project) if name in PROJECTS} - {project}
 
 
+def _depends_on(project: str) -> set[str]:
+    config = yaml.safe_load((ROOT / WORKSPACE[project] / "moon.yml").read_text()) or {}
+    return set(config.get("dependsOn", []))
+
+
 @pytest.mark.parametrize("project", sorted(SOURCES))
 def test_depends_on_matches_the_pyproject(project: str) -> None:
-    config = yaml.safe_load((ROOT / SOURCES[project] / "moon.yml").read_text()) or {}
-    declared = set(config.get("dependsOn", []))
-    assert declared == _siblings(project) | NOT_IN_PYPROJECT.get(project, set())
+    assert _depends_on(project) == _siblings(project) | NOT_IN_PYPROJECT.get(project, set())
+
+
+def _package(project: str) -> dict[str, Any]:
+    return json.loads((ROOT / WEB[project] / "package.json").read_text())
+
+
+PACKAGES = {_package(project)["name"]: project for project in WEB}
+"""Each web package's moon project, by its package name."""
+
+
+@pytest.mark.parametrize("project", sorted(WEB))
+def test_depends_on_matches_the_package_json(project: str) -> None:
+    package = _package(project)
+    workspace = {
+        name
+        for field in ("dependencies", "devDependencies")
+        for name, version in package.get(field, {}).items()
+        if version.startswith("workspace:")
+    }
+    assert workspace <= PACKAGES.keys()
+    assert _depends_on(project) == {PACKAGES[name] for name in workspace}
 
 
 @pytest.mark.parametrize("project", sorted(SOURCES))

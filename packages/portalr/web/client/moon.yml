@@ -1,0 +1,6 @@
+# @portalr/client: the generated types, the fetch client and the WebSocket stores.
+language: 'typescript'
+layer: 'library'
+workspace:
+  inheritedTasks:
+    exclude: ['build'] # its source is built into app and admin

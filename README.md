@@ -81,16 +81,16 @@ uv run docplan --user alice     # in another
 
 ## Development
 
-You need [uv](https://docs.astral.sh/uv/), `make`, and [moon](https://moonrepo.dev/moon) at the version in [`.prototools`](.prototools): `proto use` installs both. Docker runs stackr's stack and the PostgreSQL tests.
+You need [uv](https://docs.astral.sh/uv/), [Bun](https://bun.sh), `make`, and [moon](https://moonrepo.dev/moon), at the versions in [`.prototools`](.prototools): `proto use` installs all three. Docker runs stackr's stack and the PostgreSQL tests.
 
 ```bash
-make install    # every package, example, dependency group and extra, in one environment, and the git hooks
+make install    # every package, example, dependency group and extra, in one environment; the web packages; and the git hooks
 make check      # every project's checks, as CI runs them: moon run :check
 ```
 
-moon runs every task, from any directory, and only what a change affects: `moon run <project>:<task>`, or `moon run :<task>` for every project that has one. The projects are the packages, the two examples and `lattice`, the root; `moon project <project>` lists a project's tasks. Every Python project is held to 100% branch coverage, and its `src/` to pyright strict.
+moon runs every task, from any directory, and only what a change affects: `moon run <project>:<task>`, or `moon run :<task>` for every project that has one. The projects are the packages, portalr's four web packages, the two examples and `lattice`, the root; `moon project <project>` lists a project's tasks. Every Python project is held to 100% branch coverage, and its `src/` to pyright strict.
 
-[`.devcontainer/`](.devcontainer) has uv, moon and Docker, and runs everything CI runs. Open it in your editor's dev container, or in a GitHub Codespace, which builds the same container; a prebuilt image and Codespaces prebuilds are planned in [RFC-0003](docs/stackr/rfcs/0003-one-repository-lattice.md)'s phase 7.
+[`.devcontainer/`](.devcontainer) has uv, Bun, moon and Docker, and runs everything CI runs. Open it in your editor's dev container, or in a GitHub Codespace, which builds the same container; a prebuilt image and Codespaces prebuilds are planned in [RFC-0003](docs/stackr/rfcs/0003-one-repository-lattice.md)'s phase 7.
 
 ## Documentation
 

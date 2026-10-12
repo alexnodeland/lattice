@@ -1,5 +1,5 @@
 # moon runs every task, and only the ones a change affects (stackr's RFC-0003, moon). uv manages
-# the dependencies; moon never edits a manifest or a lockfile.
+# the Python dependencies and Bun the web packages'; moon never edits a manifest or a lockfile.
 
 # lattice is the root-level project: the family's documentation site and its own tests.
 projects:
@@ -11,6 +11,10 @@ projects:
   grantr: 'packages/grantr'
   stackr: 'packages/stackr'
   portalr: 'packages/portalr'
+  client: 'packages/portalr/web/client'
+  ui: 'packages/portalr/web/ui'
+  app: 'packages/portalr/web/app'
+  admin: 'packages/portalr/web/admin'
   docplan: 'examples/docplan'
   oncall: 'examples/oncall'
 

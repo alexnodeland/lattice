@@ -11,13 +11,12 @@ lattice is the family's one repository: seven packages, two reference implementa
 - Every package stays installable on its own, and CI proves it on every change.
 - The libraries stay independent ([reflexr ADR-0003](reflexr/adr/0003-independent-sibling-of-artifactr.md)), and checks enforce it, where repository walls used to.
 - A change that spans packages lands in one pull request, tested with every package it can break.
-- One of each: lock, CI, set of hooks, documentation site, dev container and release process.
+- One of each: lock per language, CI, set of hooks, documentation site, dev container and release process.
 
 ### Non-goals (for now)
 
 - A shared package for the code artifactr and reflexr keep verbatim ([Aligned with reflexr](artifactr/architecture.md#aligned-with-reflexr)). It would be the shared kernel that reflexr ADR-0003 deferred. In lattice, one pull request changes both copies.
 - Publishing to PyPI ([#7](https://github.com/alexnodeland/lattice/issues/7)). Until then, a package installs from its tag, in a subdirectory of lattice ([Releases](#releases)).
-- TypeScript. The Bun workspace RFC-0003 plans arrives with portalr's code.
 
 ## Layout
 
@@ -30,7 +29,7 @@ lattice/
 │   ├── relayr/          relayr-ai
 │   ├── grantr/          its core, with in-memory storage, so far
 │   ├── stackr/          the stack and the application template: compose.yaml, supabase/, deploy/, scripts/, template/, copier.yml, versions.env, Makefile
-│   └── portalr/         the portal: its Python package, and its web packages to come
+│   └── portalr/         the portal: its Python package, and web/ (client, ui, app, admin), the Bun workspace's packages
 ├── examples/
 │   ├── docplan/         artifactr's reference implementation, and its image
 │   └── oncall/          reflexr's
@@ -42,6 +41,9 @@ lattice/
 ├── .github/             the workflows, issue forms and pull request template
 ├── pyproject.toml       the uv workspace's root: its members, the family's tools, and the shared ruff configuration
 ├── uv.lock              one lock for every package
+├── package.json         the Bun workspace's root: its members, and the shared web tools
+├── bun.lock             one lock for every web package
+├── biome.json, tsconfig.base.json, knip.json   the web packages' shared configuration
 ├── moon.yml             the root project, lattice
 ├── mkdocs.yml           the site's one configuration
 ├── copier.yml           points Copier at stackr's template
@@ -58,7 +60,7 @@ lattice/
 
 ## The projects
 
-moon knows ten projects: the nine below, and `lattice`, the root, which holds the site and the family's own tests and scripts.
+moon knows fourteen projects: the thirteen below, and `lattice`, the root, which holds the site and the family's own tests and scripts.
 
 | Project | Path | What it is | Kind | Depends on |
 |---|---|---|---|---|
@@ -69,6 +71,10 @@ moon knows ten projects: the nine below, and `lattice`, the root, which holds th
 | grantr | `packages/grantr` | Identity and access for artifactr and reflexr; its core so far ([its plan](grantr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
 | stackr | `packages/stackr` | The stack the libraries run on, and the application template | Tool (shell), ships no wheel | artifactr, reflexr, evalr |
 | portalr | `packages/portalr` | The portal: the router that serves the app and admin UIs. Planned: it holds only its version ([RFC-0001](portalr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
+| client | `packages/portalr/web/client` | `@portalr/client`, the only code in the UIs that talks to the server | Library (TypeScript) | |
+| ui | `packages/portalr/web/ui` | `@portalr/ui`, the kit app and admin build from | Library (TypeScript) | |
+| app | `packages/portalr/web/app` | The people's UI, a single-page app | Application (TypeScript) | ui |
+| admin | `packages/portalr/web/admin` | The admin UI, a single-page app | Application (TypeScript) | ui |
 | docplan | `examples/docplan` | artifactr's reference implementation | Application | artifactr, evalr |
 | oncall | `examples/oncall` | reflexr's reference implementation | Application | reflexr |
 
@@ -85,11 +91,13 @@ graph TD
     artifactr --> evalr
     reflexr --> evalr
     grantr
+    app --> ui
+    admin --> ui
 ```
 
 - **An edge is a requirement.** The dependent names its dependency in `[project]` and takes it from the workspace ([The uv workspace](#the-uv-workspace)). The libraries name their siblings with a range, which their wheels carry; docplan and oncall ship no wheel, and name theirs without one. docplan depends on evalr through its `[dspy]` extra.
 - **stackr's edges are its template's:** it generates applications on the three libraries, and no `pyproject.toml` records that.
-- **Each `moon.yml` states its `dependsOn`,** since moon infers no edge from a requirement with a range. [`tests/test_moon.py`](https://github.com/alexnodeland/lattice/blob/main/tests/test_moon.py) holds it to the siblings the project's `pyproject.toml` requires, and checks that each comes from the workspace.
+- **Each `moon.yml` states its `dependsOn`,** since moon infers no edge from a requirement with a range. [`tests/test_moon.py`](https://github.com/alexnodeland/lattice/blob/main/tests/test_moon.py) holds it to the siblings the project's `pyproject.toml` requires, and checks that each comes from the workspace; for a web package, to the workspace packages its `package.json` depends on.
 - **Independence is checked, not assumed.** In one environment every member is importable, so an undeclared import that would once have failed passes silently. artifactr's and reflexr's layering tests list what each layer may import, evalr's forbid artifactr and reflexr, and deptry fails on an import that a package's shipped code doesn't declare.
 
 ## The uv workspace
@@ -103,7 +111,7 @@ The root `pyproject.toml` is a virtual project (`package = false`) whose members
 | ruff | One configuration, at the root; stackr extends it for its scripts |
 | pyright | Per package, until ty replaces it with one root configuration (phase 6); the root's covers `scripts/` and `tests/` |
 | pytest and coverage | Per project, since neither tool reads a parent directory's configuration |
-| The quality test | One, at the root ([`tests/test_quality.py`](https://github.com/alexnodeland/lattice/blob/main/tests/test_quality.py)), over every package, `examples/` and the root's Python: no inline suppressions anywhere |
+| The quality test | One, at the root ([`tests/test_quality.py`](https://github.com/alexnodeland/lattice/blob/main/tests/test_quality.py)), over every package, `examples/` and the root's Python, and portalr's TypeScript: no inline suppressions anywhere |
 
 One resolution means every package agrees on every third-party version. Today that costs one hold: litellm stays at 1.83.0, and `osv-scanner.toml` records the advisories that don't apply ([ADR-0008](adr/0008-one-resolution-litellm-held-at-1-83-0.md)).
 
@@ -117,18 +125,36 @@ Every package that ships a wheel is tagged `distribution` in its `moon.yml`, and
 
 `check` includes `standalone` and `deptry`.
 
+## The Bun workspace
+
+portalr's web packages are a Bun workspace rooted at lattice's root, so TypeScript has one lock, as Python has one `uv.lock` ([portalr ADR-0008](portalr/adr/0008-the-bun-workspace-runs-in-bun.md)).
+
+| | Where it lives |
+|---|---|
+| The members | `packages/portalr/web/*` in the root `package.json`'s `workspaces`: `client`, `ui`, `app` and `admin`, each private, named `@portalr/<name>`, and without a version of its own: portalr's is its `pyproject.toml`'s |
+| The lock | One `bun.lock`, the text lockfile. `bun install` installs it into `node_modules/`, and CI adds `--frozen-lockfile` |
+| The shared tools | The root `package.json`'s devDependencies: TypeScript 7, Biome, Vitest and knip. A package's own tools, such as Vite, are its own. Every version is exact |
+| TypeScript | `tsconfig.base.json`, strict, which each package's `tsconfig.json` extends. `tsc` is TypeScript 7.0, the native compiler; no tool in the workspace needs TypeScript's library API yet ([portalr ADR-0007](portalr/adr/0007-typescript-7-and-6-only-where-a-tool-needs-its-api.md)) |
+| Biome | `biome.json`: formatting and the recommended lint rules, for the web packages and the workspace's own configuration |
+| knip | `knip.json`: one run over the workspace, from the root project, which reads moon's tasks for the tools they run |
+| A sibling | `"@portalr/ui": "workspace:*"`. `client` and `ui` are consumed as source: their `exports` point at `src/index.ts`, and Vite builds them into `app` and `admin` |
+
+**Bun runs every tool, in its own runtime.** Each task runs `bun x --bun --no-install <tool>`, so a tool's Node.js script runs in Bun, and one that `bun.lock` doesn't hold fails rather than being fetched. lattice pins no Node.js, and no task runs one.
+
 ## moon
 
-moon runs every task, and only those a change affects; uv manages the dependencies, and moon never edits a manifest or the lock. moon's Python toolchain stays off until it is stable (RFC-0003, D3), so every Python task is a plain `uv run` command.
+moon runs every task, and only those a change affects; uv and Bun manage the dependencies, and moon never edits a manifest or a lock. moon's Python toolchain stays off until it is stable (RFC-0003, D3), so every Python task is a plain `uv run` command.
 
 | File | Holds |
 |---|---|
-| `.moon/workspace.yml` | The ten projects, by path; `main` as the default branch; moon's version constraint |
+| `.moon/workspace.yml` | The fourteen projects, by path; `main` as the default branch; moon's version constraint |
 | `.moon/tasks/python.yml` | For every Python project: `lint`, `typecheck`, `test`, `format` and `check`. The root's `pyproject.toml` and `uv.lock` are inputs of every task |
 | `.moon/tasks/distribution.yml` | For every project tagged `distribution`: `build`, `standalone` and `deptry` |
+| `.moon/toolchains.yml` | JavaScript, with Bun as its package manager, Bun, and TypeScript. Every setting that would install dependencies or rewrite a `package.json` or `tsconfig.json` is off, and moon installs no Bun of its own: proto does, from `.prototools` |
+| `.moon/tasks/typescript.yml` | For every web package: `lint` (Biome), `typecheck` (`tsc`), `test` (Vitest), `build` (Vite), `format` and `check`. The root's `package.json`, `bun.lock`, `biome.json` and `tsconfig.base.json` are inputs of every task. `client` and `ui` have no `build`, and `app` and `admin` no `test` until they have code to test |
 | `<project>/moon.yml` | The project's language, layer, tags and `dependsOn`, and tasks of its own |
-| `moon.yml` | The root project, `lattice`: lint, types and tests for the root's Python and the family's tests; `docs` and `docs-serve`; `workflows`, which runs actionlint and zizmor; and `check`. It inherits no Python task, which would check every package again |
-| `.prototools` | The versions of moon and uv, which CI's `moonrepo/setup-toolchain` installs, and proto anywhere else. `detect-strategy = "only-prototools"` leaves Python to uv, from `.python-version` |
+| `moon.yml` | The root project, `lattice`: lint, types and tests for the root's Python and the family's tests; `docs` and `docs-serve`; `workflows`, which runs actionlint and zizmor; `knip`, over the Bun workspace; and `check`. It inherits no task, which would check every package again |
+| `.prototools` | The versions of moon, uv and Bun, which CI's `moonrepo/setup-toolchain` installs, and proto anywhere else. `detect-strategy = "only-prototools"` leaves Python to uv, from `.python-version` |
 
 - **`check` is one task per project** that runs nothing itself and depends on the project's checks, so the list lives in one place. `make check` runs `moon run :check`, and CI and Nightly run the same tasks.
 - **artifactr's and reflexr's contributor tasks,** `schema`, `dashboards`, `pg-up`, `pg-down`, `app-up` and `test-pg`, are ones CI doesn't run and moon doesn't cache (RFC-0003, D2). stackr keeps its Makefile for the stack, and its checks are tasks: `validate`, `reference`, `template`, `smoke` and `smoke-app`.
@@ -148,9 +174,9 @@ A change to evalr runs the checks of evalr and of every project above it; a chan
 
 | Workflow | Runs | Jobs |
 |---|---|---|
-| `ci.yml` | On pull requests | **Check** (Python 3.12): `check` in every affected project and its dependents, with PostgreSQL 17 and a database per library. **Tests** (Python 3.13 and 3.14): `test`, the same way. **Images**: `image`, the same way. **Template**: the application template's seven variants, each generated and checked as its own CI would. **Smoke**: the stack, started three ways, with telemetry sent through it, and in one of them an application from the template beside it. **Dependency review**. **OSV**: the advisories a change adds to `uv.lock`. **CI**: passes only when every other job does |
+| `ci.yml` | On pull requests | **Check** (Python 3.12): `check` in every affected project and its dependents, with PostgreSQL 17 and a database per library. **Tests** (Python 3.13 and 3.14): `test`, the same way. **Images**: `image`, the same way. **Template**: the application template's seven variants, each generated and checked as its own CI would. **Smoke**: the stack, started three ways, with telemetry sent through it, and in one of them an application from the template beside it. **Dependency review**. **OSV**: the advisories a change adds to `uv.lock` or `bun.lock`. **CI**: passes only when every other job does |
 | `title.yml` | When a pull request is opened, edited, pushed to or reopened | **Title**: the title is a Conventional Commit |
-| `nightly.yml` | On every push to `main`, every night, and by hand | Every project's `check`, whatever changed; the images; osv-scanner over `uv.lock`; lychee over every Markdown file's links |
+| `nightly.yml` | On every push to `main`, every night, and by hand | Every project's `check`, whatever changed; the images; osv-scanner over `uv.lock` and `bun.lock`; lychee over every Markdown file's links |
 | `docs.yml` | On every push to `main`, and by hand | Builds the site and deploys it to GitHub Pages |
 | `release.yml` | On every push to `main` | release-please; then each released package's wheel, built, attested and attached |
 | `renovate.yml` | Every day, and by hand | Renovate |
@@ -159,22 +185,22 @@ A change to evalr runs the checks of evalr and of every project above it; a chan
 - **`main` is Nightly's.** CI runs on pull requests only, and `nightly.yml` runs everything on each push to `main`.
 - **Every workflow is hardened the same way:** each action pinned to a commit, with its version beside it; `permissions: {}` at the top, and each job granted what it needs; and no checkout keeps its credentials. actionlint and zizmor check the workflows, in the hooks and in the root's `workflows` task.
 - **Every test and every job has a timeout:** a test fails after a minute, printing every thread's stack, and each job has a limit of a few times its usual length ([ADR-0007](adr/0007-a-timeout-on-every-test-and-every-job.md)).
-- **Every job that runs moon or uv installs them** through `moonrepo/setup-toolchain`, at the versions in `.prototools`.
+- **Every job that runs moon, uv or Bun installs them** through `moonrepo/setup-toolchain`, at the versions in `.prototools`. The jobs that run checks and tests install the web packages with `bun install --frozen-lockfile`.
 
 ## Hooks
 
-prek runs the hooks in `.pre-commit-config.yaml`, and `make install` installs them. The Python tools run from `uv.lock` through `uv run`, so the hooks run the versions CI does.
+prek runs the hooks in `.pre-commit-config.yaml`, and `make install` installs them. The Python tools run from `uv.lock` through `uv run`, and Biome from `bun.lock` through `bun x`, so the hooks run the versions CI does.
 
-- The hygiene hooks, leaving each `CHANGELOG.md` exactly as release-please writes it, and `uv.lock` out of the large-file check; JSON, shebangs and private keys, for every file.
+- The hygiene hooks, leaving each `CHANGELOG.md` exactly as release-please writes it, and `uv.lock` and `bun.lock` out of the large-file check; JSON, shebangs and private keys, for every file.
 - Conventional Commits, at `commit-msg`.
-- ruff; yamllint and shellcheck for stackr's files; actionlint and zizmor for the workflows; and pyright, through `moon run :typecheck`, whose cache skips what a change doesn't touch.
+- ruff; Biome for the web packages; yamllint and shellcheck for stackr's files; actionlint and zizmor for the workflows; and pyright and `tsc`, through `moon run :typecheck`, whose cache skips what a change doesn't touch.
 - `.prekignore` leaves out `packages/stackr/template/`, whose hook configuration is the generated applications'.
 - `.git-blame-ignore-revs` names the setup's commit that only sorted imports, and `make install` points `git blame` at it.
 
 ## Dependencies and advisories
 
-- **Renovate** keeps the dependencies current ([ADR-0005](adr/0005-renovate-runs-in-lattices-own-actions.md)), from lattice's own Actions, as lattice's GitHub App ([ADR-0004](adr/0004-one-github-app-for-release-please-and-renovate.md)). `renovate.json` extends `config:best-practices`, which pins actions by commit and maintains the lock weekly. Python ranges stay as written and the lock moves within them, so a package's floors move by hand, with the code that needs them. A release waits three days, on PyPI as on npm. PostgreSQL stays at major 17, the version local Supabase runs. Its `proto` manager moves `.prototools`, and its `pre-commit` manager the hooks.
-- **Advisories.** GitHub's dependency graph doesn't read `uv.lock`, so osv-scanner does: on each pull request for what it adds, and every night in full. [`osv-scanner.toml`](https://github.com/alexnodeland/lattice/blob/main/osv-scanner.toml) records what doesn't apply, each with its reason and a date by which it is reviewed again, and the matching Dependabot alerts are dismissed with the same reasons ([ADR-0008](adr/0008-one-resolution-litellm-held-at-1-83-0.md)). Dependabot's security updates are off.
+- **Renovate** keeps the dependencies current ([ADR-0005](adr/0005-renovate-runs-in-lattices-own-actions.md)), from lattice's own Actions, as lattice's GitHub App ([ADR-0004](adr/0004-one-github-app-for-release-please-and-renovate.md)). `renovate.json` extends `config:best-practices`, which pins actions by commit and maintains the lock weekly. Python ranges stay as written and the lock moves within them, so a package's floors move by hand, with the code that needs them. The web packages' versions are exact, and move with `bun.lock`. A release waits three days, on PyPI as on npm. PostgreSQL stays at major 17, the version local Supabase runs. Its `proto` manager moves `.prototools`, and its `pre-commit` manager the hooks; Bun's version, in `.prototools` and in `package.json`'s `packageManager`, moves in one pull request.
+- **Advisories.** GitHub's dependency graph doesn't read `uv.lock` or `bun.lock`, so osv-scanner does, over every lockfile git doesn't ignore: on each pull request for what it adds, and every night in full. [`osv-scanner.toml`](https://github.com/alexnodeland/lattice/blob/main/osv-scanner.toml) records what doesn't apply, each with its reason and a date by which it is reviewed again, and the matching Dependabot alerts are dismissed with the same reasons ([ADR-0008](adr/0008-one-resolution-litellm-held-at-1-83-0.md)). Dependabot's security updates are off.
 
 ## Releases
 
@@ -199,7 +225,7 @@ prek runs the hooks in `.pre-commit-config.yaml`, and `make install` installs th
 
 ## The dev container
 
-One dev container, at the root, for every package ([ADR-0009](adr/0009-one-dev-container-at-the-root.md)). Docker runs inside it, for stackr's stack, the reference implementations and the PostgreSQL tests. It installs proto, which installs moon and uv from `.prototools`; Python 3.12 to 3.14 through uv; the workspace; and the hooks. The egress firewall, the prebuilt image and Codespaces come in phase 7.
+One dev container, at the root, for every package ([ADR-0009](adr/0009-one-dev-container-at-the-root.md)). Docker runs inside it, for stackr's stack, the reference implementations and the PostgreSQL tests. It installs proto, which installs moon, uv and Bun from `.prototools`; Python 3.12 to 3.14 through uv; the two workspaces; and the hooks. The egress firewall, the prebuilt image and Codespaces come in phase 7.
 
 ## Decisions
 

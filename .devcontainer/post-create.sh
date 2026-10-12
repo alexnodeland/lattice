@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs proto, then moon and uv at the versions in .prototools, then the workspace, as
+# Installs proto, then moon, uv and Bun at the versions in .prototools, then the workspaces, as
 # `make install` does, without assuming make is in the base image.
 set -euo pipefail
 
@@ -8,4 +8,5 @@ export PATH="$HOME/.proto/bin:$HOME/.proto/shims:$PATH"
 proto install
 uv python install 3.12 3.13 3.14
 uv sync --all-packages --all-groups --all-extras
+bun install
 uv run prek install

@@ -1,6 +1,6 @@
 # ADR-0010: The client: generated types, and resumable stores
 
-**Status:** Accepted, amended by [artifactr ADR-0060](../../artifactr/adr/0060-the-openapi-documents-describe-refusals.md) and [reflexr ADR-0060](../../reflexr/adr/0060-the-openapi-documents-describe-refusals.md)
+**Status:** Accepted, amended by [artifactr ADR-0062](../../artifactr/adr/0062-the-openapi-documents-describe-refusals.md) and [reflexr ADR-0061](../../reflexr/adr/0061-the-openapi-documents-describe-refusals.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

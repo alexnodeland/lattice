@@ -53,7 +53,7 @@ def _schemas(node: object) -> Iterator[dict[str, Any]]:
     "document", ["openapi", *sorted(p.name for p in SCHEMAS.glob("*.v1.json"))]
 )
 def test_every_tag_is_required(document: str) -> None:
-    """A field fixed to one value, a union member's tag, is required (ADR-0060)."""
+    """A field fixed to one value, a union member's tag, is required (ADR-0062)."""
     found = (
         openapi_document()
         if document == "openapi"

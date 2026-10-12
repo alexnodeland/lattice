@@ -1,4 +1,4 @@
-# ADR-0060: The OpenAPI documents describe refusals
+# ADR-0061: The OpenAPI documents describe refusals
 
 **Status:** Accepted
 **Date:** 2026-10-12

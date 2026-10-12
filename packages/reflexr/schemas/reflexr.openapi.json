@@ -1338,7 +1338,7 @@
         "type": "object"
       },
       "Refused": {
-        "description": "The body of a refused request (ADR-0060).\n\n``detail`` is the rejection, the message of a resolver's refusal, or the problems FastAPI\nfound with the request.",
+        "description": "The body of a refused request (artifactr ADR-0062, reflexr ADR-0061).\n\n``detail`` is the rejection, the message of a resolver's refusal, or the problems FastAPI\nfound with the request.",
         "properties": {
           "detail": {
             "anyOf": [

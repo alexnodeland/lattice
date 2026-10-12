@@ -1,6 +1,6 @@
 # ADR-0021: The deployment's own tools
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0025](0025-the-application-lists-tenants-and-workspaces-and-writes-for-code-rules.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

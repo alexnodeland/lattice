@@ -1,7 +1,13 @@
 import pytest
 
 from grantr.core import GRANTR_ACTIONS, OPERATOR, Catalog, Invalid, ResourceKind, Role
-from grantr.core.roles import BOOKKEEPING, DEPLOYMENT_READS, LEVELS, TENANT_ADMIN_READS
+from grantr.core.roles import (
+    BOOKKEEPING,
+    CODE_RULE_WRITES,
+    DEPLOYMENT_READS,
+    LEVELS,
+    TENANT_ADMIN_READS,
+)
 from tests.catalogs import ARTIFACTR, PORTALR, REFLEXR
 
 CATALOG = Catalog.of(ARTIFACTR, REFLEXR, PORTALR)
@@ -125,7 +131,10 @@ def test_the_application_holds_the_runtime_and_every_read() -> None:
     assert {"artifactr:read_artifacts", "reflexr:open", "artifactr:give_feedback"} <= application
     bridge = {"artifactr:open", "artifactr:read_events", "reflexr:open", "reflexr:publish"}
     assert bridge <= application, "what relayr's bridge does, as the application"
-    assert application & {"artifactr:edit_artifact", "reflexr:install_rule"} == frozenset()
+    assert application >= CODE_RULE_WRITES & CATALOG.actions, "its code rules write via relayr"
+    assert application & {"artifactr:respond_to_proposal", "reflexr:install_rule"} == frozenset()
+    assert "artifactr:read_workspaces" in application, "it lists a tenant's workspaces"
+    assert application & (TENANT_ADMIN_READS | DEPLOYMENT_READS) == frozenset()
 
 
 def test_a_rule_publishes_checkpoints_and_reads_its_workspace() -> None:

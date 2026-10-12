@@ -1,6 +1,6 @@
 # ADR-0002: Local Supabase, through its CLI
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0019](0019-access-with-grantr-in-the-template.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

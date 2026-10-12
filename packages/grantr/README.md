@@ -14,7 +14,7 @@
 
 **grantr** is the identity and access package for [artifactr](https://lattice.alexnodeland.com/artifactr/) and [reflexr](https://lattice.alexnodeland.com/reflexr/): tenants, their members, groups, roles and service principals, and the grants that bind them to tenants, workspaces, threads, artifacts and rules. The libraries will ask it, through their own hooks, before every command and read. It imports neither library, and neither imports it.
 
-> **Status:** in progress, not yet wired in. Its core, storage and admin API are built: the model, built-in and custom roles, groups, service principals and keys, checks, the libraries' hooks, the audit log, in-memory and SQL storage (the `sql`, `sqlite` and `postgres` extras), the admin router (the `fastapi` extra) and telemetry. The libraries don't ask it yet; the template wires it in next, as its [v0.1 plan](https://lattice.alexnodeland.com/grantr/rfcs/0001-v0.1-implementation-plan/) sets out.
+> **Status:** in progress. Its core, storage and admin API are built: the model, built-in and custom roles, groups, service principals and keys, checks, the libraries' hooks, the audit log, in-memory and SQL storage (the `sql`, `sqlite` and `postgres` extras), the admin router (the `fastapi` extra) and telemetry. stackr's template wires it in by default, so each library asks it before every command and read; restricted items and row-level security come next, as its [v0.1 plan](https://lattice.alexnodeland.com/grantr/rfcs/0001-v0.1-implementation-plan/) sets out.
 
 ## Why
 

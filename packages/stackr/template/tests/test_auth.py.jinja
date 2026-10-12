@@ -13,7 +13,7 @@ from starlette.requests import HTTPConnection
 
 from {{ package_name }}.auth import (
     JwksKeys,
-    Principal,
+    {% if access == 'grantr' %}Person{% else %}Principal{% endif %},
     RequireToken,
     TokenVerifier,
     Unauthenticated,
@@ -48,6 +48,17 @@ def es256(signing_key: ec.EllipticCurvePrivateKey, **claims: Any) -> str:
         **claims,
     }
     return jwt.encode(payload, signing_key, algorithm="ES256", headers={"kid": KID})
+{%- if access == 'grantr' %}
+
+
+def verifier(*, issuer: str | None = None) -> TokenVerifier:
+    return TokenVerifier(audience="authenticated", secret=SECRET, issuer=issuer)
+
+
+async def test_a_valid_token_names_its_user() -> None:
+    person = await verifier().verify(token("alice"))
+    assert person == Person(user_id="alice", name="alice@example.com")
+{%- else %}
 
 
 def verifier(
@@ -61,6 +72,7 @@ def verifier(
 async def test_a_valid_token_names_its_tenant_and_user() -> None:
     principal = await verifier().verify(token("alice"))
     assert principal == Principal(tenant_id=TENANT, user_id="alice", name="alice@example.com")
+{%- endif %}
 
 
 async def test_the_user_is_named_by_its_id_without_an_email() -> None:
@@ -74,8 +86,10 @@ async def test_the_user_is_named_by_its_id_without_an_email() -> None:
         pytest.param(token(expires_in=-60), "expired", id="expired"),
         pytest.param(token(audience="someone-else"), "Audience", id="audience"),
         pytest.param(token(secret=f"another-{SECRET}"), "Signature", id="key"),
+{%- if access != 'grantr' %}
         pytest.param(token(tenant=None), "no tenant", id="no-tenant"),
         pytest.param(token(tenant=None, app_metadata="acme"), "no tenant", id="metadata"),
+{%- endif %}
         pytest.param(jwt.encode({"sub": "a", "aud": "authenticated"}, SECRET), "exp", id="exp"),
         pytest.param("not-a-token", "malformed", id="malformed"),
     ],
@@ -91,10 +105,13 @@ async def test_the_issuer_is_checked_when_it_is_set() -> None:
     with pytest.raises(Unauthenticated, match="issuer"):
         await checked.verify(token(iss="http://elsewhere"))
 
+{%- if access != 'grantr' %}
+
 
 async def test_the_tenant_claim_can_be_elsewhere() -> None:
     principal = await verifier(tenant_claim="org").verify(token(tenant=None, org="initech"))
     assert principal.tenant_id == "initech"
+{%- endif %}
 
 
 async def test_es256_tokens_are_verified_with_the_issuers_keys(
@@ -127,7 +144,7 @@ async def test_keys_are_fetched_from_the_jwks_url(
     monkeypatch.setattr(jwt.PyJWKClient, "fetch_data", fetch)
     url = "http://supabase/auth/v1/.well-known/jwks.json"
     from_settings = TokenVerifier.from_settings(AuthSettings(jwks_url=url))
-    assert (await from_settings.verify(es256(signing_key))).tenant_id == TENANT
+    assert (await from_settings.verify(es256(signing_key))).user_id == "bob"
     assert fetched == [url]
 
 
@@ -189,7 +206,10 @@ def test_require_token_refuses_requests_without_one() -> None:
         await websocket.send_text("hello")
         await websocket.close()
 
-    with TestClient(RequireToken(guarded, verifier())) as client:
+    async def checked(connection: HTTPConnection) -> object:
+        return await verifier().verify(bearer_token(connection))
+
+    with TestClient(RequireToken(guarded, checked)) as client:
         refused = client.get("/")
         assert (refused.status_code, refused.headers["www-authenticate"]) == (401, "Bearer")
         assert refused.json() == {"detail": "an access token is required"}

@@ -8,6 +8,7 @@
 # Usage: scripts/check-app
 #   TEMPLATE_LIBRARIES   artifactr, reflexr or both (default: both)
 #   TEMPLATE_EVALS       true or false (default: true)
+#   TEMPLATE_ACCESS      grantr or none (default: grantr)
 #   TEMPLATE_PYTHON      the application's Python version (default: 3.12)
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -17,6 +18,7 @@ trap 'rm -rf "$scratch"' EXIT
 uv run copier copy --quiet --defaults --vcs-ref HEAD \
   --data libraries="${TEMPLATE_LIBRARIES:-both}" \
   --data evals="${TEMPLATE_EVALS:-true}" \
+  --data access="${TEMPLATE_ACCESS:-grantr}" \
   --data python_version="${TEMPLATE_PYTHON:-3.12}" \
   --data libraries_path="$(dirname "$PWD")" \
   ../.. "$scratch/app"

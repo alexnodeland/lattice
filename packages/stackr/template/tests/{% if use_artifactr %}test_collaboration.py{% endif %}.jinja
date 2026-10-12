@@ -11,10 +11,9 @@ from mcp.types import TextContent
 
 from artifactr import new_id
 
-from {{ package_name }}.auth import TokenVerifier
 from {{ package_name }}.collaboration import Collaboration
 
-from conftest import TENANT, TENANT_KEY, Script, bearer, call, say, settings, wait_for
+from conftest import TENANT, TENANT_KEY, Script, bearer, call, nobody, say, settings, wait_for
 
 BASE = "/artifactr/v1/workspaces/main"
 
@@ -91,7 +90,8 @@ async def test_mcp_clients_in_process_are_refused(script: Script) -> None:
     config = settings()
     collaboration = Collaboration(
         name="{{ project_slug }}",
-        verifier=TokenVerifier.from_settings(config.auth),
+        authenticate=nobody,
+        identify=nobody,
         model=script.model,
         gateway=config.gateway,
     )

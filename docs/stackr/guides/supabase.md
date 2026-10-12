@@ -85,9 +85,10 @@ Supabase Auth issues each signed-in user an access token, a JWT. The CLI pinned 
 | `AUTH_ISSUER` | `http://127.0.0.1:54321/auth/v1` | `iss` |
 | `AUTH_AUDIENCE` | `authenticated` | `aud` |
 | `AUTH_JWT_SECRET` | Empty | HS256 tokens, from a hosted project still on the legacy secret |
-| `AUTH_TENANT_CLAIM` | `app_metadata.tenant_id` | Where the tenant is |
+| `AUTH_TENANT_CLAIM` | `app_metadata.tenant_id` | Where the tenant is, with `access=none` |
+| `AUTH_SERVICE_ROLE_KEY` | Empty | With grantr: for `make tenant` and the other commands to find a user by their email |
 
-Each algorithm is verified only with its kind of key, and a token must carry `exp`, `sub` and the audience. The user is `sub`. The tenant is in `app_metadata`, which only Supabase's service role can set, so a user can't choose their own tenant: set it when you create the user, with the secret key.
+Each algorithm is verified only with its kind of key, and a token must carry `exp`, `sub` and the audience. The user is `sub`. With grantr, the application's default, the tenant is the request's to name and grantr's to check: create the user, then give them a tenant with `make tenant NAME=acme OWNER=ada@example.com` in the application. With `access=none`, the tenant is in `app_metadata`, which only Supabase's service role can set, so a user can't choose their own tenant: set it when you create the user, with the secret key, as below.
 
 ```bash
 eval "$(supabase status -o env | grep -E '^(SECRET_KEY|PUBLISHABLE_KEY)=')"

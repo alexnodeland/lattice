@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Write the template's access matrix from the libraries' catalogs, for each choice of libraries.
+
+Usage: scripts/access-matrix [--check]
+
+An application generated with grantr commits `access.md`, every role against every action, and a
+test of its own compares the two (grantr's `grantr.testing.matrix`). The template renders the
+table for the libraries the application chose, from template/access.md's block for each. This
+script writes those blocks from this checkout's libraries; with `--check` it writes nothing, and
+fails when they are out of date, so a library's new action, or a change to a role, is reviewed
+here as it will be in every application.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+from artifactr.workspace import ACTIONS as ARTIFACTR
+from grantr.testing import matrix
+from reflexr.workspace import ACTIONS as REFLEXR
+
+TEMPLATE = (
+    Path(__file__).resolve().parent.parent
+    / "template"
+    / "{% if access == 'grantr' %}access.md{% endif %}.jinja"
+)
+CATALOGS = {"both": [ARTIFACTR, REFLEXR], "artifactr": [ARTIFACTR], "reflexr": [REFLEXR]}
+
+
+def rendered() -> str:
+    """The template's file: one block per choice of libraries."""
+    blocks = [
+        f"{{% {'if' if i == 0 else 'elif'} libraries == '{choice}' -%}}\n" + matrix(catalogs)
+        for i, (choice, catalogs) in enumerate(CATALOGS.items())
+    ]
+    return "".join(blocks) + "{% endif %}"
+
+
+def main() -> int:
+    """Write the file, or check it."""
+    expected = rendered()
+    if "--check" in sys.argv[1:]:
+        if TEMPLATE.read_text() != expected:
+            print(f"{TEMPLATE.name} is out of date: run scripts/access-matrix", file=sys.stderr)
+            return 1
+        return 0
+    TEMPLATE.write_text(expected)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

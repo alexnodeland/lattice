@@ -30,7 +30,7 @@ WEB = {
 """The Bun workspace's packages."""
 REQUIREMENT = re.compile(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
 
-NOT_IN_PYPROJECT = {"stackr": {"artifactr", "reflexr", "evalr"}}
+NOT_IN_PYPROJECT = {"stackr": {"artifactr", "reflexr", "evalr", "grantr"}}
 """Edges no pyproject.toml records: stackr's template generates applications on the libraries."""
 
 

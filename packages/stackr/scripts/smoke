@@ -23,8 +23,10 @@
 # rendered from, HEAD, as an application generated from lattice does, so HEAD
 # must be pushed and the working tree clean: Copier renders uncommitted
 # changes from a commit of its own, which GitHub doesn't have. In CI, HEAD is
-# the pull request's merge commit. A request without a token is refused. A
-# user signed in with local Supabase Auth sends a message (artifactr) and
+# the pull request's merge commit. A request without a token is refused. The
+# application's own command creates two tenants in grantr: a user signed in
+# with local Supabase Auth owns one, and is refused the other. In theirs, they
+# send a message (artifactr) and
 # opens a ticket (reflexr); each starts an agent whose model request goes
 # through the gateway on a stackr-smoke key, mocked so no provider is called.
 # Each agent's trace, with the gateway's spans in it, is in Tempo and
@@ -296,11 +298,13 @@ app_package=${app_name//-/_}
 app_port=${SMOKE_APP_PORT:-8800}
 app_url="http://127.0.0.1:$app_port"
 
-# The application's API as the signed-in user; the token goes to curl on stdin.
+# The application's API as the signed-in user, in a tenant (APP_TENANT, or the one they own);
+# the token goes to curl on stdin.
 app_call() {
   local path=$1
   shift
-  printf 'header = "Authorization: Bearer %s"\nurl = "%s"\n' "$app_token" "$app_url$path" |
+  printf 'header = "Authorization: Bearer %s"\nheader = "X-Tenant: %s"\nurl = "%s"\n' \
+    "$app_token" "${APP_TENANT:-stackr-smoke}" "$app_url$path" |
     curl -fsS --config - "$@"
 }
 app_json() { app_call "$1" -H 'Content-Type: application/json' --data "$2" -o /dev/null; }
@@ -315,6 +319,9 @@ supabase_auth() {
 }
 
 app_compose() { docker compose --project-directory "$app_dir" --profile app "$@"; }
+
+# The application's own commands, in its container, on its database.
+app_admin() { app_compose exec -T app "$app_name-admin" "$@" >/dev/null; }
 
 cleanup_app() {
   [[ -n ${app_dir:-} ]] || return 0
@@ -415,15 +422,35 @@ ENV
   local password
   password=$(random_hex 16)
   local user="{\"email\": \"$run_id@stackr.local\", \"password\": \"$password\""
-  local tenant='"email_confirm": true, "app_metadata": {"tenant_id": "stackr-smoke"}'
-  if ! app_user=$(supabase_auth "$supabase_secret" /admin/users --data "$user, $tenant}" |
+  if ! app_user=$(supabase_auth "$supabase_secret" /admin/users --data "$user, \"email_confirm\": true}" |
     jq -er .id) ||
     ! app_token=$(supabase_auth "$supabase_publishable" "/token?grant_type=password" --data "$user}" |
       jq -er .access_token); then
     log "FAIL: app: local Supabase didn't sign a user in"
     return 1
   fi
-  log "ok: local Supabase signed a user of the tenant stackr-smoke in"
+  log "ok: local Supabase signed a user in"
+
+  # grantr holds the tenants: one the user owns, and one they aren't in.
+  if ! app_admin tenant stackr-smoke "$app_user" ||
+    ! app_admin tenant stackr-smoke-other "$run_id-someone-else"; then
+    log "FAIL: app: creating its tenants in grantr"
+    return 1
+  fi
+  if app_call "/artifactr/v1/workspaces/$run_id/artifacts" -o /dev/null; then
+    log "ok: the user works in the tenant they own"
+  else
+    log "FAIL: the user can't work in the tenant they own"
+    status=1
+  fi
+  code=$(APP_TENANT=stackr-smoke-other app_call "/artifactr/v1/workspaces/$run_id/artifacts" \
+    -o /dev/null -w '%{http_code}' || true)
+  if [[ $code == 403 ]]; then
+    log "ok: the user is refused the tenant they aren't in"
+  else
+    log "FAIL: the tenant the user isn't in answered $code, not 403"
+    status=1
+  fi
 
   log "app: a message to the notes agent, and a ticket for the triage agent"
   app_json "/artifactr/v1/workspaces/$run_id/commands" \

@@ -144,21 +144,21 @@ The app profile is the application's own `compose.yaml`. Its service joins the `
 
 ### Sign in and call it
 
-The libraries' surfaces need a Supabase access token whose `app_metadata.tenant_id` names the tenant. Create a user of the tenant `acme` with local Supabase's admin API, then sign in:
+The libraries' surfaces need a Supabase access token, and the application's grantr says which tenants its user is in. Create a user with local Supabase's admin API, make them the owner of a tenant `acme` with the application's own command, then sign in:
 
 ```bash
 eval "$(cd ../stackr && supabase status -o env | grep -E '^(SECRET_KEY|PUBLISHABLE_KEY)=')"
 curl -X POST http://127.0.0.1:54321/auth/v1/admin/users \
   -H "apikey: $SECRET_KEY" -H "Authorization: Bearer $SECRET_KEY" -H 'Content-Type: application/json' \
-  -d '{"email": "ada@example.com", "password": "a-local-password", "email_confirm": true,
-       "app_metadata": {"tenant_id": "acme"}}'
+  -d '{"email": "ada@example.com", "password": "a-local-password", "email_confirm": true}'
+AUTH_SERVICE_ROLE_KEY=$SECRET_KEY make tenant NAME=acme OWNER=ada@example.com   # in my-app
 TOKEN=$(curl -s 'http://127.0.0.1:54321/auth/v1/token?grant_type=password' \
   -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Type: application/json' \
   -d '{"email": "ada@example.com", "password": "a-local-password"}' | jq -r .access_token)
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8800/artifactr/v1/workspaces/main/artifacts
 ```
 
-The last request lists a workspace's artifacts, in an application with artifactr; without a token it is refused with 401. The generated `README.md` goes on from here with requests for each library's example. An agent's trace, from the application through the gateway to the model, is in Grafana's Explore (Tempo) and in Langfuse, and the application's metrics are in Prometheus, with `job` set to its slug (`my-app`). [The application template](guides/template.md) describes what was generated and how to keep it up to date.
+The last request lists a workspace's artifacts, in an application with artifactr; without a token it is refused with 401. Ada is in one tenant, so her requests needn't name it; a user in several names one with `X-Tenant`. The generated `README.md` goes on from here with requests for each library's example. An agent's trace, from the application through the gateway to the model, is in Grafana's Explore (Tempo) and in Langfuse, and the application's metrics are in Prometheus, with `job` set to its slug (`my-app`). [The application template](guides/template.md) describes what was generated and how to keep it up to date.
 
 ## Stop
 

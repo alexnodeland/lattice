@@ -1,6 +1,6 @@
 # The application template
 
-stackr's [Copier](https://copier.readthedocs.io) template generates an application on artifactr, reflexr or both, wired to the stack's ports and nothing else: Supabase for sign-in and PostgreSQL, the gateway for models, the Collector for telemetry, and Langfuse for feedback and experiments ([ADR-0004](../adr/0004-the-application-template.md), [ADR-0011](../adr/0011-the-application-template-in-detail.md), [ADR-0015](../adr/0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md)). Its questions are in stackr's `copier.yml`, which the `copier.yml` at lattice's root includes, since Copier reads a repository's root, and its files in `template/`.
+stackr's [Copier](https://copier.readthedocs.io) template generates an application on artifactr, reflexr or both, wired to the stack's ports and nothing else: Supabase for sign-in and PostgreSQL, the gateway for models, the Collector for telemetry, and Langfuse for feedback and experiments ([ADR-0004](../adr/0004-the-application-template.md), [ADR-0011](../adr/0011-the-application-template-in-detail.md), [ADR-0015](../adr/0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md), [ADR-0019](../adr/0019-access-with-grantr-in-the-template.md)). Its questions are in stackr's `copier.yml`, which the `copier.yml` at lattice's root includes, since Copier reads a repository's root, and its files in `template/`.
 
 ## Generate an application
 
@@ -24,6 +24,7 @@ make check          # lint, types and tests, as its CI runs them
 | `project_name`, `project_slug`, `description` | My App, `my-app` | The distribution, the package (`my_app`), the OpenTelemetry service and the Compose project |
 | `libraries` | `both` | `artifactr`, `reflexr`, or both side by side on one database and one telemetry setup |
 | `evals` | Yes | An `evals/` directory with starter evalr experiments |
+| `access` | `grantr` | `grantr`: tenants, members, roles and keys, and every command and read checked; or `none`: the tenant from the token, and every user of a tenant may do anything in it |
 | `python_version` | 3.12 | 3.12, 3.13 or 3.14 |
 | `app_port` | 8800 | The port the application is published on, on this machine |
 
@@ -43,7 +44,8 @@ uvx copier copy --defaults --data libraries=reflexr --data evals=false gh:alexno
 |---|---|---|
 | Surfaces | `app.py`, `collaboration.py`, `automation.py` | FastAPI with each library's REST and WebSocket routes and MCP server, under its name: `/artifactr/v1`, `/artifactr/mcp/`, `/reflexr/v1`, `/reflexr/mcp/`. reflexr's reactor runs while the application is up, and stops gracefully when it stops |
 | Examples | `notes.py`, `tickets.py` | A `note` artifact type, its agent and a `rating` of turns (artifactr); `ticket.opened` and `ticket.triaged` events, a `triage` rule, its agent, and a `triage-review` of runs (reflexr). reflexr's names are qualified with the application's namespace, its package's name: `my_app:ticket.opened`, `my_app:triage` |
-| Identity | `auth.py` | Supabase's access tokens, verified against its published keys (`AUTH_JWKS_URL`), or with a legacy HS256 secret (`AUTH_JWT_SECRET`). The user is `sub` and the tenant `app_metadata.tenant_id`; anything else is 401, the MCP servers included |
+| Identity | `auth.py` | Supabase's access tokens, verified against its published keys (`AUTH_JWKS_URL`), or with a legacy HS256 secret (`AUTH_JWT_SECRET`). The user is `sub`; with `access=none`, the tenant is `app_metadata.tenant_id`. Anything else is 401, the MCP servers included |
+| Access | `access.py`, `admin.py`, `access.md` | With `access=grantr`: the tenant the request names (`X-Tenant`, or a WebSocket's `tenant` parameter, or the user's only one), checked against grantr's memberships; service principals' keys in place of tokens; grantr's hook on both libraries' `Workspaces`; grantr's admin API at `/grantr/v1`; `make operator`, `make tenant` and `make migrate-tenants`; and `access.md`, every role against every action, which a test compares with the libraries' catalogs |
 | Database | `database.py` | The libraries' SQL storage on `DATABASE_URL`, migrated at startup, in a schema of the application's own (`DATABASE_SCHEMA`) |
 | Telemetry | `telemetry.py` | `configure_telemetry` when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, once for both libraries (artifactr's, given reflexr's contribution): FastAPI, SQLAlchemy and httpx traced, the application and its engine included, and the libraries' polling untraced. Langfuse's client when `LANGFUSE_PUBLIC_KEY` is set too, for trace attributes and scores only (`langfuse="scores"`), since traces reach Langfuse through the Collector |
 | Gateway | `gateway.py` | Agents on `litellm_model("default")`, each request with its tenant's key and the `pii-mask` and `prompt-injection` guardrails. A mocked reply, for smoke tests, is in the model's settings |
@@ -63,7 +65,7 @@ The application reads the stack's ports from its environment ([`settings.py`](ht
 |---|---|
 | Telemetry | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_METRIC_EXPORT_INTERVAL` |
 | Database | `DATABASE_URL`, `DATABASE_SCHEMA` |
-| Identity | `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWT_SECRET`, `AUTH_TENANT_CLAIM` |
+| Identity | `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWT_SECRET`; `AUTH_SERVICE_ROLE_KEY` with grantr, for its commands to find users by email; `AUTH_TENANT_CLAIM` without |
 | LLM gateway | `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `LITELLM_TENANT_KEYS`, `LITELLM_MODEL`, `LITELLM_GUARDRAILS` |
 | Evaluation data | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` |
 
@@ -78,6 +80,17 @@ Fill in two things after `make env`: `LITELLM_API_KEY`, a tenant's key from `mak
 | `make serve` | On this machine, with the settings in `.env`, at `APP_HOST:APP_PORT` |
 | `make up` | In the `app` profile: builds its image and runs it beside the stack, at <http://localhost:8800> (`app_port`) |
 | `make down`, `make logs` | Stops the app profile, or follows its logs |
+
+With `access=grantr`, the application's own commands set up its tenants, in process, on its database ([grantr ADR-0021](../../grantr/adr/0021-the-deployments-own-tools.md)). Each takes a user's email, which Supabase Auth's admin API looks up with `AUTH_SERVICE_ROLE_KEY`, or their id:
+
+| Command | What it does |
+|---|---|
+| `make operator EMAIL=...` | Makes a user the deployment's first operator, who may create tenants through grantr's API |
+| `make tenant NAME=... OWNER=...` | Creates a tenant, with its owner, once |
+| `make migrate-tenants` | Moves each user's tenant from their token's `app_metadata.tenant_id` into grantr: a new tenant's earliest user becomes its owner, and the rest its admins; a tenant grantr holds gains its claimed users who aren't members, as admins. It prints who got what, and can run again |
+| `make access-matrix` | Rewrites `access.md`, every role against every action, to review and commit |
+
+`make tenant` here is grantr's; stackr's own `make tenant` creates a tenant's team and key on the gateway.
 
 The **app profile** is the application's own `compose.yaml`, not a service in stackr's. Its service joins the `stackr` network and local Supabase's, and reads [`stackr.env`](https://github.com/alexnodeland/lattice/blob/main/packages/stackr/template/stackr.env) after `.env`, which replaces the stack's addresses in `.env` with their names on those networks. Its `DATABASE_URL` is local Supabase's PostgreSQL by name, unless `STACK_DATABASE_URL` in `.env` names another database.
 
@@ -116,9 +129,10 @@ lattice's tags carry their package's name, so Copier records the application's `
 
 ## How the template is checked
 
-- **`make validate`** renders all six variants (three choices of libraries, with and without evals) with `scripts/check-template`, under a name whose slug is the longest Copier accepts and whose package sorts before `conftest`, and checks that nothing is left unrendered, that the libraries come from lattice at the commit it was rendered from, that the Python passes the generated project's own ruff settings, and that the YAML, shell scripts and Compose file pass their linters.
-- **CI's template job** generates each variant, and the largest again on Python 3.14, and runs its own `make check`: lint, strict types, and the tests with 100% coverage. `scripts/check-app` sets `libraries_path`, so the application installs the libraries from the checkout, and the job runs when stackr or any library changes. A library's change and the template's then land in one pull request, checked together.
-- **`make smoke-app`** generates an application with both libraries and evals, which installs them from GitHub at `HEAD`, as an application generated from lattice does (so `HEAD` must be pushed and the working tree clean; in CI, it is the pull request's merge commit). It runs it in its app profile beside the whole stack, and traces its agents through the gateway into Tempo and Langfuse ([The smoke tests](smoke-tests.md)).
+- **`make validate`** renders all twelve variants (three choices of libraries, with and without evals, with grantr or without access control) with `scripts/check-template`, under a name whose slug is the longest Copier accepts and whose package sorts before `conftest`, and checks that nothing is left unrendered, that the libraries come from lattice at the commit it was rendered from, that the Python passes the generated project's own ruff settings, and that the YAML, shell scripts and Compose file pass their linters.
+- **CI's template job** generates each variant with grantr, the largest again on Python 3.14 and again without access control, and runs its own `make check`: lint, strict types, and the tests with 100% coverage. `scripts/check-app` sets `libraries_path`, so the application installs the libraries from the checkout, and the job runs when stackr or any library changes. A library's change and the template's then land in one pull request, checked together.
+- **`stackr:access-matrix`** checks that the template's `access.md`, which it renders for each choice of libraries, matches the libraries' catalogs and grantr's roles; `scripts/access-matrix` rewrites it.
+- **`make smoke-app`** generates an application with both libraries and evals, which installs them from GitHub at `HEAD`, as an application generated from lattice does (so `HEAD` must be pushed and the working tree clean; in CI, it is the pull request's merge commit). It runs it in its app profile beside the whole stack, creates two tenants with its own command, signs a user in to the one they own and has them refused the other, and traces its agents through the gateway into Tempo and Langfuse ([The smoke tests](smoke-tests.md)).
 
 To render and check one variant locally, from lattice's root, whose `copier.yml` points Copier at the template, with the libraries from the checkout:
 

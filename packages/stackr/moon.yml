@@ -7,6 +7,7 @@ dependsOn:
   - 'artifactr'
   - 'reflexr'
   - 'evalr'
+  - 'grantr'
 
 # Its tasks run the workspace's tools, so the lock and the root's configuration are inputs too.
 tasks:
@@ -28,12 +29,24 @@ tasks:
       - '/uv.lock'
       - '/docs/stackr/reference/**/*'
 
+  access-matrix:
+    description: "Check the template's access matrix against the libraries' catalogs and grantr's roles"
+    command: 'uv run scripts/access-matrix --check'
+    inputs:
+      - 'scripts/access-matrix'
+      - 'template/**/*'
+      - '/packages/artifactr/src/**/*'
+      - '/packages/reflexr/src/**/*'
+      - '/packages/grantr/src/**/*'
+      - '/uv.lock'
+
   check:
     description: "Run the project's checks, as CI does"
     command: 'noop'
     deps:
       - 'validate'
       - 'reference'
+      - 'access-matrix'
 
   # CI's Template and Smoke jobs, with their matrix values in the environment. The values aren't
   # inputs: moon counts a variable that is set as a change, so every variant would run on every

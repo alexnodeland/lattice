@@ -89,58 +89,109 @@ async def test_prometheus_answering_nonsense_or_nothing_is_unavailable() -> None
 
 
 async def test_langfuse_reads_the_tenants_scores_newest_first_and_links_for_operators() -> None:
-    page = {
+    observations = {
+        "data": [
+            {"traceId": "t1", "tags": ["tenant:acme"]},
+            {"traceId": "t2", "tags": ["tenant:acme", "thread:thr_1"]},
+            # Langfuse ignored the filter: another tenant's trace is left out.
+            {"traceId": "t3", "tags": ["tenant:globex"]},
+        ]
+    }
+    scores = {
         "data": [
             {
                 "id": "s1",
-                "traceId": "t1",
                 "name": "thumbs",
-                "value": 1,
+                "dataType": "BOOLEAN",
+                "value": True,
                 "source": "API",
                 "timestamp": "2026-10-12T00:00:00Z",
-                "trace": {"tags": ["tenant:acme"]},
+                "subject": {"kind": "trace", "id": "t1"},
             },
             {
                 "id": "s2",
                 "name": "accuracy",
-                "stringValue": "good",
+                "dataType": "CATEGORICAL",
+                "value": "good",
+                "source": "EVAL",
                 "timestamp": "2026-10-12T01:00:00Z",
                 "comment": "fine",
-                "trace": {"tags": ["tenant:acme", "thread:thr_1"]},
+                "subject": {"kind": "observation", "id": "o1", "traceId": "t2"},
             },
-            # Langfuse ignored the filter: another tenant's score is dropped.
+            # On a trace that isn't the tenant's, or on no trace: dropped.
             {
                 "id": "s3",
                 "name": "thumbs",
+                "dataType": "NUMERIC",
                 "value": 0,
+                "source": "API",
                 "timestamp": "2026-10-12T02:00:00Z",
-                "trace": {"tags": ["tenant:globex"]},
+                "subject": {"kind": "trace", "id": "t3"},
+            },
+            {
+                "id": "s4",
+                "name": "thumbs",
+                "dataType": "NUMERIC",
+                "value": 1,
+                "source": "API",
+                "timestamp": "2026-10-12T03:00:00Z",
+                "subject": {"kind": "session", "id": "thr_1"},
+            },
+            {
+                "id": "s5",
+                "name": "thumbs",
+                "dataType": "NUMERIC",
+                "value": 1,
+                "source": "API",
+                "timestamp": "2026-10-12T04:00:00Z",
             },
         ]
     }
-    tool = Tool({"/api/public/scores": json(page)})
+    tool = Tool(
+        {"/api/public/v2/observations": json(observations), "/api/public/v3/scores": json(scores)}
+    )
     langfuse = Langfuse("http://langfuse", project="p1", client=tool.client())
-    scores = await langfuse.scores(ACME, Window(start=START, end=END))
-    assert isinstance(scores, Ok)
-    assert [score.id for score in scores.data] == ["s2", "s1"]
-    assert scores.data[1].trace_id == "t1"
-    assert scores.data[1].trace_id == "t1"
-    assert tool.last.url.params["traceTags"] == "tenant:acme"
+    read = await langfuse.scores(ACME, Window(start=START, end=END))
+    assert isinstance(read, Ok)
+    assert [(score.id, score.trace_id, score.value) for score in read.data] == [
+        ("s2", "t2", "good"),
+        ("s1", "t1", True),
+    ]
+    assert tool.last.url.params["traceId"] == "t1,t2"
     assert langfuse.trace_link("t1") == "http://langfuse/project/p1/traces/t1"
     assert langfuse.session_link("thr_1") == "http://langfuse/project/p1/sessions/thr_1"
+
+
+async def test_langfuse_names_at_most_fifty_traces_a_request() -> None:
+    observations = {"data": [{"traceId": f"t{n:03}", "tags": ["tenant:acme"]} for n in range(120)]}
+    tool = Tool(
+        {
+            "/api/public/v2/observations": json(observations),
+            "/api/public/v3/scores": json({"data": []}),
+        }
+    )
+    langfuse = Langfuse("http://langfuse", project="p1", client=tool.client())
+    assert await langfuse.scores(ACME, Window(start=START, end=END)) == Ok(data=[])
+    named = [request.url.params["traceId"].split(",") for request in tool.requests[1:]]
+    assert [len(traces) for traces in named] == [50, 50, 20]
+
+
+async def test_langfuse_without_its_apis_or_tags_is_unavailable() -> None:
     absent = Langfuse("http://langfuse", project="p1", client=Tool().client())
     assert await absent.scores(ACME, Window(start=START, end=END)) == Unavailable(
+        reason="langfuse has no observations API at that address"
+    )
+    traced = {
+        "/api/public/v2/observations": json({"data": [{"traceId": "t1", "tags": ["tenant:acme"]}]})
+    }
+    no_scores = Langfuse("http://langfuse", project="p1", client=Tool(traced).client())
+    assert await no_scores.scores(ACME, Window(start=START, end=END)) == Unavailable(
         reason="langfuse has no scores API at that address"
     )
-
-
-async def test_scores_without_their_traces_tags_are_unavailable() -> None:
-    page = {"data": [{"id": "s1", "name": "thumbs", "timestamp": "2026-10-12T00:00:00Z"}]}
-    langfuse = Langfuse(
-        "http://langfuse", project="p1", client=Tool({"/api/public/scores": json(page)}).client()
-    )
+    untagged = {"/api/public/v2/observations": json({"data": [{"traceId": "t1"}]})}
+    langfuse = Langfuse("http://langfuse", project="p1", client=Tool(untagged).client())
     assert await langfuse.scores(ACME, Window(start=START, end=END)) == Unavailable(
-        reason="langfuse answered scores without their traces' tags"
+        reason="langfuse answered observations without their traces' tags"
     )
 
 

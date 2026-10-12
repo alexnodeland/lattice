@@ -404,6 +404,17 @@
             ],
             "title": "Comment"
           },
+          "data_type": {
+            "enum": [
+              "NUMERIC",
+              "BOOLEAN",
+              "CATEGORICAL",
+              "TEXT",
+              "CORRECTION"
+            ],
+            "title": "Data Type",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -413,26 +424,8 @@
             "type": "string"
           },
           "source": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source"
-          },
-          "string_value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "String Value"
+            "title": "Source",
+            "type": "string"
           },
           "timestamp": {
             "format": "date-time",
@@ -440,15 +433,8 @@
             "type": "string"
           },
           "trace_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Trace Id"
+            "title": "Trace Id",
+            "type": "string"
           },
           "value": {
             "anyOf": [
@@ -456,7 +442,10 @@
                 "type": "number"
               },
               {
-                "type": "null"
+                "type": "boolean"
+              },
+              {
+                "type": "string"
               }
             ],
             "title": "Value"
@@ -464,7 +453,11 @@
         },
         "required": [
           "id",
+          "trace_id",
           "name",
+          "data_type",
+          "value",
+          "source",
           "timestamp"
         ],
         "title": "Score",

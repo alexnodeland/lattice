@@ -1,8 +1,8 @@
 """Check portalr's Langfuse and LiteLLM readers against a running stack: each answers ``ok``.
 
 The Acceptance job runs neither tool (portalr ADR-0011), so stackr's smoke test runs this beside
-both. It gives the tenant a trace in Langfuse, tagged as the libraries tag theirs, and a score on
-it, then reads the tenant's scores, its spend and every tenant's spend through portalr's readers.
+both. It sends Langfuse a trace over OpenTelemetry, tagged as the libraries tag theirs, and a score
+on it, then reads the tenant's scores, its spend and every tenant's spend through portalr's readers.
 The tenant's LiteLLM team, ``tenant-<TENANT>``, must exist already, as the smoke test's does.
 
 Usage: scripts/smoke_readers.py TENANT   (from portalr's directory)
@@ -24,7 +24,8 @@ from portalr.readers.langfuse import tenant_tag
 from portalr.tenant import allowed
 
 SCORE = "portalr-smoke"
-TIMEOUT = 120
+TIMEOUT = 240
+"""Seconds to wait for the score: Langfuse's score API may lag its ingestion by minutes."""
 
 
 def say(message: str) -> None:
@@ -33,31 +34,40 @@ def say(message: str) -> None:
 
 
 async def scored(langfuse: Langfuse, tenant: str) -> bool:
-    """Score a trace tagged for the tenant, and find the score through the reader."""
-    trace, now = uuid.uuid4().hex, datetime.now(UTC)
-    stamp = now.isoformat()
-    batch = [
-        {
-            "id": uuid.uuid4().hex,
-            "timestamp": stamp,
-            "type": "trace-create",
-            "body": {
-                "id": trace,
-                "name": SCORE,
-                "timestamp": stamp,
-                "tags": [tenant_tag(allowed(tenant))],
-            },
-        },
-        {
-            "id": uuid.uuid4().hex,
-            "timestamp": stamp,
-            "type": "score-create",
-            "body": {"id": uuid.uuid4().hex, "traceId": trace, "name": SCORE, "value": 1},
-        },
-    ]
-    sent = await langfuse.client.post(f"{langfuse.url}/api/public/ingestion", json={"batch": batch})
+    """Score a trace tagged for the tenant, as the libraries tag theirs, and find the score."""
+    trace, span, now = uuid.uuid4().hex, uuid.uuid4().hex[:16], datetime.now(UTC)
+    nanos = str(int(now.timestamp() * 1e9))
+    tags = {"arrayValue": {"values": [{"stringValue": tenant_tag(allowed(tenant))}]}}
+    spans = {
+        "resourceSpans": [
+            {
+                "resource": {
+                    "attributes": [{"key": "service.name", "value": {"stringValue": SCORE}}]
+                },
+                "scopeSpans": [
+                    {
+                        "spans": [
+                            {
+                                "traceId": trace,
+                                "spanId": span,
+                                "name": SCORE,
+                                "kind": 1,
+                                "startTimeUnixNano": nanos,
+                                "endTimeUnixNano": nanos,
+                                "attributes": [{"key": "langfuse.trace.tags", "value": tags}],
+                            }
+                        ]
+                    }
+                ],
+            }
+        ]
+    }
+    sent = await langfuse.client.post(f"{langfuse.url}/api/public/otel/v1/traces", json=spans)
     sent.raise_for_status()
-    window = Window(start=now - timedelta(hours=1), end=now + timedelta(minutes=5))
+    score = {"traceId": trace, "name": SCORE, "value": 1, "dataType": "NUMERIC"}
+    sent = await langfuse.client.post(f"{langfuse.url}/api/public/scores", json=score)
+    sent.raise_for_status()
+    window = Window(start=now - timedelta(hours=1), end=now + timedelta(minutes=10))
     answer = await langfuse.scores(allowed(tenant), window)
     for _ in range(TIMEOUT // 3):
         if isinstance(answer, Ok) and any(score.trace_id == trace for score in answer.data):

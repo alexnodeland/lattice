@@ -41,7 +41,7 @@ Each reader takes a `Tenant` and typed parameters, and builds its query with the
 | Tempo | `span.tenant.id`, in TraceQL. A trace read by its id is the tenant's only if one span names it and none names another |
 | Loki | `tenant_id`, the structured metadata the collector's `tenant.id` becomes |
 | Prometheus | `tenant_id` in every selector, and prom-label-proxy's `tenant_id` parameter, which rewrites every selector |
-| Langfuse | The traces' `tenant:<id>` tag, checked again on every score it answers |
+| Langfuse | The traces' `tenant:<id>` tag: Langfuse 4's observations API finds the tenant's traces by it, checked again on each, and only scores on those traces are kept |
 | LiteLLM | The tenant's team, `tenant-<id>`, checked again on its answer |
 
 `tests/readers/test_queries.py` builds every query each reader can send, and fails if one lacks its tenant.

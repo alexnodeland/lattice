@@ -269,6 +269,11 @@ class Workspaces:
             in ``registry``. reflexr's own events can never be published.
         emitted: Event types only runs may publish, such as an incident a triage agent opens.
             Clients, over REST, the WebSocket or MCP, are refused them.
+        publishers: The actors that alone may publish some types, such as the bridge that
+            publishes artifactr's events: by namespace (``"artifactr"``), or by type
+            (``"plans:plan_approved"``), whose entry replaces its namespace's. Actors are
+            compared by ``participant``, so every run of one rule's agent is one publisher.
+            Anyone else is refused, runs included.
         registry: The namespaces whose types these workspaces accept. ``events`` and ``emitted``
             must be in it. Applications in one process each use their own, so neither
             accepts the other's types.
@@ -294,7 +299,8 @@ class Workspaces:
     Raises:
         InvalidRule: If a rule refers to an event type, field or predicate that does not exist.
         ValueError: If two rules, or two schedules, have the same name, a type in ``events`` or
-            ``emitted`` is not in ``registry``, or a rule is in a namespace of stored rules.
+            ``emitted`` is not in ``registry``, a rule is in a namespace of stored rules, or a
+            key of ``publishers`` is ``reflexr`` or not a type or namespace in ``registry``.
     """
 
     def __init__(
@@ -303,6 +309,7 @@ class Workspaces:
         *,
         events: Iterable[type[Event]] | None = None,
         emitted: Iterable[type[Event]] = (),
+        publishers: Mapping[str, Iterable[Actor]] | None = None,
         registry: EventRegistry = DEFAULT_REGISTRY,
         rules: Iterable[Rule] = (),
         predicates: Predicates | None = None,
@@ -323,6 +330,7 @@ class Workspaces:
                 raise ValueError(f"{name} is not in the registry these workspaces use")
         accepted = registry if events is None else chosen_types
         known = {**accepted, **from_runs}
+        reserved = _reserved(publishers or {}, registry)
         chosen = dict(predicates or {})
         stored = stored_rules.namespaces if stored_rules else frozenset[str]()
         named: dict[RuleName, Rule] = {}
@@ -343,6 +351,7 @@ class Workspaces:
             storage=storage,
             accepted=accepted,
             emitted=frozenset(from_runs),
+            publishers=reserved,
             known=known,
             rules=named,
             code={name: WorkspaceRule(rule=rule, origin="code") for name, rule in named.items()},
@@ -499,6 +508,9 @@ class _Context:
     storage: Storage
     accepted: Mapping[str, type[Event]]
     emitted: frozenset[str]
+    publishers: Mapping[str, frozenset[str]]
+    """The participants that alone may publish a type, or the types of a namespace."""
+
     known: Mapping[str, type[Event]]
     """The event types rules may watch: those clients may publish, and those only runs may."""
 
@@ -1222,6 +1234,11 @@ class Workspace:
             raise NotFound("event type", name)
         if name.startswith("reflexr:"):
             raise Forbidden(f"{name} events are recorded by reflexr, not published")
+        publishers = self._context.publishers
+        allowed = publishers.get(name, publishers.get(name.partition(":")[0]))
+        if allowed is not None and self._actor.participant not in allowed:
+            named = ", ".join(sorted(allowed)) or "no one"
+            raise Forbidden(f"{name} events are reserved to {named}")
         if name in self._context.emitted:
             if self._cause is None:
                 raise Forbidden(f"{name} events are published by runs, not clients")
@@ -1446,6 +1463,25 @@ def _versioned(changed: RuleVersion) -> RuleVersionOutcome:
     return RuleVersionOutcome(
         rule=stored.rule.name, version=stored.version, seq=changed.seq, duplicate=changed.duplicate
     )
+
+
+def _reserved(
+    publishers: Mapping[str, Iterable[Actor]], registry: EventRegistry
+) -> dict[str, frozenset[str]]:
+    """Each type or namespace reserved to publishers, and their participants (ADR-0057).
+
+    Raises:
+        ValueError: If a key is ``reflexr``'s namespace or type, or not in ``registry``.
+    """
+    namespaces = {t.event_namespace for t in registry.values()}
+    reserved: dict[str, frozenset[str]] = {}
+    for key, actors in publishers.items():
+        if key.partition(":")[0] == "reflexr":
+            raise ValueError(f"{key} events are recorded by reflexr, not published")
+        if key not in registry and key not in namespaces:
+            raise ValueError(f"{key} is not in the registry these workspaces use")
+        reserved[key] = frozenset(actor.participant for actor in actors)
+    return reserved
 
 
 def _check_name(name: str) -> str:

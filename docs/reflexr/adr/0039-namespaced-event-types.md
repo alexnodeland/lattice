@@ -1,6 +1,6 @@
 # ADR-0039: Namespaced event types
 
-**Status:** Accepted
+**Status:** Accepted; its reserved publishers amended by [ADR-0057](0057-reserved-publishers.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 
@@ -438,4 +438,4 @@ No matching change. artifactr's own events are a closed union that nothing else 
 4. [x] Schemas: regenerate both, with `EventName`'s pattern.
 5. [x] oncall: the `oncall` namespace, keeping ADR-0031's local names.
 6. [x] Docs: the protocol, the architecture, the guides and the getting-started page.
-7. [ ] Then: #72 on namespace keys, relayr's phase 1 with `artifactr:` names, and RFC-0002's tracking item in stackr.
+7. [ ] Then: #72 on namespace keys (done: [ADR-0057](0057-reserved-publishers.md)), relayr's phase 1 with `artifactr:` names, and RFC-0002's tracking item in stackr.

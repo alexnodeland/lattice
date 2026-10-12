@@ -1,5 +1,6 @@
 """Workspace handles: publishing, feedback, run operations and reads, with their telemetry."""
 
+import inspect
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import timedelta
 from typing import Any, Literal, cast
@@ -32,6 +33,7 @@ from reflexr.core import (
     Forbidden,
     InvalidState,
     NotFound,
+    Publish,
     RuleFired,
     RuleProgress,
     RunCancelled,
@@ -632,17 +634,18 @@ async def _caused_by_with_nul(workspaces: Workspaces, workspace: Workspace) -> N
 DEPLOYS = Rule(name="app:deploys", when=on(Deploy).where(service=NUL), then=run("note"))
 
 NUL_CALLS: dict[str, NulCall] = {
-    "open's tenant": lambda w, ws: w.open(NUL, "prod", actor=UserActor(id="ada")),
-    "open's workspace": lambda w, ws: w.open("acme", NUL, actor=UserActor(id="ada")),
-    "open's actor": lambda w, ws: w.open("acme", "prod", actor=UserActor(id=NUL)),
+    "open: tenant": lambda w, ws: w.open(NUL, "prod", actor=UserActor(id="ada")),
+    "open: workspace": lambda w, ws: w.open("acme", NUL, actor=UserActor(id="ada")),
+    "open: actor": lambda w, ws: w.open("acme", "prod", actor=UserActor(id=NUL)),
     "rules_for": lambda w, ws: w.rules_for(NUL, actor=UserActor(id="ada")),
     "schedules_for": lambda w, ws: w.schedules_for(NUL, actor=UserActor(id="ada")),
     "as_actor": _as_actor_with_nul,
     "caused_by": _caused_by_with_nul,
-    "an event": lambda w, ws: ws.publish(Deploy(service=NUL)),
-    "an event's id": lambda w, ws: ws.publish(Deploy(service="auth"), id=NUL),
-    "a chain": lambda w, ws: ws.publish(Deploy(service="auth"), correlation_id=NUL),
-    "feedback": lambda w, ws: ws.give_feedback(RunQuality(score=1), on=RunTarget(run_id=NUL)),
+    "publish: event": lambda w, ws: ws.publish(Deploy(service=NUL)),
+    "publish: id": lambda w, ws: ws.publish(Deploy(service="auth"), id=NUL),
+    "publish: chain": lambda w, ws: ws.publish(Deploy(service="auth"), correlation_id=NUL),
+    "publish_many": lambda w, ws: ws.publish_many([Deploy(service="auth")], ids=[NUL]),
+    "give_feedback": lambda w, ws: ws.give_feedback(RunQuality(score=1), on=RunTarget(run_id=NUL)),
     "retry_run": lambda w, ws: ws.retry_run(NUL),
     "skip_run": lambda w, ws: ws.skip_run("run_1", reason=NUL),
     "cancel_run": lambda w, ws: ws.cancel_run("run_1", reason=NUL),
@@ -659,7 +662,45 @@ NUL_CALLS: dict[str, NulCall] = {
     "dead_letters": lambda w, ws: ws.dead_letters(rule=NUL),
     "get_rule": lambda w, ws: ws.get_rule(NUL),
 }
-"""Each way a string reaches a workspace, with a NUL character in it (ADR-0059)."""
+"""Each way a string reaches a workspace, with a NUL character in it (ADR-0059), named by the
+method it reaches, and what it is when a method takes more than one."""
+
+TEXTLESS = {
+    "check": "takes an Access, which every other method builds from text already checked",
+    "rules_in": "takes a workspace or a transaction the library opened",
+    "execute": "answers a rejection rather than raising one: see the test below",
+    "head_seq": "takes nothing",
+    "subscribe": "takes a seq",
+    "rule_progress": "takes nothing",
+    "rule_statuses": "takes nothing",
+    "schedule_statuses": "takes nothing",
+    "schedule_ticks": "takes nothing",
+}
+"""Public methods that take no text of their own, or don't raise, and why."""
+
+
+def test_every_public_method_that_takes_text_refuses_a_nul() -> None:
+    public = {
+        name
+        for cls in (Workspaces, Workspace)
+        for name, member in inspect.getmembers(cls)
+        if not name.startswith("_") and inspect.isfunction(member)
+    }
+    assert {call.split(":")[0] for call in NUL_CALLS} | set(TEXTLESS) == public
+
+
+async def test_a_command_id_with_a_nul_is_answered_with_a_rejection(build: Build) -> None:
+    workspaces = build()
+    workspace = await workspaces.open("acme", "prod", actor=UserActor(id="ada"))
+    result = await workspaces.execute(
+        workspace, Publish(event=Deploy(service="auth")), command_id=NUL
+    )
+    assert result.rejection == {
+        "type": "validation_failed",
+        "message": "text cannot hold a NUL character",
+        "errors": [],
+    }
+    assert await workspace.head_seq() == 0
 
 
 @pytest.mark.parametrize("call", sorted(NUL_CALLS))

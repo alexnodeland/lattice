@@ -732,6 +732,7 @@ class Workspace:
         the log is untraced, so a subscription that polls storage makes no trace per poll
         (ADR-0046); what the subscriber does with each envelope is traced as usual.
         """
+        _check_text(threads)
         await self.check(Access(action="artifactr:read_events"))
         stream = self._storage.subscribe(self._scope, after_seq=after_seq)
         async with contextlib.aclosing(stream) as envelopes:
@@ -896,15 +897,17 @@ def _check_text(*values: object) -> None:
     Raises:
         ValidationFailed: If a string holds a NUL character.
     """
-    for value in values:
+    pending: list[object] = list(values)  # a stack, so deep data can't exhaust recursion
+    while pending:
+        value = pending.pop()
         found = value.model_dump() if isinstance(value, BaseModel) else value
         if isinstance(found, str):
             if "\x00" in found:
                 raise ValidationFailed("text cannot hold a NUL character", [])
         elif isinstance(found, Mapping):
-            _check_text(*cast("Mapping[object, object]", found).items())
+            pending += cast("Mapping[object, object]", found).items()
         elif isinstance(found, Collection) and not isinstance(found, bytes):
-            _check_text(*cast("Collection[object]", found))
+            pending += cast("Collection[object]", found)
 
 
 def _check_page(

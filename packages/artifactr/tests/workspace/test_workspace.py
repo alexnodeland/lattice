@@ -1,6 +1,7 @@
 """Workspace behaviour, independent of the storage implementation."""
 
 import asyncio
+import inspect
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -604,17 +605,19 @@ async def _as_actor_with_nul(workspaces: Workspaces, ws: Workspace) -> None:
 
 
 NUL_CALLS: dict[str, NulCall] = {
-    "open's tenant": lambda w, ws: w.open(NUL, "ws_1", actor=ALICE),
-    "open's workspace": lambda w, ws: w.open("tenant_a", NUL, actor=ALICE),
-    "open's actor": lambda w, ws: w.open("tenant_a", "ws_1", actor=UserActor(id=NUL)),
-    "list's tenant": lambda w, ws: w.list(NUL, actor=ALICE),
-    "list's after": lambda w, ws: w.list("tenant_a", actor=ALICE, after=NUL),
+    "open: tenant": lambda w, ws: w.open(NUL, "ws_1", actor=ALICE),
+    "open: workspace": lambda w, ws: w.open("tenant_a", NUL, actor=ALICE),
+    "open: actor": lambda w, ws: w.open("tenant_a", "ws_1", actor=UserActor(id=NUL)),
+    "list: tenant": lambda w, ws: w.list(NUL, actor=ALICE),
+    "list: after": lambda w, ws: w.list("tenant_a", actor=ALICE, after=NUL),
     "as_actor": _as_actor_with_nul,
-    "a command's text": lambda w, ws: ws.commit(CreateThread(title=NUL)),
-    "a command's data": lambda w, ws: ws.create(Note(text=NUL)),
-    "a command's cursor": lambda w, ws: ws.commit(CreateThread(), cursor=(NUL, 1)),
-    "a fact": lambda w, ws: ws.record(AppEvent(name="noted", data={"note": [NUL]})),
-    "a fact's cursor": lambda w, ws: ws.record(AppEvent(name="noted"), cursor=(NUL, 1)),
+    "commit: text": lambda w, ws: ws.commit(CreateThread(title=NUL)),
+    "commit: cursor": lambda w, ws: ws.commit(CreateThread(), cursor=(NUL, 1)),
+    "create": lambda w, ws: ws.create(Note(text=NUL)),
+    "create_thread": lambda w, ws: ws.create_thread(NUL),
+    "post_message": lambda w, ws: ws.post_message("thr_1", NUL),
+    "record: data": lambda w, ws: ws.record(AppEvent(name="noted", data={"note": [NUL]})),
+    "record: cursor": lambda w, ws: ws.record(AppEvent(name="noted"), cursor=(NUL, 1)),
     "get": lambda w, ws: ws.get(Note, NUL),
     "artifact": lambda w, ws: ws.artifact(NUL),
     "artifacts": lambda w, ws: ws.artifacts(kind=NUL),
@@ -625,12 +628,32 @@ NUL_CALLS: dict[str, NulCall] = {
     "runs": lambda w, ws: ws.runs(thread_id=NUL),
     "history": lambda w, ws: ws.history(NUL),
     "read": lambda w, ws: ws.read(threads=[NUL]),
+    "subscribe": lambda w, ws: anext(aiter(ws.subscribe(threads=[NUL]))),
     "change_notes": lambda w, ws: ws.change_notes(after_seq=0, focus={NUL}),
     "cursor": lambda w, ws: ws.cursor(NUL),
     "save_cursor": lambda w, ws: ws.save_cursor(NUL, 1),
     "claim_thread": _claim_with_nul,
 }
-"""Each way a string reaches a workspace, with a NUL character in it (ADR-0059)."""
+"""Each way a string reaches a workspace, with a NUL character in it (ADR-0059), named by the
+method it reaches, and what it is when a method takes more than one."""
+
+TEXTLESS = {
+    "check": "takes an Access, which every other method builds from text already checked",
+    "head_seq": "takes nothing",
+    "threads": "takes nothing",
+    "proposals": "takes a status, one of a few literals",
+}
+"""Public methods that take no text of their own, and why."""
+
+
+def test_every_public_method_that_takes_text_refuses_a_nul() -> None:
+    public = {
+        name
+        for cls in (Workspaces, Workspace)
+        for name, member in inspect.getmembers(cls)
+        if not name.startswith("_") and inspect.isfunction(member)
+    }
+    assert {call.split(":")[0] for call in NUL_CALLS} | set(TEXTLESS) == public
 
 
 @pytest.mark.parametrize("call", sorted(NUL_CALLS))

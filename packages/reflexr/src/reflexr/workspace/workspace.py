@@ -454,6 +454,10 @@ class Workspaces:
         remembered. A repeated id returns the remembered result and carries nothing out,
         whatever command it comes with, so a retry is safe on every surface.
         """
+        try:
+            _check_text(command_id)
+        except ValidationFailed as refused:  # remembered under no key: storage can't hold it
+            return CommandResult(command_id=command_id, ok=False, rejection=refused.payload())
         key = CommandKey(
             tenant_id=workspace.tenant_id,
             workspace_id=workspace.workspace_id,
@@ -1523,15 +1527,17 @@ def _check_text(*values: object) -> None:
     Raises:
         ValidationFailed: If a string holds a NUL character.
     """
-    for value in values:
+    pending: list[object] = list(values)  # a stack, so deep data can't exhaust recursion
+    while pending:
+        value = pending.pop()
         found = value.model_dump() if isinstance(value, BaseModel) else value
         if isinstance(found, str):
             if "\x00" in found:
                 raise ValidationFailed("text cannot hold a NUL character", [])
         elif isinstance(found, Mapping):
-            _check_text(*cast("Mapping[object, object]", found).items())
+            pending += cast("Mapping[object, object]", found).items()
         elif isinstance(found, Collection) and not isinstance(found, bytes):
-            _check_text(*cast("Collection[object]", found))
+            pending += cast("Collection[object]", found)
 
 
 def _check_page(

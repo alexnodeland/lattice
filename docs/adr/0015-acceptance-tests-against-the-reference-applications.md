@@ -1,6 +1,6 @@
 # ADR-0015: Acceptance tests against the reference applications
 
-**Status:** Accepted
+**Status:** Accepted, amended by [artifactr ADR-0059](../artifactr/adr/0059-a-nul-character-is-refused-at-the-boundary.md) and [reflexr ADR-0059](../reflexr/adr/0059-a-nul-character-is-refused-at-the-boundary.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 
@@ -83,4 +83,4 @@ Schemathesis:
 1. [x] The OpenAPI documents and their drift tests.
 2. [x] The Bruno collections, the `api` tasks and the Acceptance job.
 3. [x] Schemathesis, with what it found fixed or recorded.
-4. [ ] The rejections documented ([#66](https://github.com/alexnodeland/lattice/issues/66)), and NUL bytes refused ([#67](https://github.com/alexnodeland/lattice/issues/67)).
+4. [ ] The rejections documented ([#66](https://github.com/alexnodeland/lattice/issues/66)), and NUL bytes refused (done: [#67](https://github.com/alexnodeland/lattice/issues/67)).

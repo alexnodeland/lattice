@@ -18,6 +18,10 @@
 # routed to `default`, masked by `pii-mask`, priced and charged to the key;
 # `prompt-injection` blocks an injection; with observability, the gateway's
 # spans continue the caller's trace in Tempo (and Langfuse, with langfuse).
+# langfuse and gateway together: portalr's Langfuse reader finds a score on a
+# trace tagged for the stackr-smoke tenant, and its LiteLLM reader reads that
+# tenant's team, which the gateway's check created (portalr's
+# scripts/smoke_readers.py; portalr ADR-0011).
 # app (with every profile, on local Supabase): an application generated from
 # the template (both libraries, bridged by relayr, with evals) runs in its app
 # profile beside the stack. Its image installs the libraries from GitHub at the commit it was
@@ -338,6 +342,26 @@ smoke_langfuse() {
   eventually "the same trace is in Tempo" tempo_has_trace_id
 }
 
+# portalr's readers for the tools its Acceptance job doesn't run, as the stackr-smoke tenant.
+smoke_portalr() {
+  # The keys go to the script in its environment, never in its arguments, read from stackr's
+  # settings before it leaves stackr's directory.
+  local public secret master
+  public=$(setting LANGFUSE_PUBLIC_KEY)
+  secret=$(setting LANGFUSE_SECRET_KEY)
+  master=$(master_key)
+  if (
+    cd ../portalr &&
+      PORTALR_LANGFUSE_URL=$langfuse PORTALR_LITELLM_URL=$gateway \
+      LANGFUSE_PUBLIC_KEY=$public LANGFUSE_SECRET_KEY=$secret LITELLM_MASTER_KEY=$master \
+      uv run --locked scripts/smoke_readers.py stackr-smoke
+  ); then
+    return 0
+  fi
+  log "FAIL: portalr's Langfuse and LiteLLM readers"
+  return 1
+}
+
 # --- app: an application from the template, in its app profile ----------------
 
 app_name=stackr-smoke-app
@@ -563,4 +587,7 @@ for profile in "${profiles[@]}"; do
       ;;
   esac
 done
+if has_profile langfuse && has_profile gateway; then
+  smoke_portalr || status=1
+fi
 exit $status

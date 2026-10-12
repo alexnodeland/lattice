@@ -6,3 +6,10 @@ dependsOn:
 workspace:
   inheritedTasks:
     exclude: ['test'] # it has no code of its own to test until phase 6
+
+tasks:
+  build:
+    outputs:
+      - '/packages/portalr/src/portalr/static/admin/**/*'
+    options:
+      mergeOutputs: 'replace'

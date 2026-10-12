@@ -74,9 +74,19 @@ jobs:
       - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
         with:
           auto-install: true
+      # portalr's wheel carries its two UIs, which Vite builds into its source first.
+      - name: Build portalr's UIs
+        if: matrix.path == 'packages/portalr'
+        run: |
+          bun install --frozen-lockfile
+          moon run app:build admin:build
       - name: Build the package alone, as it is published
         working-directory: ${{ matrix.path }}
         run: uv build --no-sources --out-dir dist
+      - name: Check portalr's wheel carries its UIs
+        if: matrix.path == 'packages/portalr'
+        working-directory: ${{ matrix.path }}
+        run: uv run --no-project python scripts/check_wheel.py
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: ${{ matrix.path }}/dist/*

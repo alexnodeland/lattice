@@ -15,7 +15,7 @@ portalr's design is [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md), and 
 
 ## The router
 
-An application mounts `portalr_router(resolve_actor=, grants=, readers=, invite=, site=)` at `/portalr` ([ADR-0011](adr/0011-the-router-and-its-readers.md)).
+An application mounts `portalr_router(resolve_actor=, grants=, readers=, invite=, site=)` at `/portalr` ([ADR-0011](adr/0011-the-router-and-its-readers.md)). `grants` is grantr's `Grants`, with portalr's catalog, `portalr.actions.ACTIONS`, among its catalogs: grantr's roles give a tenant's owners and admins its reads, and operators the deployment's.
 
 | Route | Answers | Needs |
 |---|---|---|
@@ -30,7 +30,7 @@ An application mounts `portalr_router(resolve_actor=, grants=, readers=, invite=
 | `GET /portalr/v1/deployment/links` | Deep links into Langfuse and Grafana | `portalr:read_deployment` |
 | `POST /portalr/v1/invites` | Invites someone through Supabase Auth, and adds them to the tenant in grantr | `grantr:add_member` |
 
-Each read names its tenant with `X-Tenant`. Each answers `ok`, `unavailable` or `unconfigured`, so a tool that is down fails only its own read. `schemas/portalr.openapi.json` is the routes' document, and a test holds it to the router.
+Each read names its tenant with `X-Tenant`. Each answers `ok`, `unavailable` or `unconfigured`, so a tool that is down fails only its own read. A refused request answers 400, 401, 403 or 422 with a `Refused` body, as artifactr's and reflexr's routers do. `schemas/portalr.openapi.json` is the routes' document, and a test holds it to the router.
 
 ## The readers
 
@@ -41,7 +41,22 @@ Each reader takes a `Tenant` and typed parameters, and builds its query with the
 | Tempo | `span.tenant.id`, in TraceQL. A trace read by its id is the tenant's only if one span names it and none names another |
 | Loki | `tenant_id`, the structured metadata the collector's `tenant.id` becomes |
 | Prometheus | `tenant_id` in every selector, and prom-label-proxy's `tenant_id` parameter, which rewrites every selector |
-| Langfuse | The traces' `tenant:<id>` tag, checked again on every score it answers |
+| Langfuse | The traces' `tenant:<id>` tag: Langfuse 4's observations API finds the tenant's traces by it, checked again on each, and only scores on those traces are kept |
 | LiteLLM | The tenant's team, `tenant-<id>`, checked again on its answer |
 
 `tests/readers/test_queries.py` builds every query each reader can send, and fails if one lacks its tenant.
+
+## The acceptance tests
+
+`moon run portalr:api` starts a test application, `tests/app/`, beside Tempo, Loki, Prometheus and prom-label-proxy, from `compose.yaml` and stackr's configuration ([ADR-0012](adr/0012-acceptance-against-a-two-tenant-stack.md)). Then:
+
+1. `tests/acceptance/` seeds two tenants' traces, logs and metrics, one trace shared between them, and reads as each, through the readers and raw through prom-label-proxy: neither sees the other's;
+2. the Bruno collection's `up/` reads every route, and checks the refusals;
+3. Tempo, Loki and the proxy stop, and `down/` finds each read `unavailable`;
+4. Schemathesis runs over `schemas/portalr.openapi.json`.
+
+Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` there; contract tests cover them, and stackr's Smoke job reads both up through `scripts/smoke_readers.py`.
+
+## The wheel
+
+Vite builds `app` and `admin` into `src/portalr/static/`, which git ignores and the wheel carries. portalr's `build` depends on theirs, and `ui-in-wheel`, in `check` and the release workflow, fails unless this version's wheel holds both.

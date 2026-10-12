@@ -1,0 +1,24 @@
+meta {
+  name: An operator's deep links
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/portalr/v1/deployment/links?trace_id=0123456789abcdef0123456789abcdef&run_id=r1
+  body: none
+  auth: none
+}
+
+headers {
+  x-user: ops
+}
+
+tests {
+  test("links into Langfuse and Grafana", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.langfuse_trace).to.contain("0123456789abcdef0123456789abcdef");
+    expect(res.body.grafana_trace).to.contain("0123456789abcdef0123456789abcdef");
+    expect(res.body.grafana_logs).to.contain("r1");
+  });
+}

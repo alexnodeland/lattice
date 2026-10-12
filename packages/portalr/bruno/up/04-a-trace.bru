@@ -1,0 +1,28 @@
+meta {
+  name: One of them
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/portalr/v1/traces/{{traceId}}
+  body: none
+  auth: none
+}
+
+headers {
+  x-user: alice
+  x-tenant: acme
+}
+
+tests {
+  test("it is answered, or null if another tenant's span shares it", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal("ok");
+    if (res.body.data) {
+      res.body.data.spans
+        .filter((span) => span.attributes["tenant.id"])
+        .forEach((span) => expect(span.attributes["tenant.id"]).to.equal("acme"));
+    }
+  });
+}

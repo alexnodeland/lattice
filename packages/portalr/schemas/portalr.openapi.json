@@ -74,20 +74,43 @@
         "title": "DeploymentTenants",
         "type": "object"
       },
-      "HTTPValidationError": {
+      "FieldError": {
+        "additionalProperties": true,
+        "description": "One problem FastAPI found with a request's parameters or body.",
         "properties": {
-          "detail": {
+          "loc": {
             "items": {
-              "$ref": "#/components/schemas/ValidationError"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
             },
-            "title": "Detail",
+            "title": "Loc",
             "type": "array"
+          },
+          "msg": {
+            "title": "Msg",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
           }
         },
-        "title": "HTTPValidationError",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "FieldError",
         "type": "object"
       },
       "Id": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$",
         "type": "string"
       },
       "Invited": {
@@ -389,6 +412,53 @@
         "title": "Point",
         "type": "object"
       },
+      "Refused": {
+        "description": "The body of a refused request, in the shape artifactr's and reflexr's routers document.\n\n``detail`` is the refusal, the message of one FastAPI gives, or the problems it found with the\nrequest's parameters or body.",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RejectionDetail"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FieldError"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "Refused",
+        "type": "object"
+      },
+      "RejectionDetail": {
+        "additionalProperties": true,
+        "description": "A refusal portalr or grantr gives: its ``type`` and its ``message``.",
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "title": "RejectionDetail",
+        "type": "object"
+      },
       "Score": {
         "description": "A score: a person's feedback, or an evaluator's verdict, on a trace.",
         "properties": {
@@ -403,6 +473,17 @@
             ],
             "title": "Comment"
           },
+          "data_type": {
+            "enum": [
+              "NUMERIC",
+              "BOOLEAN",
+              "CATEGORICAL",
+              "TEXT",
+              "CORRECTION"
+            ],
+            "title": "Data Type",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -412,26 +493,8 @@
             "type": "string"
           },
           "source": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source"
-          },
-          "string_value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "String Value"
+            "title": "Source",
+            "type": "string"
           },
           "timestamp": {
             "format": "date-time",
@@ -439,15 +502,8 @@
             "type": "string"
           },
           "trace_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Trace Id"
+            "title": "Trace Id",
+            "type": "string"
           },
           "value": {
             "anyOf": [
@@ -455,7 +511,10 @@
                 "type": "number"
               },
               {
-                "type": "null"
+                "type": "boolean"
+              },
+              {
+                "type": "string"
               }
             ],
             "title": "Value"
@@ -463,7 +522,11 @@
         },
         "required": [
           "id",
+          "trace_id",
           "name",
+          "data_type",
+          "value",
+          "source",
           "timestamp"
         ],
         "title": "Score",
@@ -723,46 +786,6 @@
         },
         "title": "Unconfigured",
         "type": "object"
-      },
-      "ValidationError": {
-        "properties": {
-          "ctx": {
-            "title": "Context",
-            "type": "object"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "title": "Location",
-            "type": "array"
-          },
-          "msg": {
-            "title": "Message",
-            "type": "string"
-          },
-          "type": {
-            "title": "Error Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError",
-        "type": "object"
       }
     }
   },
@@ -856,15 +879,45 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "Links"
@@ -884,6 +937,46 @@
               }
             },
             "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
           }
         },
         "summary": "Deployment Tenants"
@@ -932,17 +1025,54 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           },
           "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
             "description": "Supabase Auth didn't invite or find the person: `invite_failed`"
           }
         },
@@ -1065,15 +1195,45 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "Logs"
@@ -1129,10 +1289,11 @@
             "name": "step",
             "required": false,
             "schema": {
-              "default": "PT5M",
-              "format": "duration",
+              "default": 300,
+              "maximum": 86400,
+              "minimum": 15,
               "title": "Step",
-              "type": "string"
+              "type": "integer"
             }
           },
           {
@@ -1182,15 +1343,45 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "Metrics"
@@ -1280,15 +1471,45 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "Scores"
@@ -1346,15 +1567,45 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "Spend"
@@ -1476,15 +1727,45 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "Traces"
@@ -1500,6 +1781,7 @@
             "name": "trace_id",
             "required": true,
             "schema": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$",
               "title": "Trace Id",
               "type": "string"
             }
@@ -1551,15 +1833,45 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Refused"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Refused"
           }
         },
         "summary": "Trace"

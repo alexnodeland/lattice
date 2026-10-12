@@ -2,13 +2,15 @@
 # under web/ are projects of their own, so its Python tasks read only the Python package's files.
 language: 'python'
 layer: 'library'
-tags: ['distribution']
+tags: ['distribution', 'api']
 dependsOn:
   - 'grantr'
 
 fileGroups:
   python:
     - 'src/**/*'
+    - '!src/portalr/static/**/*'
+    - 'scripts/**/*'
     - 'tests/**/*'
     - 'schemas/**/*'
     - 'pyproject.toml'
@@ -28,10 +30,21 @@ tasks:
     inputs: ['@group(python)']
     options:
       mergeInputs: 'replace'
+  # The wheel carries the two UIs, which Vite builds into src/portalr/static/.
   build:
-    inputs: ['@group(python)']
+    inputs: ['@group(python)', 'src/portalr/static/**/*']
+    deps:
+      - 'app:build'
+      - 'admin:build'
     options:
       mergeInputs: 'replace'
+
+  ui-in-wheel:
+    description: "Check that the built wheel carries both UIs"
+    command: 'uv run --no-project python scripts/check_wheel.py'
+    inputs: ['scripts/check_wheel.py']
+    deps:
+      - 'build'
   standalone:
     inputs: ['@group(python)', '/scripts/standalone.py']
     options:
@@ -46,8 +59,24 @@ tasks:
       mergeInputs: 'replace'
   check:
     inputs: ['@group(python)']
+    deps:
+      - 'ui-in-wheel'
     options:
       mergeInputs: 'replace'
+
+  # Its own acceptance run, in place of the tag's: the test application beside the tools, the
+  # two-tenant test, the Bruno collection with the tools up and then down, and Schemathesis.
+  api:
+    command: 'scripts/api'
+    deps:
+      - 'app:build'
+      - 'admin:build'
+    inputs:
+      - 'src/portalr/static/**/*'
+      - '/packages/stackr/deploy/**/*'
+      - '/packages/grantr/src/**/*'
+    options:
+      mergeArgs: 'replace'
 
   schema:
     description: "Regenerate the router's OpenAPI document, schemas/portalr.openapi.json"

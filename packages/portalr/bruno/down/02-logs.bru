@@ -1,0 +1,23 @@
+meta {
+  name: logs, with Loki down
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/portalr/v1/logs?start={{start}}&end={{end}}
+  body: none
+  auth: none
+}
+
+headers {
+  x-user: alice
+  x-tenant: acme
+}
+
+tests {
+  test("unavailable, and nothing else fails", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal("unavailable");
+  });
+}

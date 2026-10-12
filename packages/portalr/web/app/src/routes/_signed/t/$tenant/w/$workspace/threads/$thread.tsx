@@ -9,8 +9,8 @@ import {
   Streaming,
   ToolCall,
 } from "@portalr/ui";
-import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useMe } from "../../../../../../../me";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
 
 /** A thread's chat: its messages, its runs as they go, its proposals, and a message to post. */
@@ -45,9 +45,7 @@ function author(actor: ArtifactrV1.Actor, me: string): string {
 function Chat() {
   const { tenant, thread: id } = Route.useParams();
   const { queries, user } = Route.useRouteContext();
-  const memberships = useSuspenseQuery(queries.grantr.memberships(user)).data;
-  // Who the server attributes this person's messages and feedback to, in this tenant.
-  const me = memberships.find((membership) => membership.tenant === tenant)?.user ?? user;
+  const me = useMe(queries, user, tenant);
   const stream = useStream();
   const snapshot = useWorkspace();
   const { threads, runs, proposals } = snapshot.state;
@@ -69,12 +67,12 @@ function Chat() {
   );
   const proposed = Object.values(proposals).filter((proposal) => proposal.threadId === id);
 
-  const give = (message: Artifactr.Message) => (up: boolean) =>
+  const give = (message: Artifactr.Message) => (up: boolean, comment: string | null) =>
     stream.send({
       type: "give_feedback",
       feedback_type: "thumbs",
       target: { kind: "message", thread_id: id, message_id: message.id, run_id: message.runId },
-      value: { up },
+      value: comment === null ? { up } : { up, comment },
     });
 
   return (
@@ -89,7 +87,7 @@ function Chat() {
             key={message.id}
             message={message}
             author={author(message.actor, me)}
-            thumbs={thumbs(message, me)}
+            thumbs={thumbs(message.feedback, me)}
             {...(message.runId !== null && { onThumbs: give(message) })}
           />
         ))}

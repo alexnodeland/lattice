@@ -1,6 +1,6 @@
 /**
  * reflexr's workspace protocol: a workspace's stored rules and runs, as reflexr's own events
- * build them.
+ * build them, and the feedback on its runs.
  *
  * reflexr's schema types an event as open, `{type, ...}`, since the application's events share
  * the log with reflexr's own. The reducer has one handler for each of reflexr's run and rule
@@ -8,15 +8,29 @@
  * reflexr's schema names its own events (lattice#83), this reducer is typed like artifactr's.
  */
 
+import type { Feedback } from "./feedback";
 import type * as v1 from "./generated/reflexr.v1";
 import type { Classified, Protocol, Stream } from "./stream";
 
 export interface Run {
   readonly id: string;
   readonly rule: string;
-  /** `running`, `retrying`, `succeeded`, `dead_lettered`, `cancelled` or `skipped`. */
-  readonly status: string;
+  /** Queued for its next attempt (`pending`), running, waiting to retry, or how it ended. */
+  readonly status:
+    | "pending"
+    | "running"
+    | "retrying"
+    | "succeeded"
+    | "dead_lettered"
+    | "cancelled"
+    | "skipped";
   readonly attempt: number;
+  /** How many times a person retried it: each retry starts its attempts again. */
+  readonly retries: number;
+  /** The `seq` it started at: the later, the newer. */
+  readonly started: number;
+  /** The feedback given on it, oldest first. */
+  readonly feedback: readonly Feedback<v1.EventFrame["actor"]>[];
 }
 
 export interface Rule {
@@ -32,7 +46,7 @@ export interface Workspace {
 }
 
 type Event = v1.EventFrame["event"];
-type Handler = (state: Workspace, event: Event) => Workspace;
+type Handler = (state: Workspace, event: Event, envelope: v1.EventFrame) => Workspace;
 
 function text(event: Event, field: string): string {
   const value = event[field];
@@ -44,8 +58,20 @@ function count(event: Event, field: string): number {
   return typeof value === "number" ? value : 0;
 }
 
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function withRun(state: Workspace, id: string, change: Partial<Run>): Workspace {
-  const run = state.runs[id] ?? { id, rule: "", status: "running", attempt: 1 };
+  const run: Run = state.runs[id] ?? {
+    id,
+    rule: "",
+    status: "running",
+    attempt: 1,
+    retries: 0,
+    started: 0,
+    feedback: [],
+  };
   return { ...state, runs: { ...state.runs, [id]: { ...run, ...change } } };
 }
 
@@ -54,7 +80,7 @@ function withRule(state: Workspace, name: string, change: Partial<Rule>): Worksp
   return { ...state, rules: { ...state.rules, [name]: { ...rule, ...change } } };
 }
 
-function ended(status: string): Handler {
+function ended(status: Run["status"]): Handler {
   return (state, event) => withRun(state, text(event, "run_id"), { status });
 }
 
@@ -71,18 +97,25 @@ const handlers: Readonly<Record<string, Handler>> = {
     const name = text(event, "rule");
     return withRule(state, name, { firings: (state.rules[name]?.firings ?? 0) + 1 });
   },
-  "reflexr:run_started": (state, event) =>
-    withRun(state, text(event, "run_id"), {
+  "reflexr:run_started": (state, event, envelope) => {
+    const id = text(event, "run_id");
+    return withRun(state, id, {
       rule: text(event, "rule"),
       status: "running",
       attempt: count(event, "attempt"),
-    }),
+      // Its first attempt's `seq`: a later attempt doesn't make the run newer.
+      started: state.runs[id]?.started || envelope.seq,
+    });
+  },
   "reflexr:run_retrying": (state, event) =>
     withRun(state, text(event, "run_id"), {
       status: "retrying",
       attempt: count(event, "attempt"),
     }),
-  "reflexr:run_requeued": ended("running"),
+  "reflexr:run_requeued": (state, event) => {
+    const id = text(event, "run_id");
+    return withRun(state, id, { status: "pending", retries: (state.runs[id]?.retries ?? 0) + 1 });
+  },
   "reflexr:run_succeeded": ended("succeeded"),
   "reflexr:run_dead_lettered": ended("dead_lettered"),
   "reflexr:run_cancelled": ended("cancelled"),
@@ -92,13 +125,26 @@ const handlers: Readonly<Record<string, Handler>> = {
   "reflexr:rule_reset": ignore,
   "reflexr:run_progressed": ignore,
   "reflexr:tick": ignore,
-  "reflexr:feedback_given": ignore,
+  "reflexr:feedback_given": (state, event, envelope) => {
+    const { target, value } = event;
+    const run =
+      isRecord(target) && target.kind === "run" ? state.runs[String(target.run_id)] : null;
+    if (!run) {
+      return state; // a firing's or a chain's, or a run before what the store read
+    }
+    const feedback = {
+      actor: envelope.actor,
+      type: text(event, "feedback_type"),
+      value: isRecord(value) ? value : {},
+    };
+    return withRun(state, run.id, { feedback: [...run.feedback, feedback] });
+  },
 };
 
 /** The state after one event. */
 export function apply(state: Workspace, envelope: v1.EventFrame): Workspace {
   const handler = handlers[envelope.event.type];
-  return handler ? handler(state, envelope.event) : state;
+  return handler ? handler(state, envelope.event, envelope) : state;
 }
 
 function classify(frame: v1.ServerFrame): Classified<v1.ServerFrame, v1.CommandResult> {

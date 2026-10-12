@@ -20,7 +20,9 @@ export {
 export { Button } from "./button";
 export { Card } from "./card";
 export {
+  CommandButton,
   Composer,
+  type GiveThumbs,
   Message,
   Messages,
   ProposalCard,
@@ -29,6 +31,7 @@ export {
   RunStatus,
   type Sent,
   Streaming,
+  Thumbs,
   ToolCall,
 } from "./chat";
 export { EmptyState } from "./empty-state";

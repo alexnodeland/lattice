@@ -67,3 +67,16 @@ Then("they are told it isn't found", async ({ page }) => {
     timeout: 2000,
   });
 });
+
+When("they find the note helpful", async ({ page, scenario }) => {
+  const note = page.getByRole("region", { name: kept(scenario.note) });
+  await note.getByRole("button", { name: "Helpful", exact: true }).click();
+});
+
+Then("the note shows them finding it helpful", async ({ page, scenario }) => {
+  const note = page.getByRole("region", { name: kept(scenario.note) });
+  await expect(note.getByRole("button", { name: "Helpful", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});

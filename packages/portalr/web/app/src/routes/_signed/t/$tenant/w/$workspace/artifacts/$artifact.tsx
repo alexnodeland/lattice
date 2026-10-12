@@ -1,8 +1,10 @@
-import { changes, keys, Refused } from "@portalr/client";
-import { ArtifactContent, Diff, ProposalCard, proposedOn, rendererFor } from "@portalr/ui";
+import { changes, keys, Refused, thumbs } from "@portalr/client";
+import { ArtifactContent, Diff, ProposalCard, proposedOn, rendererFor, Thumbs } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
+import { allowedIn } from "../../../../../../../allowed";
+import { useMe } from "../../../../../../../me";
 import { RENDERERS } from "../../../../../../../renderers";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
 
@@ -11,12 +13,19 @@ import { Connection, useStream, useWorkspace } from "../../../../../../../worksp
  * what it changed; and the proposals open on it. Its revisions are read over REST, again as the
  * workspace's log moves past them.
  */
+/** What a person may do on an artifact's page, beyond responding to its proposals. */
+const ACTIONS = ["artifactr:give_feedback"] as const;
+
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/$artifact")({
   head: ({ params }) => ({
     meta: [{ title: `${params.artifact} · ${params.workspace} · portalr` }],
   }),
   loader: async ({ context, params }) => {
     const { tenant, workspace, artifact } = params;
+    await Promise.all([
+      context.queryClient.ensureQueryData(allowedIn(context.queries, tenant, workspace, ACTIONS)),
+      context.queryClient.ensureQueryData(context.queries.grantr.memberships(context.user)),
+    ]);
     try {
       const revisions = await context.queryClient.ensureQueryData(
         context.queries.artifactr.revisions(tenant, workspace, artifact),
@@ -44,7 +53,13 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/
 
 function Artifact() {
   const { tenant, workspace, artifact: id } = Route.useParams();
-  const { queries, queryClient } = Route.useRouteContext();
+  const { queries, queryClient, user } = Route.useRouteContext();
+  const me = useMe(queries, user, tenant);
+  const checks = useMemo(
+    () => allowedIn(queries, tenant, workspace, ACTIONS),
+    [queries, tenant, workspace],
+  );
+  const { data: allowed } = useSuspenseQuery(checks);
   const { data: revisions } = useSuspenseQuery(queries.artifactr.revisions(tenant, workspace, id));
   const stream = useStream();
   const snapshot = useWorkspace();
@@ -92,6 +107,24 @@ function Artifact() {
         </p>
         <Connection snapshot={snapshot} waiting="the workspace" />
         <ArtifactContent kind={latest.kind} data={latest.data} renderers={RENDERERS} />
+        {allowed.has("artifactr:give_feedback") && (
+          <Thumbs
+            given={thumbs(
+              (snapshot.state.artifacts[id]?.feedback ?? []).filter(
+                (given) => given.version === latest.version,
+              ),
+              me,
+            )}
+            onThumbs={(up, comment) =>
+              stream.send({
+                type: "give_feedback",
+                feedback_type: "thumbs",
+                target: { kind: "artifact", artifact_id: id, version: latest.version },
+                value: comment === null ? { up } : { up, comment },
+              })
+            }
+          />
+        )}
       </section>
       {open.length > 0 && (
         <section aria-labelledby="open" className="flex flex-col gap-2">

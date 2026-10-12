@@ -21,6 +21,7 @@ nav:
   - adr/0015-the-chat-components-and-streamdown.md
   - adr/0016-the-threads-area.md
   - adr/0017-the-artifacts-and-proposals-areas.md
+  - adr/0018-the-runs-area-and-feedback.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

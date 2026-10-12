@@ -11,7 +11,7 @@
 ## Decision
 
 - **The Collector names every signal's tenant as `tenant.id`.** A `transform/tenant` processor, in every pipeline, copies `artifactr.tenant.id` or `reflexr.tenant.id` to `tenant.id` on spans, data points and log records. Tempo keeps it as `span.tenant.id`, Loki as the `tenant_id` structured metadata, and Prometheus as the `tenant_id` label.
-- **prom-label-proxy is portalr's path to Prometheus,** in the `observability` profile, at `PROM_LABEL_PROXY_PORT` (9091), bound to `STACKR_BIND`. It takes the tenant from its `tenant_id` parameter and rewrites every selector of every query to it. Grafana keeps its direct data source, for operators.
+- **prom-label-proxy is portalr's path to Prometheus,** in the `observability` profile, at `PROM_LABEL_PROXY_PORT` (9091), bound to `STACKR_BIND`. It takes the tenant from its `tenant_id` parameter and rewrites every selector of every query to it. Grafana keeps its direct data source, for operators. The proxy authenticates no one: it is only as private as `STACKR_BIND`, like Prometheus's own port.
 - **The smoke test checks both:** its trace and log are found by `tenant.id`, and the proxy finds its metric for its tenant and nothing for another.
 
 ## Options considered

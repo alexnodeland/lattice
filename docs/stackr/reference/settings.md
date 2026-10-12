@@ -39,7 +39,7 @@ Grafana signs in as `admin` with this password.
 |---|---|
 | `GRAFANA_ADMIN_PASSWORD` | Generated: 43 URL-safe characters |
 
-Published ports. Applications send OTLP to the Collector on 4317 (gRPC) or 4318 (HTTP), and profiles to Pyroscope on 4040.
+Published ports. Applications send OTLP to the Collector on 4317 (gRPC) or 4318 (HTTP), and profiles to Pyroscope on 4040; portalr reads Prometheus through prom-label-proxy on 9091.
 
 | Setting | In `.env.example` |
 |---|---|
@@ -48,11 +48,6 @@ Published ports. Applications send OTLP to the Collector on 4317 (gRPC) or 4318 
 | `PYROSCOPE_PORT` | `4040` |
 | `GRAFANA_PORT` | `3000` |
 | `PROMETHEUS_PORT` | `9090` |
-
-prom-label-proxy, portalr's tenant-scoped path to Prometheus.
-
-| Setting | In `.env.example` |
-|---|---|
 | `PROM_LABEL_PROXY_PORT` | `9091` |
 | `TEMPO_PORT` | `3200` |
 | `LOKI_PORT` | `3100` |

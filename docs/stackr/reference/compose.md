@@ -122,7 +122,8 @@ portalr's path to Prometheus: it rewrites every query's selectors to the tenant 
 | Networks | `stackr` |
 | Volumes | none |
 | Depends on | `prometheus` |
-| Runs | `-label=tenant_id -upstream=http://prometheus:9090 -insecure-listen-address=0.0.0.0:8080` |
+| Runs | `-label=tenant_id -upstream=http://prometheus:9090 -insecure-listen-address=0.0.0.0:8080 -internal-listen-address=127.0.0.1:8081` |
+| Health check | `wget -q -O /dev/null http://127.0.0.1:8081/metrics`, every 5s |
 | Restart | `unless-stopped` |
 
 ### `loki`

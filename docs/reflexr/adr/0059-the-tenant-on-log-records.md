@@ -13,7 +13,7 @@
 - **`configure_telemetry` puts the tenant on log records.** A record logged in a span that names a tenant, or in any span inside one, carries that span's tenant attribute.
 - **Two processors do it:** a span processor remembers, for each open span, its own tenant attribute or the one of the span it was opened in; a log record processor copies the current span's onto each record, before it is exported. An attribute the record names itself is kept.
 - **A library's tenant attribute is its contribution's name and `.tenant.id`:** `artifactr.tenant.id`, `reflexr.tenant.id`. One `configure_telemetry` handles both libraries, from the contributions it is given, and the contribution port is unchanged. artifactr's `configure_telemetry` does the same, in the same code.
-- **A span's attributes are read when a child opens, or a record is logged,** so a tenant named after the span started, as a stream names it once the socket is authorized, still reaches what follows.
+- **A span's attributes are read when a child opens, or a record is logged,** so a tenant named after the span started, as a stream names it once the socket is authorized, reaches the children opened, and the records logged, after it is named. A child opened before then keeps none.
 
 ## Options considered
 
@@ -26,4 +26,4 @@
 ## Consequences
 
 - Easier: stackr's Collector names every signal's tenant as `tenant.id`, and portalr filters Loki on it.
-- Harder: a record logged outside any tenant's span carries no tenant, and portalr doesn't show it to a tenant.
+- Harder: a record logged outside any tenant's span carries no tenant, and portalr doesn't show it to a tenant. Nor does a record logged in a trace the sampler drops: its spans aren't recorded, so they name no tenant.

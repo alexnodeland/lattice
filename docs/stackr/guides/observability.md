@@ -76,7 +76,7 @@ This translation is a contract with the libraries' dashboards, so a change to th
 
 Samples up to 30 minutes out of order are accepted, since the Collector retries batches.
 
-**prom-label-proxy** sits in front of Prometheus for portalr, at `PROM_LABEL_PROXY_PORT` (9091). portalr names a tenant in its `tenant_id` parameter, and the proxy rewrites every selector in the query to that tenant, so a query reads only the tenant's series. Grafana keeps its direct data source, for operators. The smoke test checks that the proxy finds its metric for its tenant and nothing for another.
+**prom-label-proxy** sits in front of Prometheus for portalr, at `PROM_LABEL_PROXY_PORT` (9091). portalr names a tenant in its `tenant_id` parameter, and the proxy rewrites every selector in the query to that tenant, so a query reads only the tenant's series. Grafana keeps its direct data source, for operators. The proxy authenticates no one: it is only as private as `STACKR_BIND`, like Prometheus's own port. The smoke test checks that the proxy finds its metric for its tenant and nothing for another.
 
 ## Loki: logs
 

@@ -83,11 +83,13 @@ eventually() {
   log "ok: $description"
 }
 
+# Telemetry as a library sends it, naming the tenant with its attribute: artifactr's unless
+# LIBRARY says otherwise.
 telemetrygen() {
   docker compose --profile smoke run --rm --no-deps telemetrygen "$@" \
     --otlp-endpoint otel-collector:4317 --otlp-insecure \
     --service "$service" --telemetry-attributes "smoke.run=\"$run_id\"" \
-    --telemetry-attributes "artifactr.tenant.id=\"$tenant\"" >/dev/null 2>&1
+    --telemetry-attributes "${LIBRARY:-artifactr}.tenant.id=\"$tenant\"" >/dev/null 2>&1
 }
 
 # A query's JSON result has at least one element.
@@ -112,9 +114,13 @@ tempo_has_tenants_trace() {
 }
 loki_has_tenants_log() {
   curl -fsS --get "$loki/loki/api/v1/query_range" \
-    --data-urlencode "query={service_name=\"$service\"} | tenant_id=\"$tenant\"" \
+    --data-urlencode "query={service_name=\"$service\"} | tenant_id=\"$tenant\" |= \"$1\"" \
     --data-urlencode "since=1h" |
     grep -q '"values":\[\['
+}
+# tenant_id is structured metadata, not an index label: a label per tenant would multiply streams.
+loki_keeps_the_tenant_out_of_its_labels() {
+  ! curl -fsS "$loki/loki/api/v1/labels" | grep -q '"tenant_id"'
 }
 proxy_has() {
   curl -fsS --get "$prom_label_proxy/api/v1/query" --data-urlencode "tenant_id=$1" \
@@ -152,13 +158,18 @@ smoke_observability() {
   telemetrygen metrics --metrics 1 --metric-type Sum --aggregation-temporality cumulative \
     --otlp-metric-name stackr.smoke
   telemetrygen logs --logs 1 --body "stackr smoke test $run_id"
+  LIBRARY=reflexr telemetrygen logs --logs 1 --body "stackr smoke test $run_id from reflexr"
 
   eventually "the trace is in Tempo" tempo_has_trace
   eventually "the metric is in Prometheus as stackr_smoke_total" \
     prometheus_has "stackr_smoke_total{job=\"$service\", smoke_run=\"$run_id\"}"
   eventually "the log is in Loki" loki_has_log
   eventually "the trace names its tenant as tenant.id in Tempo" tempo_has_tenants_trace
-  eventually "the log names its tenant as tenant_id in Loki" loki_has_tenants_log
+  eventually "artifactr's log names its tenant as tenant_id in Loki" \
+    loki_has_tenants_log "smoke test $run_id"
+  eventually "reflexr's log names its tenant as tenant_id in Loki" \
+    loki_has_tenants_log "from reflexr"
+  eventually "Loki keeps tenant_id out of its index labels" loki_keeps_the_tenant_out_of_its_labels
   eventually "prom-label-proxy finds the metric for its tenant" proxy_has "$tenant"
   eventually "prom-label-proxy finds nothing for another tenant" proxy_hides_from_another_tenant
   eventually "Tempo's span metrics are in Prometheus" \

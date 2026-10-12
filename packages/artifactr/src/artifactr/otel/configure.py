@@ -10,7 +10,7 @@ import os
 from collections.abc import Callable, Collection, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Final, Literal, Protocol, Self
+from typing import TYPE_CHECKING, Any, Final, Literal, Protocol, Self, cast
 
 from opentelemetry import context, metrics, trace
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
@@ -504,6 +504,7 @@ def _remove(handler: logging.Handler) -> None:
     handler.close()
 
 
+# Shared verbatim with reflexr's otel/configure.py: change both.
 TENANT_SUFFIX: Final = ".tenant.id"
 """A contribution's tenant attribute is its name and this: ``artifactr.tenant.id``,
 ``reflexr.tenant.id``. The log records of a span that names one, or of any span inside it, carry
@@ -540,9 +541,8 @@ class _TenancyLogs(LogRecordProcessor):
         self._tenancy = tenancy
 
     def on_emit(self, log_record: ReadWriteLogRecord) -> None:
-        attributes = log_record.log_record.attributes
-        if not isinstance(attributes, MutableMapping):
-            return  # the SDK makes every record's attributes mutable; nothing to add to otherwise
+        # The SDK gives every record it emits a mutable BoundedAttributes.
+        attributes = cast("MutableMapping[str, object]", log_record.log_record.attributes)
         for name, value in self._tenancy.of(trace.get_current_span()).items():
             attributes.setdefault(name, value)
 

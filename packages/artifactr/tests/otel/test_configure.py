@@ -4,7 +4,6 @@ import importlib.util
 import logging
 import os
 from collections.abc import Iterator
-from types import MappingProxyType
 from typing import Any
 
 import pytest
@@ -12,9 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from opentelemetry import baggage, metrics, trace
 from opentelemetry import context as otel_context
-from opentelemetry._logs import LogRecord
 from opentelemetry.instrumentation.httpx import HTTPX2ClientInstrumentor, HTTPXClientInstrumentor
-from opentelemetry.sdk._logs import ReadWriteLogRecord
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -29,7 +26,7 @@ from artifactr.otel import (
     installed,
     metric_views,
 )
-from artifactr.otel.configure import _signal, _Tenancy, _TenancyLogs
+from artifactr.otel.configure import _signal
 from artifactr.sql import create_sqlite_engine
 from artifactr.telemetry import SCOPE, Telemetry
 from artifactr.telemetry.attributes import COMMAND_TYPE, SESSION_ID, TENANT_ID, WORKSPACE_ID
@@ -181,13 +178,6 @@ def test_a_record_logged_in_a_tenants_span_carries_its_tenant(captured: Captured
         "outside": None,
     }
     handle.shutdown()
-
-
-def test_a_record_whose_attributes_cant_change_is_left_alone() -> None:
-    record = ReadWriteLogRecord(LogRecord(body="frozen", attributes={"key": "value"}))
-    record.log_record.attributes = MappingProxyType({"key": "value"})
-    _TenancyLogs(_Tenancy(frozenset({TENANT_ID}))).on_emit(record)
-    assert dict(record.log_record.attributes) == {"key": "value"}
 
 
 def test_without_logs_there_is_no_logger_provider(captured: Captured) -> None:

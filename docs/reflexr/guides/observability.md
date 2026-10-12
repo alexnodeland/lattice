@@ -37,7 +37,8 @@ It sets up:
 - a baggage span processor that copies a run attempt's session onto every span in it (see [Sessions and causal chains](#sessions-and-causal-chains))
 - the open instrumentations reflexr advises, FastAPI, SQLAlchemy, httpx and httpx2, for whichever of them is installed, with the stable HTTP semantic conventions; `instrument=` names others, such as `asyncpg` for an application that queries with asyncpg directly (SQLAlchemy's spans already cover the queries reflexr makes through it)
 - pydantic-ai's instrumentation settings: `telemetry.capability()` is its `Instrumentation` capability for your agents, with prompts, completions and tool arguments left out unless `include_content=True`
-- an OTLP handler on the root logger, so `logging` records are exported with the trace and span they were logged in; `logs=False` leaves logging alone; a record logged in a span that names a tenant, as `reflexr.tenant.id`, or in any span inside one, carries that attribute too, so stackr's Collector can name its tenant as `tenant.id` ([ADR-0059](../adr/0059-the-tenant-on-log-records.md))
+- an OTLP handler on the root logger, so `logging` records are exported with the trace and span they were logged in; `logs=False` leaves logging alone
+- a record logged in a span that names a tenant, as `reflexr.tenant.id`, or in any span inside one, carries that attribute too, so stackr's Collector can name its tenant as `tenant.id` ([ADR-0059](../adr/0059-the-tenant-on-log-records.md)); a record logged in a trace the sampler drops carries none
 
 Instrumentation patches libraries, which only reaches objects created through the patched names afterwards. Most applications import `FastAPI` and `create_async_engine` before they configure telemetry, so pass the application to `telemetry.instrument_app(app)` and each engine to `telemetry.instrument_engine(engine)`, or give existing engines as `engines=` when configuring.
 

@@ -62,6 +62,21 @@ class GrantRow(Base):
     role: Mapped[str] = mapped_column(primary_key=True)
 
 
+class ResourceRow(Base):
+    """A thread or artifact grantr knows because it was restricted, and whether it is now."""
+
+    __tablename__ = "grantr_resources"
+    __table_args__ = (
+        Index("ix_grantr_resources_restricted", "tenant_id", "resource_workspace", "restricted"),
+    )
+
+    tenant_id: Mapped[str] = mapped_column(primary_key=True)
+    resource_kind: Mapped[str] = mapped_column(primary_key=True)
+    resource_workspace: Mapped[str] = mapped_column(primary_key=True)
+    resource_id: Mapped[str] = mapped_column(primary_key=True)
+    restricted: Mapped[bool]
+
+
 class GroupRow(Base):
     """A group, which exists even with no members."""
 

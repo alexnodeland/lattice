@@ -11,12 +11,13 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from reflexr.core.ids import RuleName, RunId
+from reflexr.core.tagged import tag_required
 
 
 class UserActor(BaseModel):
     """A person, identified by the host application's user id."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     kind: Literal["user"] = "user"
     id: str
@@ -36,7 +37,7 @@ class UserActor(BaseModel):
 class AgentActor(BaseModel):
     """An agent or graph running an action for one firing of a rule."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     kind: Literal["agent"] = "agent"
     rule: RuleName
@@ -62,7 +63,7 @@ class ExternalAgentActor(BaseModel):
     does. A client with credentials of its own acts for no one.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     kind: Literal["external_agent"] = "external_agent"
     client_id: str
@@ -84,7 +85,7 @@ class ExternalAgentActor(BaseModel):
 class SystemActor(BaseModel):
     """reflexr itself (the reactor, schedules), or the application acting on its own behalf."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     kind: Literal["system"] = "system"
     name: str = "reflexr"
@@ -103,7 +104,7 @@ class SystemActor(BaseModel):
 class SourceActor(BaseModel):
     """A system that publishes events, such as a monitoring service or a webhook."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     kind: Literal["source"] = "source"
     name: str
@@ -122,7 +123,7 @@ class SourceActor(BaseModel):
 class EvaluatorActor(BaseModel):
     """An evaluator: a judge or decision model whose verdicts are recorded as feedback."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     kind: Literal["evaluator"] = "evaluator"
     name: str

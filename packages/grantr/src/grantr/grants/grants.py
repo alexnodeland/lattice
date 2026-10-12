@@ -45,6 +45,7 @@ from grantr.core import (
     Membership,
     Resource,
     ResourceKind,
+    Restricted,
     Revoked,
     Role,
     RoleDefined,
@@ -54,6 +55,7 @@ from grantr.core import (
     TenantCreated,
     TenantDeleted,
     TenantId,
+    Unrestricted,
     User,
     UserId,
     Visibility,
@@ -64,6 +66,7 @@ from grantr.core import (
     verify,
 )
 from grantr.core.grants import held
+from grantr.core.roles import RESTRICT
 from grantr.grants.storage import Reads, Storage, Transaction
 from grantr.telemetry import SLOW_CHECK, Reason, Telemetry
 
@@ -85,6 +88,9 @@ class Access(Protocol):
         """The qualified action, such as ``artifactr:edit_artifact``."""
         ...
 
+
+RESTRICTABLE: Final = frozenset({"thread", "artifact"})
+"""The kinds of item that can be restricted."""
 
 NAMED: Final[tuple[tuple[ResourceKind, str], ...]] = (
     ("thread", "thread_id"),
@@ -179,11 +185,34 @@ class Grants:
     ) -> Visibility:
         """The threads and artifacts a subject may not see in a workspace.
 
-        No item is restricted until the restricted flag arrives (grantr RFC-0001's phase 5), so
-        nothing is hidden.
+        A restricted thread or artifact is hidden from everyone but those granted a role on it,
+        and those who may restrict it: the workspace's admins, and the tenant's owners and
+        admins. The application's own principal sees everything.
         """
-        del tenant, subject, workspace
-        return Visibility()
+        items = await self._storage.restricted(tenant, workspace)
+        if not items or await self._sees_everything(subject):
+            return Visibility()
+        hidden = list(items)
+        if not isinstance(subject, Agent):
+            grants = await self._storage.grants(tenant, subject)
+            custom = await self._custom(self._storage, tenant, grants)
+            hidden = [
+                item
+                for item in items
+                if not held(grants, item, self._catalog, custom, restricted=True)
+            ]
+        return Visibility(
+            threads=frozenset(item.id for item in hidden if item.kind == "thread" and item.id),
+            artifacts=frozenset(item.id for item in hidden if item.kind == "artifact" and item.id),
+        )
+
+    async def _sees_everything(self, subject: Subject) -> bool:
+        """Whether a subject is the application's own principal, holding its role."""
+        return (
+            isinstance(subject, ServicePrincipal)
+            and subject == self._application
+            and await self._storage.has(_application(subject))
+        )
 
     async def resources(
         self, tenant: TenantId, subject: Subject, action: str, kind: ListableKind
@@ -198,7 +227,14 @@ class Grants:
         candidates = await self._storage.resources(tenant, kind)
         grants = await self._storage.grants(tenant, subject)
         custom = await self._custom(self._storage, tenant, grants)
-        return [r for r in candidates if action in held(grants, r, self._catalog, custom)]
+        restricted = (
+            frozenset(await self._storage.restricted(tenant)) if kind in RESTRICTABLE else ()
+        )
+        return [
+            r
+            for r in candidates
+            if action in held(grants, r, self._catalog, custom, restricted=r in restricted)
+        ]
 
     async def member(self, tenant: TenantId, user: UserId) -> Membership | None:
         """A user's membership of a tenant, or None if they aren't a member."""
@@ -260,6 +296,26 @@ class Grants:
 
     # ─── what an admin lists ─────────────────────────────────────────────────
     # Each list is read with the action of the command that changes it.
+
+    async def restrictions(
+        self, tenant: TenantId, workspace: WorkspaceId, *, by: Subject
+    ) -> list[Resource]:
+        """The threads and artifacts restricted in a workspace.
+
+        Raises:
+            Forbidden: If ``by`` may not: ``grantr:restrict`` on the workspace.
+        """
+        on = Resource(kind="workspace", workspace=workspace)
+        await self._require(self._storage, tenant, by, RESTRICT, on)
+        return await self._storage.restricted(tenant, workspace)
+
+    async def served_tenants(self) -> list[TenantId]:
+        """Every tenant, for the deployment's own in-process tools, such as a startup task.
+
+        It checks no one: no surface reaches it, as none reaches :meth:`provision_tenant`.
+        Surfaces list tenants with :meth:`tenants`, for an operator.
+        """
+        return await self._storage.tenants()
 
     async def tenants(self, *, by: Subject) -> list[TenantId]:
         """Every tenant, for an operator.
@@ -621,6 +677,27 @@ class Grants:
             await tx.remove_grant(grant)
             return await record(tenant, by, Revoked(grant=grant))
 
+    async def restrict(
+        self, tenant: TenantId, on: Resource, *, restricted: bool = True, by: Subject
+    ) -> AuditEntry:
+        """Restrict a thread or artifact to those granted a role on it, or lift its restriction.
+
+        Its workspace's admins, and the tenant's owners and admins, see it either way.
+
+        Raises:
+            Forbidden: If ``by`` may not: ``grantr:restrict`` on the item.
+            Invalid: If it isn't a thread or artifact, or is restricted, or not, already.
+        """
+        if on.kind not in RESTRICTABLE:
+            raise Invalid(f"a {on.kind} isn't restricted: only a thread or artifact is")
+        async with self._change(tenant) as (tx, record):
+            await self._require(tx, tenant, by, RESTRICT, on)
+            if await tx.is_restricted(tenant, on) == restricted:
+                raise Invalid(f"the {on.kind} is {'' if restricted else 'not '}restricted already")
+            await tx.set_restricted(tenant, on, restricted)
+            event = Restricted(on=on) if restricted else Unrestricted(on=on)
+            return await record(tenant, by, event)
+
     async def issue_key(
         self, tenant: TenantId, principal: ServicePrincipal, *, by: Subject
     ) -> tuple[str, AuditEntry]:
@@ -682,7 +759,15 @@ class Grants:
             return frozenset()
         scope = None if on.kind == "deployment" else tenant
         grants = await reads.grants(scope, subject, on=on.chain())
-        actions = held(grants, on, self._catalog, await self._custom(reads, scope, grants))
+        # The flag matters only to a grant around the item, so it is read only if there is one.
+        restricted = (
+            tenant is not None
+            and on.kind in RESTRICTABLE
+            and any(grant.on != on for grant in grants)
+            and await reads.is_restricted(tenant, on)
+        )
+        custom = await self._custom(reads, scope, grants)
+        actions = held(grants, on, self._catalog, custom, restricted=restricted)
         # ``application`` is the one deployment role that holds in every tenant.
         if (
             isinstance(subject, ServicePrincipal)

@@ -4,6 +4,7 @@ import asyncio
 import threading
 import time
 from collections.abc import Callable, Iterator
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -15,7 +16,7 @@ from starlette.requests import HTTPConnection
 from artifactr.agent import ArtifactWorkspace, Runner, Session
 from artifactr.core import Actor, Forbidden, TenantId, UserActor, WorkspaceId
 from artifactr.fastapi import Unauthorized, artifactr_router
-from artifactr.workspace import Access, InMemoryStorage, Workspaces
+from artifactr.workspace import Access, Hidden, InMemoryStorage, Workspaces
 from tests.agent.conftest import Script
 from tests.artifact_types import Checklist, Note
 
@@ -71,6 +72,8 @@ def build(
     script: Script,
     *,
     latch: Latch | None = None,
+    hidden: Hidden | None = None,
+    hidden_refresh: timedelta = timedelta(seconds=30),
     **options: Any,
 ) -> tuple[FastAPI, Runner[Latch]]:
     agent: Agent[Session[Latch], Any] = Agent(
@@ -80,7 +83,13 @@ def build(
         capabilities=[ArtifactWorkspace(types=[Note, Checklist])],
     )
     runner = Runner(agent, app=latch or Latch())
-    workspaces = Workspaces(InMemoryStorage(), types=[Note, Checklist], authorize=authorize)
+    workspaces = Workspaces(
+        InMemoryStorage(),
+        types=[Note, Checklist],
+        authorize=authorize,
+        hidden=hidden,
+        hidden_refresh=hidden_refresh,
+    )
     app = FastAPI()
     router = artifactr_router(workspaces, runner, resolve_actor=resolve_actor, **options)
     app.include_router(router, prefix="/v1")

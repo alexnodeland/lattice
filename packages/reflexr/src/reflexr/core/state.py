@@ -10,10 +10,11 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue
 
 from reflexr.core.events import Causation, RuleErrored, RuleFired
 from reflexr.core.ids import FiringId, RuleName, ScopeKey
+from reflexr.core.tagged import tag_required
 
 
 class _State(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
 
 class Match(_State):

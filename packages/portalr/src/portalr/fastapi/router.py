@@ -103,6 +103,42 @@ class Links(BaseModel):
     grafana_logs: str | None = None
 
 
+class RejectionDetail(BaseModel):
+    """A refusal portalr or grantr gives: its ``type`` and its ``message``."""
+
+    model_config = ConfigDict(extra="allow")
+
+    type: str
+    message: str
+
+
+class FieldError(BaseModel):
+    """One problem FastAPI found with a request's parameters or body."""
+
+    model_config = ConfigDict(extra="allow")
+
+    loc: list[str | int]
+    msg: str
+    type: str
+
+
+class Refused(BaseModel):
+    """The body of a refused request, in the shape artifactr's and reflexr's routers document.
+
+    ``detail`` is the refusal, the message of one FastAPI gives, or the problems it found with the
+    request's parameters or body.
+    """
+
+    detail: RejectionDetail | str | list[FieldError]
+
+
+REFUSALS: Final[dict[int | str, dict[str, Any]]] = {
+    status: {"model": Refused, "description": "Refused"} for status in (400, 401, 403, 422)
+}
+"""The refused responses every route under ``/v1`` documents, described in words of portalr's
+own, since FastAPI's default is Python's phrase for the status, which changes between versions."""
+
+
 TenantHeader = Annotated[TenantId | None, Header(alias="X-Tenant")]
 """The tenant a request reads, which grantr checks."""
 
@@ -136,6 +172,7 @@ def portalr_router(
     """
     router = APIRouter()
     router.include_router(ui_router(site, ui))
+    api = APIRouter(responses=REFUSALS)
 
     async def caller(request: Request) -> Caller:
         try:
@@ -177,28 +214,28 @@ def portalr_router(
             readers=readers.configured(),
         )
 
-    @router.get("/v1/traces", response_model=reading(list[TraceSummary]))
+    @api.get("/v1/traces", response_model=reading(list[TraceSummary]))
     async def traces(
         query: Annotated[TraceQuery, Query()], tenant: Tenant = telemetry
     ) -> Ok[list[TraceSummary]] | Unavailable | Unconfigured:
         """The tenant's traces, a session's or a run's, from Tempo."""
         return await readers.tempo.search(tenant, query) if readers.tempo else Unconfigured()
 
-    @router.get("/v1/traces/{trace_id}", response_model=reading(Trace | None))
+    @api.get("/v1/traces/{trace_id}", response_model=reading(Trace | None))
     async def trace(
         trace_id: Id, tenant: Tenant = telemetry
     ) -> Ok[Trace | None] | Unavailable | Unconfigured:
         """A trace, if it is the tenant's: its spans, for its waterfall."""
         return await readers.tempo.trace(tenant, trace_id) if readers.tempo else Unconfigured()
 
-    @router.get("/v1/logs", response_model=reading(list[LogLine]))
+    @api.get("/v1/logs", response_model=reading(list[LogLine]))
     async def logs(
         query: Annotated[LogQuery, Query()], tenant: Tenant = telemetry
     ) -> Ok[list[LogLine]] | Unavailable | Unconfigured:
         """The tenant's logs, a thread's or a run's, from Loki."""
         return await readers.loki.logs(tenant, query) if readers.loki else Unconfigured()
 
-    @router.get("/v1/metrics", response_model=reading(list[Point]))
+    @api.get("/v1/metrics", response_model=reading(list[Point]))
     async def metrics(
         query: Annotated[MetricQuery, Query()], tenant: Tenant = telemetry
     ) -> Ok[list[Point]] | Unavailable | Unconfigured:
@@ -207,26 +244,26 @@ def portalr_router(
             return Unconfigured()
         return await readers.prometheus.series(tenant, query)
 
-    @router.get("/v1/scores", response_model=reading(list[Score]))
+    @api.get("/v1/scores", response_model=reading(list[Score]))
     async def scores(
         window: Annotated[Window, Query()], tenant: Tenant = telemetry
     ) -> Ok[list[Score]] | Unavailable | Unconfigured:
         """The tenant's feedback and evaluation scores, from Langfuse."""
         return await readers.langfuse.scores(tenant, window) if readers.langfuse else Unconfigured()
 
-    @router.get("/v1/spend", response_model=reading(Spend | None))
+    @api.get("/v1/spend", response_model=reading(Spend | None))
     async def spend(tenant: Tenant = spending) -> Ok[Spend | None] | Unavailable | Unconfigured:
         """The tenant's usage and spend, against its budget, from its LiteLLM team."""
         return await readers.litellm.spend(tenant) if readers.litellm else Unconfigured()
 
-    @router.get("/v1/deployment/tenants")
+    @api.get("/v1/deployment/tenants")
     async def deployment_tenants(by: Subject = operating) -> DeploymentTenants:
         """Every tenant, with its spend from one LiteLLM team list, for operators."""
         tenants = await grants.tenants(by=by)
         spent = await readers.litellm.every_tenant() if readers.litellm else Unconfigured()
         return DeploymentTenants(tenants=tenants, spend=spent)
 
-    @router.get("/v1/deployment/links")
+    @api.get("/v1/deployment/links")
     async def links(
         trace_id: Id | None = None,
         session_id: Id | None = None,
@@ -243,7 +280,8 @@ def portalr_router(
         )
 
     if invite is not None:
-        _invitations(router, grants, invite, current)
+        _invitations(api, grants, invite, current)
+    router.include_router(api)
 
     return router
 
@@ -253,7 +291,10 @@ def _refused(error: GrantrError) -> HTTPException:
 
 
 def _invitations(router: APIRouter, grants: Grants, invite: Invite, current: Any) -> None:
-    failed = {"description": "Supabase Auth didn't invite or find the person: `invite_failed`"}
+    failed = {
+        "model": Refused,
+        "description": "Supabase Auth didn't invite or find the person: `invite_failed`",
+    }
 
     @router.post("/v1/invites", status_code=201, responses={502: failed})
     async def invite_member(

@@ -124,3 +124,16 @@ async def test_archived_artifacts_are_listed_on_request(ws: Workspace) -> None:
     assert await list_artifacts_text(ws) == "- n1 (note, v1)"
     listed = await list_artifacts_text(ws, "note", include_archived=True)
     assert listed == "- n1 (note, v1)\n- n2 (note, v2, archived)"
+
+
+async def test_a_command_id_with_a_nul_is_answered_with_a_rejection(
+    ws: Workspace, gate: Gate
+) -> None:
+    runner = make_runner(make_agent(Script()), gate)
+    result = await runner.execute(ws, CreateThread(thread_id="t1"), command_id="c\x00")
+    assert result.rejection == {
+        "type": "validation_failed",
+        "message": "text cannot hold a NUL character",
+        "errors": [],
+    }
+    assert await ws.read() == [], "nothing was carried out"

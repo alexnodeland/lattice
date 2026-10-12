@@ -43,7 +43,7 @@ from artifactr.core import (
     new_id,
 )
 from artifactr.telemetry import annotate, attribution
-from artifactr.workspace import Access, Workspace, Workspaces
+from artifactr.workspace import Workspace, Workspaces
 
 type McpContext = Context[Any, Request]
 """The context a :data:`ResolveClient` receives: the MCP SDK's ``Context`` of one request.
@@ -248,8 +248,8 @@ class ArtifactrMcp:
 
         The MCP SDK serves ``subscriptions/listen`` itself, so this middleware asks, when a
         stream opens, what reading each artifact it names would: its tenant, and ``authorize``
-        for opening its workspace and for ``artifactr:read_artifacts``. A refusal fails the
-        request, with the resource read's message.
+        for opening its workspace and for ``artifactr:read_artifacts``, of an artifact that
+        exists and isn't hidden. A refusal fails the request, with the resource read's message.
         """
         if ctx.method == "subscriptions/listen":
             params = SubscriptionsListenRequestParams.model_validate(ctx.params, by_name=False)
@@ -272,9 +272,9 @@ class ArtifactrMcp:
                     opened[workspace_id] = await self._workspaces.open(
                         tenant_id, workspace_id, actor=actor
                     )
-                read = Access(action="artifactr:read_artifacts", artifact_id=match["artifact"])
-                await opened[workspace_id].check(read)
-            except Forbidden as refused:
+                # As a read: refused, or missing if it is hidden or doesn't exist.
+                await opened[workspace_id].artifact(match["artifact"])
+            except Rejection as refused:
                 raise _refused(match.string, refused) from refused
 
     def _register(self) -> None:

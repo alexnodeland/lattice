@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from artifactr.fastapi.router import Refused, RejectionDetail
 from tests.agent.conftest import Script, call, say
 from tests.fastapi.conftest import build, command, wait_for
 
@@ -180,3 +181,23 @@ def test_feedback_is_a_command_like_any_other(client: TestClient) -> None:
     invalid = dict(feedback, command_id="c3")
     invalid["command"] = dict(feedback["command"], value={"rating": 0})
     assert client.post(f"{BASE}/commands", json=invalid).status_code == 422
+
+
+def test_a_nul_character_is_a_validation_failure(client: TestClient) -> None:
+    refused = client.get(f"{BASE}/events", params={"thread_id": "\x00"})
+    assert (refused.status_code, refused.json()["detail"]) == (
+        422,
+        {"type": "validation_failed", "message": "text cannot hold a NUL character", "errors": []},
+    )
+
+
+def test_refusals_answer_as_the_document_says(client: TestClient) -> None:
+    missing = Refused.model_validate(client.get(f"{BASE}/artifacts/nope").json()).detail
+    assert isinstance(missing, RejectionDetail)
+    assert (missing.type, missing.model_extra) == (
+        "not_found",
+        {"entity": "artifact", "id": "nope"},
+    )
+    invalid = Refused.model_validate(client.get(f"{BASE}/events", params={"limit": -1}).json())
+    assert isinstance(invalid.detail, list)
+    assert [error.loc for error in invalid.detail] == [["query", "limit"]]

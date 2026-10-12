@@ -1,6 +1,6 @@
 # ADR-0010: The client: generated types, and resumable stores
 
-**Status:** Accepted
+**Status:** Accepted, amended by [artifactr ADR-0063](../../artifactr/adr/0063-the-openapi-documents-describe-refusals.md) and [reflexr ADR-0061](../../reflexr/adr/0061-the-openapi-documents-describe-refusals.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 
@@ -16,7 +16,7 @@ The documents are artifactr's and reflexr's OpenAPI documents and WebSocket JSON
 ## Decision
 
 - **`scripts/generate.ts` writes `src/generated/`:** `openapi-typescript` 7.13.0 for the three OpenAPI documents, and `json-schema-to-typescript` for the three JSON Schemas. A drift test calls the same function and fails if a committed file differs; `moon run client:types` rewrites them.
-- **A constant property is required** in the schemas before they are compiled, since every frame and event carries its discriminator. The unions then narrow on `type`. The transform goes when the schemas mark it required themselves ([#82](https://github.com/alexnodeland/lattice/issues/82)).
+- **A constant property is required,** since every frame and event carries its discriminator, so the unions narrow on `type`. At first the generator made it so before compiling the schemas; the schemas now say so themselves ([#82](https://github.com/alexnodeland/lattice/issues/82)), and the transform is gone.
 - **TypeScript 6 is `client`'s own `typescript`,** as `npm:typescript@6.0.3`, which `openapi-typescript` loads. Bun's isolated installs keep it to `client`, and `client`'s `typecheck` runs the root's TypeScript 7 by its path, so every package is still checked with 7.
 - **`json-schema-to-typescript` is at 15.0.4.** 16.0.0 needs js-yaml 5, and the root's `overrides` hold js-yaml at 4.3.2 for the Bruno CLI. Renovate holds it below 16, and `client`'s TypeScript at 6.
 - **REST:** `createApi(surfaces, session)` makes one `openapi-fetch` client per surface, each request carrying the session's `Authorization` and `X-Tenant`. `createQueries(api)` makes TanStack Query's options for every read. `keys` nests each read's key under its workspace, then splits each resource into its `list` and each `detail`, so invalidating the workspace refetches everything read from it, and a list refetches without its details. `stale.artifactr` and `stale.reflexr` name the reads an event makes stale; `stale.artifactr` lists every event artifactr's schema names. `@tanstack/react-query` is a peer dependency; app and admin own the `QueryClient`.

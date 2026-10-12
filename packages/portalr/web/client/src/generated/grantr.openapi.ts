@@ -310,6 +310,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/grantr/v1/tenants/{tenant}/restrictions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Restrictions
+         * @description The threads and artifacts restricted in a workspace.
+         */
+        get: operations["list_restrictions_grantr_v1_tenants__tenant__restrictions_get"];
+        put?: never;
+        /**
+         * Restrict
+         * @description Restrict a thread or artifact, or lift its restriction.
+         */
+        post: operations["restrict_grantr_v1_tenants__tenant__restrictions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/grantr/v1/tenants/{tenant}/revocations": {
         parameters: {
             query?: never;
@@ -405,7 +429,7 @@ export interface components {
             seq: number;
             tenant: components["schemas"]["TenantId"] | null;
         };
-        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"];
+        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"];
         /**
          * Check
          * @description One question for ``/checks``: may the caller take this action on this resource?
@@ -639,6 +663,30 @@ export interface components {
         /** @enum {string} */
         ResourceKind: "deployment" | "tenant" | "workspace" | "thread" | "artifact" | "rule";
         /**
+         * Restricted
+         * @description A thread or artifact was restricted to those granted a role on it.
+         */
+        Restricted: {
+            on: components["schemas"]["Resource"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "restricted";
+        };
+        /**
+         * Restriction
+         * @description A thread or artifact, and whether it is restricted to those granted a role on it.
+         */
+        Restriction: {
+            on: components["schemas"]["Resource"];
+            /**
+             * Restricted
+             * @default true
+             */
+            restricted: boolean;
+        };
+        /**
          * Revoked
          * @description A grant was revoked.
          */
@@ -745,6 +793,18 @@ export interface components {
             type: "tenant_deleted";
         };
         TenantId: string;
+        /**
+         * Unrestricted
+         * @description A thread or artifact's restriction was lifted: its workspace's roles hold on it again.
+         */
+        Unrestricted: {
+            on: components["schemas"]["Resource"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "unrestricted";
+        };
         /**
          * User
          * @description A person, by their identity provider's id.
@@ -1404,6 +1464,74 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_restrictions_grantr_v1_tenants__tenant__restrictions_get: {
+        parameters: {
+            query: {
+                workspace: string;
+            };
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Resource"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restrict_grantr_v1_tenants__tenant__restrictions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Restriction"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

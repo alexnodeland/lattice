@@ -101,9 +101,13 @@ async def test_authorize_needs_every_item_an_access_names(grants: Grants) -> Non
     )
 
 
-async def test_hidden_hides_nothing_yet(grants: Grants) -> None:
-    hidden = await grants.hooks(subject_of).hidden("acme", "w1", UserActor("bob"))
-    assert (hidden.threads, hidden.artifacts) == (frozenset(), frozenset())
+async def test_hidden_hides_restricted_items_from_the_actors_subject(grants: Grants) -> None:
+    for thread in ("t1", "t2"):
+        await grants.restrict("acme", Resource(kind="thread", workspace="w1", id=thread), by=ALICE)
+    hidden = grants.hooks(subject_of).hidden
+    assert (await hidden("acme", "w1", UserActor("bob"))).threads == {"t2"}, "Bob is on t1"
+    assert (await hidden("acme", "w1", AgentActor(UserActor("bob")))).threads == {"t2"}
+    assert (await hidden("acme", "w1", AgentActor(None))).threads == {"t1", "t2"}
 
 
 class Unreadable(InMemoryStorage):

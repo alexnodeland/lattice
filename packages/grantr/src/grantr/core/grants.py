@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 from grantr.core.ids import TenantId, UserId
 from grantr.core.resources import Resource
-from grantr.core.roles import Catalog, Role
+from grantr.core.roles import RESTRICT, Catalog, Role
 from grantr.core.subjects import Grantee, User
 
 
@@ -60,17 +60,29 @@ class Visibility(BaseModel):
 
 
 def held(
-    grants: Iterable[Grant], on: Resource, catalog: Catalog, custom: Mapping[str, Role]
+    grants: Iterable[Grant],
+    on: Resource,
+    catalog: Catalog,
+    custom: Mapping[str, Role],
+    *,
+    restricted: bool = False,
 ) -> frozenset[str]:
-    """The actions some grants hold on a resource: those of each grant on it or around it."""
+    """The actions some grants hold on a resource: those of each grant on it or around it.
+
+    On a restricted thread or artifact, a grant around it holds only if its role may restrict:
+    the workspace's admins, and the tenant's owners and admins. Grants on the item itself hold
+    as ever.
+    """
     chain = on.chain()
-    return frozenset[str]().union(
-        *(
-            catalog.role(grant.role, grant.on.kind, custom) or frozenset[str]()
-            for grant in grants
-            if grant.on in chain
-        )
-    )
+    found: set[str] = set()
+    for grant in grants:
+        if grant.on not in chain:
+            continue
+        actions = catalog.role(grant.role, grant.on.kind, custom) or frozenset[str]()
+        if restricted and grant.on != on and RESTRICT not in actions:
+            continue
+        found |= actions
+    return frozenset(found)
 
 
 def memberships(user: UserId, grants: Iterable[Grant]) -> list[Membership]:

@@ -1,7 +1,8 @@
 """Tenant-scoped workspaces over pluggable storage.
 
 Open a :class:`Workspace` with :meth:`Workspaces.open`; every read and write goes through it,
-each asks the application's ``authorize`` hook, and every write runs core's rules in one
+each asks the application's ``authorize`` hook, every read leaves out what its ``hidden``
+hook hides, and every write runs core's rules in one
 storage transaction.
 """
 
@@ -12,6 +13,7 @@ from artifactr.workspace.workspace import (
     MAX_COUNT,
     Access,
     Authorize,
+    Hidden,
     OnOpen,
     ThreadBusy,
     Workspace,
@@ -23,6 +25,7 @@ __all__ = [
     "MAX_COUNT",
     "Access",
     "Authorize",
+    "Hidden",
     "HistoryChunk",
     "InMemoryStorage",
     "OnOpen",

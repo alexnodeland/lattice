@@ -22,10 +22,12 @@ from grantr.core import (
     Invalid,
     KeyIssued,
     KeyRevoked,
+    Member,
     MemberAdded,
     MemberRemoved,
     Membership,
     Resource,
+    Restricted,
     Revoked,
     Role,
     RoleDefined,
@@ -34,9 +36,11 @@ from grantr.core import (
     ServicePrincipal,
     TenantCreated,
     TenantDeleted,
+    Unrestricted,
     User,
     key_id,
 )
+from grantr.core.roles import RESTRICT
 from grantr.grants import Grants, Storage
 from tests.catalogs import ARTIFACTR, REFLEXR
 from tests.grants.conftest import ALICE, NOW, ROOT
@@ -230,9 +234,93 @@ async def test_resources_lists_what_a_subject_may_act_on(grants: Grants) -> None
     assert await grants.resources("acme", Agent(), "artifactr:open", "workspace") == []
 
 
-async def test_nothing_is_hidden_until_items_can_be_restricted(grants: Grants) -> None:
-    hidden = await grants.hidden("acme", BOB, "w1")
-    assert (hidden.threads, hidden.artifacts) == (frozenset(), frozenset())
+async def test_a_restricted_thread_is_hidden_from_a_non_member(grants: Grants) -> None:
+    await _members(grants, BOB, CAROL)
+    await grants.grant("acme", "editor", on=WS, to=BOB, by=ALICE)
+    await grants.grant("acme", "viewer", on=THREAD, to=CAROL, by=ALICE)
+    assert await grants.check("acme", BOB, "artifactr:read_threads", THREAD)
+
+    entry = await grants.restrict("acme", THREAD, by=ALICE)
+
+    assert entry.event == Restricted(on=THREAD)
+    assert not await grants.check("acme", BOB, "artifactr:read_threads", THREAD)
+    assert await grants.check(
+        "acme", BOB, "artifactr:read_threads", Resource(kind="thread", workspace="w1", id="t2")
+    ), "only the restricted thread is hidden"
+    assert await grants.check("acme", CAROL, "artifactr:read_threads", THREAD)
+    assert await grants.check("acme", ALICE, "artifactr:read_threads", THREAD)
+    assert (await grants.hidden("acme", BOB, "w1")).threads == {"t1"}
+    assert (await grants.hidden("acme", BOB, "w2")).threads == frozenset()
+    assert (await grants.hidden("acme", CAROL, "w1")).threads == frozenset()
+    assert (await grants.hidden("acme", ALICE, "w1")).threads == frozenset()
+    assert (await grants.hidden("acme", Agent(), "w1")).threads == {"t1"}
+    assert await grants.resources("acme", BOB, "artifactr:read_threads", "thread") == []
+    assert await grants.resources("acme", CAROL, "artifactr:read_threads", "thread") == [THREAD]
+
+    lifted = await grants.restrict("acme", THREAD, restricted=False, by=ALICE)
+
+    assert lifted.event == Unrestricted(on=THREAD)
+    assert await grants.check("acme", BOB, "artifactr:read_threads", THREAD)
+    assert (await grants.hidden("acme", BOB, "w1")).threads == frozenset()
+
+
+async def test_a_workspace_admin_restricts_and_sees_what_is_restricted(grants: Grants) -> None:
+    await _members(grants, BOB, CAROL)
+    await grants.grant("acme", "admin", on=WS, to=BOB, by=ALICE)
+    await grants.grant("acme", "editor", on=WS, to=CAROL, by=ALICE)
+
+    await grants.restrict("acme", ARTIFACT, by=BOB)
+
+    assert await grants.check("acme", BOB, "artifactr:edit_artifact", ARTIFACT)
+    assert not await grants.check("acme", CAROL, "artifactr:edit_artifact", ARTIFACT)
+    assert (await grants.hidden("acme", CAROL, "w1")).artifacts == {"a1"}
+    assert await grants.restrictions("acme", "w1", by=BOB) == [ARTIFACT]
+    assert await grants.restrictions("acme", "w2", by=ALICE) == []
+    with pytest.raises(Forbidden, match="grantr:restrict"):
+        await grants.restrictions("acme", "w1", by=CAROL)
+    with pytest.raises(Forbidden, match="grantr:restrict"):
+        await grants.restrict("acme", THREAD, by=CAROL)
+
+
+async def test_who_sees_a_restricted_thread_beyond_its_built_in_roles(grants: Grants) -> None:
+    dave, erin, rule = User(id="dave"), User(id="erin"), RulePrincipal(workspace="w1", rule="r")
+    await _members(grants, BOB, CAROL, dave, erin)
+    await grants.define_group("acme", TEAM, frozenset[Member]().union((CAROL,)), by=ALICE)
+    await grants.grant("acme", "viewer", on=THREAD, to=TEAM, by=ALICE)
+    await grants.grant("acme", "admin", on=TENANT, to=BOB, by=ALICE)
+    reads = frozenset({"artifactr:read_threads"})
+    for name, actions, to in (("reader", reads, dave), ("curator", reads | {RESTRICT}, erin)):
+        await grants.define_role("acme", Role(name=name, actions=actions), by=ALICE)
+        await grants.grant("acme", name, on=WS, to=to, by=ALICE)
+    await grants.grant("acme", "rule", on=WS, to=rule, by=ALICE)
+
+    await grants.restrict("acme", THREAD, by=ALICE)
+
+    read = "artifactr:read_threads"
+    seen = [await grants.check("acme", who, read, THREAD) for who in (BOB, CAROL, dave, erin)]
+    assert seen == [True, True, False, True], "the tenant's admin, a group, a reader, a curator"
+    assert not await grants.check("acme", rule, "reflexr:read_runs", THREAD)
+    assert (await grants.hidden("acme", CAROL, "w1")).threads == frozenset(), "by its group"
+    assert (await grants.hidden("acme", dave, "w1")).threads == {"t1"}
+    assert (await grants.hidden("acme", rule, "w1")).threads == {"t1"}
+
+
+async def test_only_a_thread_or_artifact_is_restricted_and_only_once(grants: Grants) -> None:
+    with pytest.raises(Invalid, match="a workspace isn't restricted"):
+        await grants.restrict("acme", WS, by=ALICE)
+    with pytest.raises(Invalid, match="not restricted already"):
+        await grants.restrict("acme", THREAD, restricted=False, by=ALICE)
+    await grants.restrict("acme", THREAD, by=ALICE)
+    with pytest.raises(Invalid, match="is restricted already"):
+        await grants.restrict("acme", THREAD, by=ALICE)
+    assert [e.event.type for e in await grants.audit("acme", by=ALICE)][-1] == "restricted"
+
+
+async def test_restrictions_go_with_their_tenant(grants: Grants) -> None:
+    await grants.restrict("acme", THREAD, by=ALICE)
+    await grants.delete_tenant("acme", by=ALICE)
+    await grants.create_tenant("acme", owner=CAROL.id, by=ROOT)
+    assert await grants.restrictions("acme", "w1", by=CAROL) == []
 
 
 # ─── tenants, members and operators ──────────────────────────────────────────
@@ -564,15 +652,21 @@ async def test_the_application_holds_its_runtime_in_every_tenant_and_operators_d
     for tenant in ("acme", "globex"):
         await grants.provision_tenant(tenant, owner=ALICE.id)
     assert not await grants.check("acme", APP, "artifactr:claim_thread", THREAD)
+    await grants.restrict("acme", THREAD, by=ALICE)
+    assert (await grants.hidden("acme", APP, "w1")).threads == {"t1"}
 
     [entry] = await grants.bootstrap()
+    assert (await grants.hidden("acme", APP, "w1")).threads == frozenset(), "it sees everything"
     assert (entry.by, entry.tenant) == (None, None)
     assert await grants.bootstrap() == [], "a second start changes nothing"
     for tenant in ("acme", "globex"):
         assert await grants.check(tenant, APP, "artifactr:claim_thread", THREAD)
         # reflexr asks a run's checkpoint of its workspace.
         assert await grants.check(tenant, APP, "reflexr:checkpoint_run", WS)
-        assert not await grants.check(tenant, APP, "artifactr:edit_artifact", ARTIFACT)
+        # relayr's outbound adapter writes for its code rules, and its followers list workspaces.
+        assert await grants.check(tenant, APP, "artifactr:edit_artifact", ARTIFACT)
+        assert await grants.check(tenant, APP, "artifactr:read_workspaces", TENANT)
+        assert not await grants.check(tenant, APP, "artifactr:respond_to_proposal", ARTIFACT)
         assert not await grants.check(tenant, ROOT, "artifactr:read_artifacts", WS)
     assert not await grants.check("acme", ServicePrincipal(id="other"), "artifactr:open", WS)
 
@@ -658,3 +752,10 @@ async def test_a_workspaces_admin_grants_a_stored_rule_its_role(grants: Grants) 
     assert await grants.check("acme", rule, "reflexr:publish", WS)
     assert await grants.check("acme", rule, "reflexr:checkpoint_run", WS)
     assert not await grants.check("acme", rule, "reflexr:install_rule", RULE)
+
+
+async def test_the_deployments_own_tools_list_every_tenant(storage: Storage) -> None:
+    grants = Grants(storage, catalogs=[ARTIFACTR], application=APP)
+    for tenant in ("globex", "acme"):
+        await grants.provision_tenant(tenant, owner=ALICE.id)
+    assert await grants.served_tenants() == ["acme", "globex"]

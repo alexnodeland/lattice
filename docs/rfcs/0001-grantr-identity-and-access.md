@@ -4,7 +4,7 @@
 **Author:** Alex Nodeland
 **Created:** 2026-10-12
 **Discussion:** [#43](https://github.com/alexnodeland/lattice/pull/43); accepted on 2026-10-12, with the decisions in [Decisions](#decisions) (D9 taken with lattice RFC-0002's)
-**Amended by:** [grantr ADR-0015](../grantr/adr/0015-a-check-writes-nothing.md): a check writes nothing, so grantr knows a workspace from its grants; [relayr ADR-0017](../relayr/adr/0017-the-follower-acts-as-the-application.md): `subject_of` maps the source `artifactr` to the application's own principal; [artifactr ADR-0058](../artifactr/adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md): artifactr lists a tenant's workspaces, asked with no workspace; [relayr ADR-0022](../relayr/adr/0022-what-a-rules-actor-needs-in-artifactr.md): `subject_of` maps a rule's actor in artifactr, and a turn acting for it, to the rule's principal
+**Amended by:** [grantr ADR-0015](../grantr/adr/0015-a-check-writes-nothing.md): a check writes nothing, so grantr knows a workspace from its grants; [relayr ADR-0017](../relayr/adr/0017-the-follower-acts-as-the-application.md): `subject_of` maps the source `artifactr` to the application's own principal; [artifactr ADR-0058](../artifactr/adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md): artifactr lists a tenant's workspaces, asked with no workspace; [relayr ADR-0022](../relayr/adr/0022-what-a-rules-actor-needs-in-artifactr.md): `subject_of` maps a rule's actor in artifactr, and a turn acting for it, to the rule's principal; [grantr ADR-0024](../grantr/adr/0024-who-sees-a-restricted-item.md): who may restrict a thread or artifact, and who sees it
 **Siblings:**
 
 - [artifactr ADR-0012][a-adr-0012] and [ADR-0048][a-adr-0048] put authorization within a tenant behind one hook, asked in one place. This RFC widens that hook, and amends both.
@@ -318,7 +318,7 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
 
 ## Unresolved questions
 
-- **Who may restrict a thread?** Its creator, and workspace admins, is the proposal. Whether an editor may restrict a thread someone else started is open.
+- **Who may restrict a thread?** Resolved by grantr [ADR-0024](../grantr/adr/0024-who-sees-a-restricted-item.md): whoever holds `grantr:restrict` on it, which is its workspace's admins, the tenant's owners and admins, and any custom role holding it; an application can give an item's creator such a role.
 - **A stored rule's grants at install:** the installer's role on the workspace, or a narrower set the installer picks in the review. Phase 5 of stackr RFC-0002 settles it with relayr.
 - **Ending a live connection on revocation,** rather than only refusing its next command. It needs a channel from grantr to the libraries' connections, which the template could provide.
 - **Workspaces without a library behind them:** grantr knows a workspace once a grant names it or an item in it. Whether artifactr #62's listing should come from grantr in applications that use it is for that issue.
@@ -335,7 +335,9 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
 - [x] Phase 3: storage and API
 - [x] Phase 4: the template
   - `on_tenant_created` is deferred: the template's gateway keys are settings, and stackr's `make tenant` still creates a tenant's gateway team (grantr ADR-0021)
-- [ ] Phase 5: threads and artifacts
+- [x] Phase 5: threads and artifacts
+  - [x] grantr's restricted flag and `grantr:restrict` ([#94](https://github.com/alexnodeland/lattice/pull/94), grantr ADR-0024)
+  - [x] artifactr's `hidden`, every read path filtered, and the template's exit criterion ([#97](https://github.com/alexnodeland/lattice/pull/97), artifactr ADR-0062)
 - [ ] Phase 6: row-level security
 - [ ] Phase 7: docs and ADRs
 

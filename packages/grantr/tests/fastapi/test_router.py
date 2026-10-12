@@ -174,3 +174,21 @@ async def test_a_groups_members_are_listed_in_order(client: httpx.AsyncClient) -
     await client.put("/tenants/acme/groups/team", json={"members": members}, headers=AS_ALICE)
     groups = await client.get("/tenants/acme/groups", headers=AS_ALICE)
     assert groups.json() == {"team": members[::-1]}
+
+
+async def test_an_owner_restricts_a_thread(client: httpx.AsyncClient) -> None:
+    thread = {"kind": "thread", "workspace": "w1", "id": "t1"}
+    restricted = await client.post(
+        "/tenants/acme/restrictions", json={"on": thread}, headers=AS_ALICE
+    )
+    assert restricted.json()["event"] == {"type": "restricted", "on": thread}
+    listed = await client.get(
+        "/tenants/acme/restrictions", params={"workspace": "w1"}, headers=AS_ALICE
+    )
+    assert listed.json() == [thread]
+    lifted = await client.post(
+        "/tenants/acme/restrictions",
+        json={"on": thread, "restricted": False},
+        headers=AS_ALICE,
+    )
+    assert lifted.json()["event"]["type"] == "unrestricted"

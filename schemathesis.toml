@@ -2,21 +2,27 @@
 # check not turned off here, fails.
 
 [generation]
-# PostgreSQL can't store a NUL byte, and the libraries don't refuse one yet (#67).
+# The libraries refuse a NUL character in any string as `validation_failed` (#67), which the
+# document doesn't say of every string, so a NUL would fail `positive_data_acceptance`.
 allow-x00 = false
 
 [checks]
-# The routers don't document their rejections yet (#66).
-status_code_conformance.enabled = false
-response_schema_conformance.enabled = false
 # Starlette's 405 names only the first matching route's methods in `Allow`.
 allow_header_conformance.enabled = false
 
-# A command's or an event's `type` has a default, so the document doesn't require it, but the
-# discriminator does: a body without one is refused (#66).
+# A command's body can be well formed and still not apply: an artifact's data is checked against
+# its type, and a stored rule against the workspace's events, actions and limits.
 [[operations]]
 include-method = "POST"
-include-path-regex = "/(commands|events)$"
+include-path-regex = "/commands$"
+checks.positive_data_acceptance.enabled = false
+
+# `limit` and `last` exclude each other, which OpenAPI's parameters can't say, and reflexr's `type`
+# is checked as an event name, with a hint for a name without a namespace, rather than by a
+# pattern in the document.
+[[operations]]
+include-method = "GET"
+include-path-regex = "/events$"
 checks.positive_data_acceptance.enabled = false
 
 # These take string ids in their query, and a value Schemathesis means as a boolean or a number,

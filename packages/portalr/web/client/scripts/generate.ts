@@ -29,30 +29,6 @@ const SCHEMAS = {
   "reflexr.rules.v1.ts": "packages/reflexr/schemas/reflexr.rules.v1.json",
 } as const;
 
-/**
- * The schema with every constant property required. pydantic marks a discriminator with a default
- * as optional, but every frame and event carries it, and a required literal lets the compiler
- * narrow the unions on it. This goes when the schemas mark it required themselves (lattice#82).
- */
-function requireConstants(node: unknown): unknown {
-  if (Array.isArray(node)) {
-    return node.map(requireConstants);
-  }
-  if (typeof node !== "object" || node === null) {
-    return node;
-  }
-  const object = Object.fromEntries(
-    Object.entries(node).map(([key, value]) => [key, requireConstants(value)]),
-  );
-  const properties = object.properties as Record<string, { const?: unknown }> | undefined;
-  if (properties) {
-    const constants = Object.keys(properties).filter((key) => properties[key]?.const !== undefined);
-    const required = new Set([...((object.required as string[] | undefined) ?? []), ...constants]);
-    object.required = [...required].sort();
-  }
-  return object;
-}
-
 /** Every generated file, by name, as it should read. */
 export async function generate(): Promise<Record<string, string>> {
   const files: Record<string, string> = {};
@@ -61,7 +37,7 @@ export async function generate(): Promise<Record<string, string>> {
     files[name] = `${HEADER}// ${source}\n\n${astToString(await openapiTS(document))}`;
   }
   for (const [name, source] of Object.entries(SCHEMAS)) {
-    const schema = requireConstants(JSON.parse(await readFile(join(root, source), "utf8")));
+    const schema = JSON.parse(await readFile(join(root, source), "utf8"));
     const types = await compile(schema as Parameters<typeof compile>[0], name.replace(".ts", ""), {
       bannerComment: "",
       additionalProperties: false,

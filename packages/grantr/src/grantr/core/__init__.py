@@ -13,11 +13,13 @@ from grantr.core.audit import (
     KeyRevoked,
     MemberAdded,
     MemberRemoved,
+    Restricted,
     Revoked,
     RoleDefined,
     RoleDeleted,
     TenantCreated,
     TenantDeleted,
+    Unrestricted,
 )
 from grantr.core.errors import Forbidden, GrantrError, Invalid
 from grantr.core.grants import Grant, Membership, Visibility, memberships
@@ -86,6 +88,7 @@ __all__ = [
     "Membership",
     "Resource",
     "ResourceKind",
+    "Restricted",
     "Revoked",
     "Role",
     "RoleDefined",
@@ -96,6 +99,7 @@ __all__ = [
     "TenantCreated",
     "TenantDeleted",
     "TenantId",
+    "Unrestricted",
     "User",
     "UserId",
     "Visibility",

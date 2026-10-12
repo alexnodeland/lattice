@@ -113,7 +113,7 @@ def call(tool: str, **args: Any) -> ModelResponse:
 
 
 class Script:
-    """A model that answers each request with the next step, and records the requests' settings.
+    """A model that answers each request with the next step, and records the requests.
 
     Tests append steps as they go, and set ``delay``, in seconds, to make each answer take that
     long. The agents stream their requests, and ``function_model`` streams each step.
@@ -122,6 +122,7 @@ class Script:
     def __init__(self, *steps: ModelResponse) -> None:
         self.steps = list(steps)
         self.settings: list[dict[str, Any]] = []
+        self.requests: list[list[ModelMessage]] = []
         self.delay = 0.0
 
     @property
@@ -130,6 +131,7 @@ class Script:
 
     async def _respond(self, messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
         self.settings.append(dict(info.model_settings or {}))
+        self.requests.append(messages)
         await asyncio.sleep(self.delay)
         return self.steps.pop(0)
 

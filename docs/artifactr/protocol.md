@@ -247,7 +247,7 @@ REST mirrors the commands and exposes reads; `artifactr.fastapi.artifactr_router
 
 Authentication is the host's: `resolve_actor(request)` returns the tenant and actor, or raises `Unauthorized` (401). The `authorize(tenant, workspace, actor, access)` hook of the application's `Workspaces` is asked for every request: for opening the workspace, then for each action the request takes ([ADR-0056](adr/0056-access-asked-in-every-workspace-method.md)). Listing workspaces asks `artifactr:read_workspaces` with no workspace, then `artifactr:open` in each workspace, and leaves out those refused ([ADR-0058](adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md)). A refusal is 403, whose `detail` is the `forbidden` rejection, as for every other rejection a read raises; over the WebSocket, a command it refuses has a `forbidden` result.
 
-Rejections map to HTTP status codes (`artifactr.fastapi.STATUS_CODES`): `version_conflict` and `invalid_state` → 409, `validation_failed` and `patch_failed` → 422, `not_found` → 404, `forbidden` → 403. `watch_run` over REST is rejected as `invalid_state`.
+Rejections map to HTTP status codes (`artifactr.fastapi.STATUS_CODES`): `version_conflict` and `invalid_state` → 409, `validation_failed` and `patch_failed` → 422, `not_found` → 404, `forbidden` → 403. `watch_run` over REST is rejected as `invalid_state`. A NUL character in any string, an id, a name or a command's text, is `validation_failed` on every surface and every storage, before `authorize` hears it ([ADR-0061](adr/0061-a-nul-character-is-refused-at-the-boundary.md)).
 
 ## MCP mapping
 

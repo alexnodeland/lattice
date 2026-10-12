@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 
 from reflexr.core.errors import NotFound, ValidationFailed
 from reflexr.core.ids import FiringId, RunId
+from reflexr.core.tagged import tag_required
 
 type TargetKind = Literal["run", "firing", "chain"]
 """What feedback can be about: a run (a workflow execution), a firing, or a causal chain."""
@@ -31,7 +32,7 @@ TARGET_KINDS: frozenset[TargetKind] = frozenset({"run", "firing", "chain"})
 class RunTarget(BaseModel):
     """Feedback on one run: a workflow execution."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
     kind: Literal["run"] = "run"
     run_id: RunId
@@ -40,7 +41,7 @@ class RunTarget(BaseModel):
 class FiringTarget(BaseModel):
     """Feedback on one firing: whether the rule should have fired."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
     kind: Literal["firing"] = "firing"
     firing_id: FiringId
@@ -49,7 +50,7 @@ class FiringTarget(BaseModel):
 class ChainTarget(BaseModel):
     """Feedback on a causal chain: everything one triggering event led to."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
     kind: Literal["chain"] = "chain"
     correlation_id: str

@@ -50,6 +50,10 @@ class _Data:
         default_factory=dict[tuple[TenantId, str], Role]
     )
     keys: dict[str, Key] = field(default_factory=dict[str, Key])
+    items: dict[tuple[TenantId, Resource], bool] = field(
+        default_factory=dict[tuple[TenantId, Resource], bool]
+    )
+    """Every thread and artifact ever restricted, and whether it is now."""
     log: tuple[AuditEntry, ...] = ()
 
 
@@ -102,6 +106,21 @@ class _Reads:
     async def group(self, tenant: TenantId, group: Group) -> frozenset[Member] | None:
         return self._data.groups.get((tenant, group))
 
+    async def restricted(
+        self, tenant: TenantId, workspace: WorkspaceId | None = None
+    ) -> list[Resource]:
+        return sorted(
+            (
+                item
+                for (t, item), restricted in self._data.items.items()
+                if t == tenant and workspace in (None, item.workspace) and restricted
+            ),
+            key=lambda item: (item.kind, item.workspace or "", item.id or ""),
+        )
+
+    async def is_restricted(self, tenant: TenantId, on: Resource) -> bool:
+        return self._data.items.get((tenant, on), False)
+
     async def groups(self, tenant: TenantId) -> dict[str, frozenset[Member]]:
         return {
             group.id: members for (t, group), members in self._data.groups.items() if t == tenant
@@ -113,9 +132,11 @@ class _Reads:
     async def resources(self, tenant: TenantId, kind: ListableKind) -> list[Resource]:
         named = frozenset(
             resource
-            for grant in self._data.grants
-            if grant.tenant == tenant
-            for resource in grant.on.chain()
+            for on in [
+                *(grant.on for grant in self._data.grants if grant.tenant == tenant),
+                *(item for t, item in self._data.items if t == tenant),
+            ]
+            for resource in on.chain()
             if resource.kind == kind
         )
         return sorted(named, key=lambda resource: (resource.workspace or "", resource.id or ""))
@@ -138,6 +159,7 @@ class _Transaction(_Reads):
             groups={key: members for key, members in data.groups.items() if key[0] != tenant},
             roles={key: role for key, role in data.roles.items() if key[0] != tenant},
             keys={key_id: key for key_id, key in data.keys.items() if key.tenant != tenant},
+            items={key: flag for key, flag in data.items.items() if key[0] != tenant},
         )
 
     async def add_grant(self, grant: Grant) -> None:
@@ -183,6 +205,9 @@ class _Transaction(_Reads):
             grants=frozenset(g for g in data.grants if g.tenant != tenant or g.role != name),
             roles={key: role for key, role in data.roles.items() if key != (tenant, name)},
         )
+
+    async def set_restricted(self, tenant: TenantId, on: Resource, restricted: bool) -> None:
+        self._data = replace(self._data, items={**self._data.items, (tenant, on): restricted})
 
     async def add_key(self, key: Key) -> None:
         self._data = replace(self._data, keys={**self._data.keys, key.id: key})

@@ -83,8 +83,11 @@ A stored rule is behaviour a tenant adds at runtime, so reflexr bounds what one 
 - **Provenance is a claim.** reflexr records it unread, beside the actor that made the change, which your application authenticated. Check what it says before acting on it, as relayr re-reads artifactr before it installs a rule.
 - **Operators see the names.** A stored rule's name reaches spans, Langfuse and LiteLLM metadata, which are operators' tools, not tenants'. Metrics record its namespace, such as `chat:*`, not its name.
 
-## Limits
+## A NUL character
 
+Text can't hold a NUL character. Every `Workspaces` and `Workspace` method refuses one in an id, a name or an event's field with `validation_failed`, before `authorize` hears it, so a client can't reach PostgreSQL, or your hook, with a string neither can take ([ADR-0060](../adr/0060-a-nul-character-is-refused-at-the-boundary.md)).
+
+## Limits
 Events that set off workflows can loop and can spend. The library bounds both, and [Loop and spend safety](safety.md) covers each limit in detail ([ADR-0010](../adr/0010-loop-and-spend-safety.md)):
 
 | Limit | Where | Default |

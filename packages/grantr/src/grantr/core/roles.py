@@ -43,6 +43,9 @@ GRANTR_ACTIONS: Final = frozenset(
 OPERATOR: Final = frozenset({"grantr:create_tenant", "grantr:grant_operator"})
 """grantr's actions the deployment's operators hold, and no one else."""
 
+RESTRICT: Final = "grantr:restrict"
+"""Restricting a thread or artifact: whoever may, sees every restricted item where they may."""
+
 WORKSPACE_GRANTS: Final = frozenset({"grantr:grant", "grantr:revoke", "grantr:restrict"})
 """grantr's actions a workspace's admins hold within it."""
 
@@ -97,15 +100,33 @@ DEPLOYMENT_READS: Final = frozenset({"portalr:read_deployment"})
 
 ABOVE_WORKSPACES: Final = MEMBERS_READS | TENANT_ADMIN_READS | DEPLOYMENT_READS
 """The reads asked of a tenant or of the deployment, where no workspace role reaches: no
-workspace role, nor the application, holds them, whatever their prefix."""
+workspace role holds them, whatever their prefix. The application lists a tenant's workspaces,
+but reads no portalr admin's telemetry or spend."""
 
-RUNTIME: Final = BOOKKEEPING | {
-    "artifactr:record",
-    "reflexr:publish",
-    "reflexr:checkpoint_run",
-}
+CODE_RULE_WRITES: Final = frozenset(
+    {
+        "artifactr:propose_change",
+        "artifactr:post_message",
+        "artifactr:create_artifact",
+        "artifactr:edit_artifact",
+        "artifactr:create_thread",
+    }
+)
+"""What the application's code rules write in artifactr, through relayr's outbound adapter:
+proposals and notices, and the artifacts, keyed edits and threads their allowlists grant."""
+
+RUNTIME: Final = (
+    BOOKKEEPING
+    | CODE_RULE_WRITES
+    | {
+        "artifactr:record",
+        "reflexr:publish",
+        "reflexr:checkpoint_run",
+    }
+)
 """The commands the application's ``application`` role holds, beside every ``open``, every read
-and its evaluators' feedback: its bookkeeping, the runner's records, and its code rules' runs."""
+and its evaluators' feedback: its bookkeeping, the runner's records, and its code rules' runs,
+in reflexr and, through relayr, in artifactr."""
 
 RULE: Final = frozenset(
     {

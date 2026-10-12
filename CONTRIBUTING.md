@@ -33,7 +33,7 @@ Every web package has these, each run by Bun from `bun.lock`:
 |---|---|
 | `lint` | Check formatting and lint rules with Biome |
 | `typecheck` | Type-check with TypeScript 7, strict |
-| `test` | Run the tests with Vitest (`client`'s unit tests, and `ui`'s in Chromium, light and dark) |
+| `test` | Run the tests with Vitest (`client`'s unit tests, and `ui`'s in Chromium, light and dark). `ui`'s screenshots run only where `CI` is set, against Linux baselines: to make or update one, take the `ui-screenshots` artifact from a failed Check job, review it, and commit its `-reference` (a new one) or `-actual` (a changed one) files under `packages/portalr/web/ui/src/__screenshots__/`, without that suffix |
 | `build` | Build the app with Vite (`app` and `admin`) |
 | `format` | Format the code and apply safe lint fixes with Biome |
 | `check` | Everything CI runs for the project |

@@ -1,4 +1,6 @@
-"""Fail unless portalr's built wheel carries both UIs: an application installs it to serve them.
+"""Fail unless portalr's wheel carries both UIs, their typefaces, and the typefaces' licence.
+
+An application installs the wheel to serve the UIs.
 
 Usage: scripts/check_wheel.py   (from portalr's directory, after its `build` task)
 """
@@ -9,6 +11,7 @@ import zipfile
 from pathlib import Path
 
 UIS = ("app", "admin")
+LICENCES = ("OFL-schibsted-grotesk.txt", "OFL-fragment-mono.txt")
 
 
 def main() -> int:
@@ -22,7 +25,22 @@ def main() -> int:
     if missing := [ui for ui in UIS if f"portalr/static/{ui}/index.html" not in names]:
         sys.stderr.write(f"check_wheel: {wheel.name} lacks the {', '.join(missing)} UI\n")
         return 1
-    sys.stdout.write(f"check_wheel: {wheel.name} carries {' and '.join(UIS)}\n")
+    if unfaced := [
+        ui
+        for ui in UIS
+        if not any(
+            n.startswith(f"portalr/static/{ui}/assets/") and n.endswith(".woff2") for n in names
+        )
+    ]:
+        sys.stderr.write(f"check_wheel: the {', '.join(unfaced)} UI has no typefaces\n")
+        return 1
+    licences = {Path(n).name for n in names if ".dist-info/licenses/" in n}
+    if unlicensed := [licence for licence in LICENCES if licence not in licences]:
+        sys.stderr.write(f"check_wheel: {wheel.name} lacks {', '.join(unlicensed)}\n")
+        return 1
+    sys.stdout.write(
+        f"check_wheel: {wheel.name} carries {' and '.join(UIS)}, with their typefaces\n"
+    )
     return 0
 
 

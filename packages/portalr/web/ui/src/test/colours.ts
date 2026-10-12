@@ -2,21 +2,27 @@
 
 export const dark = matchMedia("(prefers-color-scheme: dark)").matches;
 
-/** A token's value in the scheme the test runs in, as the browser computes it. */
-export function token(name: string): string {
+/** A token's value in the scheme the test runs in, as the browser computes it, within an element. */
+export function token(name: string, within: Element = document.body): string {
   const probe = document.createElement("span");
   probe.style.color = `var(--${name})`;
-  document.body.append(probe);
+  within.append(probe);
   const value = getComputedStyle(probe).color;
   probe.remove();
   return value;
 }
 
-function luminance(colour: string): number {
-  const [r, g, b] = (colour.match(/[\d.]+/g) ?? []).slice(0, 3).map((part) => {
-    const c = Number(part) / 255;
-    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  });
+/** A computed colour's channels, 0 to 1: `rgb()` counts to 255, and a mix's `color(srgb …)` to 1. */
+function channels(colour: string): number[] {
+  const scale = colour.startsWith("color(srgb") ? 1 : 255;
+  return (colour.match(/[\d.]+/g) ?? []).slice(0, 3).map((part) => Number(part) / scale);
+}
+
+/** A computed colour's relative luminance, as WCAG defines it. */
+export function luminance(colour: string): number {
+  const [r, g, b] = channels(colour).map((c) =>
+    c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4,
+  );
   return 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0);
 }
 

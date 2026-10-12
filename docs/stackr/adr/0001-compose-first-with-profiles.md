@@ -1,6 +1,6 @@
 # ADR-0001: Docker Compose first, with profiles
 
-**Status:** Accepted
+**Status:** Accepted, amended by [RFC-0004](../rfcs/0004-hosting-recipes.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

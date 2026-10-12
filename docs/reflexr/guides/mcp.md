@@ -12,7 +12,7 @@ from collections.abc import AsyncGenerator
 
 from fastapi import FastAPI
 
-from reflexr.core import ExternalAgentActor, TenantId
+from reflexr.core import ExternalAgentActor, TenantId, UserActor
 from reflexr.mcp import McpContext, ReflexrMcp
 
 
@@ -56,8 +56,14 @@ async def resolve_client(ctx: McpContext) -> tuple[TenantId, ExternalAgentActor]
     if request is None:
         raise ToolError("connect over HTTP")
     user = await authenticate(request)  # the function resolve_actor uses
-    return user.tenant_id, ExternalAgentActor(client_id=user.id, name=f"{user.name} (MCP)")
+    return user.tenant_id, ExternalAgentActor(
+        client_id=user.id,
+        name=f"{user.name} (MCP)",
+        on_behalf_of=UserActor(id=user.id, name=user.name),
+    )
 ```
+
+A client a person connects with their own token acts for them: its `on_behalf_of` is their actor, and an `authorize` hook checks it as them. A client with credentials of its own, as in the first example, leaves it unset and acts for no one ([ADR-0058](../adr/0058-an-mcp-client-acts-for-its-person.md)).
 
 The `authorize` hook `Workspaces` holds decides what a client may do, as it does for the [router](serving.md#authentication); the server takes no hook of its own ([ADR-0056](../adr/0056-access-asked-in-every-workspace-method.md)). Each tool calls `Workspace` methods, and each asks the hook first, so a tool call is asked for opening the workspace (`reflexr:open`) and for the action it takes, such as `reflexr:retry_run` or `reflexr:read_runs`. `list_rules` reads across the tenant, so it asks `reflexr:read_rules` with no workspace. A resource read is asked for `reflexr:read_runs`, and so is each run a `subscriptions/listen` request names, when the stream opens.
 
@@ -94,7 +100,7 @@ Commands answer with their outcome as JSON, such as `{"type":"published","seq":1
 Events a client publishes are attributed to its `ExternalAgentActor`, so people, the reactor and other clients see who did what:
 
 ```json
-{"kind": "external_agent", "client_id": "claude-code", "name": "Claude Code"}
+{"kind": "external_agent", "client_id": "claude-code", "name": "Claude Code", "on_behalf_of": null}
 ```
 
 The same rules apply as everywhere else: the `Workspaces` event allowlist decides what a client may publish, reflexr's own events are refused, and a publish is idempotent by its id.

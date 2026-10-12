@@ -7,12 +7,19 @@ every package, holds the names to the libraries' catalogs.
 
 from artifactr.workspace import ACTIONS as ARTIFACTR
 from grantr.core import Catalog
-from grantr.core.roles import BOOKKEEPING, EDITOR_COMMANDS, FEEDBACK, RULE, RUNTIME
+from grantr.core.roles import (
+    BOOKKEEPING,
+    EDITOR_COMMANDS,
+    FEEDBACK,
+    MEMBERS_READS,
+    RULE,
+    RUNTIME,
+)
 from reflexr.workspace import ACTIONS as REFLEXR
 
 
 def test_every_action_a_role_names_is_in_a_librarys_catalog() -> None:
-    named = BOOKKEEPING | EDITOR_COMMANDS | FEEDBACK | RULE | RUNTIME
+    named = BOOKKEEPING | EDITOR_COMMANDS | FEEDBACK | MEMBERS_READS | RULE | RUNTIME
     assert named - (ARTIFACTR | REFLEXR) == set()
 
 

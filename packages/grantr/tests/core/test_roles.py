@@ -59,7 +59,10 @@ def test_rule_management_is_the_workspace_admins_alone() -> None:
 def test_the_tenant_roles_cover_every_catalog_but_the_operators_actions() -> None:
     assert _role("owner", "tenant") == CATALOG.actions - OPERATOR - BOOKKEEPING
     assert _role("owner", "tenant") - _role("admin", "tenant") == {"grantr:delete_tenant"}
-    assert _role("member", "tenant") == frozenset()
+    assert _role("member", "tenant") == {"artifactr:read_workspaces"}, "listing what they open"
+    assert "artifactr:read_workspaces" in _role("application", "deployment")
+    for workspace_role in ("viewer", "editor", "admin"):
+        assert "artifactr:read_workspaces" not in _role(workspace_role), "asked of the tenant"
     assert _role("operator", "deployment") == OPERATOR
 
 

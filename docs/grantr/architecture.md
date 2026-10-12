@@ -44,7 +44,7 @@ The application hands `Grants` each library's catalog, its `ACTIONS`, and grantr
 | `application` | the deployment, holding in every tenant | the bookkeeping, `artifactr:record`, `reflexr:publish`, `reflexr:checkpoint_run`, its evaluators' feedback, and every `open` and read |
 | `owner` | a tenant | every action in every catalog but the operator's and the bookkeeping |
 | `admin` | a tenant | the owner's, but `grantr:delete_tenant` |
-| `member` | a tenant | nothing: it makes a user or service principal a member |
+| `member` | a tenant | `artifactr:read_workspaces`: listing the tenant's workspaces, which artifactr filters by what the caller may open; it makes a user or service principal a member |
 | `admin` | a workspace | every library action but the bookkeeping, and `grantr:grant`, `revoke` and `restrict` |
 | `editor` | a workspace, thread, artifact or rule | a viewer's, and the commands that post, create, edit, propose, archive, resolve proposals, record a turn, and stop and operate runs |
 | `viewer` | a workspace, thread, artifact or rule | every `read_` action but the cursors, every `open`, and giving feedback |

@@ -94,15 +94,15 @@ A forged acceptance installs nothing: relayr never trusts the event, only artifa
   <img alt="The marks of artifactr, reflexr, evalr, relayr, stackr, portalr and grantr, over their names" src="docs/assets/brand/family-light.svg" width="100%">
 </picture>
 
-| | Package | What it is | Status |
-|:-:|---|---|---|
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/artifactr/assets/brand/mark-dark.svg"><img src="docs/artifactr/assets/brand/mark-light.svg" width="28" alt=""></picture> | **[artifactr](packages/artifactr)** | Chat applications where people and agents collaborate through shared, versioned artifacts | ✅ v0.1 · 🏷️ [0.1.0 released](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/reflexr/assets/brand/mark-dark.svg"><img src="docs/reflexr/assets/brand/mark-light.svg" width="28" alt=""></picture> | **[reflexr](packages/reflexr)** | Rules over event streams that run LLM workflows: pydantic-ai agents, pydantic-graph graphs and functions | ✅ v0.1 |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/evalr/assets/brand/mark-dark.svg"><img src="docs/evalr/assets/brand/mark-light.svg" width="28" alt=""></picture> | **[evalr](packages/evalr)** | Typed evaluation of agent systems: judges that give typed verdicts, trained on people's feedback and measured against it | ✅ v0.1 |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/relayr/assets/brand/mark-dark.svg"><img src="docs/relayr/assets/brand/mark-light.svg" width="28" alt=""></picture> | **[relayr](packages/relayr)** | The bridge between artifactr and reflexr: chat events become events for rules, and runs act back in the chat. Rules can be drafted in chat. | 🚧 [v0.1 in progress](docs/relayr/rfcs/0001-v0.1-implementation-plan.md) |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/grantr/assets/brand/mark-dark.svg"><img src="docs/grantr/assets/brand/mark-light.svg" width="28" alt=""></picture> | **[grantr](packages/grantr)** | Identity and access: tenants, members, groups, roles, service principals and restricted items, checked before every command and read, with row-level security | ✅ v0.1 |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/portalr/assets/brand/mark-dark.svg"><img src="docs/portalr/assets/brand/mark-light.svg" width="28" alt=""></picture> | **[portalr](packages/portalr)** | The portal: an app UI to chat with agents and see their artifacts, proposals and runs, and an admin UI for access, feedback, traces and spend | 🚧 [v0.1 in progress](docs/portalr/rfcs/0001-v0.1-implementation-plan.md) |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/stackr/assets/brand/mark-dark.svg"><img src="docs/stackr/assets/brand/mark-light.svg" width="28" alt=""></picture> | **[stackr](packages/stackr)** | The stack the libraries run on (Supabase or PostgreSQL, LiteLLM, OpenTelemetry, Grafana, Langfuse), an application template, and hosting recipes | ✅ template · 🚧 [hosting recipes](docs/stackr/rfcs/0004-hosting-recipes.md) |
+| Package | What it is | Status |
+|---|---|---|
+| **[artifactr](packages/artifactr)** | Chat applications where people and agents collaborate through shared, versioned artifacts | ✅ v0.1 · 🏷️ [0.1.0 released](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) |
+| **[reflexr](packages/reflexr)** | Rules over event streams that run LLM workflows: pydantic-ai agents, pydantic-graph graphs and functions | ✅ v0.1 |
+| **[evalr](packages/evalr)** | Typed evaluation of agent systems: judges that give typed verdicts, trained on people's feedback and measured against it | ✅ v0.1 |
+| **[relayr](packages/relayr)** | The bridge between artifactr and reflexr: chat events become events for rules, and runs act back in the chat. Rules can be drafted in chat. | 🚧 [v0.1 in progress](docs/relayr/rfcs/0001-v0.1-implementation-plan.md) |
+| **[grantr](packages/grantr)** | Identity and access: tenants, members, groups, roles, service principals and restricted items, checked before every command and read, with row-level security | ✅ v0.1 |
+| **[portalr](packages/portalr)** | The portal: an app UI to chat with agents and see their artifacts, proposals and runs, and an admin UI for access, feedback, traces and spend | 🚧 [v0.1 in progress](docs/portalr/rfcs/0001-v0.1-implementation-plan.md) |
+| **[stackr](packages/stackr)** | The stack the libraries run on (Supabase or PostgreSQL, LiteLLM, OpenTelemetry, Grafana, Langfuse), an application template, and hosting recipes | ✅ template · 🚧 [hosting recipes](docs/stackr/rfcs/0004-hosting-recipes.md) |
 
 > [!NOTE]
 > **Alpha.** artifactr's [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) is the family's first release. The others will release once the family reaches v0.1. APIs may still change before 1.0.

@@ -111,7 +111,8 @@ async def test_a_key_is_its_tenants_and_no_others() -> None:
     with pytest.raises(Refused, match="another tenant"):
         await access(grants).authenticate(elsewhere)
     with pytest.raises(Unauthenticated, match="key is not valid"):
-        await access(grants).identify(request(Authorization=f"Bearer {key[:-1]}0"))
+        forged = key[:-1] + ("1" if key.endswith("0") else "0")
+        await access(grants).identify(request(Authorization=f"Bearer {forged}"))
 {%- if use_artifactr %}
 
 

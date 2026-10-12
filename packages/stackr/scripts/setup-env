@@ -11,7 +11,8 @@ Usage: scripts/setup-env [--example PATH] [--env-file PATH]
   `hex` (64 hex characters), `token` (43 URL-safe characters) or `uuid`,
   after the optional prefix (`generate:token:sk-`). `generate:auth-keys` is
   GoTrue's ES256 key set, and `generate:auth-service-role:KEYS_KEY` the service
-  role's key, signed with the key set an earlier key holds.
+  role's key, signed with the key set an earlier key holds, and made again when
+  that key set no longer has its key.
 - `basic-auth:USER_KEY:PASSWORD_KEY` is derived as base64("user:password"),
   the credentials of an HTTP Basic header. Derived values are recomputed on
   every run, so they always follow the keys they come from.
@@ -31,7 +32,7 @@ import sys
 import uuid
 from pathlib import Path
 
-from _auth_keys import key_set, service_role_key
+from _auth_keys import key_set, service_role_key, signed_by
 from _env import LINE, read_env
 
 LOCAL_HEADER = "# Local additions: keys that are not in .env.example."
@@ -54,6 +55,15 @@ def generate(spec: str, values: dict[str, str]) -> str:
     if kind == "uuid":
         return prefix + str(uuid.uuid4())
     raise SystemExit(f"setup-env: unknown generator {spec!r}")
+
+
+def stale(spec: str, value: str, values: dict[str, str]) -> bool:
+    """Whether a kept value no longer matches the values it was made from: a service role's key
+    signed with a key the key set no longer has."""
+    if not spec.startswith("generate:auth-service-role:"):
+        return False
+    keys = values.get(spec.rsplit(":", 1)[1], "")
+    return not signed_by(value, keys)
 
 
 def derive(spec: str, values: dict[str, str]) -> str:
@@ -88,7 +98,7 @@ def main() -> int:
         key, template = match["key"], match["value"]
         if template.startswith("basic-auth:"):
             value = derive(template, resolved)
-        elif key in existing:
+        elif key in existing and not stale(template, existing[key], resolved):
             value = existing[key]
         elif template.startswith("generate:"):
             value = generate(template, resolved)

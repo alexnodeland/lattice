@@ -19,3 +19,9 @@ services:
     image: ${APP_IMAGE:?set APP_IMAGE in .env, the image to run}
     ports: !reset []
     networks: !override [stackr]
+    # GoTrue on the stack's network: its key set, and{% if access == 'grantr' %} its admin API, which the edge refuses{% else %} nothing else{% endif %}.
+    environment:
+      AUTH_JWKS_URL: http://gotrue:9999/.well-known/jwks.json
+{%- if access == 'grantr' %}
+      AUTH_ADMIN_URL: http://gotrue:9999
+{%- endif %}

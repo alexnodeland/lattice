@@ -18,25 +18,31 @@ cd lattice/packages/stackr
 sudo deploy/host/bootstrap example.com
 ```
 
-`deploy/host/bootstrap` installs Docker with Compose, make, jq and uv; lets in only SSH, HTTP and HTTPS through ufw; and writes `.env` with fresh secrets and the host's settings:
+`deploy/host/bootstrap` installs Docker with Compose, make, jq and uv, and refuses Docker before 28.0 or Compose before 2.24.4; rotates Docker's logs; lets in only the ports `sshd` listens on, HTTP and HTTPS through ufw; and writes `.env` with fresh secrets and the host's settings:
 
 | Setting | Value |
 |---|---|
-| `STACKR_RECIPE` | `host`: `make` adds the overlay, `deploy/host/compose.prod.yaml` |
+| `STACKR_RECIPE` | `host`: `make` adds the overlay, `deploy/host/compose.prod.yaml`, and starts the `auth` profile |
+| `STACKR_EDGE_BIND` | `0.0.0.0`: Caddy's 80 and 443 on every interface. Everywhere else it is `127.0.0.1`, unless you choose a LAN address on purpose |
 | `STACKR_DATABASE` | `postgres` |
 | `STACKR_DOMAIN` | The domain Caddy serves, as `app.<domain>` and `auth.<domain>` |
 | `AUTH_PUBLIC_URL`, `AUTH_SITE_URL` | `https://auth.<domain>`, GoTrue's address and its tokens' issuer, and `https://app.<domain>` |
 
 Keep a copy of `.env` off the host: it holds every secret, including the ones that encrypt Langfuse's and LiteLLM's data.
 
+- **Email:** GoTrue sends invitations and password resets only through an SMTP server. Set `AUTH_SMTP_HOST`, `AUTH_SMTP_PORT`, `AUTH_SMTP_USER`, `AUTH_SMTP_PASSWORD` and `AUTH_SMTP_SENDER`.
+- **Left to you:** hardening SSH (keys only, no password or root login), fail2ban, and unattended upgrades.
+
 ## Start it
 
 ```bash
-sudo make up PROFILES="observability langfuse gateway auth"
-sudo make smoke PROFILES="observability langfuse gateway auth"
+sudo make up
+sudo make smoke
 ```
 
-Caddy gets the certificates the first time each name is asked for. `make smoke` checks the stack from inside its networks, and the edge from the outside: only Caddy publishes on a public interface, HTTP redirects to HTTPS, and GoTrue's admin API is refused at the edge.
+On a host, `make` starts the `auth` profile with the others. Caddy gets the certificates the first time each name is asked for. `make smoke` checks the stack from inside its networks, and the edge: every service publishes on the loopback but Caddy, which publishes only at `STACKR_EDGE_BIND`; HTTP redirects to HTTPS; and GoTrue's admin API is refused at the edge.
+
+To try the recipe on your own machine, leave `STACKR_EDGE_BIND` at `127.0.0.1` and use `CADDY_TLS="tls internal"`, as CI does: nothing is reachable from another machine.
 
 ## The application
 
@@ -46,8 +52,8 @@ Generate it with `hosting: host` ([The application template](template.md)). Its 
 |---|---|
 | `DATABASE_URL`, `DATABASE_ADMIN_URL` | The role it works as and the tables' owner, on `postgres:5432` |
 | `AUTH_ISSUER` | `https://auth.<domain>` |
-| `AUTH_JWKS_URL` | `http://gotrue:9999/.well-known/jwks.json`, through `STACK_AUTH_JWKS_URL` |
-| `AUTH_ADMIN_URL` | `http://gotrue:9999`, since the edge refuses the admin API |
+| `AUTH_JWKS_URL` | `http://gotrue:9999/.well-known/jwks.json`, which the overlay sets |
+| `AUTH_ADMIN_URL` | `http://gotrue:9999`, which the overlay sets, since the edge refuses the admin API |
 | `AUTH_SERVICE_ROLE_KEY` | stackr's `AUTH_SERVICE_ROLE_KEY` |
 
 Before it first starts, create the role it works as, then start it:

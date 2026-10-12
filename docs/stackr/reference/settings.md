@@ -56,6 +56,12 @@ Empty for certificates from Let's Encrypt; `tls internal` for Caddy's own CA.
 |---|---|
 | `CADDY_TLS` | Empty |
 
+Where Caddy publishes 80 and 443, as STACKR_BIND is for the rest: this machine only by default. Set a LAN address, or 0.0.0.0, only on purpose: on the host users reach, `deploy/host/bootstrap` sets 0.0.0.0.
+
+| Setting | In `.env.example` |
+|---|---|
+| `STACKR_EDGE_BIND` | `127.0.0.1` |
+
 ### Observability
 
 Grafana signs in as `admin` with this password.
@@ -125,6 +131,16 @@ GoTrue requires a shared secret too, though nothing is signed with it.
 | Setting | In `.env.example` |
 |---|---|
 | `AUTH_JWT_SECRET` | Generated: 64 hex characters |
+
+The SMTP server GoTrue sends invitations and password resets through. Optional: without one, it sends no email.
+
+| Setting | In `.env.example` |
+|---|---|
+| `AUTH_SMTP_HOST` | Empty |
+| `AUTH_SMTP_PORT` | `587` |
+| `AUTH_SMTP_USER` | Empty |
+| `AUTH_SMTP_PASSWORD` | Empty |
+| `AUTH_SMTP_SENDER` | Empty |
 
 ### The Redis protocol, with Valkey
 

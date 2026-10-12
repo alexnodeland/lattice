@@ -243,7 +243,7 @@ GoTrue, Supabase's auth server alone: the identity port on the `postgres` adapte
 | Property | Value |
 |---|---|
 | Profiles | `auth` |
-| Image | `supabase/gotrue`, pinned by tag in `compose.yaml` |
+| Image | `supabase/gotrue`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 9999 (`AUTH_PORT`) → 9999 |
 | Networks | `stackr` |
 | Volumes | none |
@@ -270,6 +270,11 @@ GoTrue, Supabase's auth server alone: the identity port on the `postgres` adapte
     | `GOTRUE_JWT_EXP` | `3600` |
     | `GOTRUE_EXTERNAL_EMAIL_ENABLED` | `true` |
     | `GOTRUE_DISABLE_SIGNUP` | `${AUTH_DISABLE_SIGNUP:-true}` |
+    | `GOTRUE_SMTP_HOST` | `${AUTH_SMTP_HOST:-}` |
+    | `GOTRUE_SMTP_PORT` | `${AUTH_SMTP_PORT:-587}` |
+    | `GOTRUE_SMTP_USER` | `${AUTH_SMTP_USER:-}` |
+    | `GOTRUE_SMTP_PASS` | `${AUTH_SMTP_PASSWORD:-}` |
+    | `GOTRUE_SMTP_ADMIN_EMAIL` | `${AUTH_SMTP_SENDER:-}` |
 
 ### `redis`
 

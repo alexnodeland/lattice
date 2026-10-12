@@ -63,6 +63,8 @@ ifeq ($(STACKR_RECIPE),local)
 COMPOSE_FILES :=
 else ifeq ($(STACKR_RECIPE),host)
 COMPOSE_FILES := -f compose.yaml -f deploy/host/compose.prod.yaml
+# A host's identity is GoTrue: the auth profile starts with the rest.
+ALL_PROFILES += auth
 else
 $(error STACKR_RECIPE must be local or host, not '$(STACKR_RECIPE)')
 endif
@@ -96,6 +98,9 @@ ifeq ($(STACKR_DATABASE)$(filter auth,$(PROFILES)),supabaseauth)
 endif
 ifeq ($(STACKR_RECIPE)$(STACKR_DATABASE),hostsupabase)
 	$(error a single host runs on the postgres adapter, with the auth profile)
+endif
+ifeq ($(STACKR_RECIPE)$(filter auth,$(PROFILES)),host)
+	$(error a single host needs the auth profile: make up PROFILES="observability langfuse gateway auth")
 endif
 	@docker network inspect $(SUPABASE_NETWORK) >/dev/null 2>&1 || docker network create $(SUPABASE_NETWORK) >/dev/null
 ifneq ($(strip $(START_SUPABASE)),)

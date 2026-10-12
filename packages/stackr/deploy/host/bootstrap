@@ -4,16 +4,23 @@
 # Usage, as root, from packages/stackr in a checkout of lattice at a stackr tag, on Ubuntu 24.04:
 #   deploy/host/bootstrap example.com
 #
-# It installs Docker with Compose, make, jq and uv (at the version lattice's .prototools pins);
-# lets in only SSH, HTTP and HTTPS through ufw; and writes .env with fresh secrets, the host
-# recipe, the postgres adapter, and GoTrue at auth.<domain>. Point app.<domain> and auth.<domain>
-# at this machine before `make up`, so Caddy can get their certificates. Running it again keeps
-# every secret in .env.
+# It installs Docker with Compose, make, jq and uv (at the version lattice's .prototools pins),
+# and refuses a Docker older than 28.0 or a Compose older than 2.24.4; rotates Docker's logs; lets
+# in only the port sshd listens on, HTTP and HTTPS, through ufw; and writes .env with fresh
+# secrets, the host recipe, Caddy on every interface, the postgres adapter, and GoTrue at
+# auth.<domain>. Point app.<domain> and auth.<domain> at this machine before `make up`, so Caddy
+# can get their certificates. Running it again keeps every secret in .env.
+#
+# Left to you: hardening SSH (keys only, no root login), fail2ban, and unattended upgrades.
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 domain=${1:?usage: deploy/host/bootstrap DOMAIN}
+if [[ ! $domain =~ ^[a-z0-9.-]+$ ]]; then
+  echo "bootstrap: '$domain' isn't a domain: lowercase letters, digits, dots and hyphens" >&2
+  exit 1
+fi
 if ((EUID != 0)); then
   echo "bootstrap: run as root" >&2
   exit 1
@@ -24,11 +31,33 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker.io docker-compose-v2
 uv_version=$(sed -n 's/^uv = "\(.*\)"$/\1/p' ../../.prototools)
 PIPX_BIN_DIR=/usr/local/bin pipx install --force "uv==$uv_version"
 
+# Docker before 28.0 lets machines on the same link reach ports published on 127.0.0.1, and the
+# overlay's !reset and !override need Compose 2.24.4.
+at_least() { [[ $(printf '%s\n%s\n' "$2" "$1" | sort -V | head -n 1) == "$2" ]]; }
+docker_version=$(docker version --format '{{.Server.Version}}')
+compose_version=$(docker compose version --short)
+if ! at_least "$docker_version" 28.0 || ! at_least "${compose_version#v}" 2.24.4; then
+  echo "bootstrap: needs Docker 28.0 and Compose 2.24.4 or later, not $docker_version and $compose_version" >&2
+  exit 1
+fi
+
+# Docker's logs, rotated: three files of 10 MB per container. An existing daemon.json is kept.
+if [[ ! -e /etc/docker/daemon.json ]]; then
+  echo '{"log-driver": "json-file", "log-opts": {"max-size": "10m", "max-file": "3"}}' \
+    >/etc/docker/daemon.json
+  systemctl restart docker
+fi
+
 # Docker writes its own iptables rules for published ports, which ufw doesn't see: the host
 # recipe publishes only Caddy's 80 and 443 on a public interface, and the rest on 127.0.0.1.
+ssh_ports=$(sshd -T 2>/dev/null | awk '$1 == "port" {print $2}')
+if [[ -z $ssh_ports ]]; then
+  echo "bootstrap: can't tell which port sshd listens on, so ufw is left off" >&2
+  exit 1
+fi
 ufw default deny incoming
 ufw default allow outgoing
-ufw allow OpenSSH
+for port in $ssh_ports; do ufw allow "$port/tcp"; done
 ufw allow 80/tcp
 ufw allow 443/tcp
 ufw --force enable
@@ -36,14 +65,16 @@ ufw --force enable
 uv run scripts/setup-env
 set_setting() { sed -i "s|^$1=.*|$1=$2|" .env; }
 set_setting STACKR_RECIPE host
+set_setting STACKR_EDGE_BIND 0.0.0.0
 set_setting STACKR_DATABASE postgres
 set_setting STACKR_DOMAIN "$domain"
 set_setting AUTH_PUBLIC_URL "https://auth.$domain"
 set_setting AUTH_SITE_URL "https://app.$domain"
 
 cat <<NEXT
-bootstrap: ready. Keep a copy of .env off this machine: it holds every secret. Then
-  make up PROFILES="observability langfuse gateway auth"
+bootstrap: ready. Keep a copy of .env off this machine: it holds every secret. Set AUTH_SMTP_*
+in .env for GoTrue's invitations and password resets. Then
+  make up
 and reach Grafana, Langfuse and LiteLLM's admin UI through an SSH tunnel, such as
   ssh -L 3000:127.0.0.1:3000 -L 3300:127.0.0.1:3300 -L 4400:127.0.0.1:4400 <this host>
 NEXT

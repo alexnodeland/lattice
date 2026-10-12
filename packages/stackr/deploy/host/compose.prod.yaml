@@ -1,10 +1,11 @@
 # stackr on a single host, behind Caddy (RFC-0004): an overlay on compose.yaml, which `make`
 # adds when STACKR_RECIPE=host. Run it with the postgres adapter and the auth profile.
 #
-# Only Caddy publishes on a public interface, on 80 and 443. The admin UIs (Grafana, Langfuse,
-# LiteLLM's, MinIO's console) keep their ports on STACKR_BIND, 127.0.0.1, for SSH tunnels; the
-# rest publish nothing. Docker's own iptables rules bypass ufw, which is why nothing else may
-# bind a public interface.
+# Only Caddy may publish on a public interface, on 80 and 443, at STACKR_EDGE_BIND: 127.0.0.1
+# unless deploy/host/bootstrap sets 0.0.0.0 on a real host, so a run on a workstation opens no
+# port. The admin UIs (Grafana, Langfuse, LiteLLM's, MinIO's console) are pinned to 127.0.0.1,
+# whatever STACKR_BIND says, for SSH tunnels; the rest publish nothing. Docker's own iptables
+# rules bypass ufw, which is why nothing else may bind a public interface.
 
 name: stackr
 
@@ -22,14 +23,30 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     ports:
-      - 80:80
-      - 443:443
+      - ${STACKR_EDGE_BIND:-127.0.0.1}:80:80
+      - ${STACKR_EDGE_BIND:-127.0.0.1}:443:443
     networks:
       default:
         # The stack's containers reach the public names at the edge too.
         aliases:
           - app.${STACKR_DOMAIN}
           - auth.${STACKR_DOMAIN}
+
+  grafana:
+    ports: !override
+      - 127.0.0.1:${GRAFANA_PORT:-3000}:3000
+  langfuse-web:
+    ports: !override
+      - 127.0.0.1:${LANGFUSE_PORT:-3300}:3000
+    networks: !override [default]
+  litellm:
+    ports: !override
+      - 127.0.0.1:${LITELLM_PORT:-4400}:4000
+    networks: !override [default]
+  minio:
+    ports: !override
+      - 127.0.0.1:${MINIO_PORT:-9000}:9000
+      - 127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001
 
   otel-collector:
     ports: !reset []
@@ -45,18 +62,17 @@ services:
     ports: !reset []
   postgres:
     ports: !reset []
-  # Reached at the edge, as auth.<domain>.
+  # Reached at the edge, as auth.<domain>. Caddy sets X-Forwarded-For to each client's address,
+  # which GoTrue's per-address rate limits read: without the header it applies none.
   gotrue:
     ports: !reset []
+    environment:
+      GOTRUE_RATE_LIMIT_HEADER: X-Forwarded-For
 
   # PostgreSQL is the postgres service, on the stack's own network: local Supabase's goes.
   db-init:
     networks: !override [default]
   langfuse-worker:
-    networks: !override [default]
-  langfuse-web:
-    networks: !override [default]
-  litellm:
     networks: !override [default]
 
   probe:

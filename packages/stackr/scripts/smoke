@@ -14,9 +14,10 @@
 # auth: GoTrue's database exists; it serves an ES256 key set; its admin API
 # takes the service role's key and refuses a request without one; a user it
 # creates signs in, with a token signed by that key, from AUTH_PUBLIC_URL.
-# edge (on a single host, STACKR_RECIPE=host): only Caddy publishes on a public
-# interface; it redirects HTTP to HTTPS, serves GoTrue at auth.<domain> with a
-# certificate the probe trusts, and refuses GoTrue's admin API there. The auth
+# edge (on a single host, STACKR_RECIPE=host): every service publishes on the
+# loopback but Caddy, which publishes only at STACKR_EDGE_BIND (127.0.0.1
+# unless chosen); it redirects HTTP to HTTPS, serves GoTrue at auth.<domain>
+# with a certificate the probe trusts, and refuses GoTrue's admin API there. The auth
 # and app checks then go through it.
 # langfuse (with observability): a trace with a known id, sent to the
 # Collector, is found in Langfuse through its public API, and in Tempo.
@@ -437,11 +438,11 @@ smoke_auth() {
 }
 
 # The containers that publish a port on an interface other than the loopback.
-publishers_outside_loopback() {
+# Every published port, as "service address".
+published() {
   stack_compose --profile '*' ps --format json |
-    jq -rs '[.[] | (if type == "array" then .[] else . end)
-      | select(any(.Publishers[]?; .PublishedPort > 0 and (.URL | test("^(127\\.|::1$)") | not)))
-      | .Service] | unique | join(" ")'
+    jq -rs '.[] | (if type == "array" then .[] else . end) | .Service as $service
+      | .Publishers[]? | select(.PublishedPort > 0) | "\($service) \(.URL)"' | sort -u
 }
 edge_answers() {
   local code
@@ -450,12 +451,18 @@ edge_answers() {
 }
 
 smoke_edge() {
-  local outside
-  outside=$(publishers_outside_loopback)
-  if [[ $outside == caddy ]]; then
-    log "ok: only Caddy publishes on a public interface"
+  # Caddy publishes at STACKR_EDGE_BIND, 127.0.0.1 unless chosen; everything else on the loopback.
+  local edge_bind edge ports outside
+  edge_bind=$(setting STACKR_EDGE_BIND)
+  # Every interface is 0.0.0.0, and :: beside it.
+  edge="^caddy ($edge_bind$([[ $edge_bind == 0.0.0.0 ]] && printf '|::'))$"
+  ports=$(published)
+  outside=$(grep -vE ' (127\.[0-9.]+|::1)$' <<<"$ports" | grep -v '^caddy ' || true)
+  if [[ -z $outside ]] && grep -qE "$edge" <<<"$ports" &&
+    ! grep '^caddy ' <<<"$ports" | grep -qvE "$edge"; then
+    log "ok: every service publishes on the loopback but Caddy, only at $edge_bind"
   else
-    log "FAIL: services publishing on a public interface: ${outside:-none}, not only caddy"
+    log "FAIL: published ports other than Caddy's at $edge_bind and the rest on the loopback: $ports"
     status=1
   fi
   eventually "Caddy redirects HTTP to HTTPS" edge_answers 308 "http://auth.$domain/health"
@@ -659,7 +666,7 @@ timeline_has() {
 app_trace_in_tempo() { tempo_trace_has_service "$app_name" && tempo_trace_has_service litellm; }
 
 smoke_app() {
-  local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE)} issuer jwks
+  local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE)} issuer jwks admin=""
   if [[ $adapter == supabase ]]; then
     auth=supabase
     supabase_status || { log "FAIL: app: local Supabase's status"; return 1; }
@@ -670,6 +677,9 @@ smoke_app() {
     gotrue_ready || { log "FAIL: app: on $adapter, it needs GoTrue, the auth profile"; return 1; }
     issuer=$(setting AUTH_PUBLIC_URL)
     jwks=http://gotrue:9999/.well-known/jwks.json
+    # The admin commands find users by email through GoTrue's admin API, on the stack's network.
+    admin="AUTH_SERVICE_ROLE_KEY=$(setting AUTH_SERVICE_ROLE_KEY)
+AUTH_ADMIN_URL=http://gotrue:9999"
   fi
   unset DOCKER_DEFAULT_PLATFORM
 
@@ -704,6 +714,7 @@ LANGFUSE_PUBLIC_KEY=$(setting LANGFUSE_PUBLIC_KEY)
 LANGFUSE_SECRET_KEY=$(setting LANGFUSE_SECRET_KEY)
 AUTH_ISSUER=$issuer
 STACK_AUTH_JWKS_URL=$jwks
+$admin
 LITELLM_API_KEY=$app_key
 LITELLM_MOCK_RESPONSE="stackr smoke ok"
 APP_IMAGE=$app_name:local
@@ -744,7 +755,11 @@ ENV
   log "ok: $auth signed a user in"
 
   # grantr holds the tenants: one the user owns, and one they aren't in.
-  if ! app_admin tenant stackr-smoke "$app_user" ||
+  # With GoTrue, the owner is named by email: the admin command finds them through its private
+  # admin API, which the edge refuses on a single host.
+  local owner=$app_user
+  [[ $auth == gotrue ]] && owner=$run_id@stackr.local
+  if ! app_admin tenant stackr-smoke "$owner" ||
     ! app_admin tenant stackr-smoke-other "$run_id-someone-else"; then
     log "FAIL: app: creating its tenants in grantr"
     return 1

@@ -62,5 +62,7 @@ GRANT gotrue TO CURRENT_USER;
 SELECT 'CREATE DATABASE auth OWNER gotrue'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'auth') \gexec
 ALTER DATABASE auth SET timezone TO 'UTC';
+-- Only GoTrue, its owner, connects to it.
+REVOKE CONNECT ON DATABASE auth FROM PUBLIC;
 \connect auth
 CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION gotrue;

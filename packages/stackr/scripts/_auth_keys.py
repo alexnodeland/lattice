@@ -2,6 +2,10 @@
 
 HCL can't make a JWK or sign a JWT, so this does, for `make env` on one machine and, on AWS, for
 a one-off task. The scripts import this from their own directory, as they do `_env.py`.
+
+The service role's key is valid for ten years, and can't be revoked on its own: replacing the key
+set (delete AUTH_JWT_KEYS, then `make env`) makes a new one, and every token signed before stops
+verifying.
 """
 
 from __future__ import annotations
@@ -38,6 +42,15 @@ def key_set() -> str:
         "key_ops": ["sign", "verify"],
     }
     return json.dumps([jwk], separators=(",", ":"))
+
+
+def signed_by(token: str, keys: str) -> bool:
+    """Whether a token names, by its `kid`, a key the key set has."""
+    try:
+        kid = jwt.get_unverified_header(token).get("kid")
+        return any(jwk.get("kid") == kid for jwk in json.loads(keys))
+    except (jwt.InvalidTokenError, ValueError):
+        return False
 
 
 def service_role_key(keys: str) -> str:

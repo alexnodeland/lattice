@@ -272,7 +272,7 @@ services:
   # local Supabase does. Its admin API takes AUTH_SERVICE_ROLE_KEY, a JWT signed
   # with the same key. `make up` refuses the profile beside local Supabase.
   gotrue:
-    image: supabase/gotrue:v2.197.0
+    image: supabase/gotrue:v2.197.0@sha256:1736a63078f5922b198c4cbe50f80ab9a2d3b54fe8b7b6cfb2e9dc5dbbc12c6b
     profiles: [auth]
     restart: unless-stopped
     environment:
@@ -296,6 +296,12 @@ services:
       # Users are created through the admin API (an application's admin
       # commands, portalr's invitations), not by signing themselves up.
       GOTRUE_DISABLE_SIGNUP: ${AUTH_DISABLE_SIGNUP:-true}
+      # Invitations and password resets need an SMTP server; without one, GoTrue sends no email.
+      GOTRUE_SMTP_HOST: ${AUTH_SMTP_HOST:-}
+      GOTRUE_SMTP_PORT: ${AUTH_SMTP_PORT:-587}
+      GOTRUE_SMTP_USER: ${AUTH_SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${AUTH_SMTP_PASSWORD:-}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${AUTH_SMTP_SENDER:-}
     ports:
       - ${STACKR_BIND:-127.0.0.1}:${AUTH_PORT:-9999}:9999
     healthcheck:

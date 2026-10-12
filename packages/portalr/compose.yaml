@@ -42,7 +42,7 @@ services:
         condition: service_healthy
 
   tempo:
-    image: grafana/tempo:3.0.3
+    image: grafana/tempo:3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5
     command: ["-config.file=/etc/tempo/tempo.yaml"]
     volumes:
       - ../stackr/deploy/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
@@ -59,7 +59,7 @@ services:
         condition: service_healthy
 
   prometheus:
-    image: prom/prometheus:v3.15.0
+    image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --web.enable-otlp-receiver
@@ -75,7 +75,7 @@ services:
       retries: 60
 
   prom-label-proxy:
-    image: quay.io/prometheuscommunity/prom-label-proxy:v0.15.1
+    image: quay.io/prometheuscommunity/prom-label-proxy:v0.15.1@sha256:186f9fe791158ef25d6f810109746ac0acdb35cb8401b554526c77c065483373
     command:
       - -label=tenant_id
       - -upstream=http://prometheus:9090
@@ -93,7 +93,7 @@ services:
         condition: service_healthy
 
   loki:
-    image: grafana/loki:3.7.8
+    image: grafana/loki:3.7.8@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193
     command: ["-config.file=/etc/loki/loki.yaml"]
     volumes:
       - ../stackr/deploy/loki/loki.yaml:/etc/loki/loki.yaml:ro

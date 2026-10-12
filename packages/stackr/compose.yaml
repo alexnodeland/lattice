@@ -79,7 +79,7 @@ services:
   # The telemetry port: every application, and the LiteLLM proxy, sends OTLP
   # here. Swapping a backend changes the Collector's exporters only.
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.161.0
+    image: otel/opentelemetry-collector-contrib:0.161.0@sha256:fd328de2552466ad78385e1b1289c3f2402b1c45f265b252aab1955b42845ac1
     profiles: [observability]
     restart: unless-stopped
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
@@ -100,7 +100,7 @@ services:
       - loki
 
   tempo:
-    image: grafana/tempo:3.0.3
+    image: grafana/tempo:3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5
     profiles: [observability]
     restart: unless-stopped
     command: ["-config.file=/etc/tempo/tempo.yaml"]
@@ -113,7 +113,7 @@ services:
       - prometheus
 
   prometheus:
-    image: prom/prometheus:v3.15.0
+    image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
     profiles: [observability]
     restart: unless-stopped
     command:
@@ -141,7 +141,7 @@ services:
   # so no query can read another's series. Grafana keeps its direct data
   # source, for operators (lattice RFC-0002).
   prom-label-proxy:
-    image: quay.io/prometheuscommunity/prom-label-proxy:v0.15.1
+    image: quay.io/prometheuscommunity/prom-label-proxy:v0.15.1@sha256:186f9fe791158ef25d6f810109746ac0acdb35cb8401b554526c77c065483373
     profiles: [observability]
     restart: unless-stopped
     command:
@@ -160,7 +160,7 @@ services:
       - prometheus
 
   loki:
-    image: grafana/loki:3.7.8
+    image: grafana/loki:3.7.8@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193
     profiles: [observability]
     restart: unless-stopped
     command: ["-config.file=/etc/loki/loki.yaml"]
@@ -173,7 +173,7 @@ services:
   # The profiles port: applications push profiles here directly, until OTLP
   # profiles are stable in the Collector (ADR-0005).
   pyroscope:
-    image: grafana/pyroscope:2.3.1
+    image: grafana/pyroscope:2.3.1@sha256:86a9ee7448487409ead8ada78789de7b78b739711b92b5d7224a1a54abf3eeb2
     profiles: [observability]
     restart: unless-stopped
     command: ["-config.file=/etc/pyroscope/config.yaml"]
@@ -184,7 +184,7 @@ services:
       - ${STACKR_BIND:-127.0.0.1}:${PYROSCOPE_PORT:-4040}:4040
 
   grafana:
-    image: grafana/grafana:13.2.2
+    image: grafana/grafana:13.2.2@sha256:ac461fb352abc50da10a51c7d02462e9c05488f11f53f14b3ad79a8145f638a0
     profiles: [observability]
     restart: unless-stopped
     environment:
@@ -218,7 +218,7 @@ services:
   # The database port's alternative adapter: plain PostgreSQL, selected with
   # STACKR_DATABASE=postgres. Local Supabase is the default (supabase/).
   postgres:
-    image: postgres:17.11-alpine
+    image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
     profiles: [postgres]
     restart: unless-stopped
     environment:
@@ -239,7 +239,7 @@ services:
   # Creates each service's role and database on the database adapter, on
   # every start (deploy/postgres/init.sql), then exits.
   db-init:
-    image: postgres:17.11-alpine
+    image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
     profiles: [langfuse, gateway]
     restart: "no"
     command: ["psql", "--no-psqlrc", "--quiet", "--file=/init.sql"]
@@ -268,7 +268,7 @@ services:
   # `noeviction`, because queued jobs must not be dropped; the gateway's
   # entries expire by their TTLs.
   redis:
-    image: valkey/valkey:9.1.2-alpine
+    image: valkey/valkey:9.1.2-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
     profiles: [langfuse, gateway]
     restart: unless-stopped
     # The password goes into a config file, never onto the command line.
@@ -314,7 +314,7 @@ services:
       retries: 30
 
   clickhouse:
-    image: clickhouse/clickhouse-server:26.9.3.38
+    image: clickhouse/clickhouse-server:26.9.3.38@sha256:12b16e744f91d8228705e136bd2b0ab14c939c87ff82443090279b65255c50c1
     profiles: [langfuse]
     restart: unless-stopped
     user: "101:101"
@@ -332,7 +332,7 @@ services:
       retries: 30
 
   langfuse-worker:
-    image: langfuse/langfuse-worker:4.46.0
+    image: langfuse/langfuse-worker:4.46.0@sha256:3568d2d1eb5dd570f4087b37972ddffa3f6ae4f872553e0b0e2eedf4896a29e9
     profiles: [langfuse]
     restart: unless-stopped
     environment:
@@ -358,7 +358,7 @@ services:
   # the organisation, project, API keys and admin user from .env on first
   # start (headless initialization).
   langfuse-web:
-    image: langfuse/langfuse:4.46.0
+    image: langfuse/langfuse:4.46.0@sha256:755b821ba8f73a20d43d90e68f2b75d2f597dd164c55890f67a05f5a8d0f0e24
     profiles: [langfuse]
     restart: unless-stopped
     environment:
@@ -391,7 +391,7 @@ services:
   # The LLM gateway port: an OpenAI-compatible API in front of the providers
   # and local model servers in deploy/litellm/config.yaml (ADR-0010).
   litellm:
-    image: ghcr.io/berriai/litellm:v1.103.0
+    image: ghcr.io/berriai/litellm:v1.103.0@sha256:bd089afdcd35b894b14a93f9743cdc8b591f82da1a38dd43a010a7b0c9de5fd7
     profiles: [gateway]
     restart: unless-stopped
     command: ["--config", "/etc/litellm/config.yaml", "--port", "4000"]
@@ -449,5 +449,5 @@ services:
 
   # Sends test telemetry for scripts/smoke; not a service.
   telemetrygen:
-    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.162.0
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.162.0@sha256:5350f77dbc914034321dc7629058e141996c8dc2cdde076d281e573efee1a67e
     profiles: [smoke]

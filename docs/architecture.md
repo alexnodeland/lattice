@@ -182,6 +182,8 @@ A change to evalr runs the checks of evalr and of every project above it; a chan
 | `docs.yml` | On every push to `main`, and by hand | Builds the site and deploys it to GitHub Pages |
 | `release.yml` | On every push to `main` | release-please; then each released package's wheel, built, attested and attached |
 | `renovate.yml` | Every day, and by hand | Renovate |
+| `codeql.yml` | On pull requests, on every push to `main`, and every week | **Analyze**: CodeQL over the Python, with its alerts in code scanning ([ADR-0011](adr/0011-codeql-and-scorecard.md)) |
+| `scorecard.yml` | Every week, and by hand | **Scorecard**: OpenSSF Scorecard, published to the OpenSSF and uploaded to code scanning ([ADR-0011](adr/0011-codeql-and-scorecard.md)) |
 
 - **Two checks are required,** `CI` and `Title`, on branches up to date with `main`. The ruleset is the one `main` shares with the siblings' repositories: no deletion, no force push, linear history, and squash-only pull requests ([ADR-0003](adr/0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md)).
 - **`main` is Nightly's.** CI runs on pull requests only, and `nightly.yml` runs everything on each push to `main`.

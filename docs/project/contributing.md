@@ -14,5 +14,6 @@ as they do on GitHub. Add a definition here for every link added to CONTRIBUTING
 [artifactr-adr-0015]: ../artifactr/adr/0015-quality-gates.md
 [code-of-conduct]: code-of-conduct.md
 [lattice-adr-0010]: ../adr/0010-every-projects-tests-run-in-a-random-order.md
+[lattice-adr-0011]: ../adr/0011-codeql-and-scorecard.md
 [license]: license.md
 [security]: security.md

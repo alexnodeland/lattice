@@ -25,12 +25,21 @@ dependencies = [
     "reflexr>=0.1.0.dev0",
     "pydantic>=2.13",
     "pydantic-ai-slim>=2.51",
+    "opentelemetry-api>=1.45",
 ]
 
 [project.optional-dependencies]
 sql = ["sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
 sqlite = ["relayr-ai[sql]", "aiosqlite>=0.22"]
 postgres = ["relayr-ai[sql]", "asyncpg>=0.31"]
+otel = ["opentelemetry-sdk>=1.45"]
+langfuse = [
+    "langfuse>=4.15,<5",
+    "artifactr-ai[langfuse]>=0.1.0",
+    "reflexr[langfuse]>=0.1.0.dev0",
+    # The libraries' [langfuse] extras need evalr; named here, it comes from the workspace too.
+    "evalr[langfuse]>=0.1.0.dev0",
+]
 
 [project.urls]
 Homepage = "https://lattice.alexnodeland.com/relayr/"
@@ -59,6 +68,7 @@ dev = [
 [tool.uv.sources]
 artifactr-ai = { workspace = true }
 reflexr = { workspace = true }
+evalr = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]

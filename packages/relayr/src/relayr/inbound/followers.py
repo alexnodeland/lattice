@@ -24,6 +24,9 @@ import logging
 from datetime import timedelta
 from typing import Final
 
+from opentelemetry.metrics import MeterProvider
+from opentelemetry.trace import SpanKind, TracerProvider
+
 import artifactr
 import artifactr.core
 import reflexr.workspace
@@ -31,9 +34,22 @@ from reflexr import SourceActor, new_id
 from reflexr.core import Causation, DepthExceeded, Forbidden
 from relayr.events import Projections
 from relayr.ledger import CauseKind, DeadLetter, Ledger, WorkspaceKey
-from relayr.outbound import is_rule_actor
+from relayr.outbound import is_rule_actor, turn_cause
+from relayr.telemetry import (
+    DEAD_LETTERS,
+    ENVELOPE_SEQ,
+    ERROR_TYPE,
+    EVENT_TYPE,
+    FOLLOWERS_STOPPED,
+    Telemetry,
+    linked,
+    workspace_attributes,
+)
 
 logger = logging.getLogger("relayr.inbound")
+
+_FORGET_EVERY = timedelta(hours=1)
+"""How often a follower forgets old causes while it holds its lease, at most."""
 
 
 FOLLOWER: Final = artifactr.SystemActor(name="relayr")
@@ -65,6 +81,11 @@ class Followers:
             cursor anyway, so a restarted follower reads at most this many again.
         read_back: How many envelopes a follower reads back at a time, looking for the message
             of a rule's that an agent turn carries out.
+        cause_ttl: How long the ledger keeps the run behind each of the outbound adapter's
+            writes. A follower forgets older ones as it takes its lease, and hourly while it
+            holds it; a write bridged after its cause is forgotten starts a chain of its own.
+        tracer_provider: Where the bridge's spans go. Defaults to the global provider.
+        meter_provider: Where its counters go. Defaults to the global provider.
     """
 
     def __init__(
@@ -78,6 +99,9 @@ class Followers:
         lease_ttl: timedelta = timedelta(seconds=30),
         save_every: int = 500,
         read_back: int = 100,
+        cause_ttl: timedelta = timedelta(days=7),
+        tracer_provider: TracerProvider | None = None,
+        meter_provider: MeterProvider | None = None,
     ) -> None:
         self._artifactr = artifactr
         self._reflexr = reflexr
@@ -87,6 +111,8 @@ class Followers:
         self._ttl = lease_ttl
         self._save_every = save_every
         self._read_back = read_back
+        self._cause_ttl = cause_ttl
+        self._telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
         self._tasks: dict[WorkspaceKey, asyncio.Task[None]] = {}
         self._closed = False
 
@@ -121,6 +147,8 @@ class Followers:
         self._tasks.pop(workspace, None)
         if not task.cancelled() and (error := task.exception()) is not None:
             logger.error("following %s/%s stopped", *workspace, exc_info=error)
+            attributes = {**workspace_attributes(*workspace), ERROR_TYPE: type(error).__qualname__}
+            self._telemetry.count(FOLLOWERS_STOPPED, attributes)
 
     async def _follow(self, workspace: WorkspaceKey) -> None:
         """Follow a workspace whenever this process holds its lease, until cancelled."""
@@ -147,6 +175,7 @@ class Followers:
         """
         relaying = asyncio.current_task()
         assert relaying is not None, "a follower runs as a task"
+        await self._ledger.forget_causes(workspace, older_than=self._cause_ttl)
         renewal = asyncio.create_task(self._renew(workspace, relaying))
         try:
             await self._relay(workspace, source, target)
@@ -160,11 +189,17 @@ class Followers:
 
     async def _renew(self, workspace: WorkspaceKey, relaying: asyncio.Task[None]) -> None:
         """Renew the lease every third of its life; cancel the relaying once it is lost or fails."""
+        loop = asyncio.get_running_loop()
+        forgot = loop.time()
+        forget_every = min(_FORGET_EVERY, self._cause_ttl).total_seconds()
         try:
             while True:
                 await asyncio.sleep(self._ttl.total_seconds() / 3)
                 if not await self._ledger.acquire_lease(workspace, self._holder, self._ttl):
                     break
+                if loop.time() - forgot >= forget_every:
+                    await self._ledger.forget_causes(workspace, older_than=self._cause_ttl)
+                    forgot = loop.time()
         except Exception:
             relaying.cancel()
             raise
@@ -191,38 +226,19 @@ class Followers:
         source: artifactr.Workspace,
         envelope: artifactr.core.Envelope,
     ) -> None:
-        """Record the run behind an agent turn that a rule's message started, as it starts.
-
-        A turn acts for the author of the messages it carries out, one author per turn, and
-        carries out the oldest messages no turn has taken. So a turn that acts for a rule carries
-        out the rule's messages since the rule's last turn in the thread, whatever turns for
-        others came between: it continues the chain of the run that posted the last of them.
-        Notices start no turn, and are passed over.
-        """
+        """Record the run behind an agent turn that acts for a rule, as it starts."""
         match envelope:
             case artifactr.core.Envelope(
-                event=artifactr.core.RunStarted(run_id=turn, thread_id=thread),
-                actor=artifactr.core.AgentActor(on_behalf_of=rule),
+                event=artifactr.core.RunStarted(run_id=turn),
+                actor=artifactr.core.AgentActor(on_behalf_of=rule) as agent,
             ) if rule is not None and is_rule_actor(rule):
-                pass
+                cause = await turn_cause(
+                    self._ledger, source, agent, before_seq=envelope.seq, read_back=self._read_back
+                )
+                if cause is not None:
+                    await self._ledger.record_cause(workspace, "turn", turn, cause)
             case _:
-                return
-        before = envelope.seq
-        while page := await source.read(before_seq=before, threads={thread}, last=self._read_back):
-            for earlier in reversed(page):
-                match earlier.event:
-                    case artifactr.core.MessagePosted(kind="message", message_id=message_id) if (
-                        earlier.actor == rule
-                    ):
-                        cause = await self._ledger.cause(workspace, "message", message_id)
-                        if cause is not None:
-                            await self._ledger.record_cause(workspace, "turn", turn, cause)
-                        return
-                    case artifactr.core.RunStarted() if _acts_for(earlier.actor, rule):
-                        return  # an earlier turn for the rule took what came before it
-                    case _:
-                        pass
-            before = page[0].seq
+                pass
 
     async def _bridge(
         self,
@@ -242,11 +258,21 @@ class Followers:
             refused = Forbidden(f"{event.event_type} events are recorded by reflexr, not published")
             await self._dead_letter(workspace, envelope, refused)
             return True
-        publishing, correlation_id = await self._chain(workspace, target, envelope)
-        try:
-            await publishing.publish(event, id=envelope.id, correlation_id=correlation_id)
-        except DepthExceeded as deep:
-            await self._dead_letter(workspace, envelope, deep)
+        with self._telemetry.tracer.start_as_current_span(
+            f"relayr.bridge {envelope.event.type}",
+            kind=SpanKind.CONSUMER,
+            links=linked(envelope.traceparent),
+            attributes={
+                **workspace_attributes(*workspace),
+                EVENT_TYPE: envelope.event.type,
+                ENVELOPE_SEQ: envelope.seq,
+            },
+        ):
+            publishing, correlation_id = await self._chain(workspace, target, envelope)
+            try:
+                await publishing.publish(event, id=envelope.id, correlation_id=correlation_id)
+            except DepthExceeded as deep:
+                await self._dead_letter(workspace, envelope, deep)
         return True
 
     async def _chain(
@@ -291,6 +317,7 @@ class Followers:
             error=f"{type(error).__name__}: {error}",
         )
         await self._ledger.dead_letter(workspace, letter)
+        self._telemetry.count(DEAD_LETTERS, {**workspace_attributes(*workspace), EVENT_TYPE: kind})
 
 
 def _written(envelope: artifactr.core.Envelope) -> tuple[CauseKind, str] | None:
@@ -313,11 +340,6 @@ def _written(envelope: artifactr.core.Envelope) -> tuple[CauseKind, str] | None:
             return "edit", f"{client_id}/{artifact_id}@{version}"
         case _:
             return None
-
-
-def _acts_for(actor: artifactr.core.Actor, rule: artifactr.core.Actor) -> bool:
-    """Whether an actor is an agent's turn acting for a rule's actor."""
-    return isinstance(actor, artifactr.core.AgentActor) and actor.on_behalf_of == rule
 
 
 def _answered(event: artifactr.core.Event) -> str | None:

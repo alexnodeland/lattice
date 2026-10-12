@@ -690,49 +690,55 @@ class Runner[AppDepsT]:
         }
         started = time.perf_counter()
         outcome: TurnOutcome = "failed"
-        with self._telemetry.tracer.start_as_current_span(
-            "invoke_workflow turn",
-            context=otel_context.Context(),
-            links=[Link(caller)] if caller.is_valid else None,
-            attributes=attributes,
-            record_exception=False,
-            set_status_on_exception=False,
-        ) as span:
-            token = otel_context.attach(baggage.set_baggage(SESSION_ID, session.thread_id))
-            try:
-                async with contextlib.AsyncExitStack() as scope:
-                    if self._turn_context is not None:
-                        await scope.enter_async_context(self._turn_context(session))
-                    history = await load_history(workspace, session.thread_id)
-                    if deferred is None:  # a new run: close the calls an ended run left open
-                        history = repair_messages(history)
-                    result = await self._agent.run(
-                        prompt,
-                        deps=session,
-                        message_history=history,
-                        deferred_tool_results=deferred,
-                        event_stream_handler=forward_live(self.live),
-                        conversation_id=session.thread_id,
-                    )
-            except asyncio.CancelledError:
-                outcome = "stopped"
-                raise
-            except Exception as error:
-                span.record_exception(error)
-                span.set_status(StatusCode.ERROR, str(error))
-                span.set_attribute(ERROR_TYPE, type(error).__qualname__)
-                raise
-            else:
-                paused = isinstance(result.output, DeferredToolRequests)
-                outcome = "paused" if paused else "completed"
-                return result
-            finally:
-                otel_context.detach(token)
-                span.set_attribute(TURN_OUTCOME, outcome)
-                counted = {**tenancy, TURN_TRIGGER: session.trigger, TURN_OUTCOME: outcome}
-                self._telemetry.add(TURNS, 1, counted)
-                self._telemetry.record(TURN_DURATION, time.perf_counter() - started, counted)
-                self._submit(EndedTurn(session, outcome, span.get_span_context()), span)
+        # A turn is its own trace (ADR-0035), so it starts from an empty context: nothing its
+        # caller propagated, such as the Langfuse attributes of a run that sent its message,
+        # reaches its spans.
+        detached = otel_context.attach(otel_context.Context())
+        try:
+            with self._telemetry.tracer.start_as_current_span(
+                "invoke_workflow turn",
+                links=[Link(caller)] if caller.is_valid else None,
+                attributes=attributes,
+                record_exception=False,
+                set_status_on_exception=False,
+            ) as span:
+                token = otel_context.attach(baggage.set_baggage(SESSION_ID, session.thread_id))
+                try:
+                    async with contextlib.AsyncExitStack() as scope:
+                        if self._turn_context is not None:
+                            await scope.enter_async_context(self._turn_context(session))
+                        history = await load_history(workspace, session.thread_id)
+                        if deferred is None:  # a new run: close the calls an ended run left open
+                            history = repair_messages(history)
+                        result = await self._agent.run(
+                            prompt,
+                            deps=session,
+                            message_history=history,
+                            deferred_tool_results=deferred,
+                            event_stream_handler=forward_live(self.live),
+                            conversation_id=session.thread_id,
+                        )
+                except asyncio.CancelledError:
+                    outcome = "stopped"
+                    raise
+                except Exception as error:
+                    span.record_exception(error)
+                    span.set_status(StatusCode.ERROR, str(error))
+                    span.set_attribute(ERROR_TYPE, type(error).__qualname__)
+                    raise
+                else:
+                    paused = isinstance(result.output, DeferredToolRequests)
+                    outcome = "paused" if paused else "completed"
+                    return result
+                finally:
+                    otel_context.detach(token)
+                    span.set_attribute(TURN_OUTCOME, outcome)
+                    counted = {**tenancy, TURN_TRIGGER: session.trigger, TURN_OUTCOME: outcome}
+                    self._telemetry.add(TURNS, 1, counted)
+                    self._telemetry.record(TURN_DURATION, time.perf_counter() - started, counted)
+                    self._submit(EndedTurn(session, outcome, span.get_span_context()), span)
+        finally:
+            otel_context.detach(detached)
 
     def _submit(self, turn: EndedTurn, span: Span) -> None:
         """Hand an ended turn to each evaluator; a failing one is recorded, never raised."""

@@ -36,3 +36,24 @@ The reference is generated from relayr's docstrings and type annotations. It doc
     options:
       show_root_heading: false
       show_root_toc_entry: false
+
+## relayr.telemetry
+
+::: relayr.telemetry
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## relayr.otel
+
+::: relayr.otel
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## relayr.langfuse
+
+::: relayr.langfuse
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false

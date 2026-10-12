@@ -2,11 +2,15 @@ from pathlib import Path
 
 import httpx
 import pytest
+from fastapi import FastAPI
 
+from grantr.core import AuditEntry, Forbidden, Invalid, Member, Subject
 from grantr.grants import Grants
-from portalr.invites import InviteFailed
+from portalr.fastapi import portalr_router
+from portalr.invites import Invite, InviteFailed
 from portalr.readers import Readers
-from tests.fastapi.conftest import Stack, app_for
+from tests.access import Intended
+from tests.fastapi.conftest import ALICE, SITE, Stack, app_for, resolve_actor
 from tests.tools import fails, json
 
 WINDOW = {"start": "2026-10-12T00:00:00Z", "end": "2026-10-12T01:00:00Z"}
@@ -207,12 +211,50 @@ async def test_inviting_is_checked_before_supabase_is_asked(
     assert invited == []
 
 
-async def test_inviting_a_member_again_is_invalid(client: httpx.AsyncClient) -> None:
+async def test_inviting_a_member_again_succeeds_and_changes_nothing(
+    client: httpx.AsyncClient, grants: Grants
+) -> None:
     response = await client.post(
         "/v1/invites", json={"email": "bob@acme.com"}, headers=headers("alice")
     )
-    assert response.status_code == 422
-    assert response.json()["detail"]["type"] == "invalid"
+    assert response.status_code == 201
+    assert response.json() == {"tenant": "acme", "user": "bob"}
+    assert len(await grants.members("acme", by=ALICE)) == 2
+
+
+async def test_a_caller_bound_to_another_tenant_invites_no_one(
+    client: httpx.AsyncClient, invited: list[str]
+) -> None:
+    bound = {**headers("alice", "acme"), "x-key-tenant": "globex"}
+    response = await client.post("/v1/invites", json={"email": "eve@x.com"}, headers=bound)
+    assert response.status_code == 403
+    assert invited == []
+
+
+@pytest.mark.parametrize(("error", "status"), [(Forbidden("no"), 403), (Invalid("no"), 422)])
+async def test_grantr_refusing_the_member_refuses_the_invitation(
+    grants: Grants, stack: Stack, invite: Invite, ui: Path, error: Exception, status: int
+) -> None:
+    class Refusing(Intended):
+        async def add_member(self, tenant: str, member: Member, *, by: Subject) -> AuditEntry:
+            raise error
+
+    app = FastAPI()
+    router = portalr_router(
+        resolve_actor=resolve_actor,
+        grants=Refusing(grants),
+        readers=stack.readers(),
+        invite=invite,
+        site=SITE,
+        ui=ui,
+    )
+    app.include_router(router, prefix="/portalr")
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
+        response = await client.post(
+            "/v1/invites", json={"email": "dan@acme.com"}, headers=headers("alice")
+        )
+    assert response.status_code == status
 
 
 async def test_an_invitation_supabase_refuses_is_a_bad_gateway(

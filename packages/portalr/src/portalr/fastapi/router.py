@@ -17,12 +17,16 @@ from grantr.core import (
     DEPLOYMENT,
     TENANT,
     AuditEntry,
+    Forbidden,
+    GrantrError,
     Invalid,
     Member,
+    Membership,
     Resource,
     Subject,
     TenantId,
     User,
+    UserId,
 )
 from grantr.fastapi import STATUS_CODES, Caller, ResolveActor, Unauthorized
 from portalr.actions import READ_DEPLOYMENT, READ_SPEND, READ_TELEMETRY
@@ -57,7 +61,8 @@ UI: Final = Path(str(files("portalr") / "static"))
 class Grants(Protocol):
     """What portalr asks of grantr: its checks, its members, and its tenants.
 
-    grantr's ``Grants`` is one; a test may pass another.
+    grantr's ``Grants`` is one. The protocol exists so that the router's tests can answer
+    portalr's actions as lattice RFC-0002 intends until grantr's roles place them.
     """
 
     async def check(self, tenant: TenantId, subject: Subject, action: str, on: Resource) -> bool:
@@ -70,6 +75,10 @@ class Grants(Protocol):
 
     async def tenants(self, *, by: Subject) -> list[TenantId]:
         """Every tenant, if ``by`` may list them."""
+        ...
+
+    async def member(self, tenant: TenantId, user: UserId) -> Membership | None:
+        """A user's membership of a tenant, or None if they aren't a member."""
         ...
 
 
@@ -267,19 +276,27 @@ def portalr_router(
     return router
 
 
+def _refused(error: GrantrError) -> HTTPException:
+    return _refusal("forbidden" if isinstance(error, Forbidden) else "invalid", str(error))
+
+
 def _invitations(router: APIRouter, grants: Grants, invite: Invite, current: Any) -> None:
-    @router.post("/v1/invites", status_code=201)
+    failed = {"description": "Supabase Auth didn't invite or find the person: `invite_failed`"}
+
+    @router.post("/v1/invites", status_code=201, responses={502: failed})
     async def invite_member(
         body: Annotated[NewInvite, Body()], x_tenant: TenantHeader = None, who: Caller = current
     ) -> Invited:
         """Invite someone to the tenant: Supabase Auth creates or finds them, grantr adds them.
 
         It needs ``grantr:add_member``, which is checked before Supabase is asked, and again
-        when grantr adds the member.
+        when grantr adds the member. Inviting a member again succeeds, and changes nothing.
         """
         tenant = x_tenant or who.tenant
         if tenant is None:
             raise _refusal("tenant_required", "name the tenant with X-Tenant")
+        if who.tenant is not None and who.tenant != tenant:
+            raise _refusal("forbidden", "this caller's key is for another tenant")
         if not await grants.check(tenant, who.subject, "grantr:add_member", TENANT):
             raise _refusal("forbidden", f"the caller may not add members to {tenant}")
         try:
@@ -287,8 +304,9 @@ def _invitations(router: APIRouter, grants: Grants, invite: Invite, current: Any
         except InviteFailed as error:
             detail = {"type": "invite_failed", "message": str(error)}
             raise HTTPException(status_code=502, detail=detail) from error
-        try:
-            await grants.add_member(tenant, User(id=user), by=who.subject)
-        except Invalid as error:
-            raise _refusal("invalid", str(error)) from error
+        if await grants.member(tenant, user) is None:
+            try:
+                await grants.add_member(tenant, User(id=user), by=who.subject)
+            except (Forbidden, Invalid) as error:
+                raise _refused(error) from error
         return Invited(tenant=tenant, user=user)

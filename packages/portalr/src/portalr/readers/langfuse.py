@@ -25,7 +25,7 @@ def tenant_tag(tenant: Tenant) -> str:
 class Score(BaseModel):
     """A score: a person's feedback, or an evaluator's verdict, on a trace."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, validate_by_name=True)
 
     id: str
     trace_id: str | None = Field(default=None, validation_alias="traceId")
@@ -37,8 +37,18 @@ class Score(BaseModel):
     comment: str | None = None
 
 
+class _Trace(BaseModel):
+    tags: list[str] | None = None
+
+
+class _Scored(Score):
+    """A score as Langfuse answers it, with the tags of the trace it is on."""
+
+    trace: _Trace | None = None
+
+
 class _Page(BaseModel):
-    data: list[Score]
+    data: list[_Scored]
 
 
 _PAGE: Final = TypeAdapter(_Page)
@@ -79,7 +89,16 @@ class Langfuse:
         )
         if page is None or isinstance(page, Unavailable):
             return page or Unavailable(reason="langfuse has no scores API at that address")
-        return Ok(data=sorted(page.data, key=lambda score: score.timestamp, reverse=True))
+        if any(score.trace is None or score.trace.tags is None for score in page.data):
+            return Unavailable(reason="langfuse answered scores without their traces' tags")
+        # Langfuse filters by the tag; each score is checked again, in case it didn't.
+        tag = tenant_tag(tenant)
+        mine = [
+            Score.model_validate(score.model_dump(exclude={"trace"}))
+            for score in page.data
+            if score.trace and score.trace.tags and tag in score.trace.tags
+        ]
+        return Ok(data=sorted(mine, key=lambda score: score.timestamp, reverse=True))
 
     def trace_link(self, trace_id: str) -> str:
         """Langfuse's page for a trace."""

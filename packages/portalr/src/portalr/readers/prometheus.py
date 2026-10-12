@@ -2,7 +2,8 @@
 
 portalr sends its PromQL to prom-label-proxy, on portalr's path only, with the tenant as the
 proxy's ``tenant_id`` parameter. The proxy rewrites every selector to that tenant, so no query
-can read another's series; Grafana keeps its direct data source (lattice RFC-0002).
+can read another's series; Grafana keeps its direct data source (lattice RFC-0002). Each selector
+names the tenant itself too, so a reader pointed at Prometheus directly is still filtered.
 """
 
 from dataclasses import dataclass, field
@@ -13,7 +14,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from portalr.readers.http import read
-from portalr.readers.query import Window
+from portalr.readers.query import Window, quoted
 from portalr.readers.reading import Ok, Unavailable
 from portalr.tenant import Tenant
 
@@ -26,11 +27,17 @@ type Metric = Literal["turn_latency", "failed_runs"]
 
 QUERIES: Final[dict[Metric, str]] = {
     "turn_latency": (
-        "histogram_quantile(0.95, sum by (le) (rate(artifactr_turn_duration_seconds_bucket[5m])))"
+        "histogram_quantile(0.95, sum by (le) "
+        "(rate(artifactr_turn_duration_seconds_bucket{{{tenant}}}[5m])))"
     ),
-    "failed_runs": 'sum(rate(artifactr_runs_total{artifactr_run_status="failed"}[5m]))',
+    "failed_runs": 'sum(rate(artifactr_runs_total{{artifactr_run_status="failed",{tenant}}}[5m]))',
 }
-"""Each metric's PromQL, which names no tenant: the proxy adds it."""
+"""Each metric's PromQL, with ``{tenant}`` where its selector names the tenant."""
+
+
+def promql(tenant: Tenant, metric: Metric) -> str:
+    """A metric's PromQL, its selector naming the tenant, as the proxy will make sure it does."""
+    return QUERIES[metric].format(tenant=f"{TENANT_LABEL}={quoted(tenant.id)}")
 
 
 class MetricQuery(Window):
@@ -70,7 +77,7 @@ _ANSWER: Final = TypeAdapter(_Answer)
 def parameters(tenant: Tenant, query: MetricQuery) -> dict[str, str | float]:
     """The proxy's parameters for a metric: its PromQL, its window, and the tenant."""
     return {
-        "query": QUERIES[query.metric],
+        "query": promql(tenant, query.metric),
         "start": query.start.timestamp(),
         "end": query.end.timestamp(),
         "step": query.step.total_seconds(),

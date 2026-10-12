@@ -56,6 +56,11 @@ async def test_a_search_sends_the_tenants_traceql_and_answers_newest_first() -> 
     answer = await Tempo("http://tempo", tool.client()).search(ACME, QUERY)
     assert isinstance(answer, Ok)
     assert [trace.trace_id for trace in answer.data] == ["b", "a"]
+    # The root may be another tenant's span: its service and name aren't shown.
+    assert [(trace.root_service, trace.root_name, trace.duration_ms) for trace in answer.data] == [
+        (None, None, None),
+        (None, None, 3),
+    ]
     params = tool.last.url.params
     assert params["q"] == '{ span.tenant.id = "acme" && span.session.id = "thr_1" }'
     assert (params["start"], params["end"], params["limit"]) == (

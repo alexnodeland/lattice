@@ -33,6 +33,14 @@ async def test_a_person_with_an_account_is_found_without_an_email() -> None:
     ("tool", "message"),
     [
         (Tool({"/auth/v1/invite": json({}, status=500)}), "supabase answered 500"),
+        (
+            Tool({"/auth/v1/invite": json({"error_code": "weak"}, status=422)}),
+            "supabase answered 422",
+        ),
+        (
+            Tool({"/auth/v1/invite": lambda _r: httpx.Response(422, text="no json")}),
+            "supabase answered 422",
+        ),
         (Tool({"/auth/v1/invite": json({"no": "id"})}), "supabase answered without a user"),
         (
             Tool({"/auth/v1/invite": fails(httpx.ConnectError)}),

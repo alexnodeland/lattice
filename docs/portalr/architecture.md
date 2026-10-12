@@ -7,7 +7,7 @@ portalr's design is [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md), and 
 | Part | Holds |
 |---|---|
 | `portalr.actions` | portalr's catalog: `portalr:read_telemetry`, `portalr:read_spend` and `portalr:read_deployment`, for `Grants(catalogs=...)` |
-| `portalr.tenant` | `Tenant`, which only `allowed()` makes, and only the router calls it, after grantr allows the read |
+| `portalr.tenant` | `Tenant`, read-only, which only `allowed()` makes; the layering test keeps `allowed()` to the router, which calls it after grantr allows the read |
 | `portalr.readers` | One reader per tool: `Tempo`, `Loki`, `Prometheus` (through prom-label-proxy), `Langfuse` and `LiteLLM`, and `Grafana` for operators' deep links. `Readers` holds those the stack runs. The only code that talks to the tools |
 | `portalr.invites` | `Invite`, and `SupabaseInvite` over Supabase Auth's admin API |
 | `portalr.fastapi` | `portalr_router`, its `Site` settings, the UIs' serving, and its OpenAPI document |
@@ -40,8 +40,8 @@ Each reader takes a `Tenant` and typed parameters, and builds its query with the
 |---|---|
 | Tempo | `span.tenant.id`, in TraceQL. A trace read by its id is the tenant's only if one span names it and none names another |
 | Loki | `tenant_id`, the structured metadata the collector's `tenant.id` becomes |
-| Prometheus | prom-label-proxy's `tenant_id` parameter, which rewrites every selector |
-| Langfuse | The traces' `tenant:<id>` tag |
-| LiteLLM | The tenant's team, `tenant-<id>` |
+| Prometheus | `tenant_id` in every selector, and prom-label-proxy's `tenant_id` parameter, which rewrites every selector |
+| Langfuse | The traces' `tenant:<id>` tag, checked again on every score it answers |
+| LiteLLM | The tenant's team, `tenant-<id>`, checked again on its answer |
 
 `tests/readers/test_queries.py` builds every query each reader can send, and fails if one lacks its tenant.

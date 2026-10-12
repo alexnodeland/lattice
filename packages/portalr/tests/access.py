@@ -6,7 +6,17 @@ tests answer portalr's actions here, from grantr's memberships and operators, an
 check to grantr.
 """
 
-from grantr.core import DEPLOYMENT, AuditEntry, Member, Resource, Subject, TenantId, User
+from grantr.core import (
+    DEPLOYMENT,
+    AuditEntry,
+    Member,
+    Membership,
+    Resource,
+    Subject,
+    TenantId,
+    User,
+    UserId,
+)
 from grantr.grants import Grants
 from portalr.actions import READ_DEPLOYMENT, READ_SPEND, READ_TELEMETRY
 
@@ -32,3 +42,6 @@ class Intended:
 
     async def tenants(self, *, by: Subject) -> list[TenantId]:
         return await self.grants.tenants(by=by)
+
+    async def member(self, tenant: TenantId, user: UserId) -> Membership | None:
+        return await self.grants.member(tenant, user)

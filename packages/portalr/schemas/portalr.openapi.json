@@ -640,7 +640,7 @@
         "type": "object"
       },
       "TraceSummary": {
-        "description": "A trace Tempo found.",
+        "description": "A trace Tempo found: its id, start and duration.\n\nIts root's service and name are left out, since the root may be another tenant's span.",
         "properties": {
           "duration_ms": {
             "anyOf": [
@@ -891,7 +891,7 @@
     },
     "/portalr/v1/invites": {
       "post": {
-        "description": "Invite someone to the tenant: Supabase Auth creates or finds them, grantr adds them.\n\nIt needs ``grantr:add_member``, which is checked before Supabase is asked, and again\nwhen grantr adds the member.",
+        "description": "Invite someone to the tenant: Supabase Auth creates or finds them, grantr adds them.\n\nIt needs ``grantr:add_member``, which is checked before Supabase is asked, and again\nwhen grantr adds the member. Inviting a member again succeeds, and changes nothing.",
         "operationId": "invite_member_portalr_v1_invites_post",
         "parameters": [
           {
@@ -941,6 +941,9 @@
               }
             },
             "description": "Validation Error"
+          },
+          "502": {
+            "description": "Supabase Auth didn't invite or find the person: `invite_failed`"
           }
         },
         "summary": "Invite Member"

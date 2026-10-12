@@ -11,6 +11,9 @@ from typing import Final
 import httpx
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
+REGISTERED: Final = frozenset({"email_exists", "user_already_exists"})
+"""Supabase Auth's error codes for an email that has an account already."""
+
 
 class InviteFailed(Exception):
     """Supabase Auth didn't invite or find the user."""
@@ -25,7 +28,19 @@ class _User(BaseModel):
     id: str
 
 
+class _Error(BaseModel):
+    error_code: str | None = None
+
+
 _USER: Final = TypeAdapter(_User)
+_ERROR: Final = TypeAdapter(_Error)
+
+
+def _error_code(response: httpx.Response) -> str | None:
+    try:
+        return _ERROR.validate_json(response.content).error_code
+    except ValidationError:
+        return None
 
 
 @dataclass(frozen=True)
@@ -53,8 +68,9 @@ class SupabaseInvite:
         """
         headers = {"apikey": self.secret_key, "Authorization": f"Bearer {self.secret_key}"}
         invited = await self._post("/auth/v1/invite", {"email": email}, headers)
-        if invited.status_code == 422:
-            # Already registered: a magic link generated, and not sent, names the user.
+        if invited.status_code == 422 and _error_code(invited) in REGISTERED:
+            # Already registered: a magic link, generated and not sent, names the user. The link
+            # itself is discarded here, and never logged.
             invited = await self._post(
                 "/auth/v1/admin/generate_link", {"type": "magiclink", "email": email}, headers
             )

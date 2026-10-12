@@ -1,5 +1,6 @@
 """Every query a reader can send names the tenant: the filters are tested where they are built."""
 
+import re
 from datetime import UTC, datetime, timedelta
 from itertools import product
 
@@ -47,7 +48,9 @@ def test_every_metric_goes_through_the_proxy_with_the_tenant() -> None:
         query = MetricQuery(start=START, end=END, metric=metric)
         sent = prometheus_parameters(ACME, query)
         assert sent[TENANT_LABEL] == "acme"
-        assert sent["query"] == QUERIES[metric]
+        selectors = re.findall(r"\{[^{}]*\}", str(sent["query"]))
+        assert selectors, metric
+        assert all('tenant_id="acme"' in selector for selector in selectors), sent["query"]
         assert sent["step"] == 300
 
 

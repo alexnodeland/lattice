@@ -60,3 +60,14 @@ async def test_config_names_supabase_the_surfaces_and_the_tools(client: httpx.As
             ("tempo", "loki", "prometheus", "langfuse", "litellm", "grafana"), True
         ),
     }
+
+
+async def test_a_missing_asset_is_not_found(client: httpx.AsyncClient) -> None:
+    response = await client.get("/app/assets/index-old.js")
+    assert response.status_code == 404
+
+
+async def test_a_path_with_a_nul_gets_the_index(client: httpx.AsyncClient) -> None:
+    response = await client.get("/app/a%00b")
+    assert response.status_code == 200
+    assert response.text.startswith("<!doctype html>")

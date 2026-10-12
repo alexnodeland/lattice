@@ -76,6 +76,8 @@ class LiteLLM:
         if info is None:
             return Ok(data=None)
         found = info.team_info
+        if found.team_id != team(tenant):
+            return Unavailable(reason="litellm answered with another team")
         return Ok(
             data=Spend(
                 spend=found.spend,

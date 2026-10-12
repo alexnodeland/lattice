@@ -1,7 +1,8 @@
 """The pieces every query is built from: typed parameters, and strings quoted for each language.
 
-No user writes TraceQL, LogQL or PromQL. A reader builds each query from its parameters, and an
-id that reaches a query is checked against :data:`ID` first, then quoted.
+No user writes TraceQL, LogQL or PromQL. A reader builds each query from its parameters. An id
+from the request is checked against :data:`ID`, then quoted; the tenant's id is grantr's, which
+grantr has checked already, and is quoted.
 """
 
 import json
@@ -27,7 +28,7 @@ type Id = Annotated[str, AfterValidator(_id)]
 
 def quoted(value: str) -> str:
     """A string literal for TraceQL, LogQL or PromQL, which all read Go's double-quoted strings."""
-    return json.dumps(value)
+    return json.dumps(value, ensure_ascii=False)
 
 
 class Window(BaseModel):

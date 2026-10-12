@@ -35,7 +35,10 @@ class TraceQuery(Window):
 
 
 class TraceSummary(BaseModel):
-    """A trace Tempo found."""
+    """A trace Tempo found: its id, start and duration.
+
+    Its root's service and name are left out, since the root may be another tenant's span.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -161,7 +164,13 @@ class Tempo:
         )
         if found is None or isinstance(found, Unavailable):
             return found or Unavailable(reason="tempo has no search API at that address")
-        return Ok(data=sorted(found.traces, key=lambda trace: trace.start_ns, reverse=True))
+        # A trace's root may be another tenant's span: its service and name aren't shown here,
+        # and reading the trace applies the rule below.
+        traces = [
+            trace.model_copy(update={"root_service": None, "root_name": None})
+            for trace in found.traces
+        ]
+        return Ok(data=sorted(traces, key=lambda trace: trace.start_ns, reverse=True))
 
     async def trace(self, tenant: Tenant, trace_id: Id) -> Ok[Trace | None] | Unavailable:
         """A trace by its id, if it is the tenant's; ``None`` if it isn't, or doesn't exist."""

@@ -62,9 +62,16 @@ def _serve(router: APIRouter, name: str, built: Path, headers: dict[str, str]) -
 
     @router.get(f"/{name}/{{path:path}}")
     async def serve(path: str) -> Response:
-        wanted = (built / path).resolve()
+        try:
+            wanted = (built / path).resolve()
+        except ValueError:  # a path no file can have, such as one with a NUL
+            wanted = built
+        hashed = wanted.is_relative_to(built / HASHED)
         if wanted.is_relative_to(built) and wanted.is_file():
-            return file(wanted, IMMUTABLE if wanted.is_relative_to(built / HASHED) else NO_CACHE)
+            return file(wanted, IMMUTABLE if hashed else NO_CACHE)
+        if hashed:
+            # An asset that isn't there is missing, not a client-side route.
+            raise HTTPException(status_code=404, detail="no such asset")
         index = built / "index.html"
         if not index.is_file():
             raise HTTPException(status_code=404, detail="this UI isn't built")

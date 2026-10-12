@@ -98,6 +98,7 @@ async def test_langfuse_reads_the_tenants_scores_newest_first_and_links_for_oper
                 "value": 1,
                 "source": "API",
                 "timestamp": "2026-10-12T00:00:00Z",
+                "trace": {"tags": ["tenant:acme"]},
             },
             {
                 "id": "s2",
@@ -105,6 +106,15 @@ async def test_langfuse_reads_the_tenants_scores_newest_first_and_links_for_oper
                 "stringValue": "good",
                 "timestamp": "2026-10-12T01:00:00Z",
                 "comment": "fine",
+                "trace": {"tags": ["tenant:acme", "thread:thr_1"]},
+            },
+            # Langfuse ignored the filter: another tenant's score is dropped.
+            {
+                "id": "s3",
+                "name": "thumbs",
+                "value": 0,
+                "timestamp": "2026-10-12T02:00:00Z",
+                "trace": {"tags": ["tenant:globex"]},
             },
         ]
     }
@@ -113,12 +123,24 @@ async def test_langfuse_reads_the_tenants_scores_newest_first_and_links_for_oper
     scores = await langfuse.scores(ACME, Window(start=START, end=END))
     assert isinstance(scores, Ok)
     assert [score.id for score in scores.data] == ["s2", "s1"]
+    assert scores.data[1].trace_id == "t1"
+    assert scores.data[1].trace_id == "t1"
     assert tool.last.url.params["traceTags"] == "tenant:acme"
     assert langfuse.trace_link("t1") == "http://langfuse/project/p1/traces/t1"
     assert langfuse.session_link("thr_1") == "http://langfuse/project/p1/sessions/thr_1"
     absent = Langfuse("http://langfuse", project="p1", client=Tool().client())
     assert await absent.scores(ACME, Window(start=START, end=END)) == Unavailable(
         reason="langfuse has no scores API at that address"
+    )
+
+
+async def test_scores_without_their_traces_tags_are_unavailable() -> None:
+    page = {"data": [{"id": "s1", "name": "thumbs", "timestamp": "2026-10-12T00:00:00Z"}]}
+    langfuse = Langfuse(
+        "http://langfuse", project="p1", client=Tool({"/api/public/scores": json(page)}).client()
+    )
+    assert await langfuse.scores(ACME, Window(start=START, end=END)) == Unavailable(
+        reason="langfuse answered scores without their traces' tags"
     )
 
 
@@ -145,6 +167,12 @@ async def test_litellm_reads_the_tenants_team_and_every_tenant_for_operators() -
     assert await litellm.every_tenant() == Ok(
         data=[TenantSpend(tenant="acme", spend=4.5), TenantSpend(tenant="globex", spend=1)]
     )
+
+
+async def test_litellm_answering_with_another_team_is_unavailable() -> None:
+    info = {"team_info": {"team_id": "tenant-globex", "spend": 9}}
+    litellm = LiteLLM("http://litellm", Tool({"/team/info": json(info)}).client())
+    assert await litellm.spend(ACME) == Unavailable(reason="litellm answered with another team")
 
 
 async def test_litellm_without_the_team_or_down() -> None:

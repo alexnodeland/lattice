@@ -90,6 +90,10 @@ test("every read has its own path", async () => {
       "/artifactr/v1/workspaces/ws_1/artifacts/plan_1",
     ],
     [queries.artifactr.proposals("acme", "ws_1"), "/artifactr/v1/workspaces/ws_1/proposals"],
+    [
+      queries.artifactr.revisions("acme", "ws_1", "plan_1"),
+      "/artifactr/v1/workspaces/ws_1/artifacts/plan_1/revisions",
+    ],
     [queries.reflexr.rules("acme", "ws_1"), "/reflexr/v1/workspaces/ws_1/rules"],
     [queries.reflexr.runs("acme", "ws_1"), "/reflexr/v1/workspaces/ws_1/runs"],
   ] as const;
@@ -144,6 +148,11 @@ test("keys nest under their workspace, so invalidating it refetches its reads", 
   ]) {
     expect(key.slice(0, workspace.length)).toEqual(workspace);
   }
+  // An artifact's revisions are under it, so its change refetches them too.
+  const artifact = keys.artifactr.artifact("acme", "ws_1", "plan_1");
+  expect(keys.artifactr.revisions("acme", "ws_1", "plan_1").slice(0, artifact.length)).toEqual(
+    artifact,
+  );
   expect(keys.reflexr.runs("acme", "ws_1").slice(0, 4)).toEqual(
     keys.reflexr.workspace("acme", "ws_1"),
   );

@@ -366,3 +366,13 @@ test("refused thumbs say so", async () => {
     .element(screen.getByRole("alert"))
     .toHaveTextContent("That wasn't done: the server refused it.");
 });
+
+test("a proposal holds what its caller adds", async () => {
+  const screen = await render(
+    <ProposalCard proposal={proposal()}>
+      <a href="#plan_1">plan_1</a>
+    </ProposalCard>,
+  );
+  const card = screen.getByRole("region", { name: "Proposal: Tighten the launch plan" });
+  await expect.element(card.getByRole("link", { name: "plan_1" })).toBeVisible();
+});

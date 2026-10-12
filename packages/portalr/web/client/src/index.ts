@@ -8,6 +8,7 @@
 
 export type * as Artifactr from "./artifactr";
 export { type ArtifactrStream, artifactr, thumbs } from "./artifactr";
+export { type Change, changes, type Granularity } from "./diff";
 export type * as ArtifactrApi from "./generated/artifactr.openapi";
 export type * as ArtifactrV1 from "./generated/artifactr.v1";
 export type * as GrantrApi from "./generated/grantr.openapi";

@@ -1,10 +1,8 @@
 import { expect, type Page } from "@playwright/test";
-import { createBdd } from "playwright-bdd";
-
-const { Then, When } = createBdd();
+import { Then, When } from "./fixtures";
 
 /** Each message is named for who posted it: the reader's are "You", the agent's "Assistant". */
-const posted = (page: Page, by: "You" | "Assistant") =>
+export const posted = (page: Page, by: "You" | "Assistant") =>
   page
     .getByRole("log", { name: "Messages" })
     .getByRole("listitem", { name: by, exact: true })
@@ -61,11 +59,7 @@ Then("the proposal is {string}", async ({ page }, status: string) => {
 });
 
 Then("the note says {string}", async ({ page }, text: string) => {
-  // The agent names the note it proposed an edit to; artifactr's REST surface reads it, as the
-  // signed-in person, in acme.
-  await expect(posted(page, "Assistant")).toContainText("proposed an edit to");
-  const said = (await posted(page, "Assistant").textContent()) ?? "";
-  const note = /proposed an edit to (art_[0-9a-f]+)/.exec(said)?.[1];
+  const note = await proposedTo(page);
   const read = await page.evaluate(async (id) => {
     const session = JSON.parse(localStorage.getItem("portalr") ?? "{}") as {
       access_token?: string;
@@ -77,6 +71,17 @@ Then("the note says {string}", async ({ page }, text: string) => {
   }, note);
   expect(read).toBe(text);
 });
+
+/** The note the agent says it proposed an edit to: it names its own (tests/app/notes.py). */
+export async function proposedTo(page: Page): Promise<string> {
+  const answer = posted(page, "Assistant");
+  await expect(answer).toContainText("proposed an edit to");
+  const note = /proposed an edit to (art_[0-9a-f]+)/.exec((await answer.textContent()) ?? "")?.[1];
+  if (note === undefined) {
+    throw new Error("the assistant named no note");
+  }
+  return note;
+}
 
 When("they find the assistant's answer helpful", async ({ page }) => {
   await posted(page, "Assistant").getByRole("button", { name: "Helpful", exact: true }).click();

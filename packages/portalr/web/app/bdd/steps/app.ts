@@ -1,8 +1,6 @@
 import { expect } from "@playwright/test";
-import { createBdd } from "playwright-bdd";
+import { Given, Then, When } from "./fixtures";
 import { email, password } from "./people";
-
-const { Given, When, Then } = createBdd();
 
 async function signIn(page: import("@playwright/test").Page, person: string, secret: string) {
   await page.goto("sign-in");

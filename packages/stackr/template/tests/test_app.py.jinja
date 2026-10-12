@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 import {{ package_name }}.app
 import {{ package_name }}.telemetry
 from {{ package_name }}.app import DRAIN
-from {{ package_name }}.database import create_schema, open_database
+from {{ package_name }}.database import Database, create_schema, open_database
 from {{ package_name }}.gateway import Guardrails, TenantKeys, gateway_model
 from {{ package_name }}.settings import GatewaySettings, Settings
 from {{ package_name }}.telemetry import configure
@@ -62,11 +62,11 @@ def test_every_surface_needs_a_valid_token(
         assert client.get(path, headers=headers).status_code == 401
 
 
-def test_workspaces_can_live_in_a_database(script: Script, tmp_path: Path) -> None:
-    config = Settings(
-        database_url=f"sqlite+aiosqlite:///{tmp_path / 'app.db'}",
-        auth=settings().auth,
-    )
+@pytest.mark.parametrize("owner", [False, True], ids=["one engine", "two engines"])
+def test_workspaces_can_live_in_a_database(script: Script, tmp_path: Path, owner: bool) -> None:
+    url = f"sqlite+aiosqlite:///{tmp_path / 'app.db'}"
+    admin_url = url if owner else None
+    config = Settings(database_url=url, database_admin_url=admin_url, auth=settings().auth)
     for restart in range(2):
         with TestClient(app(script, config), headers=bearer()) as client:
 {%- if use_artifactr %}
@@ -88,8 +88,54 @@ def test_workspaces_can_live_in_a_database(script: Script, tmp_path: Path) -> No
 
 
 def test_postgresql_gets_the_schema_as_its_search_path() -> None:
-    engine = open_database("postgresql+asyncpg://postgres:postgres@db/postgres", schema="app")
-    assert engine.dialect.name == "postgresql"
+    database = open_database("postgresql+asyncpg://postgres:postgres@db/postgres", schema="app")
+    assert database.engine.dialect.name == "postgresql"
+    assert (database.owner, database.row_level_security) == (database.engine, False)
+
+
+def test_row_level_security_works_as_a_role_that_owns_nothing() -> None:
+    database = open_database(
+        "postgresql+asyncpg://app:secret@db/postgres",
+        schema="app",
+        admin_url="postgresql+asyncpg://postgres:postgres@db/postgres",
+    )
+    assert (database.role, database.row_level_security) == ("app", True)
+    for nameless in ("postgresql+asyncpg://db/postgres", "postgresql+asyncpg://postgres:x@db/x"):
+        with pytest.raises(ValueError, match="a role of its own"):
+            open_database(nameless, schema="app", admin_url="postgresql://postgres:y@db/x")
+
+
+@pytest.mark.parametrize("exempt", [False, True])
+async def test_the_app_refuses_to_work_as_a_role_the_policies_dont_hold(exempt: bool) -> None:
+    class Connection:
+        async def scalar(self, statement: object, parameters: dict[str, str]) -> bool:
+            assert "pg_has_role" in str(statement), "a member of the owner's role is exempt too"
+            assert parameters == {"schema": "app"}
+            return exempt
+
+    class Engine:
+        dialect = SimpleNamespace(name="postgresql")
+        url = SimpleNamespace(username="app")
+
+        @asynccontextmanager
+        async def connect(self) -> AsyncIterator[Connection]:
+            yield Connection()
+
+    database = Database(cast(AsyncEngine, Engine()), cast(AsyncEngine, object()))
+    if not exempt:
+        await database.check("app")
+        return
+    with pytest.raises(RuntimeError, match="must name a role that owns nothing"):
+        await database.check("app")
+
+
+@pytest.mark.parametrize("owner", [False, True], ids=["one engine", "two engines"])
+async def test_sqlite_has_no_roles_to_check(tmp_path: Path, owner: bool) -> None:
+    url = f"sqlite+aiosqlite:///{tmp_path / 'app.db'}"
+    database = open_database(url, schema="app", admin_url=url if owner else None)
+    assert (database.role, database.row_level_security) == (None, owner)
+    await database.check("app")
+    await database.dispose()
 
 
 async def test_the_schema_is_created_on_postgresql() -> None:

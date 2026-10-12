@@ -31,7 +31,6 @@ from typing import Protocol
 import uvicorn
 from fastapi import FastAPI
 from pydantic_ai.models import Model
-from sqlalchemy.ext.asyncio import AsyncEngine
 {%- if access == 'grantr' %}
 
 from grantr import Grants
@@ -50,7 +49,7 @@ from {{ package_name }}.bridge import Bridge
 {%- if use_artifactr %}
 from {{ package_name }}.collaboration import Collaboration
 {%- endif %}
-from {{ package_name }}.database import create_schema, open_database
+from {{ package_name }}.database import Database, create_schema, open_database
 from {{ package_name }}.gateway import gateway_model
 from {{ package_name }}.settings import Settings
 from {{ package_name }}.telemetry import TelemetryHandle, configure
@@ -68,8 +67,8 @@ the time the platform gives a stopping process.{% endif %}"""
 class Part(Protocol):
     """One library's surfaces, mounted under a prefix of its own."""
 
-    async def migrate(self, engine: AsyncEngine) -> None:
-        """Upgrade the database to the library's schema."""
+    async def migrate(self, database: Database) -> None:
+        """Upgrade the database to the library's schema, as its owner."""
         ...
 
     def lifespan(self) -> AbstractAsyncContextManager[None]:
@@ -115,8 +114,12 @@ def create_app(
     settings = settings or Settings.from_environ()
     verifier = TokenVerifier.from_settings(settings.auth)
     model = model or gateway_model(settings.gateway)
-    engine = (
-        open_database(settings.database_url, schema=settings.database_schema)
+    database = (
+        open_database(
+            settings.database_url,
+            schema=settings.database_schema,
+            admin_url=settings.database_admin_url,
+        )
         if settings.database_url
         else None
     )
@@ -124,7 +127,7 @@ def create_app(
     access = Access(
         name=settings.service_name,
         verifier=verifier,
-        engine=engine,
+        database=database,
         grants=grants,
         telemetry=telemetry,
     )
@@ -133,7 +136,7 @@ def create_app(
 {%- endif %}
 {%- endif %}
 {%- if use_relayr %}
-    bridge = Bridge(engine=engine, telemetry=telemetry{% if access == 'grantr' %}, grants=access.grants{% endif %})
+    bridge = Bridge(database=database, telemetry=telemetry{% if access == 'grantr' %}, grants=access.grants{% endif %})
 {%- endif %}
 {%- if use_artifactr %}
     collaboration = Collaboration(
@@ -149,7 +152,7 @@ def create_app(
 {%- endif %}
         model=model,
         gateway=settings.gateway,
-        engine=engine,
+        database=database,
         telemetry=telemetry,
 {%- if use_relayr %}
         on_open=bridge.watch,
@@ -170,7 +173,7 @@ def create_app(
 {%- endif %}
         model=model,
         gateway=settings.gateway,
-        engine=engine,
+        database=database,
         telemetry=telemetry,
         poll_interval=poll_interval,
         grace=grace,
@@ -205,11 +208,12 @@ def create_app(
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
         async with contextlib.AsyncExitStack() as stack:
-            if engine is not None:
-                stack.push_async_callback(engine.dispose)
-                await create_schema(engine, settings.database_schema)
+            if database is not None:
+                stack.push_async_callback(database.dispose)
+                await create_schema(database.owner, settings.database_schema)
                 for part in parts:
-                    await part.migrate(engine)
+                    await part.migrate(database)
+                await database.check(settings.database_schema)
             for part in parts:
                 await stack.enter_async_context(part.lifespan())
             yield
@@ -243,8 +247,9 @@ def create_app(
 
     if telemetry is not None:
         telemetry.instrument_app(app)
-        if engine is not None:
-            telemetry.instrument_engine(engine)
+        if database is not None:
+            for engine in dict.fromkeys((database.engine, database.owner)):
+                telemetry.instrument_engine(engine)
     return app
 
 

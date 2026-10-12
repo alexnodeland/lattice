@@ -1,23 +1,34 @@
-"""The deployment's own commands: ``make tenant``, ``make operator`` and ``make migrate-tenants``.
+"""The deployment's own commands: ``make tenant``, ``operator``, ``migrate-tenants``, ``db-roles``.
 
 Each runs in process, on the database ``DATABASE_URL`` names, and is recorded in grantr's audit
 log as made by no one (grantr ADR-0021). A user is named by their id, Supabase Auth's ``sub``, or
 by their email, which Supabase Auth's admin API looks up with ``AUTH_SERVICE_ROLE_KEY``.
+``db-roles`` creates the role ``DATABASE_URL`` connects as, as ``DATABASE_ADMIN_URL``'s: run it
+before the application first starts with row-level security.
 
     {{ project_slug }}-admin operator alice@example.com
     {{ project_slug }}-admin tenant acme alice@example.com
     {{ project_slug }}-admin migrate-tenants
+    {{ project_slug }}-admin db-roles
 """
 
 import argparse
 import asyncio
+import base64
+import hashlib
+import hmac
 import json
+import os
 import sys
 import urllib.request
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import groupby
 from typing import Any, cast
+
+from sqlalchemy import URL, Connection, make_url, text
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from grantr import Grants, Invalid
 from grantr.core import MemberAdded, TenantCreated
@@ -29,6 +40,9 @@ from {{ package_name }}.settings import Settings
 
 PROGRAM = "{{ project_slug }}-admin"
 """The command's name."""
+
+SCRAM_ITERATIONS = 4096
+"""PostgreSQL's default for a SCRAM-SHA-256 verifier."""
 
 PAGE = 200
 """How many users the admin API is asked for at a time."""
@@ -162,14 +176,35 @@ async def run(arguments: Sequence[str], settings: Settings) -> str:
     new.add_argument("name")
     new.add_argument("owner")
     commands.add_parser("migrate-tenants", help="move users' tenants from their tokens")
+    commands.add_parser("db-roles", help="create the role DATABASE_URL connects as")
     parsed = parser.parse_args(arguments)
     if not settings.database_url:
         parser.error("set DATABASE_URL: the commands change the application's database")
-    engine = open_database(settings.database_url, schema=settings.database_schema)
+    if parsed.command == "db-roles":
+        url = make_url(settings.database_url)
+        admin = make_url(settings.database_admin_url or "sqlite://")
+        if admin.get_backend_name() != "postgresql" or not url.username or not url.password:
+            parser.error(
+                "set DATABASE_ADMIN_URL to PostgreSQL's tables' owner, and DATABASE_URL to the"
+                " role the application works as, with its password"
+            )
+        if url.username == admin.username:
+            parser.error("DATABASE_URL must name a role of its own, not the tables' owner")
+        return await db_roles(admin, url.username, url.password, settings.database_schema)
+    database = open_database(
+        settings.database_url,
+        schema=settings.database_schema,
+        admin_url=settings.database_admin_url,
+    )
     try:
-        await create_schema(engine, settings.database_schema)
-        await migrate(engine)
-        grants = build_grants(SqlStorage(engine), name=settings.service_name)
+        await create_schema(database.owner, settings.database_schema)
+        await migrate(database.owner, application_role=database.role)
+        storage = SqlStorage(
+            database.engine,
+            row_level_security=database.row_level_security,
+            across_tenants=database.owner,
+        )
+        grants = build_grants(storage, name=settings.service_name)
         users = Users(settings.auth.issuer, settings.auth.service_role_key)
         match parsed.command:
             case "operator":
@@ -179,7 +214,77 @@ async def run(arguments: Sequence[str], settings: Settings) -> str:
             case _:
                 return await migrate_tenants(grants, users)
     finally:
-        await engine.dispose()
+        await database.dispose()
+
+
+async def db_roles(admin_url: URL, role: str, password: str, schema: str) -> str:
+    """Create the role the application works as, which owns nothing, or set its password.
+
+    Raises:
+        Invalid: If PostgreSQL refuses, or the role is one row-level security doesn't hold.
+    """
+    owner = create_async_engine(admin_url)
+    try:
+        async with owner.begin() as connection:
+            await connection.run_sync(create_role, role, password, schema)
+    except DBAPIError as error:
+        # Not the statement, which holds the password's verifier: what PostgreSQL said.
+        raise Invalid(f"PostgreSQL refused the role: {type(error.orig).__name__}") from None
+    except OSError as error:
+        raise Invalid(f"PostgreSQL couldn't be reached: {type(error).__name__}") from None
+    finally:
+        await owner.dispose()
+    return f"{role} can connect: start the application to grant it the tables"
+
+
+def create_role(connection: Connection, role: str, password: str, schema: str) -> None:
+    """Create the role the application works as, which owns nothing, or set its password.
+
+    It runs as the tables' owner, which must be allowed to create roles. The password is sent
+    as a SCRAM-SHA-256 verifier, never in the clear, as psql's password command does. Running it
+    again sets the password again, so a changed ``DATABASE_URL`` takes effect.
+
+    Raises:
+        Invalid: If the role is a superuser, bypasses row-level security, or owns the schema
+            or is a member of its owner's role.
+    """
+    quoted = connection.dialect.identifier_preparer.quote(role)
+    found = connection.scalar(text("SELECT 1 FROM pg_roles WHERE rolname = :role"), {"role": role})
+    verb = "ALTER" if found else "CREATE"
+    connection.exec_driver_sql(f"{verb} ROLE {quoted} LOGIN PASSWORD '{scram_verifier(password)}'")
+    exempt = connection.scalar(
+        text(
+            "SELECT rolsuper OR rolbypassrls OR EXISTS (SELECT 1 FROM pg_namespace"
+            " WHERE nspname = :schema AND pg_has_role(r.oid, nspowner, 'USAGE'))"
+            " FROM pg_roles r WHERE rolname = :role"
+        ),
+        {"role": role, "schema": schema},
+    )
+    if exempt:
+        raise Invalid(f"{role} owns the schema, or bypasses row-level security: name another")
+
+
+def scram_verifier(password: str, *, salt: bytes | None = None) -> str:
+    """A SCRAM-SHA-256 verifier of a password, as PostgreSQL stores it (RFC 5802, RFC 7677).
+
+    The password must be printable ASCII, which SASLprep, as PostgreSQL applies it, leaves as it
+    is; any other would need SASLprep's mappings to match what a client sends.
+
+    Raises:
+        Invalid: If the password isn't printable ASCII.
+    """
+    if not password.isascii() or not password.isprintable():
+        raise Invalid("the password in DATABASE_URL must be printable ASCII")
+    salt = salt or os.urandom(16)
+    salted = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, SCRAM_ITERATIONS)
+    client = hmac.digest(salted, b"Client Key", "sha256")
+    server = hmac.digest(salted, b"Server Key", "sha256")
+    stored = hashlib.sha256(client).digest()
+    encode = base64.b64encode
+    return (
+        f"SCRAM-SHA-256${SCRAM_ITERATIONS}:{encode(salt).decode()}"
+        f"${encode(stored).decode()}:{encode(server).decode()}"
+    )
 
 
 def main() -> None:
@@ -188,3 +293,6 @@ def main() -> None:
         sys.stdout.write(asyncio.run(run(sys.argv[1:], Settings.from_environ())) + "\n")
     except (Invalid, LookupError) as error:
         sys.exit(f"{PROGRAM}: {error}")
+    except DBAPIError as error:
+        # Not the statement: what PostgreSQL said, without what it was asked.
+        sys.exit(f"{PROGRAM}: the database refused: {type(error.orig).__name__}")

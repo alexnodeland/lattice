@@ -27,6 +27,7 @@ def test_every_setting_comes_from_its_variable() -> None:
             "APP_PORT": "9000",
             "DATABASE_URL": "postgresql+asyncpg://postgres:postgres@db:5432/postgres",
             "DATABASE_SCHEMA": "renamed_schema",
+            "DATABASE_ADMIN_URL": "postgresql+asyncpg://owner:secret@db:5432/postgres",
             "AUTH_JWKS_URL": "http://auth/jwks.json",
             "AUTH_JWT_SECRET": "secret",
             "AUTH_AUDIENCE": "api",
@@ -52,6 +53,7 @@ def test_every_setting_comes_from_its_variable() -> None:
         port=9000,
         database_url="postgresql+asyncpg://postgres:postgres@db:5432/postgres",
         database_schema="renamed_schema",
+        database_admin_url="postgresql+asyncpg://owner:secret@db:5432/postgres",
         auth=AuthSettings(
             jwks_url="http://auth/jwks.json",
             jwt_secret="secret",
@@ -96,3 +98,8 @@ def test_tenant_keys_must_be_a_json_object(keys: str) -> None:
 def test_the_schema_must_be_a_plain_identifier(schema: str) -> None:
     with pytest.raises(ValueError, match="DATABASE_SCHEMA"):
         Settings(database_schema=schema)
+
+
+def test_the_tables_owner_needs_the_role_the_app_works_as() -> None:
+    with pytest.raises(ValueError, match="DATABASE_ADMIN_URL needs DATABASE_URL"):
+        Settings(database_admin_url="postgresql+asyncpg://owner:secret@db/postgres")

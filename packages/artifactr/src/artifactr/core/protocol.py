@@ -16,6 +16,7 @@ from artifactr.core.events import Envelope
 from artifactr.core.ids import RunId, ThreadId, WorkspaceId
 from artifactr.core.live import LiveFrame
 from artifactr.core.state import Outcome
+from artifactr.core.tagged import tag_required
 
 PROTOCOL: Final = "artifactr.v1"
 """The protocol version this library speaks."""
@@ -84,7 +85,7 @@ def resume(hello: Hello, *, head_seq: int, first_retained_seq: int = 1) -> Resum
 class StopRun(BaseModel):
     """Cancel a run. Handled by the transport, not by core's rules."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
     type: Literal["stop_run"] = "stop_run"
     run_id: RunId
@@ -93,7 +94,7 @@ class StopRun(BaseModel):
 class WatchRun(BaseModel):
     """Receive a run's live frames on this connection. WebSocket only."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
     type: Literal["watch_run"] = "watch_run"
     run_id: RunId
@@ -160,7 +161,7 @@ class ReplayComplete(BaseModel):
 class CommandResult(BaseModel):
     """The result of one command frame."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     type: Literal["command_result"] = "command_result"
     command_id: str

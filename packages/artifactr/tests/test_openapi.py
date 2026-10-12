@@ -10,6 +10,7 @@ import httpx
 import pytest
 
 from artifactr.fastapi.openapi import openapi_app, openapi_document
+from artifactr.fastapi.router import Refused
 
 DOCUMENT = Path(__file__).parent.parent / "schemas" / "artifactr.openapi.json"
 
@@ -31,3 +32,21 @@ async def test_the_documents_application_admits_no_one() -> None:
     transport = httpx.ASGITransport(app=openapi_app())
     async with httpx.AsyncClient(transport=transport, base_url="http://artifactr") as client:
         assert (await client.get("/workspaces/main/runs/run_1")).status_code == 401
+
+
+def test_every_tag_is_required() -> None:
+    """A union member's tag is required (ADR-0060). A REST body is always a command frame, so
+    its own ``type`` may be left out."""
+    schemas = openapi_document()["components"]["schemas"]
+    for name, schema in schemas.items():
+        if name == "CommandFrame":
+            continue
+        tags = {key for key, field in schema.get("properties", {}).items() if "const" in field}
+        assert tags <= set(schema.get("required", [])), name
+
+
+async def test_a_refused_request_answers_as_the_document_says() -> None:
+    transport = httpx.ASGITransport(app=openapi_app())
+    async with httpx.AsyncClient(transport=transport, base_url="http://artifactr") as client:
+        refused = await client.get("/workspaces/main/runs/run_1")
+    assert Refused.model_validate(refused.json()).detail == "unauthorized"

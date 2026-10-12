@@ -18,6 +18,7 @@ from artifactr.core.commands import ProposedChange, ThreadMode
 from artifactr.core.events import DeferredRequest, KnownEvent
 from artifactr.core.ids import ArtifactId, MessageId, ProposalId, RunId, ThreadId, TraceId
 from artifactr.core.patches import Patch
+from artifactr.core.tagged import tag_required
 
 # ─── entities ─────────────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ class Revision(BaseModel):
 
 
 class _Outcome(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
     seq: int | None = None
     """The sequence number of the last event the command appended, set by the workspace."""

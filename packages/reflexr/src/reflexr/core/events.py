@@ -323,7 +323,7 @@ AnyEvent = Annotated[
     WithJsonSchema(
         {
             "type": "object",
-            "properties": {"type": {"type": "string"}},
+            "properties": {"type": {"type": "string", "pattern": _EVENT_NAME}},
             "required": ["type"],
             "additionalProperties": True,
         }

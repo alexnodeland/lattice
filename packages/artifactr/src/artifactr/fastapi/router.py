@@ -1,12 +1,13 @@
 """The router: REST endpoints and the WebSocket stream."""
 
 from collections.abc import Awaitable, Callable
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, WebSocket
 from fastapi.responses import JSONResponse
 from opentelemetry.metrics import MeterProvider
 from opentelemetry.trace import TracerProvider
+from pydantic import BaseModel, ConfigDict
 from starlette.requests import HTTPConnection
 
 from artifactr.agent import Runner
@@ -47,6 +48,46 @@ STATUS_CODES: dict[str, int] = {
 Count = Annotated[int, Query(ge=0, le=MAX_COUNT)]
 """A ``seq`` or a count in a query: as many as storage holds, which the document states."""
 
+PathId = Annotated[str, Path(min_length=1)]
+"""An id in a path, which is never empty: ``.../threads/`` would be the list of threads."""
+
+
+# RejectionDetail, FieldError, Refused and REFUSALS are shared verbatim with reflexr's
+# src/reflexr/fastapi/router.py; change both.
+class RejectionDetail(BaseModel):
+    """A rejection, as REST sends it: its ``type``, its ``message`` and its typed details."""
+
+    model_config = ConfigDict(extra="allow")
+
+    type: str
+    message: str
+
+
+class FieldError(BaseModel):
+    """One problem FastAPI found with a request's parameters or body."""
+
+    model_config = ConfigDict(extra="allow")
+
+    loc: list[str | int]
+    msg: str
+    type: str
+
+
+class Refused(BaseModel):
+    """The body of a refused request (ADR-0060).
+
+    ``detail`` is the rejection, the message of a resolver's refusal, or the problems FastAPI
+    found with the request.
+    """
+
+    detail: RejectionDetail | str | list[FieldError]
+
+
+REFUSALS: Final[dict[int | str, dict[str, Any]]] = {
+    status: {"model": Refused} for status in (400, 401, 403, 404, 409, 422)
+}
+"""The refused responses every route documents."""
+
 
 class Unauthorized(Exception):
     """Raise from ``resolve_actor`` to refuse a request (401) or connection (close 4401)."""
@@ -78,7 +119,7 @@ def artifactr_router(
     each connection's ``artifactr.stream`` span are attributed to the tenant, workspace and
     actor.
     """
-    router = APIRouter()
+    router = APIRouter(responses=REFUSALS)
     telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
 
     async def resolve(connection: HTTPConnection) -> tuple[TenantId, Actor]:
@@ -103,7 +144,7 @@ def artifactr_router(
         annotate(attribution(tenant_id=tenant_id, workspace_id=workspace_id, actor=actor))
         return await workspaces.open(tenant_id, workspace_id, actor=actor)
 
-    async def workspace_dependency(request: Request, workspace_id: WorkspaceId) -> Workspace:
+    async def workspace_dependency(request: Request, workspace_id: PathId) -> Workspace:
         return await _or_http(open_workspace(request, workspace_id))
 
     current_workspace = Depends(workspace_dependency)
@@ -120,7 +161,10 @@ def artifactr_router(
         tenant_id, actor = await resolve(request)
         return await _or_http(workspaces.list(tenant_id, actor=actor, after=after, limit=limit))
 
-    @router.post("/workspaces/{workspace_id}/commands")
+    @router.post(
+        "/workspaces/{workspace_id}/commands",
+        responses={status: {"model": CommandResult | Refused} for status in STATUS_CODES.values()},
+    )
     async def post_command(
         frame: CommandFrame, response: Response, workspace: Workspace = current_workspace
     ) -> CommandResult:
@@ -150,7 +194,7 @@ def artifactr_router(
 
     @router.get("/workspaces/{workspace_id}/artifacts/{artifact_id}")
     async def get_artifact(
-        artifact_id: str, workspace: Workspace = current_workspace
+        artifact_id: PathId, workspace: Workspace = current_workspace
     ) -> JSONResponse:
         """Return an artifact's current version."""
         artifact = await _or_http(workspace.artifact(artifact_id))
@@ -158,7 +202,7 @@ def artifactr_router(
 
     @router.get("/workspaces/{workspace_id}/artifacts/{artifact_id}/revisions")
     async def list_revisions(
-        artifact_id: str, workspace: Workspace = current_workspace
+        artifact_id: PathId, workspace: Workspace = current_workspace
     ) -> list[Revision]:
         """Return an artifact's revisions, oldest first."""
         return await _or_http(workspace.revisions(artifact_id))
@@ -193,7 +237,7 @@ def artifactr_router(
         return await _or_http(workspace.threads())
 
     @router.get("/workspaces/{workspace_id}/threads/{thread_id}")
-    async def get_thread(thread_id: str, workspace: Workspace = current_workspace) -> Thread:
+    async def get_thread(thread_id: PathId, workspace: Workspace = current_workspace) -> Thread:
         """Return a thread, with its mode and focus."""
         return await _or_http(workspace.thread(thread_id))
 
@@ -206,7 +250,7 @@ def artifactr_router(
         return await _or_http(workspace.proposals(status=status))
 
     @router.get("/workspaces/{workspace_id}/runs/{run_id}")
-    async def get_run(run_id: str, workspace: Workspace = current_workspace) -> Run:
+    async def get_run(run_id: PathId, workspace: Workspace = current_workspace) -> Run:
         """Return a run, with any requests it is paused on."""
         return await _or_http(workspace.run(run_id))
 

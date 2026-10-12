@@ -23,6 +23,7 @@ from artifactr.core.ids import (
     new_thread_id,
 )
 from artifactr.core.patches import Patch
+from artifactr.core.tagged import tag_required
 
 ThreadMode = Literal["edit", "suggest"]
 """How agents change artifacts in a thread: directly, or always through proposals."""
@@ -33,7 +34,7 @@ people and starts or steers no turn (ADR-0051)."""
 
 
 class _Command(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=tag_required)
 
 
 class CreateArtifact(_Command):

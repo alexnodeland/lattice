@@ -28,10 +28,11 @@ from artifactr.core.ids import (
     WorkspaceId,
 )
 from artifactr.core.patches import Patch
+from artifactr.core.tagged import tag_required
 
 
 class _Event(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, json_schema_extra=tag_required)
 
 
 # ─── threads and messages ─────────────────────────────────────────────────────
@@ -267,10 +268,17 @@ class AppEvent(_Event):
     data: JsonValue = None
 
 
+def _unknown_type(schema: dict[str, JsonValue]) -> None:
+    """Say an unknown event's ``type`` is none of the known ones, so no event matches two."""
+    properties = cast("dict[str, dict[str, JsonValue]]", schema["properties"])
+    known = [member.model_fields["type"].default for member in get_args(KnownEvent)]
+    properties["type"]["not"] = {"enum": sorted(known)}
+
+
 class UnknownEvent(BaseModel):
     """An event type this version does not know, kept as-is so it round-trips."""
 
-    model_config = ConfigDict(frozen=True, extra="allow")
+    model_config = ConfigDict(frozen=True, extra="allow", json_schema_extra=_unknown_type)
 
     type: str
 

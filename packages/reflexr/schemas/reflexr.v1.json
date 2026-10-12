@@ -17,7 +17,8 @@
         }
       },
       "required": [
-        "within"
+        "within",
+        "kind"
       ],
       "title": "AbsencePattern",
       "type": "object"
@@ -68,7 +69,8 @@
       "required": [
         "rule",
         "run_id",
-        "name"
+        "name",
+        "kind"
       ],
       "title": "AgentActor",
       "type": "object"
@@ -93,7 +95,8 @@
         }
       },
       "required": [
-        "of"
+        "of",
+        "kind"
       ],
       "title": "AllFilter",
       "type": "object"
@@ -118,7 +121,8 @@
         }
       },
       "required": [
-        "of"
+        "of",
+        "kind"
       ],
       "title": "AnyFilter",
       "type": "object"
@@ -163,7 +167,8 @@
         }
       },
       "required": [
-        "rule"
+        "rule",
+        "type"
       ],
       "title": "ArchiveRule",
       "type": "object"
@@ -195,7 +200,8 @@
         }
       },
       "required": [
-        "run_id"
+        "run_id",
+        "type"
       ],
       "title": "CancelRun",
       "type": "object"
@@ -239,7 +245,8 @@
         }
       },
       "required": [
-        "correlation_id"
+        "correlation_id",
+        "kind"
       ],
       "title": "ChainTarget",
       "type": "object"
@@ -379,7 +386,8 @@
       },
       "required": [
         "command_id",
-        "ok"
+        "ok",
+        "type"
       ],
       "title": "CommandResult",
       "type": "object"
@@ -449,7 +457,8 @@
       },
       "required": [
         "at_least",
-        "within"
+        "within",
+        "kind"
       ],
       "title": "CountPattern",
       "type": "object"
@@ -490,6 +499,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "kind"
+      ],
       "title": "EachPattern",
       "type": "object"
     },
@@ -534,7 +546,8 @@
       },
       "required": [
         "name",
-        "version"
+        "version",
+        "kind"
       ],
       "title": "EvaluatorActor",
       "type": "object"
@@ -595,6 +608,7 @@
           "additionalProperties": true,
           "properties": {
             "type": {
+              "pattern": "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$",
               "type": "string"
             }
           },
@@ -692,7 +706,8 @@
         }
       },
       "required": [
-        "client_id"
+        "client_id",
+        "kind"
       ],
       "title": "ExternalAgentActor",
       "type": "object"
@@ -769,7 +784,8 @@
         }
       },
       "required": [
-        "firing_id"
+        "firing_id",
+        "kind"
       ],
       "title": "FiringTarget",
       "type": "object"
@@ -802,7 +818,8 @@
       "required": [
         "feedback_type",
         "target",
-        "value"
+        "value",
+        "type"
       ],
       "title": "GiveFeedback",
       "type": "object"
@@ -878,7 +895,8 @@
         }
       },
       "required": [
-        "rule"
+        "rule",
+        "type"
       ],
       "title": "InstallRule",
       "type": "object"
@@ -899,7 +917,8 @@
         }
       },
       "required": [
-        "filter"
+        "filter",
+        "kind"
       ],
       "title": "NotFilter",
       "type": "object"
@@ -925,7 +944,8 @@
         }
       },
       "required": [
-        "types"
+        "types",
+        "kind"
       ],
       "title": "OnFilter",
       "type": "object"
@@ -1001,7 +1021,8 @@
         }
       },
       "required": [
-        "name"
+        "name",
+        "kind"
       ],
       "title": "PredicateFilter",
       "type": "object"
@@ -1026,6 +1047,7 @@
           "additionalProperties": true,
           "properties": {
             "type": {
+              "pattern": "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$",
               "type": "string"
             }
           },
@@ -1054,7 +1076,8 @@
         }
       },
       "required": [
-        "event"
+        "event",
+        "type"
       ],
       "title": "Publish",
       "type": "object"
@@ -1084,7 +1107,8 @@
       },
       "required": [
         "seq",
-        "id"
+        "id",
+        "type"
       ],
       "title": "PublishedOutcome",
       "type": "object"
@@ -1109,7 +1133,8 @@
       },
       "required": [
         "seq",
-        "id"
+        "id",
+        "type"
       ],
       "title": "RecordedOutcome",
       "type": "object"
@@ -1165,7 +1190,8 @@
         }
       },
       "required": [
-        "rule"
+        "rule",
+        "type"
       ],
       "title": "ReplayRule",
       "type": "object"
@@ -1217,7 +1243,8 @@
         }
       },
       "required": [
-        "run_id"
+        "run_id",
+        "type"
       ],
       "title": "RetryRun",
       "type": "object"
@@ -1336,7 +1363,8 @@
       },
       "required": [
         "rule",
-        "progress"
+        "progress",
+        "type"
       ],
       "title": "RuleOutcome",
       "type": "object"
@@ -1381,6 +1409,7 @@
           "type": "integer"
         }
       },
+      "required": [],
       "title": "RuleProgress",
       "type": "object"
     },
@@ -1414,7 +1443,8 @@
       "required": [
         "rule",
         "version",
-        "seq"
+        "seq",
+        "type"
       ],
       "title": "RuleVersionOutcome",
       "type": "object"
@@ -1584,7 +1614,8 @@
         }
       },
       "required": [
-        "run"
+        "run",
+        "type"
       ],
       "title": "RunOutcome",
       "type": "object"
@@ -1604,7 +1635,8 @@
         }
       },
       "required": [
-        "run_id"
+        "run_id",
+        "kind"
       ],
       "title": "RunTarget",
       "type": "object"
@@ -1654,7 +1686,8 @@
       },
       "required": [
         "steps",
-        "within"
+        "within",
+        "kind"
       ],
       "title": "SequencePattern",
       "type": "object"
@@ -1715,7 +1748,8 @@
         }
       },
       "required": [
-        "run_id"
+        "run_id",
+        "type"
       ],
       "title": "SkipRun",
       "type": "object"
@@ -1735,7 +1769,8 @@
         }
       },
       "required": [
-        "name"
+        "name",
+        "kind"
       ],
       "title": "SourceActor",
       "type": "object"
@@ -1755,6 +1790,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "kind"
+      ],
       "title": "SystemActor",
       "type": "object"
     },
@@ -1819,7 +1857,8 @@
         }
       },
       "required": [
-        "rule"
+        "rule",
+        "type"
       ],
       "title": "UpdateRule",
       "type": "object"
@@ -1851,7 +1890,8 @@
         }
       },
       "required": [
-        "id"
+        "id",
+        "kind"
       ],
       "title": "UserActor",
       "type": "object"
@@ -1929,7 +1969,8 @@
       },
       "required": [
         "field",
-        "op"
+        "op",
+        "kind"
       ],
       "title": "WhereFilter",
       "type": "object"

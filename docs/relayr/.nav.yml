@@ -6,6 +6,7 @@ nav:
   - Bridging artifactr into reflexr: guides/inbound.md
   - Acting in artifactr from rules: guides/outbound.md
   - Tracing across the bridge: guides/telemetry.md
+  - Rules from chat: guides/rules.md
 - Reference: reference.md
 - Decisions:
   - adr/README.md
@@ -36,6 +37,7 @@ nav:
   - adr/0025-counters-and-how-long-causes-are-kept.md
   - adr/0026-a-retried-send-asks-again-and-turns-traced-by-their-messages.md
   - adr/0027-row-level-security-under-the-scoping.md
+  - adr/0028-rules-from-chat.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

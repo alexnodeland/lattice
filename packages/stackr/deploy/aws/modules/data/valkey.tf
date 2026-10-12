@@ -27,7 +27,7 @@ resource "aws_elasticache_replication_group" "this" {
   num_cache_clusters         = 1
   automatic_failover_enabled = false
   subnet_group_name          = aws_elasticache_subnet_group.this.name
-  security_group_ids         = [var.security_group_id]
+  security_group_ids         = [aws_security_group.this.id]
   parameter_group_name       = aws_elasticache_parameter_group.this.name
   transit_encryption_enabled = true
   at_rest_encryption_enabled = true

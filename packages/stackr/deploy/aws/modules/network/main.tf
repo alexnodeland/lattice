@@ -1,5 +1,5 @@
 # The network (RFC-0004): a VPC across two zones, public subnets for the ALB and one NAT gateway,
-# private subnets for everything else, and a security group for each kind of traffic.
+# private subnets for everything else, flow logs, and the ALB's and the services' security groups.
 
 locals {
   public  = { for index, zone in var.zones : zone => cidrsubnet(var.cidr, 4, index) }
@@ -24,19 +24,21 @@ resource "aws_internet_gateway" "this" {
 }
 
 resource "aws_subnet" "public" {
-  for_each          = local.public
-  vpc_id            = aws_vpc.this.id
-  availability_zone = each.key
-  cidr_block        = each.value
-  tags              = { Name = "${var.name}-public-${each.key}" }
+  for_each                = local.public
+  vpc_id                  = aws_vpc.this.id
+  availability_zone       = each.key
+  cidr_block              = each.value
+  map_public_ip_on_launch = false
+  tags                    = { Name = "${var.name}-public-${each.key}" }
 }
 
 resource "aws_subnet" "private" {
-  for_each          = local.private
-  vpc_id            = aws_vpc.this.id
-  availability_zone = each.key
-  cidr_block        = each.value
-  tags              = { Name = "${var.name}-private-${each.key}" }
+  for_each                = local.private
+  vpc_id                  = aws_vpc.this.id
+  availability_zone       = each.key
+  cidr_block              = each.value
+  map_public_ip_on_launch = false
+  tags                    = { Name = "${var.name}-private-${each.key}" }
 }
 
 # One NAT gateway, in the first zone: Multi-AZ comes later (RFC-0004).

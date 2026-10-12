@@ -14,10 +14,14 @@ output "private_subnet_ids" {
 }
 
 output "security_groups" {
-  description = "The security groups, by the traffic they let in: alb, services and data."
+  description = "The ALB's and the services' security groups."
   value = {
     alb      = aws_security_group.alb.id
     services = aws_security_group.services.id
-    data     = aws_security_group.data.id
   }
+}
+
+output "vpc_cidr" {
+  description = "The VPC's address range."
+  value       = aws_vpc.this.cidr_block
 }

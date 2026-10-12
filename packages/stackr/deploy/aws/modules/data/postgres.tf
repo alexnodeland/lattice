@@ -8,8 +8,12 @@ resource "aws_db_subnet_group" "this" {
 }
 
 resource "aws_db_parameter_group" "this" {
-  name   = "${var.name}-postgres17"
-  family = "postgres17"
+  name_prefix = "${var.name}-postgres17-"
+  family      = "postgres17"
+
+  lifecycle {
+    create_before_destroy = true
+  }
 
   parameter {
     name  = "rds.force_ssl"
@@ -19,6 +23,12 @@ resource "aws_db_parameter_group" "this" {
     name  = "log_min_duration_statement"
     value = "1000"
   }
+}
+
+# A final snapshot's name is unique to this instance, so a second deployment of the same name
+# doesn't collide with the first's.
+resource "random_id" "final_snapshot" {
+  byte_length = 4
 }
 
 resource "aws_db_instance" "this" {
@@ -33,7 +43,7 @@ resource "aws_db_instance" "this" {
   username                            = "postgres"
   manage_master_user_password         = true
   db_subnet_group_name                = aws_db_subnet_group.this.name
-  vpc_security_group_ids              = [var.security_group_id]
+  vpc_security_group_ids              = [aws_security_group.this.id]
   parameter_group_name                = aws_db_parameter_group.this.name
   publicly_accessible                 = false
   multi_az                            = false
@@ -45,5 +55,5 @@ resource "aws_db_instance" "this" {
   iam_database_authentication_enabled = true
   deletion_protection                 = var.postgres.deletion_protection
   skip_final_snapshot                 = var.postgres.skip_final_snapshot
-  final_snapshot_identifier           = var.postgres.skip_final_snapshot ? null : "${var.name}-final"
+  final_snapshot_identifier           = var.postgres.skip_final_snapshot ? null : "${var.name}-final-${random_id.final_snapshot.hex}"
 }

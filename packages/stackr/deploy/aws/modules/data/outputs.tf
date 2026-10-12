@@ -15,6 +15,11 @@ output "valkey" {
   }
 }
 
+output "security_group_id" {
+  description = "The data stores' security group."
+  value       = aws_security_group.this.id
+}
+
 output "buckets" {
   description = "The buckets, by role: each one's name and ARN."
   value       = { for role, bucket in aws_s3_bucket.this : role => { name = bucket.id, arn = bucket.arn } }

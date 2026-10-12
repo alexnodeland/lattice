@@ -211,7 +211,7 @@ packages/portalr/web/app/.features-gen/
 packages/portalr/web/app/test-results/
 packages/portalr/web/app/playwright-report/
 
-# OpenTofu's working directories, and the lock files of stackr's AWS modules and their test root
+# OpenTofu's working directories, and the lock files of stackr's AWS modules, if one is ever made:
+# deploy/aws/.terraform.lock.hcl, which their tests use, is committed
 .terraform/
-packages/stackr/deploy/aws/.terraform.lock.hcl
 packages/stackr/deploy/aws/modules/*/.terraform.lock.hcl

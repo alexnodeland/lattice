@@ -10,20 +10,11 @@
       "description": "OpenTofu and TFLint in .prototools, whose plugins are lattice's own, so Renovate's proto manager doesn't know them (stackr ADR-0029).",
       "customType": "regex",
       "managerFilePatterns": ["/^\\.prototools$/"],
-      "matchStrings": ["(?<depName>tofu) = \"(?<currentValue>[^\"]+)\"", "(?<depName>tflint) = \"(?<currentValue>[^\"]+)\""],
+      "matchStrings": ["(?<depName>tofu) = \"(?<currentValue>\\d[^\"]*)\"", "(?<depName>tflint) = \"(?<currentValue>\\d[^\"]*)\""],
       "datasourceTemplate": "github-releases",
       "packageNameTemplate": "{{#if (equals depName 'tofu')}}opentofu/opentofu{{else}}terraform-linters/tflint{{/if}}",
       "extractVersionTemplate": "^v(?<version>.+)$"
-    },
-    {
-      "description": "checkov, run by stackr's deploy/aws/check through uvx at an exact version, outside the workspace's resolution (stackr ADR-0029).",
-      "customType": "regex",
-      "managerFilePatterns": ["/^packages/stackr/deploy/aws/check$/"],
-      "matchStrings": ["CHECKOV_VERSION=(?<currentValue>\\S+)"],
-      "depNameTemplate": "checkov",
-      "datasourceTemplate": "pypi"
-    }
-  ],
+    }  ],
   "packageRules": [
     {
       "description": "Python ranges stay as written: the lockfile moves, and the packages' floors move by hand, with the code that needs them.",

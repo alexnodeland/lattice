@@ -17,13 +17,28 @@
 
   /* The roles. */
   --paper: light-dark(#f7f4fb, #17111f);
-  --surface: light-dark(#ffffff, #0d1920);
+  --surface: light-dark(#ffffff, #1f1829);
   --fg: light-dark(#1c1d26, #f1eef6);
   --muted: light-dark(#5e5470, #bdb2cc);
   --line: light-dark(#dcd5e6, #3a3247);
   --accent: var(--portalr-violet);
   --on-accent: light-dark(#ffffff, #17111f);
   --focus: light-dark(#6b2fa0, #38c6f4);
+  /* A control's boundary: 3:1 or more on every surface, as WCAG asks of one. */
+  --edge: light-dark(#857a97, #7d7091);
+  /* Behind a drawer or a dialog. */
+  --scrim: light-dark(rgb(28 29 38 / 45%), rgb(0 0 0 / 60%));
+}
+
+/*
+ * Mixed from the working colour: a tint for hover, the current place, and what is selected or
+ * added; and the working colour, hovered. A custom property is resolved where it is declared, so
+ * these are declared again wherever a screen re-skins --accent.
+ */
+:root,
+[data-brand] {
+  --wash: color-mix(in srgb, var(--accent) 10%, var(--paper));
+  --accent-hover: color-mix(in srgb, var(--accent) 88%, var(--on-accent));
 }
 
 :root[data-theme="light"] {

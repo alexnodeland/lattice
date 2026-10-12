@@ -4,6 +4,7 @@
  */
 @import "tailwindcss";
 @import "./tokens.css";
+@import "./fonts/fonts.css";
 /* Streamdown renders with Tailwind classes of its own, which Tailwind finds here. */
 @source "../node_modules/streamdown/dist/*.js";
 
@@ -17,6 +18,10 @@
   --color-accent: var(--accent);
   --color-on-accent: var(--on-accent);
   --color-focus: var(--focus);
+  --color-edge: var(--edge);
+  --color-scrim: var(--scrim);
+  --color-wash: var(--wash);
+  --color-accent-hover: var(--accent-hover);
   /* The names Streamdown's own classes use, as portalr's roles. */
   --color-foreground: var(--fg);
   --color-background: var(--paper);

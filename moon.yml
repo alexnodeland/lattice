@@ -39,7 +39,8 @@ tasks:
       - '**/moon.yml'
       - '.moon/workspace.yml'
       - 'uv.lock'
-      - 'packages/portalr/web/**/*'
+      - 'packages/portalr/web/*/src/**/*'
+      - 'packages/portalr/web/*/*.{json,ts,yml}'
 
   docs:
     description: 'Build the documentation site in strict mode, and check that its lists rendered'
@@ -74,7 +75,8 @@ tasks:
     description: 'Find unused files, exports and dependencies in the web packages with knip'
     command: 'bun x --bun --no-install knip'
     inputs:
-      - 'packages/portalr/web/**/*'
+      - 'packages/portalr/web/*/src/**/*'
+      - 'packages/portalr/web/*/*.{json,ts,yml}'
       - '.moon/tasks/*.yml'
       - 'moon.yml'
       - 'knip.json'

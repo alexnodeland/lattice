@@ -58,7 +58,7 @@ Both are open-source (SIL Open Font License) and served by Google Fonts. The wor
 
 ## The family
 
-artifactr, reflexr, evalr, relayr and stackr share one brand system with lattice, which holds them. [lattice's brand page](../../../assets/brand/README.md#the-family) states it in full: the inks, the grid, the stroke, the overprint and the layout every mark follows, each member's mark and inks, the inks reserved for portalr and grantr, and a family sheet with all six marks.
+artifactr, reflexr, evalr, relayr, grantr, stackr and portalr share one brand system with lattice, which holds them. [lattice's brand page](../../../assets/brand/README.md#the-family) states it in full: the inks, the grid, the stroke, the overprint and the layout every mark follows, each member's mark and inks, and a family sheet with all eight marks.
 
 ### Known weaknesses
 

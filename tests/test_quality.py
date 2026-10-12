@@ -36,7 +36,9 @@ def _web_sources() -> list[Path]:
     return sorted(
         path
         for path in WEB.rglob("*")
-        if path.suffix in {".ts", ".tsx"} and "node_modules" not in path.parts
+        if path.suffix in {".ts", ".tsx"}
+        and path.is_file()
+        and not {"node_modules", ".vitest"} & set(path.parts)
     )
 
 

@@ -33,7 +33,7 @@ Every web package has these, each run by Bun from `bun.lock`:
 |---|---|
 | `lint` | Check formatting and lint rules with Biome |
 | `typecheck` | Type-check with TypeScript 7, strict |
-| `test` | Run the tests with Vitest (`client` and `ui`) |
+| `test` | Run the tests with Vitest (`client`, and `ui` in Chromium, light and dark) |
 | `build` | Build the app with Vite (`app` and `admin`) |
 | `format` | Format the code and apply safe lint fixes with Biome |
 | `check` | Everything CI runs for the project |

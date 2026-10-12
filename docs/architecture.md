@@ -138,6 +138,8 @@ portalr's web packages are a Bun workspace rooted at lattice's root, so TypeScri
 | Biome | `biome.json`: formatting and the recommended lint rules, for the web packages and the workspace's own configuration |
 | knip | `knip.json`: one run over the workspace, from the root project, which reads moon's tasks for the tools they run |
 | A sibling | `"@portalr/ui": "workspace:*"`. `client` and `ui` are consumed as source: their `exports` point at `src/index.ts`, and Vite builds them into `app` and `admin` |
+| `ui`'s styles | portalr's brand tokens as CSS custom properties, light and dark, in `tokens.css`, which `styles.css` hands to Tailwind 4's `@theme`; the primitives are Base UI's, styled with them |
+| Browser tests | `ui`'s tests run in Chromium, through Vitest's browser mode and Playwright, twice: with the system's scheme light, and dark ([portalr ADR-0009](portalr/adr/0009-ui-tested-in-chromium-in-both-schemes-under-bun.md)). `make install`, the dev container and CI install Playwright's headless Chromium |
 
 **Bun runs every tool, in its own runtime.** Each task runs `bun x --bun --no-install <tool>`, so a tool's Node.js script runs in Bun, and one that `bun.lock` doesn't hold fails rather than being fetched. lattice pins no Node.js, and no task runs one.
 

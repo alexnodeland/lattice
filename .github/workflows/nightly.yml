@@ -53,6 +53,7 @@ jobs:
         run: psql -h localhost -U postgres -c 'CREATE DATABASE artifactr' -c 'CREATE DATABASE reflexr' -c 'CREATE DATABASE grantr'
       - run: uv sync --locked --all-packages --all-groups --all-extras
       - run: bun install --frozen-lockfile
+      - run: bun x --bun --no-install playwright install --with-deps --only-shell chromium
       - run: moon run :check
 
   images:

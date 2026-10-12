@@ -199,3 +199,5 @@ cython_debug/
 
 # Bun
 node_modules/
+# Vitest browser mode's failure screenshots
+.vitest/

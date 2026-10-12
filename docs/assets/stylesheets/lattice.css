@@ -71,7 +71,9 @@
 .md-typeset .reflexr-visually-hidden,
 .md-typeset .evalr-visually-hidden,
 .md-typeset .relayr-visually-hidden,
-.md-typeset .stackr-visually-hidden {
+.md-typeset .stackr-visually-hidden,
+.md-typeset .grantr-visually-hidden,
+.md-typeset .portalr-visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -87,7 +89,9 @@
 .md-typeset .reflexr-hero,
 .md-typeset .evalr-hero,
 .md-typeset .relayr-hero,
-.md-typeset .stackr-hero {
+.md-typeset .stackr-hero,
+.md-typeset .grantr-hero,
+.md-typeset .portalr-hero {
   margin: 0.5rem 0 2rem;
 }
 
@@ -96,7 +100,9 @@
 .md-typeset .reflexr-hero img,
 .md-typeset .evalr-hero img,
 .md-typeset .relayr-hero img,
-.md-typeset .stackr-hero img {
+.md-typeset .stackr-hero img,
+.md-typeset .grantr-hero img,
+.md-typeset .portalr-hero img {
   width: min(22rem, 100%);
   height: auto;
 }
@@ -106,7 +112,9 @@
 .md-typeset .reflexr-hero p,
 .md-typeset .evalr-hero p,
 .md-typeset .relayr-hero p,
-.md-typeset .stackr-hero p {
+.md-typeset .stackr-hero p,
+.md-typeset .grantr-hero p,
+.md-typeset .portalr-hero p {
   max-width: 34em;
   font-size: 1.15em;
   line-height: 1.55;

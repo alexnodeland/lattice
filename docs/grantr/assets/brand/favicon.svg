@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+<title id="title">grantr</title>
+<style>.y{fill:#FFC400}.k{fill:#1C1D26}.o{fill:#6B5300}@media (prefers-color-scheme:dark){.y{fill:#FFD54A}.k{fill:#8C8E9E}.o{fill:#FFF6D6}}</style>
+<polygon class="y" points="5,6 59,6 51.73,20 12.27,20"/>
+<polygon class="k" points="5,6 19,6 39,44.52 32,58"/>
+<polygon class="k" points="59,6 45,6 25,44.52 32,58"/>
+<polygon class="o" points="5,6 12.27,20 26.27,20 19,6"/>
+<polygon class="o" points="37.73,20 51.73,20 59,6 45,6"/>
+<polygon class="o" points="25,44.52 32,58 39,44.52 32,31.04"/>
+</svg>

@@ -214,7 +214,8 @@ Pass `Session.start(..., on_behalf_of=user)` for a run that acts for a person; w
 A run's record is on the log, attributed to the agent:
 
 ```text
-run_started      trigger: message, resume or api; the trace id when the run is traced
+run_started      trigger: message, resume or api; the trace id when the run is traced;
+                 the ids of the messages its start carries out
 tool_called      for every tool call, the application's included
 artifact_changed (or proposal_created, artifact_created, ...) for each change a tool commits
 tool_returned    the tool's name, and status: ok, retry (a rejection or the tool's own

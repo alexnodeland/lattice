@@ -79,8 +79,8 @@ def test_only_the_applications_events_are_accepted(client: TestClient) -> None:
 
 
 def test_the_rules_are_described(client: TestClient) -> None:
-    [rule] = client.get("/reflexr/v1/rules").json()
-    assert (rule["name"], rule["then"]["action"]) == (TRIAGE, "triage")
+    [rule] = [r for r in client.get("/reflexr/v1/rules").json() if r["name"] == TRIAGE]
+    assert rule["then"]["action"] == "triage"
 
 
 async def test_mcp_clients_publish_for_the_user_of_their_token(server: str) -> None:

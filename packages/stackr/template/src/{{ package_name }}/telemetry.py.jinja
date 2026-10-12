@@ -19,6 +19,9 @@ from importlib.metadata import version
 {% if libraries == 'both' -%}
 import reflexr.otel
 {% endif -%}
+{% if use_relayr -%}
+import relayr.otel
+{% endif -%}
 from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.otel import TelemetryHandle, configure_telemetry
 
 from {{ package_name }}.settings import Settings
@@ -31,6 +34,9 @@ def configure(settings: Settings) -> TelemetryHandle | None:
     return configure_telemetry(
 {%- if libraries == 'both' %}
         reflexr.otel.telemetry(),
+{%- endif %}
+{%- if use_relayr %}
+        relayr.otel.telemetry(),
 {%- endif %}
         service_name=settings.service_name,
         service_version=version("{{ project_slug }}"),

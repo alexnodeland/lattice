@@ -44,6 +44,9 @@ from grantr.testing import matrix
 from reflexr import core as reflexr
 from reflexr.workspace import ACTIONS as REFLEXR_ACTIONS
 {%- endif %}
+{%- if use_relayr %}
+from relayr.outbound import rule_actor
+{%- endif %}
 
 from {{ package_name }}.auth import (
     Person,
@@ -52,6 +55,9 @@ from {{ package_name }}.auth import (
     Unauthenticated,
     bearer_token,
 )
+{%- if use_relayr %}
+from {{ package_name }}.incidents import RULES as INCIDENT_RULES
+{%- endif %}
 from {{ package_name }}.telemetry import TelemetryHandle
 {%- if use_reflexr %}
 from {{ package_name }}.tickets import RULES
@@ -63,8 +69,17 @@ KEY_PREFIX: Final = "grantr_sk_"
 """How a service principal's key begins, where a token would be."""
 
 {% if use_reflexr -%}
+{% if use_relayr -%}
+CODE_RULES: Final = frozenset(rule.name for rule in [*RULES, *INCIDENT_RULES])
+{%- else -%}
 CODE_RULES: Final = frozenset(rule.name for rule in RULES)
+{%- endif %}
 """The rules defined here, in code, whose runs act as the application."""
+{%- if use_relayr %}
+
+CODE_RULE_ACTORS: Final = frozenset(rule_actor(rule).client_id for rule in CODE_RULES)
+"""Who the code rules' runs act as in artifactr, through relayr: the application too."""
+{%- endif %}
 
 {% endif -%}
 CATALOGS: Final = [{% if use_artifactr %}ARTIFACTR_ACTIONS{% endif %}{% if libraries == 'both' %}, {% endif %}{% if use_reflexr %}REFLEXR_ACTIONS{% endif %}]
@@ -195,10 +210,22 @@ class Access:
     def artifactr_subject(
         self, _tenant: str, _workspace: str | None, actor: artifactr.Actor
     ) -> Subject:
+{%- if use_relayr %}
+        """Who grantr checks for an artifactr actor: the person a run or client acts for.
+
+        A code rule's run, which acts in artifactr through relayr, and a turn it starts, act as
+        the application, as the rule's run does in reflexr.
+        """
+{%- else %}
         """Who grantr checks for an artifactr actor: the person a run or client acts for."""
+{%- endif %}
         match actor:
             case artifactr.UserActor():
                 return User(id=actor.id)
+{%- if use_relayr %}
+            case artifactr.ExternalAgentActor(client_id=client) if client in CODE_RULE_ACTORS:
+                return self.application
+{%- endif %}
             case artifactr.ExternalAgentActor(on_behalf_of=person):
                 return (
                     ServicePrincipal(id=actor.client_id) if person is None else User(id=person.id)

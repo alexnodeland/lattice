@@ -8,7 +8,7 @@ gracefully with it{% if access == 'grantr' %}; the rules, defined here in code, 
 
 import asyncio
 import contextlib
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable{% if use_relayr %}, Mapping{% endif %}
 from datetime import timedelta
 
 from fastapi import FastAPI{% if access == 'grantr' %}, HTTPException{% endif %}
@@ -22,19 +22,41 @@ from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
 from reflexr import Actor, ExternalAgentActor, SystemActor, UserActor
 from reflexr.core import {% if access == 'grantr' %}Forbidden, {% endif %}TenantId
 from reflexr.fastapi import Unauthorized, reflexr_router
+{% if not use_relayr -%}
 from reflexr.langfuse import langfuse_run
+{% endif -%}
 from reflexr.litellm import LiteLLMGateway
 from reflexr.mcp import McpContext, ReflexrMcp
 from reflexr.scores import FeedbackMirror, sync_score_configs
 from reflexr.sql import SqlStorage, migrate
-from reflexr.workspace import Authorize, InMemoryStorage, Reaction, Reactor, Workspaces
+from reflexr.workspace import (
+{%- if use_relayr %}
+    Action,
+{%- endif %}
+    Authorize,
+    InMemoryStorage,
+    Reaction,
+    Reactor,
+{%- if use_relayr %}
+    RunContext,
+{%- endif %}
+    Workspaces,
+)
+{%- if use_relayr %}
+from relayr.events import BRIDGED
+from relayr.inbound import SOURCE
+{%- endif %}
 
 {% if access == 'grantr' -%}
 from {{ package_name }}.access import Refused
 {% endif -%}
 from {{ package_name }}.auth import Authenticate, RequireToken, Unauthenticated
 from {{ package_name }}.gateway import Guardrails, TenantKeys
-from {{ package_name }}.scores import Mirrors, sync_configs
+{%- if use_relayr %}
+from {{ package_name }}.incidents import EVENTS as INCIDENT_EVENTS
+from {{ package_name }}.incidents import RULES as INCIDENT_RULES
+{%- endif %}
+from {{ package_name }}.scores import Mirrors, {% if use_relayr %}OnOpen, {% endif %}opened, sync_configs
 from {{ package_name }}.settings import GatewaySettings
 from {{ package_name }}.telemetry import TelemetryHandle
 from {{ package_name }}.tickets import (
@@ -66,6 +88,12 @@ class Automation:
         telemetry: OpenTelemetry, and Langfuse when it has a client.
         poll_interval: How often the reactor looks for work.
         grace: How long running actions have to end when the application stops.
+{%- if use_relayr %}
+        on_open: Called each time a workspace is opened, after the mirrors': relayr's followers.
+        run_context: Entered around each run: relayr's Langfuse context, when Langfuse is on.
+        actions: The bridge's example rules' actions, which act in artifactr; without them, the
+            example's rules are left out.
+{%- endif %}
     """
 
     def __init__(
@@ -81,6 +109,11 @@ class Automation:
         telemetry: TelemetryHandle | None = None,
         poll_interval: timedelta = timedelta(seconds=1),
         grace: timedelta = STOP_GRACE,
+{%- if use_relayr %}
+        on_open: OnOpen | None = None,
+        run_context: RunContext | None = None,
+        actions: Mapping[str, Action[None]] | None = None,
+{%- endif %}
     ) -> None:
         self._authenticate = authenticate
         self._identify = identify
@@ -99,10 +132,13 @@ class Automation:
             self._mirrors = Mirrors(follow)
         self.workspaces = Workspaces(
             SqlStorage(engine) if engine else InMemoryStorage(),
-            events=EVENTS,
-            rules=RULES,
+            events={% if use_relayr %}[*EVENTS, *BRIDGED, *INCIDENT_EVENTS]{% else %}EVENTS{% endif %},
+            rules={% if use_relayr %}[*RULES, *(INCIDENT_RULES if actions else [])]{% else %}RULES{% endif %},
             authorize=authorize,
-            on_open=self._mirrors.watch if self._mirrors else None,
+{%- if use_relayr %}
+            publishers={"artifactr": [SOURCE]},
+{%- endif %}
+            on_open=opened(self._mirrors.watch if self._mirrors else None{% if use_relayr %}, on_open{% endif %}),
             tracer_provider=telemetry.tracer_provider if telemetry else None,
             meter_provider=telemetry.meter_provider if telemetry else None,
         )
@@ -118,8 +154,8 @@ class Automation:
         agent = build_triage_agent(model, capabilities=capabilities)
         self.reactor = Reactor[None](
             self.workspaces,
-            actions={"triage": triage_action(agent)},
-            run_context=langfuse_run if langfuse else None,
+            actions={"triage": triage_action(agent){% if use_relayr %}, **(actions or {}){% endif %}},
+            run_context={% if use_relayr %}run_context{% else %}langfuse_run if langfuse else None{% endif %},
         )
         self.mcp = ReflexrMcp(self.workspaces, resolve=self._resolve_client, name=name)
 

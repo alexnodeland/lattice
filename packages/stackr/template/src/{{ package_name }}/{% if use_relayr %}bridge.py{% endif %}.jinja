@@ -1,0 +1,141 @@
+"""relayr in the application: the bridge between artifactr and reflexr, both ways.
+
+Inbound, a follower per workspace publishes selected artifactr events into reflexr, under the
+``artifactr`` namespace, such as ``artifactr:message_posted``, so rules can react to what people
+and agents do. A workspace's follower starts the first time either library opens it, and when the
+application starts, for every workspace the ledger knows{% if access == 'grantr' %} and every workspace of every tenant{% endif %}.
+
+Outbound, rules' runs act back in artifactr as their rules' own participants, within each rule's
+allowlist: proposals and notices by default (``incidents.py``). The ledger, in the application's
+database, holds each follower's cursor and lease, and the run behind each write, so that rules
+that answer each other stop at reflexr's depth limit.
+"""
+
+import contextlib
+from collections.abc import AsyncGenerator
+
+from fastapi import FastAPI
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+{% if access == 'grantr' -%}
+from artifactr import Workspaces
+{% endif -%}
+from artifactr.agent import TurnContext
+{%- if access == 'grantr' %}
+from grantr import Grants
+{%- endif %}
+from reflexr.workspace import Action, RunContext
+from relayr.inbound import {% if access == 'grantr' %}FOLLOWER, {% endif %}Followers
+from relayr.langfuse import bridged_run, bridged_turns
+from relayr.ledger import InMemoryLedger, Ledger
+from relayr.outbound import Outbound
+from relayr.sql import SqlLedger, migrate
+
+from {{ package_name }}.automation import Automation
+from {{ package_name }}.collaboration import Collaboration
+from {{ package_name }}.incidents import ALLOWLISTS, incident_actions
+from {{ package_name }}.telemetry import TelemetryHandle
+
+
+class Bridge:
+    """relayr's followers, its outbound adapter and its ledger.
+
+    ``create_app`` gives :meth:`watch` to both parts as their ``on_open``, the bridge's actions
+    to the reactor, and then :meth:`connect` s the parts.
+
+    Args:
+        engine: The database; without one, the ledger lives in memory.
+        telemetry: OpenTelemetry, and Langfuse when it has a client.
+{%- if access == 'grantr' %}
+        grants: grantr, which lists the tenants whose workspaces are followed at startup.
+{%- endif %}
+    """
+
+    def __init__(
+        self,
+        *,
+        engine: AsyncEngine | None = None,
+        telemetry: TelemetryHandle | None = None,
+{%- if access == 'grantr' %}
+        grants: Grants,
+{%- endif %}
+    ) -> None:
+        self.ledger: Ledger = SqlLedger(engine) if engine else InMemoryLedger()
+        self._telemetry = telemetry
+        langfuse = telemetry.langfuse if telemetry else None
+        self.turn_context: TurnContext | None = bridged_turns(self.ledger) if langfuse else None
+        """The runner's turn context: Langfuse's, with the rule and chain a turn continues."""
+        self.run_context: RunContext | None = bridged_run if langfuse else None
+        """The reactor's run context: Langfuse's, with the threads and person behind a run."""
+        self._followers: Followers | None = None
+{%- if access == 'grantr' %}
+        self._grants = grants
+        self._workspaces: Workspaces | None = None
+{%- endif %}
+
+    def actions(self, collaboration: Collaboration) -> dict[str, Action[None]]:
+        """The example rules' actions, which act in artifactr through relayr's outbound adapter."""
+        outbound = Outbound(
+            collaboration.workspaces,
+            self.ledger,
+            allowlists=ALLOWLISTS,
+            runner=collaboration.runner,
+        )
+        return incident_actions(outbound, collaboration.workspaces)
+
+    def connect(self, collaboration: Collaboration, automation: Automation) -> None:
+        """Follow artifactr's workspaces into reflexr's."""
+        tracer_provider = self._telemetry.tracer_provider if self._telemetry else None
+        meter_provider = self._telemetry.meter_provider if self._telemetry else None
+{%- if access == 'grantr' %}
+        self._workspaces = collaboration.workspaces
+{%- endif %}
+        self._followers = Followers(
+            collaboration.workspaces,
+            automation.workspaces,
+            self.ledger,
+            tracer_provider=tracer_provider,
+            meter_provider=meter_provider,
+        )
+
+    async def watch(self, tenant_id: str, workspace_id: str) -> None:
+        """Follow a workspace, unless it is followed already: the libraries' ``on_open`` hook."""
+        assert self._followers is not None, "create_app connects the bridge before anything opens"
+        await self._followers.watch(tenant_id, workspace_id)
+
+    async def migrate(self, engine: AsyncEngine) -> None:
+        """Upgrade the database to relayr's schema: the ledger."""
+        await migrate(engine)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(self) -> AsyncGenerator[None]:
+        """Follow every workspace there is to follow; stop each follower as the application stops.
+
+        It starts after the parts, so the reactor is serving, and stops before them, so each
+        follower lets go of its lease while the libraries are up.
+        """
+        assert self._followers is not None, "create_app connects the bridge"
+        try:
+            await self._followers.resume()
+{%- if access == 'grantr' %}
+            await self._follow_every_tenant()
+{%- endif %}
+            yield
+        finally:
+            await self._followers.aclose()
+
+{%- if access == 'grantr' %}
+
+    async def _follow_every_tenant(self) -> None:
+        workspaces = self._workspaces
+        assert workspaces is not None, "create_app connects the bridge"
+        for tenant in await self._grants.served_tenants():
+            after: str | None = None
+            while page := await workspaces.list(tenant, actor=FOLLOWER, after=after):
+                for workspace in page:
+                    await self.watch(tenant, workspace)
+                after = page[-1]
+{%- endif %}
+
+    def mount(self, app: FastAPI) -> None:
+        """The bridge has no routes of its own."""

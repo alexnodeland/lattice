@@ -8,6 +8,7 @@ dependsOn:
   - 'reflexr'
   - 'evalr'
   - 'grantr'
+  - 'relayr'
 
 # Its tasks run the workspace's tools, so the lock and the root's configuration are inputs too.
 tasks:

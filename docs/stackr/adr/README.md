@@ -24,5 +24,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0018](0018-the-template-pins-the-libraries-at-its-own-commit.md) | The template pins the libraries at its own commit | Accepted |
 | [0019](0019-access-with-grantr-in-the-template.md) | Access with grantr in the template | Accepted |
 | [0020](0020-one-tenant-attribute-and-prom-label-proxy.md) | One tenant attribute, and prom-label-proxy | Accepted |
+| [0021](0021-the-bridge-in-the-template.md) | The bridge in the template | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

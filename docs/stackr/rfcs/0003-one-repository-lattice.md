@@ -148,7 +148,7 @@ moon runs every task, and only the ones a change affects. uv and Bun manage depe
 | artifactr, reflexr | evalr |
 | relayr | artifactr, reflexr, and evalr (its `langfuse` extra) |
 | docplan, oncall | artifactr, reflexr respectively |
-| stackr | artifactr, reflexr and evalr (its template generates applications on them), and relayr once the template wires it in |
+| stackr | artifactr, reflexr, evalr, grantr and relayr: its template generates applications on them |
 | portalr's `app` and `admin` | `client`, `ui` |
 
 artifactr's and reflexr's `api` tasks also depend on docplan's and oncall's `image` tasks, since their collections run against those apps. A change to either app then reaches them through `--downstream deep`, which CI uses because `moon ci` defaults to direct dependents only.

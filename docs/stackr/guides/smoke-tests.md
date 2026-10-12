@@ -59,6 +59,10 @@ With `STACKR_RECIPE=host`, `make smoke` adds the edge's checks:
 - it serves GoTrue at `auth.<domain>`, with a certificate the probe trusts: with `CADDY_TLS="tls internal"`, Caddy's own root, copied from Caddy's container, and nothing else
 - it refuses GoTrue's admin API there, with 404
 
+### `drill`: a single host's restore drill
+
+After `make backup restore-drill`, `make smoke PROFILES=drill` finds the drill's success in Prometheus, where Grafana's alert reads it.
+
 ### `langfuse` and `gateway` together: portalr's readers
 
 portalr's Acceptance job runs neither Langfuse nor LiteLLM, so this reads both through portalr's readers, as the `stackr-smoke` tenant ([portalr ADR-0012](../../portalr/adr/0012-acceptance-against-a-two-tenant-stack.md)). portalr's `scripts/smoke_readers.py` sends Langfuse a trace tagged `tenant:stackr-smoke` with a score on it, and the Langfuse reader must find the score. The LiteLLM reader must read the tenant's team, which the gateway's check created, and find it in every tenant's spend. Each must answer `ok`.
@@ -99,6 +103,6 @@ CI's smoke job starts the stack four ways, each on a fresh runner, and runs `mak
 | observability | `observability` | None |
 | everything on local Supabase, and an application | `observability langfuse gateway`, then `make smoke-app` | Local Supabase |
 | everything on PostgreSQL | `observability langfuse gateway` | Plain PostgreSQL |
-| a single host, behind Caddy, and an application | `observability langfuse gateway auth`, with `STACKR_RECIPE=host` and Caddy's own CA, then `make smoke-app` | Plain PostgreSQL |
+| a single host, behind Caddy, and an application | `observability langfuse gateway auth`, with `STACKR_RECIPE=host` and Caddy's own CA, then `make smoke-app`, then the backups to a MinIO of the job's own and the restore drill | Plain PostgreSQL |
 
 It installs the Supabase CLI version pinned in `versions.env`, and starts Supabase without the services the smoke tests don't use (`SUPABASE_START_FLAGS`). When a run fails, it prints every container and the last 200 lines of each service's logs, and it always ends with `make reset`.

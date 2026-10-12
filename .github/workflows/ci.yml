@@ -287,7 +287,7 @@ jobs:
             -subj /CN=backups -addext subjectAltName=DNS:backups \
             -keyout "$RUNNER_TEMP/backups/private.key" -out "$RUNNER_TEMP/backups/public.crt"
           chmod 644 "$RUNNER_TEMP/backups/private.key"
-          minio=$(docker compose config --format json | jq -r .services.minio.image)
+          minio=$(docker compose --profile langfuse config --format json | jq -r .services.minio.image)
           docker run -d --name backups --network stackr -v "$RUNNER_TEMP/backups:/certs:ro" \
             -e MINIO_ROOT_USER="$BACKUP_S3_ACCESS_KEY_ID" -e MINIO_ROOT_PASSWORD="$BACKUP_S3_SECRET_ACCESS_KEY" \
             --entrypoint sh "$minio" \

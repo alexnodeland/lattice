@@ -46,4 +46,4 @@ RFC-0004 runs stackr's Compose stack on one VM behind Caddy, on the `postgres` a
 - Easier: `make smoke` and `make smoke-app` run the same way on one machine and on a host, and CI checks the host with Caddy's own CA.
 - Easier: the `postgres` adapter has identity, so an application runs end to end without local Supabase.
 - Harder: each smoke check starts a container.
-- Next: the host's backups and their restore drill, RFC-0004's phase 2, in their own pull request.
+- Next: the host's backups and their restore drill, in [ADR-0027](0027-the-single-hosts-backups.md).

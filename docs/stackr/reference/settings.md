@@ -62,6 +62,23 @@ Where Caddy publishes 80 and 443, as STACKR_BIND is for the rest: this machine o
 |---|---|
 | `STACKR_EDGE_BIND` | `127.0.0.1` |
 
+On a single host, the S3-compatible bucket, off the host, that `make backup` (pgBackRest and ClickHouse's BACKUP) writes to and the restore drill reads. The endpoint is a host name, reached over HTTPS on the port, path-style.
+
+| Setting | In `.env.example` |
+|---|---|
+| `BACKUP_S3_ENDPOINT` | Empty |
+| `BACKUP_S3_PORT` | `443` |
+| `BACKUP_S3_BUCKET` | Empty |
+| `BACKUP_S3_REGION` | `us-east-1` |
+| `BACKUP_S3_ACCESS_KEY_ID` | Empty |
+| `BACKUP_S3_SECRET_ACCESS_KEY` | Empty |
+
+relaxed checks the bucket's certificate; none, only for a test bucket with a certificate of its own.
+
+| Setting | In `.env.example` |
+|---|---|
+| `BACKUP_S3_TLS_VERIFICATION` | `relaxed` |
+
 ### Observability
 
 Grafana signs in as `admin` with this password.

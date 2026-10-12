@@ -73,6 +73,23 @@ ssh -L 3000:127.0.0.1:3000 -L 3300:127.0.0.1:3300 -L 4400:127.0.0.1:4400 <the ho
 
 Then open <http://localhost:3000>, <http://localhost:3300> and <http://localhost:4400/ui> as you would on one machine. `make tenant` runs on the host itself, against LiteLLM's port there.
 
+## Backups
+
+Set `BACKUP_S3_*` in `.env` to a bucket off the host, on any S3-compatible store reached over HTTPS, then `make up` again, so PostgreSQL starts archiving its WAL there ([ADR-0027](../adr/0027-the-single-hosts-backups.md)):
+
+| Setting | What it is |
+|---|---|
+| `BACKUP_S3_ENDPOINT`, `BACKUP_S3_PORT` | The store's host name and HTTPS port, reached path-style |
+| `BACKUP_S3_BUCKET`, `BACKUP_S3_REGION` | The bucket, and its region |
+| `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` | Keys that may read and write the bucket |
+| `BACKUP_S3_TLS_VERIFICATION` | `relaxed`, the default, checks the store's certificate; `none` only for a test bucket |
+
+- **Nightly,** `stackr-backup.timer` runs `deploy/host/backup`: pgBackRest backs up PostgreSQL, full the first time and incremental after, keeping two full backups and the WAL between them; then ClickHouse backs itself up whole, as `clickhouse/<UTC time>`. Give the bucket a lifecycle rule that expires `clickhouse/` after the days you need. `make backup` runs it now.
+- **Weekly,** `stackr-restore-drill.timer` runs `deploy/host/restore-drill`: it restores PostgreSQL's latest backup into a new container and ClickHouse's as `restore_drill`, checks them against the live databases, and reports to the Collector. Grafana alerts when the drill hasn't passed in eight days. `make restore-drill` runs it now.
+- **Not backed up:** Prometheus's data, 15 days of metrics; and `.env`, which you keep elsewhere yourself.
+
+To restore PostgreSQL after losing the host, set up a new one with the same `.env`, then, with the stack stopped, restore into the empty data volume with `pgbackrest --stanza=stackr restore` in the `postgres` service's image. ClickHouse restores with `RESTORE DATABASE default FROM S3(backups, '<name>')`.
+
 ## Update it
 
 Check out the new stackr tag, then `make up` again: Compose pulls the new images and recreates what changed. Langfuse, LiteLLM, GoTrue and the application migrate their databases when they start.

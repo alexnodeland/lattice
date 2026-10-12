@@ -36,11 +36,11 @@ restored_tables() {
 set -eu
 pgbackrest-conf
 mkdir -p /tmp/drill && chown postgres /tmp/drill && chmod 700 /tmp/drill
-su-exec postgres pgbackrest --stanza=stackr --log-level-console=warn --pg1-path=/tmp/drill restore
-su-exec postgres pg_ctl -D /tmp/drill -o "-c archive_mode=off -c listen_addresses=''" -w -t 300 start >/dev/null
-until su-exec postgres psql -Atc 'SELECT NOT pg_is_in_recovery()' 2>/dev/null | grep -q t; do sleep 1; done
+gosu postgres pgbackrest --stanza=stackr --log-level-console=warn --pg1-path=/tmp/drill restore
+gosu postgres pg_ctl -D /tmp/drill -o "-c archive_mode=off -c listen_addresses=''" -w -t 300 start >/dev/null
+until gosu postgres psql -Atc 'SELECT NOT pg_is_in_recovery()' 2>/dev/null | grep -q t; do sleep 1; done
 for database in $databases; do
-  su-exec postgres psql -d "\$database" -Atc "$tables" | sed "s/^/\$database /"
+  gosu postgres psql -d "\$database" -Atc "$tables" | sed "s/^/\$database /"
 done
 SH
 }

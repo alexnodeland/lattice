@@ -5,6 +5,11 @@
 # Lifting litellm's and diskcache's ignores is tracked in alexnodeland/lattice#17.
 
 [[IgnoredVulns]]
+id = "GHSA-3cv6-jpf6-8222"
+ignoreUntil = 2026-12-31
+reason = "Server-side request forgery and provider-credential exfiltration through request-body routing parameters, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
 id = "GHSA-4g5m-c9r5-49xf"
 ignoreUntil = 2026-12-31
 reason = "Local file read through request-supplied OIDC file references, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."

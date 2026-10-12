@@ -136,6 +136,23 @@ services:
       timeout: 3s
       retries: 30
 
+  # portalr's path to Prometheus: every query it sends names a tenant in the
+  # tenant_id parameter, and the proxy rewrites each selector to that tenant,
+  # so no query can read another's series. Grafana keeps its direct data
+  # source, for operators (lattice RFC-0002).
+  prom-label-proxy:
+    image: quay.io/prometheuscommunity/prom-label-proxy:v0.15.1
+    profiles: [observability]
+    restart: unless-stopped
+    command:
+      - -label=tenant_id
+      - -upstream=http://prometheus:9090
+      - -insecure-listen-address=0.0.0.0:8080
+    ports:
+      - ${STACKR_BIND:-127.0.0.1}:${PROM_LABEL_PROXY_PORT:-9091}:8080
+    depends_on:
+      - prometheus
+
   loki:
     image: grafana/loki:3.7.8
     profiles: [observability]

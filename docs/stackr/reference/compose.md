@@ -8,7 +8,7 @@
 
 | Profile | Services | In `make up`'s default |
 |---|---|---|
-| `observability` | `otel-collector`, `tempo`, `prometheus`, `loki`, `pyroscope`, `grafana` | yes |
+| `observability` | `otel-collector`, `tempo`, `prometheus`, `prom-label-proxy`, `loki`, `pyroscope`, `grafana` | yes |
 | `postgres` | `postgres` | no |
 | `langfuse` | `db-init`, `redis`, `minio`, `clickhouse`, `langfuse-worker`, `langfuse-web` | yes |
 | `gateway` | `db-init`, `redis`, `litellm` | yes |
@@ -24,7 +24,7 @@
 
 | Network | Created | Joined by |
 |---|---|---|
-| `stackr` | by Compose | `otel-collector`, `tempo`, `prometheus`, `loki`, `pyroscope`, `grafana`, `postgres`, `db-init`, `redis`, `minio`, `clickhouse`, `langfuse-worker`, `langfuse-web`, `litellm`, `telemetrygen` |
+| `stackr` | by Compose | `otel-collector`, `tempo`, `prometheus`, `prom-label-proxy`, `loki`, `pyroscope`, `grafana`, `postgres`, `db-init`, `redis`, `minio`, `clickhouse`, `langfuse-worker`, `langfuse-web`, `litellm`, `telemetrygen` |
 | `supabase_network_stackr-supabase` | by `make up`, if missing | `db-init`, `langfuse-worker`, `langfuse-web`, `litellm` |
 
 <!-- end generated -->
@@ -108,6 +108,21 @@ Metrics: OTLP from the Collector, remote write from Tempo, and scrapes of the st
 | Depends on | none |
 | Runs | `--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=15d --web.enable-otlp-receiver --web.enable-remote-write-receiver --enable-feature=exemplar-storage` |
 | Health check | `wget -q -O /dev/null http://127.0.0.1:9090/-/ready`, every 5s |
+| Restart | `unless-stopped` |
+
+### `prom-label-proxy`
+
+portalr's path to Prometheus: it rewrites every query's selectors to the tenant its `tenant_id` parameter names. Grafana keeps its direct data source.
+
+| Property | Value |
+|---|---|
+| Profiles | `observability` |
+| Image | `quay.io/prometheuscommunity/prom-label-proxy`, pinned by tag in `compose.yaml` |
+| Published ports | 9091 (`PROM_LABEL_PROXY_PORT`) → 8080 |
+| Networks | `stackr` |
+| Volumes | none |
+| Depends on | `prometheus` |
+| Runs | `-label=tenant_id -upstream=http://prometheus:9090 -insecure-listen-address=0.0.0.0:8080` |
 | Restart | `unless-stopped` |
 
 ### `loki`

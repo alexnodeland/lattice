@@ -4,6 +4,7 @@ import importlib.util
 import logging
 import os
 from collections.abc import Iterator
+from types import MappingProxyType
 from typing import Any
 
 import pytest
@@ -11,7 +12,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from opentelemetry import baggage, metrics, trace
 from opentelemetry import context as otel_context
+from opentelemetry._logs import LogRecord
 from opentelemetry.instrumentation.httpx import HTTPX2ClientInstrumentor, HTTPXClientInstrumentor
+from opentelemetry.sdk._logs import ReadWriteLogRecord
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -26,7 +29,7 @@ from artifactr.otel import (
     installed,
     metric_views,
 )
-from artifactr.otel.configure import _signal
+from artifactr.otel.configure import _signal, _Tenancy, _TenancyLogs
 from artifactr.sql import create_sqlite_engine
 from artifactr.telemetry import SCOPE, Telemetry
 from artifactr.telemetry.attributes import COMMAND_TYPE, SESSION_ID, TENANT_ID, WORKSPACE_ID
@@ -151,6 +154,40 @@ def test_logs_are_exported_until_shutdown(captured: Captured) -> None:
     handle.shutdown()
     handle.shutdown()  # idempotent
     assert len(root.handlers) == len(before) - 1
+
+
+def test_a_record_logged_in_a_tenants_span_carries_its_tenant(captured: Captured) -> None:
+    handle = configure_telemetry(service_name="docplan", instrument=(), **captured.options())
+    tracer = handle.tracer_provider.get_tracer("test")
+    log = logging.getLogger("docplan")
+    with tracer.start_as_current_span("work", attributes={TENANT_ID: "acme"}):
+        with tracer.start_as_current_span("query"):
+            log.warning("inside")
+        log.warning("given", extra={TENANT_ID: "its own"})
+    with tracer.start_as_current_span("stream") as stream:
+        stream.set_attribute(TENANT_ID, "globex")  # named once it is known
+        log.warning("named later")
+    log.warning("outside")
+    assert handle.logger_provider is not None
+    handle.logger_provider.force_flush()
+    tenants = {
+        record.log_record.body: (record.log_record.attributes or {}).get(TENANT_ID)
+        for record in captured.logs.get_finished_logs()
+    }
+    assert tenants == {
+        "inside": "acme",
+        "given": "its own",
+        "named later": "globex",
+        "outside": None,
+    }
+    handle.shutdown()
+
+
+def test_a_record_whose_attributes_cant_change_is_left_alone() -> None:
+    record = ReadWriteLogRecord(LogRecord(body="frozen", attributes={"key": "value"}))
+    record.log_record.attributes = MappingProxyType({"key": "value"})
+    _TenancyLogs(_Tenancy(frozenset({TENANT_ID}))).on_emit(record)
+    assert dict(record.log_record.attributes) == {"key": "value"}
 
 
 def test_without_logs_there_is_no_logger_provider(captured: Captured) -> None:

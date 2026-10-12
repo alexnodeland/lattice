@@ -41,7 +41,7 @@ The Collector is the one place telemetry is routed, filtered and enriched: repla
 | Metrics | Prometheus | OTLP HTTP to Prometheus's own OTLP receiver, `/api/v1/otlp` |
 | Logs | Loki | OTLP HTTP to Loki's `/otlp` |
 
-Every pipeline runs three processors: `memory_limiter`, which refuses data before the Collector runs out of memory; `resource/environment`, which labels telemetry that doesn't say which environment it comes from with `deployment.environment.name` set to `STACKR_ENVIRONMENT` (`local` by default); and `batch`.
+Every pipeline runs four processors: `memory_limiter`, which refuses data before the Collector runs out of memory; `resource/environment`, which labels telemetry that doesn't say which environment it comes from with `deployment.environment.name` set to `STACKR_ENVIRONMENT` (`local` by default); `transform/tenant`, which copies a span's, data point's or log record's `artifactr.tenant.id` or `reflexr.tenant.id` to `tenant.id`, so every signal names its tenant under one name ([ADR-0020](../adr/0020-one-tenant-attribute-and-prom-label-proxy.md)); and `batch`.
 
 The traces pipeline takes its exporters from `STACKR_TRACES_EXPORTERS`, which `make up` sets from the profiles: `[otlp_grpc/tempo, otlp_http/langfuse]` with `langfuse`, and `[otlp_grpc/tempo]` without it, so a stack without Langfuse doesn't log failed exports. [Collector pipelines](../reference/collector.md) lists every receiver, processor and exporter.
 
@@ -75,6 +75,8 @@ Prometheus translates OTLP metrics to its own names with its default rules, and 
 This translation is a contract with the libraries' dashboards, so a change to the `otlp:` settings in `deploy/prometheus/prometheus.yml` is a breaking change for them. The smoke test checks it, by finding its counter as `stackr_smoke_total`.
 
 Samples up to 30 minutes out of order are accepted, since the Collector retries batches.
+
+**prom-label-proxy** sits in front of Prometheus for portalr, at `PROM_LABEL_PROXY_PORT` (9091). portalr names a tenant in its `tenant_id` parameter, and the proxy rewrites every selector in the query to that tenant, so a query reads only the tenant's series. Grafana keeps its direct data source, for operators. The smoke test checks that the proxy finds its metric for its tenant and nothing for another.
 
 ## Loki: logs
 

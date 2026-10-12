@@ -52,6 +52,10 @@ ROLES = {
         "Metrics: OTLP from the Collector, remote write from Tempo, and scrapes of the "
         "stack's own services."
     ),
+    "prom-label-proxy": (
+        "portalr's path to Prometheus: it rewrites every query's selectors to the tenant its "
+        "`tenant_id` parameter names. Grafana keeps its direct data source."
+    ),
     "loki": "Logs, over OTLP.",
     "pyroscope": "Profiles, pushed by applications.",
     "grafana": "Dashboards and exploration, over the four backends.",

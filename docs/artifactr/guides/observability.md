@@ -129,7 +129,7 @@ During a turn, the thread id is in OpenTelemetry baggage as `session.id`. `confi
 
 ## Logs
 
-`configure_telemetry` exports the standard `logging` module's records through OTLP, with the trace and span they were logged in; pass `logs=False` to leave logging alone.
+`configure_telemetry` exports the standard `logging` module's records through OTLP, with the trace and span they were logged in; pass `logs=False` to leave logging alone. A record logged in a span that names a tenant, as `artifactr.tenant.id`, or in any span inside one, carries that attribute too, so stackr's Collector can name its tenant as `tenant.id`, as it does for spans and metrics ([ADR-0059](../adr/0059-the-tenant-on-log-records.md)).
 
 ## Langfuse
 

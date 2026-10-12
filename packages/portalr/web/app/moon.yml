@@ -1,0 +1,8 @@
+# The people's UI: sign in, pick a tenant and a workspace, and work.
+language: 'typescript'
+layer: 'application'
+dependsOn:
+  - 'ui'
+workspace:
+  inheritedTasks:
+    exclude: ['test'] # it has no code of its own to test until phase 5

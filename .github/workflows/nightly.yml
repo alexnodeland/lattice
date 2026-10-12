@@ -1,5 +1,5 @@
 # On pushes to main and every night: every project's checks, whatever changed, the reference
-# implementations' images, osv-scanner over the lockfile, and a check of the links in the
+# implementations' images, osv-scanner over the lockfiles, and a check of the links in the
 # Markdown. CI runs on pull requests only, so this is what runs on main.
 
 name: Nightly
@@ -51,6 +51,7 @@ jobs:
           PGPASSWORD: lattice
         run: psql -h localhost -U postgres -c 'CREATE DATABASE artifactr' -c 'CREATE DATABASE reflexr'
       - run: uv sync --locked --all-packages --all-groups --all-extras
+      - run: bun install --frozen-lockfile
       - run: moon run :check
 
   images:
@@ -68,6 +69,7 @@ jobs:
           auto-install: true
       - run: moon run :image
 
+  # Every lockfile git doesn't ignore: uv.lock and bun.lock.
   osv:
     name: OSV
     permissions:
@@ -77,7 +79,8 @@ jobs:
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
     with:
       scan-args: |-
-        --lockfile=uv.lock
+        --recursive
+        ./
 
   links:
     name: Links

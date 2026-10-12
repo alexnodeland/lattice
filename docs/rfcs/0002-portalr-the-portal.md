@@ -281,7 +281,7 @@ The maintainer decided these on 2026-10-12.
 portalr's own RFC series turns these phases into its plan, with a tracking issue.
 
 - [x] Sign-off on P1 to P6 (2026-10-12)
-- [ ] Phase 1: the workspace
+- [x] Phase 1: the workspace (2026-10-12)
 - [ ] Phase 2: the brand
 - [ ] Phase 3: client
 - [ ] Phase 4: the router

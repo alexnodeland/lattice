@@ -534,6 +534,74 @@ async def test_by_default_time_is_utc_and_nothing_is_traced() -> None:
     assert envelope.traceparent is None
 
 
+async def test_reserved_events_are_published_by_their_publishers_only(storage: Storage) -> None:
+    asked: list[str] = []
+
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: Actor, access: Access
+    ) -> bool:
+        asked.append(access.action)
+        return True
+
+    triage = AgentActor(rule="app:triage", run_id="fir_1", name="triage")
+    publishers = {
+        "app": [SourceActor(name="bridge")],
+        "app:escalated": [SourceActor(name="pager"), triage],
+    }
+    workspaces = Workspaces(storage, publishers=publishers, authorize=authorize)
+    client = await workspaces.open("acme", "prod", actor=UserActor(id="ada"))
+    asked.clear()
+    with pytest.raises(
+        Forbidden, match=r"app:deploy\.finished events are reserved to source:bridge"
+    ):
+        await client.publish(Deploy(service="auth"))
+    assert asked == ["reflexr:publish"], "authorize is asked first, and allows it"
+    bridge = client.as_actor(SourceActor(name="bridge"))
+    root = (await bridge.publish(Deploy(service="auth"))).envelope
+    with pytest.raises(Forbidden, match="reserved to agent:app:triage, source:pager"):
+        await bridge.publish(Escalated(service="auth"))
+    assert await client.as_actor(SourceActor(name="pager")).publish(Escalated(service="auth"))
+    cause = Causation(firing_id="fir_2", run_id="fir_2", depth=1)
+    another_run = triage.model_copy(update={"run_id": "fir_2"})
+    run_handle = client.as_actor(another_run).caused_by(cause, correlation_id=root.id)
+    assert await run_handle.publish(Escalated(service="auth")), "every run of the rule's agent"
+    with pytest.raises(Forbidden, match="reserved to source:bridge"):
+        await run_handle.publish(Deploy(service="auth"))
+
+
+async def test_an_event_both_emitted_and_reserved_is_published_by_a_run_of_a_publisher(
+    storage: Storage,
+) -> None:
+    triage = AgentActor(rule="app:triage", run_id="fir_1", name="triage")
+    workspaces = Workspaces(storage, emitted=[Escalated], publishers={"app:escalated": [triage]})
+    client = await workspaces.open("acme", "prod", actor=triage)
+    with pytest.raises(Forbidden, match="published by runs, not clients"):
+        await client.publish(Escalated(service="auth"))
+    root = (await client.as_actor(UserActor(id="ada")).publish(Deploy(service="auth"))).envelope
+    cause = Causation(firing_id="fir_1", run_id="fir_1", depth=1)
+    assert await client.caused_by(cause, correlation_id=root.id).publish(Escalated(service="auth"))
+
+
+@pytest.mark.parametrize(
+    ("key", "refusal"),
+    [
+        ("reflexr", "reflexr events are recorded by reflexr"),
+        ("reflexr:rule_fired", "reflexr:rule_fired events are recorded by reflexr"),
+        ("app:nothing", "app:nothing is not in the registry"),
+        ("ours", "ours is not in the registry"),
+    ],
+)
+async def test_publishers_are_reserved_types_and_namespaces_of_the_registry(
+    storage: Storage, key: str, refusal: str
+) -> None:
+    with pytest.raises(ValueError, match=refusal):
+        Workspaces(storage, publishers={key: [SourceActor(name="bridge")]})
+    workspaces = Workspaces(storage, registry=OURS, publishers={"ours": []})
+    workspace = await workspaces.open("acme", "prod", actor=SourceActor(name="bridge"))
+    with pytest.raises(Forbidden, match="ours:ping events are reserved to no one"):
+        await workspace.publish(Ping())
+
+
 async def test_events_only_runs_may_publish_are_refused_to_clients(storage: Storage) -> None:
     incident = Rule(name="app:incidents", when=on(Escalated), then=run("note"))
     workspaces = Workspaces(storage, events=[Deploy], emitted=[Escalated], rules=[incident])

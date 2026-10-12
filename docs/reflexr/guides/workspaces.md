@@ -25,6 +25,7 @@ ada = monitoring.as_actor(UserActor(id="ada", name="Ada"))
 | `storage` | required | Where workspaces are kept ([Storage](storage.md)) |
 | `events` | every type in `registry` | The event types clients may publish: an allowlist ([Events and envelopes](events.md#publishing)) |
 | `emitted` | none | Event types only runs may publish, such as an incident an agent opens; clients are refused them |
+| `publishers` | none | The actors that alone may publish a namespace's types, or one type's, such as a bridge; anyone else is refused ([Events and envelopes](events.md#publishing)) |
 | `registry` | `DEFAULT_REGISTRY` | The namespaces whose types the workspaces accept, so applications in one process stay apart ([Registries](events.md#registries)) |
 | `rules` | none | The [rules](rules.md) every workspace evaluates, checked when `Workspaces` is built |
 | `predicates` | none | The Python predicates rules refer to, by name |

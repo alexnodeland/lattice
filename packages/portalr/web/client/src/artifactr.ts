@@ -19,8 +19,8 @@ export type Known = v1.Event extends infer E
     : never
   : never;
 
-/** Feedback someone gave on a message, an artifact or a turn. */
-export type Feedback = Given<v1.Actor>;
+/** Feedback someone gave on a message, an artifact or a turn; on an artifact, on one version. */
+export type Feedback = Given<v1.Actor> & { readonly version?: number };
 
 export interface Message {
   readonly id: v1.MessageId;
@@ -49,7 +49,7 @@ export interface Artifact {
   /** The latest version the log has reached; its content is read over REST. */
   readonly version: number;
   readonly archived: boolean;
-  /** The feedback given on it, oldest first. */
+  /** The feedback given on its latest version, oldest first: each version is judged anew. */
   readonly feedback: readonly Feedback[];
 }
 
@@ -110,7 +110,8 @@ function withThread(state: Workspace, id: v1.ThreadId, change: Partial<Thread>):
 }
 
 function withArtifact(state: Workspace, artifact: Omit<Artifact, "feedback">): Workspace {
-  const feedback = state.artifacts[artifact.id]?.feedback ?? [];
+  const before = state.artifacts[artifact.id];
+  const feedback = before?.version === artifact.version ? before.feedback : [];
   return { ...state, artifacts: { ...state.artifacts, [artifact.id]: { ...artifact, feedback } } };
 }
 
@@ -268,10 +269,11 @@ const handlers: Handlers = {
       }
       case "artifact": {
         const artifact = state.artifacts[target.artifact_id];
-        if (artifact === undefined) {
-          return state;
+        if (artifact?.version !== target.version) {
+          return state; // an earlier version's, or an artifact the store hasn't read
         }
-        const given = { ...artifact, feedback: [...artifact.feedback, feedback] };
+        const judged = { ...feedback, version: target.version };
+        const given = { ...artifact, feedback: [...artifact.feedback, judged] };
         return { ...state, artifacts: { ...state.artifacts, [artifact.id]: given } };
       }
       case "turn": {

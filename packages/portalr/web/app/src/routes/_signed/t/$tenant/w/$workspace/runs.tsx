@@ -2,6 +2,7 @@ import { type Artifactr, type Reflexr, thumbs } from "@portalr/client";
 import { CommandButton, TextLink, Thumbs } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { allowedIn } from "../../../../../../allowed";
 import { useMe } from "../../../../../../me";
 import {
@@ -26,7 +27,7 @@ const ACTIONS = [
  * The workspace's runs: artifactr's turns, each with its thread, and reflexr's rule runs, the
  * dead-lettered marked, newest first. Each offers what its library does with a run, where grantr
  * allows: a running turn stops (artifactr can stop no other); a rule run retries, is skipped or is
- * cancelled, by its status.
+ * cancelled, by its status, a queued one only cancelled.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/runs")({
   head: ({ params }) => ({ meta: [{ title: `Runs · ${params.workspace} · portalr` }] }),
@@ -40,6 +41,10 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/runs")({
   component: Runs,
 });
 
+/** Runs, the newest first. */
+const newest = <R extends { started: number }>(runs: Readonly<Record<string, R>>) =>
+  Object.values(runs).sort((a, b) => b.started - a.started);
+
 const TURN: Record<Artifactr.Run["status"], string> = {
   running: "Working",
   paused: "Waiting for someone",
@@ -49,6 +54,7 @@ const TURN: Record<Artifactr.Run["status"], string> = {
 };
 
 const RULE_RUN: Record<Reflexr.Run["status"], string> = {
+  pending: "Queued",
   running: "Running",
   retrying: "Retrying",
   succeeded: "Succeeded",
@@ -61,13 +67,17 @@ function Runs() {
   const { tenant, workspace } = Route.useParams();
   const { queries, user } = Route.useRouteContext();
   const me = useMe(queries, user, tenant);
-  const { data: allowed } = useSuspenseQuery(allowedIn(queries, tenant, workspace, ACTIONS));
+  const checks = useMemo(
+    () => allowedIn(queries, tenant, workspace, ACTIONS),
+    [queries, tenant, workspace],
+  );
+  const { data: allowed } = useSuspenseQuery(checks);
   const turns = useWorkspace();
   const automation = useAutomation();
   const artifactr = useStream();
   const reflexr = useAutomationStream();
-  const newest = <R extends { started: number }>(runs: Record<string, R>) =>
-    Object.values(runs).sort((a, b) => b.started - a.started);
+  const turnRuns = useMemo(() => newest(turns.state.runs), [turns.state.runs]);
+  const ruleRuns = useMemo(() => newest(automation.state.runs), [automation.state.runs]);
 
   return (
     <section aria-labelledby="runs" className="flex flex-col gap-6">
@@ -80,7 +90,7 @@ function Runs() {
         </h3>
         <Connection snapshot={turns} waiting="the workspace's turns" />
         <ul aria-label="Turns" className="flex flex-col gap-3">
-          {newest(turns.state.runs).map((run) => (
+          {turnRuns.map((run) => (
             <li key={run.id} aria-label={`Turn ${run.id}`} className="flex flex-col gap-1">
               <span className="flex flex-wrap gap-2 text-sm">
                 <TextLink
@@ -123,7 +133,7 @@ function Runs() {
         </h3>
         <Connection snapshot={automation} waiting="the workspace's rules" />
         <ul aria-label="Rules' runs" className="flex flex-col gap-3">
-          {newest(automation.state.runs).map((run) => (
+          {ruleRuns.map((run) => (
             <li key={run.id} aria-label={`Run ${run.id}`} className="flex flex-col gap-1">
               <span className="flex flex-wrap gap-2 text-sm">
                 <code className="font-mono">{run.rule}</code>
@@ -149,7 +159,9 @@ function Runs() {
                       Skip
                     </CommandButton>
                   )}
-                {(run.status === "running" || run.status === "retrying") &&
+                {(run.status === "pending" ||
+                  run.status === "running" ||
+                  run.status === "retrying") &&
                   allowed.has("reflexr:cancel_run") && (
                     <CommandButton
                       onSend={() => reflexr.send({ type: "cancel_run", run_id: run.id })}

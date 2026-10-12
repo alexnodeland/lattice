@@ -40,7 +40,7 @@ test("a run moves through its statuses", () => {
     [{ type: "reflexr:run_started", run_id: "run_1", rule: "ops:page", attempt: 1 }, "running"],
     [{ type: "reflexr:run_retrying", run_id: "run_1", attempt: 2 }, "retrying"],
     [{ type: "reflexr:run_dead_lettered", run_id: "run_1" }, "dead_lettered"],
-    [{ type: "reflexr:run_requeued", run_id: "run_1" }, "running"],
+    [{ type: "reflexr:run_requeued", run_id: "run_1" }, "pending"],
     [{ type: "reflexr:run_succeeded", run_id: "run_1" }, "succeeded"],
   ];
   const events: v1.EventFrame["event"][] = [];
@@ -89,4 +89,13 @@ test("feedback on a run is kept with it; on a firing, a chain or an unread run, 
     { actor: { kind: "system", name: "reflexr" }, type: "thumbs", value: { up: false } },
   ]);
   expect(state.runs.run_9).toBeUndefined();
+});
+
+test("a run is as new as its first attempt", () => {
+  const state = replay(
+    { type: "reflexr:run_started", run_id: "run_1", rule: "ops:page", attempt: 1 },
+    { type: "reflexr:run_retrying", run_id: "run_1", attempt: 1 },
+    { type: "reflexr:run_started", run_id: "run_1", rule: "ops:page", attempt: 2 },
+  );
+  expect(state.runs.run_1).toMatchObject({ attempt: 2, started: 1 });
 });

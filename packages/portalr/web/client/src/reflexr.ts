@@ -15,7 +15,15 @@ import type { Classified, Protocol, Stream } from "./stream";
 export interface Run {
   readonly id: string;
   readonly rule: string;
-  readonly status: "running" | "retrying" | "succeeded" | "dead_lettered" | "cancelled" | "skipped";
+  /** Queued for its next attempt (`pending`), running, waiting to retry, or how it ended. */
+  readonly status:
+    | "pending"
+    | "running"
+    | "retrying"
+    | "succeeded"
+    | "dead_lettered"
+    | "cancelled"
+    | "skipped";
   readonly attempt: number;
   /** How many times a person retried it: each retry starts its attempts again. */
   readonly retries: number;
@@ -89,13 +97,16 @@ const handlers: Readonly<Record<string, Handler>> = {
     const name = text(event, "rule");
     return withRule(state, name, { firings: (state.rules[name]?.firings ?? 0) + 1 });
   },
-  "reflexr:run_started": (state, event, envelope) =>
-    withRun(state, text(event, "run_id"), {
+  "reflexr:run_started": (state, event, envelope) => {
+    const id = text(event, "run_id");
+    return withRun(state, id, {
       rule: text(event, "rule"),
       status: "running",
       attempt: count(event, "attempt"),
-      started: envelope.seq,
-    }),
+      // Its first attempt's `seq`: a later attempt doesn't make the run newer.
+      started: state.runs[id]?.started || envelope.seq,
+    });
+  },
   "reflexr:run_retrying": (state, event) =>
     withRun(state, text(event, "run_id"), {
       status: "retrying",
@@ -103,7 +114,7 @@ const handlers: Readonly<Record<string, Handler>> = {
     }),
   "reflexr:run_requeued": (state, event) => {
     const id = text(event, "run_id");
-    return withRun(state, id, { status: "running", retries: (state.runs[id]?.retries ?? 0) + 1 });
+    return withRun(state, id, { status: "pending", retries: (state.runs[id]?.retries ?? 0) + 1 });
   },
   "reflexr:run_succeeded": ended("succeeded"),
   "reflexr:run_dead_lettered": ended("dead_lettered"),

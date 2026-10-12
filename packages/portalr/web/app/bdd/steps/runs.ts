@@ -12,6 +12,7 @@ async function token(request: APIRequestContext, person: string): Promise<string
   const signed = await request.post(`${origin()}/auth/v1/token?grant_type=password`, {
     data: { email: email(person), password: password(person) },
   });
+  expect(signed.ok()).toBe(true);
   return ((await signed.json()) as { access_token: string }).access_token;
 }
 
@@ -111,6 +112,10 @@ Then("its run shows {string}", async ({ page, scenario }, text: string) => {
 
 Then("their thread's turn is {string}", async ({ page, scenario }, status: string) => {
   await expect(turnOf(page, scenario.thread).getByRole("status")).toHaveText(status);
+});
+
+Then("their thread's turn has no Stop", async ({ page, scenario }) => {
+  await expect(turnOf(page, scenario.thread).getByRole("button", { name: "Stop" })).toHaveCount(0);
 });
 
 When("they stop their thread's turn", async ({ page, scenario }) => {

@@ -3,14 +3,12 @@
 The agent answers from a script, so the app's scenarios choose its path by the first word they
 post: ``ask`` makes it ask a question, ``publish`` makes it call a tool that waits for approval,
 ``propose`` makes it write a note of its own and propose an edit to it, which it names in its
-answer, so each scenario resolves a proposal of its own, and ``wait`` keeps its turn running for a
-while, for a scenario to stop. Anything else gets its words back. Each run streams, as every run
-does.
+answer, so each scenario resolves a proposal of its own, and ``wait`` keeps its turn running until
+it is stopped. Anything else gets its words back. Each run streams, as every run does.
 """
 
 import asyncio
 import re
-from datetime import timedelta
 
 from pydantic_ai import (
     Agent,
@@ -45,9 +43,6 @@ from grantr.core import Agent as AgentSubject
 from grantr.core import ServicePrincipal, Subject, User
 from grantr.grants import Grants
 
-WAIT = timedelta(seconds=30)
-"""How long a turn asked to wait keeps running: longer than a scenario takes to stop it."""
-
 CREATED = re.compile(r"^Done: (?P<note>\S+) is now at version")
 """What artifactr tells the agent when it has written a note: which note."""
 
@@ -80,7 +75,7 @@ async def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelRespons
         case ["ask"]:
             return ModelResponse(parts=[ToolCallPart("ask_user", {"question": "Which week?"})])
         case ["wait"]:
-            await asyncio.sleep(WAIT.total_seconds())
+            await asyncio.Event().wait()  # until someone stops the turn, which cancels it
             return ModelResponse(parts=[TextPart("Done waiting.")])
         case _:
             return ModelResponse(parts=[TextPart(f"You said: **{prompt}**")])

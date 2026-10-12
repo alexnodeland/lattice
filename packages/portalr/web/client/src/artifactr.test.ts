@@ -310,7 +310,7 @@ test("feedback on a message the store hasn't read has nowhere to go", () => {
   }
 });
 
-test("feedback on an artifact, and on a turn, is kept with it", () => {
+test("feedback on an artifact's version, and on a turn, is kept with it", () => {
   const thumbs = (target: Record<string, unknown>) => ({
     type: "feedback_given",
     feedback_type: "thumbs",
@@ -324,14 +324,33 @@ test("feedback on an artifact, and on a turn, is kept with it", () => {
     thumbs({ kind: "turn", run_id: "run_1" }),
     thumbs({ kind: "artifact", artifact_id: "plan_9", version: 1 }),
     thumbs({ kind: "turn", run_id: "run_9" }),
-    { type: "artifact_changed", artifact_id: "plan_1", kind: "plan", version: 2 },
   );
-  const given = [
-    { actor: { kind: "user", id: "alice" }, type: "thumbs", value: { up: true, comment: "Clear" } },
-  ];
-  // An artifact's feedback outlasts its changes; feedback on what the store hasn't read goes.
-  expect(state.artifacts.plan_1?.feedback).toEqual(given);
-  expect(state.runs.run_1?.feedback).toEqual(given);
+  const given = {
+    actor: { kind: "user", id: "alice" },
+    type: "thumbs",
+    value: { up: true, comment: "Clear" },
+  };
+  expect(state.artifacts.plan_1?.feedback).toEqual([{ ...given, version: 1 }]);
+  expect(state.runs.run_1?.feedback).toEqual([given]);
   expect(state.artifacts.plan_9).toBeUndefined();
   expect(state.runs.run_9).toBeUndefined();
+});
+
+test("each version of an artifact is judged anew: v1's thumbs aren't v3's", () => {
+  const thumbs = (version: number) => ({
+    type: "feedback_given",
+    feedback_type: "thumbs",
+    target: { kind: "artifact", artifact_id: "plan_1", version },
+    value: { up: true },
+  });
+  const state = replay(
+    { type: "artifact_created", artifact_id: "plan_1", kind: "plan", version: 1 },
+    thumbs(1),
+    { type: "artifact_changed", artifact_id: "plan_1", kind: "plan", version: 2 },
+    { type: "artifact_changed", artifact_id: "plan_1", kind: "plan", version: 3 },
+    thumbs(1), // late, for a version that has passed
+  );
+  expect(state.artifacts.plan_1).toMatchObject({ version: 3, feedback: [] });
+  const judged = apply(state, envelope(thumbs(3), 6));
+  expect(judged.artifacts.plan_1?.feedback).toHaveLength(1);
 });

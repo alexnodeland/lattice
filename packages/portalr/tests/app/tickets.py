@@ -66,15 +66,22 @@ def automation(grants: Grants, application: ServicePrincipal) -> tuple[Workspace
     """reflexr's workspaces, checked by grantr, and the reactor that runs their rules."""
 
     def subject(_tenant: str, _workspace: str | None, actor: Actor) -> Subject:
-        """Who grantr checks for a reflexr actor, as the template maps them."""
+        """Who grantr checks for a reflexr actor, as the template's ``reflexr_subject`` maps them,
+        less stored rules, which this application has none of: a person, and a client acting for
+        one, as them; a client with a key as its principal; the code rule's runs, and the
+        application's own system, as the application; any other agent as no one."""
         match actor:
             case UserActor():
                 return User(id=actor.id)
+            case ExternalAgentActor(on_behalf_of=None):
+                return ServicePrincipal(id=actor.client_id)
             case ExternalAgentActor(on_behalf_of=UserActor(id=person)):
                 return User(id=person)
-            case AgentActor() | SystemActor() | EvaluatorActor() | SourceActor():
-                return application  # the code rule's runs, and the application's own system
-            case _:
+            case AgentActor(rule=rule) if rule == TRIAGE.name:
+                return application
+            case SystemActor() | EvaluatorActor() | SourceActor():
+                return application
+            case _:  # an agent of no rule this application has holds nothing
                 return AgentSubject()
 
     hooks = grants.hooks(subject)

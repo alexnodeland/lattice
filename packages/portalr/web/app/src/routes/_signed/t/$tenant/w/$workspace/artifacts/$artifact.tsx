@@ -55,7 +55,11 @@ function Artifact() {
   const { tenant, workspace, artifact: id } = Route.useParams();
   const { queries, queryClient, user } = Route.useRouteContext();
   const me = useMe(queries, user, tenant);
-  const { data: allowed } = useSuspenseQuery(allowedIn(queries, tenant, workspace, ACTIONS));
+  const checks = useMemo(
+    () => allowedIn(queries, tenant, workspace, ACTIONS),
+    [queries, tenant, workspace],
+  );
+  const { data: allowed } = useSuspenseQuery(checks);
   const { data: revisions } = useSuspenseQuery(queries.artifactr.revisions(tenant, workspace, id));
   const stream = useStream();
   const snapshot = useWorkspace();
@@ -105,7 +109,12 @@ function Artifact() {
         <ArtifactContent kind={latest.kind} data={latest.data} renderers={RENDERERS} />
         {allowed.has("artifactr:give_feedback") && (
           <Thumbs
-            given={thumbs(snapshot.state.artifacts[id]?.feedback ?? [], me)}
+            given={thumbs(
+              (snapshot.state.artifacts[id]?.feedback ?? []).filter(
+                (given) => given.version === latest.version,
+              ),
+              me,
+            )}
             onThumbs={(up, comment) =>
               stream.send({
                 type: "give_feedback",

@@ -63,7 +63,7 @@ Clients then connect to `https://your-host/mcp/` with any MCP client that speaks
 
 ## Authorization
 
-The `authorize` hook `Workspaces` holds decides what a client may do, as it does for the router ([Authentication and authorization](serving.md#authentication-and-authorization)); the server takes no hook of its own ([ADR-0056](../adr/0056-access-asked-in-every-workspace-method.md)). Each tool calls `Workspace` methods, and each method asks the hook first, so a tool call is asked for opening the workspace (`artifactr:open`) and for each action it takes: `edit_text` for reading the artifact and editing it, `list_threads` for `artifactr:read_threads`. A resource read is asked for `artifactr:read_artifacts`, and so is each artifact a `subscriptions/listen` request names, when the stream opens.
+The `authorize` hook `Workspaces` holds decides what a client may do, as it does for the router ([Authentication and authorization](serving.md#authentication-and-authorization)); the server takes no hook of its own ([ADR-0056](../adr/0056-access-asked-in-every-workspace-method.md)). Each tool calls `Workspace` methods, and each method asks the hook first, so a tool call is asked for opening the workspace (`artifactr:open`) and for each action it takes: `edit_text` for reading the artifact and editing it, `list_threads` for `artifactr:read_threads`. `list_workspaces` names no workspace: it is asked for `artifactr:read_workspaces`, then for opening each workspace it finds, and lists those allowed. A resource read is asked for `artifactr:read_artifacts`, and so is each artifact a `subscriptions/listen` request names, when the stream opens.
 
 A refusal is a tool error carrying the message of REST's 403, such as `Error executing tool list_artifacts: artifactr:open is refused in this workspace`. A refused resource read fails with the same message, and so does a `subscriptions/listen` request that names a refused artifact ([Resources](#resources)). Listing the tools and the resource template names no workspace, so neither is asked. Without `authorize`, a client may do anything in every workspace of the tenant `resolve` returns.
 
@@ -83,10 +83,11 @@ The tools that change something:
 | `post_message(workspace_id, thread_id, content, kind="message")` | Posts a message in a thread, and says which run it started; a `notice` is for people, and starts no run |
 | `give_feedback(workspace_id, feedback_type, target, value=None)` | Gives feedback of an application's type on an artifact, thread, turn or message |
 
-Each also takes an optional `command_id` ([Retries](#retries)). The reads cover [REST](serving.md#rest)'s reads of artifacts, revisions, proposals, threads, runs and the log:
+Each also takes an optional `command_id` ([Retries](#retries)). The reads cover [REST](serving.md#rest)'s reads of workspaces, artifacts, revisions, proposals, threads, runs and the log:
 
 | Tool | Returns |
 |---|---|
+| `list_workspaces(after=None, limit=100)` | The workspaces of the client's tenant that it may open, one id per line, as `GET /v1/workspaces` lists them |
 | `list_artifacts(workspace_id, kind=None, include_archived=False)` | The workspace's artifacts, one per line, archived ones marked |
 | `read_artifact(workspace_id, artifact_id)` | An artifact's current version, rendered for agents |
 | `list_revisions(workspace_id, artifact_id)` | An artifact's revisions, oldest first, as JSON lines |

@@ -59,7 +59,9 @@ async def resolve_actor(connection: HTTPConnection) -> tuple[TenantId, Actor]:
 async def authorize(
     tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
 ) -> bool:
-    """Refuse everything in ``secret``, and everything but opening it in ``sealed``."""
+    """Refuse ``secret``, all but opening ``sealed``, and ``w2`` to Bob."""
+    if workspace_id == "w2" and actor.participant == "user:bob":
+        return False
     if workspace_id == "sealed":
         return access.action == "artifactr:open"
     return workspace_id != "secret"

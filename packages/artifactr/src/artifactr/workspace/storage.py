@@ -100,6 +100,8 @@ class Transaction(Protocol):
 class Storage(Protocol):
     """Persistence for workspaces. Every method is scoped to one tenant's workspace.
 
+    The exception is :meth:`workspaces`, which lists a tenant's.
+
     A caller can be cancelled at any await, by a stopped run, a timeout or a closed connection,
     so every method is cancel-safe: a cancelled caller leaves no lock or connection behind;
     cancellation may be deferred until the current statement ends. So a cancelled call may still
@@ -111,6 +113,22 @@ class Storage(Protocol):
 
     def transaction(self, scope: Scope) -> AbstractAsyncContextManager[Transaction]:
         """Begin a transaction that commits when the block exits normally."""
+        ...
+
+    async def workspaces(
+        self, tenant_id: TenantId, *, after: WorkspaceId | None = None, limit: int = 100
+    ) -> list[WorkspaceId]:
+        """Return a page of a tenant's workspaces, in the order of their ids.
+
+        A workspace is listed once its log has an event. Reading one, or keeping its cursors
+        or leases, does not list it. Ids are ordered as the storage orders strings, so one page
+        follows on from the last.
+
+        Args:
+            tenant_id: The tenant whose workspaces to list.
+            after: Only workspaces whose ids come after this one: the last of the previous page.
+            limit: At most this many.
+        """
         ...
 
     async def artifact(self, scope: Scope, artifact_id: ArtifactId) -> Versioned[Artifact] | None:

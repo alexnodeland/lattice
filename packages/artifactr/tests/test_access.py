@@ -1,11 +1,11 @@
 """The permission matrix (lattice RFC-0001, ADR-0056): every way in asks ``authorize``.
 
-Every public ``Workspace`` method is listed with the action it asks for, and every REST route,
-WebSocket command, and MCP tool and resource with the actions its caller is asked for, which
-are those of the methods it calls. Each is called with a hook that records what it is asked.
-A method or surface missing from the tables fails, as does one that asks for an action outside
-:data:`~artifactr.workspace.ACTIONS`, or one that asks for nothing. A surface that is open on
-purpose is listed with its reason, and asks nothing.
+Every public ``Workspace`` and ``Workspaces`` method is listed with what it asks for, and every
+REST route, WebSocket command, and MCP tool and resource with the actions its caller is asked
+for, which are those of the methods it calls. Each is called with a hook that records what it
+is asked. A method or surface missing from the tables fails, as does one that asks for an
+action outside :data:`~artifactr.workspace.ACTIONS`, or one that asks for nothing. A surface
+that is open on purpose is listed with its reason, and asks nothing.
 """
 
 import asyncio
@@ -46,6 +46,8 @@ from artifactr.workspace import ACTIONS, Access, InMemoryStorage, Workspace, Wor
 from tests.artifact_types import Note
 
 TENANT, WORKSPACE = "tenant", "w1"
+TENANT_WIDE = "artifactr:read_workspaces"
+"""The one action asked with no workspace."""
 ALICE = UserActor(id="alice", name="Alice")
 CLIENT = ExternalAgentActor(client_id="claude", on_behalf_of=ALICE)
 THREAD, RUN, ARTIFACT, PROPOSAL = "thr_1", "run_1", "n1", "prp_1"
@@ -61,7 +63,8 @@ class Recorder:
     async def __call__(
         self, tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
     ) -> bool:
-        assert (tenant_id, workspace_id) == (TENANT, WORKSPACE)
+        assert tenant_id == TENANT
+        assert workspace_id == (None if access.action == TENANT_WIDE else WORKSPACE)
         self.asked.append((actor.participant, access.action))
         return access.action not in self.refused
 
@@ -162,16 +165,25 @@ OPEN_METHODS = {
 """Public ``Workspace`` methods that ask for no action of their own, and why."""
 
 
-def _public_methods() -> set[str]:
+WORKSPACES_METHODS: dict[str, tuple[Callable[[Workspaces], Awaitable[object]], list[str]]] = {
+    "open": (lambda w: w.open(TENANT, WORKSPACE, actor=ALICE), ["artifactr:open"]),
+    "list": (lambda w: w.list(TENANT, actor=ALICE), [TENANT_WIDE, "artifactr:open"]),
+}
+"""Each public ``Workspaces`` method, a call of it, and what it asks for: listing asks to open
+each workspace it finds, here the one seeded."""
+
+
+def _public_methods(cls: type) -> set[str]:
     return {
         name
-        for name, member in inspect.getmembers(Workspace)
+        for name, member in inspect.getmembers(cls)
         if not name.startswith("_") and inspect.isfunction(member)
     }
 
 
 def test_every_public_method_is_listed() -> None:
-    assert _public_methods() == set(METHODS) | set(OPEN_METHODS)
+    assert _public_methods(Workspace) == set(METHODS) | set(OPEN_METHODS)
+    assert _public_methods(Workspaces) == set(WORKSPACES_METHODS)
 
 
 @pytest.mark.parametrize("method", sorted(METHODS))
@@ -183,6 +195,16 @@ async def test_each_method_asks_for_its_action_once(
     await call(ws)
     assert [action for _, action in recorder.asked] == [action]
     assert action in ACTIONS
+
+
+@pytest.mark.parametrize("method", sorted(WORKSPACES_METHODS))
+async def test_each_workspaces_method_asks_for_its_actions(
+    workspaces: Workspaces, recorder: Recorder, method: str
+) -> None:
+    await _seed(workspaces, recorder)
+    call, actions = WORKSPACES_METHODS[method]
+    await call(workspaces)
+    assert recorder.by(ALICE) == actions
 
 
 def _command_types() -> set[str]:
@@ -269,6 +291,11 @@ ROUTES: dict[tuple[str, str], tuple[str, list[str]]] = {
 """Each route, the id its path names last, if any, and what its caller is asked for after
 ``artifactr:open``."""
 
+TENANT_ROUTES: dict[tuple[str, str], list[str]] = {
+    ("GET", "/workspaces"): [TENANT_WIDE, "artifactr:open"],
+}
+"""Each route that names no workspace, and what its caller is asked for."""
+
 
 async def _resolve_actor(connection: HTTPConnection) -> tuple[TenantId, Actor]:
     return TENANT, ALICE
@@ -310,7 +337,10 @@ def _wait_for(check: Callable[[], bool]) -> None:
 def test_every_route_asks_for_the_actions_of_the_methods_it_calls(
     router: APIRouter, client: TestClient, recorder: Recorder
 ) -> None:
-    assert _routes(router) == set(ROUTES)
+    assert _routes(router) == set(ROUTES) | set(TENANT_ROUTES)
+    for (_, path), actions in TENANT_ROUTES.items():
+        assert client.get(path).json() == [WORKSPACE]
+        assert recorder.by(ALICE) == actions, path
     for (method, path), (last, actions) in ROUTES.items():
         url = path.replace("{workspace_id}", WORKSPACE)
         url = url[: url.rfind("{")] + last if last else url
@@ -394,6 +424,9 @@ TOOLS: dict[str, tuple[dict[str, Any], list[str]]] = {
 }
 """Each tool, arguments for it, and what its client is asked for after ``artifactr:open``."""
 
+TENANT_TOOLS: dict[str, list[str]] = {"list_workspaces": [TENANT_WIDE, "artifactr:open"]}
+"""Each tool that names no workspace, and what its client is asked for."""
+
 OPEN_MCP = {
     "tools/list": "names no workspace: it lists what the server offers",
     "resources/templates/list": "names no workspace: it lists the artifact resource's template",
@@ -418,7 +451,10 @@ async def test_every_tool_and_resource_asks_for_the_actions_of_the_methods_it_ca
 ) -> None:
     await _seed(workspaces, recorder)
     async with Client(mcp.server) as client:
-        assert {tool.name for tool in (await client.list_tools()).tools} == set(TOOLS)
+        assert {tool.name for tool in (await client.list_tools()).tools} == {
+            *TOOLS,
+            *TENANT_TOOLS,
+        }
         assert len((await client.list_resource_templates()).resource_templates) == 1
         async with client.listen(tools_list_changed=True):
             pass
@@ -436,6 +472,9 @@ async def test_every_tool_and_resource_asks_for_the_actions_of_the_methods_it_ca
             content = result.content[0]
             assert isinstance(content, TextContent)
             assert recorder.by(CLIENT) == ["artifactr:open", *actions], (tool, content.text)
+        for tool, actions in TENANT_TOOLS.items():
+            await client.call_tool(tool, {})
+            assert recorder.by(CLIENT) == actions, tool
         uri = artifact_uri(TENANT, WORKSPACE, ARTIFACT)
         await client.read_resource(uri)
         assert recorder.by(CLIENT) == ["artifactr:open", "artifactr:read_artifacts"]
@@ -451,6 +490,9 @@ async def test_every_tool_and_resource_asks_for_the_actions_of_the_methods_it_ca
 
 def test_the_catalog_is_every_action_asked_for_and_no_other() -> None:
     asked = {action for _, action in METHODS.values()}
+    asked |= {action for _, actions in WORKSPACES_METHODS.values() for action in actions}
+    asked |= {action for actions in TENANT_ROUTES.values() for action in actions}
+    asked |= {action for actions in TENANT_TOOLS.values() for action in actions}
     asked |= {action for _, actions in FRAMES.values() for action in actions}
     asked |= {action for _, actions in ROUTES.values() for action in actions}
     asked |= {action for _, actions in TOOLS.values() for action in actions}

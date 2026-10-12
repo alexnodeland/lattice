@@ -354,7 +354,7 @@ The run holds a thread claim, not a socket: if the connection that started it dr
 
 - **Scoped handles.** `await workspaces.open(tenant_id, workspace_id, actor=...)` returns a `Workspace` bound to that tenant, workspace and actor. Nothing below it accepts a raw tenant id, so a query that crosses tenants cannot be written. Postgres row-level security can be layered underneath as defence in depth.
 - **Actors are bound to handles.** `ws.as_actor(agent_actor)` returns a handle for the agent, and commits through it are attributed to the agent, and checked as it.
-- **Every method asks `authorize`.** `Workspaces(storage, authorize=, on_open=)` holds the hooks, and each `Workspace` method asks `authorize(tenant_id, workspace_id, actor, access)` before it reads or writes, with its action from `ACTIONS` ([ADR-0056](adr/0056-access-asked-in-every-workspace-method.md)). Opening a workspace asks `artifactr:open`, then calls `on_open`. The runner's own work, holding threads and keeping its cursors, asks as `SystemActor(name="runner")`. `tests/test_access.py`, the permission matrix, lists every method and surface with what it asks.
+- **Every method asks `authorize`.** `Workspaces(storage, authorize=, on_open=)` holds the hooks, and each `Workspace` method asks `authorize(tenant_id, workspace_id, actor, access)` before it reads or writes, with its action from `ACTIONS` ([ADR-0056](adr/0056-access-asked-in-every-workspace-method.md)). Opening a workspace asks `artifactr:open`, then calls `on_open`. `Workspaces.list` asks `artifactr:read_workspaces` with no workspace, then `artifactr:open` in each workspace it finds, and lists those allowed without opening them ([ADR-0058](adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md)). The runner's own work, holding threads and keeping its cursors, asks as `SystemActor(name="runner")`. `tests/test_access.py`, the permission matrix, lists every method and surface with what it asks.
 - **Type allowlist.** `Workspaces(storage, types=[Doc, Plan])` rejects creating any other artifact type, even one registered elsewhere in the process.
 - **Optimistic concurrency.** Every edit names the version it was based on. A stale edit is rejected with the changes made since, so the agent retries against fresh state and a UI can rebase or ask the person.
 - **One active run per thread**, enforced by `Workspace.claim_thread`: a storage lease with a time-to-live, renewed while held, that works across replicas and lapses if its holder dies. Concurrency happens across threads. A message sent during a run steers it instead of queueing, and one sent as the run ends is taken by the turn the run hands the thread over to. Each claim has a holder of its own.
@@ -389,7 +389,7 @@ pydantic-ai's AG-UI and Vercel AI adapters may be added later as compatibility s
 
 ## Storage protocols
 
-One protocol, `Storage`, covers everything a workspace persists ([ADR-0019](adr/0019-storage-protocol-and-workspace-handles.md)). Every method takes a `Scope` (tenant and workspace); `Workspace` handles hold the scope so application code never passes it.
+One protocol, `Storage`, covers everything a workspace persists ([ADR-0019](adr/0019-storage-protocol-and-workspace-handles.md)). Every method but `workspaces` takes a `Scope` (tenant and workspace); `Workspace` handles hold the scope so application code never passes it. `workspaces` lists a tenant's.
 
 ```python
 class Transaction(Protocol):
@@ -403,6 +403,9 @@ class Transaction(Protocol):
 
 class Storage(Protocol):
     def transaction(self, scope: Scope) -> AbstractAsyncContextManager[Transaction]: ...
+    async def workspaces(
+        self, tenant_id: TenantId, *, after: WorkspaceId | None = None, limit: int = 100
+    ) -> list[WorkspaceId]: ...
     async def read(
         self,
         scope: Scope,
@@ -421,6 +424,7 @@ class Storage(Protocol):
 ```
 
 - **Transactions serialize per workspace from the moment they begin**, so what a transaction loads cannot change before it saves. Writes are staged and applied atomically when the block exits normally; an exception rolls back entities, log and history together.
+- **A tenant's workspaces are those with an event in their logs,** a page at a time, ordered by id ([ADR-0058](adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md)). Reading a workspace, or keeping its cursors or leases, doesn't list it.
 - **Message ids are looked up by key.** `load` says whether each message id in `needs` is used, and `save` records a result's `messages` as used.
 - **`read` takes a window of the log** (`after_seq < seq < before_seq`), for some threads by `delivered_to`'s rule, and its first `limit` or last `last` envelopes, oldest first. Storage filters, so a tail read of a long log reads only its tail; `Workspace.read` refuses both `limit` and `last`.
 - **`subscribe(after_seq)` replays, then follows live**, on one iterator. Because a subscription starts from a `seq`, there is no gap to manage between history and live events. The WebSocket's replay, MCP notifications, the feedback mirror and a run's watcher follow the log this way; the notes a run starts with are a window `read`.
@@ -531,7 +535,7 @@ reflexr, the sibling library for event-driven agents, is released on its own, an
 | Convention | artifactr | reflexr |
 |---|---|---|
 | Tenancy | Tenants own workspaces; `workspaces.open(tenant, workspace, actor=)` | The same |
-| Authorization | `Workspaces(authorize=)`, asked with an `Access` in every `Workspace` method | The same, with the rule in `Access`, and no workspace for reads across a tenant |
+| Authorization | `Workspaces(authorize=)`, asked with an `Access` in every `Workspace` method, and no workspace for listing a tenant's | The same, with the rule in `Access`, and no workspace for reads across a tenant |
 | Log | One per workspace, envelopes with a gap-free `seq` and a `traceparent` | The same |
 | Actors | user, agent, external agent, system, evaluator | The same, plus source |
 | Types | `Artifact` subclasses registered by name | `Event` subclasses registered by name |

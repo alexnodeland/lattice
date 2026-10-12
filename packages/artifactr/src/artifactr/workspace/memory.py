@@ -26,9 +26,11 @@ from artifactr.core import (
     RunId,
     RunStatus,
     State,
+    TenantId,
     Thread,
     ThreadId,
     Versioned,
+    WorkspaceId,
     delivered_to,
 )
 from artifactr.core.actors import Actor
@@ -166,6 +168,19 @@ class InMemoryStorage:
             transaction.commit()
             async with data.appended:
                 data.appended.notify_all()
+
+    async def workspaces(
+        self, tenant_id: TenantId, *, after: WorkspaceId | None = None, limit: int = 100
+    ) -> list[WorkspaceId]:
+        """Return a page of a tenant's workspaces with an event in their logs, by id."""
+        found = sorted(
+            scope.workspace_id
+            for scope, data in self._workspaces.items()
+            if scope.tenant_id == tenant_id
+            and data.log
+            and (after is None or scope.workspace_id > after)
+        )
+        return found[:limit]
 
     async def artifact(self, scope: Scope, artifact_id: ArtifactId) -> Versioned[Artifact] | None:
         """Return an artifact's current version, or None."""

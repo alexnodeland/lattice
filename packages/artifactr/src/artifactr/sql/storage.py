@@ -39,9 +39,11 @@ from artifactr.core import (
     RunId,
     RunStatus,
     State,
+    TenantId,
     Thread,
     ThreadId,
     Versioned,
+    WorkspaceId,
     load_versioned,
 )
 from artifactr.core.actors import Actor
@@ -351,6 +353,22 @@ class SqlStorage:
         async with self._committed:
             self._heads[scope] = max(head, self._heads.get(scope, 0))
             self._committed.notify_all()
+
+    @_awaited_to_the_end
+    async def workspaces(
+        self, tenant_id: TenantId, *, after: WorkspaceId | None = None, limit: int = 100
+    ) -> list[WorkspaceId]:
+        """Return a page of a tenant's workspaces with an event in their logs, by id."""
+        query = (
+            select(WorkspaceRow.workspace_id)
+            .where(WorkspaceRow.tenant_id == tenant_id, WorkspaceRow.head_seq > 0)
+            .order_by(WorkspaceRow.workspace_id)
+            .limit(limit)
+        )
+        if after is not None:
+            query = query.where(WorkspaceRow.workspace_id > after)
+        async with self._sessions() as session:
+            return list(await session.scalars(query))
 
     async def artifact(self, scope: Scope, artifact_id: ArtifactId) -> Versioned[Artifact] | None:
         """Return an artifact's current version, or None."""

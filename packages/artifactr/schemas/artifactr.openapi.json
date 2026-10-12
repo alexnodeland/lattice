@@ -2707,6 +2707,68 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/workspaces": {
+      "get": {
+        "description": "Return a page of the caller's tenant's workspaces that the caller may open, by id.\n\nPass the last id as ``after`` for the next page; a page shorter than ``limit`` is the\nlast.",
+        "operationId": "list_workspaces_workspaces_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WorkspaceId"
+                  },
+                  "title": "Response List Workspaces Workspaces Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Workspaces"
+      }
+    },
     "/workspaces/{workspace_id}/artifacts": {
       "get": {
         "description": "List current artifacts, optionally of one kind.",

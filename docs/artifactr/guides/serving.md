@@ -40,7 +40,7 @@ The router needs no lifespan of its own, but the runner does. Keep one `Workspac
 
 ## Authentication and authorization
 
-Authentication is your application's. `resolve_actor` receives the `HTTPConnection` of each REST request, and of each WebSocket before it is accepted, and returns the tenant and the actor. It can read headers, cookies or query parameters; browsers cannot set headers on a WebSocket, so a cookie or a short-lived token in the query string is usual there. Raise `Unauthorized` to refuse: REST answers 401, and the WebSocket is closed with code 4401.
+Authentication is your application's. `resolve_actor` receives the `HTTPConnection` of each REST request, and of each WebSocket before it is accepted, and returns the tenant and the actor. It can read headers, cookies or query parameters; browsers cannot set headers on a WebSocket, so a cookie or a short-lived token in the query string is usual there. Raise `Unauthorized` to refuse: REST answers 401, and the WebSocket is closed with code 4401. Raise `Forbidden` for a caller who is signed in but may not be served, such as one outside the tenant it names: 403, and 4403. An `HTTPException` it raises answers with its status, and closes the WebSocket with 4000 and the status.
 
 The actor always comes from `resolve_actor`, never from the client's frames, so a client cannot act as someone else.
 
@@ -74,7 +74,7 @@ workspaces = Workspaces(storage, types=[Plan, Brief], authorize=authorize)
 router = artifactr_router(workspaces, runner, resolve_actor=resolve_actor)
 ```
 
-Every `Workspace` method asks it first, as the handle's actor ([ADR-0056](../adr/0056-access-asked-in-every-workspace-method.md)): opening the workspace is `artifactr:open`, a command is its type (`artifactr:edit_artifact`), and a read is `read_` and what it reads (`artifactr:read_artifacts`). So every REST request, every command on a WebSocket, every MCP tool call and every in-process call is asked, and none can be given a different hook. A refusal answers 403, closes a WebSocket that may not open the workspace or read its log with 4403, and answers a command on an open WebSocket with a `forbidden` result. Without `authorize`, any authenticated actor may do anything in any workspace of its own tenant.
+Every `Workspace` method asks it first, as the handle's actor ([ADR-0056](../adr/0056-access-asked-in-every-workspace-method.md)): opening the workspace is `artifactr:open`, a command is its type (`artifactr:edit_artifact`), and a read is `read_` and what it reads (`artifactr:read_artifacts`). So every REST request, every command on a WebSocket, every MCP tool call and every in-process call is asked, and none can be given a different hook. `GET /workspaces` lists the workspaces the caller may open: it asks `artifactr:read_workspaces` with no workspace, then `artifactr:open` in each ([ADR-0058](../adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md)). A refusal answers 403, closes a WebSocket that may not open the workspace or read its log with 4403, and answers a command on an open WebSocket with a `forbidden` result. Without `authorize`, any authenticated actor may do anything in any workspace of its own tenant.
 
 An agent's run acts for the person whose message or answer started it, in its `on_behalf_of`, and an MCP client a person connects with their own token acts for them, so a check can ask about the person ([ADR-0057](../adr/0057-a-turn-acts-for-one-author.md)). The runner's own work, holding a thread and keeping its place in the log, is asked as `SystemActor(name="runner")`.
 
@@ -86,6 +86,7 @@ Every path is relative to the router's prefix, `/v1` above:
 
 | Method and path | Purpose |
 |---|---|
+| `GET /workspaces?after=&limit=` | A page of the caller's tenant's workspaces that the caller may open, as an array of ids ordered by id. Pass the last as `after` for the next page; a page shorter than `limit` (100 by default) is the last |
 | `POST /workspaces/{workspace_id}/commands` | Submit one command frame; the response is its `command_result` |
 | `GET /workspaces/{workspace_id}/artifacts?kind=&include_archived=` | List current artifacts |
 | `GET /workspaces/{workspace_id}/artifacts/{artifact_id}` | One artifact's current version |

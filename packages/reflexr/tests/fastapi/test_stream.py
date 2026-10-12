@@ -104,7 +104,12 @@ def test_a_client_ahead_of_the_log_is_reset(client: TestClient) -> None:
 
 @pytest.mark.parametrize(
     ("path", "headers", "code"),
-    [(STREAM, {"x-token": "bad"}, 4401), ("/v1/workspaces/secret/stream", {}, 4403)],
+    [
+        (STREAM, {"x-token": "bad"}, 4401),
+        (STREAM, {"x-token": "unnamed"}, 4400),
+        (STREAM, {"x-token": "stranger"}, 4403),
+        ("/v1/workspaces/secret/stream", {}, 4403),
+    ],
 )
 def test_refused_connections_are_closed_with_a_reason(
     client: TestClient, path: str, headers: dict[str, str], code: int

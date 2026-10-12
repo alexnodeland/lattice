@@ -96,7 +96,9 @@ The storage does not own the engine: dispose of it when your application shuts d
 
 ## What a storage guarantees
 
-Every storage method takes a `Scope`, a tenant id and a workspace id: the unit of isolation, ordering and locking. The guarantees below are what the rest of the library relies on.
+Every storage method but one takes a `Scope`, a tenant id and a workspace id: the unit of isolation, ordering and locking. The guarantees below are what the rest of the library relies on.
+
+**A tenant's workspaces are listed by id.** `workspaces(tenant_id, after=None, limit=100)` returns a page of the ids of the tenant's workspaces whose logs have an event, ordered as the storage orders strings, after `after`. Reading a workspace, or keeping its cursors or leases, doesn't list it ([ADR-0058](../adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md)).
 
 **Transactions serialize per workspace from the moment they begin.** `storage.transaction(scope)` returns an async context manager for a `Transaction`. What a transaction loads cannot change before it saves, because no other transaction on that workspace runs meanwhile. Writes are applied atomically when the block exits normally, and an exception rolls back entities, log and history together. This is how `Workspace.commit` runs core's rules, slightly simplified:
 

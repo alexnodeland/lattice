@@ -281,6 +281,19 @@ class ArtifactrMcp:
         server = self.server
 
         @server.tool()
+        async def list_workspaces(ctx: Context, after: str | None = None, limit: int = 100) -> str:
+            """List the workspaces you may open, one id per line, ordered by id.
+
+            For the next page, pass the last id as ``after``. A page shorter than ``limit`` is
+            the last.
+            """
+            tenant_id, actor = await self._resolve(ctx)
+            found = await _tool(
+                self._workspaces.list(tenant_id, actor=actor, after=after, limit=limit)
+            )
+            return "\n".join(found) or "No workspaces."
+
+        @server.tool()
         async def list_artifacts(
             workspace_id: str, ctx: Context, kind: str | None = None, include_archived: bool = False
         ) -> str:

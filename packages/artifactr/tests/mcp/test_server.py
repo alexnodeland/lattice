@@ -376,7 +376,7 @@ async def test_authorize_decides_which_workspaces_a_client_may_use(
     try:
         async with Client(mcp.server) as client:
             served = {tool.name for tool in (await client.list_tools()).tools}
-            assert served == set(tools), "every tool names a workspace"
+            assert served == {*tools, "list_workspaces"}, "every tool but one names a workspace"
             for tool, args in tools.items():
                 error, text = await _call(client, tool, **{**args, "workspace_id": "secret"})
                 assert (error, text.endswith(FORBIDDEN)) == (True, True), tool
@@ -406,6 +406,36 @@ async def test_authorize_decides_which_workspaces_a_client_may_use(
     assert asked[-1] == ("tenant", "w1", "external_agent")
     assert await secret.head_seq() == head + 1, "the client wrote nothing"
     assert bus.events == [ResourceUpdated(uri=artifact_uri("tenant", "w1", "n3"))], "nor followed"
+
+
+async def test_a_client_lists_the_workspaces_it_may_open(
+    storage: InMemoryStorage, identity: Identity, gate: Gate
+) -> None:
+    async def authorize(
+        tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
+    ) -> bool:
+        return workspace_id != "secret"
+
+    guarded = Workspaces(storage, authorize=authorize)
+    for workspace_id in ("w2", "secret", "w1"):
+        await (await Workspaces(storage).open("tenant", workspace_id, actor=ALICE)).create_thread()
+    mcp = ArtifactrMcp(guarded, Runner(make_agent(Script()), app=gate), resolve=identity.resolve)
+
+    async def listed(**args: Any) -> tuple[bool, str]:
+        result = await client.call_tool("list_workspaces", args)
+        content = result.content[0]
+        assert isinstance(content, TextContent)
+        return result.is_error, content.text
+
+    async with Client(mcp.server) as client:
+        assert await listed() == (False, "w1\nw2")
+        assert await listed(after="w1") == (False, "w2")
+        assert await listed(limit=0) == (
+            True,
+            "Error executing tool list_workspaces: limit must be at least 1",
+        )
+        identity.tenant = "other"
+        assert await listed() == (False, "No workspaces.")
 
 
 async def test_changes_notify_resource_subscribers(

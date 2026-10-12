@@ -55,13 +55,20 @@ class AgentActor(BaseModel):
 
 
 class ExternalAgentActor(BaseModel):
-    """An agent outside reflexr, connected over MCP."""
+    """An agent outside reflexr, connected over MCP.
+
+    A person who connects a client with their own credentials acts through it: their actor is
+    its ``on_behalf_of``, and an application's ``authorize`` checks it as them, as artifactr's
+    does. A client with credentials of its own acts for no one.
+    """
 
     model_config = ConfigDict(frozen=True)
 
     kind: Literal["external_agent"] = "external_agent"
     client_id: str
     name: str | None = None
+    on_behalf_of: UserActor | None = None
+    """The person the client acts for, if it acts for one."""
 
     @property
     def participant(self) -> str:

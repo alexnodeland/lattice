@@ -162,5 +162,7 @@ class Automation:
             raise ToolError("connect over HTTP")
         principal = await self._verifier.authenticate(request)
         return principal.tenant_id, ExternalAgentActor(
-            client_id=principal.user_id, name=f"{principal.name} (MCP)"
+            client_id=principal.user_id,
+            name=f"{principal.name} (MCP)",
+            on_behalf_of=UserActor(id=principal.user_id, name=principal.name),
         )

@@ -42,9 +42,12 @@ test = [
     "pytest-timeout>=2.4",
 ]
 lint = ["ruff>=0.16", "pyright>=1.1.414"]
+# The acceptance tests' application (tests/app/), which its image serves.
+app = ["uvicorn>=0.54"]
 dev = [
     { include-group = "test" },
     { include-group = "lint" },
+    { include-group = "app" },
 ]
 
 # In lattice, grantr is the checkout's. A built wheel keeps the range in [project] alone.
@@ -58,8 +61,8 @@ build-backend = "uv_build"
 # ─── types ────────────────────────────────────────────────────────────────────
 
 [tool.pyright]
-include = ["src", "tests"]
-strict = ["src"]
+include = ["src", "tests", "scripts"]
+strict = ["src", "scripts"]
 typeCheckingMode = "standard"
 pythonVersion = "3.12"
 venvPath = "../.."

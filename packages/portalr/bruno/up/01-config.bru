@@ -1,0 +1,20 @@
+meta {
+  name: The UIs' configuration
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/portalr/config.json
+  body: none
+  auth: none
+}
+
+tests {
+  test("it names Supabase's publishable key, and every tool", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.supabase.key).to.equal("sb_publishable_test");
+    expect(res.body.readers.tempo).to.equal(true);
+    expect(res.body.surfaces.portalr).to.equal("/portalr/v1");
+  });
+}

@@ -1,0 +1,23 @@
+meta {
+  name: A member without a role is refused
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/portalr/v1/logs?start={{start}}&end={{end}}
+  body: none
+  auth: none
+}
+
+headers {
+  x-user: bob
+  x-tenant: acme
+}
+
+tests {
+  test("403, before any tool is asked", function () {
+    expect(res.status).to.equal(403);
+    expect(res.body.detail.type).to.equal("forbidden");
+  });
+}

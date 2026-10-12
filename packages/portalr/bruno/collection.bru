@@ -1,0 +1,6 @@
+docs {
+  portalr's routes, as its test application serves them at /portalr (lattice ADR-0015). The
+  application trusts the x-user header, so every request names its user. `moon run portalr:api`
+  starts it beside Tempo, Loki, Prometheus and prom-label-proxy, seeds two tenants' telemetry,
+  runs `up/` with every tool up, stops them, runs `down/`, then runs Schemathesis.
+}

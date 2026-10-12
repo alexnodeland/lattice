@@ -1,0 +1,25 @@
+meta {
+  name: An owner's traces
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/portalr/v1/traces?start={{start}}&end={{end}}
+  body: none
+  auth: none
+}
+
+headers {
+  x-user: alice
+  x-tenant: acme
+}
+
+tests {
+  test("acme's traces, read from Tempo", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal("ok");
+    expect(res.body.data.length).to.be.greaterThan(0);
+    bru.setVar("traceId", res.body.data[0].trace_id);
+  });
+}

@@ -1,0 +1,25 @@
+meta {
+  name: An owner's logs
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/portalr/v1/logs?start={{start}}&end={{end}}
+  body: none
+  auth: none
+}
+
+headers {
+  x-user: alice
+  x-tenant: acme
+}
+
+tests {
+  test("acme's logs, read from Loki, and only theirs", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal("ok");
+    expect(res.body.data.length).to.be.greaterThan(0);
+    res.body.data.forEach((line) => expect(line.line).not.to.contain("globex"));
+  });
+}

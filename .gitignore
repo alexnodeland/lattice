@@ -203,3 +203,6 @@ cython_debug/
 node_modules/
 # Vitest browser mode's failure screenshots
 .vitest/
+
+# portalr's built UIs, which its wheel carries
+packages/portalr/src/portalr/static/

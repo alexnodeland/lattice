@@ -1,0 +1,22 @@
+meta {
+  name: Another tenant's owner is refused
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/portalr/v1/traces?start={{start}}&end={{end}}
+  body: none
+  auth: none
+}
+
+headers {
+  x-user: carol
+  x-tenant: acme
+}
+
+tests {
+  test("403", function () {
+    expect(res.status).to.equal(403);
+  });
+}

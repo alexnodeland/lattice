@@ -1,0 +1,67 @@
+# portalr's acceptance stack (lattice ADR-0015): its test application, and the tools its readers
+# read, as stackr runs them, with stackr's own configurations. Langfuse and LiteLLM aren't here:
+# their reads are unavailable (portalr ADR-0011). `moon run portalr:api` runs it.
+#
+# Ports are the system's to pick, which scripts/api reads back.
+
+name: portalr
+
+services:
+  app:
+    profiles: [app]
+    build:
+      # lattice's root, which holds the one uv.lock.
+      context: ../..
+      dockerfile: packages/portalr/tests/app/Dockerfile
+    ports:
+      - "127.0.0.1::8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/portalr/config.json')"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      - tempo
+      - loki
+      - prom-label-proxy
+
+  tempo:
+    image: grafana/tempo:3.0.3
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ../stackr/deploy/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+    ports:
+      - "127.0.0.1::3200"
+      - "127.0.0.1::4318"
+    depends_on:
+      - prometheus
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-otlp-receiver
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ../stackr/deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1::9090"
+
+  prom-label-proxy:
+    image: quay.io/prometheuscommunity/prom-label-proxy:v0.15.1
+    command:
+      - -label=tenant_id
+      - -upstream=http://prometheus:9090
+      - -insecure-listen-address=0.0.0.0:8080
+    ports:
+      - "127.0.0.1::8080"
+    depends_on:
+      - prometheus
+
+  loki:
+    image: grafana/loki:3.7.8
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - ../stackr/deploy/loki/loki.yaml:/etc/loki/loki.yaml:ro
+    ports:
+      - "127.0.0.1::3100"

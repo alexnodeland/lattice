@@ -681,7 +681,7 @@ smoke_app() {
   app_files=()
   if [[ ${STACKR_RECIPE:-local} == host ]]; then
     hosting=host
-    app_files=(-f compose.yaml -f deploy/host/compose.prod.yaml)
+    app_files=(-f "$app_dir/compose.yaml" -f "$app_dir/deploy/host/compose.prod.yaml")
   fi
   if ! uv run copier copy --quiet --defaults --vcs-ref HEAD --data project_name="stackr smoke app" \
     --data libraries=both --data evals=true --data hosting=$hosting ../.. "$app_dir" 2>/dev/null ||

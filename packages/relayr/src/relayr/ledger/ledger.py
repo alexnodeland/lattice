@@ -1,13 +1,14 @@
 """The ledger port: relayr's own storage, beside the libraries'.
 
 For each followed workspace it keeps a cursor, the lease that lets one follower at a time follow
-it, and the envelopes the follower could not bridge. Every adapter passes the one contract test,
-`tests/ledger/test_contract.py`.
+it, and the envelopes the follower could not bridge. For the outbound adapter it keeps what
+caused each of its writes in artifactr: the reflexr run, so the follower continues its chain.
+Every adapter passes the one contract test, `tests/ledger/test_contract.py`.
 """
 
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import NamedTuple, Protocol
+from typing import Literal, NamedTuple, Protocol
 
 from pydantic import BaseModel, ConfigDict
 
@@ -43,6 +44,26 @@ class DeadLetter(BaseModel):
     """What went wrong: the exception's type and message."""
 
 
+type CauseKind = Literal["proposal", "artifact", "edit", "message", "turn"]
+"""What a cause is recorded by: a proposal's, a created artifact's or a message's id; an edited
+artifact's id and the version the edit makes, as `<id>@<version>`; or the id of an agent turn a
+message started."""
+
+
+class Cause(BaseModel):
+    """The reflexr run behind an artifactr write: what continues its causal chain."""
+
+    model_config = ConfigDict(frozen=True)
+
+    correlation_id: str
+    """The run's chain: the id of its first event."""
+
+    firing_id: str
+    run_id: str
+    depth: int
+    """The depth of the run's own events: one deeper than what made its rule fire."""
+
+
 class Ledger(Protocol):
     """Where followers keep their cursors, leases and dead letters."""
 
@@ -68,6 +89,16 @@ class Ledger(Protocol):
 
     async def dead_letters(self, workspace: WorkspaceKey) -> list[DeadLetter]:
         """Return the workspace's dead letters, in `seq` order."""
+        ...
+
+    async def record_cause(
+        self, workspace: WorkspaceKey, kind: CauseKind, key: str, cause: Cause
+    ) -> None:
+        """Record the run behind a write, by what the follower will find it by; the first kept."""
+        ...
+
+    async def cause(self, workspace: WorkspaceKey, kind: CauseKind, key: str) -> Cause | None:
+        """Return the run behind a write, or None if no run of a rule made it."""
         ...
 
     async def followed(self) -> list[WorkspaceKey]:

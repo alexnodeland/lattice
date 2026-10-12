@@ -20,8 +20,8 @@ from sqlalchemy import ColumnElement, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from relayr.ledger import Clock, DeadLetter, WorkspaceKey, utc_now
-from relayr.sql.tables import DeadLetterRow, FollowerRow
+from relayr.ledger import Cause, CauseKind, Clock, DeadLetter, WorkspaceKey, utc_now
+from relayr.sql.tables import CauseRow, DeadLetterRow, FollowerRow
 
 
 # Shared verbatim with artifactr's src/artifactr/sql/storage.py, reflexr's
@@ -89,6 +89,15 @@ class SqlLedger:
         self._sessions = async_sessionmaker(engine, expire_on_commit=False)
         self._clock = clock
 
+    async def _insert_once(self, row: CauseRow | DeadLetterRow) -> None:
+        """Insert a row, unless one with its key is there: the first is kept."""
+        async with self._sessions() as session:
+            session.add(row)
+            try:
+                await session.commit()
+            except IntegrityError:
+                await session.rollback()
+
     @_awaited_to_the_end
     async def acquire_lease(self, workspace: WorkspaceKey, holder: str, ttl: timedelta) -> bool:
         """Take or renew the workspace's lease for `ttl`. Return False if another holder has it."""
@@ -143,13 +152,7 @@ class SqlLedger:
     @_awaited_to_the_end
     async def dead_letter(self, workspace: WorkspaceKey, letter: DeadLetter) -> None:
         """Record an envelope the follower could not bridge; once per `seq`, the first kept."""
-        row = DeadLetterRow(**workspace._asdict(), **letter.model_dump())
-        async with self._sessions() as session:
-            session.add(row)
-            try:
-                await session.commit()
-            except IntegrityError:
-                await session.rollback()  # the envelope's first dead letter is kept
+        await self._insert_once(DeadLetterRow(**workspace._asdict(), **letter.model_dump()))
 
     @_awaited_to_the_end
     async def dead_letters(self, workspace: WorkspaceKey) -> list[DeadLetter]:
@@ -173,6 +176,29 @@ class SqlLedger:
                 )
                 for row in rows
             ]
+
+    @_awaited_to_the_end
+    async def record_cause(
+        self, workspace: WorkspaceKey, kind: CauseKind, key: str, cause: Cause
+    ) -> None:
+        """Record the run behind a write, by what the follower will find it by; the first kept."""
+        await self._insert_once(
+            CauseRow(**workspace._asdict(), kind=kind, key=key, **cause.model_dump())
+        )
+
+    @_awaited_to_the_end
+    async def cause(self, workspace: WorkspaceKey, kind: CauseKind, key: str) -> Cause | None:
+        """Return the run behind a write, or None if no run of a rule made it."""
+        async with self._sessions() as session:
+            row = await session.get(CauseRow, (*workspace, kind, key))
+        if row is None:
+            return None
+        return Cause(
+            correlation_id=row.correlation_id,
+            firing_id=row.firing_id,
+            run_id=row.run_id,
+            depth=row.depth,
+        )
 
     @_awaited_to_the_end
     async def followed(self) -> list[WorkspaceKey]:

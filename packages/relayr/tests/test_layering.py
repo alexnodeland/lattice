@@ -21,6 +21,10 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "ledger": ({"relayr.ledger"}, {"pydantic"}),
     "sql": ({"relayr.ledger", "relayr.sql"}, {"sqlalchemy", "alembic"}),
     "inbound": ({"relayr.events", "relayr.ledger", "relayr.inbound"}, LIBRARIES),
+    "outbound": (
+        {"relayr.events", "relayr.ledger", "relayr.outbound"},
+        {*LIBRARIES, "pydantic", "pydantic_ai"},
+    ),
 }
 
 

@@ -9,6 +9,7 @@ from relayr.ledger import InMemoryLedger, Ledger
 from relayr.sql import SqlLedger, create_schema
 from tests.clock import FakeClock
 from tests.databases import POSTGRES_URL, SQL_BACKENDS, empty_database
+from tests.stack import Stack
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -35,3 +36,12 @@ async def ledger(
     async with empty_database(request.param, tmp_path) as engine:
         await create_schema(engine)
         yield SqlLedger(engine, clock=clock)
+
+
+@pytest.fixture
+async def stack() -> AsyncIterator[Stack]:
+    """The storage processes share; every process's followers stop when the test ends."""
+    shared = Stack()
+    yield shared
+    for process in shared.processes:
+        await process.followers.aclose()

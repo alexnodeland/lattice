@@ -6,8 +6,6 @@ restart and a redelivery.
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable
-from dataclasses import dataclass, field
 from datetime import timedelta
 
 import pytest
@@ -19,137 +17,11 @@ import reflexr
 import reflexr.workspace as r
 from reflexr.core import Tick
 from relayr.events import BRIDGED, ArtifactCreated, MessagePosted, Projections
-from relayr.inbound import FOLLOWER, SOURCE, Followers
-from relayr.ledger import DeadLetter, InMemoryLedger, Ledger, WorkspaceKey
+from relayr.inbound import FOLLOWER, SOURCE
+from relayr.ledger import Cause, CauseKind, DeadLetter, InMemoryLedger, Ledger, WorkspaceKey
 from tests.app_types import Note
 from tests.clock import START, FakeClock
-
-type Access = artifactr.workspace.Access | r.Access
-
-TENANT, WORKSPACE = "acme", "prod"
-KEY = WorkspaceKey(TENANT, WORKSPACE)
-ALICE = a.UserActor(id="alice")
-TTL = timedelta(milliseconds=60)
-
-GREET = reflexr.Rule(
-    name="app:greet",
-    when=reflexr.on(MessagePosted).where(reflexr.F.author.kind.eq("user")),
-    then=reflexr.run("greet"),
-)
-
-
-@dataclass
-class Process:
-    """One process of an application: both libraries, the followers and a reactor."""
-
-    collaboration: artifactr.Workspaces
-    automation: r.Workspaces
-    followers: Followers
-    reactor: r.Reactor[None]
-
-    async def post(self, content: str) -> a.Recorded:
-        """Post a message as Alice, opening the workspace as people do."""
-        return await post(self.collaboration, content)
-
-
-async def post(collaboration: artifactr.Workspaces, content: str) -> a.Recorded:
-    """Post a message as Alice, in a thread of its own."""
-    workspace = await collaboration.open(TENANT, WORKSPACE, actor=ALICE)
-    thread = await workspace.create_thread()
-    return await workspace.post_message(thread.id, content)
-
-
-def at(outcome: a.Recorded | a.Applied | a.Proposed) -> int:
-    """Where in artifactr's log a command's last event is."""
-    assert outcome.seq is not None
-    return outcome.seq
-
-
-@dataclass
-class Stack:
-    """What outlives a process: the libraries' storage, and what the rule's runs did."""
-
-    artifactr_storage: artifactr.InMemoryStorage = field(default_factory=artifactr.InMemoryStorage)
-    reflexr_storage: r.InMemoryStorage = field(default_factory=r.InMemoryStorage)
-    greeted: list[str] = field(default_factory=list[str])
-    processes: list[Process] = field(default_factory=list[Process])
-
-    async def bridged(self) -> list[reflexr.Envelope]:
-        """The bridged envelopes in reflexr's log, read past the followers."""
-        reader = r.Workspaces(self.reflexr_storage)
-        workspace = await reader.open(TENANT, WORKSPACE, actor=reflexr.SystemActor())
-        return [e for e in await workspace.read() if e.event_type.startswith("artifactr:")]
-
-    async def log(self) -> list[a.Envelope]:
-        """artifactr's log, read past the followers."""
-        reader = artifactr.Workspaces(self.artifactr_storage)
-        return await (await reader.open(TENANT, WORKSPACE, actor=ALICE)).read()
-
-    def process(
-        self,
-        ledger: Ledger,
-        *,
-        holder: str = "p1",
-        projections: Projections | None = None,
-        events: tuple[type[reflexr.Event], ...] = BRIDGED,
-        save_every: int = 500,
-        authorize: r.Authorize | None = None,
-        artifactr_authorize: artifactr.workspace.Authorize | None = None,
-    ) -> Process:
-        async def on_open(tenant_id: str, workspace_id: str) -> None:
-            await bridge.watch(tenant_id, workspace_id)
-
-        async def greet(reaction: r.Reaction[None]) -> None:
-            [envelope] = reaction.events
-            self.greeted.append(envelope.event.model_dump()["content"])
-
-        collaboration = artifactr.Workspaces(
-            self.artifactr_storage, authorize=artifactr_authorize, on_open=on_open
-        )
-        automation = r.Workspaces(
-            self.reflexr_storage,
-            events=events,
-            rules=[GREET],
-            authorize=authorize,
-            on_open=on_open,
-        )
-        bridge = Followers(
-            collaboration,
-            automation,
-            ledger,
-            projections=projections,
-            holder=holder,
-            lease_ttl=TTL,
-            save_every=save_every,
-        )
-        reactor = r.Reactor(automation, actions={"greet": greet})
-        process = Process(collaboration, automation, bridge, reactor)
-        self.processes.append(process)
-        return process
-
-
-@pytest.fixture
-async def stack() -> AsyncIterator[Stack]:
-    """The storage processes share; every process's followers stop when the test ends."""
-    shared = Stack()
-    yield shared
-    for process in shared.processes:
-        await process.followers.aclose()
-
-
-async def until(check: Callable[[], Awaitable[bool]]) -> None:
-    for _ in range(300):
-        if await check():
-            return
-        await asyncio.sleep(0.01)
-    pytest.fail("it never happened")
-
-
-async def bridged(stack: Stack, count: int) -> None:
-    async def done() -> bool:
-        return len(await stack.bridged()) >= count
-
-    await until(done)
+from tests.stack import ALICE, KEY, TENANT, TTL, WORKSPACE, Access, Stack, at, bridged, post, until
 
 
 class Forgetful:
@@ -175,6 +47,14 @@ class Forgetful:
 
     async def dead_letters(self, workspace: WorkspaceKey) -> list[DeadLetter]:
         return await self._ledger.dead_letters(workspace)
+
+    async def record_cause(
+        self, workspace: WorkspaceKey, kind: CauseKind, key: str, cause: Cause
+    ) -> None:
+        await self._ledger.record_cause(workspace, kind, key, cause)
+
+    async def cause(self, workspace: WorkspaceKey, kind: CauseKind, key: str) -> Cause | None:
+        return await self._ledger.cause(workspace, kind, key)
 
     async def followed(self) -> list[WorkspaceKey]:
         return await self._ledger.followed()

@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 
-from relayr.ledger import DeadLetter, Ledger, WorkspaceKey
+from relayr.ledger import Cause, DeadLetter, Ledger, WorkspaceKey
 from tests.clock import FakeClock
 
 PROD = WorkspaceKey("acme", "prod")
@@ -82,3 +82,18 @@ async def test_dead_letters_are_kept_once_per_seq_in_order(ledger: Ledger) -> No
     assert await ledger.dead_letters(PROD) == [letter(2), letter(7)]
     assert await ledger.dead_letters(STAGING) == [letter(1)]
     assert await ledger.dead_letters(OTHER) == []
+
+
+CAUSE = Cause(correlation_id="evt_1", firing_id="fir_1", run_id="fir_1", depth=1)
+
+
+async def test_a_cause_is_kept_once_per_key(ledger: Ledger) -> None:
+    later = CAUSE.model_copy(update={"run_id": "fir_2"})
+    await ledger.record_cause(PROD, "message", "7", CAUSE)
+    await ledger.record_cause(PROD, "message", "7", later)
+    await ledger.record_cause(PROD, "proposal", "7", later)
+    assert await ledger.cause(PROD, "message", "7") == CAUSE
+    assert await ledger.cause(PROD, "proposal", "7") == later
+    assert await ledger.cause(PROD, "turn", "7") is None
+    assert await ledger.cause(STAGING, "message", "7") is None
+    assert await ledger.followed() == [], "a cause follows no workspace"

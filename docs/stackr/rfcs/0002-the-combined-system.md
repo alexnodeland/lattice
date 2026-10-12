@@ -4,7 +4,7 @@
 **Author:** Alex Nodeland
 **Created:** 2026-09-29
 **Discussion:** [#30](https://github.com/alexnodeland/stackr/pull/30), from [issue #8](https://github.com/alexnodeland/stackr/issues/8); accepted on 2026-09-29, with the decisions in [Decision points](#decision-points)
-**Amended by:** [relayr ADR-0016](../../relayr/adr/0016-followers-start-on-open.md): followers start through the libraries' `on_open` hook, not `authorize`
+**Amended by:** [relayr ADR-0016](../../relayr/adr/0016-followers-start-on-open.md): followers start through the libraries' `on_open` hook, not `authorize`; [relayr ADR-0021](../../relayr/adr/0021-chains-continue-across-the-bridge.md): the run behind each write is recorded before it, by ids on its envelope, and a rule's turn is traced from its start
 **Siblings:**
 
 - [reflexr ADR-0003][r-adr-0003] keeps the libraries independent and leaves the adapters between them to this system. [artifactr ADR-0032][a-adr-0032] makes it an application built from stackr's template.
@@ -405,7 +405,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 - [x] Implement reflexr #45 (reflexr #83): event types and rule names are `namespace:name`, so relayr's bridged types are `artifactr:<type>` and its rules are qualified too
 - [x] File the prerequisite issues: artifactr [#60][a-60], [#61][a-61], [#62][a-62] and [#63][a-63], and reflexr [#72][r-72]
 - [x] Phase 1: inbound adapter, in relayr ([relayr RFC-0001](../../relayr/rfcs/0001-v0.1-implementation-plan.md)); its followers start from `on_open`, which lattice RFC-0001 made for this, not from `authorize` ([relayr ADR-0016](../../relayr/adr/0016-followers-start-on-open.md))
-- [ ] Phase 2: outbound adapter and loop control
+- [x] Phase 2: outbound adapter and loop control, in relayr; messages are idempotent by id in artifactr, so there is no read-back, and the run behind each write is recorded before it ([relayr ADR-0019](../../relayr/adr/0019-runs-act-once-through-derived-ids-and-keyed-edits.md), [ADR-0021](../../relayr/adr/0021-chains-continue-across-the-bridge.md))
 - [ ] Phase 3: template option, example and smoke test
 - [ ] Phase 4: telemetry links and tags
 - [ ] Phase 5: rules from chat

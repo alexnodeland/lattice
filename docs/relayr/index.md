@@ -12,13 +12,13 @@ hide:
 ![relayr](assets/brand/lockup-light.svg#gh-light-mode-only)
 ![relayr](assets/brand/lockup-dark.svg#gh-dark-mode-only)
 
-The bridge between artifactr and reflexr: events from chats and artifacts become events for rules, and runs will act back in the chat as proposals and notices.
+The bridge between artifactr and reflexr: events from chats and artifacts become events for rules, and runs act back in the chat as proposals and notices.
 
 </div>
 
-!!! note "Inbound only, so far"
+!!! note "Both adapters built"
 
-    relayr's inbound adapter is built: artifactr's events reach reflexr, exactly once. The rest below is what the [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)'s later phases build. It is distributed as `relayr-ai`, since the name `relayr` on PyPI is an unrelated project, and imported as `relayr`.
+    relayr's inbound and outbound adapters are built: artifactr's events reach reflexr exactly once, and rules' runs act back in artifactr once however often they are retried, in chains that stop at reflexr's depth limit. The rest below is what the [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)'s later phases build. It is distributed as `relayr-ai`, since the name `relayr` on PyPI is an unrelated project, and imported as `relayr`.
 
 ## Why: one bridge, built once
 
@@ -29,8 +29,8 @@ An application can mount [artifactr](../artifactr/index.md) and [reflexr](../ref
 ## What it does, and will do
 
 - **Inbound: chats and artifacts become events (built).** One follower per workspace, with a lease, a cursor and dead letters, publishes selected artifactr events into reflexr under the `artifactr` namespace, such as `artifactr:message_posted`, `artifactr:artifact_changed` and `artifactr:proposal_resolved`, so that a message fires a rule exactly once, across a restart and a redelivery ([ADR-0006](adr/0006-bridged-types-in-the-artifactr-namespace.md), [the guide](guides/inbound.md)).
-- **Outbound: runs act as participants.** A pydantic-ai capability and helpers let a run act in artifactr as its rule's own external agent, `reflexr:<rule>`, so artifactr's rules apply to it: under a `propose` write policy its edits are proposals, and relayr never resolves one ([ADR-0002](adr/0002-the-outbound-actor-an-external-agent-per-rule.md)).
-- **Notices by default.** A rule's messages start no turn in the thread, unless the rule's allowlist grants it ([ADR-0007](adr/0007-notices-by-default.md)).
+- **Outbound: runs act as participants (built).** A pydantic-ai capability and helpers let a run act in artifactr as its rule's own external agent, `reflexr:<rule>`, so artifactr's rules apply to it: under a `propose` write policy its edits are proposals, and relayr never resolves one ([ADR-0002](adr/0002-the-outbound-actor-an-external-agent-per-rule.md)).
+- **Notices by default (built).** A rule's messages start no turn in the thread, unless the rule's allowlist grants it ([ADR-0007](adr/0007-notices-by-default.md)).
 - **Chains and sessions kept apart, and linked.** A thread is never a causal chain, and a chain never joins a thread's session or model history; traces are linked, and Langfuse sessions tagged, across the two ([ADR-0003](adr/0003-a-thread-is-never-a-chain.md), [ADR-0004](adr/0004-sessions-linked-not-continued.md)).
 - **Rules from chat.** A rule drafted in a thread is a `rule` artifact, reviewed as a proposal, and goes live in reflexr's stored rules only when a person accepts it, with provenance recorded both ways ([ADR-0005](adr/0005-where-a-rules-source-of-truth-lives.md)).
 - **Evaluation.** Proposal outcomes become feedback on the runs that proposed them, with measures of acceptance, rewrites and time to resolution.
@@ -43,6 +43,7 @@ An application can mount [artifactr](../artifactr/index.md) and [reflexr](../ref
 | If you want to | Read |
 |---|---|
 | Bridge artifactr's events into reflexr | [Bridging artifactr into reflexr](guides/inbound.md) |
+| Let rules act in artifactr | [Acting in artifactr from rules](guides/outbound.md) |
 | See how it works | The [architecture](architecture.md), and the [API reference](reference.md) |
 | Understand why each part will be the way it is | The [decision records](adr/README.md) |
 | See the plan, its phases and what each waits on | [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and the [RFCs](rfcs/README.md) |

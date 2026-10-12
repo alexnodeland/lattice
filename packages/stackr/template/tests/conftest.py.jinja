@@ -2,13 +2,18 @@
 
 No test needs the stack or the network. Tokens are signed in the test with a secret (or a key)
 the verifier is given; the agents' model is a :class:`Script` that answers each request with its
-next step; workspaces live in memory, or in SQLite.
+next step; workspaces live in memory, or in SQLite.{% if access == 'grantr' %} grantr lives in memory too, with acme, owned by
+alice, with bob its admin, and initech and globex, owned by carol.{% endif %}
 """
 
 import asyncio
+import contextlib
 import socket
 import time
 from collections.abc import AsyncIterator, Callable, Iterator
+{%- if access == 'grantr' %}
+from concurrent.futures import ThreadPoolExecutor
+{%- endif %}
 {%- if use_reflexr %}
 from datetime import timedelta
 {%- endif %}
@@ -21,14 +26,30 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic_ai import ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
+from starlette.requests import HTTPConnection
 
-from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.agent import function_model
-
+{% if use_artifactr -%}
+from artifactr.agent import function_model
+{% endif -%}
+{% if access == 'grantr' -%}
+from grantr import Grants, InMemoryStorage
+{% endif -%}
+{% if not use_artifactr -%}
+from reflexr.agent import function_model
+{% endif %}
+{% if access == 'grantr' -%}
+from {{ package_name }}.access import build_grants
+{% endif -%}
 from {{ package_name }}.app import create_app
+from {{ package_name }}.auth import Principal, Unauthenticated
 from {{ package_name }}.settings import AuthSettings, GatewaySettings, Settings
 
 SECRET = "a-secret-for-the-tests-at-least-32-characters-long"
 TENANT = "acme"
+{%- if access == 'grantr' %}
+OTHER = "initech"
+"""carol's tenant, which no one else is in."""
+{%- endif %}
 TENANT_KEY = "sk-acme-key"
 {%- if use_reflexr %}
 
@@ -42,13 +63,16 @@ TRIAGE = "{{ package_name }}:triage"
 def token(
     user: str = "alice",
     *,
+{%- if access != 'grantr' %}
     tenant: str | None = TENANT,
+{%- endif %}
     audience: str = "authenticated",
     expires_in: int = 3600,
     secret: str = SECRET,
     **claims: Any,
 ) -> str:
-    """An HS256 access token, like one Supabase Auth issues on its legacy JWT secret."""
+    """An HS256 access token, like one Supabase Auth issues on its legacy JWT secret{% if access == 'grantr' %}: who, never
+    where{% endif %}."""
     payload: dict[str, Any] = {
         "sub": user,
         "aud": audience,
@@ -56,14 +80,26 @@ def token(
         "email": f"{user}@example.com",
         **claims,
     }
+{%- if access != 'grantr' %}
     if tenant is not None:
         payload["app_metadata"] = {"provider": "email", "tenant_id": tenant}
+{%- endif %}
     return jwt.encode(payload, secret, algorithm="HS256")
 
 
 def bearer(user: str = "alice", *, tenant: str = TENANT) -> dict[str, str]:
+{%- if access == 'grantr' %}
+    """The headers of a user's requests in a tenant: their token, and the tenant's name."""
+    return {"Authorization": f"Bearer {token(user)}", "X-Tenant": tenant}
+{%- else %}
     """The Authorization header of a user of a tenant."""
     return {"Authorization": f"Bearer {token(user, tenant=tenant)}"}
+{%- endif %}
+
+
+async def nobody(connection: HTTPConnection) -> Principal:
+    """Authenticates no one: for parts whose tests never make a request."""
+    raise Unauthenticated("no one is signed in")
 
 
 def say(text: str) -> ModelResponse:
@@ -106,8 +142,29 @@ def settings(**gateway: Any) -> Settings:
     )
 
 
+{%- if access == 'grantr' %}
+
+
+async def _seed(grants: Grants) -> None:
+    await grants.provision_tenant(TENANT, owner="alice", admins=["bob"])
+    await grants.provision_tenant(OTHER, owner="carol")
+    await grants.provision_tenant("globex", owner="carol")
+
+
+def seeded() -> Grants:
+    """grantr in memory, with acme, initech and globex; seeded in a thread, from any test."""
+    grants = build_grants(InMemoryStorage(), name=Settings().service_name)
+    with ThreadPoolExecutor(1) as thread:
+        thread.submit(asyncio.run, _seed(grants)).result()
+    return grants
+{%- endif %}
+
+
 def app(script: Script, config: Settings | None = None, **options: Any) -> FastAPI:
     """The application over a scripted model."""
+{%- if access == 'grantr' %}
+    options.setdefault("grants", seeded())
+{%- endif %}
 {%- if use_reflexr %}
     options.setdefault("poll_interval", timedelta(milliseconds=10))
 {%- endif %}
@@ -134,18 +191,25 @@ def client(script: Script) -> Iterator[TestClient]:
         yield client
 
 
-@pytest.fixture
-async def server(script: Script) -> AsyncIterator[str]:
-    """Serve the application on a free port in this event loop, and return its URL."""
+@contextlib.asynccontextmanager
+async def serving(application: FastAPI) -> AsyncIterator[str]:
+    """Serve an application on a free port in this event loop, and give its URL."""
     listener = socket.socket()
     listener.bind(("127.0.0.1", 0))
-    config = uvicorn.Config(app(script), ws="websockets-sansio", log_level="warning")
+    config = uvicorn.Config(application, ws="websockets-sansio", log_level="warning")
     served = uvicorn.Server(config)
-    serving = asyncio.create_task(served.serve(sockets=[listener]))
+    task = asyncio.create_task(served.serve(sockets=[listener]))
     for _ in range(3000):  # thirty seconds at most
         if served.started:
             break
         await asyncio.sleep(0.01)
     yield f"http://127.0.0.1:{listener.getsockname()[1]}"
     served.should_exit = True
-    await serving
+    await task
+
+
+@pytest.fixture
+async def server(script: Script) -> AsyncIterator[str]:
+    """Serve the application on a free port in this event loop, and return its URL."""
+    async with serving(app(script)) as url:
+        yield url

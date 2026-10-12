@@ -1,0 +1,263 @@
+"""Access, with grantr: who may do what, in which tenant.
+
+Supabase Auth says who a person is, and grantr what they may do. A request names its tenant, in
+the ``X-Tenant`` header or, on a WebSocket, the ``tenant`` query parameter; a user who is a member
+of one tenant may leave it out. A service principal's key, sent in place of a token, belongs to
+one tenant, and names it. The libraries ask grantr before every command and read, through the
+``authorize`` hook of each part's ``Workspaces``.
+
+- ``/grantr/v1``: grantr's admin API, and ``/me`` and ``/checks`` for the UIs
+
+``python -m {{ package_name }}.access`` prints every role against every action (``make
+access-matrix``), which ``access.md`` holds and a test compares.
+"""
+
+import contextlib
+import sys
+from collections.abc import AsyncGenerator
+from typing import Final
+
+from fastapi import FastAPI
+from sqlalchemy.ext.asyncio import AsyncEngine
+from starlette.requests import HTTPConnection
+
+{% if use_artifactr -%}
+import artifactr.core as artifactr
+from artifactr.workspace import ACTIONS as ARTIFACTR_ACTIONS
+{% endif -%}
+from grantr import (
+    Agent,
+    Grants,
+    InMemoryStorage,
+{%- if use_reflexr %}
+    RulePrincipal,
+{%- endif %}
+    ServicePrincipal,
+    Storage,
+    Subject,
+    User,
+)
+from grantr.fastapi import Caller, Unauthorized, grantr_router
+from grantr.sql import SqlStorage, migrate
+from grantr.testing import matrix
+{%- if use_reflexr %}
+from reflexr import core as reflexr
+from reflexr.workspace import ACTIONS as REFLEXR_ACTIONS
+{%- endif %}
+
+from {{ package_name }}.auth import (
+    Person,
+    Principal,
+    TokenVerifier,
+    Unauthenticated,
+    bearer_token,
+)
+from {{ package_name }}.telemetry import TelemetryHandle
+{%- if use_reflexr %}
+from {{ package_name }}.tickets import RULES
+{%- endif %}
+
+PREFIX = "/grantr"
+
+KEY_PREFIX: Final = "grantr_sk_"
+"""How a service principal's key begins, where a token would be."""
+
+{% if use_reflexr -%}
+CODE_RULES: Final = frozenset(rule.name for rule in RULES)
+"""The rules defined here, in code, whose runs act as the application."""
+
+{% endif -%}
+CATALOGS: Final = [{% if use_artifactr %}ARTIFACTR_ACTIONS{% endif %}{% if libraries == 'both' %}, {% endif %}{% if use_reflexr %}REFLEXR_ACTIONS{% endif %}]
+"""The libraries' catalogs, which grantr's roles are made of."""
+
+
+class Refused(Exception):
+    """A signed-in caller a request can't be served for, with the HTTP status to answer.
+
+    Args:
+        status: 400, when the request must name its tenant and doesn't; 403, when the caller
+            isn't in the tenant it names.
+        message: Why.
+    """
+
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+def build_grants(
+    storage: Storage, *, name: str, telemetry: TelemetryHandle | None = None
+) -> Grants:
+    """Make grantr over a storage, with the libraries' catalogs, for the application ``name``.
+
+    The application's own service principal is named after it, and holds the ``application``
+    role once :meth:`Access.lifespan` has started.
+    """
+    return Grants(
+        storage,
+        catalogs=CATALOGS,
+        application=ServicePrincipal(id=name),
+        tracer_provider=telemetry.tracer_provider if telemetry else None,
+        meter_provider=telemetry.meter_provider if telemetry else None,
+    )
+
+
+class Access:
+    """grantr in the application: its storage, its admin API, and who each request is.
+
+    Args:
+        name: The application's name, which its own service principal takes.
+        verifier: Verifies access tokens.
+        engine: The database; without one, grants live in memory.
+        grants: grantr itself, when the caller has built it, as the tests do.
+        telemetry: OpenTelemetry.
+    """
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        verifier: TokenVerifier,
+        engine: AsyncEngine | None = None,
+        grants: Grants | None = None,
+        telemetry: TelemetryHandle | None = None,
+    ) -> None:
+        self._verifier = verifier
+        self.application = ServicePrincipal(id=name)
+        """The application's own service principal: its runner, reactor, mirrors and rules."""
+        storage = SqlStorage(engine) if engine else InMemoryStorage()
+        self.grants = grants or build_grants(storage, name=name, telemetry=telemetry)
+
+    async def migrate(self, engine: AsyncEngine) -> None:
+        """Upgrade the database to grantr's schema."""
+        await migrate(engine)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(self) -> AsyncGenerator[None]:
+        """Grant the application's own principal its role, the first time it starts."""
+        await self.grants.bootstrap()
+        yield
+
+    def mount(self, app: FastAPI) -> None:
+        """Add grantr's admin API to the application."""
+        router = grantr_router(self.grants, resolve_actor=self._caller)
+        app.include_router(router, prefix=f"{PREFIX}/v1")
+
+    async def identify(self, connection: HTTPConnection) -> Person | tuple[str, ServicePrincipal]:
+        """Who a request comes from: a person, by their token; or a key's tenant and principal.
+
+        Raises:
+            Unauthenticated: If it carries neither a valid token nor a valid key, or a key
+                anywhere but its ``Authorization`` header.
+        """
+        credential = bearer_token(connection)
+        if not credential.startswith(KEY_PREFIX):
+            return await self._verifier.verify(credential)
+        if not connection.headers.get("authorization", "").strip().endswith(credential):
+            # A URL ends up in logs: a key, which lasts, goes in its header only.
+            raise Unauthenticated("a key goes in the Authorization header")
+        found = await self.grants.authenticate(credential)
+        if found is None:
+            raise Unauthenticated("the key is not valid")
+        return found
+
+    async def authenticate(self, connection: HTTPConnection) -> Principal:
+        """Who a request comes from, and the tenant it names, which they must be in.
+
+        Raises:
+            Unauthenticated: If it carries neither a valid token nor a valid key.
+            Refused: If it names no tenant and its user is in several (400); or its user is in
+                none, or it names a tenant its caller isn't in (403).
+        """
+        who = await self.identify(connection)
+        named = connection.headers.get("x-tenant") or None
+        if connection.scope["type"] == "websocket":
+            named = named or connection.query_params.get("tenant") or None
+        if isinstance(who, tuple):
+            tenant, principal = who
+            if named and named != tenant:
+                raise Refused(403, "this key is for another tenant")
+            return Principal(
+                tenant_id=tenant, user_id=principal.id, name=principal.id, service=True
+            )
+        if named is None:
+            memberships = await self.grants.memberships(who.user_id)
+            if not memberships:
+                raise Refused(403, f"{who.name} isn't a member of any tenant")
+            if len(memberships) > 1:
+                raise Refused(400, "name the tenant with X-Tenant")
+            named = memberships[0].tenant
+        if await self.grants.member(named, who.user_id) is None:
+            raise Refused(403, f"{who.name} isn't a member of {named}")
+        return Principal(tenant_id=named, user_id=who.user_id, name=who.name)
+{%- if use_artifactr %}
+
+    def artifactr_subject(
+        self, _tenant: str, _workspace: str | None, actor: artifactr.Actor
+    ) -> Subject:
+        """Who grantr checks for an artifactr actor: the person a run or client acts for."""
+        match actor:
+            case artifactr.UserActor():
+                return User(id=actor.id)
+            case artifactr.ExternalAgentActor(on_behalf_of=person):
+                return (
+                    ServicePrincipal(id=actor.client_id) if person is None else User(id=person.id)
+                )
+            case artifactr.AgentActor(on_behalf_of=acting):
+                if acting is None:
+                    return Agent()
+                return self.artifactr_subject(_tenant, _workspace, acting)
+            case artifactr.SystemActor() | artifactr.EvaluatorActor():
+                return self.application
+            case _:  # an actor this application doesn't know holds nothing
+                return Agent()
+{%- endif %}
+{%- if use_reflexr %}
+
+    def reflexr_subject(
+        self, _tenant: str, _workspace: str | None, actor: reflexr.Actor
+    ) -> Subject:
+        """Who grantr checks for a reflexr actor.
+
+        A person, and a client acting for one, is checked as them; a client with a key as its
+        principal; a stored rule's run as the rule. The rest runs in the application, and is
+        checked as its principal: its code rules, its system and evaluators, and the sources it
+        runs, which publish in process, such as relayr's bridge from artifactr. An actor it
+        doesn't know holds nothing.
+        """
+        match actor:
+            case reflexr.UserActor():
+                return User(id=actor.id)
+            case reflexr.ExternalAgentActor(on_behalf_of=person):
+                return (
+                    ServicePrincipal(id=actor.client_id) if person is None else User(id=person.id)
+                )
+            case reflexr.AgentActor(rule=rule) if rule in CODE_RULES:
+                return self.application
+            case reflexr.AgentActor(rule=rule) if _workspace is not None:
+                return RulePrincipal(workspace=_workspace, rule=rule)
+            case reflexr.SystemActor() | reflexr.EvaluatorActor() | reflexr.SourceActor():
+                return self.application
+            case _:  # an actor this application doesn't know holds nothing
+                return Agent()
+{%- endif %}
+
+    async def _caller(self, connection: HTTPConnection) -> Caller:
+        """The caller of grantr's admin API: a person, or a key bound to its tenant."""
+        try:
+            who = await self.identify(connection)
+        except Unauthenticated as error:
+            raise Unauthorized(str(error)) from error
+        if isinstance(who, tuple):
+            tenant, principal = who
+            return Caller(principal, tenant)
+        return Caller(User(id=who.user_id))
+
+
+def main() -> None:
+    """Print every role against every action in the libraries' catalogs."""
+    sys.stdout.write(matrix(CATALOGS))
+
+
+if __name__ == "__main__":
+    main()

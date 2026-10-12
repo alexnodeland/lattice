@@ -45,6 +45,7 @@ nav:
     - adr/0016-stackr-in-lattice.md
     - adr/0017-one-site-for-the-family.md
     - adr/0018-the-template-pins-the-libraries-at-its-own-commit.md
+    - adr/0019-access-with-grantr-in-the-template.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

@@ -2,8 +2,9 @@
 
 A request carries a JWT: in the ``Authorization: Bearer`` header, or, for a WebSocket (which
 browsers open without headers), in the ``access_token`` query parameter. The token must be
-signed by the issuer, unexpired, and for this audience. Its ``sub`` is the user, and a claim
-(``app_metadata.tenant_id`` by default, which only the service role can set) is the tenant.
+signed by the issuer, unexpired, and for this audience. Its ``sub`` is the user{% if access == 'grantr' %}; the tenant
+is the request's to name, and grantr's to check (``access.py``){% else %}, and a claim
+(``app_metadata.tenant_id`` by default, which only the service role can set) is the tenant{% endif %}.
 Anything else is 401.
 
 Local Supabase signs tokens with an asymmetric key (ES256) published at its JWKS URL; projects
@@ -11,9 +12,9 @@ still on Supabase's legacy JWT secret sign them with HS256. Either or both can b
 """
 
 import asyncio
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable{% if access != 'grantr' %}, Mapping{% endif %}
 from dataclasses import dataclass
-from typing import Any, Self, cast
+from typing import Any, Self{% if access != 'grantr' %}, cast{% endif %}
 
 import jwt
 from starlette.requests import HTTPConnection
@@ -37,17 +38,40 @@ class Unauthenticated(Exception):
 
 @dataclass(frozen=True)
 class Principal:
-    """Who a valid token names.
+    """Who is calling, and in which tenant.
 
     Attributes:
-        tenant_id: The tenant, from the token's tenant claim.
-        user_id: The user, the token's ``sub``.
+        tenant_id: The tenant, {% if access == 'grantr' %}which the request names and grantr says the caller is in.{% else %}from the token's tenant claim.{% endif %}
+        user_id: The user, the token's ``sub``{% if access == 'grantr' %}; or the service principal a key belongs to{% endif %}.
         name: How to show the user: the token's ``email``, or its ``sub``.
+{%- if access == 'grantr' %}
+        service: Whether the caller is a service principal, with a key, rather than a person.
+{%- endif %}
     """
 
     tenant_id: str
     user_id: str
     name: str
+{%- if access == 'grantr' %}
+    service: bool = False
+
+
+@dataclass(frozen=True)
+class Person:
+    """Who a valid token names, in no tenant yet.
+
+    Attributes:
+        user_id: The user, the token's ``sub``.
+        name: How to show the user: the token's ``email``, or its ``sub``.
+    """
+
+    user_id: str
+    name: str
+{%- endif %}
+
+
+type Authenticate = Callable[[HTTPConnection], Awaitable[Principal]]
+"""Says who a request or connection comes from, and in which tenant, or raises Unauthenticated."""
 
 
 class JwksKeys:
@@ -78,7 +102,9 @@ class TokenVerifier:
         secret: The shared secret of HS256 tokens, when they are accepted.
         keys: Where the public keys of asymmetrically signed tokens come from, when they are
             accepted.
+{%- if access != 'grantr' %}
         tenant_claim: The dotted path of the tenant in the claims.
+{%- endif %}
 
     Raises:
         ValueError: If neither a secret nor keys are given, so no token could be verified.
@@ -91,7 +117,9 @@ class TokenVerifier:
         issuer: str | None = None,
         secret: str | None = None,
         keys: KeySource | None = None,
+{%- if access != 'grantr' %}
         tenant_claim: str = "app_metadata.tenant_id",
+{%- endif %}
     ) -> None:
         if secret is None and keys is None:
             raise ValueError("set AUTH_JWKS_URL or AUTH_JWT_SECRET, to verify access tokens")
@@ -99,7 +127,9 @@ class TokenVerifier:
         self._issuer = issuer
         self._secret = secret
         self._keys = keys
+{%- if access != 'grantr' %}
         self._tenant_claim = tenant_claim.split(".")
+{%- endif %}
 
     @classmethod
     def from_settings(cls, settings: AuthSettings) -> Self:
@@ -109,16 +139,18 @@ class TokenVerifier:
             issuer=settings.issuer,
             secret=settings.jwt_secret,
             keys=JwksKeys(settings.jwks_url) if settings.jwks_url else None,
+{%- if access != 'grantr' %}
             tenant_claim=settings.tenant_claim,
+{%- endif %}
         )
 
-    async def verify(self, token: str) -> Principal:
+    async def verify(self, token: str) -> {% if access == 'grantr' %}Person{% else %}Principal{% endif %}:
         """Verify a token and return who it names.
 
         Raises:
             Unauthenticated: If the token is malformed, signed by an unknown key or with an
-                algorithm not accepted, expired, for another audience or issuer, or names no
-                tenant.
+                algorithm not accepted, expired, or for another audience or issuer{% if access != 'grantr' %}, or names no
+                tenant{% endif %}.
         """
         try:
             algorithm = jwt.get_unverified_header(token).get("alg")
@@ -143,15 +175,19 @@ class TokenVerifier:
             )
         except jwt.InvalidTokenError as error:
             raise Unauthenticated(f"the access token is not valid: {error}") from error
+        user = str(claims["sub"])
+{%- if access == 'grantr' %}
+        return Person(user_id=user, name=str(claims.get("email") or user))
+{%- else %}
         tenant = _claim(claims, self._tenant_claim)
         if not isinstance(tenant, str) or not tenant:
             raise Unauthenticated("the access token names no tenant")
-        user = str(claims["sub"])
         return Principal(tenant_id=tenant, user_id=user, name=str(claims.get("email") or user))
 
     async def authenticate(self, connection: HTTPConnection) -> Principal:
         """Verify the token a request or WebSocket carries."""
         return await self.verify(bearer_token(connection))
+{%- endif %}
 
 
 def bearer_token(connection: HTTPConnection) -> str:
@@ -172,25 +208,27 @@ def bearer_token(connection: HTTPConnection) -> str:
 
 
 class RequireToken:
-    """An ASGI app that answers 401 unless a request carries a valid access token.
+    """An ASGI app that answers 401 unless a request carries {% if access == 'grantr' %}valid credentials{% else %}a valid access token{% endif %}.
 
     It guards apps that authenticate each call themselves, such as an MCP server, so a request
-    without a token is refused before it reaches them.
+    without {% if access == 'grantr' %}them{% else %}a token{% endif %} is refused before it reaches them.
 
     Args:
         app: The app to guard.
-        verifier: Verifies the tokens.
+        authenticate: Checks a request's credentials, or raises Unauthenticated.
     """
 
-    def __init__(self, app: ASGIApp, verifier: TokenVerifier) -> None:
+    def __init__(
+        self, app: ASGIApp, authenticate: Callable[[HTTPConnection], Awaitable[object]]
+    ) -> None:
         self._app = app
-        self._verifier = verifier
+        self._authenticate = authenticate
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Refuse the request, or pass it on; lifespan events pass on."""
         if scope["type"] in ("http", "websocket"):
             try:
-                await self._verifier.authenticate(HTTPConnection(scope))
+                await self._authenticate(HTTPConnection(scope))
             except Unauthenticated as error:
                 refusal = JSONResponse(
                     {"detail": str(error)}, status_code=401, headers={"WWW-Authenticate": "Bearer"}
@@ -199,6 +237,8 @@ class RequireToken:
                 return
         await self._app(scope, receive, send)
 
+{%- if access != 'grantr' %}
+
 
 def _claim(claims: Mapping[str, Any], path: list[str]) -> object:
     """The value at a dotted path in the claims, or None."""
@@ -206,3 +246,4 @@ def _claim(claims: Mapping[str, Any], path: list[str]) -> object:
     for key in path:
         value = cast(Mapping[str, object], value).get(key) if isinstance(value, Mapping) else None
     return value
+{%- endif %}

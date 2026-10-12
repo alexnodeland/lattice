@@ -1,7 +1,8 @@
 """The application: {% if libraries == 'both' %}artifactr and reflexr side by side{% else %}{{ libraries }}'s surfaces{% endif %}, on one database and telemetry setup.
 
 Run it with ``{{ project_slug }}`` (``make serve``), or beside the stack in its
-``app`` profile (``make up``). Every surface needs a Supabase access token.
+``app`` profile (``make up``). Every surface needs a Supabase access token{% if access == 'grantr' %}, or a service
+principal's key, and names its tenant (``access.py``){% endif %}.
 {%- if use_artifactr %}
 
 - ``/artifactr/v1``: artifactr's REST commands and reads, and its WebSocket stream
@@ -11,6 +12,10 @@ Run it with ``{{ project_slug }}`` (``make serve``), or beside the stack in its
 
 - ``/reflexr/v1``: reflexr's REST publishing, reads and administration, and its WebSocket stream
 - ``/reflexr/mcp/``: reflexr's MCP server
+{%- endif %}
+{%- if access == 'grantr' %}
+
+- ``/grantr/v1``: grantr's admin API: tenants, members, groups, roles, grants and keys
 {%- endif %}
 """
 
@@ -27,7 +32,14 @@ import uvicorn
 from fastapi import FastAPI
 from pydantic_ai.models import Model
 from sqlalchemy.ext.asyncio import AsyncEngine
+{%- if access == 'grantr' %}
 
+from grantr import Grants
+{%- endif %}
+
+{% if access == 'grantr' -%}
+from {{ package_name }}.access import Access
+{% endif -%}
 from {{ package_name }}.auth import TokenVerifier
 {%- if use_reflexr %}
 from {{ package_name }}.automation import STOP_GRACE, Automation
@@ -71,6 +83,9 @@ def create_app(
     *,
     model: Model | None = None,
     telemetry: TelemetryHandle | None = None,
+{%- if access == 'grantr' %}
+    grants: Grants | None = None,
+{%- endif %}
 {%- if use_reflexr %}
     poll_interval: timedelta = timedelta(seconds=1),
     grace: timedelta = STOP_GRACE,
@@ -84,6 +99,10 @@ def create_app(
             one.
         telemetry: OpenTelemetry and Langfuse, as ``telemetry.configure`` sets them up; it
             traces the application's requests and its database's queries.
+{%- if access == 'grantr' %}
+        grants: grantr, when the caller has built it, as the tests do; otherwise it is built
+            over the database.
+{%- endif %}
 {%- if use_reflexr %}
         poll_interval: How often the reactor looks for work.
         grace: How long the reactor's running actions have to end when the application stops;
@@ -98,11 +117,30 @@ def create_app(
         if settings.database_url
         else None
     )
+{%- if access == 'grantr' %}
+    access = Access(
+        name=settings.service_name,
+        verifier=verifier,
+        engine=engine,
+        grants=grants,
+        telemetry=telemetry,
+    )
+{%- endif %}
     parts: list[Part] = [
+{%- if access == 'grantr' %}
+        access,
+{%- endif %}
 {%- if use_artifactr %}
         Collaboration(
             name=settings.service_name,
-            verifier=verifier,
+{%- if access == 'grantr' %}
+            authenticate=access.authenticate,
+            identify=access.identify,
+            authorize=access.grants.hooks(access.artifactr_subject).authorize,
+{%- else %}
+            authenticate=verifier.authenticate,
+            identify=verifier.authenticate,
+{%- endif %}
             model=model,
             gateway=settings.gateway,
             engine=engine,
@@ -112,7 +150,14 @@ def create_app(
 {%- if use_reflexr %}
         Automation(
             name=settings.service_name,
-            verifier=verifier,
+{%- if access == 'grantr' %}
+            authenticate=access.authenticate,
+            identify=access.identify,
+            authorize=access.grants.hooks(access.reflexr_subject).authorize,
+{%- else %}
+            authenticate=verifier.authenticate,
+            identify=verifier.authenticate,
+{%- endif %}
             model=model,
             gateway=settings.gateway,
             engine=engine,
@@ -144,6 +189,9 @@ def create_app(
         """Where the surfaces are."""
         return {
             "name": TITLE,
+{%- if access == 'grantr' %}
+            "grantr": "/grantr/v1",
+{%- endif %}
 {%- if use_artifactr %}
             "artifactr": "/artifactr/v1",
             "artifactr_mcp": "/artifactr/mcp/",

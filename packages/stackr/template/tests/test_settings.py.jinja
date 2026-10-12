@@ -10,7 +10,11 @@ def test_an_empty_environment_gives_the_defaults() -> None:
     assert settings == Settings()
     assert (settings.database_url, settings.telemetry, settings.langfuse) == (None, False, False)
     assert settings.gateway.guardrails == ("pii-mask", "prompt-injection")
+{%- if access == 'grantr' %}
+    assert settings.auth.service_role_key is None
+{%- else %}
     assert settings.auth.tenant_claim == "app_metadata.tenant_id"
+{%- endif %}
 
 
 def test_every_setting_comes_from_its_variable() -> None:
@@ -27,7 +31,11 @@ def test_every_setting_comes_from_its_variable() -> None:
             "AUTH_JWT_SECRET": "secret",
             "AUTH_AUDIENCE": "api",
             "AUTH_ISSUER": "http://auth",
+{%- if access == 'grantr' %}
+            "AUTH_SERVICE_ROLE_KEY": "service-role",
+{%- else %}
             "AUTH_TENANT_CLAIM": "tenant",
+{%- endif %}
             "LITELLM_BASE_URL": "http://litellm:4000",
             "LITELLM_API_KEY": "sk-default",
             "LITELLM_MODEL": "fast",
@@ -49,7 +57,11 @@ def test_every_setting_comes_from_its_variable() -> None:
             jwt_secret="secret",
             audience="api",
             issuer="http://auth",
+{%- if access == 'grantr' %}
+            service_role_key="service-role",
+{%- else %}
             tenant_claim="tenant",
+{%- endif %}
         ),
         gateway=GatewaySettings(
             base_url="http://litellm:4000",

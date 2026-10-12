@@ -1,6 +1,6 @@
 ---
 title: grantr
-description: The planned identity and access package for artifactr and reflexr, which decides what each actor may do in a tenant before every command and read.
+description: The identity and access package for artifactr and reflexr, which decides what each actor may do in a tenant before every command and read.
 hide:
   - navigation
 ---
@@ -16,9 +16,9 @@ Identity and access for the family: tenants, their members, groups, roles and se
 
 </div>
 
-!!! note "In progress, not yet wired in"
+!!! note "In progress"
 
-    grantr's core, storage and admin API are built: its model, built-in and custom roles, groups, service principals and keys, checks, the libraries' hooks, the audit log, in-memory and SQL storage, the admin router and telemetry, as its [architecture](architecture.md) describes. The libraries don't ask it yet; the rest of this page describes what the [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)'s phases build.
+    grantr's core, storage and admin API are built: its model, built-in and custom roles, groups, service principals and keys, checks, the libraries' hooks, the audit log, in-memory and SQL storage, the admin router and telemetry, as its [architecture](architecture.md) describes. stackr's template wires it in by default: each library asks it before every command and read. Restricted threads and artifacts, and row-level security, come next; the rest of this page describes what the [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)'s phases build.
 
 ## Why: one model of who may do what
 

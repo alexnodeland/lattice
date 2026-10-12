@@ -14,7 +14,7 @@ unexport DOCKER_DEFAULT_PLATFORM
 # Local commands read .env, when there is one.
 ENV_FILE := $(if $(wildcard .env),--env-file .env)
 
-.PHONY: help install env fmt lint typecheck test check serve {% if evals %}evals evals-langfuse {% endif %}up down logs clean
+.PHONY: help install env fmt lint typecheck test check serve {% if evals %}evals evals-langfuse {% endif %}{% if access == 'grantr' %}tenant operator migrate-tenants access-matrix {% endif %}up down logs clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -52,6 +52,23 @@ evals: ## Run the starter experiments offline, with a scripted model
 
 evals-langfuse: ## Run them in Langfuse, with the gateway's model, as .env configures them
 	$(UV) run $(ENV_FILE) python -m evals --langfuse
+{%- endif %}
+
+{%- if access == 'grantr' %}
+
+tenant: ## Create a tenant, with its owner: make tenant NAME=acme OWNER=alice@example.com (or a user id)
+	@if [ -z "$(NAME)" ] || [ -z "$(OWNER)" ]; then echo "usage: make tenant NAME=<tenant> OWNER=<email or user id>"; exit 2; fi
+	$(UV) run $(ENV_FILE) {{ project_slug }}-admin tenant $(NAME) $(OWNER)
+
+operator: ## Make a user the deployment's first operator: make operator EMAIL=alice@example.com
+	@if [ -z "$(EMAIL)" ]; then echo "usage: make operator EMAIL=<email or user id>"; exit 2; fi
+	$(UV) run $(ENV_FILE) {{ project_slug }}-admin operator $(EMAIL)
+
+migrate-tenants: ## Move each user's tenant from their token's claim into grantr; it can run again
+	$(UV) run $(ENV_FILE) {{ project_slug }}-admin migrate-tenants
+
+access-matrix: ## Write every role against every action to access.md, to review and commit
+	$(UV) run python -m {{ package_name }}.access > access.md
 {%- endif %}
 
 up: ## Build and start the application in the app profile, beside stackr's stack

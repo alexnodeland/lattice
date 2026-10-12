@@ -1,13 +1,16 @@
 """artifactr's surfaces: REST and the WebSocket at ``/artifactr/v1``, MCP at ``/artifactr/mcp/``.
 
-People sign in with Supabase; each request's tenant and user come from its access token. MCP
-clients are external agents acting for the user whose token they carry.
+People sign in with Supabase; {% if access == 'grantr' %}each request's user comes from its access token, and its tenant
+from the request, as ``access.py`` checks; grantr says what they may do in it. A service
+principal's key stands in for a token. MCP clients are external agents acting for the user whose
+token they carry, or for no one with a key{% else %}each request's tenant and user come from its access token. MCP
+clients are external agents acting for the user whose token they carry{% endif %}.
 """
 
 import contextlib
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 
-from fastapi import FastAPI
+from fastapi import FastAPI{% if access == 'grantr' %}, HTTPException{% endif %}
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.models import Model
@@ -15,16 +18,20 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from starlette.requests import HTTPConnection
 
 from artifactr import InMemoryStorage, Runner, Session, SystemActor, UserActor, Workspaces
-from artifactr.core import Actor, ExternalAgentActor, TenantId
+from artifactr.core import Actor, ExternalAgentActor, {% if access == 'grantr' %}Forbidden, {% endif %}TenantId
 from artifactr.fastapi import Unauthorized, artifactr_router
 from artifactr.langfuse import langfuse_turn
 from artifactr.litellm import LiteLLMGateway
 from artifactr.mcp import ArtifactrMcp, McpContext
 from artifactr.scores import FeedbackMirror, sync_score_configs
 from artifactr.sql import SqlStorage, migrate
+from artifactr.workspace import Authorize
 from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
 
-from {{ package_name }}.auth import RequireToken, TokenVerifier, Unauthenticated
+{% if access == 'grantr' -%}
+from {{ package_name }}.access import Refused
+{% endif -%}
+from {{ package_name }}.auth import Authenticate, RequireToken, Unauthenticated
 from {{ package_name }}.gateway import Guardrails, TenantKeys
 from {{ package_name }}.notes import Note, Rating, build_note_agent
 from {{ package_name }}.scores import Mirrors, sync_configs
@@ -39,7 +46,9 @@ class Collaboration:
 
     Args:
         name: The application's name, as MCP clients and the gateway's tags see it.
-        verifier: Verifies access tokens.
+        authenticate: Says who each request comes from, and in which tenant.
+        identify: Checks a request's credentials alone, for the MCP server's door.
+        authorize: Whether an actor may take an action; without one, everything is allowed.
         model: The agent's model.
         gateway: The gateway's settings: tenant keys and guardrails.
         engine: The database; without one, workspaces live in memory.
@@ -50,13 +59,16 @@ class Collaboration:
         self,
         *,
         name: str,
-        verifier: TokenVerifier,
+        authenticate: Authenticate,
+        identify: Callable[[HTTPConnection], Awaitable[object]],
+        authorize: Authorize | None = None,
         model: Model,
         gateway: GatewaySettings,
         engine: AsyncEngine | None = None,
         telemetry: TelemetryHandle | None = None,
     ) -> None:
-        self._verifier = verifier
+        self._authenticate = authenticate
+        self._identify = identify
         tracer_provider = telemetry.tracer_provider if telemetry else None
         meter_provider = telemetry.meter_provider if telemetry else None
         langfuse = telemetry.langfuse if telemetry else None
@@ -70,10 +82,10 @@ class Collaboration:
                 await FeedbackMirror(workspace, sink, cursor="langfuse").follow()
 
             self._mirrors = Mirrors(follow)
-        # No authorize hook: every user of a tenant may use each of its workspaces.
         self.workspaces = Workspaces(
             SqlStorage(engine) if engine else InMemoryStorage(),
             types=[Note],
+            authorize=authorize,
             on_open=self._mirrors.watch if self._mirrors else None,
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,
@@ -137,20 +149,37 @@ class Collaboration:
         )
         app.include_router(router, prefix=f"{PREFIX}/v1")
         mcp = self.mcp.http_app(streamable_http_path="/")
-        app.mount(f"{PREFIX}/mcp", RequireToken(mcp, self._verifier))
+        app.mount(f"{PREFIX}/mcp", RequireToken(mcp, self._identify))
 
     async def _resolve_actor(self, connection: HTTPConnection) -> tuple[TenantId, Actor]:
         try:
-            principal = await self._verifier.authenticate(connection)
+            principal = await self._authenticate(connection)
         except Unauthenticated as error:
             raise Unauthorized(str(error)) from error
+{%- if access == 'grantr' %}
+        except Refused as refused:
+            if refused.status == 403:
+                raise Forbidden(str(refused)) from refused
+            raise HTTPException(status_code=refused.status, detail=str(refused)) from refused
+        if principal.service:
+            return principal.tenant_id, ExternalAgentActor(client_id=principal.user_id)
+{%- endif %}
         return principal.tenant_id, UserActor(id=principal.user_id, name=principal.name)
 
     async def _resolve_client(self, ctx: McpContext) -> tuple[TenantId, ExternalAgentActor]:
         request = ctx.request_context.request  # None for a client in process, without a token
         if request is None:
             raise ToolError("connect over HTTP")
-        principal = await self._verifier.authenticate(request)
+{%- if access == 'grantr' %}
+        try:
+            principal = await self._authenticate(request)
+        except Refused as refused:
+            raise ToolError(str(refused)) from refused
+        if principal.service:
+            return principal.tenant_id, ExternalAgentActor(client_id=principal.user_id)
+{%- else %}
+        principal = await self._authenticate(request)
+{%- endif %}
         return principal.tenant_id, ExternalAgentActor(
             client_id=principal.user_id,
             name=f"{principal.name} (MCP)",

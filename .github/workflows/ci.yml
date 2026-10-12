@@ -143,7 +143,7 @@ jobs:
   # it runs when stackr or a library changes, and checks the two together (stackr ADR-0018). The
   # matrix values aren't the task's inputs: moon counts a variable that is set as a change.
   template:
-    name: Template (${{ matrix.libraries }}${{ matrix.evals && ', evals' || '' }}, Python ${{ matrix.python }})
+    name: Template (${{ matrix.libraries }}${{ matrix.evals && ', evals' || '' }}${{ matrix.access == 'none' && ', no access' || '' }}, Python ${{ matrix.python }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -154,14 +154,21 @@ jobs:
         libraries: [artifactr, reflexr, both]
         evals: [true, false]
         python: ["3.12"]
+        access: [grantr]
         include:
           - libraries: both
             evals: true
             python: "3.14"
+            access: grantr
+          - libraries: both
+            evals: true
+            python: "3.12"
+            access: none
     env:
       TEMPLATE_LIBRARIES: ${{ matrix.libraries }}
       TEMPLATE_EVALS: ${{ matrix.evals }}
       TEMPLATE_PYTHON: ${{ matrix.python }}
+      TEMPLATE_ACCESS: ${{ matrix.access }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

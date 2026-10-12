@@ -5,7 +5,7 @@ Each record captures one decision: the context that forced it, the options consi
 | ADR | Title | Status |
 |---|---|---|
 | [0001](0001-compose-first-with-profiles.md) | Docker Compose first, with profiles | Accepted |
-| [0002](0002-local-supabase-through-its-cli.md) | Local Supabase, through its CLI | Accepted |
+| [0002](0002-local-supabase-through-its-cli.md) | Local Supabase, through its CLI | Accepted, amended by [0019](0019-access-with-grantr-in-the-template.md) |
 | [0003](0003-observability-and-gateway-services.md) | The observability and gateway services | Accepted, amended by [0016](0016-stackr-in-lattice.md) |
 | [0004](0004-the-application-template.md) | The application template | Accepted |
 | [0005](0005-ports-and-adapters-for-the-stack.md) | Ports and adapters for the stack | Accepted |
@@ -14,7 +14,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0008](0008-langfuse-and-its-services.md) | Langfuse and its services | Accepted |
 | [0009](0009-local-supabase-as-the-database-adapter.md) | Local Supabase as the database adapter | Accepted, amended by [0016](0016-stackr-in-lattice.md) |
 | [0010](0010-the-llm-gateway.md) | The LLM gateway | Accepted |
-| [0011](0011-the-application-template-in-detail.md) | The application template, in detail | Accepted; partly superseded by [0013](0013-how-the-template-pins-the-libraries.md), [0015](0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md) and [0018](0018-the-template-pins-the-libraries-at-its-own-commit.md), and amended by [0016](0016-stackr-in-lattice.md) |
+| [0011](0011-the-application-template-in-detail.md) | The application template, in detail | Accepted; partly superseded by [0013](0013-how-the-template-pins-the-libraries.md), [0015](0015-telemetry-mirrors-shutdown-and-namespaces-in-the-template.md) and [0018](0018-the-template-pins-the-libraries-at-its-own-commit.md), and amended by [0016](0016-stackr-in-lattice.md) and [0019](0019-access-with-grantr-in-the-template.md) |
 | [0012](0012-documentation-site.md) | The documentation site, and publishing it from main | Accepted, amended by [0014](0014-one-docs-build.md), [0016](0016-stackr-in-lattice.md) and [0017](0017-one-site-for-the-family.md) |
 | [0013](0013-how-the-template-pins-the-libraries.md) | How the template pins the libraries | Superseded by [0018](0018-the-template-pins-the-libraries-at-its-own-commit.md) |
 | [0014](0014-one-docs-build.md) | One docs build | Accepted, amended by [0017](0017-one-site-for-the-family.md) |
@@ -22,5 +22,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0016](0016-stackr-in-lattice.md) | stackr in lattice | Accepted, amended by [0018](0018-the-template-pins-the-libraries-at-its-own-commit.md) |
 | [0017](0017-one-site-for-the-family.md) | One site for the family | Accepted |
 | [0018](0018-the-template-pins-the-libraries-at-its-own-commit.md) | The template pins the libraries at its own commit | Accepted |
+| [0019](0019-access-with-grantr-in-the-template.md) | Access with grantr in the template | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

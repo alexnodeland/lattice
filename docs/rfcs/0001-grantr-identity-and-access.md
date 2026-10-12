@@ -333,7 +333,7 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
   - [x] reflexr and the template's automation ([#61](https://github.com/alexnodeland/lattice/pull/61))
 - [x] Phase 2: grantr's core
 - [x] Phase 3: storage and API
-- [ ] Phase 4: the template
+- [x] Phase 4: the template
   - `on_tenant_created` is deferred: the template's gateway keys are settings, and stackr's `make tenant` still creates a tenant's gateway team (grantr ADR-0021)
 - [ ] Phase 5: threads and artifacts
 - [ ] Phase 6: row-level security

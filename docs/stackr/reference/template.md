@@ -13,6 +13,7 @@ The application template's questions are in stackr's `copier.yml`, which the `co
 | `description` | str | `An application on stackr.` |  | always | One line about what it does |
 | `libraries` | str | `both` | `artifactr`, `reflexr`, `both` | always | The libraries it uses |
 | `evals` | bool | yes |  | always | Include evaluation with evalr (an evals/ directory and a starter experiment)? |
+| `access` | str | `grantr` | `grantr`, `none` | always | Who may do what |
 | `python_version` | str | `3.12` | `3.12`, `3.13`, `3.14` | always | The Python version it runs on |
 | `app_port` | int | `8800` |  | always | The port it is published on, on this machine |
 
@@ -76,6 +77,8 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `src/<package>/scores.py` | always | rendered |
 | `src/<package>/settings.py` | always | rendered |
 | `src/<package>/telemetry.py` | always | rendered |
+| `src/<package>/access.py` | `access == 'grantr'` | rendered |
+| `src/<package>/admin.py` | `access == 'grantr'` | rendered |
 | `src/<package>/collaboration.py` | `use_artifactr` | rendered |
 | `src/<package>/notes.py` | `use_artifactr` | rendered |
 | `src/<package>/automation.py` | `use_reflexr` | rendered |
@@ -86,9 +89,12 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `tests/test_auth.py` | always | rendered |
 | `tests/test_scores.py` | always | rendered |
 | `tests/test_settings.py` | always | rendered |
+| `tests/test_access.py` | `access == 'grantr'` | rendered |
+| `tests/test_admin.py` | `access == 'grantr'` | rendered |
 | `tests/test_evals.py` | `evals` | rendered |
 | `tests/test_collaboration.py` | `use_artifactr` | rendered |
 | `tests/test_automation.py` | `use_reflexr` | rendered |
+| `access.md` | `access == 'grantr'` | rendered |
 | `evals/__init__.py` | `evals` | copied |
 | `evals/__main__.py` | `evals` | copied |
 | `evals/experiments.py` | `evals` | rendered |

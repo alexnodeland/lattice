@@ -13,7 +13,6 @@ from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 from mcp.types import TextContent
 
-from {{ package_name }}.auth import TokenVerifier
 from {{ package_name }}.automation import Automation
 from {{ package_name }}.settings import Settings
 
@@ -27,6 +26,7 @@ from conftest import (
     app,
     bearer,
     call,
+    nobody,
     say,
     settings,
     wait_for,
@@ -106,7 +106,8 @@ async def test_mcp_clients_in_process_are_refused(script: Script) -> None:
     config = settings()
     automation = Automation(
         name="{{ project_slug }}",
-        verifier=TokenVerifier.from_settings(config.auth),
+        authenticate=nobody,
+        identify=nobody,
         model=script.model,
         gateway=config.gateway,
     )

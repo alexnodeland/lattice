@@ -58,10 +58,11 @@ It runs an application from the template beside the whole stack:
 1. It generates an application with both libraries and evals from this checkout, locks its dependencies, and creates a key on the `stackr-smoke` tenant for it.
 2. It starts the application in its app profile, on port `SMOKE_APP_PORT` (8800 by default), with telemetry, Langfuse and mocked model replies, and waits for it to be healthy.
 3. A request without a token must be refused with 401.
-4. It creates a user of the tenant `stackr-smoke` with local Supabase's admin API, and signs them in.
-5. As that user, it posts a message to the notes agent (artifactr) and opens a ticket for the triage agent (reflexr). Each agent's model request goes through the gateway on the tenant's key.
-6. For each agent, the turn or run must end successfully, and its trace must be in Tempo, with the gateway's spans in it, and in Langfuse.
-7. The completed turn and the succeeded run must be counted in Prometheus, as `artifactr_turns_total` and `reflexr_runs_total`, for the run's own workspace.
+4. It creates a user with local Supabase's admin API, and signs them in.
+5. With the application's own command, it creates two tenants in grantr: `stackr-smoke`, which the user owns, and `stackr-smoke-other`, which they aren't in. The user's request in the first must succeed, and in the second be refused with 403.
+6. As that user, in `stackr-smoke`, it posts a message to the notes agent (artifactr) and opens a ticket for the triage agent (reflexr). Each agent's model request goes through the gateway on the tenant's key.
+7. For each agent, the turn or run must end successfully, and its trace must be in Tempo, with the gateway's spans in it, and in Langfuse.
+8. The completed turn and the succeeded run must be counted in Prometheus, as `artifactr_turns_total` and `reflexr_runs_total`, for the run's own workspace.
 
 At the end it removes the application, its image and volumes, the key, the user and the application's schema. It needs local Supabase, whose Auth signs the user in, so it fails on the `postgres` adapter. Building the application's image fetches the libraries from GitHub at `HEAD`, the commit the application was rendered from, so it needs the network, and `HEAD` must be pushed and the working tree clean: Copier renders uncommitted changes from a commit of its own, which GitHub doesn't have. In CI, `HEAD` is the pull request's merge commit, so the application runs the pull request's libraries.
 

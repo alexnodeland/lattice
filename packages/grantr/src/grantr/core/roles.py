@@ -85,6 +85,10 @@ BOOKKEEPING: Final = frozenset(
 """What the application's own machinery does, and no person's role holds: claiming threads, and
 keeping the log's consumers' cursors."""
 
+MEMBERS_READS: Final = frozenset({"artifactr:read_workspaces"})
+"""The tenant-wide reads every member of a tenant may ask: listings whose results the library
+filters by what the caller may open."""
+
 RUNTIME: Final = BOOKKEEPING | {
     "artifactr:record",
     "reflexr:publish",
@@ -117,7 +121,8 @@ CUSTOM_LEVELS: Final[frozenset[Level]] = frozenset({"workspace", "item"})
 """Where a custom role may be granted: wherever a built-in workspace role can."""
 
 MEMBER: Final = "member"
-"""The role that makes a user or service principal a member of a tenant, and nothing more."""
+"""The role that makes a user or service principal a member of a tenant, and lets them list
+what in it they may open."""
 
 APPLICATION: Final = "application"
 """The role of the application's own service principal: granted on the deployment, and the one
@@ -172,7 +177,8 @@ class Catalog:
             for action in libraries
             if action.partition(":")[2].startswith("read_") or action.endswith(":open")
         }
-        viewer = (FEEDBACK & libraries | reads) - BOOKKEEPING
+        # A tenant-wide listing is asked of the tenant, where a workspace's roles don't reach.
+        viewer = (FEEDBACK & libraries | reads) - BOOKKEEPING - MEMBERS_READS
         editor = viewer | EDITOR_COMMANDS & libraries
         owner = actions - OPERATOR - BOOKKEEPING
         return cls(
@@ -182,8 +188,8 @@ class Catalog:
                 ("deployment", APPLICATION): frozenset(reads | (RUNTIME | FEEDBACK) & libraries),
                 ("tenant", "owner"): owner,
                 ("tenant", "admin"): owner - {"grantr:delete_tenant"},
-                ("tenant", MEMBER): frozenset(),
-                ("workspace", "admin"): libraries - BOOKKEEPING | WORKSPACE_GRANTS,
+                ("tenant", MEMBER): MEMBERS_READS & libraries,
+                ("workspace", "admin"): libraries - BOOKKEEPING - MEMBERS_READS | WORKSPACE_GRANTS,
                 ("workspace", "editor"): editor,
                 ("workspace", "viewer"): viewer,
                 ("workspace", "rule"): RULE & libraries,

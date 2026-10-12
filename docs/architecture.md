@@ -68,8 +68,8 @@ moon knows fourteen projects: the thirteen below, and `lattice`, the root, which
 | artifactr | `packages/artifactr` | Chat applications where people and agents share versioned artifacts; distributed as `artifactr-ai` | Library | evalr |
 | reflexr | `packages/reflexr` | Rules over event streams that run LLM workflows | Library | evalr |
 | relayr | `packages/relayr` | The bridge between artifactr and reflexr; distributed as `relayr-ai` | Library | artifactr, reflexr |
-| grantr | `packages/grantr` | Identity and access for artifactr and reflexr; its core, storage and admin API so far ([its plan](grantr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
-| stackr | `packages/stackr` | The stack the libraries run on, and the application template | Tool (shell), ships no wheel | artifactr, reflexr, evalr |
+| grantr | `packages/grantr` | Identity and access for artifactr and reflexr, in stackr's template ([its plan](grantr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
+| stackr | `packages/stackr` | The stack the libraries run on, and the application template | Tool (shell), ships no wheel | artifactr, reflexr, evalr, grantr |
 | portalr | `packages/portalr` | The portal: the router that serves the app and admin UIs, and reads the stack's tools for one tenant ([its architecture](portalr/architecture.md)) | Library | grantr |
 | client | `packages/portalr/web/client` | `@portalr/client`, the only code in the UIs that talks to the server | Library (TypeScript) | |
 | ui | `packages/portalr/web/ui` | `@portalr/ui`, the kit app and admin build from | Library (TypeScript) | |
@@ -88,16 +88,16 @@ graph TD
     stackr --> artifactr
     stackr --> reflexr
     stackr --> evalr
+    stackr --> grantr
     artifactr --> evalr
     reflexr --> evalr
-    grantr
     portalr --> grantr
     app --> ui
     admin --> ui
 ```
 
 - **An edge is a requirement.** The dependent names its dependency in `[project]` and takes it from the workspace ([The uv workspace](#the-uv-workspace)). The libraries name their siblings with a range, which their wheels carry; docplan and oncall ship no wheel, and name theirs without one. docplan depends on evalr through its `[dspy]` extra.
-- **stackr's edges are its template's:** it generates applications on the three libraries, and no `pyproject.toml` records that.
+- **stackr's edges are its template's:** it generates applications on the three libraries and grantr, and no `pyproject.toml` records that.
 - **Each `moon.yml` states its `dependsOn`,** since moon infers no edge from a requirement with a range. [`tests/test_moon.py`](https://github.com/alexnodeland/lattice/blob/main/tests/test_moon.py) holds it to the siblings the project's `pyproject.toml` requires, and checks that each comes from the workspace; for a web package, to the workspace packages its `package.json` depends on.
 - **Independence is checked, not assumed.** In one environment every member is importable, so an undeclared import that would once have failed passes silently. artifactr's and reflexr's layering tests list what each layer may import, evalr's forbid artifactr and reflexr, and deptry fails on an import that a package's shipped code doesn't declare.
 

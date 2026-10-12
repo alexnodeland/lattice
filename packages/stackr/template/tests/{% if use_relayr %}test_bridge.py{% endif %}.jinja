@@ -1,0 +1,118 @@
+"""relayr's bridge: an alert opens an incident timeline, and people's messages add to it."""
+
+import asyncio
+from pathlib import Path
+from typing import Any
+
+from fastapi.testclient import TestClient
+
+from artifactr import UserActor, Workspaces, new_id
+from artifactr.sql import SqlStorage
+from relayr.ledger import WorkspaceKey
+from relayr.sql import SqlLedger
+
+from {{ package_name }}.database import open_database
+from {{ package_name }}.settings import Settings
+
+from conftest import TENANT, Script, app, bearer, say, settings, wait_for
+
+ARTIFACTR = "/artifactr/v1/workspaces/main"
+REFLEXR = "/reflexr/v1/workspaces/main"
+FIRED = "{{ package_name }}:alert.fired"
+
+
+def command(client: TestClient, **body: Any) -> None:
+    frame = {"type": "command", "command_id": new_id("cmd"), "command": body}
+    response = client.post(f"{ARTIFACTR}/commands", json=frame)
+    assert response.json()["ok"], response.text
+
+
+def timelines(client: TestClient) -> list[dict[str, Any]]:
+    return [a for a in client.get(f"{ARTIFACTR}/artifacts").json() if a["kind"] == "timeline"]
+
+
+def notices(client: TestClient, thread: str) -> list[str]:
+    return [
+        e["event"]["content"]
+        for e in client.get(f"{ARTIFACTR}/events").json()
+        if e["event"]["type"] == "message_posted"
+        and e["event"]["kind"] == "notice"
+        and e["thread_id"] == thread
+    ]
+
+
+def test_an_alert_opens_an_incident_and_people_add_to_its_timeline(
+    client: TestClient, script: Script
+) -> None:
+    script.steps += [say("Noted."), say("Noted.")]
+    fired = {"type": FIRED, "service": "checkout", "summary": "Payments fail"}
+    assert client.post(f"{REFLEXR}/events", json={"event": fired}).status_code == 200
+    wait_for(lambda: timelines(client))
+    [timeline] = timelines(client)
+    thread = timeline["data"]["thread_id"]
+    assert list(timeline["data"]["entries"].values()) == [
+        {"source": "monitoring", "text": "Payments fail"}
+    ]
+    wait_for(lambda: notices(client, thread))
+    assert notices(client, thread) == ["Opened the timeline: Payments fail"]
+
+    command(client, type="create_thread", thread_id="elsewhere")
+    command(client, type="post_message", thread_id="elsewhere", content="Unrelated")
+    command(client, type="post_message", thread_id=thread, content="Rolled back the deploy")
+    wait_for(lambda: len(timelines(client)[0]["data"]["entries"]) == 2)
+    entries = list(timelines(client)[0]["data"]["entries"].values())
+    assert entries[1] == {"source": "alice@example.com", "text": "Rolled back the deploy"}
+
+
+def test_only_the_bridge_publishes_artifactr_events(client: TestClient) -> None:
+    forged = {
+        "type": "artifactr:message_posted",
+        "author": {"kind": "user", "id": "bob", "name": "Bob"},
+        "thread_id": "t1",
+        "message_id": "msg_forged",
+        "content": "Rolled back the deploy",
+    }
+    refused = client.post(f"{REFLEXR}/events", json={"event": forged})
+    assert (refused.status_code, refused.json()["detail"]["type"]) == (403, "forbidden")
+
+
+def test_a_restarted_application_follows_the_workspaces_it_knows(
+    tmp_path: Path, script: Script
+) -> None:
+    url = f"sqlite+aiosqlite:///{tmp_path / 'app.db'}"
+    config = Settings(database_url=url, auth=settings().auth, gateway=settings().gateway)
+    with TestClient(app(script, config), headers=bearer()) as client:
+        command(client, type="create_thread", thread_id="t1")
+        wait_for(lambda: asyncio.run(_followed(url)))
+    asyncio.run(_write_while_stopped(url))  # a message no follower saw
+    with TestClient(app(script, config), headers=bearer()) as client:
+        wait_for(lambda: asyncio.run(_cursor(url)) >= 2)
+        bridged = client.get(f"{REFLEXR}/events", params={"type": "artifactr:message_posted"})
+        contents = [e["event"]["content"] for e in bridged.json()]
+        assert contents == ["While the application was stopped"]
+
+
+async def _write_while_stopped(url: str) -> None:
+    engine = open_database(url, schema="")
+    try:
+        workspaces = Workspaces(SqlStorage(engine))
+        workspace = await workspaces.open(TENANT, "main", actor=UserActor(id="alice"))
+        await workspace.post_message("t1", "While the application was stopped")
+    finally:
+        await engine.dispose()
+
+
+async def _followed(url: str) -> list[WorkspaceKey]:
+    engine = open_database(url, schema="")
+    try:
+        return await SqlLedger(engine).followed()
+    finally:
+        await engine.dispose()
+
+
+async def _cursor(url: str) -> int:
+    engine = open_database(url, schema="")
+    try:
+        return await SqlLedger(engine).cursor(WorkspaceKey(TENANT, "main"))
+    finally:
+        await engine.dispose()

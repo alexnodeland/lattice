@@ -3,11 +3,14 @@
 language: 'python'
 layer: 'library'
 tags: ['distribution']
+dependsOn:
+  - 'grantr'
 
 fileGroups:
   python:
     - 'src/**/*'
     - 'tests/**/*'
+    - 'schemas/**/*'
     - 'pyproject.toml'
     - 'README.md'
     - 'LICENSE'
@@ -45,3 +48,10 @@ tasks:
     inputs: ['@group(python)']
     options:
       mergeInputs: 'replace'
+
+  schema:
+    description: "Regenerate the router's OpenAPI document, schemas/portalr.openapi.json"
+    script: 'uv run python -m portalr.fastapi.openapi > schemas/portalr.openapi.json'
+    options:
+      cache: false
+      runInCI: false

@@ -220,6 +220,8 @@ GET /v1/workspaces/prod/events?type=ops:service.error&last=20
 GET /v1/workspaces/prod/events?type=ops:service.error&last=20&before_seq=4180
 ```
 
+The router's OpenAPI document is committed as [`schemas/reflexr.openapi.json`](https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/schemas/reflexr.openapi.json), with its paths relative to the prefix, so a client's types can be generated from it; FastAPI also serves an application's own at `/openapi.json`. A test fails when it drifts from the router. reflexr's [Bruno](https://www.usebruno.com) collection, in `packages/reflexr/bruno/`, exercises these endpoints against oncall, and Schemathesis fuzzes the document against it, in CI's Acceptance job ([lattice ADR-0015](../../adr/0015-acceptance-tests-against-the-reference-applications.md)).
+
 ## Stored rules
 
 When the application turns [stored rules](rules.md#stored-rules) on, a client installs, updates and archives them in a workspace with their commands, and each answers `rule_version`, the rule's new version and the `seq` of the fact that recorded the change:

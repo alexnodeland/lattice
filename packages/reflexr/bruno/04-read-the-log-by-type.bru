@@ -1,0 +1,19 @@
+meta {
+  name: Read the log by type
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/workspaces/{{workspace}}/events?type=oncall:alert.fired
+  body: none
+  auth: none
+}
+
+tests {
+  test("the alert, once", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.map((e) => e.id)).to.eql(["evt_acceptance_alert"]);
+    expect(res.body[0].actor).to.eql({ kind: "user", id: "alice", name: "alice" });
+  });
+}

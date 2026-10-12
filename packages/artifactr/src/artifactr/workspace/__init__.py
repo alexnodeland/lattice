@@ -9,6 +9,7 @@ from artifactr.workspace.memory import InMemoryStorage
 from artifactr.workspace.storage import HistoryChunk, Scope, Storage, Transaction, seal
 from artifactr.workspace.workspace import (
     ACTIONS,
+    MAX_COUNT,
     Access,
     Authorize,
     OnOpen,
@@ -19,6 +20,7 @@ from artifactr.workspace.workspace import (
 
 __all__ = [
     "ACTIONS",
+    "MAX_COUNT",
     "Access",
     "Authorize",
     "HistoryChunk",

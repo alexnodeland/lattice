@@ -1,0 +1,20 @@
+meta {
+  name: Read the doc
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/workspaces/{{workspace}}/artifacts/{{doc}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("it is the current version", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.version).to.equal(1);
+    expect(res.body.data.title).to.equal("Launch");
+    expect(res.body.updated_by).to.eql({ kind: "user", id: "alice", name: "alice" });
+  });
+}

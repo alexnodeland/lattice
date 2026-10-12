@@ -1,0 +1,32 @@
+meta {
+  name: Publish an alert
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/workspaces/{{workspace}}/events
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "event": {
+      "type": "oncall:alert.fired",
+      "service": "checkout",
+      "severity": 8,
+      "message": "p99 latency is up"
+    },
+    "id": "evt_acceptance_alert"
+  }
+}
+
+tests {
+  test("it is logged", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body).to.have.lengthOf(1);
+    expect(res.body[0].id).to.equal("evt_acceptance_alert");
+    expect(res.body[0].duplicate).to.equal(false);
+  });
+}

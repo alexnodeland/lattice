@@ -1,11 +1,21 @@
 # artifactr, distributed as artifactr-ai.
 language: 'python'
 layer: 'library'
-tags: ['distribution']
+tags: ['distribution', 'api']
 dependsOn:
   - 'evalr'
 
 tasks:
+  api:
+    env:
+      API_SERVICE: 'docplan'
+      # Ports the system picks, which scripts/api reads back.
+      DOCPLAN_PORT: '0'
+      ARTIFACTR_PG_PORT: '0'
+    inputs:
+      # docplan, the reference application the collection runs against.
+      - '/examples/docplan/**/*'
+
   test:
     inputs:
       # The layering test holds docplan, the reference implementation, to the public API.
@@ -16,8 +26,10 @@ tasks:
       # run without them.
 
   schema:
-    description: 'Regenerate the protocol JSON Schema from the frame models'
-    script: 'uv run python -m artifactr.core.schema > schemas/artifactr.v1.json'
+    description: "Regenerate the protocol JSON Schema, and the REST surface's OpenAPI document"
+    script: >-
+      uv run python -m artifactr.core.schema > schemas/artifactr.v1.json
+      && uv run python -m artifactr.fastapi.openapi > schemas/artifactr.openapi.json
     options:
       cache: false
       runInCI: false

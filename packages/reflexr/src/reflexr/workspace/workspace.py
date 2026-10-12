@@ -148,6 +148,10 @@ it reads, and opening a workspace is ``reflexr:open``.
 """
 
 
+MAX_COUNT: Final = 2**63 - 1
+"""The largest ``seq`` or count a read takes: what PostgreSQL's ``bigint`` holds."""
+
+
 class Access(BaseModel):
     """What an actor is about to do, in a workspace or across its tenant, as ``authorize`` hears."""
 
@@ -1051,7 +1055,8 @@ class Workspace:
                 returned.
 
         Raises:
-            ValidationFailed: If both ``limit`` and ``last`` are given, or a number is negative.
+            ValidationFailed: If both ``limit`` and ``last`` are given, or a number is negative
+                or more than storage holds.
         """
         await self.check(Access(action="reflexr:read_events"))
         _check_page(after_seq=after_seq, before_seq=before_seq, limit=limit, last=last)
@@ -1120,8 +1125,13 @@ class Workspace:
         scope_key: ScopeKey | None = None,
         limit: int | None = None,
     ) -> list[Run]:
-        """Return runs, newest first, optionally of one rule, status or scope."""
+        """Return runs, newest first, optionally of one rule, status or scope; at most ``limit``.
+
+        Raises:
+            ValidationFailed: If ``limit`` is negative, or more than storage can hold.
+        """
         await self.check(Access(action="reflexr:read_runs", rule=rule))
+        _check_count("limit", limit)
         return await self._context.storage.runs(
             self._ref, rule=rule, status=status, scope_key=scope_key, limit=limit
         )
@@ -1448,13 +1458,20 @@ def _check_name(name: str) -> str:
 def _check_page(
     *, after_seq: int, before_seq: int | None, limit: int | None, last: int | None
 ) -> None:
-    """Refuse a read of the log that gives both ``limit`` and ``last``, or a negative number."""
+    """Refuse a read of the log that gives both ``limit`` and ``last``, or a number out of range."""
     if limit is not None and last is not None:
         raise ValidationFailed("give limit or last, not both", [])
     given = {"after_seq": after_seq, "before_seq": before_seq, "limit": limit, "last": last}
     for name, value in given.items():
-        if value is not None and value < 0:
-            raise ValidationFailed(f"{name} cannot be negative", [])
+        _check_count(name, value)
+
+
+def _check_count(name: str, value: int | None) -> None:
+    """Refuse a ``seq`` or a count that is negative, or more than storage can hold."""
+    if value is not None and value < 0:
+        raise ValidationFailed(f"{name} cannot be negative", [])
+    if value is not None and value > MAX_COUNT:
+        raise ValidationFailed(f"{name} cannot be more than {MAX_COUNT}", [])
 
 
 async def _stored(transaction: Transaction, name: RuleName) -> StoredRule:

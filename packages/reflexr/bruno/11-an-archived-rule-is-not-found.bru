@@ -1,0 +1,18 @@
+meta {
+  name: An archived rule is not found
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/workspaces/{{workspace}}/rules/team:checkout-deploys
+  body: none
+  auth: none
+}
+
+tests {
+  test("404", function () {
+    expect(res.status).to.equal(404);
+    expect(res.body.detail.type).to.equal("not_found");
+  });
+}

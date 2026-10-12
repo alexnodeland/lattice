@@ -1,0 +1,18 @@
+meta {
+  name: A missing artifact is not found
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{baseUrl}}/workspaces/{{workspace}}/artifacts/doc_missing
+  body: none
+  auth: none
+}
+
+tests {
+  test("404, with the rejection", function () {
+    expect(res.status).to.equal(404);
+    expect(res.body.detail.type).to.equal("not_found");
+  });
+}

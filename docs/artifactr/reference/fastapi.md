@@ -17,3 +17,11 @@ The `fastapi` extra. See [Serving over WebSocket and REST](../guides/serving.md)
 ::: artifactr.fastapi.Unauthorized
 
 ::: artifactr.fastapi.STATUS_CODES
+
+## The OpenAPI document
+
+The document committed as `schemas/artifactr.openapi.json`, from a bare application that mounts the router at its root.
+
+::: artifactr.fastapi.openapi.openapi_app
+
+::: artifactr.fastapi.openapi.openapi_document

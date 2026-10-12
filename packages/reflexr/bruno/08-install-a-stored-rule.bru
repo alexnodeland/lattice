@@ -1,0 +1,67 @@
+meta {
+  name: Install a stored rule
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/workspaces/{{workspace}}/commands
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "type": "command",
+    "command_id": "install-checkout-deploys",
+    "command": {
+      "type": "install_rule",
+      "provenance": {
+        "requested_by": "alice"
+      },
+      "rule": {
+        "name": "team:checkout-deploys",
+        "description": "Tell the person on call for checkout whenever it is deployed.",
+        "when": {
+          "filter": {
+            "kind": "all",
+            "of": [
+              {
+                "kind": "on",
+                "types": [
+                  "oncall:deploy.completed"
+                ]
+              },
+              {
+                "kind": "where",
+                "field": "service",
+                "op": "eq",
+                "value": "checkout"
+              }
+            ]
+          },
+          "throttle": {
+            "at_most": 1,
+            "per": "PT15M"
+          }
+        },
+        "then": {
+          "action": "notify",
+          "params": {
+            "service": "checkout"
+          }
+        },
+        "ordering": "none",
+        "timeout": "PT1M"
+      }
+    }
+  }
+}
+
+tests {
+  test("version 1", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.outcome.type).to.equal("rule_version");
+    expect(res.body.outcome.version).to.equal(1);
+  });
+}

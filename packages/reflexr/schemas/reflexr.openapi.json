@@ -1,0 +1,3058 @@
+{
+  "components": {
+    "schemas": {
+      "AbsencePattern": {
+        "additionalProperties": false,
+        "description": "Fire once when nothing has passed the filter for ``within`` since the last envelope did.\n\nOnly scopes that have been seen can go quiet. Time passes with every envelope in the log,\nwhether or not it passes the filter.",
+        "properties": {
+          "kind": {
+            "const": "absence",
+            "default": "absence",
+            "title": "Kind",
+            "type": "string"
+          },
+          "within": {
+            "format": "duration",
+            "title": "Within",
+            "type": "string"
+          }
+        },
+        "required": [
+          "within"
+        ],
+        "title": "AbsencePattern",
+        "type": "object"
+      },
+      "ActionRef": {
+        "additionalProperties": false,
+        "description": "The action a rule runs, by name, and the params the rule passes it.",
+        "properties": {
+          "action": {
+            "minLength": 1,
+            "title": "Action",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Params",
+            "type": "object"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "ActionRef",
+        "type": "object"
+      },
+      "AgentActor": {
+        "description": "An agent or graph running an action for one firing of a rule.",
+        "properties": {
+          "kind": {
+            "const": "agent",
+            "default": "agent",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/RuleName"
+          },
+          "run_id": {
+            "$ref": "#/components/schemas/RunId"
+          }
+        },
+        "required": [
+          "rule",
+          "run_id",
+          "name"
+        ],
+        "title": "AgentActor",
+        "type": "object"
+      },
+      "AllFilter-Input": {
+        "additionalProperties": false,
+        "description": "Envelopes that match every filter in ``of``.",
+        "properties": {
+          "kind": {
+            "const": "all",
+            "default": "all",
+            "title": "Kind",
+            "type": "string"
+          },
+          "of": {
+            "items": {
+              "$ref": "#/components/schemas/Filter-Input"
+            },
+            "minItems": 1,
+            "title": "Of",
+            "type": "array"
+          }
+        },
+        "required": [
+          "of"
+        ],
+        "title": "AllFilter",
+        "type": "object"
+      },
+      "AllFilter-Output": {
+        "additionalProperties": false,
+        "description": "Envelopes that match every filter in ``of``.",
+        "properties": {
+          "kind": {
+            "const": "all",
+            "default": "all",
+            "title": "Kind",
+            "type": "string"
+          },
+          "of": {
+            "items": {
+              "$ref": "#/components/schemas/Filter-Output"
+            },
+            "minItems": 1,
+            "title": "Of",
+            "type": "array"
+          }
+        },
+        "required": [
+          "of"
+        ],
+        "title": "AllFilter",
+        "type": "object"
+      },
+      "AnyFilter-Input": {
+        "additionalProperties": false,
+        "description": "Envelopes that match at least one filter in ``of``.",
+        "properties": {
+          "kind": {
+            "const": "any",
+            "default": "any",
+            "title": "Kind",
+            "type": "string"
+          },
+          "of": {
+            "items": {
+              "$ref": "#/components/schemas/Filter-Input"
+            },
+            "minItems": 1,
+            "title": "Of",
+            "type": "array"
+          }
+        },
+        "required": [
+          "of"
+        ],
+        "title": "AnyFilter",
+        "type": "object"
+      },
+      "AnyFilter-Output": {
+        "additionalProperties": false,
+        "description": "Envelopes that match at least one filter in ``of``.",
+        "properties": {
+          "kind": {
+            "const": "any",
+            "default": "any",
+            "title": "Kind",
+            "type": "string"
+          },
+          "of": {
+            "items": {
+              "$ref": "#/components/schemas/Filter-Output"
+            },
+            "minItems": 1,
+            "title": "Of",
+            "type": "array"
+          }
+        },
+        "required": [
+          "of"
+        ],
+        "title": "AnyFilter",
+        "type": "object"
+      },
+      "ArchiveRule": {
+        "additionalProperties": false,
+        "description": "Archive a stored rule, and cancel its unfinished runs.",
+        "properties": {
+          "expected_version": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Version"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/RuleName"
+          },
+          "type": {
+            "const": "archive_rule",
+            "default": "archive_rule",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule"
+        ],
+        "title": "ArchiveRule",
+        "type": "object"
+      },
+      "CancelRun": {
+        "additionalProperties": false,
+        "description": "Cancel a run that has not finished, stopping its action if it is running.",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "run_id": {
+            "$ref": "#/components/schemas/RunId"
+          },
+          "type": {
+            "const": "cancel_run",
+            "default": "cancel_run",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "title": "CancelRun",
+        "type": "object"
+      },
+      "Causation": {
+        "description": "What caused an event that a run emitted, and how deep its causal chain is.",
+        "properties": {
+          "depth": {
+            "minimum": 1.0,
+            "title": "Depth",
+            "type": "integer"
+          },
+          "firing_id": {
+            "$ref": "#/components/schemas/FiringId"
+          },
+          "run_id": {
+            "$ref": "#/components/schemas/RunId"
+          }
+        },
+        "required": [
+          "firing_id",
+          "run_id",
+          "depth"
+        ],
+        "title": "Causation",
+        "type": "object"
+      },
+      "ChainTarget": {
+        "additionalProperties": false,
+        "description": "Feedback on a causal chain: everything one triggering event led to.",
+        "properties": {
+          "correlation_id": {
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "chain",
+            "default": "chain",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "correlation_id"
+        ],
+        "title": "ChainTarget",
+        "type": "object"
+      },
+      "Command": {
+        "discriminator": {
+          "mapping": {
+            "archive_rule": "#/components/schemas/ArchiveRule",
+            "cancel_run": "#/components/schemas/CancelRun",
+            "give_feedback": "#/components/schemas/GiveFeedback",
+            "install_rule": "#/components/schemas/InstallRule",
+            "publish": "#/components/schemas/Publish",
+            "replay_rule": "#/components/schemas/ReplayRule",
+            "retry_run": "#/components/schemas/RetryRun",
+            "skip_run": "#/components/schemas/SkipRun",
+            "update_rule": "#/components/schemas/UpdateRule"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Publish"
+          },
+          {
+            "$ref": "#/components/schemas/GiveFeedback"
+          },
+          {
+            "$ref": "#/components/schemas/RetryRun"
+          },
+          {
+            "$ref": "#/components/schemas/SkipRun"
+          },
+          {
+            "$ref": "#/components/schemas/CancelRun"
+          },
+          {
+            "$ref": "#/components/schemas/ReplayRule"
+          },
+          {
+            "$ref": "#/components/schemas/InstallRule"
+          },
+          {
+            "$ref": "#/components/schemas/UpdateRule"
+          },
+          {
+            "$ref": "#/components/schemas/ArchiveRule"
+          }
+        ]
+      },
+      "CommandFrame": {
+        "additionalProperties": false,
+        "description": "A client's command, with an id that correlates it with its result.\n\n``command_id`` is also an idempotency key: the server deduplicates repeated ids.",
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/Command"
+          },
+          "command_id": {
+            "minLength": 1,
+            "title": "Command Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "command",
+            "default": "command",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "command"
+        ],
+        "title": "CommandFrame",
+        "type": "object"
+      },
+      "CommandResult": {
+        "additionalProperties": false,
+        "description": "The result of one command frame.",
+        "properties": {
+          "command_id": {
+            "title": "Command Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Outcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rejection": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejection"
+          },
+          "type": {
+            "const": "command_result",
+            "default": "command_result",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "ok"
+        ],
+        "title": "CommandResult",
+        "type": "object"
+      },
+      "Condition-Input": {
+        "additionalProperties": false,
+        "description": "A rule's ``when``: a filter, and optionally dedupe, a pattern and a throttle.",
+        "properties": {
+          "dedupe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Dedupe"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "filter": {
+            "$ref": "#/components/schemas/Filter-Input"
+          },
+          "pattern": {
+            "$ref": "#/components/schemas/Pattern-Input",
+            "default": {
+              "kind": "each"
+            }
+          },
+          "throttle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Throttle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "filter"
+        ],
+        "title": "Condition",
+        "type": "object"
+      },
+      "Condition-Output": {
+        "additionalProperties": false,
+        "description": "A rule's ``when``: a filter, and optionally dedupe, a pattern and a throttle.",
+        "properties": {
+          "dedupe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Dedupe"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "filter": {
+            "$ref": "#/components/schemas/Filter-Output"
+          },
+          "pattern": {
+            "$ref": "#/components/schemas/Pattern-Output",
+            "default": {
+              "kind": "each"
+            }
+          },
+          "throttle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Throttle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "filter"
+        ],
+        "title": "Condition",
+        "type": "object"
+      },
+      "CountPattern": {
+        "additionalProperties": false,
+        "description": "Fire when ``at_least`` envelopes pass within ``within``. A firing consumes them.",
+        "properties": {
+          "at_least": {
+            "minimum": 1.0,
+            "title": "At Least",
+            "type": "integer"
+          },
+          "kind": {
+            "const": "count",
+            "default": "count",
+            "title": "Kind",
+            "type": "string"
+          },
+          "within": {
+            "format": "duration",
+            "title": "Within",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at_least",
+          "within"
+        ],
+        "title": "CountPattern",
+        "type": "object"
+      },
+      "Dedupe": {
+        "additionalProperties": false,
+        "description": "Drop an envelope whose ``key`` fields were already seen within ``within``.",
+        "properties": {
+          "key": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Key",
+            "type": "array"
+          },
+          "within": {
+            "format": "duration",
+            "title": "Within",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "within"
+        ],
+        "title": "Dedupe",
+        "type": "object"
+      },
+      "EachPattern": {
+        "additionalProperties": false,
+        "description": "Fire for every envelope that passes the filter.",
+        "properties": {
+          "kind": {
+            "const": "each",
+            "default": "each",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "title": "EachPattern",
+        "type": "object"
+      },
+      "Envelope": {
+        "description": "A stored event with its position and attribution. Its shape is also the wire shape.",
+        "properties": {
+          "actor": {
+            "discriminator": {
+              "mapping": {
+                "agent": "#/components/schemas/AgentActor",
+                "evaluator": "#/components/schemas/EvaluatorActor",
+                "external_agent": "#/components/schemas/ExternalAgentActor",
+                "source": "#/components/schemas/SourceActor",
+                "system": "#/components/schemas/SystemActor",
+                "user": "#/components/schemas/UserActor"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserActor"
+              },
+              {
+                "$ref": "#/components/schemas/AgentActor"
+              },
+              {
+                "$ref": "#/components/schemas/ExternalAgentActor"
+              },
+              {
+                "$ref": "#/components/schemas/SystemActor"
+              },
+              {
+                "$ref": "#/components/schemas/SourceActor"
+              },
+              {
+                "$ref": "#/components/schemas/EvaluatorActor"
+              }
+            ],
+            "title": "Actor"
+          },
+          "causation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Causation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "correlation_id": {
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "event": {
+            "additionalProperties": true,
+            "properties": {
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "title": "Event",
+            "type": "object"
+          },
+          "id": {
+            "$ref": "#/components/schemas/EventId"
+          },
+          "seq": {
+            "minimum": 1.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "traceparent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Traceparent"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          },
+          "workspace_id": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          }
+        },
+        "required": [
+          "seq",
+          "id",
+          "ts",
+          "workspace_id",
+          "actor",
+          "correlation_id",
+          "event"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "EvaluationError": {
+        "additionalProperties": false,
+        "description": "A rule could not evaluate one envelope.",
+        "properties": {
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/RuleName"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rule",
+          "seq",
+          "error"
+        ],
+        "title": "EvaluationError",
+        "type": "object"
+      },
+      "EvaluatorActor": {
+        "description": "An evaluator: a judge or decision model whose verdicts are recorded as feedback.",
+        "properties": {
+          "kind": {
+            "const": "evaluator",
+            "default": "evaluator",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version"
+        ],
+        "title": "EvaluatorActor",
+        "type": "object"
+      },
+      "Event": {
+        "additionalProperties": false,
+        "description": "Base class for event types.\n\nSubclass it through an abstract base that declares a namespace with ``event_namespace=``,\nand give it ordinary Pydantic fields. Events are facts, so they are immutable, and unknown\nfields are rejected so that a producer's typo fails loudly.",
+        "properties": {},
+        "title": "Event",
+        "type": "object"
+      },
+      "EventId": {
+        "type": "string"
+      },
+      "ExternalAgentActor": {
+        "description": "An agent outside reflexr, connected over MCP.",
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "external_agent",
+            "default": "external_agent",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "client_id"
+        ],
+        "title": "ExternalAgentActor",
+        "type": "object"
+      },
+      "FeedbackTarget": {
+        "discriminator": {
+          "mapping": {
+            "chain": "#/components/schemas/ChainTarget",
+            "firing": "#/components/schemas/FiringTarget",
+            "run": "#/components/schemas/RunTarget"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RunTarget"
+          },
+          {
+            "$ref": "#/components/schemas/FiringTarget"
+          },
+          {
+            "$ref": "#/components/schemas/ChainTarget"
+          }
+        ]
+      },
+      "Filter-Input": {
+        "discriminator": {
+          "mapping": {
+            "all": "#/components/schemas/AllFilter-Input",
+            "any": "#/components/schemas/AnyFilter-Input",
+            "not": "#/components/schemas/NotFilter-Input",
+            "on": "#/components/schemas/OnFilter",
+            "predicate": "#/components/schemas/PredicateFilter",
+            "where": "#/components/schemas/WhereFilter"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/OnFilter"
+          },
+          {
+            "$ref": "#/components/schemas/WhereFilter"
+          },
+          {
+            "$ref": "#/components/schemas/AllFilter-Input"
+          },
+          {
+            "$ref": "#/components/schemas/AnyFilter-Input"
+          },
+          {
+            "$ref": "#/components/schemas/NotFilter-Input"
+          },
+          {
+            "$ref": "#/components/schemas/PredicateFilter"
+          }
+        ]
+      },
+      "Filter-Output": {
+        "discriminator": {
+          "mapping": {
+            "all": "#/components/schemas/AllFilter-Output",
+            "any": "#/components/schemas/AnyFilter-Output",
+            "not": "#/components/schemas/NotFilter-Output",
+            "on": "#/components/schemas/OnFilter",
+            "predicate": "#/components/schemas/PredicateFilter",
+            "where": "#/components/schemas/WhereFilter"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/OnFilter"
+          },
+          {
+            "$ref": "#/components/schemas/WhereFilter"
+          },
+          {
+            "$ref": "#/components/schemas/AllFilter-Output"
+          },
+          {
+            "$ref": "#/components/schemas/AnyFilter-Output"
+          },
+          {
+            "$ref": "#/components/schemas/NotFilter-Output"
+          },
+          {
+            "$ref": "#/components/schemas/PredicateFilter"
+          }
+        ]
+      },
+      "FiringId": {
+        "type": "string"
+      },
+      "FiringTarget": {
+        "additionalProperties": false,
+        "description": "Feedback on one firing: whether the rule should have fired.",
+        "properties": {
+          "firing_id": {
+            "$ref": "#/components/schemas/FiringId"
+          },
+          "kind": {
+            "const": "firing",
+            "default": "firing",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "firing_id"
+        ],
+        "title": "FiringTarget",
+        "type": "object"
+      },
+      "GiveFeedback": {
+        "additionalProperties": false,
+        "description": "Give typed feedback on a run, a firing or a causal chain.",
+        "properties": {
+          "feedback_type": {
+            "title": "Feedback Type",
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/FeedbackTarget"
+          },
+          "type": {
+            "const": "give_feedback",
+            "default": "give_feedback",
+            "title": "Type",
+            "type": "string"
+          },
+          "value": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Value",
+            "type": "object"
+          }
+        },
+        "required": [
+          "feedback_type",
+          "target",
+          "value"
+        ],
+        "title": "GiveFeedback",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "InstallRule": {
+        "additionalProperties": false,
+        "description": "Install a stored rule: its first version, or the next version of an archived one.",
+        "properties": {
+          "provenance": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "default": {},
+            "title": "Provenance",
+            "type": "object"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/Rule-Input"
+          },
+          "type": {
+            "const": "install_rule",
+            "default": "install_rule",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule"
+        ],
+        "title": "InstallRule",
+        "type": "object"
+      },
+      "JsonValue": {},
+      "NotFilter-Input": {
+        "additionalProperties": false,
+        "description": "Envelopes that do not match ``filter``.",
+        "properties": {
+          "filter": {
+            "$ref": "#/components/schemas/Filter-Input"
+          },
+          "kind": {
+            "const": "not",
+            "default": "not",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "filter"
+        ],
+        "title": "NotFilter",
+        "type": "object"
+      },
+      "NotFilter-Output": {
+        "additionalProperties": false,
+        "description": "Envelopes that do not match ``filter``.",
+        "properties": {
+          "filter": {
+            "$ref": "#/components/schemas/Filter-Output"
+          },
+          "kind": {
+            "const": "not",
+            "default": "not",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "filter"
+        ],
+        "title": "NotFilter",
+        "type": "object"
+      },
+      "OnFilter": {
+        "additionalProperties": false,
+        "description": "Envelopes whose event is one of ``types``.",
+        "properties": {
+          "kind": {
+            "const": "on",
+            "default": "on",
+            "title": "Kind",
+            "type": "string"
+          },
+          "types": {
+            "items": {
+              "pattern": "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Types",
+            "type": "array"
+          }
+        },
+        "required": [
+          "types"
+        ],
+        "title": "OnFilter",
+        "type": "object"
+      },
+      "Outcome": {
+        "discriminator": {
+          "mapping": {
+            "published": "#/components/schemas/PublishedOutcome",
+            "recorded": "#/components/schemas/RecordedOutcome",
+            "rule": "#/components/schemas/RuleOutcome",
+            "rule_version": "#/components/schemas/RuleVersionOutcome",
+            "run": "#/components/schemas/RunOutcome"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PublishedOutcome"
+          },
+          {
+            "$ref": "#/components/schemas/RecordedOutcome"
+          },
+          {
+            "$ref": "#/components/schemas/RunOutcome"
+          },
+          {
+            "$ref": "#/components/schemas/RuleOutcome"
+          },
+          {
+            "$ref": "#/components/schemas/RuleVersionOutcome"
+          }
+        ]
+      },
+      "Pattern-Input": {
+        "discriminator": {
+          "mapping": {
+            "absence": "#/components/schemas/AbsencePattern",
+            "count": "#/components/schemas/CountPattern",
+            "each": "#/components/schemas/EachPattern",
+            "sequence": "#/components/schemas/SequencePattern-Input"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/EachPattern"
+          },
+          {
+            "$ref": "#/components/schemas/CountPattern"
+          },
+          {
+            "$ref": "#/components/schemas/SequencePattern-Input"
+          },
+          {
+            "$ref": "#/components/schemas/AbsencePattern"
+          }
+        ]
+      },
+      "Pattern-Output": {
+        "discriminator": {
+          "mapping": {
+            "absence": "#/components/schemas/AbsencePattern",
+            "count": "#/components/schemas/CountPattern",
+            "each": "#/components/schemas/EachPattern",
+            "sequence": "#/components/schemas/SequencePattern-Output"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/EachPattern"
+          },
+          {
+            "$ref": "#/components/schemas/CountPattern"
+          },
+          {
+            "$ref": "#/components/schemas/SequencePattern-Output"
+          },
+          {
+            "$ref": "#/components/schemas/AbsencePattern"
+          }
+        ]
+      },
+      "PredicateFilter": {
+        "additionalProperties": false,
+        "description": "Envelopes whose event the registered Python predicate ``name`` accepts.\n\nAn escape hatch for what the other filters cannot express. Predicates must be pure.",
+        "properties": {
+          "kind": {
+            "const": "predicate",
+            "default": "predicate",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "PredicateFilter",
+        "type": "object"
+      },
+      "Publish": {
+        "additionalProperties": false,
+        "description": "Publish an event. Publishing an ``id`` already in the log appends nothing.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "event": {
+            "additionalProperties": true,
+            "properties": {
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "title": "Event",
+            "type": "object"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "publish",
+            "default": "publish",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event"
+        ],
+        "title": "Publish",
+        "type": "object"
+      },
+      "PublishBatch": {
+        "additionalProperties": false,
+        "description": "Events to publish atomically and in order, optionally joining a causal chain.",
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/PublishItem"
+            },
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "events"
+        ],
+        "title": "PublishBatch",
+        "type": "object"
+      },
+      "PublishItem": {
+        "additionalProperties": false,
+        "description": "One event to publish, with an optional id for idempotency.",
+        "properties": {
+          "event": {
+            "additionalProperties": true,
+            "properties": {
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "title": "Event",
+            "type": "object"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "event"
+        ],
+        "title": "PublishItem",
+        "type": "object"
+      },
+      "PublishedOutcome": {
+        "additionalProperties": false,
+        "description": "What publishing did: the event's position, and whether it was already there.",
+        "properties": {
+          "duplicate": {
+            "default": false,
+            "title": "Duplicate",
+            "type": "boolean"
+          },
+          "id": {
+            "$ref": "#/components/schemas/EventId"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "type": {
+            "const": "published",
+            "default": "published",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "id"
+        ],
+        "title": "PublishedOutcome",
+        "type": "object"
+      },
+      "RecordedOutcome": {
+        "additionalProperties": false,
+        "description": "Where a fact the command recorded, such as feedback, was appended.",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/EventId"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "type": {
+            "const": "recorded",
+            "default": "recorded",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "id"
+        ],
+        "title": "RecordedOutcome",
+        "type": "object"
+      },
+      "ReplayRule": {
+        "additionalProperties": false,
+        "description": "Reset a rule to evaluate the log again, rebuilding its state or firing again.",
+        "properties": {
+          "from_seq": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "From Seq",
+            "type": "integer"
+          },
+          "mode": {
+            "default": "rebuild",
+            "enum": [
+              "rebuild",
+              "refire"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/RuleName"
+          },
+          "type": {
+            "const": "replay_rule",
+            "default": "replay_rule",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule"
+        ],
+        "title": "ReplayRule",
+        "type": "object"
+      },
+      "RetryPolicy": {
+        "additionalProperties": false,
+        "description": "How a failed run is retried: exponential backoff, up to ``max_attempts`` attempts.",
+        "properties": {
+          "backoff": {
+            "default": "PT1S",
+            "format": "duration",
+            "title": "Backoff",
+            "type": "string"
+          },
+          "max_attempts": {
+            "default": 5,
+            "minimum": 1.0,
+            "title": "Max Attempts",
+            "type": "integer"
+          },
+          "max_backoff": {
+            "default": "PT5M",
+            "format": "duration",
+            "title": "Max Backoff",
+            "type": "string"
+          },
+          "multiplier": {
+            "default": 2.0,
+            "minimum": 1.0,
+            "title": "Multiplier",
+            "type": "number"
+          }
+        },
+        "title": "RetryPolicy",
+        "type": "object"
+      },
+      "RetryRun": {
+        "additionalProperties": false,
+        "description": "Make a run runnable now.",
+        "properties": {
+          "run_id": {
+            "$ref": "#/components/schemas/RunId"
+          },
+          "type": {
+            "const": "retry_run",
+            "default": "retry_run",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "title": "RetryRun",
+        "type": "object"
+      },
+      "Rule-Input": {
+        "additionalProperties": false,
+        "description": "When ``when`` holds for a scope, run ``then``.",
+        "properties": {
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "name": {
+            "$ref": "#/components/schemas/RuleName_a-z__a-z0-9____a-z0-9___-_____"
+          },
+          "on_dead_letter": {
+            "default": "continue",
+            "enum": [
+              "continue",
+              "block"
+            ],
+            "title": "On Dead Letter",
+            "type": "string"
+          },
+          "ordering": {
+            "default": "scope",
+            "enum": [
+              "scope",
+              "none"
+            ],
+            "title": "Ordering",
+            "type": "string"
+          },
+          "retry": {
+            "$ref": "#/components/schemas/RetryPolicy",
+            "default": {
+              "backoff": "PT1S",
+              "max_attempts": 5,
+              "max_backoff": "PT5M",
+              "multiplier": 2.0
+            }
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope",
+            "default": {
+              "fields": []
+            }
+          },
+          "start": {
+            "default": "now",
+            "enum": [
+              "now",
+              "beginning"
+            ],
+            "title": "Start",
+            "type": "string"
+          },
+          "then": {
+            "$ref": "#/components/schemas/ActionRef"
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "format": "duration",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout"
+          },
+          "when": {
+            "$ref": "#/components/schemas/Condition-Input"
+          }
+        },
+        "required": [
+          "name",
+          "when",
+          "then"
+        ],
+        "title": "Rule",
+        "type": "object"
+      },
+      "Rule-Output": {
+        "additionalProperties": false,
+        "description": "When ``when`` holds for a scope, run ``then``.",
+        "properties": {
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "name": {
+            "$ref": "#/components/schemas/RuleName_a-z__a-z0-9____a-z0-9___-_____"
+          },
+          "on_dead_letter": {
+            "default": "continue",
+            "enum": [
+              "continue",
+              "block"
+            ],
+            "title": "On Dead Letter",
+            "type": "string"
+          },
+          "ordering": {
+            "default": "scope",
+            "enum": [
+              "scope",
+              "none"
+            ],
+            "title": "Ordering",
+            "type": "string"
+          },
+          "retry": {
+            "$ref": "#/components/schemas/RetryPolicy",
+            "default": {
+              "backoff": "PT1S",
+              "max_attempts": 5,
+              "max_backoff": "PT5M",
+              "multiplier": 2.0
+            }
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope",
+            "default": {
+              "fields": []
+            }
+          },
+          "start": {
+            "default": "now",
+            "enum": [
+              "now",
+              "beginning"
+            ],
+            "title": "Start",
+            "type": "string"
+          },
+          "then": {
+            "$ref": "#/components/schemas/ActionRef"
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "format": "duration",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout"
+          },
+          "when": {
+            "$ref": "#/components/schemas/Condition-Output"
+          }
+        },
+        "required": [
+          "name",
+          "when",
+          "then"
+        ],
+        "title": "Rule",
+        "type": "object"
+      },
+      "RuleName": {
+        "type": "string"
+      },
+      "RuleName_a-z__a-z0-9____a-z0-9___-_____": {
+        "maxLength": 100,
+        "pattern": "^[a-z][a-z0-9_]*:[a-z0-9][a-z0-9._-]*$",
+        "type": "string"
+      },
+      "RuleOutcome": {
+        "additionalProperties": false,
+        "description": "A rule's progress after the command reset it.",
+        "properties": {
+          "progress": {
+            "$ref": "#/components/schemas/RuleProgress"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/RuleName"
+          },
+          "type": {
+            "const": "rule",
+            "default": "rule",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule",
+          "progress"
+        ],
+        "title": "RuleOutcome",
+        "type": "object"
+      },
+      "RuleProgress": {
+        "additionalProperties": false,
+        "description": "Where a rule is in a workspace's log, stored with its cursor.",
+        "properties": {
+          "cursor": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Cursor",
+            "type": "integer"
+          },
+          "deadlines": {
+            "additionalProperties": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "default": {},
+            "propertyNames": {
+              "$ref": "#/components/schemas/ScopeKey"
+            },
+            "title": "Deadlines",
+            "type": "object"
+          },
+          "definition": {
+            "default": "",
+            "title": "Definition",
+            "type": "string"
+          },
+          "generation": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Generation",
+            "type": "integer"
+          },
+          "silent_through": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Silent Through",
+            "type": "integer"
+          }
+        },
+        "title": "RuleProgress",
+        "type": "object"
+      },
+      "RuleStatus": {
+        "additionalProperties": false,
+        "description": "A rule's progress in a workspace.",
+        "properties": {
+          "cursor": {
+            "title": "Cursor",
+            "type": "integer"
+          },
+          "dead_letters": {
+            "title": "Dead Letters",
+            "type": "integer"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "generation": {
+            "title": "Generation",
+            "type": "integer"
+          },
+          "lag": {
+            "title": "Lag",
+            "type": "integer"
+          },
+          "origin": {
+            "enum": [
+              "code",
+              "stored"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/RuleName"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "rule",
+          "origin",
+          "enabled",
+          "cursor",
+          "lag",
+          "generation",
+          "dead_letters"
+        ],
+        "title": "RuleStatus",
+        "type": "object"
+      },
+      "RuleVersionOutcome": {
+        "additionalProperties": false,
+        "description": "A stored rule's version after the command changed it, or found it changed already.",
+        "properties": {
+          "duplicate": {
+            "default": false,
+            "title": "Duplicate",
+            "type": "boolean"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/RuleName"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "type": {
+            "const": "rule_version",
+            "default": "rule_version",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rule",
+          "version",
+          "seq"
+        ],
+        "title": "RuleVersionOutcome",
+        "type": "object"
+      },
+      "Run": {
+        "additionalProperties": false,
+        "description": "One firing's action: its status, attempts, and a graph's latest checkpoint.",
+        "properties": {
+          "attempts": {
+            "default": 0,
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "checkpoint": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "checkpoints": {
+            "default": 0,
+            "title": "Checkpoints",
+            "type": "integer"
+          },
+          "correlation_id": {
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "depth": {
+            "default": 0,
+            "title": "Depth",
+            "type": "integer"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "fired_seq": {
+            "title": "Fired Seq",
+            "type": "integer"
+          },
+          "id": {
+            "$ref": "#/components/schemas/RunId"
+          },
+          "matched": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Matched",
+            "type": "array"
+          },
+          "next_attempt_at": {
+            "format": "date-time",
+            "title": "Next Attempt At",
+            "type": "string"
+          },
+          "output": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/RuleName"
+          },
+          "scope": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Scope",
+            "type": "object"
+          },
+          "scope_key": {
+            "$ref": "#/components/schemas/ScopeKey"
+          },
+          "status": {
+            "default": "pending",
+            "enum": [
+              "pending",
+              "running",
+              "retrying",
+              "succeeded",
+              "dead",
+              "cancelled",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "trace_ids": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/TraceId"
+            },
+            "title": "Trace Ids",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "rule",
+          "scope_key",
+          "scope",
+          "fired_seq",
+          "matched",
+          "correlation_id",
+          "next_attempt_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Run",
+        "type": "object"
+      },
+      "RunId": {
+        "type": "string"
+      },
+      "RunOutcome": {
+        "additionalProperties": false,
+        "description": "A run after the command changed it.",
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/Run"
+          },
+          "type": {
+            "const": "run",
+            "default": "run",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run"
+        ],
+        "title": "RunOutcome",
+        "type": "object"
+      },
+      "RunTarget": {
+        "additionalProperties": false,
+        "description": "Feedback on one run: a workflow execution.",
+        "properties": {
+          "kind": {
+            "const": "run",
+            "default": "run",
+            "title": "Kind",
+            "type": "string"
+          },
+          "run_id": {
+            "$ref": "#/components/schemas/RunId"
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "title": "RunTarget",
+        "type": "object"
+      },
+      "Schedule": {
+        "additionalProperties": false,
+        "description": "When to publish ticks, and into which workspaces.\n\nGive ``every`` or ``cron``, not both::\n\n    Schedule(name=\"heartbeat-check\", every=timedelta(seconds=30))\n    Schedule(name=\"weekday-standup\", cron=\"0 9 * * mon-fri\", timezone=\"Europe/Oslo\")",
+        "properties": {
+          "catch_up": {
+            "default": "skip",
+            "enum": [
+              "skip",
+              "all"
+            ],
+            "title": "Catch Up",
+            "type": "string"
+          },
+          "cron": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cron"
+          },
+          "every": {
+            "anyOf": [
+              {
+                "format": "duration",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Every"
+          },
+          "max_catch_up": {
+            "default": 100,
+            "minimum": 1.0,
+            "title": "Max Catch Up",
+            "type": "integer"
+          },
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "timezone": {
+            "default": "UTC",
+            "title": "Timezone",
+            "type": "string"
+          },
+          "workspaces": {
+            "anyOf": [
+              {
+                "const": "all",
+                "type": "string"
+              },
+              {
+                "items": {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "$ref": "#/components/schemas/TenantId"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WorkspaceId"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "type": "array"
+              }
+            ],
+            "default": "all",
+            "title": "Workspaces"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "Schedule",
+        "type": "object"
+      },
+      "ScheduleStatus": {
+        "additionalProperties": false,
+        "description": "When a schedule last ticked in a workspace, and when it ticks next.",
+        "properties": {
+          "last_tick": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Tick"
+          },
+          "next_tick": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Tick"
+          },
+          "schedule": {
+            "title": "Schedule",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schedule",
+          "last_tick",
+          "next_tick"
+        ],
+        "title": "ScheduleStatus",
+        "type": "object"
+      },
+      "Scope": {
+        "additionalProperties": false,
+        "description": "The event fields that partition a rule's state and ordering. None: the whole workspace.",
+        "properties": {
+          "fields": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Fields",
+            "type": "array"
+          }
+        },
+        "title": "Scope",
+        "type": "object"
+      },
+      "ScopeKey": {
+        "type": "string"
+      },
+      "SequencePattern-Input": {
+        "additionalProperties": false,
+        "description": "Fire when envelopes match ``steps`` in order, all within ``within`` of the first.\n\nAn envelope that matches the first step while a sequence is in progress (but not the step\nit is waiting for) starts the sequence again from it, so the latest start counts.",
+        "properties": {
+          "kind": {
+            "const": "sequence",
+            "default": "sequence",
+            "title": "Kind",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/Filter-Input"
+            },
+            "minItems": 2,
+            "title": "Steps",
+            "type": "array"
+          },
+          "within": {
+            "format": "duration",
+            "title": "Within",
+            "type": "string"
+          }
+        },
+        "required": [
+          "steps",
+          "within"
+        ],
+        "title": "SequencePattern",
+        "type": "object"
+      },
+      "SequencePattern-Output": {
+        "additionalProperties": false,
+        "description": "Fire when envelopes match ``steps`` in order, all within ``within`` of the first.\n\nAn envelope that matches the first step while a sequence is in progress (but not the step\nit is waiting for) starts the sequence again from it, so the latest start counts.",
+        "properties": {
+          "kind": {
+            "const": "sequence",
+            "default": "sequence",
+            "title": "Kind",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/Filter-Output"
+            },
+            "minItems": 2,
+            "title": "Steps",
+            "type": "array"
+          },
+          "within": {
+            "format": "duration",
+            "title": "Within",
+            "type": "string"
+          }
+        },
+        "required": [
+          "steps",
+          "within"
+        ],
+        "title": "SequencePattern",
+        "type": "object"
+      },
+      "SkipRun": {
+        "additionalProperties": false,
+        "description": "Give up on a waiting or dead-lettered run.",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "run_id": {
+            "$ref": "#/components/schemas/RunId"
+          },
+          "type": {
+            "const": "skip_run",
+            "default": "skip_run",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "title": "SkipRun",
+        "type": "object"
+      },
+      "SourceActor": {
+        "description": "A system that publishes events, such as a monitoring service or a webhook.",
+        "properties": {
+          "kind": {
+            "const": "source",
+            "default": "source",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "SourceActor",
+        "type": "object"
+      },
+      "SystemActor": {
+        "description": "reflexr itself (the reactor, schedules), or the application acting on its own behalf.",
+        "properties": {
+          "kind": {
+            "const": "system",
+            "default": "system",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "default": "reflexr",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "title": "SystemActor",
+        "type": "object"
+      },
+      "TenantId": {
+        "type": "string"
+      },
+      "Throttle": {
+        "additionalProperties": false,
+        "description": "Allow at most ``at_most`` firings per scope in any period of ``per``.",
+        "properties": {
+          "at_most": {
+            "minimum": 1.0,
+            "title": "At Most",
+            "type": "integer"
+          },
+          "per": {
+            "format": "duration",
+            "title": "Per",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at_most",
+          "per"
+        ],
+        "title": "Throttle",
+        "type": "object"
+      },
+      "TraceId": {
+        "type": "string"
+      },
+      "UpdateRule": {
+        "additionalProperties": false,
+        "description": "Replace an active stored rule with a new version, reset if its condition or scope changed.",
+        "properties": {
+          "expected_version": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Version"
+          },
+          "provenance": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "default": {},
+            "title": "Provenance",
+            "type": "object"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/Rule-Input"
+          },
+          "type": {
+            "const": "update_rule",
+            "default": "update_rule",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule"
+        ],
+        "title": "UpdateRule",
+        "type": "object"
+      },
+      "UserActor": {
+        "description": "A person, identified by the host application's user id.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "user",
+            "default": "user",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "UserActor",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WhereFilter": {
+        "additionalProperties": false,
+        "description": "Envelopes whose event field ``field`` compares with ``value`` by ``op``.\n\nA missing field matches nothing, except ``exists`` with ``value=False``.",
+        "properties": {
+          "field": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+            "title": "Field",
+            "type": "string"
+          },
+          "kind": {
+            "const": "where",
+            "default": "where",
+            "title": "Kind",
+            "type": "string"
+          },
+          "op": {
+            "enum": [
+              "eq",
+              "ne",
+              "lt",
+              "le",
+              "gt",
+              "ge",
+              "in",
+              "contains",
+              "matches",
+              "exists"
+            ],
+            "title": "Op",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/components/schemas/JsonValue"
+          }
+        },
+        "required": [
+          "field",
+          "op"
+        ],
+        "title": "WhereFilter",
+        "type": "object"
+      },
+      "WorkspaceId": {
+        "type": "string"
+      },
+      "WorkspaceRule": {
+        "additionalProperties": false,
+        "description": "One of a workspace's rules: a code rule, or the current version of an active stored one.",
+        "properties": {
+          "origin": {
+            "enum": [
+              "code",
+              "stored"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/Rule-Output"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "rule",
+          "origin"
+        ],
+        "title": "WorkspaceRule",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "reflexr",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/rules": {
+      "get": {
+        "description": "Return the rules registered in code, which every workspace evaluates.",
+        "operationId": "list_rules_rules_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Rule-Output"
+                  },
+                  "title": "Response List Rules Rules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Rules"
+      }
+    },
+    "/schedules": {
+      "get": {
+        "description": "Return the registered schedules that tick in the caller's tenant.\n\nA schedule that targets particular workspaces lists only the tenant's own, so no\ntenant sees another's ids; one that targets none of them is left out.",
+        "operationId": "list_schedules_schedules_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Schedule"
+                  },
+                  "title": "Response List Schedules Schedules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Schedules"
+      }
+    },
+    "/workspaces/{workspace_id}/commands": {
+      "post": {
+        "description": "Submit one command. The body is the same frame as over the WebSocket.",
+        "operationId": "post_command_workspaces__workspace_id__commands_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandFrame"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Command"
+      }
+    },
+    "/workspaces/{workspace_id}/dead-letters": {
+      "get": {
+        "description": "Return the envelopes rules could not evaluate, oldest first.",
+        "operationId": "list_dead_letters_workspaces__workspace_id__dead_letters_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rule",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RuleName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rule"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EvaluationError"
+                  },
+                  "title": "Response List Dead Letters Workspaces  Workspace Id  Dead Letters Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Dead Letters"
+      }
+    },
+    "/workspaces/{workspace_id}/events": {
+      "get": {
+        "description": "Return a page of the log, optionally of some event types. ``type`` may repeat.\n\nThe window is ``after_seq < seq < before_seq``. ``limit`` returns its first envelopes,\n``last`` its last ones, oldest first either way.",
+        "operationId": "list_events_workspaces__workspace_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after_seq",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "title": "After Seq",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before_seq",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 9223372036854775807,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Seq"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 9223372036854775807,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "in": "query",
+            "name": "last",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 9223372036854775807,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Envelope"
+                  },
+                  "title": "Response List Events Workspaces  Workspace Id  Events Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Events"
+      },
+      "post": {
+        "description": "Publish one event, or a batch in order: all of them, or none.",
+        "operationId": "post_events_workspaces__workspace_id__events_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PublishItem"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PublishBatch"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublishedOutcome"
+                  },
+                  "title": "Response Post Events Workspaces  Workspace Id  Events Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Events"
+      }
+    },
+    "/workspaces/{workspace_id}/rules": {
+      "get": {
+        "description": "Return the status of each of the workspace's rules, code rules first.\n\nA status is the rule's origin, a stored rule's version, whether the rule is enabled,\nand its cursor, lag, generation and dead letters.",
+        "operationId": "list_rule_status_workspaces__workspace_id__rules_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RuleStatus"
+                  },
+                  "title": "Response List Rule Status Workspaces  Workspace Id  Rules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Rule Status"
+      }
+    },
+    "/workspaces/{workspace_id}/rules/{rule}": {
+      "get": {
+        "description": "Return one of the workspace's rules, with a stored rule's version and provenance.",
+        "operationId": "get_rule_workspaces__workspace_id__rules__rule__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule",
+            "required": true,
+            "schema": {
+              "title": "Rule",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceRule"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Rule"
+      }
+    },
+    "/workspaces/{workspace_id}/runs": {
+      "get": {
+        "description": "Return runs, newest first.",
+        "operationId": "list_runs_workspaces__workspace_id__runs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rule",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RuleName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rule"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope_key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Key"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pending",
+                    "running",
+                    "retrying",
+                    "succeeded",
+                    "dead",
+                    "cancelled",
+                    "skipped"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 9223372036854775807,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Run"
+                  },
+                  "title": "Response List Runs Workspaces  Workspace Id  Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Runs"
+      }
+    },
+    "/workspaces/{workspace_id}/runs/{run_id}": {
+      "get": {
+        "description": "Return a run, with its attempts, last error and checkpoint.",
+        "operationId": "get_run_workspaces__workspace_id__runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run"
+      }
+    },
+    "/workspaces/{workspace_id}/schedules": {
+      "get": {
+        "description": "Return when each schedule targeting this workspace last ticked and ticks next.",
+        "operationId": "list_schedule_status_workspaces__workspace_id__schedules_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScheduleStatus"
+                  },
+                  "title": "Response List Schedule Status Workspaces  Workspace Id  Schedules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Schedule Status"
+      }
+    }
+  }
+}

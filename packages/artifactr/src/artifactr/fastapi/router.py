@@ -27,7 +27,7 @@ from artifactr.core import (
 )
 from artifactr.fastapi.stream import Stream
 from artifactr.telemetry import Telemetry, annotate, attribution
-from artifactr.workspace import Workspace, Workspaces
+from artifactr.workspace import MAX_COUNT, Workspace, Workspaces
 
 ResolveActor = Callable[[HTTPConnection], Awaitable[tuple[TenantId, Actor]]]
 """Authenticates a request or connection: returns its tenant and actor, or raises Unauthorized."""
@@ -42,6 +42,10 @@ STATUS_CODES: dict[str, int] = {
     "unsupported_protocol": 400,
 }
 """The HTTP status for each rejection ``type``."""
+
+
+Count = Annotated[int, Query(ge=0, le=MAX_COUNT)]
+"""A ``seq`` or a count in a query: as many as storage holds, which the document states."""
 
 
 class Unauthorized(Exception):
@@ -118,7 +122,9 @@ def artifactr_router(
         workspace: Workspace = current_workspace,
     ) -> JSONResponse:
         """List current artifacts, optionally of one kind."""
-        artifacts = await workspace.artifacts(kind=kind, include_archived=include_archived)
+        artifacts = await _or_http(
+            workspace.artifacts(kind=kind, include_archived=include_archived)
+        )
         return JSONResponse([a.model_dump(mode="json") for a in artifacts])
 
     @router.get("/workspaces/{workspace_id}/artifacts/{artifact_id}")
@@ -138,11 +144,11 @@ def artifactr_router(
 
     @router.get("/workspaces/{workspace_id}/events")
     async def list_events(
-        after_seq: int = 0,
-        before_seq: int | None = None,
+        after_seq: Count = 0,
+        before_seq: Count | None = None,
         thread_id: Annotated[list[str] | None, Query()] = None,
-        limit: int | None = None,
-        last: int | None = None,
+        limit: Count | None = None,
+        last: Count | None = None,
         workspace: Workspace = current_workspace,
     ) -> list[Envelope]:
         """Return a page of the log, optionally for some threads. ``thread_id`` may repeat.
@@ -163,7 +169,7 @@ def artifactr_router(
     @router.get("/workspaces/{workspace_id}/threads")
     async def list_threads(workspace: Workspace = current_workspace) -> list[Thread]:
         """Return every thread, oldest first."""
-        return await workspace.threads()
+        return await _or_http(workspace.threads())
 
     @router.get("/workspaces/{workspace_id}/threads/{thread_id}")
     async def get_thread(thread_id: str, workspace: Workspace = current_workspace) -> Thread:
@@ -176,7 +182,7 @@ def artifactr_router(
         workspace: Workspace = current_workspace,
     ) -> list[Proposal]:
         """Return proposals with a status, pending by default."""
-        return await workspace.proposals(status=status)
+        return await _or_http(workspace.proposals(status=status))
 
     @router.get("/workspaces/{workspace_id}/runs/{run_id}")
     async def get_run(run_id: str, workspace: Workspace = current_workspace) -> Run:

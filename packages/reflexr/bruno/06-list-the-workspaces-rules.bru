@@ -1,0 +1,20 @@
+meta {
+  name: List the workspace's rules
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/workspaces/{{workspace}}/rules
+  body: none
+  auth: none
+}
+
+tests {
+  test("each code rule's status", function () {
+    expect(res.status).to.equal(200);
+    const triage = res.body.find((s) => s.rule === "oncall:triage");
+    expect(triage.origin).to.equal("code");
+    expect(triage.enabled).to.equal(true);
+  });
+}

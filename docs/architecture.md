@@ -23,7 +23,7 @@ lattice is the family's one repository: seven packages, two reference implementa
 ```text
 lattice/
 ├── packages/
-│   ├── artifactr/       artifactr-ai: src/, tests/, schemas/, deploy/ (its dashboards), scripts/, compose.yaml, compose.stackr.yaml, moon.yml, pyproject.toml, README.md, CHANGELOG.md, LICENSE
+│   ├── artifactr/       artifactr-ai: src/, tests/, schemas/ (its JSON Schema and OpenAPI document), bruno/ (its collection), deploy/ (its dashboards), scripts/, compose.yaml, compose.stackr.yaml, moon.yml, pyproject.toml, README.md, CHANGELOG.md, LICENSE
 │   ├── reflexr/         the same shape
 │   ├── evalr/
 │   ├── relayr/          relayr-ai
@@ -34,7 +34,7 @@ lattice/
 │   ├── docplan/         artifactr's reference implementation, and its image
 │   └── oncall/          reflexr's
 ├── docs/                the site: the family's pages, and docs/<package>/ for each package
-├── scripts/             affected.py, standalone.py, check_site.py, griffe_sphinx_roles.py
+├── scripts/             affected.py, api (the acceptance tests), breaks.py, standalone.py, check_site.py, griffe_sphinx_roles.py
 ├── tests/               the family's tests: the quality gates over all Python, and moon's edges
 ├── .devcontainer/       the dev container
 ├── .moon/               workspace.yml, and the tasks projects inherit
@@ -160,6 +160,7 @@ moon runs every task, and only those a change affects; uv and Bun manage the dep
 
 - **`check` is one task per project** that runs nothing itself and depends on the project's checks, so the list lives in one place. `make check` runs `moon run :check`, and CI and Nightly run the same tasks.
 - **artifactr's and reflexr's contributor tasks,** `schema`, `dashboards`, `pg-up`, `pg-down`, `app-up` and `test-pg`, are ones CI doesn't run and moon doesn't cache (RFC-0003, D2). stackr keeps its Makefile for the stack, and its checks are tasks: `validate`, `reference`, `template`, `smoke` and `smoke-app`.
+- **artifactr's and reflexr's `api` tasks,** which the `api` tag gives them, are their acceptance tests ([ADR-0015](adr/0015-acceptance-tests-against-the-reference-applications.md)). Each starts its reference implementation from the package's `compose.yaml`, on pydantic-ai's test model, runs the package's Bruno collection against it, then Schemathesis over the package's committed OpenAPI document, and stops it. A change to the reference implementation runs them, through their inputs. Each runs as a compose project of its own, on ports the system picks, so they run side by side. The root's `schemathesis.toml` configures Schemathesis.
 - **The reference implementations' `image` tasks** build each image from lattice's root, since it installs from the root's lock. The image's own `Dockerfile.dockerignore` lets in only the workspace's manifests, the lock, and the packages it installs, with the README and license their metadata names. Each starts its image on its library's PostgreSQL, and a mutex runs them one at a time.
 
 ### What a change affects
@@ -168,7 +169,7 @@ moon runs every task, and only those a change affects; uv and Bun manage the dep
 
 1. It asks moon which projects the change touches, by their files and by their tasks' inputs, which include `uv.lock`, the root `pyproject.toml` and `.moon/`.
 2. It adds every project that depends on one of them, all the way down, from the project graph.
-3. It runs the task, `check`, `test`, `image`, or stackr's `template`, `smoke` or `smoke-app`, in each of those projects that has it.
+3. It runs the task, `check`, `test`, `image`, `api`, or stackr's `template`, `smoke` or `smoke-app`, in each of those projects that has it.
 
 A change to evalr runs the checks of evalr and of every project above it; a change to `uv.lock` runs every package's. A change to stackr or to a library runs the Template and Smoke jobs, whose applications install the pull request's libraries ([stackr ADR-0018](../stackr/adr/0018-the-template-pins-the-libraries-at-its-own-commit.md)).
 
@@ -176,7 +177,7 @@ A change to evalr runs the checks of evalr and of every project above it; a chan
 
 | Workflow | Runs | Jobs |
 |---|---|---|
-| `ci.yml` | On pull requests | **Check** (Python 3.12): `check` in every affected project and its dependents, with PostgreSQL 17 and a database per library. **Tests** (Python 3.13 and 3.14): `test`, the same way. **Images**: `image`, the same way. **Template**: the application template's seven variants, each generated and checked as its own CI would. **Smoke**: the stack, started three ways, with telemetry sent through it, and in one of them an application from the template beside it. **Dependency review**. **OSV**: the advisories a change adds to `uv.lock` or `bun.lock`. **CI**: passes only when every other job does |
+| `ci.yml` | On pull requests | **Check** (Python 3.12): `check` in every affected project and its dependents, with PostgreSQL 17 and a database per library. **Tests** (Python 3.13 and 3.14): `test`, the same way. **Images**: `image`, the same way. **Acceptance**: `api`, the same way: each library's Bruno collection and Schemathesis against its reference implementation. **Template**: the application template's seven variants, each generated and checked as its own CI would. **Smoke**: the stack, started three ways, with telemetry sent through it, and in one of them an application from the template beside it. **Dependency review**. **OSV**: the advisories a change adds to `uv.lock` or `bun.lock`. **CI**: passes only when every other job does |
 | `title.yml` | When a pull request is opened, edited, pushed to or reopened | **Title**: the title is a Conventional Commit, and it, or the description, marks every break the pull request adds to a package's public API against its last release ([ADR-0012](adr/0012-title-checks-the-breaks-in-the-public-apis.md)) |
 | `nightly.yml` | On every push to `main`, every night, and by hand | Every project's `check`, whatever changed; the images; osv-scanner over `uv.lock` and `bun.lock`; lychee over every Markdown file's links |
 | `docs.yml` | On every push to `main`, and by hand | Builds the site and deploys it to GitHub Pages |

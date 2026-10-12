@@ -143,6 +143,10 @@ what it reads, and opening a workspace is ``artifactr:open``.
 """
 
 
+MAX_COUNT: Final = 2**63 - 1
+"""The largest ``seq`` or count a read takes: what PostgreSQL's ``bigint`` holds."""
+
+
 class Access(BaseModel):
     """What an actor is about to do in a workspace, as ``authorize`` hears it."""
 
@@ -630,7 +634,8 @@ class Workspace:
                 returned.
 
         Raises:
-            ValidationFailed: If both ``limit`` and ``last`` are given, or a number is negative.
+            ValidationFailed: If both ``limit`` and ``last`` are given, or a number is negative
+                or more than storage holds.
         """
         await self.check(Access(action="artifactr:read_events"))
         _check_page(after_seq=after_seq, before_seq=before_seq, limit=limit, last=last)
@@ -805,13 +810,20 @@ def _access(command: Command) -> Access:
 def _check_page(
     *, after_seq: int, before_seq: int | None, limit: int | None, last: int | None
 ) -> None:
-    """Refuse a read of the log that gives both ``limit`` and ``last``, or a negative number."""
+    """Refuse a read of the log that gives both ``limit`` and ``last``, or a number out of range."""
     if limit is not None and last is not None:
         raise ValidationFailed("give limit or last, not both", [])
     given = {"after_seq": after_seq, "before_seq": before_seq, "limit": limit, "last": last}
     for name, value in given.items():
-        if value is not None and value < 0:
-            raise ValidationFailed(f"{name} cannot be negative", [])
+        _check_count(name, value)
+
+
+def _check_count(name: str, value: int | None) -> None:
+    """Refuse a ``seq`` or a count that is negative, or more than storage can hold."""
+    if value is not None and value < 0:
+        raise ValidationFailed(f"{name} cannot be negative", [])
+    if value is not None and value > MAX_COUNT:
+        raise ValidationFailed(f"{name} cannot be more than {MAX_COUNT}", [])
 
 
 def _traced(result: CommitResult) -> CommitResult:

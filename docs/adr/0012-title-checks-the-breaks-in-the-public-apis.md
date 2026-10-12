@@ -18,11 +18,11 @@ The marking lives in the title and the description, which CI's jobs never rerun 
 
 ## Decision
 
-- **A pull request answers for the breaks it adds.** [`scripts/api.py`](https://github.com/alexnodeland/lattice/blob/main/scripts/api.py) compares each package with its last release, its newest `<name>-v*` tag on the base, through griffe's library: once as the pull request's merge commit has it, and once as the merge commit's first parent (`HEAD^1`), the base it merges into, has it. A break the merge commit has and the base doesn't is the pull request's, and it fails unless the title has `!` after its type or scope, or the description has a `BREAKING CHANGE:` footer. Each break is an annotation on the file and line. A break that is reverted before the release adds nothing.
+- **A pull request answers for the breaks it adds.** [`scripts/breaks.py`](https://github.com/alexnodeland/lattice/blob/main/scripts/breaks.py) compares each package with its last release, its newest `<name>-v*` tag on the base, through griffe's library: once as the pull request's merge commit has it, and once as the merge commit's first parent (`HEAD^1`), the base it merges into, has it. A break the merge commit has and the base doesn't is the pull request's, and it fails unless the title has `!` after its type or scope, or the description has a `BREAKING CHANGE:` footer. Each break is an annotation on the file and line. A break that is reverted before the release adds nothing.
 - **A package with no release tag is skipped,** with a message saying so. It has no published API to keep, and its first release starts the comparison.
 - **`Attribute value was changed` isn't counted.** Every other kind griffe reports is: removed objects, changed kinds, removed bases, and added, removed, reordered or newly required parameters.
 - **The Title check runs it,** as a step after the title's own check. Title already reruns when the title or the description is edited, and is already required. So Title now says that the title is a Conventional Commit, and marks every break that the pull request makes.
-- **`moon run lattice:api`** runs the same comparison locally against `origin/main`, with no marking, to show what a branch would have to mark.
+- **`moon run lattice:breaks`** runs the same comparison locally against `origin/main`, with no marking, to show what a branch would have to mark.
 
 ## Options considered
 

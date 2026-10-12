@@ -56,13 +56,14 @@ class Recorder:
 
     def __init__(self) -> None:
         self.asked: list[tuple[str, str]] = []
+        self.refused: frozenset[str] = frozenset()
 
     async def __call__(
         self, tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
     ) -> bool:
         assert (tenant_id, workspace_id) == (TENANT, WORKSPACE)
         self.asked.append((actor.participant, access.action))
-        return True
+        return access.action not in self.refused
 
     def by(self, actor: Actor) -> list[str]:
         """What ``actor`` was asked for, in order, and forget it all."""
@@ -324,6 +325,18 @@ def test_every_route_asks_for_the_actions_of_the_methods_it_calls(
         else:
             assert client.get(url).status_code == 200, url
         assert recorder.by(ALICE) == ["artifactr:open", *actions], (method, path)
+
+
+def test_every_route_answers_a_refusal_with_403(client: TestClient, recorder: Recorder) -> None:
+    recorder.refused = ACTIONS - {"artifactr:open"}
+    for (method, path), (last, _) in ROUTES.items():
+        url = path.replace("{workspace_id}", WORKSPACE)
+        url = url[: url.rfind("{")] + last if last else url
+        if method == "POST":
+            frame = {"type": "command", "command_id": "c1", "command": {"type": "create_thread"}}
+            assert client.post(url, json=frame).status_code == 403, url
+        elif method == "GET":
+            assert client.get(url).status_code == 403, url
 
 
 def test_every_websocket_command_asks_for_the_actions_of_the_methods_it_calls(

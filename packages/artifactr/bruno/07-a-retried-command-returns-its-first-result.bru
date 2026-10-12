@@ -1,0 +1,41 @@
+meta {
+  name: A retried command returns its first result
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/workspaces/{{workspace}}/commands
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "type": "command",
+    "command_id": "edit-doc",
+    "command": {
+      "type": "edit_artifact",
+      "artifact_id": "{{doc}}",
+      "base_version": 1,
+      "summary": "move to Monday",
+      "patch": {
+        "kind": "json_patch",
+        "ops": [
+          {
+            "op": "replace",
+            "path": "/text",
+            "value": "Ship on Monday."
+          }
+        ]
+      }
+    }
+  }
+}
+
+tests {
+  test("the first result, and nothing done again", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.outcome.version).to.equal(2);
+  });
+}

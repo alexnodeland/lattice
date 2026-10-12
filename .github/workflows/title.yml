@@ -5,7 +5,7 @@
 # new module brings a new scope.
 #
 # A break in a package's public API, against its last release, must be marked as breaking
-# (scripts/api.py, with griffe).
+# (scripts/breaks.py, with griffe).
 
 name: Title
 
@@ -56,4 +56,4 @@ jobs:
         env:
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}
-        run: uv run --locked --only-group dev python scripts/api.py HEAD^1
+        run: uv run --locked --only-group dev python scripts/breaks.py HEAD^1

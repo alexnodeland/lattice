@@ -38,6 +38,7 @@ from artifactr.core import (
 from artifactr.workspace import (
     Access,
     InMemoryStorage,
+    Scope,
     Storage,
     ThreadBusy,
     Workspace,
@@ -271,9 +272,10 @@ async def test_reading_the_log_from_its_end(ws: Workspace) -> None:
         ({"before_seq": -1}, "before_seq cannot be negative"),
         ({"limit": -1}, "limit cannot be negative"),
         ({"last": -1}, "last cannot be negative"),
+        ({"after_seq": 2**63}, f"after_seq cannot be more than {2**63 - 1}"),  # PostgreSQL's
     ],
 )
-async def test_a_read_takes_limit_or_last_and_no_negative_numbers(
+async def test_a_read_takes_limit_or_last_and_numbers_storage_holds(
     ws: Workspace, options: dict[str, Any], message: str
 ) -> None:
     with pytest.raises(ValidationFailed, match=message):
@@ -385,12 +387,27 @@ async def test_a_thread_is_claimed_by_one_run_at_a_time(ws: Workspace) -> None:
         pass
 
 
-async def test_a_claim_is_renewed_while_held(ws: Workspace) -> None:
+async def test_a_claim_is_renewed_while_held(
+    storage: Storage, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = await Workspaces(storage).open("tenant_a", "ws_1", actor=ALICE)
     thread = await ws.create_thread()
-    # Renewed every ttl/3, so the claim lapses only if a renewal stalls for most of the ttl.
-    ttl = timedelta(seconds=1)
+    acquired: list[str] = []
+    renewed = asyncio.Event()
+    acquire = storage.acquire_lease
+
+    async def watched(scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
+        kept = await acquire(scope, key, holder, ttl)
+        acquired.append(holder)
+        if acquired.count("run_1") == 2:  # the claim, then its first renewal
+            renewed.set()
+        return kept
+
+    monkeypatch.setattr(storage, "acquire_lease", watched)
+    ttl = timedelta(seconds=10)  # renewed every ttl/3
     async with ws.claim_thread(thread.id, holder="run_1", ttl=ttl) as lost:
-        await asyncio.sleep(1.2)  # longer than the ttl: only renewal keeps the claim
+        async with asyncio.timeout(5):
+            await renewed.wait()
         with pytest.raises(ThreadBusy):
             async with ws.claim_thread(thread.id, holder="run_2", ttl=ttl):
                 pass

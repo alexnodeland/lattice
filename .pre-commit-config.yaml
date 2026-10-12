@@ -51,7 +51,8 @@ repos:
         language: system
         types_or: [ts, tsx, javascript, json]
         files: ^(packages/portalr/web/|package\.json$|biome\.json$|knip\.json$|tsconfig\.base\.json$)
-      # yamllint and shellcheck check stackr's files, as they did in stackr.
+      # yamllint and shellcheck check stackr's files, as they did in stackr, and shellcheck the
+      # acceptance tests' script.
       - id: yamllint
         name: yamllint
         entry: uv run yamllint --strict -c packages/stackr/.yamllint.yaml
@@ -63,7 +64,7 @@ repos:
         entry: uv run shellcheck
         language: system
         types: [shell]
-        files: ^packages/stackr/
+        files: ^(packages/stackr/|scripts/api$)
       - id: actionlint
         name: actionlint
         entry: uv run actionlint

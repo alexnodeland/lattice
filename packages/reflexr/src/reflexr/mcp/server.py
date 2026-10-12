@@ -452,7 +452,7 @@ class ReflexrMcp:
             """
             workspace = await self._workspace(ctx, workspace_id)
             key = None if scope_key is None else key_of(scope_key)
-            runs = await workspace.runs(rule=rule, scope_key=key, status=status, limit=limit)
+            runs = await _tool(workspace.runs(rule=rule, scope_key=key, status=status, limit=limit))
             return "\n".join(run.model_dump_json() for run in runs) or "No runs."
 
         @server.tool()

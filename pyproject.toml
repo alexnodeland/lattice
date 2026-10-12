@@ -25,6 +25,11 @@ dev = [
     "ruff>=0.16",
     "zizmor>=1.30",
 ]
+# The acceptance tests' fuzzer: Schemathesis, over each REST surface's committed OpenAPI document,
+# against its reference application (the `api` tasks).
+acceptance = [
+    "schemathesis>=4.29",
+]
 # The documentation site: one build over every package (docs/, mkdocs.yml).
 docs = [
     "zensical>=0.0.66",

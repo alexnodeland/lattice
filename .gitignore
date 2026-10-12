@@ -50,6 +50,8 @@ coverage.xml
 *.cover
 *.py,cover
 .hypothesis/
+.schemathesis/
+.api-reports/
 .pytest_cache/
 cover/
 

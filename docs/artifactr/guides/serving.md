@@ -123,6 +123,8 @@ runner = Runner(agent, app=None, results=InMemoryCommandResults(capacity=50_000)
 
 A retry that reaches another process, or arrives after its result was forgotten, is carried out again. To cover that, choose the ids of what a command creates, such as `message_id`, and repeat them on a retry: an id already used is refused with 409 `invalid_state`, which then means an earlier attempt succeeded. For `post_message` it means the message was posted, not that its turn ran: a process that died between the two leaves the message without a turn ([Deduplication](../protocol.md#deduplication)).
 
+The router's OpenAPI document is committed as [`schemas/artifactr.openapi.json`](https://github.com/alexnodeland/lattice/blob/main/packages/artifactr/schemas/artifactr.openapi.json), with its paths relative to the prefix, so a client's types can be generated from it; FastAPI also serves an application's own at `/openapi.json`. A test fails when it drifts from the router. artifactr's [Bruno](https://www.usebruno.com) collection, in `packages/artifactr/bruno/`, exercises these endpoints against docplan, and Schemathesis fuzzes the document against it, in CI's Acceptance job ([lattice ADR-0015](../../adr/0015-acceptance-tests-against-the-reference-applications.md)).
+
 ## The WebSocket
 
 A client connects to `/v1/workspaces/{workspace_id}/stream` with the subprotocol `artifactr.v1`, and sends `hello` with the last `seq` it has seen (0 the first time) and, optionally, the threads it follows:

@@ -1,6 +1,6 @@
 """Fail on a break in a package's public API that a change adds, unless the change marks it.
 
-Usage: scripts/api.py BASE   (TITLE and BODY are the pull request's, when there is one)
+Usage: scripts/breaks.py BASE   (TITLE and BODY are the pull request's, when there is one)
 
 Each package (`packages/<name>/src/<name>`) is compared with its last release (its newest
 `<name>-v*` tag in BASE) by griffe, as `griffe check` does: once as the working tree has it,
@@ -56,7 +56,7 @@ def _added(name: str, base: str) -> list[griffe.Breakage]:
     """The breaks against the package's last release that the working tree adds to BASE's."""
     release = _last_release(name, base)
     if release is None:
-        sys.stdout.write(f"api: {name} has no release yet, so it has no public API to keep\n")
+        sys.stdout.write(f"breaks: {name} has no release yet, so it has no public API to keep\n")
         return []
     # load_git finds the package in a checkout of the ref, so its search path is relative.
     source = Path("packages", name, "src")
@@ -64,7 +64,7 @@ def _added(name: str, base: str) -> list[griffe.Breakage]:
     before = _breaks(released, griffe.load_git(name, ref=base, repo=ROOT, search_paths=[source]))
     after = _breaks(released, griffe.load(name, search_paths=[ROOT / source]))
     added = [breakage for key, breakage in after.items() if key not in before]
-    sys.stdout.write(f"api: {name} against {release}: {len(added)} new break(s)\n")
+    sys.stdout.write(f"breaks: {name} against {release}: {len(added)} new break(s)\n")
     return added
 
 
@@ -82,10 +82,10 @@ def main() -> int:
     if MARKED_TITLE.match(os.environ.get("TITLE", "")) or MARKED_BODY.search(
         os.environ.get("BODY", "")
     ):
-        sys.stdout.write("api: the change is marked as breaking\n")
+        sys.stdout.write("breaks: the change is marked as breaking\n")
         return 0
     sys.stdout.write(
-        "api: mark the break with `!` in the title, as in `feat(core)!: ...`, "
+        "breaks: mark the break with `!` in the title, as in `feat(core)!: ...`, "
         "or a `BREAKING CHANGE:` footer in the description\n"
     )
     return 1

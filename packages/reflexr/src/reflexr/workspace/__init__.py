@@ -24,6 +24,7 @@ from reflexr.workspace.storage import (
 )
 from reflexr.workspace.workspace import (
     ACTIONS,
+    MAX_COUNT,
     Access,
     Authorize,
     OnOpen,
@@ -39,6 +40,7 @@ from reflexr.workspace.workspace import (
 __all__ = [
     "ACTIONS",
     "EVALUATION_LEASE",
+    "MAX_COUNT",
     "REACTOR",
     "RUN_LEASE_PREFIX",
     "SCHEDULER",

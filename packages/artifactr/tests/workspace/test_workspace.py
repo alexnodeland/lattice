@@ -377,6 +377,58 @@ async def test_every_method_asks_authorize_as_its_handles_actor(storage: Storage
     ]
 
 
+async def test_a_tenants_workspaces_are_listed_by_those_the_actor_may_open(
+    storage: Storage,
+) -> None:
+    asked: list[tuple[str | None, str]] = []
+    opened: list[str] = []
+
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: Actor, access: Access
+    ) -> bool:
+        asked.append((workspace_id, access.action))
+        return workspace_id is None or not workspace_id.startswith("secret")
+
+    async def on_open(tenant_id: str, workspace_id: str) -> None:
+        opened.append(workspace_id)
+
+    everyone = Workspaces(storage)
+    for workspace_id in ("a", "b", "secret_1", "secret_2", "c", "d"):
+        await (await everyone.open("tenant_a", workspace_id, actor=ALICE)).create_thread()
+    workspaces = Workspaces(storage, authorize=authorize, on_open=on_open)
+    assert await workspaces.list("tenant_a", actor=ALICE, limit=2) == ["a", "b"]
+    assert asked == [
+        (None, "artifactr:read_workspaces"),
+        ("a", "artifactr:open"),
+        ("b", "artifactr:open"),
+    ]
+    page = await workspaces.list("tenant_a", actor=ALICE, after="b", limit=2)
+    assert page == ["c", "d"], "a page is filled past the workspaces refused"
+    assert await workspaces.list("tenant_a", actor=ALICE, after="d") == []
+    assert opened == [], "listing opens nothing"
+    assert await everyone.list("tenant_a", actor=ALICE) == [
+        "a",
+        "b",
+        "c",
+        "d",
+        "secret_1",
+        "secret_2",
+    ]
+
+
+async def test_listing_workspaces_is_asked_with_no_workspace(storage: Storage) -> None:
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: Actor, access: Access
+    ) -> bool:
+        return workspace_id is not None
+
+    workspaces = Workspaces(storage, authorize=authorize)
+    with pytest.raises(Forbidden, match="artifactr:read_workspaces is refused in this tenant"):
+        await workspaces.list("tenant_a", actor=ALICE)
+    with pytest.raises(ValidationFailed, match="limit must be at least 1"):
+        await Workspaces(storage).list("tenant_a", actor=ALICE, limit=0)
+
+
 async def test_a_thread_is_claimed_by_one_run_at_a_time(ws: Workspace) -> None:
     thread = await ws.create_thread()
     async with ws.claim_thread(thread.id, holder="run_1"):

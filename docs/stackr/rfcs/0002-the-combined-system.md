@@ -125,7 +125,7 @@ The default set:
 
 - **Not bridged:** tool calls and returns, run starts and pauses, deferred answers, and focus and mode changes. They are noisy, and tool arguments can hold data that rules have no need to see. Live frames never reach the log anyway.
 - **Failures:** if a projection raises, or an event fails validation, the envelope is dead-lettered in the ledger and the follower moves on, as reflexr does per rule. A continued chain that would exceed the depth limit (see [Loop control](#loop-control)) is recorded the same way.
-- **Starting followers:** a follower starts the first time a workspace is used, through the libraries' `authorize` hook, as the template's `Mirrors` does for feedback. At startup the bridge also resumes every workspace that has a cursor in the ledger. A workspace that has never been used since the bridge was installed is found only once someone uses it, because artifactr can't list workspaces (a prerequisite).
+- **Starting followers:** a follower starts the first time a workspace is used, through the libraries' `authorize` hook, as the template's `Mirrors` does for feedback. At startup the bridge also resumes every workspace that has a cursor in the ledger. A workspace that has never been used since the bridge was installed would be found only once someone used it, but artifactr lists a tenant's workspaces (a prerequisite, now `Workspaces.list`: [artifactr ADR-0058](../../artifactr/adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md)), so at startup the bridge starts a follower for every listed workspace.
 
 ### Outbound: reflexr to artifactr
 
@@ -357,7 +357,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 | `traceparent` on artifactr envelopes | artifactr | [#60][a-60] | phase 4, for links in the artifactr-to-reflexr direction | tags only, in that direction |
 | Durable message idempotency: core checks `message_id` | artifactr | [#61][a-61] | phase 2 | the ledger's read-back |
 | Reserved publishers: a type only one source (or runs) may publish | reflexr | [#72][r-72], now [lattice #8](https://github.com/alexnodeland/lattice/issues/8), decided in [reflexr ADR-0057](../../reflexr/adr/0057-reserved-publishers.md) and implemented | phase 5 | done |
-| Workspace discovery: list a tenant's workspaces | artifactr | [lattice #5](https://github.com/alexnodeland/lattice/issues/5), was [#62][a-62] | phase 3 | followers start on first use, and resume from the ledger |
+| Workspace discovery: list a tenant's workspaces | artifactr | [lattice #5](https://github.com/alexnodeland/lattice/issues/5), was [#62][a-62], decided in [artifactr ADR-0058](../../artifactr/adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md) and implemented | phase 3 | done |
 | Notices that don't start or steer a turn, marked as notices | artifactr | [#63][a-63] | phase 2 | direct commits, which start no turn but still reach a running one |
 
 ## Phases

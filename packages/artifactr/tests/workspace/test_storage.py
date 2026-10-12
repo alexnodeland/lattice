@@ -20,7 +20,7 @@ from artifactr.core import (
     commit,
     needs,
 )
-from artifactr.workspace import Scope, Storage, Workspace, Workspaces
+from artifactr.workspace import Scope, Storage, Transaction, Workspace, Workspaces
 from tests.workspace.conftest import StorageFactory
 
 ALICE = UserActor(id="alice")
@@ -239,6 +239,57 @@ async def test_a_handle_saves_its_workspaces_cursors(ws: Workspace, storage: Sto
     await ws.save_cursor("mirror", 2)
     assert await ws.cursor("mirror") == 2
     assert await storage.cursor(SCOPE, "mirror") == 2
+
+
+async def _create_in(tx: Transaction) -> None:
+    command = CreateThread()
+    state = await tx.load(needs(command, actor=ALICE))
+    await tx.save(commit(command, state, actor=ALICE), actor=ALICE)
+
+
+async def _log_in(storage: Storage, scope: Scope) -> None:
+    """Commit one event in a workspace's log."""
+    async with storage.transaction(scope) as tx:
+        await _create_in(tx)
+
+
+async def test_a_tenants_workspaces_are_those_with_an_event_ordered_by_id(
+    storage: Storage,
+) -> None:
+    for workspace_id in ("ws_3", "ws_1", "ws_2"):
+        await _log_in(storage, Scope("tenant_a", workspace_id))
+    await _log_in(storage, Scope("tenant_b", "ws_0"))
+    assert await storage.workspaces("tenant_a") == ["ws_1", "ws_2", "ws_3"]
+    assert await storage.workspaces("tenant_b") == ["ws_0"], "per tenant"
+    assert await storage.workspaces("tenant_c") == []
+
+
+async def test_workspaces_are_paged_after_an_id(storage: Storage) -> None:
+    for workspace_id in ("ws_1", "ws_2", "ws_3"):
+        await _log_in(storage, Scope("tenant_a", workspace_id))
+    assert await storage.workspaces("tenant_a", limit=2) == ["ws_1", "ws_2"]
+    assert await storage.workspaces("tenant_a", after="ws_2", limit=2) == ["ws_3"]
+    assert await storage.workspaces("tenant_a", after="ws_10") == ["ws_2", "ws_3"], "any id"
+    assert await storage.workspaces("tenant_a", after="ws_3") == []
+
+
+async def test_a_workspace_without_an_event_is_not_listed(storage: Storage) -> None:
+    scope = Scope("tenant_a", "ws_1")
+    assert await storage.head_seq(scope) == 0
+    assert await storage.threads(scope) == []
+    await storage.save_cursor(scope, "mirror", 1)
+    await storage.acquire_lease(scope, "thread:t1", "h", timedelta(seconds=5))
+    async with storage.transaction(scope):
+        pass  # commits nothing
+
+    async def roll_back() -> None:
+        async with storage.transaction(scope) as tx:
+            await _create_in(tx)
+            raise RuntimeError("rolled back")
+
+    with pytest.raises(RuntimeError):
+        await roll_back()
+    assert await storage.workspaces("tenant_a") == []
 
 
 async def test_a_subscription_ends_when_its_storage_stream_ends() -> None:

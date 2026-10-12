@@ -16,6 +16,15 @@ ws = await workspaces.open("acme", "launch", actor=UserActor(id="u_alice", name=
 
 Workspaces need no creating: opening one that has never been written to gives an empty workspace. Handles are cheap; open one per request or connection, for the actor making it.
 
+`workspaces.list(tenant_id, actor=...)` returns a page of the tenant's workspaces that the actor may open, ordered by id ([ADR-0058](../adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md)). A workspace is listed once its log has an event. A page holds `limit` ids (100 by default) unless the list has ended; pass the last as `after` for the next:
+
+```python
+page = await workspaces.list("acme", actor=SystemActor(name="relayr"))
+while page:
+    ...
+    page = await workspaces.list("acme", actor=SystemActor(name="relayr"), after=page[-1])
+```
+
 An actor is who does something, and every event is attributed to one:
 
 | Actor | Who |

@@ -54,6 +54,18 @@ def test_authentication_and_authorization(client: TestClient) -> None:
     }, "a rejection's payload, as every REST error"
 
 
+def test_a_tenants_workspaces_are_those_the_caller_may_open(client: TestClient) -> None:
+    for workspace_id in ("w2", "w1", "w3"):
+        create = command("c1", type="create_thread")
+        client.post(f"/v1/workspaces/{workspace_id}/commands", json=create)
+    assert client.get("/v1/workspaces").json() == ["w1", "w2", "w3"]
+    assert client.get("/v1/workspaces", params={"after": "w1", "limit": 1}).json() == ["w2"]
+    assert client.get("/v1/workspaces", headers={"x-user": "bob"}).json() == ["w1", "w3"]
+    assert client.get("/v1/workspaces", headers={"x-tenant": "other"}).json() == []
+    assert client.get("/v1/workspaces", params={"limit": 0}).status_code == 422
+    assert client.get("/v1/workspaces", headers={"x-token": "bad"}).status_code == 401
+
+
 def test_reads(client: TestClient) -> None:
     def post(command_id: str, **fields: Any) -> None:
         client.post(f"{BASE}/commands", json=command(command_id, **fields))

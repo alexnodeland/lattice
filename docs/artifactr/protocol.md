@@ -234,6 +234,7 @@ REST mirrors the commands and exposes reads; `artifactr.fastapi.artifactr_router
 
 | Method and path | Purpose |
 |---|---|
+| `GET /v1/workspaces?after=&limit=` | A page of the caller's tenant's workspaces that it may open: an array of ids ordered by id, after `after`. A page shorter than `limit` (100 by default) is the last. A `limit` below 1 is `validation_failed`. |
 | `POST /v1/workspaces/{workspace_id}/commands` | Submit one command frame; the response body is its `command_result`. |
 | `GET /v1/workspaces/{workspace_id}/artifacts?kind=&include_archived=` | List artifacts. |
 | `GET /v1/workspaces/{workspace_id}/artifacts/{artifact_id}` | The current `Versioned` artifact: `id`, `kind`, `version`, `data`, `updated_by`, `archived`. |
@@ -244,7 +245,7 @@ REST mirrors the commands and exposes reads; `artifactr.fastapi.artifactr_router
 | `GET /v1/workspaces/{workspace_id}/proposals?status=` | Proposals, pending by default. |
 | `GET /v1/workspaces/{workspace_id}/runs/{run_id}` | A run, with any requests it is paused on. |
 
-Authentication is the host's: `resolve_actor(request)` returns the tenant and actor, or raises `Unauthorized` (401). The `authorize(tenant, workspace, actor, access)` hook of the application's `Workspaces` is asked for every request: for opening the workspace, then for each action the request takes ([ADR-0056](adr/0056-access-asked-in-every-workspace-method.md)). A refusal is 403, whose `detail` is the `forbidden` rejection, as for every other rejection a read raises; over the WebSocket, a command it refuses has a `forbidden` result.
+Authentication is the host's: `resolve_actor(request)` returns the tenant and actor, or raises `Unauthorized` (401). The `authorize(tenant, workspace, actor, access)` hook of the application's `Workspaces` is asked for every request: for opening the workspace, then for each action the request takes ([ADR-0056](adr/0056-access-asked-in-every-workspace-method.md)). Listing workspaces asks `artifactr:read_workspaces` with no workspace, then `artifactr:open` in each workspace, and leaves out those refused ([ADR-0058](adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md)). A refusal is 403, whose `detail` is the `forbidden` rejection, as for every other rejection a read raises; over the WebSocket, a command it refuses has a `forbidden` result.
 
 Rejections map to HTTP status codes (`artifactr.fastapi.STATUS_CODES`): `version_conflict` and `invalid_state` → 409, `validation_failed` and `patch_failed` → 422, `not_found` → 404, `forbidden` → 403. `watch_run` over REST is rejected as `invalid_state`.
 
@@ -256,6 +257,7 @@ External agents connect over MCP (`artifactr.mcp.ArtifactrMcp`) with the same au
 |---|---|
 | Resource template `artifactr://{tenant_id}/{workspace_id}/artifacts/{artifact_id}` | The artifact's current `Versioned` JSON. Only readable by clients of that tenant, and only if `authorize` allows them `artifactr:read_artifacts`. |
 | `subscriptions/listen` and resource-updated notifications | Published for `artifact_created`, `artifact_changed` and `artifact_archived` in every workspace a client has used, through the server's `SubscriptionBus`. A `listen` request that names an artifact of another tenant, or one `authorize` refuses, fails as a read of it would. |
+| Tool `list_workspaces` | `GET /v1/workspaces`, one id per line. |
 | Tools `list_artifacts`, `read_artifact`, `create_artifact`, `edit_text`, `edit_artifact`, `archive_artifact` | Artifact commands and reads. `list_artifacts` takes REST's `kind` and `include_archived`. The edit tools take an optional `base_version` (required for `edit_artifact`) and `propose` with `rationale`. |
 | Tool `list_revisions` | `GET .../artifacts/{artifact_id}/revisions`, as JSON lines. |
 | Tools `list_proposals`, `respond_to_proposal` | Review others' proposals. `list_proposals` takes REST's `status`, `pending` by default. |

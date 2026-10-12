@@ -74,11 +74,23 @@ def artifactr_router(
         tracer_provider: Where ``artifactr.stream`` spans go. Defaults to the global one.
         meter_provider: Where connection metrics go. Defaults to the global one.
 
-    Each REST request's span (FastAPI's own, when it is instrumented) and each connection's
-    ``artifactr.stream`` span are attributed to the tenant, workspace and actor.
+    The span of each REST request in a workspace (FastAPI's own, when it is instrumented) and
+    each connection's ``artifactr.stream`` span are attributed to the tenant, workspace and
+    actor.
     """
     router = APIRouter()
     telemetry = Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider)
+
+    async def resolve(connection: HTTPConnection) -> tuple[TenantId, Actor]:
+        """Authenticate a request or connection.
+
+        Raises:
+            HTTPException: 401, if ``resolve_actor`` refuses it.
+        """
+        try:
+            return await resolve_actor(connection)
+        except Unauthorized as error:
+            raise HTTPException(status_code=401, detail=str(error) or "unauthorized") from error
 
     async def open_workspace(connection: HTTPConnection, workspace_id: WorkspaceId) -> Workspace:
         """Authenticate a request or connection, and open its workspace if it may use it.
@@ -87,10 +99,7 @@ def artifactr_router(
             HTTPException: 401, if ``resolve_actor`` refuses it.
             Forbidden: If the workspaces' ``authorize`` refuses the actor this workspace.
         """
-        try:
-            tenant_id, actor = await resolve_actor(connection)
-        except Unauthorized as error:
-            raise HTTPException(status_code=401, detail=str(error) or "unauthorized") from error
+        tenant_id, actor = await resolve(connection)
         annotate(attribution(tenant_id=tenant_id, workspace_id=workspace_id, actor=actor))
         return await workspaces.open(tenant_id, workspace_id, actor=actor)
 
@@ -98,6 +107,18 @@ def artifactr_router(
         return await _or_http(open_workspace(request, workspace_id))
 
     current_workspace = Depends(workspace_dependency)
+
+    @router.get("/workspaces")
+    async def list_workspaces(
+        request: Request, after: str | None = None, limit: int = 100
+    ) -> list[WorkspaceId]:
+        """Return a page of the caller's tenant's workspaces that the caller may open, by id.
+
+        Pass the last id as ``after`` for the next page; a page shorter than ``limit`` is the
+        last.
+        """
+        tenant_id, actor = await resolve(request)
+        return await _or_http(workspaces.list(tenant_id, actor=actor, after=after, limit=limit))
 
     @router.post("/workspaces/{workspace_id}/commands")
     async def post_command(

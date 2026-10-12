@@ -109,6 +109,7 @@ logger = logging.getLogger("artifactr.workspace")
 ACTIONS: Final = frozenset(
     {
         "artifactr:open",
+        "artifactr:read_workspaces",
         # commands, by their type
         "artifactr:create_artifact",
         "artifactr:edit_artifact",
@@ -139,7 +140,8 @@ ACTIONS: Final = frozenset(
 """Every action a :class:`Workspace` asks ``authorize`` about: the complete catalog.
 
 An action is ``artifactr:`` and a name. A command's is its ``type``, a read's is ``read_`` and
-what it reads, and opening a workspace is ``artifactr:open``.
+what it reads, and opening a workspace is ``artifactr:open``. ``artifactr:read_workspaces``,
+listing a tenant's workspaces, is the one asked with no workspace.
 """
 
 
@@ -168,7 +170,7 @@ Authorize = Callable[[TenantId, WorkspaceId | None, Actor, Access], Awaitable[bo
 :class:`Workspaces` holds it, and every :class:`Workspace` it opens asks it in each method,
 before anything is read or written: so every REST request, WebSocket command, MCP tool call
 and in-process call is checked alike. A refusal raises :class:`~artifactr.core.Forbidden`.
-artifactr always names the workspace; the ``None`` is for a library whose reads span a tenant.
+The workspace is ``None`` only for listing a tenant's workspaces, which spans the tenant.
 """
 
 OnOpen = Callable[[TenantId, WorkspaceId], Awaitable[None]]
@@ -177,6 +179,9 @@ OnOpen = Callable[[TenantId, WorkspaceId], Awaitable[None]]
 It starts a workspace's background work, such as a feedback mirror, so it must be idempotent:
 a permission check has no side effects.
 """
+
+
+_OPEN: Final = Access(action="artifactr:open")
 
 
 class ThreadBusy(InvalidState):
@@ -228,10 +233,44 @@ class Workspaces:
             Forbidden: If ``authorize`` refuses the actor this workspace.
         """
         workspace = Workspace(self._context, Scope(tenant_id, workspace_id), actor)
-        await workspace.check(Access(action="artifactr:open"))
+        await workspace.check(_OPEN)
         if self._on_open is not None:
             await self._on_open(tenant_id, workspace_id)
         return workspace
+
+    async def list(
+        self,
+        tenant_id: TenantId,
+        *,
+        actor: Actor,
+        after: WorkspaceId | None = None,
+        limit: int = 100,
+    ) -> list[WorkspaceId]:
+        """Return a page of the tenant's workspaces that ``actor`` may open, ordered by id.
+
+        A workspace is listed once its log has an event. Listing spans the tenant, so it asks
+        ``authorize`` for ``artifactr:read_workspaces`` with no workspace, then for
+        ``artifactr:open`` in each workspace it finds, and leaves out those refused (ADR-0058).
+        It opens none of them, so ``on_open`` is not called. A page is full unless the list
+        has ended; pass its last id as ``after`` for the next.
+
+        Raises:
+            Forbidden: If ``authorize`` refuses the actor the list.
+            ValidationFailed: If ``limit`` is below 1.
+        """
+        context = self._context
+        await context.check(tenant_id, None, actor, Access(action="artifactr:read_workspaces"))
+        if limit < 1:
+            raise ValidationFailed("limit must be at least 1", [])
+        found: list[WorkspaceId] = []
+        while len(found) < limit:
+            wanted = limit - len(found)
+            page = await context.storage.workspaces(tenant_id, after=after, limit=wanted)
+            found += [w for w in page if await context.allows(tenant_id, w, actor, _OPEN)]
+            if len(page) < wanted:
+                break
+            after = page[-1]
+        return found
 
 
 @dataclasses.dataclass(frozen=True)
@@ -242,6 +281,26 @@ class _Context:
     kinds: frozenset[str] | None
     authorize: Authorize | None
     telemetry: Telemetry
+
+    async def allows(
+        self, tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
+    ) -> bool:
+        """Whether ``authorize`` lets an actor take an action; true without a hook."""
+        return self.authorize is None or await self.authorize(
+            tenant_id, workspace_id, actor, access
+        )
+
+    async def check(
+        self, tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
+    ) -> None:
+        """Ask ``authorize`` whether an actor may take an action, as every check does.
+
+        Raises:
+            Forbidden: If ``authorize`` refuses it.
+        """
+        if not await self.allows(tenant_id, workspace_id, actor, access):
+            where = "tenant" if workspace_id is None else "workspace"
+            raise Forbidden(f"{access.action} is refused in this {where}")
 
 
 class Workspace:
@@ -290,12 +349,8 @@ class Workspace:
         Raises:
             Forbidden: If ``authorize`` refuses it.
         """
-        authorize = self._context.authorize
         scope = self._scope
-        if authorize is not None and not await authorize(
-            scope.tenant_id, scope.workspace_id, self._actor, access
-        ):
-            raise Forbidden(f"{access.action} is refused in this workspace")
+        await self._context.check(scope.tenant_id, scope.workspace_id, self._actor, access)
 
     # ─── writes ───────────────────────────────────────────────────────────────
 

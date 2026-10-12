@@ -1,6 +1,6 @@
 # ADR-0039: Namespaced event types
 
-**Status:** Accepted; decision 4's values designed by [ADR-0057](0057-reserved-publishers.md)
+**Status:** Accepted; its reserved publishers amended by [ADR-0057](0057-reserved-publishers.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 

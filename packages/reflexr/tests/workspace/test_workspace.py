@@ -569,6 +569,19 @@ async def test_reserved_events_are_published_by_their_publishers_only(storage: S
         await run_handle.publish(Deploy(service="auth"))
 
 
+async def test_an_event_both_emitted_and_reserved_is_published_by_a_run_of_a_publisher(
+    storage: Storage,
+) -> None:
+    triage = AgentActor(rule="app:triage", run_id="fir_1", name="triage")
+    workspaces = Workspaces(storage, emitted=[Escalated], publishers={"app:escalated": [triage]})
+    client = await workspaces.open("acme", "prod", actor=triage)
+    with pytest.raises(Forbidden, match="published by runs, not clients"):
+        await client.publish(Escalated(service="auth"))
+    root = (await client.as_actor(UserActor(id="ada")).publish(Deploy(service="auth"))).envelope
+    cause = Causation(firing_id="fir_1", run_id="fir_1", depth=1)
+    assert await client.caused_by(cause, correlation_id=root.id).publish(Escalated(service="auth"))
+
+
 @pytest.mark.parametrize(
     ("key", "refusal"),
     [

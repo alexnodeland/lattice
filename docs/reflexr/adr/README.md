@@ -40,7 +40,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0036](0036-typed-run-failures.md) | Typed run failures | Accepted |
 | [0037](0037-joining-stackrs-network.md) | Joining stackr's network when it runs | Accepted; its override superseded by lattice ADR-0009 |
 | [0038](0038-dashboards-generated-tested-and-released.md) | Dashboards generated, tested and released | Accepted; its release assets superseded by 0050 |
-| [0039](0039-namespaced-event-types.md) | Namespaced event types | Accepted; decision 4 designed by 0057 |
+| [0039](0039-namespaced-event-types.md) | Namespaced event types | Accepted; its reserved publishers amended by 0057 |
 | [0040](0040-telemetry-that-composes-across-libraries.md) | Telemetry that composes across libraries, untraced polling and mirror cursors | Accepted |
 | [0041](0041-executing-runs.md) | Executing runs | Accepted |
 | [0042](0042-cancel-safe-storage.md) | Cancel-safe storage | Accepted |

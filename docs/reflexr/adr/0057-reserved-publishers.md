@@ -21,7 +21,7 @@ ADR-0039 settled where the policy lives and its keys. It left three questions op
 - **Anyone else is `forbidden`, runs included:** `"artifactr:proposal_resolved events are reserved to source:artifactr"`. A rule's agent that emits a bridged type is as much a forgery as a client that publishes one.
 - **A fixed check beneath `authorize`,** beside the refusal of `reflexr:*`. `publish` asks `authorize` for `reflexr:publish` first, then checks the type. The hook decides who may publish at all, and the policy decides who may publish a type. grantr can't grant around it. It adds nothing to `ACTIONS`.
 - **Keys are checked at startup,** as `events=`, `emitted=` and rules are. A type or namespace that isn't in the workspaces' `registry`, or `reflexr`'s, raises `ValueError`.
-- **`emitted=` stays.** It reserves a type to whatever a run caused, which is a handle's causation, not an actor's identity. Folding it in would need a "runs" value that is not an actor.
+- **`emitted=` stays.** It reserves a type to whatever a run caused, which is a handle's causation, not an actor's identity. Folding it in would need a "runs" value that is not an actor. The two compose: a type in both must be published by a run of a listed publisher.
 
 ## Options considered
 

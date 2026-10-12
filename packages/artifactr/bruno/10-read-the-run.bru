@@ -10,6 +10,25 @@ get {
   auth: none
 }
 
+script:pre-request {
+  // The message starts its run in the background, so the run may not be recorded yet: wait for
+  // it, for up to ten seconds, before reading it. The poll sends the request's own headers, the
+  // collection's x-user among them.
+  const url = bru.interpolate("{{baseUrl}}/workspaces/{{workspace}}/runs/{{run}}");
+  const headers = req.getHeaders();
+  let status = 0;
+  for (let attempt = 0; attempt < 50 && status !== 200; attempt++) {
+    const found = await bru.sendRequest({ method: "GET", url, headers, validateStatus: () => true });
+    status = found.status;
+    if (status !== 200) {
+      await bru.sleep(200);
+    }
+  }
+  if (status !== 200) {
+    throw new Error(`the run wasn't recorded within ten seconds: the last read answered ${status}`);
+  }
+}
+
 tests {
   test("it is the thread's run", function () {
     expect(res.status).to.equal(200);

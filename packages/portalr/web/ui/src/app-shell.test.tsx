@@ -52,7 +52,9 @@ test("narrower, the navigation waits behind Menu, in a drawer that keeps the foc
   const menu = screen.getByRole("button", { name: "Menu" });
   await menu.click();
   const drawer = screen.getByRole("dialog", { name: "Navigation" });
+  await expect.element(drawer).toHaveAttribute("aria-modal", "true");
   await expect.element(drawer.getByRole("navigation", { name: "Workspace" })).toBeVisible();
+  await expect.element(screen.getByRole("main")).not.toBeInTheDocument();
   for (let i = 0; i < 5; i += 1) {
     await userEvent.tab();
     expect(drawer.element().contains(document.activeElement)).toBe(true);
@@ -70,6 +72,24 @@ test("following a link in the drawer, or Close, closes it", async () => {
   await screen.getByRole("button", { name: "Menu" }).click();
   await screen.getByRole("button", { name: "Close" }).click();
   await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+});
+
+test("widening past the rail's width closes the drawer", async () => {
+  const screen = await shell(390);
+  await screen.getByRole("button", { name: "Menu" }).click();
+  await expect.element(screen.getByRole("dialog")).toBeVisible();
+  await page.viewport(1280, 800);
+  await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+  await expect.element(screen.getByRole("navigation", { name: "Workspace" })).toBeVisible();
+});
+
+test("the switcher, the navigation and the account are each rendered once", async () => {
+  const screen = await shell(1280);
+  expect(screen.container.querySelectorAll("nav")).toHaveLength(1);
+  expect(screen.getByRole("button", { name: "Workspace: acme / notes" }).elements()).toHaveLength(
+    1,
+  );
+  expect(screen.getByRole("button", { name: "Account: Alex" }).elements()).toHaveLength(1);
 });
 
 test("admin's frame is named for admin, and shows its own mark", async () => {

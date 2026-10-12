@@ -50,6 +50,11 @@ test("a screen that re-skins the working colour re-mixes the wash and the hover 
   document.body.append(screen);
   expect(token("wash", screen)).not.toBe(token("wash"));
   expect(token("accent-hover", screen)).not.toBe(token("accent-hover"));
+  expect(contrast(token("fg", screen), token("wash", screen))).toBeGreaterThanOrEqual(7);
+  expect(contrast(token("accent", screen), token("wash", screen))).toBeGreaterThanOrEqual(4.5);
+  expect(
+    contrast(token("on-accent", screen), token("accent-hover", screen)),
+  ).toBeGreaterThanOrEqual(4.5);
 });
 
 test("a page asks for a scheme with data-theme", () => {

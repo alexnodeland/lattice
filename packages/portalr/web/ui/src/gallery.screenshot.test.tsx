@@ -1,13 +1,13 @@
 /**
  * The kit's look, pinned by screenshots (portalr ADR-0019): the frame with every component in it,
  * wide and narrow, in each scheme. Computed styles pin each component's colours and states; these
- * pin how they sit together. Baselines are Linux's, made in CI, with motion reduced and the
+ * pin how they sit together, and the menu and the drawer open. Baselines are Linux's, made in CI, with motion reduced and the
  * self-hosted faces loaded, so they don't move between runs.
  */
 
 import { MessageSquare, Play, Plus, ScrollText, Zap } from "lucide-react";
 import { expect, onTestFinished, test } from "vitest";
-import { commands, page } from "vitest/browser";
+import { commands, page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { AccountMenu } from "./account-menu";
 import { AppShell } from "./app-shell";
@@ -32,8 +32,11 @@ function Gallery() {
         <Switcher
           tenant="acme"
           workspace="notes"
-          tenants={[{ id: "acme" }]}
-          workspaces={[{ id: "notes" }]}
+          tenants={[{ id: "acme" }, { id: "globex" }]}
+          workspaces={[
+            { id: "notes", detail: "4 threads" },
+            { id: "support", detail: "12 threads" },
+          ]}
           onTenant={() => undefined}
           onWorkspace={() => undefined}
         />
@@ -139,21 +142,51 @@ function Gallery() {
   );
 }
 
-for (const [view, width, height] of [
-  ["wide", 1280, 900],
-  ["narrow", 390, 844],
-] as const) {
-  test(`the frame and its components, ${view}`, async () => {
-    await page.viewport(width, height);
-    await commands.reduceMotion(true);
-    onTestFinished(async () => {
-      await commands.reduceMotion(false);
-      await page.viewport(414, 896);
-    });
-    const screen = await render(<Gallery />);
-    await document.fonts.ready;
-    await expect(screen.container).toMatchScreenshot(`gallery-${view}-${dark ? "dark" : "light"}`, {
-      screenshotOptions: { animations: "disabled" },
-    });
+/** Lay the gallery out at a width, with motion reduced and the faces loaded before the shot. */
+async function shown(width: number, height: number) {
+  await page.viewport(width, height);
+  await commands.reduceMotion(true);
+  onTestFinished(async () => {
+    await commands.reduceMotion(false);
+    await page.viewport(414, 896);
   });
+  const screen = await render(<Gallery />);
+  await Promise.all([
+    document.fonts.load('1em "Schibsted Grotesk"'),
+    document.fonts.load('italic 1em "Schibsted Grotesk"'),
+    document.fonts.load('1em "Fragment Mono"'),
+  ]);
+  return screen;
 }
+
+/** The whole page, so a menu or a drawer, which portals to the body, is in the shot. */
+async function matches(name: string) {
+  await expect(page.elementLocator(document.body)).toMatchScreenshot(
+    `${name}-${dark ? "dark" : "light"}`,
+    { screenshotOptions: { animations: "disabled" } },
+  );
+}
+
+test("the frame and its components, wide", async () => {
+  await shown(1280, 900);
+  await matches("gallery-wide");
+});
+
+test("the frame and its components, narrow", async () => {
+  await shown(390, 844);
+  await matches("gallery-narrow");
+});
+
+test("the switcher's menu, open, with the keyboard on an item", async () => {
+  const screen = await shown(1280, 900);
+  await screen.getByRole("button", { name: "Workspace: acme, notes" }).click();
+  await userEvent.keyboard("{ArrowDown}");
+  await matches("gallery-menu");
+});
+
+test("the drawer, open", async () => {
+  const screen = await shown(390, 844);
+  await screen.getByRole("button", { name: "Menu" }).click();
+  await expect.element(screen.getByRole("dialog", { name: "Navigation" })).toBeVisible();
+  await matches("gallery-drawer");
+});

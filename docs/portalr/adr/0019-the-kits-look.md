@@ -12,7 +12,7 @@ The app worked but was bare. It had no frame or navigation chrome, and its works
 - **B, Masthead:** the docs site's header and tabs.
 - **C, Workbench:** an icon rail, a list pane and dense tables.
 
-The pass followed the principles the family already shows:
+The pass followed the principles lattice already shows:
 
 | Principle | Source |
 |---|---|
@@ -21,7 +21,7 @@ The pass followed the principles the family already shows:
 | **Contrast asserted, not judged by eye:** text 4.5:1 or more, the foreground 7:1, the focus ring 3:1 against every surface | `tokens.test.ts`; lattice's [brand page](../../assets/brand/README.md) |
 | **The plates are never text.** Violet is the working colour, for actions and links. Headings stay in the text colour | [lattice ADR-0014](../../adr/0014-portalrs-and-grantrs-marks.md); the brand page's palette rule |
 | **Never colour alone.** Links are underlined, and a diff says "added" and "removed" | `docs/assets/stylesheets/lattice.css`; [ADR-0017](0017-the-artifacts-and-proposals-areas.md) |
-| **The family's type:** Schibsted Grotesk, and Fragment Mono for code | the brand page's Type section |
+| **lattice's type:** Schibsted Grotesk, and Fragment Mono for code | the brand page's Type section |
 | **The marks are the only decoration**, and `app` and `admin` are told apart by their mark's open side | the brand page; [lattice ADR-0014](../../adr/0014-portalrs-and-grantrs-marks.md) |
 | **Roles and accessible names**, which the tests find things by | [ADR-0015](0015-the-chat-components-and-streamdown.md) |
 | **Plain English in the components** | [ADR-0014](0014-the-apps-shell.md) |
@@ -34,18 +34,18 @@ The pass also found five faults in `ui` as it was:
 - Text fields were bordered in `--line`, at 1.43:1, under the 3:1 WCAG asks of a control's boundary.
 - Schibsted Grotesk was named but never loaded, and the CSP would have refused it from Google Fonts.
 - Hover and disabled were opacity, which lowered contrast.
-- A paused run read "Waiting for you" in the chat and "Waiting for someone" in Runs.
+- A paused run had no one wording: the chat said "Waiting for you", and the Runs area, then in review, its own.
 - In dark, `--surface` was lattice's cyan-black, `#0d1920`, which is darker than the paper and of another hue.
 
 ## Decision
 
-- **The frame is a side rail (direction A).** `AppShell` holds the lockup, the `Switcher`, a `SideNav` and the `AccountMenu` in a rail on the surface from 1024 pixels. The rail stays put as the page scrolls. Narrower, a bar holds the mark, the switcher and the account, and Menu opens the navigation in a drawer: a Base UI Dialog that keeps the focus, closes on Escape, on Close or on following a link, and gives the focus back to Menu. `ui` (`app | admin`) chooses the mark, so `admin` is told apart by the side its mark opens to. A skip link comes first. Lists are lined rows, cards hold what asks something of the reader, and Runs is a `Table`.
-- **Icons are Lucide's** (`lucide-react`, pinned at 1.53.0, ISC), the set the docs site's scheme toggle already uses. `Icon` hides each one from assistive technology, and every icon sits beside the word that names its control: never icon-only.
+- **The frame is a side rail (direction A).** `AppShell` holds the lockup, the `Switcher`, a `SideNav` and the `AccountMenu` in a rail on the surface from 1024 pixels. The rail stays put as the page scrolls. Narrower, a bar holds the mark, the switcher and the account, and Menu opens the navigation in a drawer: a Base UI Dialog that keeps the focus, closes on Escape, on Close or on following a link, and gives the focus back to Menu. `ui` (`app | admin`) chooses the mark, so `admin` is told apart by the side its mark opens to. A skip link comes first. The header renders the switcher, the navigation and the account once, and CSS moves them between rail and bar; the drawer is modal, and widening past 1024 pixels closes it. Cards hold what asks something of the reader, and `Table` is for rows; the list pattern, lined rows, comes with the areas' restyle.
+- **Icons are Lucide's** (`lucide-react`, pinned at 1.55.0, ISC), the set the docs site's scheme toggle already uses. `Icon` hides each one from assistive technology, and every icon sits beside the word that names its control: never icon-only.
 - **The dark surface is raised and violet, `#1f1829`,** lighter than the paper. A test holds it lighter in both schemes.
-- **A status is neutral: a shape and a word** (`StatusBadge`). Only waiting for you takes the working colour, and the inks stay in the marks. A paused run says "Waiting for you" wherever it is shown, through `RunStatus`.
+- **A status is neutral: a shape and a word** (`StatusBadge`). Only waiting for you takes the working colour, and the inks stay in the marks. Each shape stays its own when motion is reduced: working is an open ring, still, where queued is dotted. A paused run says "Waiting for you" wherever it is shown, through `RunStatus`.
 - **Four tokens join the roles,** each asserted in both schemes and listed below. `--wash` and `--accent-hover` are declared on `:root` and again on `[data-brand]`, since a custom property is resolved where it is declared.
-- **No opacity for state.** A disabled control keeps its words in the quiet text, with a line border and no fill. Hover is `--wash` or `--accent-hover`, and a pressed toggle takes the wash in the working colour. Colour transitions stop under reduced motion, which a browser command, `reduceMotion`, lets each test ask for.
-- **The typefaces are self-hosted** under `ui/src/fonts/`. Schibsted Grotesk is variable, upright and italic; Fragment Mono is 400. Each is cut to Latin and Latin Extended, from Fontsource's 5.3.0 files, with `font-display: swap`. Vite emits them beside each UI's assets, so the CSP's `font-src 'self'` serves them. Both are under the SIL Open Font License 1.1. Their licences sit beside them and in the wheel's `licenses/`, and portalr's licence expression is `MIT AND OFL-1.1`. `ui-in-wheel` fails unless each UI carries its typefaces and the wheel carries both licences. `admin` now imports `ui`'s styles too.
+- **No opacity for state.** A disabled control keeps its words in the quiet text, with a line border and no fill. Hover is `--wash` or `--accent-hover`. Whatever is chosen or pressed has one look: the wash, its words in the working colour, edged in it. That is a pressed toggle, the chosen segment of a `SegmentedFilter` (a radio group, its counts said after their words), and the current area in the navigation. The item a menu's keyboard is on is washed, in the working colour, and ringed in `--focus` inside its edge, since the wash alone is 1.28:1 on the surface in light and 1.15:1 in dark. A `Table`'s horizontal scroll is a region named by its caption that the keyboard can reach. Colour transitions stop under reduced motion, which a browser command, `reduceMotion`, lets each test ask for.
+- **The typefaces are self-hosted** under `ui/src/fonts/`. Schibsted Grotesk is variable, upright and italic; Fragment Mono is 400. Each is cut to Latin and Latin Extended, from Fontsource's 5.3.0 files, with `font-display: swap`. Vite emits them beside each UI's assets, so the CSP's `font-src 'self'` serves them. Both are under the SIL Open Font License 1.1. Their licences sit beside them and in the wheel's `licenses/`, and portalr's licence expression is `MIT AND OFL-1.1`. The expression covers portalr's own code and the typefaces it redistributes as files; the JavaScript libraries the UIs bundle, Lucide (ISC) and React (MIT) among them, are under their own permissive licences, which it doesn't restate. `ui-in-wheel` fails unless each UI carries its typefaces and the wheel carries both licences. `admin` now imports `ui`'s styles too.
 - **Screenshots pin how the parts sit together.** `gallery.screenshot.test.tsx` renders the frame, with every new component in it, wide and narrow, in each scheme, with motion reduced and the faces loaded. Its baselines are Linux's and are made in CI: the file runs only where `CI` is set. On a mismatch or a missing baseline, CI's Check job uploads `ui-screenshots`, which holds what the run took. Updating a look means reviewing those files and committing them under `src/__screenshots__/`, without their `-reference` or `-actual` suffix. Computed styles still pin each component's colours and states.
 
 ### The new tokens
@@ -64,7 +64,7 @@ The pass also found five faults in `ui` as it was:
 | Frame | **A, side rail (chosen)** | Holds `admin`'s seven areas; the switcher and the lockup always in reach | Phones open the navigation with a tap |
 | | B, header and tabs | Closest to the docs site | Tabs can't hold `admin`'s areas; the switcher scrolls away; "Rules" falls off a phone |
 | | C, icon rail and panes | Densest | Icons as the only labels; tiny type; three panes fix every area's layout |
-| Icons | **Lucide, labelled (chosen)** | The family's set already; faster scanning | More to draw than words alone |
+| Icons | **Lucide, labelled (chosen)** | lattice's set already; faster scanning | More to draw than words alone |
 | | Words only | The least decoration | The rail reads slower |
 | Dark surface | **Re-tint to `#1f1829` (chosen)** | Raised cards in portalr's own hue | One more number that differs from the site |
 | | Keep `#0d1920` | lattice's site background | Sunken, cyan cards on violet paper |

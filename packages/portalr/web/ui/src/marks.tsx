@@ -10,7 +10,7 @@ import { cn } from "./cn";
 /** Which UI a mark is for. */
 export type Ui = "app" | "admin";
 
-/** Each side of the cell, and the two overlaps, on the family's 64-unit grid: [fill, points]. */
+/** Each side of the cell, and the two overlaps, on lattice's 64-unit grid: [fill, points]. */
 const SIDES: Record<Ui, readonly (readonly [string, string])[]> = {
   app: [
     ["fill-(--portalr-cyan)", "6,40.23 17.03,45.95 34.8,11.73 23.77,6"],

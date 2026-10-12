@@ -30,7 +30,8 @@ test("it holds the scheme, chosen among three, and signing out", async () => {
   );
   await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
   const menu = screen.getByRole("menu");
-  await expect.element(menu.getByText("alex@acme.test")).toBeVisible();
+  const signedIn = menu.getByRole("group", { name: "Alex Nodeland alex@acme.test" });
+  await expect.element(signedIn.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
   await expect
     .element(menu.getByRole("menuitemradio", { name: "Follow the system" }))
     .toHaveAttribute("aria-checked", "true");

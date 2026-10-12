@@ -2,6 +2,7 @@ import { expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { Switcher } from "./switcher";
+import { contrast, token } from "./test/colours";
 
 function Rendered({ onTenant = vi.fn(), onWorkspace = vi.fn() }) {
   return (
@@ -53,4 +54,19 @@ test("the keyboard opens it, and Escape closes it, back on the switcher", async 
   await userEvent.keyboard("{Escape}");
   await expect.element(screen.getByRole("menu")).not.toBeInTheDocument();
   await expect.element(trigger).toHaveFocus();
+});
+
+test("the item the keyboard is on is ringed and coloured, 3:1 or more from the surface", async () => {
+  const screen = await render(<Rendered />);
+  await userEvent.tab();
+  await userEvent.keyboard("{Enter}");
+  await userEvent.keyboard("{ArrowDown}");
+  const item = screen.getByRole("menuitemradio", { name: "support 12 threads" });
+  await expect.element(item).toHaveAttribute("data-highlighted");
+  const style = getComputedStyle(item.element());
+  const shadows = style.boxShadow.match(/rgba?\([^)]*\)/g) ?? [];
+  expect(shadows).toContain(token("focus"));
+  expect(contrast(token("focus"), token("surface"))).toBeGreaterThanOrEqual(3);
+  expect(style.color).toBe(token("accent"));
+  expect(contrast(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5);
 });

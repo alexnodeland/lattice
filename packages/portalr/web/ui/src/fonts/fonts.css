@@ -1,5 +1,5 @@
 /*
- * The family's two typefaces (lattice ADR-0001), served from the UIs' own origin, as their
+ * lattice's two typefaces (lattice ADR-0001), served from the UIs' own origin, as their
  * Content-Security-Policy's font-src 'self' asks: Schibsted Grotesk, variable from 400 to 900,
  * upright and italic, and Fragment Mono. Each is cut to Latin and Latin Extended, from
  * Fontsource's 5.3.0 files; text outside them falls back to the system's faces. Both are under

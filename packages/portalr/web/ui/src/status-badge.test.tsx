@@ -47,3 +47,19 @@ test("working stops turning when motion is reduced", async () => {
   await commands.reduceMotion(true);
   expect(getComputedStyle(glyph).animationName).toBe("none");
 });
+
+test("still, working keeps a shape of its own, apart from queued's", async () => {
+  onTestFinished(() => commands.reduceMotion(false));
+  await commands.reduceMotion(true);
+  const screen = await render(
+    <div>
+      <StatusBadge tone="working">Working</StatusBadge>
+      <StatusBadge tone="queued">Queued</StatusBadge>
+    </div>,
+  );
+  const shape = (word: string) => {
+    const style = getComputedStyle(screen.getByText(word).element().firstElementChild as Element);
+    return [style.borderTopStyle, style.borderRightColor === style.borderTopColor].join();
+  };
+  expect(shape("Working")).not.toBe(shape("Queued"));
+});

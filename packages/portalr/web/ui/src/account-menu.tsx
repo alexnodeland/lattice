@@ -18,7 +18,7 @@ function initials(name: string): string {
   return `${words[0]?.[0] ?? ""}${words.length > 1 ? (words.at(-1)?.[0] ?? "") : ""}`.toUpperCase();
 }
 
-/** Who is signed in, their scheme, and signing out. */
+/** Who is signed in, signing out, and their scheme. */
 export function AccountMenu({
   name,
   email,
@@ -51,10 +51,16 @@ export function AccountMenu({
       <Menu.Portal>
         <Menu.Positioner sideOffset={6} align="end" className="z-30">
           <Menu.Popup className={popup}>
-            <div className="px-2.5 py-1.5">
-              <p className="font-semibold">{name}</p>
-              {email && <p className="text-muted text-xs">{email}</p>}
-            </div>
+            <Menu.Group>
+              <Menu.GroupLabel className="px-2.5 pt-1.5 pb-1">
+                <span className="block font-semibold">{name}</span>
+                {email && <span className="block text-muted text-xs">{email}</span>}
+              </Menu.GroupLabel>
+              <Menu.Item className={item} onClick={onSignOut}>
+                Sign out
+                <Icon icon={LogOut} />
+              </Menu.Item>
+            </Menu.Group>
             <Menu.Separator className={separator} />
             <Menu.Group>
               <Menu.GroupLabel className={groupLabel}>Appearance</Menu.GroupLabel>
@@ -72,11 +78,6 @@ export function AccountMenu({
                 ))}
               </Menu.RadioGroup>
             </Menu.Group>
-            <Menu.Separator className={separator} />
-            <Menu.Item className={item} onClick={onSignOut}>
-              Sign out
-              <Icon icon={LogOut} className="text-muted" />
-            </Menu.Item>
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>

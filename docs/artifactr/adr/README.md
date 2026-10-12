@@ -64,5 +64,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0058](0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md) | A tenant's workspaces, listed by what each actor may open | Accepted |
 | [0059](0059-a-turn-starts-from-an-empty-context.md) | A turn starts from an empty context | Accepted |
 | [0060](0060-the-tenant-on-log-records.md) | The tenant on log records | Accepted |
+| [0059](0059-a-nul-character-is-refused-at-the-boundary.md) | A NUL character is refused at the boundary | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

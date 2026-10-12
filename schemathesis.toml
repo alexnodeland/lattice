@@ -1,10 +1,6 @@
 # Schemathesis, as the `api` tasks run it (scripts/api, lattice ADR-0015). A server error, and every
 # check not turned off here, fails.
 
-[generation]
-# PostgreSQL can't store a NUL byte, and the libraries don't refuse one yet (#67).
-allow-x00 = false
-
 [checks]
 # The routers don't document their rejections yet (#66).
 status_code_conformance.enabled = false

@@ -61,5 +61,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0057](0057-reserved-publishers.md) | Reserved publishers | Accepted |
 | [0058](0058-an-mcp-client-acts-for-its-person.md) | An MCP client acts for its person | Accepted |
 | [0059](0059-the-tenant-on-log-records.md) | The tenant on log records | Accepted |
+| [0059](0059-a-nul-character-is-refused-at-the-boundary.md) | A NUL character is refused at the boundary | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

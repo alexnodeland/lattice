@@ -516,3 +516,9 @@ async def test_building_the_server_leaves_logging_as_it_was(
     runner = Runner(make_agent(Script()), app=gate)
     await ArtifactrMcp(workspaces, runner, resolve=identity.resolve).aclose()
     assert (root.handlers, root.level) == ([], logging.WARNING)
+
+
+async def test_a_nul_character_is_a_tool_error(mcp: ArtifactrMcp) -> None:
+    async with Client(mcp.server) as client:
+        error, text = await _call(client, "get_thread", thread_id="\x00")
+    assert (error, text.endswith("text cannot hold a NUL character")) == (True, True)

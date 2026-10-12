@@ -21,7 +21,7 @@ from collections.abc import (
 from contextlib import AbstractContextManager, aclosing
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Final, Literal, assert_never
+from typing import Final, Literal, assert_never, cast
 
 from opentelemetry.metrics import MeterProvider
 from opentelemetry.trace import Span, SpanKind, TracerProvider
@@ -434,6 +434,7 @@ class Workspaces:
         Raises:
             Forbidden: If ``authorize`` refuses the actor this workspace.
         """
+        _check_text(tenant_id, workspace_id, actor)
         workspace = Workspace(self._context, WorkspaceRef(tenant_id, workspace_id), actor)
         await workspace.check(Access(action="reflexr:open"))
         if self._on_open is not None:
@@ -479,6 +480,7 @@ class Workspaces:
         Raises:
             Forbidden: If ``authorize`` refuses it.
         """
+        _check_text(tenant_id, actor)
         await self._context.check(tenant_id, None, actor, Access(action="reflexr:read_rules"))
         return list(self._context.rules.values())
 
@@ -492,6 +494,7 @@ class Workspaces:
         Raises:
             Forbidden: If ``authorize`` refuses it.
         """
+        _check_text(tenant_id, actor)
         access = Access(action="reflexr:read_schedules")
         await self._context.check(tenant_id, None, actor, access)
         seen: list[Schedule] = []
@@ -611,6 +614,7 @@ class Workspace:
 
     def as_actor(self, actor: Actor) -> "Workspace":
         """Return a handle on the same workspace that acts as ``actor``, checked as it."""
+        _check_text(actor)
         return Workspace(self._context, self._ref, actor, self._cause)
 
     def caused_by(self, causation: Causation, *, correlation_id: str) -> "Workspace":
@@ -619,6 +623,7 @@ class Workspace:
         The reactor gives each run such a handle, so the events its action emits record the
         firing and run behind them and count towards the chain's depth.
         """
+        _check_text(causation, correlation_id)
         return Workspace(self._context, self._ref, self._actor, _Cause(causation, correlation_id))
 
     async def check(self, access: Access) -> None:
@@ -672,6 +677,7 @@ class Workspace:
         Raises:
             ValueError: If ``ids`` is not as long as ``events``.
         """
+        _check_text(events, ids, correlation_id)
         await self.check(Access(action="reflexr:publish"))
         chosen = list(ids) if ids is not None else [None] * len(events)
         if len(chosen) != len(events):
@@ -722,6 +728,7 @@ class Workspace:
                 a chain target names an event that did not start its chain.
             NotFound: If the target does not exist.
         """
+        _check_text(feedback, on)
         await self.check(Access(action="reflexr:give_feedback"))
         kind = on.kind
         if kind not in feedback.targets:
@@ -772,6 +779,7 @@ class Workspace:
             NotFound: If the run does not exist.
             InvalidState: If the run is running or has finished otherwise.
         """
+        _check_text(reason)
         return await self._operate(
             run_id, "skip", lambda run, now: skip(run, now=now, reason=reason)
         )
@@ -783,6 +791,7 @@ class Workspace:
             NotFound: If the run does not exist.
             InvalidState: If the run has finished.
         """
+        _check_text(reason)
         return await self._operate(
             run_id, "cancel", lambda run, now: cancel(run, now=now, reason=reason)
         )
@@ -806,6 +815,7 @@ class Workspace:
             InvalidState: If the run is no longer running this attempt: it was cancelled, or
                 another executor took it over.
         """
+        _check_text(run_id, step, state)
         await self.check(Access(action="reflexr:checkpoint_run"))
         with self._span("reflexr.checkpoint_run") as span:
             span.set_attributes({a.RUN_ID: run_id, a.ATTEMPT: attempt})
@@ -846,6 +856,7 @@ class Workspace:
             NotFound: If the workspace has no such rule.
             ValidationFailed: If ``from_seq`` is not between 0 and the head of the log.
         """
+        _check_text(rule)
         await self.check(Access(action="reflexr:replay_rule", rule=rule))
         with self._span("reflexr.replay_rule") as span:
             span.set_attribute(a.RULE, rule)
@@ -902,6 +913,7 @@ class Workspace:
                 rules as it may.
             InvalidState: If the rule is installed already: update it instead.
         """
+        _check_text(rule, provenance)
         await self.check(Access(action="reflexr:install_rule", rule=rule.name))
         kept = dict(provenance or {})
         self._validate(rule, kept, self._stored_rules(rule.name))
@@ -955,6 +967,7 @@ class Workspace:
             InvalidState: If the rule is not at ``expected_version``, which the message names,
                 or is archived: install it again.
         """
+        _check_text(rule, provenance)
         await self.check(Access(action="reflexr:update_rule", rule=rule.name))
         kept = dict(provenance or {})
         self._validate(rule, kept, self._stored_rules(rule.name))
@@ -995,6 +1008,7 @@ class Workspace:
             NotFound: If no stored rule has the name.
             InvalidState: If the rule is not at ``expected_version``, which the message names.
         """
+        _check_text(rule, reason)
         await self.check(Access(action="reflexr:archive_rule", rule=rule))
         self._stored_rules(rule)
         with self._span("reflexr.archive_rule") as span:
@@ -1070,6 +1084,7 @@ class Workspace:
             ValidationFailed: If both ``limit`` and ``last`` are given, or a number is negative
                 or more than storage holds.
         """
+        _check_text(types)
         await self.check(Access(action="reflexr:read_events"))
         _check_page(after_seq=after_seq, before_seq=before_seq, limit=limit, last=last)
         for name in types or ():
@@ -1105,6 +1120,7 @@ class Workspace:
         A consumer, such as a feedback mirror, saves its cursor with :meth:`save_cursor` and
         carries on after it when it starts again.
         """
+        _check_text(name)
         await self.check(Access(action="reflexr:read_cursors"))
         return await self._context.storage.cursor(self._ref, name)
 
@@ -1114,6 +1130,7 @@ class Workspace:
         A cursor only moves forward: saving a ``seq`` below the saved one leaves it, so a
         consumer that runs in several processes, each at its own pace, cannot move it back.
         """
+        _check_text(name)
         await self.check(Access(action="reflexr:save_cursor"))
         await self._context.storage.save_cursor(self._ref, name, seq)
 
@@ -1123,6 +1140,7 @@ class Workspace:
         Raises:
             NotFound: If the run does not exist.
         """
+        _check_text(run_id)
         await self.check(Access(action="reflexr:read_runs"))
         run = await self._context.storage.run(self._ref, run_id)
         if run is None:
@@ -1142,6 +1160,7 @@ class Workspace:
         Raises:
             ValidationFailed: If ``limit`` is negative, or more than storage can hold.
         """
+        _check_text(rule, scope_key)
         await self.check(Access(action="reflexr:read_runs", rule=rule))
         _check_count("limit", limit)
         return await self._context.storage.runs(
@@ -1150,6 +1169,7 @@ class Workspace:
 
     async def dead_letters(self, *, rule: RuleName | None = None) -> list[EvaluationError]:
         """Return the envelopes rules could not evaluate, oldest first."""
+        _check_text(rule)
         await self.check(Access(action="reflexr:read_dead_letters", rule=rule))
         return await self._context.storage.dead_letters(self._ref, rule=rule)
 
@@ -1169,6 +1189,7 @@ class Workspace:
         Raises:
             NotFound: If the workspace has no such rule, as for a stored rule that is archived.
         """
+        _check_text(rule)
         await self.check(Access(action="reflexr:read_rules", rule=rule))
         found = (await self._context.rules_in(self._ref)).get(rule)
         if found is None:
@@ -1311,6 +1332,7 @@ class Workspace:
         action: Literal["retry", "skip", "cancel"],
         transition: _Transition,
     ) -> Run:
+        _check_text(run_id)
         await self.check(Access(action=f"reflexr:{action}_run"))
         with self._span(f"reflexr.{action}_run") as span:
             span.set_attribute(a.RUN_ID, run_id)
@@ -1489,6 +1511,27 @@ def _check_name(name: str) -> str:
         return check_event_name(name)
     except ValueError as error:
         raise ValidationFailed(str(error), []) from None
+
+
+# Shared verbatim with artifactr's src/artifactr/workspace/workspace.py; change both.
+def _check_text(*values: object) -> None:
+    """Refuse a NUL character in any string ``values`` hold, as models, mappings or collections.
+
+    PostgreSQL's text can't hold one, so every storage refuses it alike, before ``authorize``
+    hears it (ADR-0059).
+
+    Raises:
+        ValidationFailed: If a string holds a NUL character.
+    """
+    for value in values:
+        found = value.model_dump() if isinstance(value, BaseModel) else value
+        if isinstance(found, str):
+            if "\x00" in found:
+                raise ValidationFailed("text cannot hold a NUL character", [])
+        elif isinstance(found, Mapping):
+            _check_text(*cast("Mapping[object, object]", found).items())
+        elif isinstance(found, Collection) and not isinstance(found, bytes):
+            _check_text(*cast("Collection[object]", found))
 
 
 def _check_page(

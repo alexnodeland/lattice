@@ -541,3 +541,12 @@ async def test_a_caller_the_resolver_refuses_is_answered_403_not_500(
 ) -> None:
     refused = await client.get(path, headers={"x-token": "stranger"})
     assert (refused.status_code, refused.json()["detail"]["type"]) == (403, "forbidden")
+
+
+async def test_a_nul_character_is_a_validation_failure(app: App) -> None:
+    client, _, _ = app
+    refused = await client.get("/workspaces/prod/runs", params={"scope_key": "\x00"})
+    assert (refused.status_code, refused.json()["detail"]) == (
+        422,
+        {"type": "validation_failed", "message": "text cannot hold a NUL character", "errors": []},
+    )

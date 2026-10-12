@@ -180,3 +180,11 @@ def test_feedback_is_a_command_like_any_other(client: TestClient) -> None:
     invalid = dict(feedback, command_id="c3")
     invalid["command"] = dict(feedback["command"], value={"rating": 0})
     assert client.post(f"{BASE}/commands", json=invalid).status_code == 422
+
+
+def test_a_nul_character_is_a_validation_failure(client: TestClient) -> None:
+    refused = client.get(f"{BASE}/events", params={"thread_id": "\x00"})
+    assert (refused.status_code, refused.json()["detail"]) == (
+        422,
+        {"type": "validation_failed", "message": "text cannot hold a NUL character", "errors": []},
+    )

@@ -85,6 +85,8 @@ A stored rule is behaviour a tenant adds at runtime, so reflexr bounds what one 
 
 ## Limits
 
+Text can't hold a NUL character. Every `Workspaces` and `Workspace` method refuses one in an id, a name or an event's field with `validation_failed`, before `authorize` hears it, so a client can't reach PostgreSQL, or your hook, with a string neither can take ([ADR-0059](../adr/0059-a-nul-character-is-refused-at-the-boundary.md)).
+
 Events that set off workflows can loop and can spend. The library bounds both, and [Loop and spend safety](safety.md) covers each limit in detail ([ADR-0010](../adr/0010-loop-and-spend-safety.md)):
 
 | Limit | Where | Default |

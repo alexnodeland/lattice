@@ -1,6 +1,6 @@
 """Workspace handles: publishing, feedback, run operations and reads, with their telemetry."""
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import timedelta
 from typing import Any, Literal, cast
 
@@ -614,3 +614,70 @@ async def test_events_only_runs_may_publish_are_refused_to_clients(storage: Stor
         Causation(firing_id="fir_1", run_id="fir_1", depth=1), correlation_id=root.id
     )
     assert not (await run_handle.publish(Escalated(service="auth"))).duplicate
+
+
+NUL = "a\x00b"
+
+type NulCall = Callable[[Workspaces, Workspace], Awaitable[object]]
+
+
+async def _as_actor_with_nul(workspaces: Workspaces, workspace: Workspace) -> None:
+    workspace.as_actor(UserActor(id=NUL))
+
+
+async def _caused_by_with_nul(workspaces: Workspaces, workspace: Workspace) -> None:
+    workspace.caused_by(Causation(firing_id="f", run_id="r", depth=1), correlation_id=NUL)
+
+
+DEPLOYS = Rule(name="app:deploys", when=on(Deploy).where(service=NUL), then=run("note"))
+
+NUL_CALLS: dict[str, NulCall] = {
+    "open's tenant": lambda w, ws: w.open(NUL, "prod", actor=UserActor(id="ada")),
+    "open's workspace": lambda w, ws: w.open("acme", NUL, actor=UserActor(id="ada")),
+    "open's actor": lambda w, ws: w.open("acme", "prod", actor=UserActor(id=NUL)),
+    "rules_for": lambda w, ws: w.rules_for(NUL, actor=UserActor(id="ada")),
+    "schedules_for": lambda w, ws: w.schedules_for(NUL, actor=UserActor(id="ada")),
+    "as_actor": _as_actor_with_nul,
+    "caused_by": _caused_by_with_nul,
+    "an event": lambda w, ws: ws.publish(Deploy(service=NUL)),
+    "an event's id": lambda w, ws: ws.publish(Deploy(service="auth"), id=NUL),
+    "a chain": lambda w, ws: ws.publish(Deploy(service="auth"), correlation_id=NUL),
+    "feedback": lambda w, ws: ws.give_feedback(RunQuality(score=1), on=RunTarget(run_id=NUL)),
+    "retry_run": lambda w, ws: ws.retry_run(NUL),
+    "skip_run": lambda w, ws: ws.skip_run("run_1", reason=NUL),
+    "cancel_run": lambda w, ws: ws.cancel_run("run_1", reason=NUL),
+    "checkpoint_run": lambda w, ws: ws.checkpoint_run("run_1", attempt=1, step=NUL, state={}),
+    "replay_rule": lambda w, ws: ws.replay_rule(NUL),
+    "install_rule": lambda w, ws: ws.install_rule(DEPLOYS),
+    "update_rule": lambda w, ws: ws.update_rule(DEPLOYS),
+    "archive_rule": lambda w, ws: ws.archive_rule("app:deploys", reason=NUL),
+    "read": lambda w, ws: ws.read(types=[NUL]),
+    "cursor": lambda w, ws: ws.cursor(NUL),
+    "save_cursor": lambda w, ws: ws.save_cursor(NUL, 1),
+    "run": lambda w, ws: ws.run(NUL),
+    "runs": lambda w, ws: ws.runs(scope_key=NUL),
+    "dead_letters": lambda w, ws: ws.dead_letters(rule=NUL),
+    "get_rule": lambda w, ws: ws.get_rule(NUL),
+}
+"""Each way a string reaches a workspace, with a NUL character in it (ADR-0059)."""
+
+
+@pytest.mark.parametrize("call", sorted(NUL_CALLS))
+async def test_a_nul_character_is_refused_before_authorize_hears_it(
+    build: Build, call: str
+) -> None:
+    asked: list[str] = []
+
+    async def authorize(
+        tenant_id: str, workspace_id: str | None, actor: Actor, access: Access
+    ) -> bool:
+        asked.append(access.action)
+        return True
+
+    workspaces = build(authorize=authorize)
+    workspace = await workspaces.open("acme", "prod", actor=UserActor(id="ada"))
+    asked.clear()
+    with pytest.raises(ValidationFailed, match="text cannot hold a NUL character"):
+        await NUL_CALLS[call](workspaces, workspace)
+    assert asked == []
+    assert await workspace.head_seq() == 0, "nothing was written"

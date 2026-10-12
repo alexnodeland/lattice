@@ -49,6 +49,8 @@ Finer rules come from the library itself:
 
 ## Resource limits
 
+Text can't hold a NUL character. Every `Workspaces` and `Workspace` method refuses one in an id, a name or a command's text with `validation_failed`, before `authorize` hears it, so a client can't reach PostgreSQL, or your hook, with a string neither can take ([ADR-0059](../adr/0059-a-nul-character-is-refused-at-the-boundary.md)).
+
 The WebSocket surface closes connections that do not say `hello` within `hello_timeout` (10 seconds), and disconnects clients whose outbox exceeds `outbox_size` frames (1,000) instead of buffering without bound. A disconnected client resumes from the log without losing anything. The library does not limit request sizes, message lengths or command rates; enforce those in your application or at your proxy.
 
 ## Reporting vulnerabilities

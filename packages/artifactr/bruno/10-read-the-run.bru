@@ -10,6 +10,20 @@ get {
   auth: none
 }
 
+script:pre-request {
+  // The message starts its run in the background, so the run may not be recorded yet: wait for
+  // it, for up to ten seconds, before reading it.
+  const url = bru.interpolate("{{baseUrl}}/workspaces/{{workspace}}/runs/{{run}}");
+  let started = false;
+  for (let attempt = 0; attempt < 50 && !started; attempt++) {
+    const found = await bru.sendRequest({ method: "GET", url, validateStatus: () => true });
+    started = found.status === 200;
+    if (!started) {
+      await bru.sleep(200);
+    }
+  }
+}
+
 tests {
   test("it is the thread's run", function () {
     expect(res.status).to.equal(200);

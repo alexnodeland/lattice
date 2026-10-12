@@ -23,6 +23,13 @@ The reference is generated from relayr's docstrings and type annotations. It doc
       show_root_heading: false
       show_root_toc_entry: false
 
+## relayr.sql.tenancy
+
+::: relayr.sql.tenancy
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## relayr.inbound
 
 ::: relayr.inbound

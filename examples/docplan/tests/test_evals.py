@@ -3,7 +3,7 @@ judges the server's turns and a replay of them, and the measures come from the l
 
 import contextlib
 import io
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -128,7 +128,7 @@ def chat(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, script: Script) -> Cha
 
 
 @contextlib.asynccontextmanager
-async def opened(database_url: str, workspace_id: str = "main") -> AsyncIterator[Workspace]:
+async def opened(database_url: str, workspace_id: str = "main") -> AsyncGenerator[Workspace]:
     """The server's workspace, read from its database as ``docplan-eval`` reads it."""
     engine = open_database(database_url)
     try:

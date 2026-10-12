@@ -1,10 +1,10 @@
 """The reactor's evaluation: rules over workspaces' logs, exactly once, with their facts."""
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import timedelta
-from typing import Any
+from typing import Any, override
 
 import pytest
 from opentelemetry.trace import SpanKind
@@ -318,6 +318,7 @@ class LosesLease(InMemoryStorage):
         super().__init__(clock=clock)
         self.renewals = 0
 
+    @override
     async def acquire_lease(
         self, workspace: WorkspaceRef, key: str, holder: str, ttl: timedelta
     ) -> bool:
@@ -345,7 +346,8 @@ class StopsInATransaction(InMemoryStorage):
         self.armed = False
 
     @asynccontextmanager
-    async def transaction(self, workspace: WorkspaceRef) -> AsyncIterator[Any]:
+    @override
+    async def transaction(self, workspace: WorkspaceRef) -> AsyncGenerator[Any]:
         if self.armed:
             self.stop.set()
         async with super().transaction(workspace) as transaction:

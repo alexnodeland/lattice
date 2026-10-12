@@ -166,7 +166,7 @@ artifactr's and reflexr's `api` tasks also depend on docplan's and oncall's `ima
 | Repository security | Secret scanning with push protection, and private vulnerability reporting |
 | Test signal | pytest-timeout, and `timeout-minutes` on every job. pytest-randomly. JUnit reports as annotations and job summaries, and moon's run report. Hypothesis and fast-check are allowed dev dependencies everywhere |
 | Pull request titles | A lint against the Conventional Commits types and the module scopes, which stay as they are (`mcp`, `scores`, `template`); paths route commits to packages |
-| Types | ty (Astral) replaces pyright, configured once at the root. It is beta (0.0.84) and has no strict mode, so every rule is set to `error` (`all = "error"`), and `respect-type-ignore-comments = false`. Its adoption pull request runs both checkers once, reports what pyright strict catches that ty doesn't on this code, and adds `ty: ignore` to the quality test's banned suppressions |
+| Types | ty (Astral) replaces pyright, configured once at the root. It is beta (0.0.84) and has no strict mode, so every rule is set to `error` (`all = "error"`), and `respect-type-ignore-comments = false`. Its adoption pull request runs both checkers once, reports what pyright strict catches that ty doesn't on this code, and adds `ty: ignore` to the quality test's banned suppressions. Amended by [lattice ADR-0013](../../adr/0013-pyright-stays-until-ty-can-replace-it.md): pyright strict stays until ty can replace it |
 | Hooks | prek replaces pre-commit, with the same `.pre-commit-config.yaml` |
 | Releases | release-please replaces git-cliff ([Releases and versioning](#releases-and-versioning)) |
 | Dependencies | Renovate replaces Dependabot: `config:best-practices` (SHA-pinned actions, weekly lockfile maintenance), a `minimumReleaseAge` for PyPI as well as npm, its built-in `proto` manager for `.prototools` (a custom manager isn't needed), and PostgreSQL held at major 17 (a regex in `allowedVersions`, since Docker versioning rejects `17.x`). Python ranges use `update-lockfile`, so the libraries' floors stay; stackr's tool floors now move only by hand |
@@ -379,7 +379,7 @@ The maintainer settled these on 2026-09-30.
 - **portalr's npm names,** if `client` and `ui` are ever published. `@portalr/*` needs the npm organization, or they go under another scope.
 - **Template releases.** With prefixed tags, Copier always follows `HEAD`. If stackr ever wants releases that Copier can see, it would need bare PEP 440 tags reserved for the template.
 - **One mkdocstrings configuration for the whole site.** artifactr's and reflexr's Griffe extension for Sphinx roles would apply to every package, including evalr's and relayr's Markdown docstrings. It should be harmless; phase 1 checks it.
-- **What ty misses.** Its adoption pull request reports what pyright strict catches that ty doesn't, and the family decides then whether any gap needs a stopgap.
+- **What ty misses.** Its adoption pull request reports what pyright strict catches that ty doesn't, and the family decides then whether any gap needs a stopgap. Answered by [lattice ADR-0013](../../adr/0013-pyright-stays-until-ty-can-replace-it.md): ty 0.0.86 flagged 1 of pyright strict's 202 findings, and has no rule that keeps unknown types out of `src/`, so pyright stays.
 
 ## Tracking
 
@@ -396,6 +396,7 @@ In lattice, this list becomes a tracking issue with a sub-issue per phase (phase
 - [ ] Phase 6: test signal and hardening
   - The timeouts, on the day ([#4](https://github.com/alexnodeland/lattice/pull/4), [lattice ADR-0007](../../adr/0007-a-timeout-on-every-test-and-every-job.md)).
   - pytest-randomly ([#55](https://github.com/alexnodeland/lattice/pull/55), [lattice ADR-0010](../../adr/0010-every-projects-tests-run-in-a-random-order.md)): no test depended on its order.
+  - ty: decided against, for now. Its trial ([#58](https://github.com/alexnodeland/lattice/pull/58)) kept its real findings ([#62](https://github.com/alexnodeland/lattice/pull/62)), and pyright strict stays until ty can replace it ([lattice ADR-0013](../../adr/0013-pyright-stays-until-ty-can-replace-it.md)).
 - [ ] Phase 7: agents and process
 
 ### What the rehearsal settled

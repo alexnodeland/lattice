@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
-from typing import Any, assert_type
+from typing import Any, assert_type, override
 
 import pytest
 from mcp import Client
@@ -34,6 +34,7 @@ class RecordingBus(InMemorySubscriptionBus):
         super().__init__()
         self.events: list[ServerEvent] = []
 
+    @override
     async def publish(self, event: ServerEvent) -> None:
         self.events.append(event)
         await super().publish(event)

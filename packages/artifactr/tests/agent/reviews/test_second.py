@@ -8,8 +8,8 @@ message, so a direct post in a paused thread is its reply.
 
 import asyncio
 import contextlib
-from collections.abc import AsyncGenerator, AsyncIterator
-from typing import Any
+from collections.abc import AsyncGenerator
+from typing import Any, override
 
 import pytest
 from pydantic_ai import (
@@ -49,6 +49,7 @@ class Probe(HeldStorage):
         self.held_head: Gate | None = None
         self.held_subscribe: Gate | None = None
 
+    @override
     async def save_cursor(self, scope: Scope, name: str, seq: int) -> None:
         await super().save_cursor(scope, name, seq)
         # SqlStorage's save is awaited to its end, and a cancellation that came meanwhile is
@@ -57,6 +58,7 @@ class Probe(HeldStorage):
             self.held_taken = None
             await gate.wait()
 
+    @override
     async def runs(
         self, scope: Scope, *, thread_id: Any = None, status: RunStatus | None = None
     ) -> Any:
@@ -65,12 +67,14 @@ class Probe(HeldStorage):
             await gate.wait()
         return await super().runs(scope, thread_id=thread_id, status=status)
 
+    @override
     async def head_seq(self, scope: Scope) -> int:
         if (gate := self.held_head) is not None:
             self.held_head = None
             await gate.wait()
         return await super().head_seq(scope)
 
+    @override
     async def subscribe(self, scope: Scope, *, after_seq: int = 0) -> AsyncGenerator[Envelope]:
         gate, self.held_subscribe = self.held_subscribe, None
         if gate is not None:
@@ -186,7 +190,7 @@ async def test_c1_a_resume_that_fails_early_loses_a_message_sent_in_the_pausing_
     failed: list[str] = []
 
     @contextlib.asynccontextmanager
-    async def resume_fails_once(session: Session[Any]) -> AsyncIterator[None]:
+    async def resume_fails_once(session: Session[Any]) -> AsyncGenerator[None]:
         if session.trigger == "resume" and not failed:
             failed.append(session.run_id)
             raise RuntimeError("the tracing backend blinked")

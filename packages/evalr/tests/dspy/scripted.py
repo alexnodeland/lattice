@@ -1,6 +1,6 @@
 """A scripted language model and a synthetic dataset for training judges offline."""
 
-from typing import Annotated, Any
+from typing import Annotated, Any, override
 
 from dspy.utils import DummyLM
 from pydantic import BaseModel, Field
@@ -31,6 +31,7 @@ class InstructionAware(DummyLM):
     def __init__(self) -> None:
         super().__init__([], follow_examples=True)
 
+    @override
     def _use_example(self, messages: list[dict[str, Any]]) -> Any:
         system = messages[0]["content"] if messages[0]["role"] == "system" else ""
         pluses = messages[-1]["content"].count("+")

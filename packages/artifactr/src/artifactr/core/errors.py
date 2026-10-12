@@ -4,7 +4,7 @@ Every rejection has a stable ``code``, which is what the thread protocol sends t
 ``command_result`` frame, and a :meth:`Rejection.payload` with its typed details.
 """
 
-from typing import ClassVar
+from typing import ClassVar, override
 
 from pydantic import JsonValue
 
@@ -40,6 +40,7 @@ class VersionConflict(Rejection):
         self.base = base
         self.head = head
 
+    @override
     def details(self) -> dict[str, JsonValue]:
         """Return the artifact and both versions."""
         return {"artifact_id": self.artifact_id, "base": self.base, "head": self.head}
@@ -54,6 +55,7 @@ class ValidationFailed(Rejection):
         super().__init__(message)
         self.errors = errors
 
+    @override
     def details(self) -> dict[str, JsonValue]:
         """Return Pydantic's validation errors."""
         return {"errors": self.errors}
@@ -75,6 +77,7 @@ class NotFound(Rejection):
         self.entity = entity
         self.id = id
 
+    @override
     def details(self) -> dict[str, JsonValue]:
         """Return what was missing."""
         return {"entity": self.entity, "id": self.id}

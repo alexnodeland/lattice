@@ -9,7 +9,7 @@ application's own tables.
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, override
 
 from sqlalchemy import JSON, BigInteger, DateTime, Index, LargeBinary, MetaData
 from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
@@ -62,6 +62,7 @@ class EntityRow(ScopedRow):
 
     @declared_attr.directive
     @classmethod
+    @override
     def __table_args__(cls) -> tuple[Index]:
         return (Index(f"ix_{cls.__tablename__}_position", "tenant_id", "workspace_id", "position"),)
 

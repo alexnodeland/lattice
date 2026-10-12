@@ -3,7 +3,7 @@
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Annotated, Any
+from typing import Annotated, Any, override
 
 import pytest
 from opentelemetry.sdk.trace import TracerProvider
@@ -750,6 +750,7 @@ async def test_a_stream_steps_input_type_can_be_given(clock: FakeClock) -> None:
 class Escalate(BaseNode[Notes, Reaction[Flaky], str]):
     service: str
 
+    @override
     async def run(self, ctx: GraphRunContext[Notes, Reaction[Flaky]]) -> End[str]:
         ctx.deps.deps.step("escalate")
         return End(f"escalated {self.service}")

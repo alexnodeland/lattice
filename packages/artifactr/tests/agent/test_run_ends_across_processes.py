@@ -5,6 +5,7 @@ import random
 from collections.abc import AsyncIterator
 from datetime import timedelta
 from pathlib import Path
+from typing import override
 
 import pytest
 from pydantic_ai import (
@@ -45,11 +46,13 @@ class HeldSqlRelease(SqlStorage):
     held: Gate | None = None
     claims = 0
 
+    @override
     async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
         if self.held is not None:
             await self.held.wait()
         await super().release_lease(scope, key, holder)
 
+    @override
     async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
         self.claims += 1
         if self.claims > 50:

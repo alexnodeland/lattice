@@ -6,8 +6,8 @@ message without asserting that it starts a run, since the run's hand-over may ta
 
 import asyncio
 import contextlib
-from collections.abc import AsyncIterator
-from typing import Any
+from collections.abc import AsyncGenerator
+from typing import Any, override
 
 import pytest
 from pydantic_ai import DeferredToolRequests, FunctionToolset
@@ -38,6 +38,7 @@ class After(HeldStorage):
         super().__init__()
         self.held_after_runs: Gate | None = None
 
+    @override
     async def runs(
         self, scope: Scope, *, thread_id: ThreadId | None = None, status: RunStatus | None = None
     ) -> list[Run]:
@@ -115,7 +116,7 @@ async def test_n2_a_reply_whose_resume_fails_early_is_given_twice(
     failed: list[str] = []
 
     @contextlib.asynccontextmanager
-    async def resuming_fails_once(session: Session[Any]) -> AsyncIterator[None]:
+    async def resuming_fails_once(session: Session[Any]) -> AsyncGenerator[None]:
         if session.trigger == "resume" and not failed:
             failed.append(session.run_id)
             raise RuntimeError("the tracing backend blinked")
@@ -218,7 +219,7 @@ async def test_n4_a_message_deferred_to_a_holder_that_fails_before_it_starts(
     turns: list[str] = []
 
     @contextlib.asynccontextmanager
-    async def second_fails(session: Session[Any]) -> AsyncIterator[None]:
+    async def second_fails(session: Session[Any]) -> AsyncGenerator[None]:
         turns.append(session.run_id)
         if len(turns) == 2:
             await held.wait()
@@ -250,7 +251,7 @@ async def test_n4b_a_stop_before_the_run_starts_strands_a_bystander(
     held = Gate()
 
     @contextlib.asynccontextmanager
-    async def slow(session: Session[Any]) -> AsyncIterator[None]:
+    async def slow(session: Session[Any]) -> AsyncGenerator[None]:
         if not held.release.is_set():
             await held.wait()
         yield

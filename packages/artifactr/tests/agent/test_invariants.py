@@ -17,7 +17,7 @@ Each test holds one storage call at a :class:`Gate`, patched onto the storage it
 
 import asyncio
 import contextlib
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, cast
@@ -325,7 +325,7 @@ async def test_i3_a_command_that_asked_before_its_holder_read_is_handed_over(
     beginning = Gate()
 
     @contextlib.asynccontextmanager
-    async def begins(session: Session[Any]) -> AsyncIterator[None]:
+    async def begins(session: Session[Any]) -> AsyncGenerator[None]:
         if not beginning.release.is_set():
             await beginning.wait()
         yield
@@ -364,7 +364,7 @@ async def test_i3_a_message_left_to_a_holder_that_never_starts_is_handed_over(
     held = Gate()
 
     @contextlib.asynccontextmanager
-    async def begins(session: Session[Any]) -> AsyncIterator[None]:
+    async def begins(session: Session[Any]) -> AsyncGenerator[None]:
         if not held.release.is_set():
             await held.wait()
             if ends == "fails":
@@ -395,7 +395,7 @@ async def test_i4_a_turn_that_keeps_failing_before_it_starts_consumes_nothing(
     turns = 0
 
     @contextlib.asynccontextmanager
-    async def broken(session: Session[Any]) -> AsyncIterator[None]:
+    async def broken(session: Session[Any]) -> AsyncGenerator[None]:
         nonlocal turns
         turns += 1
         raise RuntimeError("the tracing backend is down")
@@ -445,6 +445,7 @@ async def test_i4_two_processes_whose_plans_fail_now_and_then_consume_each_messa
     there: Workspace,
     thread: Thread,
     runners: MakeRunner,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     here_storage = storages[0]
     reads, runs = [0], here_storage.runs
@@ -457,7 +458,7 @@ async def test_i4_two_processes_whose_plans_fail_now_and_then_consume_each_messa
                 raise ConnectionError("it blinked")
         return found
 
-    here_storage.runs = blinks
+    monkeypatch.setattr(here_storage, "runs", blinks)
     recorder = Recorder()
 
     def agent() -> Agent[Session[Any], str]:
@@ -476,14 +477,18 @@ async def test_i4_two_processes_whose_plans_fail_now_and_then_consume_each_messa
 
     await asyncio.gather(*(send(index) for index in range(12)))
     await settled(thread.id, here_runner, there_runner)
-    here_storage.runs = runs
+    monkeypatch.setattr(here_storage, "runs", runs)
     await there_runner.send(there, thread.id, "last")
     await settled(thread.id, here_runner, there_runner)
     assert sorted(recorder.prompts) == sorted([*(f"m{index}" for index in range(12)), "last"])
 
 
 async def test_i4_a_cancelled_error_no_one_asked_for_is_a_failure_and_never_spins(
-    storage: Storage, ws: Workspace, thread: Thread, runners: MakeRunner
+    storage: Storage,
+    ws: Workspace,
+    thread: Thread,
+    runners: MakeRunner,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     plans, runs = [0], storage.runs
 
@@ -495,14 +500,14 @@ async def test_i4_a_cancelled_error_no_one_asked_for_is_a_failure_and_never_spin
                 raise asyncio.CancelledError
         return found
 
-    storage.runs = interrupted
+    monkeypatch.setattr(storage, "runs", interrupted)
     script = Script(*[say("ok")] * 3)
     runner = runners(make_agent(script))
     with pytest.raises(asyncio.CancelledError):
         await runner.send(ws, thread.id, "Plan the launch")
     await runner.drain()
     assert plans[0] == 1, "no one cancelled it: it hands over only what was asked after"
-    storage.runs = runs
+    monkeypatch.setattr(storage, "runs", runs)
     started(await runner.send(ws, thread.id, "Hello?"))
     await settled(thread.id, runner)
     assert script.conversation() == ["Plan the launch", "Hello?"]

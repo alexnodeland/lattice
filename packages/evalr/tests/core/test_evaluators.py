@@ -1,3 +1,4 @@
+import functools
 from typing import cast
 
 import pytest
@@ -56,6 +57,13 @@ async def test_an_async_function_is_an_evaluator(spans: Spans) -> None:
     assert evaluator.name == "quick"
     assert evaluator.version == "1"
     assert evaluator.verdict_type is Helpfulness
+
+
+async def test_a_callable_without_a_name_is_named_for_its_type() -> None:
+    # A functools.partial, like any callable object, has no __name__.
+    evaluator = FunctionEvaluator(functools.partial(judge), verdict_type=Helpfulness)
+    assert evaluator.name == "partial"
+    assert (await evaluator.evaluate(THREAD)).evaluator == "partial"
 
 
 async def test_verdicts_record_the_enclosing_trace(spans: Spans) -> None:

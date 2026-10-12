@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import override
 
 import pytest
 from pydantic import BaseModel
@@ -51,6 +52,7 @@ class Forgetful:
 class Silent(InMemoryDatasetStore):
     """Saves, but returns no revision."""
 
+    @override
     async def save[I: BaseModel, V: BaseModel](self, dataset: Dataset[I, V], /) -> str:
         await super().save(dataset)
         return ""
@@ -59,6 +61,7 @@ class Silent(InMemoryDatasetStore):
 class Undescribed(InMemoryDatasetStore):
     """Forgets descriptions."""
 
+    @override
     async def load[I: BaseModel, V: BaseModel](
         self,
         name: str,

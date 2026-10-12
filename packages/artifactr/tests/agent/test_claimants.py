@@ -7,7 +7,7 @@ thread.
 
 import asyncio
 import contextlib
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import pytest
@@ -120,7 +120,7 @@ async def test_a_send_cancelled_at_any_step_has_its_message_carried_out_once(
     beginning = Gate()
 
     @contextlib.asynccontextmanager
-    async def begins(session: Session[Any]) -> AsyncIterator[None]:
+    async def begins(session: Session[Any]) -> AsyncGenerator[None]:
         if when == "as its turn begins" and not beginning.release.is_set():
             await beginning.wait()
         yield
@@ -210,7 +210,7 @@ async def test_a_resume_that_fails_before_it_starts_leaves_its_messages_for_the_
     failed: list[str] = []
 
     @contextlib.asynccontextmanager
-    async def resuming_fails_once(session: Session[Any]) -> AsyncIterator[None]:
+    async def resuming_fails_once(session: Session[Any]) -> AsyncGenerator[None]:
         if session.trigger == "resume" and not failed:
             failed.append(session.run_id)
             raise RuntimeError("the tracing backend blinked")
@@ -357,7 +357,7 @@ async def test_a_run_that_took_nothing_reads_what_was_asked_after_its_release(
     failing = [True]
 
     @contextlib.asynccontextmanager
-    async def fails_once(session: Session[Any]) -> AsyncIterator[None]:
+    async def fails_once(session: Session[Any]) -> AsyncGenerator[None]:
         if failing.pop() if failing else False:
             raise RuntimeError("the tracing backend blinked")
         yield

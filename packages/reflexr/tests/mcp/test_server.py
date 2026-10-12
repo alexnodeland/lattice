@@ -5,7 +5,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
-from typing import Any, Literal
+from typing import Any, Literal, override
 
 import pytest
 from mcp import Client
@@ -64,6 +64,7 @@ class RecordingBus(InMemorySubscriptionBus):
         super().__init__()
         self.events: list[ResourceUpdated] = []
 
+    @override
     async def publish(self, event: ServerEvent) -> None:
         if isinstance(event, ResourceUpdated):
             self.events.append(event)

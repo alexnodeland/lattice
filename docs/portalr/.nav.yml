@@ -12,6 +12,7 @@ nav:
   - adr/0007-typescript-7-and-6-only-where-a-tool-needs-its-api.md
   - adr/0008-the-bun-workspace-runs-in-bun.md
   - adr/0009-ui-tested-in-chromium-in-both-schemes-under-bun.md
+  - adr/0010-the-client-generated-types-and-resumable-stores.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

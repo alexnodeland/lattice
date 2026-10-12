@@ -4,3 +4,46 @@ layer: 'library'
 workspace:
   inheritedTasks:
     exclude: ['build'] # its source is built into app and admin
+
+tasks:
+  # This package's own `typescript` is TypeScript 6, which openapi-typescript loads (portalr
+  # ADR-0010); its code is checked with the root's TypeScript 7.
+  typecheck:
+    command: 'bun run --bun $workspaceRoot/node_modules/typescript/bin/tsc'
+    options:
+      mergeArgs: 'replace'
+
+  test:
+    command: 'bun x --bun --no-install vitest run --project unit'
+    inputs:
+      # The documents the drift test regenerates the types from.
+      - '/packages/artifactr/schemas/*.json'
+      - '/packages/reflexr/schemas/*.json'
+      - '/packages/grantr/schemas/*.json'
+    options:
+      mergeArgs: 'replace'
+
+  # Against docplan and oncall, in CI's Acceptance job (lattice ADR-0015). It needs Docker.
+  api:
+    description: 'Start docplan and oncall, and run the client against them'
+    command: 'scripts/api'
+    inputs:
+      - 'api/**/*'
+      - 'src/**/*'
+      - 'scripts/api'
+      - '/examples/docplan/**/*'
+      - '/examples/oncall/**/*'
+      - '/packages/artifactr/src/**/*'
+      - '/packages/reflexr/src/**/*'
+      - '/packages/*/compose.yaml'
+    env:
+      # The reference applications' agents run on pydantic-ai's test model: no provider is called.
+      DOCPLAN_MODEL: 'test'
+      ONCALL_MODEL: 'test'
+
+  types:
+    description: "Regenerate src/generated/ from the packages' committed documents"
+    command: 'bun run --bun scripts/generate.ts'
+    options:
+      cache: false
+      runInCI: false

@@ -1,19 +1,32 @@
 /**
  * @portalr/client: the only code in portalr's UIs that talks to the server.
  *
- * It grows into the generated types, the fetch client and the WebSocket stores in phase 3 of
- * portalr's RFC-0001.
+ * Its types are generated from each package's committed documents (`src/generated/`). It holds
+ * the REST clients, the queries' keys and options, and a store per workspace stream, with a
+ * reducer for each protocol.
  */
 
-/** Who is signed in, and which tenant they are working in. */
-export interface Session {
-  /** The access token Supabase Auth issued. */
-  readonly token: string;
-  /** The active tenant's id. */
-  readonly tenant: string;
-}
-
-/** The headers every REST request carries: the token, and the active tenant. */
-export function sessionHeaders(session: Session): Record<string, string> {
-  return { Authorization: `Bearer ${session.token}`, "X-Tenant": session.tenant };
-}
+export type * as Artifactr from "./artifactr";
+export { type ArtifactrStream, artifactr } from "./artifactr";
+export type * as ArtifactrApi from "./generated/artifactr.openapi";
+export type * as ArtifactrV1 from "./generated/artifactr.v1";
+export type * as GrantrApi from "./generated/grantr.openapi";
+export type * as ReflexrApi from "./generated/reflexr.openapi";
+export type * as ReflexrRulesV1 from "./generated/reflexr.rules.v1";
+export type * as ReflexrV1 from "./generated/reflexr.v1";
+export { createQueries, keys, stale } from "./queries";
+export type * as Reflexr from "./reflexr";
+export { type ReflexrStream, reflexr } from "./reflexr";
+export { type Api, createApi, type Surfaces } from "./rest";
+export { type Session, sessionHeaders, streamUrl } from "./session";
+export {
+  type Classified,
+  type Envelope,
+  type Protocol,
+  type Result,
+  type Settled,
+  type Snapshot,
+  type Status,
+  Stream,
+  type StreamOptions,
+} from "./stream";

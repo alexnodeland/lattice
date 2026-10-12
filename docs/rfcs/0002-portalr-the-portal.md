@@ -283,7 +283,7 @@ portalr's own RFC series turns these phases into its plan, with a tracking issue
 - [x] Sign-off on P1 to P6 (2026-10-12)
 - [x] Phase 1: the workspace (2026-10-12)
 - [x] Phase 2: the brand (2026-10-12), in lattice ADR-0014, since ADR-0010 had gone to another decision
-- [ ] Phase 3: client
+- [x] Phase 3: client (2026-10-12)
 - [ ] Phase 4: the router
 - [ ] Phase 5: app
 - [ ] Phase 6: admin

@@ -7,13 +7,13 @@ from collections.abc import Callable, Iterator
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic_ai import Agent, FunctionToolset, RunContext
 from starlette.requests import HTTPConnection
 
 from artifactr.agent import ArtifactWorkspace, Runner, Session
-from artifactr.core import Actor, TenantId, UserActor, WorkspaceId
+from artifactr.core import Actor, Forbidden, TenantId, UserActor, WorkspaceId
 from artifactr.fastapi import Unauthorized, artifactr_router
 from artifactr.workspace import Access, InMemoryStorage, Workspaces
 from tests.agent.conftest import Script
@@ -47,6 +47,10 @@ def latch_tools() -> FunctionToolset[Session[Latch]]:
 async def resolve_actor(connection: HTTPConnection) -> tuple[TenantId, Actor]:
     if connection.headers.get("x-token") == "bad":
         raise Unauthorized("bad token")
+    if connection.headers.get("x-token") == "stranger":
+        raise Forbidden("not in this tenant")
+    if connection.headers.get("x-token") == "unnamed":
+        raise HTTPException(status_code=400, detail="name the tenant")
     return connection.headers.get("x-tenant", "tenant"), UserActor(
         id=connection.headers.get("x-user", "alice")
     )

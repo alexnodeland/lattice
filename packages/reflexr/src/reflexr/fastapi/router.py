@@ -174,7 +174,7 @@ def reflexr_router(
     @router.get("/rules")
     async def list_rules(request: Request) -> list[Rule]:
         """Return the rules registered in code, which every workspace evaluates."""
-        tenant_id, actor = await _authenticate(request)
+        tenant_id, actor = await _or_http(_authenticate(request))
         return await _or_http(workspaces.rules_for(tenant_id, actor=actor))
 
     @router.get("/workspaces/{workspace_id}/rules")
@@ -223,7 +223,7 @@ def reflexr_router(
         A schedule that targets particular workspaces lists only the tenant's own, so no
         tenant sees another's ids; one that targets none of them is left out.
         """
-        tenant_id, actor = await _authenticate(request)
+        tenant_id, actor = await _or_http(_authenticate(request))
         return await _or_http(workspaces.schedules_for(tenant_id, actor=actor))
 
     @router.get("/workspaces/{workspace_id}/schedules")

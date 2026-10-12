@@ -4,11 +4,11 @@ from collections.abc import Iterable
 from datetime import timedelta
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from starlette.requests import HTTPConnection
 
 from reflexr import Actor, F, Feedback, Rule, UserActor, by, on, run
-from reflexr.core import Predicates, StoredRules, TenantId, WorkspaceId
+from reflexr.core import Forbidden, Predicates, StoredRules, TenantId, WorkspaceId
 from reflexr.fastapi import Unauthorized, reflexr_router
 from reflexr.workspace import (
     Access,
@@ -42,6 +42,10 @@ async def page(reaction: Reaction[None]) -> dict[str, Any]:
 async def resolve_actor(connection: HTTPConnection) -> tuple[TenantId, Actor]:
     if connection.headers.get("x-token") == "bad":
         raise Unauthorized("bad token")
+    if connection.headers.get("x-token") == "stranger":
+        raise Forbidden("not in this tenant")
+    if connection.headers.get("x-token") == "unnamed":
+        raise HTTPException(status_code=400, detail="name the tenant")
     headers = connection.headers
     user = UserActor(id=headers.get("x-user", "ada"), name=headers.get("x-name"))
     return headers.get("x-tenant", "acme"), user

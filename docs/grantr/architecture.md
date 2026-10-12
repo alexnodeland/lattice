@@ -41,7 +41,7 @@ The application hands `Grants` each library's catalog, its `ACTIONS`, and grantr
 | Role | On | Holds |
 |---|---|---|
 | `operator` | the deployment | `grantr:create_tenant` and `grantr:grant_operator` |
-| `application` | the deployment, holding in every tenant | the bookkeeping, `artifactr:record`, `reflexr:publish`, `reflexr:checkpoint_run`, and every `open` and read |
+| `application` | the deployment, holding in every tenant | the bookkeeping, `artifactr:record`, `reflexr:publish`, `reflexr:checkpoint_run`, its evaluators' feedback, and every `open` and read |
 | `owner` | a tenant | every action in every catalog but the operator's and the bookkeeping |
 | `admin` | a tenant | the owner's, but `grantr:delete_tenant` |
 | `member` | a tenant | nothing: it makes a user or service principal a member |

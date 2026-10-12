@@ -14,7 +14,7 @@ The libraries' catalogs (lattice RFC-0001's phase 1) name actions no person take
 
 - **No person's role holds the bookkeeping:** `artifactr:claim_thread`, and `save_cursor` and `read_cursors` in both libraries, are left out of every role a person is granted, whatever their prefix.
 - **`editor` gains `artifactr:stop_run`, and `artifactr:record`,** which a turn an editor's message starts asks as them. A viewer can't start a turn, and doesn't hold it. `reflexr:checkpoint_run` stays out of `viewer` and `editor`; a workspace's `admin` holds it.
-- **A built-in `application` role,** granted on the deployment, holds the runtime: the bookkeeping, `artifactr:record`, `reflexr:publish` and `reflexr:checkpoint_run`, and every `open` and read. It holds none of a person's other commands.
+- **A built-in `application` role,** granted on the deployment, holds the runtime: the bookkeeping, `artifactr:record`, `reflexr:publish` and `reflexr:checkpoint_run`, the libraries' `give_feedback` for its evaluators, and every `open` and read. It holds none of a person's other commands.
 - **`application` is the one deployment role that holds in every tenant.** A check for a service principal also looks up that grant, one indexed lookup; a user can't hold it, and `operator` still puts no one inside a tenant.
 - **Only the application's own principal holds it.** `Grants` is made with that principal, and `Grants.bootstrap()` grants it the role when the application starts, if it hasn't it, in an audit entry made by no one. Nothing else grants the role.
 

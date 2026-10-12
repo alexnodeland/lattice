@@ -115,7 +115,7 @@ def test_the_application_holds_the_runtime_and_every_read() -> None:
     application = _role("application", "deployment")
     assert application >= BOOKKEEPING
     assert {"artifactr:record", "reflexr:publish", "reflexr:checkpoint_run"} <= application
-    assert {"artifactr:read_artifacts", "reflexr:open"} <= application
+    assert {"artifactr:read_artifacts", "reflexr:open", "artifactr:give_feedback"} <= application
     assert application & {"artifactr:edit_artifact", "reflexr:install_rule"} == frozenset()
 
 

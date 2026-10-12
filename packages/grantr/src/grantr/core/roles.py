@@ -90,8 +90,8 @@ RUNTIME: Final = BOOKKEEPING | {
     "reflexr:publish",
     "reflexr:checkpoint_run",
 }
-"""The commands the application's ``application`` role holds, beside every ``open`` and read:
-its bookkeeping, the runner's records, and its code rules' runs."""
+"""The commands the application's ``application`` role holds, beside every ``open``, every read
+and its evaluators' feedback: its bookkeeping, the runner's records, and its code rules' runs."""
 
 RULE: Final = frozenset({"reflexr:open", "reflexr:publish", "reflexr:checkpoint_run"})
 """The commands a stored rule's ``rule`` role holds, beside reflexr's reads."""
@@ -167,7 +167,7 @@ class Catalog:
             actions=actions,
             built_in={
                 ("deployment", "operator"): OPERATOR,
-                ("deployment", APPLICATION): frozenset(reads | RUNTIME & libraries),
+                ("deployment", APPLICATION): frozenset(reads | (RUNTIME | FEEDBACK) & libraries),
                 ("tenant", "owner"): owner,
                 ("tenant", "admin"): owner - {"grantr:delete_tenant"},
                 ("tenant", MEMBER): frozenset(),

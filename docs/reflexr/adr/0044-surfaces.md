@@ -1,6 +1,6 @@
 # ADR-0044: Surfaces
 
-**Status:** Accepted; partly superseded by [ADR-0047](0047-commands-carried-out-once-per-id.md)
+**Status:** Accepted; partly superseded by [ADR-0047](0047-commands-carried-out-once-per-id.md), its authorization amended by [ADR-0056](0056-access-asked-in-every-workspace-method.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 
@@ -55,3 +55,11 @@ Refusing a workspace:
 1. [x] REST, the WebSocket, schedules and MCP over one command handler.
 2. [x] `authorize` on every surface, through `Workspaces.open`.
 3. [x] Statuses computed by the workspace layer, and windows, type filters and tails of the log.
+
+## Amendment (2026-10-12): authorization in every workspace method
+
+"Authorization within a tenant is one hook, asked in one place" still holds, but the place moves ([ADR-0056](0056-access-asked-in-every-workspace-method.md), [lattice RFC-0001](../../rfcs/0001-grantr-identity-and-access.md)):
+
+- **The hook hears the action.** `authorize(tenant_id, workspace_id, actor, access)`, where `access` is an `Access` naming one of `ACTIONS` and the rule it is about.
+- **`Workspaces` holds it,** with `on_open`, and the router, `ReflexrMcp` and `Workspaces.open` no longer take it. Every `Workspace` method asks it, so every REST request, WebSocket command, MCP tool call, resource read and subscription, and in-process call is asked. The reads across a tenant ask with no workspace.
+- **Refusals keep their shapes:** REST's 403, the WebSocket's 4403 when it may not open the workspace or read its log, a `forbidden` command result, and MCP's tool error or `INVALID_PARAMS`. The message names the action.

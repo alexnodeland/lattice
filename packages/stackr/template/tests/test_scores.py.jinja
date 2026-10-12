@@ -152,7 +152,7 @@ async def test_a_workspace_is_mirrored_once() -> None:
         await asyncio.Event().wait()
 
     mirrors = Mirrors(follow)
-    assert await mirrors.authorize("acme", "main", object())
+    await mirrors.watch("acme", "main")
     await mirrors.watch("acme", "main")
     await asyncio.sleep(0.01)
     assert started == [("acme", "main")]

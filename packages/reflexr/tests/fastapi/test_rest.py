@@ -290,8 +290,15 @@ async def test_requests_are_authenticated_and_authorized(app: App) -> None:
     refused = await client.get("/workspaces/secret/events")
     assert (refused.status_code, refused.json()["detail"]) == (
         403,
-        {"type": "forbidden", "message": "this workspace is not yours to use"},
+        {"type": "forbidden", "message": "reflexr:open is refused in this workspace"},
     )
+    eve = {"x-user": "eve"}
+    for path, action in (("/rules", "read_rules"), ("/schedules", "read_schedules")):
+        tenant_wide = await client.get(path, headers=eve)
+        assert (tenant_wide.status_code, tenant_wide.json()["detail"]["message"]) == (
+            403,
+            f"reflexr:{action} is refused in this tenant",
+        ), "a read across the tenant asks with no workspace"
     await client.post("/workspaces/prod/events", json={"event": ERROR})
     other = await client.get("/workspaces/prod/events", headers={"x-tenant": "globex"})
     assert other.json() == []  # the same workspace id in another tenant is another workspace
@@ -427,9 +434,9 @@ async def test_no_other_tenant_or_workspace_sees_a_stored_rule(client: httpx.Asy
             403,
             {
                 "type": "forbidden",
-                "message": "this change to rule chat:releases is not yours to make",
+                "message": "reflexr:install_rule is refused in this workspace",
             },
-            id="allow refuses",
+            id="authorize refuses",
         ),
         pytest.param(
             {"type": "update_rule", "rule": spike.model_dump(mode="json")},

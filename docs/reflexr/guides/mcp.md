@@ -38,9 +38,8 @@ Clients connect to `https://your-host/mcp/` with any MCP client that speaks Stre
 
 | `ReflexrMcp` argument | Meaning |
 |---|---|
-| `workspaces` | Opens tenant-scoped workspaces, holds the rules the tools list and replay, and carries out every tool's command, once per `command_id` ([Retries](#retries)) |
+| `workspaces` | Opens tenant-scoped workspaces, holds the rules the tools list and replay, carries out every tool's command, once per `command_id` ([Retries](#retries)), and holds the `authorize` hook every tool call asks |
 | `resolve` | Authenticates each request and returns the client's tenant and `ExternalAgentActor` |
-| `authorize` | Whether a client may use a workspace of its tenant: the router's hook, asked on every tool call, resource read and resource subscription that names a workspace. `None`, the default, allows every one |
 | `name` | The server's name, `"reflexr"` by default |
 | `bus` | Where resource-updated notifications go: in process by default. Pass the MCP SDK's `SubscriptionBus` over a shared broker to fan them out across replicas. |
 
@@ -60,21 +59,9 @@ async def resolve_client(ctx: McpContext) -> tuple[TenantId, ExternalAgentActor]
     return user.tenant_id, ExternalAgentActor(client_id=user.id, name=f"{user.name} (MCP)")
 ```
 
-To decide which workspaces of its tenant a client may use, pass `authorize`, the same `reflexr.workspace.Authorize` hook the [router](serving.md#authentication) takes:
+The `authorize` hook `Workspaces` holds decides what a client may do, as it does for the [router](serving.md#authentication); the server takes no hook of its own ([ADR-0056](../adr/0056-access-asked-in-every-workspace-method.md)). Each tool calls `Workspace` methods, and each asks the hook first, so a tool call is asked for opening the workspace (`reflexr:open`) and for the action it takes, such as `reflexr:retry_run` or `reflexr:read_runs`. `list_rules` reads across the tenant, so it asks `reflexr:read_rules` with no workspace. A resource read is asked for `reflexr:read_runs`, and so is each run a `subscriptions/listen` request names, when the stream opens.
 
-```python
-from reflexr import Actor
-from reflexr.core import WorkspaceId
-
-
-async def authorize(tenant_id: TenantId, workspace_id: WorkspaceId, actor: Actor) -> bool:
-    return await api_keys.may_use(actor, tenant_id, workspace_id)  # your access control
-
-
-mcp = ReflexrMcp(workspaces, resolve=resolve_client, authorize=authorize)
-```
-
-It is asked on every tool call and resource read that names a workspace, before anything is read or written, and when a client subscribes to a run's changes. A refusal is a tool error carrying the `forbidden` rejection's message, `Error executing tool read_events: this workspace is not yours to use`. A refused resource read fails with the same message, and so does a `subscriptions/listen` request that names a run of a refused workspace, with `INVALID_PARAMS`; the error's data carries the URI and the `forbidden` rejection, as REST's error body does. `list_rules` names no workspace, so it is not asked. Without `authorize`, a client may use every workspace of the tenant `resolve` returns.
+A refusal is a tool error carrying the `forbidden` rejection's message, such as `Error executing tool read_events: reflexr:open is refused in this workspace`. A refused resource read fails with the same message, and so does a `subscriptions/listen` request that names a refused run, with `INVALID_PARAMS`; the error's data carries the URI and the `forbidden` rejection, as REST's error body does. Without `authorize`, a client may do anything in every workspace of the tenant `resolve` returns.
 
 ## Tools
 
@@ -137,7 +124,7 @@ When the application turns [stored rules](rules.md#stored-rules) on, a client ca
 {"type": "rule_version", "rule": "chat:prod-deploy-failures", "version": 1, "seq": 812, "duplicate": false}
 ```
 
-The configuration's `allow` hook is asked about each change after `authorize`, and each change is checked as over REST: a rule the fixed limits refuse answers every problem at once, `rule chat:prod-deploy-failures cannot be stored: ["when.throttle is required", "timeout is required"]`, and a rule someone else changed since the `expected_version` a client gives answers `rule chat:prod-deploy-failures is at version 2, not 1`. A change retried with its `command_id` answers with its first result ([Retries](#retries)); one retried under a new `command_id`, or none, after it succeeded, changes nothing and answers `"duplicate": true`, whatever its `expected_version`. Give `expected_version` so a retry after someone else's change is refused rather than applied.
+`authorize` hears each change with the rule's name, as it hears every command, and each change is checked as over REST: a rule the fixed limits refuse answers every problem at once, `rule chat:prod-deploy-failures cannot be stored: ["when.throttle is required", "timeout is required"]`, and a rule someone else changed since the `expected_version` a client gives answers `rule chat:prod-deploy-failures is at version 2, not 1`. A change retried with its `command_id` answers with its first result ([Retries](#retries)); one retried under a new `command_id`, or none, after it succeeded, changes nothing and answers `"duplicate": true`, whatever its `expected_version`. Give `expected_version` so a retry after someone else's change is refused rather than applied.
 
 A stored rule belongs to the workspace it is installed in. `rule_status` lists it after the code rules, with its version, and `get_rule` returns it; another workspace, or another tenant's workspace of the same id, has no rule of that name. `list_rules` lists the code rules only.
 
@@ -148,7 +135,7 @@ A stored rule belongs to the workspace it is installed in. `rule_status` lists i
 
 ## Run resources
 
-Each run is a resource at `reflexr://{tenant_id}/{workspace_id}/runs/{run_id}`, whose content is the run's current JSON. `run_uri(tenant_id, workspace_id, run_id)` builds the URI. A client may read, and subscribe to, the runs of its own tenant only, in the workspaces `authorize` allows: reading another tenant's run fails with `runs of tenant acme are not available`, and so does a `subscriptions/listen` request that names one, with `INVALID_PARAMS`. The MCP SDK serves `subscriptions/listen` itself, so `ReflexrMcp` checks each run URI a listen request names, when the stream opens, as a read of it is checked; a request that names no run is not checked, and `resolve` is not called for it.
+Each run is a resource at `reflexr://{tenant_id}/{workspace_id}/runs/{run_id}`, whose content is the run's current JSON. `run_uri(tenant_id, workspace_id, run_id)` builds the URI. A client may read, and subscribe to, the runs of its own tenant only, if `authorize` lets it read them: reading another tenant's run fails with `runs of tenant acme are not available`, and so does a `subscriptions/listen` request that names one, with `INVALID_PARAMS`. The MCP SDK serves `subscriptions/listen` itself, so `ReflexrMcp` checks each run URI a listen request names, when the stream opens, as a read of it is checked; a request that names no run is not checked, and `resolve` is not called for it.
 
 Once a client has used a workspace through a tool, the server follows that workspace's log, and every fact about a run from then on (`reflexr:run_started`, `reflexr:run_progressed`, `reflexr:run_retrying`, `reflexr:run_succeeded` and the rest) is published as a resource-updated notification for the run's URI. A client that listens for a run's URI learns when to read it again, which suits an agent that published an alert and wants to watch the triage it caused.
 

@@ -28,7 +28,7 @@ A command is a JSON object with a `type`. Over REST and WebSocket it travels in 
 
 Run commands answer with `run`: the run as it now is; `replay_rule` answers with `rule`: `{rule, progress}`; and the stored-rule commands with `rule_version`: `{rule, version, seq, duplicate}`, where `seq` is the change's fact. Each outcome has a `type` naming which it is.
 
-Stored rules are off unless the application configures them, and then its `allow` hook is asked about each change after `authorize`: without either, the change is `forbidden`, as it is for a code rule's name. `provenance` is an opaque JSON object of at most 4 KiB, kept on the rule and its fact. A rule that fails `Rule.check` or `check_stored`, or provenance over 4 KiB, is `validation_failed`, with every problem in `errors`. Updating or archiving a name no stored rule has is `not_found`. A change that would leave the rule as it is appends nothing and answers `duplicate: true`, checked before `expected_version`, so a retried change is no conflict; its `seq` is the head of the log.
+Stored rules are off unless the application configures them: without them, a change is `forbidden`, as it is for a code rule's name, or one `authorize` refuses; it hears each change with the rule's name. `provenance` is an opaque JSON object of at most 4 KiB, kept on the rule and its fact. A rule that fails `Rule.check` or `check_stored`, or provenance over 4 KiB, is `validation_failed`, with every problem in `errors`. Updating or archiving a name no stored rule has is `not_found`. A change that would leave the rule as it is appends nothing and answers `duplicate: true`, checked before `expected_version`, so a retried change is no conflict; its `seq` is the head of the log.
 
 Rejections carry a stable `type` and a `message`: `not_found`, `invalid_state`, `validation_failed` (with Pydantic's `errors`), `forbidden`, `depth_exceeded` (a publish beyond the causation limit), and `unsupported_protocol`.
 
@@ -47,16 +47,16 @@ Beyond that memory, the log deduplicates what carries an id, whichever process a
 | `POST /v1/workspaces/{workspace_id}/commands` | One command frame; the response body is its `command_result`. A repeated `command_id` returns the first result. |
 | `POST /v1/workspaces/{workspace_id}/events` | Publish `{"event": {...}, "id"?}`, or `{"events": [{"event", "id"?}, ...], "correlation_id"?}` atomically and in order. A convenience for producers and webhooks, equivalent to `publish` commands; the response lists each `published` outcome. |
 | `GET /v1/workspaces/{workspace_id}/events?after_seq=&before_seq=&type=&limit=&last=` | A page of the log, as envelopes, oldest first: the window `after_seq < seq < before_seq` (to the head without `before_seq`), of the event types `type` names (it may repeat), and of those the first `limit` or the last `last`. `last` is the tail of the log; `last` with `before_seq` set to the oldest `seq` a client has pages backwards. Both `limit` and `last`, or a negative number, is `validation_failed`. |
-| `GET /v1/rules` | The rules registered in code, as JSON. They are the application's, shared by every tenant, so every authenticated client of any tenant gets them all, and `authorize` is not asked. A workspace's stored rules are not among them. |
+| `GET /v1/rules` | The rules registered in code, as JSON. They are the application's, shared by every tenant, so every client of any tenant that `authorize` allows `reflexr:read_rules`, asked with no workspace, gets them all. A workspace's stored rules are not among them. |
 | `GET /v1/workspaces/{workspace_id}/rules` | Each of the workspace's rules, code rules first: its `origin` (`code` or `stored`) and a stored rule's `version`, whether it is `enabled`, and its `cursor`, `lag` behind the head, `generation`, and `dead_letters` count. A disabled rule's cursor holds. |
 | `GET /v1/workspaces/{workspace_id}/rules/{rule}` | One of the workspace's rules: `rule`, its definition, as the rules schema has it; its `origin`; and a stored rule's `version` and `provenance`, both `null` for a code rule. A name the workspace has no rule of is `not_found`, as is an archived stored rule, or one installed in another workspace or tenant. |
 | `GET /v1/workspaces/{workspace_id}/runs?rule=&scope_key=&status=&limit=` | Runs, newest first. |
 | `GET /v1/workspaces/{workspace_id}/runs/{run_id}` | A run, with its attempts, last error and checkpoint. |
 | `GET /v1/workspaces/{workspace_id}/dead-letters?rule=` | The envelopes rules could not evaluate. |
-| `GET /v1/schedules` | The registered schedules that tick in the caller's tenant, shared by every tenant as rules are. A schedule that targets particular workspaces lists only the caller's tenant's; one that targets none of them is left out. |
+| `GET /v1/schedules` | The registered schedules that tick in the caller's tenant, shared by every tenant as rules are, if `authorize` allows `reflexr:read_schedules`, asked with no workspace. A schedule that targets particular workspaces lists only the caller's tenant's; one that targets none of them is left out. |
 | `GET /v1/workspaces/{workspace_id}/schedules` | Each schedule targeting the workspace, with its `last_tick` and `next_tick`. |
 
-Rejections map to HTTP status codes: `not_found` → 404, `invalid_state` → 409, `validation_failed` and `depth_exceeded` → 422, `forbidden` → 403, `unsupported_protocol` → 400. A body that does not validate, such as an event whose fields do not match its type, is 422. Authentication is the host's: `resolve_actor(request)` returns the tenant and actor, or raises `Unauthorized` (401); an optional `authorize(tenant, workspace, actor)` refuses a workspace (403, with the `forbidden` rejection as the body's `detail`, as every rejection has).
+Rejections map to HTTP status codes: `not_found` → 404, `invalid_state` → 409, `validation_failed` and `depth_exceeded` → 422, `forbidden` → 403, `unsupported_protocol` → 400. A body that does not validate, such as an event whose fields do not match its type, is 422. Authentication is the host's: `resolve_actor(request)` returns the tenant and actor, or raises `Unauthorized` (401). The `authorize(tenant, workspace, actor, access)` hook of the application's `Workspaces` is asked for every request: for opening the workspace, then for each action it takes ([ADR-0056](adr/0056-access-asked-in-every-workspace-method.md)). A refusal is 403, with the `forbidden` rejection as the body's `detail`, as every rejection has.
 
 ## WebSocket
 
@@ -117,24 +117,24 @@ reflexr's own events, alongside the application's:
 |---|---|---|
 | `4400` | Bad `hello` or unsupported protocol | fix and reconnect |
 | `4401` | Not authenticated | re-authenticate |
-| `4403` | Actor may not access this workspace | stop |
+| `4403` | The actor may not open this workspace, or read its log | stop |
 | `4408` | `hello` not received in time | reconnect |
 | `4429` | The client did not read frames fast enough | reconnect and resume |
 
 ## MCP
 
-`reflexr.mcp` serves the same commands and reads to MCP clients, with the host's `resolve(ctx)` returning the client's tenant and `ExternalAgentActor`. An optional `authorize(tenant, workspace, actor)`, the same hook as REST's, is asked on every tool call, resource read and resource subscription that names a workspace, and a refusal is a tool error, or a failed read or subscription, carrying the `forbidden` rejection's message. Commands go through the same handler as REST and the WebSocket; a rejection is a tool error carrying its message, followed, for a `validation_failed` that lists problems, by its `errors` as JSON.
+`reflexr.mcp` serves the same commands and reads to MCP clients, with the host's `resolve(ctx)` returning the client's tenant and `ExternalAgentActor`. The same `authorize` hook as REST's is asked on every tool call, resource read and resource subscription, for each action it takes, and a refusal is a tool error, or a failed read or subscription, carrying the `forbidden` rejection's message. Commands go through the same handler as REST and the WebSocket; a rejection is a tool error carrying its message, followed, for a `validation_failed` that lists problems, by its `errors` as JSON.
 
 | MCP | reflexr |
 |---|---|
 | Tools `publish_event`, `read_events` | Publish and read, with the same idempotency, window, filter and tail as REST. `read_events` returns 50 when given neither `limit` nor `last`. |
-| Tools `list_rules`, `rule_status`, `get_rule`, `replay_rule` | Inspect and replay rules. `list_rules`, like `GET /v1/rules`, gives every code rule to every authenticated client of any tenant. `rule_status` reports what `GET /v1/workspaces/{workspace_id}/rules` does, as a line per rule, and `get_rule` returns what `GET /v1/workspaces/{workspace_id}/rules/{rule}` does. |
+| Tools `list_rules`, `rule_status`, `get_rule`, `replay_rule` | Inspect and replay rules. `list_rules`, like `GET /v1/rules`, gives every code rule to every client of any tenant that `authorize` allows `reflexr:read_rules`. `rule_status` reports what `GET /v1/workspaces/{workspace_id}/rules` does, as a line per rule, and `get_rule` returns what `GET /v1/workspaces/{workspace_id}/rules/{rule}` does. |
 | Tools `install_rule`, `update_rule`, `archive_rule` | Change a stored rule: the commands, with their fields as arguments, answering `rule_version` as JSON. Served only when stored rules are on. A change retried under a new `command_id`, or none, answers as a `duplicate`, and changes nothing; give `expected_version` so a retry after someone else's change is refused rather than applied. |
 | Tool `schedule_status` | Each schedule targeting the workspace, with its last and next tick, as `GET /v1/workspaces/{workspace_id}/schedules` reports them. |
 | Tools `list_runs`, `get_run`, `retry_run`, `skip_run`, `cancel_run`, `list_dead_letters` | Operate runs. `list_runs` and `list_dead_letters` take the filters REST's reads do. |
 | Tool `give_feedback` | Typed feedback on a run, a firing or a chain. |
-| Resource template `reflexr://{tenant_id}/{workspace_id}/runs/{run_id}` | A run's current JSON, with resource-updated notifications as it progresses. Readable only by clients of that tenant, in a workspace `authorize` allows. |
-| `subscriptions/listen` and resource-updated notifications | Published for every run fact in each workspace a client has used through a tool. A `listen` request that names a run of another tenant, or of a workspace `authorize` refuses, fails with `INVALID_PARAMS` and the message a read of it would fail with; the error's data carries the URI and the `forbidden` rejection. |
+| Resource template `reflexr://{tenant_id}/{workspace_id}/runs/{run_id}` | A run's current JSON, with resource-updated notifications as it progresses. Readable only by clients of that tenant, and only if `authorize` allows them `reflexr:read_runs`. |
+| `subscriptions/listen` and resource-updated notifications | Published for every run fact in each workspace a client has used through a tool. A `listen` request that names a run of another tenant, or one `authorize` refuses, fails with `INVALID_PARAMS` and the message a read of it would fail with; the error's data carries the URI and the `forbidden` rejection. |
 
 Every tool that changes something (`publish_event`, `give_feedback`, `retry_run`, `skip_run`, `cancel_run`, `replay_rule`, `install_rule`, `update_rule` and `archive_rule`) takes an optional `command_id`, the command frame's idempotency key: a retry with the same id returns the first result ([Deduplication](#deduplication)). A call without one is carried out every time, and an empty one is refused, as in a command frame. The MCP request id cannot serve, since a retry is a new request.
 

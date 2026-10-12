@@ -1,9 +1,11 @@
 """Workspaces: tenant-scoped handles over a workspace's log, runs and rule progress (ADR-0016).
 
-Every write goes through a :class:`Workspace` handle, inside one storage transaction: publishing
-events, giving feedback, operating runs, and changing stored rules. Each write is attributed to
-the handle's actor, and each is traced (ADR-0018). Every surface hands the protocol's commands
-to :meth:`Workspaces.execute`, which carries each out through a handle once per id (ADR-0047).
+Every read and write goes through a :class:`Workspace` handle, each of whose methods asks the
+application's ``authorize`` hook first, with the action it takes (ADR-0056). Every write is
+inside one storage transaction: publishing events, giving feedback, operating runs, and changing
+stored rules. Each write is attributed to the handle's actor, and each is traced (ADR-0018).
+Every surface hands the protocol's commands to :meth:`Workspaces.execute`, which carries each
+out through a handle once per id (ADR-0047).
 """
 
 from collections import Counter
@@ -19,7 +21,7 @@ from collections.abc import (
 from contextlib import AbstractContextManager, aclosing
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal, assert_never
+from typing import Final, Literal, assert_never
 
 from opentelemetry.metrics import MeterProvider
 from opentelemetry.trace import Span, SpanKind, TracerProvider
@@ -59,7 +61,6 @@ from reflexr.core import (
     RetryRun,
     Rule,
     RuleArchived,
-    RuleChange,
     RuleInstalled,
     RuleName,
     RuleOutcome,
@@ -115,12 +116,65 @@ from reflexr.workspace.storage import Clock, Entry, Storage, Transaction, Worksp
 
 type _Transition = Callable[[Run, datetime], tuple[Run, RunRequeued | RunSkipped | RunCancelled]]
 
-Authorize = Callable[[TenantId, WorkspaceId, Actor], Awaitable[bool]]
-"""Decides whether an actor may use a workspace of its tenant.
+ACTIONS: Final = frozenset(
+    {
+        "reflexr:open",
+        # commands, by their type
+        "reflexr:publish",
+        "reflexr:give_feedback",
+        "reflexr:retry_run",
+        "reflexr:skip_run",
+        "reflexr:cancel_run",
+        "reflexr:replay_rule",
+        "reflexr:install_rule",
+        "reflexr:update_rule",
+        "reflexr:archive_rule",
+        # actions' runs, and consumers of the log
+        "reflexr:checkpoint_run",
+        "reflexr:save_cursor",
+        # reads
+        "reflexr:read_events",
+        "reflexr:read_cursors",
+        "reflexr:read_runs",
+        "reflexr:read_dead_letters",
+        "reflexr:read_rules",
+        "reflexr:read_schedules",
+    }
+)
+"""Every action a :class:`Workspace` or :class:`Workspaces` asks ``authorize`` about.
 
-The surfaces that serve workspaces, the FastAPI router and the MCP server, take one as their
-``authorize`` hook, and pass it to :meth:`Workspaces.open` for every request that names a
-workspace.
+An action is ``reflexr:`` and a name. A command's is its ``type``, a read's is ``read_`` and what
+it reads, and opening a workspace is ``reflexr:open``.
+"""
+
+
+class Access(BaseModel):
+    """What an actor is about to do, in a workspace or across its tenant, as ``authorize`` hears."""
+
+    model_config = ConfigDict(frozen=True)
+
+    action: str
+    """One of :data:`ACTIONS`."""
+
+    rule: RuleName | None = None
+    """The rule it is about, when it names one: a rule command's, or a read of one rule's."""
+
+
+Authorize = Callable[[TenantId, WorkspaceId | None, Actor, Access], Awaitable[bool]]
+"""Decides whether an actor may take an action in a workspace of its tenant.
+
+:class:`Workspaces` holds it, and every :class:`Workspace` it opens asks it in each method,
+before anything is read or written: so every REST request, WebSocket command, MCP tool call and
+in-process call is checked alike. The workspace is ``None`` for the reads that span a tenant,
+:meth:`Workspaces.rules_for` and :meth:`Workspaces.schedules_for`. A refusal raises
+:class:`~reflexr.core.Forbidden`.
+"""
+
+OnOpen = Callable[[TenantId, WorkspaceId], Awaitable[None]]
+"""Called each time :meth:`Workspaces.open` opens a workspace, after ``authorize`` allows it.
+
+It starts a workspace's background work, such as a feedback mirror, so it must be idempotent:
+a permission check has no side effects.
 """
 
 
@@ -219,11 +273,15 @@ class Workspaces:
             disabled rule is registered and checked too, but the reactor leaves it be.
         predicates: The Python predicates rules refer to, by name. They must be pure.
         stored_rules: What rules installed in a workspace at runtime may do. Without it, every
-            change to a stored rule is forbidden, and no workspace reads any.
+            change to a stored rule is forbidden, and no workspace reads any. Who may change
+            them is ``authorize``'s to decide.
         schedules: The schedules that publish ticks into the workspaces.
         clock: Returns the current time for run transitions. Defaults to the system clock.
         max_depth: The deepest causal chain an event may extend: a run's events beyond it are
             rejected and firings beyond it refused, so workflows that trigger themselves stop.
+        authorize: Whether an actor may take an action, asked by every handle in each of its
+            methods, and by the reads that span a tenant; allows everything if omitted.
+        on_open: Called each time a workspace is opened, once ``authorize`` allows it.
         tracer_provider: Where spans go. Defaults to OpenTelemetry's global provider.
         meter_provider: Where metrics go. Defaults to OpenTelemetry's global provider.
         results: Where :meth:`execute` remembers commands' results. Defaults to the 10,000
@@ -248,6 +306,8 @@ class Workspaces:
         schedules: Iterable[Schedule] = (),
         clock: Clock = utc_now,
         max_depth: int = 8,
+        authorize: Authorize | None = None,
+        on_open: OnOpen | None = None,
         tracer_provider: TracerProvider | None = None,
         meter_provider: MeterProvider | None = None,
         results: CommandResults | None = None,
@@ -287,12 +347,14 @@ class Workspaces:
             schedules=timetables,
             clock=clock,
             max_depth=max_depth,
+            authorize=authorize,
             telemetry=Telemetry(
                 tracer_provider=tracer_provider,
                 meter_provider=meter_provider,
                 stored_namespaces=stored,
             ),
         )
+        self._on_open = on_open
         self._results = results or InMemoryCommandResults()
 
     @property
@@ -349,24 +411,21 @@ class Workspaces:
         return await self._context.rules_in(at)
 
     async def open(
-        self,
-        tenant_id: TenantId,
-        workspace_id: WorkspaceId,
-        *,
-        actor: Actor,
-        authorize: Authorize | None = None,
+        self, tenant_id: TenantId, workspace_id: WorkspaceId, *, actor: Actor
     ) -> "Workspace":
         """Return a handle on a tenant's workspace, acting as ``actor``.
 
         This is the only place a tenant id enters; nothing on the handle can reach another
-        tenant. The surfaces pass their ``authorize`` hook, so each refuses a workspace alike.
+        tenant. Opening asks ``authorize`` for ``reflexr:open``, then calls ``on_open``.
 
         Raises:
-            Forbidden: If ``authorize`` is given and refuses the actor this workspace.
+            Forbidden: If ``authorize`` refuses the actor this workspace.
         """
-        if authorize is not None and not await authorize(tenant_id, workspace_id, actor):
-            raise Forbidden("this workspace is not yours to use")
-        return Workspace(self._context, WorkspaceRef(tenant_id, workspace_id), actor)
+        workspace = Workspace(self._context, WorkspaceRef(tenant_id, workspace_id), actor)
+        await workspace.check(Access(action="reflexr:open"))
+        if self._on_open is not None:
+            await self._on_open(tenant_id, workspace_id)
+        return workspace
 
     async def execute(
         self, workspace: "Workspace", command: Command, *, command_id: str
@@ -398,12 +457,30 @@ class Workspaces:
         await self._results.put(key, result)
         return result
 
-    def schedules_for(self, tenant_id: TenantId) -> list[Schedule]:
+    async def rules_for(self, tenant_id: TenantId, *, actor: Actor) -> list[Rule]:
+        """Return the rules registered in code, which every workspace of the tenant evaluates.
+
+        It spans the tenant, so it asks ``authorize`` for ``reflexr:read_rules`` with no
+        workspace.
+
+        Raises:
+            Forbidden: If ``authorize`` refuses it.
+        """
+        await self._context.check(tenant_id, None, actor, Access(action="reflexr:read_rules"))
+        return list(self._context.rules.values())
+
+    async def schedules_for(self, tenant_id: TenantId, *, actor: Actor) -> list[Schedule]:
         """Return the schedules that tick in a tenant's workspaces, as the tenant may see them.
 
         A schedule that targets particular workspaces lists only the tenant's own, so no tenant
-        sees another's ids; one that targets none of them is left out.
+        sees another's ids; one that targets none of them is left out. It spans the tenant, so
+        it asks ``authorize`` for ``reflexr:read_schedules`` with no workspace.
+
+        Raises:
+            Forbidden: If ``authorize`` refuses it.
         """
+        access = Access(action="reflexr:read_schedules")
+        await self._context.check(tenant_id, None, actor, access)
         seen: list[Schedule] = []
         for schedule in self._context.schedules.values():
             if schedule.workspaces == "all":
@@ -430,7 +507,22 @@ class _Context:
     schedules: Mapping[str, Schedule]
     clock: Clock
     max_depth: int
+    authorize: Authorize | None
     telemetry: Telemetry
+
+    async def check(
+        self, tenant_id: TenantId, workspace_id: WorkspaceId | None, actor: Actor, access: Access
+    ) -> None:
+        """Ask ``authorize`` whether an actor may take an action, as every check does.
+
+        Raises:
+            Forbidden: If ``authorize`` refuses it.
+        """
+        if self.authorize is not None and not await self.authorize(
+            tenant_id, workspace_id, actor, access
+        ):
+            where = "tenant" if workspace_id is None else "workspace"
+            raise Forbidden(f"{access.action} is refused in this {where}")
 
     async def rules_in(self, at: WorkspaceRef | Transaction) -> dict[RuleName, WorkspaceRule]:
         rules = dict(self.code)
@@ -459,7 +551,9 @@ class Workspace:
     """A handle on one tenant's workspace, bound to the actor it acts as.
 
     Create handles with :meth:`Workspaces.open`, derive handles for other actors with
-    :meth:`as_actor`, and handles whose events a run caused with :meth:`caused_by`.
+    :meth:`as_actor`, and handles whose events a run caused with :meth:`caused_by`. Each method
+    asks the ``authorize`` hook first, as the handle's actor, with the action it takes; a refusal
+    raises :class:`~reflexr.core.Forbidden`.
     """
 
     def __init__(
@@ -500,7 +594,7 @@ class Workspace:
         return self._cause.causation if self._cause else None
 
     def as_actor(self, actor: Actor) -> "Workspace":
-        """Return a handle on the same workspace that acts as ``actor``."""
+        """Return a handle on the same workspace that acts as ``actor``, checked as it."""
         return Workspace(self._context, self._ref, actor, self._cause)
 
     def caused_by(self, causation: Causation, *, correlation_id: str) -> "Workspace":
@@ -510,6 +604,16 @@ class Workspace:
         firing and run behind them and count towards the chain's depth.
         """
         return Workspace(self._context, self._ref, self._actor, _Cause(causation, correlation_id))
+
+    async def check(self, access: Access) -> None:
+        """Ask ``authorize`` whether this handle's actor may take an action here.
+
+        Every method asks it first.
+
+        Raises:
+            Forbidden: If ``authorize`` refuses it.
+        """
+        await self._context.check(self.tenant_id, self.workspace_id, self._actor, access)
 
     # ─── writes ───────────────────────────────────────────────────────────────
 
@@ -552,6 +656,7 @@ class Workspace:
         Raises:
             ValueError: If ``ids`` is not as long as ``events``.
         """
+        await self.check(Access(action="reflexr:publish"))
         chosen = list(ids) if ids is not None else [None] * len(events)
         if len(chosen) != len(events):
             raise ValueError(f"{len(events)} events but {len(chosen)} ids")
@@ -601,6 +706,7 @@ class Workspace:
                 a chain target names an event that did not start its chain.
             NotFound: If the target does not exist.
         """
+        await self.check(Access(action="reflexr:give_feedback"))
         kind = on.kind
         if kind not in feedback.targets:
             raise ValidationFailed(
@@ -684,6 +790,7 @@ class Workspace:
             InvalidState: If the run is no longer running this attempt: it was cancelled, or
                 another executor took it over.
         """
+        await self.check(Access(action="reflexr:checkpoint_run"))
         with self._span("reflexr.checkpoint_run") as span:
             span.set_attributes({a.RUN_ID: run_id, a.ATTEMPT: attempt})
             traceparent = current_traceparent()
@@ -723,6 +830,7 @@ class Workspace:
             NotFound: If the workspace has no such rule.
             ValidationFailed: If ``from_seq`` is not between 0 and the head of the log.
         """
+        await self.check(Access(action="reflexr:replay_rule", rule=rule))
         with self._span("reflexr.replay_rule") as span:
             span.set_attribute(a.RULE, rule)
             traceparent = current_traceparent()
@@ -770,17 +878,17 @@ class Workspace:
             duplicate.
 
         Raises:
-            Forbidden: If stored rules are off, the name is a code rule's, or ``allow`` refuses
-                the change.
+            Forbidden: If ``authorize`` refuses the change, stored rules are off, or the name is a
+                code rule's.
             ValidationFailed: If :meth:`~reflexr.core.Rule.check`,
                 :func:`~reflexr.core.check_stored` or :func:`~reflexr.core.check_provenance`
                 finds problems, listing them all, or the workspace has as many active stored
                 rules as it may.
             InvalidState: If the rule is installed already: update it instead.
         """
+        await self.check(Access(action="reflexr:install_rule", rule=rule.name))
         kept = dict(provenance or {})
-        config = await self._allow(RuleChange(kind="install", rule=rule.name, spec=rule))
-        self._validate(rule, kept, config)
+        self._validate(rule, kept, self._stored_rules(rule.name))
         with self._span("reflexr.install_rule") as span:
             span.set_attribute(a.RULE, rule.name)
             traceparent = current_traceparent()
@@ -831,9 +939,9 @@ class Workspace:
             InvalidState: If the rule is not at ``expected_version``, which the message names,
                 or is archived: install it again.
         """
+        await self.check(Access(action="reflexr:update_rule", rule=rule.name))
         kept = dict(provenance or {})
-        config = await self._allow(RuleChange(kind="update", rule=rule.name, spec=rule))
-        self._validate(rule, kept, config)
+        self._validate(rule, kept, self._stored_rules(rule.name))
         with self._span("reflexr.update_rule") as span:
             span.set_attribute(a.RULE, rule.name)
             traceparent = current_traceparent()
@@ -871,7 +979,8 @@ class Workspace:
             NotFound: If no stored rule has the name.
             InvalidState: If the rule is not at ``expected_version``, which the message names.
         """
-        await self._allow(RuleChange(kind="archive", rule=rule))
+        await self.check(Access(action="reflexr:archive_rule", rule=rule))
+        self._stored_rules(rule)
         with self._span("reflexr.archive_rule") as span:
             span.set_attribute(a.RULE, rule)
             traceparent = current_traceparent()
@@ -918,6 +1027,7 @@ class Workspace:
 
     async def head_seq(self) -> int:
         """Return the ``seq`` of the latest envelope, or 0 if the log is empty."""
+        await self.check(Access(action="reflexr:read_events"))
         return await self._context.storage.head_seq(self._ref)
 
     async def read(
@@ -943,6 +1053,7 @@ class Workspace:
         Raises:
             ValidationFailed: If both ``limit`` and ``last`` are given, or a number is negative.
         """
+        await self.check(Access(action="reflexr:read_events"))
         _check_page(after_seq=after_seq, before_seq=before_seq, limit=limit, last=last)
         for name in types or ():
             _check_name(name)
@@ -961,6 +1072,7 @@ class Workspace:
         Reading the log is untraced, so a subscription that polls storage makes no trace per
         poll (ADR-0040); what the subscriber does with each envelope is traced as usual.
         """
+        await self.check(Access(action="reflexr:read_events"))
         stream = self._context.storage.subscribe(self._ref, after_seq=after_seq)
         async with aclosing(stream) as envelopes:
             while True:
@@ -976,6 +1088,7 @@ class Workspace:
         A consumer, such as a feedback mirror, saves its cursor with :meth:`save_cursor` and
         carries on after it when it starts again.
         """
+        await self.check(Access(action="reflexr:read_cursors"))
         return await self._context.storage.cursor(self._ref, name)
 
     async def save_cursor(self, name: str, seq: int) -> None:
@@ -984,6 +1097,7 @@ class Workspace:
         A cursor only moves forward: saving a ``seq`` below the saved one leaves it, so a
         consumer that runs in several processes, each at its own pace, cannot move it back.
         """
+        await self.check(Access(action="reflexr:save_cursor"))
         await self._context.storage.save_cursor(self._ref, name, seq)
 
     async def run(self, run_id: RunId) -> Run:
@@ -992,6 +1106,7 @@ class Workspace:
         Raises:
             NotFound: If the run does not exist.
         """
+        await self.check(Access(action="reflexr:read_runs"))
         run = await self._context.storage.run(self._ref, run_id)
         if run is None:
             raise NotFound("run", run_id)
@@ -1006,20 +1121,24 @@ class Workspace:
         limit: int | None = None,
     ) -> list[Run]:
         """Return runs, newest first, optionally of one rule, status or scope."""
+        await self.check(Access(action="reflexr:read_runs", rule=rule))
         return await self._context.storage.runs(
             self._ref, rule=rule, status=status, scope_key=scope_key, limit=limit
         )
 
     async def dead_letters(self, *, rule: RuleName | None = None) -> list[EvaluationError]:
         """Return the envelopes rules could not evaluate, oldest first."""
+        await self.check(Access(action="reflexr:read_dead_letters", rule=rule))
         return await self._context.storage.dead_letters(self._ref, rule=rule)
 
     async def schedule_ticks(self) -> dict[str, datetime]:
         """Return when each schedule last ticked in this workspace."""
+        await self.check(Access(action="reflexr:read_schedules"))
         return await self._context.storage.schedules(self._ref)
 
     async def rule_progress(self) -> dict[RuleName, RuleProgress]:
         """Return each rule's progress: its cursor, generation and pending deadlines."""
+        await self.check(Access(action="reflexr:read_rules"))
         return await self._context.storage.progress(self._ref)
 
     async def get_rule(self, rule: RuleName) -> WorkspaceRule:
@@ -1028,6 +1147,7 @@ class Workspace:
         Raises:
             NotFound: If the workspace has no such rule, as for a stored rule that is archived.
         """
+        await self.check(Access(action="reflexr:read_rules", rule=rule))
         found = (await self._context.rules_in(self._ref)).get(rule)
         if found is None:
             raise NotFound("rule", rule)
@@ -1040,11 +1160,13 @@ class Workspace:
         yet is at cursor 0, and the progress of a rule the workspace no longer has, such as a
         code rule no longer registered or an archived stored rule, is left out.
         """
+        await self.check(Access(action="reflexr:read_rules"))
+        storage = self._context.storage
         rules = await self._context.rules_in(self._ref)
         # Progress next: the head only grows, so no cursor read before it is past it.
-        progress = await self.rule_progress()
-        head = await self.head_seq()
-        letters = Counter(letter.rule for letter in await self.dead_letters())
+        progress = await storage.progress(self._ref)
+        head = await storage.head_seq(self._ref)
+        letters = Counter(letter.rule for letter in await storage.dead_letters(self._ref))
         statuses: list[RuleStatus] = []
         for name, found in rules.items():
             cursor, generation = (
@@ -1070,7 +1192,8 @@ class Workspace:
         Every surface reports this, so they agree. A schedule that has not checked the
         workspace yet has neither.
         """
-        ticks = await self.schedule_ticks()
+        await self.check(Access(action="reflexr:read_schedules"))
+        ticks = await self._context.storage.schedules(self._ref)
         return [
             ScheduleStatus(
                 schedule=name,
@@ -1161,6 +1284,7 @@ class Workspace:
         action: Literal["retry", "skip", "cancel"],
         transition: _Transition,
     ) -> Run:
+        await self.check(Access(action=f"reflexr:{action}_run"))
         with self._span(f"reflexr.{action}_run") as span:
             span.set_attribute(a.RUN_ID, run_id)
             traceparent = current_traceparent()
@@ -1179,19 +1303,17 @@ class Workspace:
         )
         return updated
 
-    async def _allow(self, change: RuleChange) -> StoredRules:
-        """Return the configuration of stored rules, if the actor may make the change.
+    def _stored_rules(self, rule: RuleName) -> StoredRules:
+        """Return the configuration of stored rules, if a stored rule may have this name.
 
         Raises:
-            Forbidden: If stored rules are off, the name is a code rule's, or ``allow`` refuses.
+            Forbidden: If stored rules are off, or the name is a code rule's.
         """
         config = self._context.stored_rules
         if config is None:
             raise Forbidden("stored rules are off in these workspaces")
-        if change.rule in self._context.rules:
-            raise Forbidden(f"rule {change.rule} is registered in code")
-        if not await config.allow(self.tenant_id, self.workspace_id, self._actor, change):
-            raise Forbidden(f"this change to rule {change.rule} is not yours to make")
+        if rule in self._context.rules:
+            raise Forbidden(f"rule {rule} is registered in code")
         return config
 
     def _validate(

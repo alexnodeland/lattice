@@ -267,7 +267,7 @@ async def test_only_people_change_rules_at_runtime(server: str) -> None:
     assert result.is_error
     [content] = result.content
     assert isinstance(content, TextContent)
-    assert "not yours to make" in content.text
+    assert "reflexr:install_rule is refused in this workspace" in content.text
 
 
 async def test_workspaces_can_live_in_a_database(

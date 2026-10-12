@@ -45,15 +45,6 @@ class Mirrors:
         self._tasks[key] = task
         task.add_done_callback(lambda done: self._ended(key, done))
 
-    async def authorize(self, tenant_id: str, workspace_id: str, actor: object) -> bool:
-        """The libraries' ``authorize`` hook: mirror each workspace a request uses.
-
-        It allows every request: every user of a tenant may use the tenant's workspaces.
-        """
-        del actor
-        await self.watch(tenant_id, workspace_id)
-        return True
-
     def _ended(self, key: tuple[str, str], task: asyncio.Task[None]) -> None:
         # A mirror that stopped starts again the next time its workspace is used.
         self._tasks.pop(key, None)

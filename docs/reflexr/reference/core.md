@@ -120,8 +120,6 @@ What rules installed at runtime may do, the limits every one is held to, and how
 
 ::: reflexr.core.StoredRules
 
-::: reflexr.core.RuleChange
-
 ::: reflexr.core.check_stored
 
 ::: reflexr.core.check_provenance

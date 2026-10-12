@@ -1,6 +1,6 @@
 # RFC-0003: Managing rules at runtime
 
-**Status:** Implemented
+**Status:** Implemented; its `allow` hook folded into `authorize` by [ADR-0056](../adr/0056-access-asked-in-every-workspace-method.md)
 **Author:** Alex Nodeland
 **Created:** 2026-09-29
 **Discussion:** [#75](https://github.com/alexnodeland/reflexr/pull/75), from [issue #21][issue-21]; accepted on 2026-09-29, with the decisions in [Decisions](#decisions)
@@ -412,3 +412,7 @@ Each phase is a series of small pull requests to `main`.
 [issue-72]: https://github.com/alexnodeland/reflexr/issues/72
 [s-37]: https://github.com/alexnodeland/stackr/issues/37
 [s-rfc-0002]: https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md
+
+## Amendment (2026-10-12): `allow` is folded into `authorize`
+
+[lattice RFC-0001](../../rfcs/0001-grantr-identity-and-access.md) widens `authorize` to hear each action, and [ADR-0056](../adr/0056-access-asked-in-every-workspace-method.md) folds `StoredRules.allow` into it: a rule change is a command like any other, which the hook hears with the rule's name. `RuleChange` is gone, and `StoredRules` is `actions` and `namespaces`. The examples above that pass `allow=` describe the design as it was implemented, before that change.

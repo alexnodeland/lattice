@@ -26,6 +26,7 @@ from reflexr.core import (
     WAITING,
     AgentActor,
     Envelope,
+    Forbidden,
     InvalidRule,
     Rule,
     RuleName,
@@ -270,11 +271,16 @@ class Executor[D]:
             action, params = self._resolve(rule)
         except RunFailure as failure:
             return _Outcome.failed(failure)
-        workspace = await self._workspaces.open(
-            ref.tenant_id,
-            ref.workspace_id,
-            actor=AgentActor(rule=rule.name, run_id=run.id, name=rule.then.action),
-        )
+        try:
+            workspace = await self._workspaces.open(
+                ref.tenant_id,
+                ref.workspace_id,
+                actor=AgentActor(rule=rule.name, run_id=run.id, name=rule.then.action),
+            )
+        except Forbidden as refused:  # the rule may not act in its workspace
+            return _Outcome.failed(_refused(refused))
+        except Exception as error:  # the application's on_open failed: the attempt's, to retry
+            return _Outcome("failed", error=f"{type(error).__name__}: {error}")
         reaction = Reaction(
             workspace=workspace.caused_by(run.causation, correlation_id=run.correlation_id),
             run=run,
@@ -354,6 +360,8 @@ class Executor[D]:
             return _Outcome("failed", error=f"the action timed out after {limit}", reason="timeout")
         except RunFailure as failure:
             return _Outcome.failed(failure)
+        except Forbidden as refused:  # authorize refused the rule what it did: so would a retry
+            return _Outcome.failed(_refused(refused))
         except Exception as error:  # an action's failure is the run's, to retry
             return _Outcome("failed", error=f"{type(error).__name__}: {error}")
         try:
@@ -448,6 +456,11 @@ class Executor[D]:
             workspace_id=ref.workspace_id,
             attributes=attributes,
         )
+
+
+def _refused(refused: Forbidden) -> RunFailure:
+    """A refusal as a permanent failure, ``forbidden``: retrying the same run would be refused."""
+    return RunFailure(refused.message, reason="forbidden", permanent=True)
 
 
 async def _cancel_when_set(event: asyncio.Event, task: asyncio.Task[_Outcome]) -> None:

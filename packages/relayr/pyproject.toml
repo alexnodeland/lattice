@@ -112,6 +112,8 @@ markers = [
 [tool.coverage.run]
 branch = true
 source = ["src/relayr"]
+# SQLAlchemy runs run_sync callables in a greenlet, which coverage follows only when told.
+concurrency = ["greenlet", "thread"]
 
 [tool.coverage.report]
 fail_under = 100

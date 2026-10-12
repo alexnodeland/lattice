@@ -44,6 +44,13 @@ await followers.resume()  # at startup: every workspace the ledger knows
 await followers.aclose()  # at shutdown: each follower releases its lease
 ```
 
+With row-level security ([ADR-0027](../adr/0027-row-level-security-under-the-scoping.md)), as the libraries have it, the ledger works as a role that owns nothing, and starts the followers from every tenant's workspaces on the tables' owner's engine. Create the role before you migrate, then:
+
+```python
+await migrate(owner, application_role="app")  # grants the role relayr's tables
+ledger = SqlLedger(engine, row_level_security=True, across_tenants=owner)
+```
+
 - **`events` must include `BRIDGED`.** reflexr refuses a type its `Workspaces` doesn't accept, and the follower stops, logging an error, until the workspace is next opened. Nothing is skipped meanwhile.
 - **Give each process its own `holder`,** or leave it to its random default. One process at a time follows a workspace; the others wait for its lease.
 - **A workspace is followed from its first open**, and from startup once the ledger knows it.

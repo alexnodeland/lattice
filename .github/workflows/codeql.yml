@@ -1,0 +1,39 @@
+# CodeQL (stackr's RFC-0003, CI and tooling: supply chain), on every pull request, on every push to
+# main, and every week, so new queries reach code that hasn't changed. Its alerts are in the
+# repository's code scanning, and a pull request's show on it. The Python and portalr's TypeScript
+# are analysed from source, with no build; zizmor already checks the workflows.
+
+name: CodeQL
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  # A pull request's newer push replaces its analysis; main's analyses all finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: python, javascript-typescript
+          build-mode: none
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3

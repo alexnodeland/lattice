@@ -27,6 +27,7 @@ Most LLM applications start with a person typing. Many useful workflows don't: t
 reflexr is that something. Applications publish events into workspaces, each with one ordered log. Rules watch the log, and when a rule's condition holds, the reactor runs its action:
 
 - **Rules are data.** A condition, a scope and an action, as a Pydantic model with a JSON Schema, so a rule can be listed, stored, diffed, validated and written by an agent as easily as by a person.
+- **Rules can change at runtime.** Besides the rules in code, a workspace can hold stored rules, installed, updated and archived through the API, as when a person accepts a rule drafted in chat. They are off by default, run only allowlisted actions, and are never listed to another tenant ([Stored rules](guides/rules.md#stored-rules)).
 - **Deciding is exact.** Rules are pure reducers over the log, which is also their clock, so the same log always produces the same firings: testable without I/O, and replayable after a fix.
 - **Acting is durable.** Every firing's run executes at least once under a lease, with retries, dead letters, ordering per scope and an idempotency key, and graph workflows resume after their last completed step.
 - **Workflows stay in bounds.** Rules never react to their own activity, causal chains have a depth limit, and throttles, emit allowlists, timeouts and usage limits cap what a workflow can do and spend.

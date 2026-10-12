@@ -9,9 +9,9 @@ Each record captures one decision: the context that forced it, the options consi
 | [0003](0003-independent-sibling-of-artifactr.md) | An independent sibling of artifactr, with aligned conventions | Accepted |
 | [0004](0004-tenant-scoped-streams.md) | Tenant-scoped streams with one log each | Superseded by 0016 |
 | [0005](0005-per-rule-cursors.md) | Per-rule cursors: decide exactly, act at least once | Accepted |
-| [0006](0006-rules-as-typed-serializable-data.md) | Rules as typed, serializable data | Accepted, amended by 0041 |
+| [0006](0006-rules-as-typed-serializable-data.md) | Rules as typed, serializable data | Accepted, amended by 0041, 0051 and 0053 |
 | [0007](0007-rule-state-as-pure-reducers.md) | Rule state as pure reducers, with the log as the clock | Accepted |
-| [0008](0008-actions-agents-graphs-and-functions.md) | Actions: agents, graphs and functions over one Reaction | Accepted |
+| [0008](0008-actions-agents-graphs-and-functions.md) | Actions: agents, graphs and functions over one Reaction | Accepted, amended by 0052 |
 | [0009](0009-graph-checkpoints.md) | Graph checkpoints at step boundaries | Superseded by 0043 |
 | [0010](0010-loop-and-spend-safety.md) | Loop and spend safety | Accepted |
 | [0011](0011-surfaces.md) | Surfaces: ingest, REST, WebSocket, schedules and MCP | Superseded by 0044 |
@@ -19,9 +19,9 @@ Each record captures one decision: the context that forced it, the options consi
 | [0013](0013-quality-gates.md) | Quality gates | Accepted, amended by 0048 |
 | [0014](0014-mit-license.md) | MIT license | Accepted |
 | [0015](0015-reference-implementation-oncall.md) | Reference implementation: incident response | Accepted, amended by 0031 and 0048 |
-| [0016](0016-tenants-and-workspaces-like-artifactr.md) | Tenants and workspaces, like artifactr | Accepted |
+| [0016](0016-tenants-and-workspaces-like-artifactr.md) | Tenants and workspaces, like artifactr | Accepted, amended by 0053 |
 | [0017](0017-the-cores-evaluation-contract.md) | The core's evaluation contract | Accepted |
-| [0018](0018-opentelemetry-observability-with-langfuse.md) | OpenTelemetry-native observability, with Langfuse primary | Accepted |
+| [0018](0018-opentelemetry-observability-with-langfuse.md) | OpenTelemetry-native observability, with Langfuse primary | Accepted, amended by 0055 |
 | [0019](0019-typed-feedback-as-events.md) | Typed feedback as events, mirrored to Langfuse | Accepted |
 | [0020](0020-evalr-shared-eval-kit.md) | evalr, a shared eval kit | Accepted; its last amendment superseded by 0045, and its pin of evalr by 0048 |
 | [0021](0021-contributor-compose-and-dev-containers.md) | Contributor Compose and dev containers here, infrastructure in stackr | Accepted; its dev container superseded by lattice ADR-0009, and its dashboard releases by 0050 |
@@ -34,7 +34,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0028](0028-schedules-and-cronsim.md) | Schedules, with cronsim for cron expressions | Accepted |
 | [0029](0029-metric-detail-through-sdk-views.md) | Metric detail through SDK views, and the OpenTelemetry and Langfuse adapters | Accepted; its score adapters superseded by 0045 |
 | [0030](0030-sql-storage.md) | SQL storage with one dialect-neutral implementation | Accepted |
-| [0031](0031-the-reference-implementations-events-and-rules.md) | The reference implementation's events and rules | Accepted |
+| [0031](0031-the-reference-implementations-events-and-rules.md) | The reference implementation's events and rules | Accepted, amended by 0051 |
 | [0032](0032-documentation-site.md) | The documentation site, and a brand shared by the family | Accepted, amended by 0046 and 0049 |
 | [0033](0033-publishing-the-documentation-site.md) | Publishing the documentation site from main | Accepted, amended by 0046 and 0049 |
 | [0036](0036-typed-run-failures.md) | Typed run failures | Accepted |
@@ -52,5 +52,10 @@ Each record captures one decision: the context that forced it, the options consi
 | [0048](0048-reflexr-in-lattice.md) | reflexr in lattice | Accepted |
 | [0049](0049-one-site-for-the-family.md) | One site for the family | Accepted |
 | [0050](0050-dashboards-from-the-checkout.md) | Dashboards from the checkout | Accepted |
+| [0051](0051-qualified-rule-names.md) | Qualified rule names | Accepted |
+| [0052](0052-typed-action-parameters.md) | Typed action parameters | Accepted |
+| [0053](0053-stored-rules-one-fixed-configuration.md) | Stored rules, under one fixed configuration | Accepted |
+| [0054](0054-installing-updating-and-archiving-stored-rules.md) | Installing, updating and archiving stored rules | Accepted |
+| [0055](0055-reading-stored-rules.md) | Reading stored rules: every pass, in their workspace, by namespace in metrics | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

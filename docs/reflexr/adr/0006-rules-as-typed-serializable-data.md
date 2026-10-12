@@ -1,6 +1,6 @@
 # ADR-0006: Rules as typed, serializable data
 
-**Status:** Accepted, amended by [ADR-0041](0041-executing-runs.md)
+**Status:** Accepted, amended by [ADR-0041](0041-executing-runs.md), [ADR-0051](0051-qualified-rule-names.md) and [ADR-0053](0053-stored-rules-one-fixed-configuration.md)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

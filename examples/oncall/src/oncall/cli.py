@@ -182,6 +182,12 @@ def describe(event: Frame) -> tuple[str, str]:
             "generation": generation,
         }:
             return "magenta", f"rule {rule} reset ({reason}), generation {generation}"
+        case {
+            "type": "reflexr:rule_installed" | "reflexr:rule_archived" as kind,
+            "rule": rule,
+            "version": version,
+        }:
+            return "magenta", f"rule {rule} {kind.removeprefix('reflexr:rule_')}, version {version}"
         case {"type": "reflexr:run_started", "run_id": run, "rule": rule, "attempt": attempt}:
             return "cyan", f"run {run} of {rule} started, attempt {attempt}"
         case {"type": "reflexr:run_progressed", "run_id": run, "step": step}:

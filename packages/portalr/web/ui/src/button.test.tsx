@@ -83,7 +83,8 @@ test("a pressed toggle takes the wash, in the working colour", async () => {
 });
 
 test("a button changes colour at once when motion is reduced", async () => {
-  onTestFinished(() => commands.reduceMotion(false));
+  onTestFinished(() => commands.reduceMotion(true));
+  await commands.reduceMotion(false);
   const screen = await render(<Button>Approve</Button>);
   const button = screen.getByRole("button", { name: "Approve" }).element();
   expect(getComputedStyle(button).transitionProperty).not.toBe("none");

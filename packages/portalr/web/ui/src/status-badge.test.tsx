@@ -40,7 +40,8 @@ test("every tone's word reads on its pill, and only waiting for you takes the wo
 });
 
 test("working stops turning when motion is reduced", async () => {
-  onTestFinished(() => commands.reduceMotion(false));
+  onTestFinished(() => commands.reduceMotion(true));
+  await commands.reduceMotion(false);
   const screen = await render(<StatusBadge tone="working">Working</StatusBadge>);
   const glyph = screen.getByText("Working").element().firstElementChild as Element;
   expect(getComputedStyle(glyph).animationName).toBe("spin");
@@ -49,8 +50,6 @@ test("working stops turning when motion is reduced", async () => {
 });
 
 test("still, working keeps a shape of its own, apart from queued's", async () => {
-  onTestFinished(() => commands.reduceMotion(false));
-  await commands.reduceMotion(true);
   const screen = await render(
     <div>
       <StatusBadge tone="working">Working</StatusBadge>

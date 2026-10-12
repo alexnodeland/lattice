@@ -7,7 +7,7 @@
 
 import { MessageSquare, Play, Plus, ScrollText, Zap } from "lucide-react";
 import { expect, onTestFinished, test } from "vitest";
-import { commands, page, userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { AccountMenu } from "./account-menu";
 import { AppShell } from "./app-shell";
@@ -142,14 +142,10 @@ function Gallery() {
   );
 }
 
-/** Lay the gallery out at a width, with motion reduced and the faces loaded before the shot. */
+/** Lay the gallery out at a width, with the faces loaded before the shot (motion is reduced). */
 async function shown(width: number, height: number) {
   await page.viewport(width, height);
-  await commands.reduceMotion(true);
-  onTestFinished(async () => {
-    await commands.reduceMotion(false);
-    await page.viewport(414, 896);
-  });
+  onTestFinished(() => page.viewport(414, 896));
   const screen = await render(<Gallery />);
   await Promise.all([
     document.fonts.load('1em "Schibsted Grotesk"'),

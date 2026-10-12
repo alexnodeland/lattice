@@ -4,14 +4,15 @@ import { playwright } from "@vitest/browser-playwright";
 import { configDefaults, defineConfig } from "vitest/config";
 import type { BrowserCommand } from "vitest/node";
 
-// Every component is tested in Chromium twice: with the system's scheme light, and dark.
+// Every component is tested in Chromium twice: with the system's scheme light, and dark. Motion is
+// reduced, so a colour is read where it settles rather than mid-transition.
 const scheme = (colorScheme: "light" | "dark") => ({
   browser: "chromium" as const,
   name: colorScheme,
-  provider: playwright({ contextOptions: { colorScheme } }),
+  provider: playwright({ contextOptions: { colorScheme, reducedMotion: "reduce" } }),
 });
 
-/** Ask the browser for reduced motion, or stop asking, so a test can see what it stops. */
+/** Stop asking the browser for reduced motion, or ask again, so a test can see what it stops. */
 const reduceMotion: BrowserCommand<[reduce: boolean]> = async ({ page }, reduce) => {
   await page.emulateMedia({ reducedMotion: reduce ? "reduce" : "no-preference" });
 };

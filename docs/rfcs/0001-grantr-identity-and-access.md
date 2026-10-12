@@ -154,6 +154,7 @@ class Grants:
     async def hidden(self, tenant: TenantId, subject: Subject, workspace: WorkspaceId) -> Visibility: ...
     async def member(self, tenant: TenantId, user: UserId) -> Membership | None: ...
     async def memberships(self, user: UserId) -> list[Membership]: ...
+    async def resources(self, tenant: TenantId, subject: Subject, action: str, kind: ResourceKind) -> list[str]: ...
 
     def hooks(self, subject_of: SubjectOf) -> Hooks: ...   # .authorize and .hidden, for Workspaces
 
@@ -161,7 +162,7 @@ class Grants:
 SubjectOf = Callable[[TenantId, WorkspaceId | None, Actor], Subject]
 ```
 
-- **`check` and `hidden` are shaped like OpenFGA's `Check` and `ListObjects`,** so an OpenFGA adapter can be added if the model ever outgrows fixed resource levels. None is planned.
+- **`check`, and `hidden` and `resources`, are shaped like OpenFGA's `Check` and `ListObjects`,** so an OpenFGA adapter can be added if the model ever outgrows fixed resource levels. None is planned.
 - **`hooks` adapts grantr to the libraries' hooks** without importing them. The library types it needs (`Visibility`, the actors) reach it structurally, and `subject_of`, which the template supplies, maps an actor to a grantr subject:
 
   | Actor | Subject |
@@ -215,6 +216,7 @@ grantr ships the other half, `grantr.testing.matrix(catalogs, roles)`, which pri
 ### grantr's surfaces
 
 - **A FastAPI router,** `grantr_router(grants, resolve_actor=...)`, for tenants, members, groups, roles, grants, restrictions, keys and the audit log. It checks its callers with grantr's own actions (`grantr:add_member`, `grantr:issue_key`, ...), granted by the tenant `owner` and `admin` roles.
+- **Two reads for UIs:** `GET /grantr/v1/me`, the caller's roles in the active tenant and the workspaces they can open (from `resources`), and `POST /grantr/v1/checks`, a batch of `(action, resource)` questions answered in one call. A UI asks rather than working out a permission itself; each command is checked again when it arrives. portalr (lattice RFC-0002) uses both.
 - **Its OpenAPI document** is committed in `packages/grantr/schemas/` with a drift test, as stackr RFC-0003 plans, and portalr's client takes its types from it.
 - **No MCP server in v0.1.** Managing access through an agent is a later decision.
 - **Telemetry** follows the family's: spans for checks over a threshold, counters for allowed and refused checks by action, and the audit events.

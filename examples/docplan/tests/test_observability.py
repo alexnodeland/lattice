@@ -7,7 +7,6 @@ from typing import Any
 
 import httpx
 import pytest
-from conftest import Script, say, wait_for
 from fastapi.testclient import TestClient
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -17,6 +16,7 @@ from artifactr import new_id
 from artifactr.otel import configure_telemetry
 from docplan.agent import build_agent
 from docplan.app import create_app
+from tests.conftest import Script, say, wait_for
 
 
 class FakeLangfuse:

@@ -1,4 +1,4 @@
-"""Minimal type stubs for the parts of opentelemetry-processor-baggage artifactr uses."""
+"""Minimal stubs for the parts of opentelemetry-processor-baggage the libraries use."""
 
 from collections.abc import Callable, Sequence
 

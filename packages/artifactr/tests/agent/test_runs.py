@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from datetime import timedelta
+from typing import override
 
 import pytest
 from pydantic import BaseModel
@@ -206,6 +207,7 @@ class SlowRunningReads(InMemoryStorage):
         self.reading = asyncio.Event()
         self.go = asyncio.Event()
 
+    @override
     async def runs(
         self, scope: Scope, *, thread_id: ThreadId | None = None, status: RunStatus | None = None
     ) -> list[Run]:
@@ -246,6 +248,7 @@ async def test_a_runner_closed_while_abandoning_starts_no_run(gate: Gate) -> Non
 class StaleRunningReads(InMemoryStorage):
     """Storage whose reads of running runs are stale: they list runs that have since ended."""
 
+    @override
     async def runs(
         self, scope: Scope, *, thread_id: ThreadId | None = None, status: RunStatus | None = None
     ) -> list[Run]:

@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import override
 
 import pytest
 from huggingface_hub import HfApi
@@ -76,6 +77,7 @@ async def test_branches_and_tags_resolve_to_commits(hub: FakeHub) -> None:
 
 def test_a_revision_without_a_commit_is_refused() -> None:
     class Headless(FakeHub):
+        @override
         def dataset_info(self, repo_id: str, *, revision: str | None = None) -> DatasetInfo:
             return DatasetInfo(id=repo_id, sha=None)
 

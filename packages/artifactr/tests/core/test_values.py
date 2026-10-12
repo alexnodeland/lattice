@@ -1,7 +1,7 @@
 """Actors, identifiers, patches, rejections and state helpers."""
 
 import pytest
-from pydantic import TypeAdapter
+from pydantic import JsonValue, TypeAdapter
 
 from artifactr.core import (
     Actor,
@@ -105,8 +105,11 @@ class TestPatches:
         assert apply_patch({"text": "one"}, edits) == {"text": "three"}
 
     def test_diff_round_trips(self) -> None:
-        before = {"a": 1, "items": {"t1": {"done": False}}}
-        after = {"a": 1, "items": {"t1": {"done": True}, "t2": {"done": False}}}
+        before: dict[str, JsonValue] = {"a": 1, "items": {"t1": {"done": False}}}
+        after: dict[str, JsonValue] = {
+            "a": 1,
+            "items": {"t1": {"done": True}, "t2": {"done": False}},
+        }
         assert apply_patch(before, diff(before, after)) == after
 
     def test_descriptions(self) -> None:

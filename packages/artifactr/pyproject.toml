@@ -76,7 +76,7 @@ test = [
     "asyncpg>=0.31",
     "opentelemetry-sdk>=1.28",
 ]
-lint = ["ruff>=0.16", "pyright>=1.1.414"]
+lint = ["ruff>=0.16", "ty>=0.0.86"]
 dev = [
     { include-group = "test" },
     { include-group = "lint" },
@@ -93,16 +93,6 @@ build-backend = "uv_build"
 # Distributed as artifactr-ai (ADR-0025); imported as artifactr.
 [tool.uv.build-backend]
 module-name = "artifactr"
-
-# ─── types ────────────────────────────────────────────────────────────────────
-
-[tool.pyright]
-include = ["src", "tests", "scripts"]
-strict = ["src", "scripts"]
-typeCheckingMode = "standard"
-pythonVersion = "3.12"
-venvPath = "../.."
-venv = ".venv"
 
 # ─── tests and coverage ───────────────────────────────────────────────────────
 

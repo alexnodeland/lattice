@@ -8,7 +8,7 @@
   <a href="https://lattice.alexnodeland.com"><img alt="Docs" src="https://img.shields.io/badge/docs-lattice.alexnodeland.com-005A87"></a>
   <img alt="Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-005A87">
   <img alt="Coverage: 100%" src="https://img.shields.io/badge/coverage-100%25-005A87">
-  <img alt="Typed: pyright strict" src="https://img.shields.io/badge/typed-pyright%20strict-005A87">
+  <img alt="Typed: ty" src="https://img.shields.io/badge/typed-ty-005A87">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-005A87"></a>
 </p>
 
@@ -88,7 +88,7 @@ make install    # every package, example, dependency group and extra, in one env
 make check      # every project's checks, as CI runs them: moon run :check
 ```
 
-moon runs every task, from any directory, and only what a change affects: `moon run <project>:<task>`, or `moon run :<task>` for every project that has one. The projects are the packages, the two examples and `lattice`, the root; `moon project <project>` lists a project's tasks. Every Python project is held to 100% branch coverage, and its `src/` to pyright strict.
+moon runs every task, from any directory, and only what a change affects: `moon run <project>:<task>`, or `moon run :<task>` for every project that has one. The projects are the packages, the two examples and `lattice`, the root; `moon project <project>` lists a project's tasks. Every Python project is held to 100% branch coverage, and to ty, with every rule an error.
 
 [`.devcontainer/`](.devcontainer) has uv, moon and Docker, and runs everything CI runs. Open it in your editor's dev container, or in a GitHub Codespace, which builds the same container; a prebuilt image and Codespaces prebuilds are planned in [RFC-0003](docs/stackr/rfcs/0003-one-repository-lattice.md)'s phase 7.
 

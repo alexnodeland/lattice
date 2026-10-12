@@ -1,7 +1,7 @@
 """Every feedback source meets the FeedbackSource contract."""
 
 from collections.abc import AsyncIterator
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from pydantic import BaseModel
@@ -37,7 +37,7 @@ async def test_an_input_of_the_wrong_type_fails() -> None:
     class Other(BaseModel):
         x: int = 0
 
-    wrong = cast(Ex, Example[Other, ContractVerdict](id="w", input=Other()))
+    wrong = cast(Any, Example[Other, ContractVerdict](id="w", input=Other()))
     with pytest.raises(ContractViolation, match="w: the input must be a ContractInput"):
         await check_feedback_source(source([wrong]))
 

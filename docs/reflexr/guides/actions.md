@@ -319,7 +319,7 @@ In JSON the params are the action reference's `params`, a JSON object: `"then": 
 
 An action declares its model with a `params` attribute:
 
-- **A function** is adapted by `with_params(fn, Model)`, which passes the validated params as its second argument. pyright checks that the function's second parameter takes a `Model`.
+- **A function** is adapted by `with_params(fn, Model)`, which passes the validated params as its second argument. A type checker checks that the function's second parameter takes a `Model`.
 - **An agent or a graph** takes `params=Model`: `AgentAction(agent, params=NotifyParams)`, `GraphAction(graph, params=NotifyParams)`. Its prompt function and tools, or its steps and its `state` and `inputs` builders, read the params with `reaction.params_as(NotifyParams)`, which names the model a second time. A mismatch is a `TypeError` when the action runs, not a type error, since `Reaction` has one type parameter, the deps.
 
 A function without `with_params` declares no model, and a rule may pass it no params.

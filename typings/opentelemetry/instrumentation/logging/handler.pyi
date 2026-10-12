@@ -1,4 +1,4 @@
-"""Minimal type stubs for the parts of opentelemetry-instrumentation-logging artifactr uses."""
+"""Minimal stubs for the parts of opentelemetry-instrumentation-logging the libraries use."""
 
 import logging
 

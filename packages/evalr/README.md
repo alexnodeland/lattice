@@ -8,7 +8,7 @@
   <a href="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml"><img alt="Nightly" src="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml/badge.svg?branch=main"></a>
   <img alt="Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-00704F">
   <img alt="Coverage: 100%" src="https://img.shields.io/badge/coverage-100%25-00704F">
-  <img alt="Typed: pyright strict" src="https://img.shields.io/badge/typed-pyright%20strict-00704F">
+  <img alt="Typed: ty" src="https://img.shields.io/badge/typed-ty-00704F">
   <a href="https://github.com/alexnodeland/lattice/blob/main/packages/evalr/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-00704F"></a>
 </p>
 
@@ -96,7 +96,7 @@ It needs `OPENAI_API_KEY` (or another provider's, with the models renamed) and `
 - **Datasets that stay put.** Content-hashed, split by a hash of each example's id, and kept at every revision in memory, as JSON Lines files, in [Langfuse](https://langfuse.com) or on the [Hugging Face Hub](https://huggingface.co/datasets).
 - **Experiments and online evaluation.** Compare systems on a dataset in memory or in Langfuse; judge live traffic sampled by key, within a budget, with scores in Langfuse or as OpenTelemetry events.
 - **End-to-end measures.** Task completion, drop-off and rewrites, defined in terms any application's log can be put in.
-- **Built to be tested.** Ports and adapters, in-memory adapters of every port, and contract suites every adapter passes, with 100% branch coverage and pyright strict.
+- **Built to be tested.** Ports and adapters, in-memory adapters of every port, and contract suites every adapter passes, with 100% branch coverage and ty, every rule an error.
 
 ## Documentation
 

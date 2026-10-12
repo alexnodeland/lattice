@@ -8,17 +8,17 @@ requires-python = ">=3.12"
 dependencies = []
 
 [dependency-groups]
-# The family's own checks: the root tests, lint and types for the root's Python, and deptry over
-# each package's shipped code.
+# The family's own checks: the root tests, lint for the root's Python, ty for every project's,
+# and deptry over each package's shipped code.
 dev = [
     "actionlint-py>=1.7.12",
     "deptry>=0.25",
     "prek>=0.5.4",
-    "pyright>=1.1.414",
     "pytest>=9.1",
     "pytest-timeout>=2.4",
     "pyyaml>=6.0.3",
     "ruff>=0.16",
+    "ty>=0.0.86",
     "zizmor>=1.30",
 ]
 # The documentation site: one build over every package (docs/, mkdocs.yml).
@@ -69,19 +69,116 @@ convention = "google"
 "packages/reflexr/src/reflexr/agent/tools.py" = ["D417"]
 "examples/docplan/src/docplan/agent.py" = ["D417"]
 # Stubs for untyped libraries mirror the libraries' own names (DSPy's InputField, toDict).
-"packages/evalr/typings/**" = ["N802"]
+"typings/**" = ["N802"]
 
 # ─── types ────────────────────────────────────────────────────────────────────
-# pyright stays per package until ty replaces it with one root configuration. This one covers
-# the root's own Python.
+# ty, for every project, from this one configuration (lattice ADR-0013). Every rule is an error,
+# and only `ty: ignore` could silence one, which the quality test bans. Each project's typecheck
+# task adds its own directory to the roots, so its tests import as `tests`.
 
-[tool.pyright]
-include = ["scripts", "tests"]
-strict = ["scripts"]
-typeCheckingMode = "standard"
-pythonVersion = "3.12"
-venvPath = "."
-venv = ".venv"
+[tool.ty.environment]
+python-version = "3.12"
+# Each package's and example's code imports by its own name.
+root = [
+    "packages/artifactr/src",
+    "packages/reflexr/src",
+    "packages/evalr/src",
+    "packages/relayr/src",
+    "packages/grantr/src",
+    "examples/docplan/src",
+    "examples/oncall/src",
+]
+# Stubs for the parts of untyped libraries the family uses.
+extra-paths = ["typings"]
+
+[tool.ty.src]
+# The application template's Python is the generated applications', checked by their own CI.
+exclude = ["packages/stackr/template"]
+
+[tool.ty.analysis]
+respect-type-ignore-comments = false
+
+[tool.ty.rules]
+all = "error"
+# Opinions ty offers that the family doesn't hold (lattice ADR-0013): a truth test of an optional
+# value where both its None and its empty value mean "none", and an assignment, return or yield
+# of an `Any`, which SQLAlchemy's `Mapped[str] = mapped_column()` makes on every column.
+truthiness-test-of-none-union = "ignore"
+unsound-assignment = "ignore"
+unsound-return-statement = "ignore"
+unsound-yield = "ignore"
+
+# ty 0.0.86 rejects what these files rightly do. Each override names the gap and the narrowest
+# files; it goes when ty closes the gap (lattice ADR-0013).
+
+# A class keyword argument isn't inferred from its parameter's type, so `targets={"thread"}` is a
+# `set[str]` rather than a set of `TargetKind`s.
+[[tool.ty.overrides]]
+include = [
+    "examples/docplan/src/docplan/artifacts.py",
+    "packages/artifactr/src/artifactr/evals/measures.py",
+    "packages/artifactr/tests/artifact_types.py",
+    "packages/artifactr/tests/core/test_feedback.py",
+    "packages/artifactr/tests/scores/test_mapping.py",
+    "packages/reflexr/tests/core/test_feedback.py",
+    "packages/reflexr/tests/evals/test_evals.py",
+    "packages/reflexr/tests/fastapi/conftest.py",
+    "packages/reflexr/tests/mcp/test_server.py",
+    "packages/reflexr/tests/scores/kinds.py",
+    "packages/reflexr/tests/scores/test_mapping.py",
+    "packages/reflexr/tests/workspace/test_commands.py",
+    "packages/reflexr/tests/workspace/test_workspace.py",
+]
+rules = { invalid-argument-type = "ignore" }
+
+# A frozen Pydantic model's type parameter is invariant, not covariant as a frozen dataclass's
+# is, so a `Verdict[TaskCompletion]` isn't a `Verdict[BaseModel]`, nor its evaluators evaluators
+# of `BaseModel`.
+[[tool.ty.overrides]]
+include = [
+    "examples/docplan/src/docplan/evals.py",
+    "packages/artifactr/src/artifactr/evals/online.py",
+    "packages/artifactr/tests/evals/test_experiments.py",
+    "packages/artifactr/tests/evals/test_measures.py",
+    "packages/artifactr/tests/evals/test_online.py",
+    "packages/evalr/src/evalr/contracts/experiments.py",
+    "packages/evalr/src/evalr/contracts/scores.py",
+    "packages/evalr/src/evalr/core/measuring.py",
+    "packages/evalr/tests/core/test_metrics.py",
+    "packages/evalr/tests/core/test_scores.py",
+    "packages/evalr/tests/online/test_events.py",
+    "packages/evalr/tests/online/test_runner.py",
+    "packages/reflexr/tests/evals/test_experiments.py",
+]
+rules = { invalid-argument-type = "ignore" }
+
+# pydantic-graph's builder: a step is not taken as the `Source` of its output type.
+[[tool.ty.overrides]]
+include = [
+    "examples/oncall/src/oncall/runbook.py",
+    "packages/reflexr/tests/agent/test_graph_actions.py",
+]
+rules = { invalid-argument-type = "ignore" }
+
+# A variable declared `Any` takes the type of what is assigned to it.
+[[tool.ty.overrides]]
+include = ["packages/artifactr/tests/core/test_conformance.py"]
+rules = { invalid-argument-type = "ignore" }
+
+# A generic model subscripted at run time with the types it was given: `Example[input_type, ...]`.
+[[tool.ty.overrides]]
+include = ["packages/evalr/src/evalr/core/datasets.py", "packages/evalr/src/evalr/hf/imports.py"]
+rules = { invalid-type-form = "ignore" }
+
+# A type parameter's default class: `artifact_type: type[A] = Artifact`.
+[[tool.ty.overrides]]
+include = ["packages/artifactr/src/artifactr/workspace/workspace.py"]
+rules = { invalid-parameter-default = "ignore" }
+
+# pydantic-ai's `Agent` overloads, with `output_type` a list of types.
+[[tool.ty.overrides]]
+include = ["examples/docplan/src/docplan/agent.py"]
+rules = { no-matching-overload = "ignore", invalid-return-type = "ignore" }
 
 # ─── tests ────────────────────────────────────────────────────────────────────
 

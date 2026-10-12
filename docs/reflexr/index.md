@@ -107,7 +107,7 @@ The workspace's log tells the whole story, in order: the three severe errors and
 - **Storage in memory, SQLite or PostgreSQL**, behind one protocol with one behaviour suite. [Storage](guides/storage.md)
 - **Surfaces that behave the same.** Publishing, REST and a resumable WebSocket stream for your services and frontends, and an MCP server for external agents, all through one command handler. [Serving over REST and WebSocket](guides/serving.md), [External agents over MCP](guides/mcp.md)
 - **Observability and evaluation built in.** OpenTelemetry spans and metrics with every run in its causal chain's session, Langfuse, typed feedback as scores, and evaluators as rules through evalr. [Observability](guides/observability.md), [Feedback and evaluation](guides/evaluation.md)
-- **Rules you can port.** The decisions live in a pure, synchronous core, pinned by language-neutral conformance fixtures, and the library is held to 100% branch coverage and pyright strict. [Architecture](architecture.md)
+- **Rules you can port.** The decisions live in a pure, synchronous core, pinned by language-neutral conformance fixtures, and the library is held to 100% branch coverage and to ty, with every rule an error. [Architecture](architecture.md)
 
 ## Where to go next
 

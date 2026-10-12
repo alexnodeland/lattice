@@ -1,7 +1,8 @@
-"""moon's edges agree with the workspace.
+"""moon's edges, and ty's roots, agree with the workspace.
 
 moon infers no edge from a requirement with a range, so each project's moon.yml states its
-dependsOn, and this test holds it to the siblings its pyproject.toml requires.
+dependsOn, and this test holds it to the siblings its pyproject.toml requires. ty's roots, in
+the root pyproject.toml, list every project's src/.
 """
 
 import re
@@ -70,3 +71,11 @@ def test_siblings_come_from_the_workspace(project: str) -> None:
     assert {
         _normalize(name) for name, source in sources.items() if source == {"workspace": True}
     } == distributions
+
+
+def test_every_projects_code_is_a_root_for_ty() -> None:
+    # Otherwise ty names a project's modules from the repository's root, as packages.<name>.src.
+    roots = _pyproject("lattice")["tool"]["ty"]["environment"]["root"]
+    assert set(roots) == {
+        f"{path}/src" for path in SOURCES.values() if (ROOT / path / "src").is_dir()
+    }

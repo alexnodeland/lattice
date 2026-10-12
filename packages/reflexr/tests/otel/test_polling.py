@@ -37,17 +37,13 @@ async def respond(reaction: Reaction[None]) -> None:
 
 
 def workspaces(engine: AsyncEngine, telemetry: TelemetryHandle | None = None) -> Workspaces:
-    providers = (
-        {"tracer_provider": telemetry.tracer_provider, "meter_provider": telemetry.meter_provider}
-        if telemetry
-        else {}
-    )
     return Workspaces(
         SqlStorage(engine, poll_interval=POLL),
         events=[ServiceError, Deploy],
         rules=RULES,
         schedules=SCHEDULES,
-        **providers,
+        tracer_provider=telemetry.tracer_provider if telemetry else None,
+        meter_provider=telemetry.meter_provider if telemetry else None,
     )
 
 

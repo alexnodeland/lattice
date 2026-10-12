@@ -198,7 +198,7 @@ class Impostor:
 
     async def evaluate(self, input: Said, /) -> Verdict[Helpfulness]:
         plain = Verdict[Plain](value=Plain(good=True), evaluator=self.name, version=self.version)
-        return cast(Verdict[Helpfulness], plain)
+        return cast(Any, plain)
 
 
 async def test_a_verdict_that_is_not_feedback_is_a_recorded_failure(

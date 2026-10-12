@@ -2,7 +2,7 @@
 
 import asyncio
 import contextlib
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, Sequence
 from typing import Any
 
 import pytest
@@ -270,7 +270,7 @@ async def test_a_turn_context_is_entered_inside_the_turns_span(
     entered: list[tuple[str, str]] = []
 
     @contextlib.asynccontextmanager
-    async def attribute(session: Session[Any]) -> AsyncIterator[None]:
+    async def attribute(session: Session[Any]) -> AsyncGenerator[None]:
         span = trace.get_current_span()
         entered.append((getattr(span, "name", ""), session.thread_id))
         yield

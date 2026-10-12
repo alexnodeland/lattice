@@ -1,6 +1,6 @@
 """The two artifact types, a Markdown document and a plan of tasks, and the feedback on turns."""
 
-from typing import Annotated, ClassVar, Literal, Self
+from typing import Annotated, ClassVar, Literal, Self, override
 
 from pydantic import BaseModel, Field
 
@@ -14,6 +14,7 @@ class Doc(MarkdownArtifact):
 
     title: str = ""
 
+    @override
     def render_for_agent(self) -> str:
         """Show the title as a heading above the text."""
         return f"# {self.title}\n\n{self.text}" if self.title else self.text
@@ -50,6 +51,7 @@ class Plan(Artifact):
             raise KeyError(f"the plan has no task {task_id}")
         self.tasks[task_id].status = status
 
+    @override
     def render_for_agent(self) -> str:
         """Show the plan as a checklist, with task ids for the tools."""
         marks = {"todo": " ", "doing": "~", "done": "x"}
@@ -64,6 +66,7 @@ class Plan(Artifact):
         ]
         return "\n".join(lines)
 
+    @override
     def describe_change(self, before: Self) -> str | None:
         """Summarize added tasks and status changes."""
         changes = [f"added {t.title!r}" for i, t in self.tasks.items() if i not in before.tasks]

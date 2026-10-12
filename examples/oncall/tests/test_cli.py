@@ -9,7 +9,6 @@ from typing import Any
 
 import httpx
 import pytest
-from conftest import FakeClock, Script, eventually, publish, triage
 from rich.console import Console
 
 from oncall import cli
@@ -25,6 +24,7 @@ from oncall.cli import (
     render_result,
     render_run,
 )
+from tests.conftest import FakeClock, Script, eventually, publish, triage
 
 
 def terminal() -> tuple[Console, io.StringIO]:

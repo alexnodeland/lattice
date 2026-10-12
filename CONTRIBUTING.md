@@ -22,7 +22,7 @@ Every Python project has these:
 | Task | What it does |
 |---|---|
 | `lint` | Check formatting and lint rules |
-| `typecheck` | Type-check with pyright (strict for `src/` and `scripts/`) |
+| `typecheck` | Type-check with ty, every rule an error |
 | `test` | Run the tests with the 100% branch-coverage gate |
 | `format` | Format the code and apply safe lint fixes |
 | `check` | Everything CI runs for the project |
@@ -117,9 +117,9 @@ Markdown is read on GitHub and on the documentation site, which renders it with 
 These are enforced by CI, for every package, and described in each package's quality ADR ([artifactr ADR-0015][artifactr-adr-0015] and its siblings):
 
 - **100% branch coverage** of each package's `src/`, and of each reference implementation's, each measured by its own tests. The only exclusions are configured in each `pyproject.toml` (type-checking blocks, protocol stubs, overloads, `assert_never`).
-- **pyright strict** for `src/` and `scripts/`, standard for `tests/`.
+- **ty**, with every rule an error, over all Python: `src/`, `tests/`, `scripts/` and the stubs in `typings/`. One configuration, in the root `pyproject.toml`, holds the few rules and files it leaves out, each with ty's gap beside it ([lattice ADR-0013][lattice-adr-0013]).
 - **ruff** for formatting and linting, with one configuration at the root, and Google-style docstrings on public API.
-- **No inline suppressions** in any Python in the repository: no `# type: ignore`, `# pyright: ignore`, `# noqa` or `# pragma: no cover`. Restructure the code instead; the root's `tests/test_quality.py` fails on any. Per-file ignores in the root `pyproject.toml` are configuration, reviewed as such.
+- **No inline suppressions** in any Python in the repository: no `# type: ignore`, `# ty: ignore`, `# pyright: ignore`, `# noqa` or `# pragma: no cover`. Restructure the code instead; the root's `tests/test_quality.py` fails on any. Per-file ignores in the root `pyproject.toml` are configuration, reviewed as such.
 - **Warnings are errors** in the test suites.
 - **The libraries stay independent.** Each library's layering test lists what each of its modules may import, deptry fails on an import a package doesn't declare, and each package's `standalone` task installs it outside the workspace.
 
@@ -148,5 +148,6 @@ By contributing, you agree that your contributions are licensed under the [MIT L
 [artifactr-adr-0014]: docs/artifactr/adr/0014-trunk-based-development-with-rfcs-and-adrs.md
 [artifactr-adr-0015]: docs/artifactr/adr/0015-quality-gates.md
 [code-of-conduct]: CODE_OF_CONDUCT.md
+[lattice-adr-0013]: docs/adr/0013-ty-replaces-pyright.md
 [license]: LICENSE
 [security]: SECURITY.md

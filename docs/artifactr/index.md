@@ -116,7 +116,7 @@ The workspace's log tells the whole story, in order:
 - **Observable and evaluable.** Every turn is a trace, attributed to its tenant, workspace, thread and person, with metrics from a registry and Grafana dashboards tested against it. People and evaluators give typed feedback on turns, messages and artifact versions, mirrored to Langfuse as scores on the traces they judge. [Observability](guides/observability.md), [Evaluation](guides/evaluation.md)
 - **An LLM gateway.** Agents can reach models through a LiteLLM proxy, with each tenant's key, the workspace's guardrails and the trace on every request, and guardrail blocks recorded as typed failures. [The LLM gateway](guides/gateway.md)
 - **Tenant isolation by construction.** A workspace handle is bound to one tenant and one actor; nothing below it accepts a tenant id. [Multi-tenancy and security](guides/security.md)
-- **Rules you can read and port.** The rules live in a pure, synchronous core, pinned by language-neutral conformance fixtures, and the library is held to 100% branch coverage and pyright strict. [Architecture](architecture.md)
+- **Rules you can read and port.** The rules live in a pure, synchronous core, pinned by language-neutral conformance fixtures, and the library is held to 100% branch coverage and to ty, with every rule an error. [Architecture](architecture.md)
 
 ## Where to go next
 

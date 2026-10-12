@@ -8,13 +8,13 @@ from typing import Any
 import httpx
 import pytest
 import uvicorn
-from conftest import BASE, FakeClock, Script, log, publish, triage
 from mcp import Client
 from mcp.types import TextContent
 
 import oncall.app
 from oncall.app import Oncall, create_app, open_database
 from oncall.services import Page, Rollback
+from tests.conftest import BASE, FakeClock, Script, log, publish, triage
 
 CHECKOUT_DEPLOYS: dict[str, Any] = {
     "name": "team:checkout-deploys",

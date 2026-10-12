@@ -141,7 +141,7 @@ An evaluator that declines an input raises `HandOff`. `Fallback` hands off when 
 - **Version:** a hash of the program's state (instructions, demonstrations, fields) and of how each field of the two types is judged, described so that it is the same on every Python and pydantic version. Training changes it.
 - **Cost:** DSPy reports no per-call cost, so a DSPy verdict's `cost` is unknown.
 
-DSPy ships no type information, so `typings/dspy/` holds minimal stubs for the parts evalr uses; pyright reads them in place of the package.
+DSPy ships no type information, so `typings/dspy/` holds minimal stubs, in lattice's root `typings/`, for the parts evalr uses; ty reads them in place of the package.
 
 ### Decision evaluators
 
@@ -378,7 +378,7 @@ evalr uses the OpenTelemetry API only, under the `evalr` scope, and never config
 
 ## Quality
 
-The gates are those of artifactr and reflexr ([ADR-0005](adr/0005-quality-gates-and-license.md)): pyright strict with no suppressions, 100% line and branch coverage, warnings as errors, and no network in tests. Jev is tested through the TypeSafe SDK's transport, DSPy with its dummy language model, Langfuse with fakes and an in-memory span exporter, and Hugging Face with local datasets.
+The gates are those of artifactr and reflexr ([ADR-0005](adr/0005-quality-gates-and-license.md)): ty with every rule an error and no suppressions, 100% line and branch coverage, warnings as errors, and no network in tests. Jev is tested through the TypeSafe SDK's transport, DSPy with its dummy language model, Langfuse with fakes and an in-memory span exporter, and Hugging Face with local datasets.
 
 ## Documentation
 

@@ -8,7 +8,7 @@
   <a href="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml"><img alt="Nightly" src="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml/badge.svg?branch=main"></a>
   <img alt="Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-2D2A8C">
   <img alt="Coverage: 100%" src="https://img.shields.io/badge/coverage-100%25-2D2A8C">
-  <img alt="Typed: pyright strict" src="https://img.shields.io/badge/typed-pyright%20strict-2D2A8C">
+  <img alt="Typed: ty" src="https://img.shields.io/badge/typed-ty-2D2A8C">
   <a href="https://github.com/alexnodeland/lattice/blob/main/packages/artifactr/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2D2A8C"></a>
 </p>
 
@@ -110,7 +110,7 @@ Set `DOCPLAN_DATABASE_URL` (for example `sqlite+aiosqlite:///docplan.db`) to kee
 - **Live output apart from history.** Token-level output streams to watchers; the log holds only durable facts.
 - **Surfaces that behave the same.** A WebSocket thread protocol and REST for your frontend, and MCP for external agents, all through one command handler.
 - **Storage in memory, SQLite or PostgreSQL**, behind one protocol.
-- **Rules you can read and port.** A pure, synchronous core pinned by language-neutral conformance fixtures, with 100% branch coverage and pyright strict.
+- **Rules you can read and port.** A pure, synchronous core pinned by language-neutral conformance fixtures, with 100% branch coverage and ty, every rule an error.
 
 ## Documentation
 

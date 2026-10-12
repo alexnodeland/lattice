@@ -59,7 +59,7 @@ async def deployed(workspaces: Workspaces) -> Workspace:
 
 async def test_a_function_gets_its_rules_params_typed(build: Build) -> None:
     action = with_params(notify, NotifyParams)
-    assert_type(action, Action[Notices])  # pyright checks that notify takes NotifyParams
+    assert_type(action, Action[Notices])  # ty checks that notify takes NotifyParams
     workspaces = build([notice(thread_id="thr_4")])
     workspace = await deployed(workspaces)
     notices = Notices()

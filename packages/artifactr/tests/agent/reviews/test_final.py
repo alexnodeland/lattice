@@ -9,6 +9,7 @@ over only what was asked after it read, so the bystander's message waits for the
 import asyncio
 import contextlib
 from collections import Counter
+from typing import override
 
 import pytest
 
@@ -36,6 +37,7 @@ class Failing(HeldStorage):
         self.failing = False
         self.plans = 0
 
+    @override
     async def runs(
         self, scope: Scope, *, thread_id: ThreadId | None = None, status: RunStatus | None = None
     ) -> list[Run]:

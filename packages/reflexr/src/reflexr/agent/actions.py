@@ -56,8 +56,8 @@ class AgentAction[D, O]:
         return result.output
 
     def _prompt(self, reaction: Reaction[D]) -> str:
-        if callable(self.prompt):
-            return self.prompt(reaction)
-        if self.prompt is not None:
+        if isinstance(self.prompt, str):
             return self.prompt
+        if self.prompt is not None:
+            return self.prompt(reaction)
         return f"{firing_text(reaction)}\n\n{DEFAULT_PROMPT}"

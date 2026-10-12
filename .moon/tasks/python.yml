@@ -13,9 +13,14 @@ tasks:
     description: 'Check formatting and lint rules'
     script: 'uv run ruff format --check . && uv run ruff check .'
 
+  # ty takes its configuration from the root, and the project's own directory as a root too, so
+  # that its tests import as `tests`.
   typecheck:
-    description: 'Type-check with pyright'
-    command: 'uv run pyright'
+    description: 'Type-check with ty'
+    script: "uv run ty check --config \"environment.root = ['src', '.']\" ."
+    inputs:
+      - '**/*'
+      - '/typings/**/*'
 
   test:
     description: 'Run the tests with the 100% branch-coverage gate'

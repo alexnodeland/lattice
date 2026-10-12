@@ -6,7 +6,6 @@ from typing import Any
 import httpx
 import pytest
 import uvicorn
-from conftest import Script, call, say, wait_for
 from fastapi.testclient import TestClient
 from mcp import Client
 from pydantic_ai.capabilities import Instrumentation
@@ -15,6 +14,7 @@ from pydantic_ai.models.instrumented import InstrumentationSettings
 import docplan.app
 from artifactr import new_id
 from docplan.app import create_app, open_database
+from tests.conftest import Script, call, say, wait_for
 
 BASE = "/v1/workspaces/main"
 

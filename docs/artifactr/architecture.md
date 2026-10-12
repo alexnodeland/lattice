@@ -115,7 +115,7 @@ Rejections are exceptions with a stable `code` and typed details: `VersionConfli
 
 Because core is pure, its behaviour is pinned by a **conformance suite** of JSON fixtures in `tests/conformance/cases/`: given an actor, the entities that exist and a command, expect these events and entities or this rejection. The fixtures are the language-neutral specification. Any future port of core, or a hot path rewritten as a native extension, must pass them.
 
-Core events form a **closed** discriminated union (`KnownEvent`), so pyright checks `match event:` blocks ending in `assert_never` for exhaustiveness. Applications extend the log through one **open** family, `AppEvent`. An event type from a newer protocol version validates as `UnknownEvent` rather than failing, and round-trips unchanged. This mirrors how pydantic-ai separates its own events from application `CustomEvent`s.
+Core events form a **closed** discriminated union (`KnownEvent`), so a type checker checks `match event:` blocks ending in `assert_never` for exhaustiveness. Applications extend the log through one **open** family, `AppEvent`. An event type from a newer protocol version validates as `UnknownEvent` rather than failing, and round-trips unchanged. This mirrors how pydantic-ai separates its own events from application `CustomEvent`s.
 
 ### Defining an artifact type
 
@@ -566,7 +566,7 @@ Some code is shared verbatim, at the same path under `src/reflexr/`, and each co
 | evalr (extras) | Evaluators, datasets, experiments, online evaluation and end-to-end measures (`evals`); the score mapping and ports (`langfuse`, `evals`); from lattice until published | 0.1 |
 | opentelemetry-api | Spans and metrics, through the API only | 1.45 |
 
-Python 3.12+. Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical with mkdocstrings for the documentation site ([ADR-0023](adr/0023-documentation-site.md)).
+Python 3.12+. Tooling: uv, ruff, ty with every rule an error, pytest, and Zensical with mkdocstrings for the documentation site ([ADR-0023](adr/0023-documentation-site.md)).
 
 ## Testing
 

@@ -7,7 +7,6 @@ from typing import Any
 import httpx
 import pytest
 import uvicorn
-from conftest import FakeClock, Script, log, publish, triage
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from pydantic_ai.models.openai import OpenAIChatModel
@@ -16,6 +15,7 @@ import oncall.app
 from oncall.app import Oncall, telemetry_from_environment
 from oncall.triage import build_triage_agent
 from reflexr.otel import TelemetryHandle, configure_telemetry
+from tests.conftest import FakeClock, Script, log, publish, triage
 
 
 @pytest.fixture

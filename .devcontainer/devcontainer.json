@@ -24,11 +24,13 @@
           }
         },
         "python.defaultInterpreterPath": ".venv/bin/python",
+        "python.languageServer": "None",
         "remote.containers.forwardAgent": true
       },
       "extensions": [
         "charliermarsh.ruff",
         "ms-python.python",
+        "astral-sh.ty",
         "moonrepo.moon-console",
         "tamasfe.even-better-toml",
         "redhat.vscode-yaml",

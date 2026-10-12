@@ -1,7 +1,7 @@
 """Events: facts appended to a workspace's log.
 
 Core events form a closed union (ADR-0005): code that handles them can ``match`` exhaustively,
-and pyright checks it. Applications record their own facts through the one open family,
+and a type checker checks it. Applications record their own facts through the one open family,
 :class:`AppEvent`. Events from a newer protocol version that this version does not know
 validate as :class:`UnknownEvent` instead of failing, so old clients keep working.
 

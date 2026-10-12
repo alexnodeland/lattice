@@ -8,19 +8,20 @@ fileGroups:
   python:
     - 'scripts/**/*'
     - 'tests/**/*'
+    - 'typings/**/*'
 
 tasks:
   lint:
     description: "Check the root's Python for formatting and lint rules"
-    script: 'uv run ruff format --check scripts tests && uv run ruff check scripts tests'
+    script: 'uv run ruff format --check scripts tests typings && uv run ruff check scripts tests typings'
     inputs:
       - '@group(python)'
       - 'pyproject.toml'
       - 'uv.lock'
 
   typecheck:
-    description: "Type-check the root's Python with pyright"
-    command: 'uv run pyright'
+    description: "Type-check the root's Python, and the stubs, with ty"
+    command: 'uv run ty check scripts tests typings'
     inputs:
       - '@group(python)'
       - 'pyproject.toml'

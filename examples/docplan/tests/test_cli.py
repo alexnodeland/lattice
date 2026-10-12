@@ -9,7 +9,6 @@ from typing import Any, cast
 
 import httpx
 import pytest
-from conftest import Hold, Script, call, say
 from prompt_toolkit.application import create_app_session
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
@@ -18,6 +17,7 @@ from websockets.exceptions import ConnectionClosedError
 
 from docplan import cli
 from docplan.cli import Client, Local, Renderer, State, command_frame, parse_line
+from tests.conftest import Hold, Script, call, say
 
 ALICE = {"kind": "user", "id": "alice", "name": "alice"}
 AGENT = {"kind": "agent", "thread_id": "thr_1", "run_id": "run_1", "name": "docplan"}
@@ -320,7 +320,7 @@ class Typist:
         while wait not in self._out.getvalue():
             assert time.monotonic() < deadline, f"never saw {wait!r} in:\n{self._out.getvalue()}"
             await asyncio.sleep(0.01)
-        return line(self._out.getvalue()) if callable(line) else line
+        return line if isinstance(line, str) else line(self._out.getvalue())
 
 
 def found(pattern: str, template: str) -> Callable[[str], str]:

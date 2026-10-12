@@ -166,7 +166,7 @@ def with_params[D, P: BaseModel](
 ) -> Action[D]:
     """Adapt a function of the reaction and its params into an action that declares ``params``.
 
-    pyright checks that the function's second parameter takes a ``params``::
+    A type checker checks that the function's second parameter takes a ``params``::
 
         class NotifyParams(BaseModel):
             thread_id: str

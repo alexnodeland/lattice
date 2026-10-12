@@ -200,7 +200,7 @@ A rule that pages someone on every severe error, after one error is published an
 4 system reflexr:run_succeeded
 ```
 
-The rule and run facts form a closed union, `SystemEvent`, so code that handles them can `match` on their classes and pyright checks the cases. `about_rule(event)` returns the rule one of them is about, and `SYSTEM_EVENTS` lists every type reflexr appends, including `FeedbackGiven` and `Tick`. Following the log, for example:
+The rule and run facts form a closed union, `SystemEvent`, so code that handles them can `match` on their classes and a type checker checks the cases. `about_rule(event)` returns the rule one of them is about, and `SYSTEM_EVENTS` lists every type reflexr appends, including `FeedbackGiven` and `Tick`. Following the log, for example:
 
 ```python
 from reflexr.core import RunDeadLettered, RunSucceeded

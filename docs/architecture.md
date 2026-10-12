@@ -37,10 +37,11 @@ lattice/
 ├── docs/                the site: the family's pages, and docs/<package>/ for each package
 ├── scripts/             affected.py, standalone.py, check_site.py, griffe_sphinx_roles.py
 ├── tests/               the family's tests: the quality gates over all Python, and moon's edges
+├── typings/             stubs for the parts of untyped libraries the family uses
 ├── .devcontainer/       the dev container
 ├── .moon/               workspace.yml, and the tasks projects inherit
 ├── .github/             the workflows, issue forms and pull request template
-├── pyproject.toml       the uv workspace's root: its members, the family's tools, and the shared ruff configuration
+├── pyproject.toml       the uv workspace's root: its members, the family's tools, and the shared ruff and ty configuration
 ├── uv.lock              one lock for every package
 ├── moon.yml             the root project, lattice
 ├── mkdocs.yml           the site's one configuration
@@ -101,7 +102,7 @@ The root `pyproject.toml` is a virtual project (`package = false`) whose members
 | The lock | One `uv.lock`, one resolution for every package, extra and group. `uv sync --all-packages --all-groups --all-extras` installs them all into one `.venv`, and CI adds `--locked` |
 | A sibling | A range in `[project]`, such as `evalr>=0.1.0.dev0`, and `{ workspace = true }` in `[tool.uv.sources]`, which only development sees. A built wheel carries the range and no path |
 | ruff | One configuration, at the root; stackr extends it for its scripts |
-| pyright | Per package, until ty replaces it with one root configuration (phase 6); the root's covers `scripts/` and `tests/` |
+| ty | One configuration, at the root, with every rule an error and each stopgap listed beside ty's gap. Each project's `typecheck` adds its own directory as a root, so its tests import as `tests` ([ADR-0013](adr/0013-ty-replaces-pyright.md)). The stubs for untyped libraries are in the root's `typings/` |
 | pytest and coverage | Per project, since neither tool reads a parent directory's configuration |
 | The quality test | One, at the root ([`tests/test_quality.py`](https://github.com/alexnodeland/lattice/blob/main/tests/test_quality.py)), over every package, `examples/` and the root's Python: no inline suppressions anywhere |
 
@@ -167,7 +168,7 @@ prek runs the hooks in `.pre-commit-config.yaml`, and `make install` installs th
 
 - The hygiene hooks, leaving each `CHANGELOG.md` exactly as release-please writes it, and `uv.lock` out of the large-file check; JSON, shebangs and private keys, for every file.
 - Conventional Commits, at `commit-msg`.
-- ruff; yamllint and shellcheck for stackr's files; actionlint and zizmor for the workflows; and pyright, through `moon run :typecheck`, whose cache skips what a change doesn't touch.
+- ruff; yamllint and shellcheck for stackr's files; actionlint and zizmor for the workflows; and ty, through `moon run :typecheck`, whose cache skips what a change doesn't touch.
 - `.prekignore` leaves out `packages/stackr/template/`, whose hook configuration is the generated applications'.
 - `.git-blame-ignore-revs` names the setup's commit that only sorted imports, and `make install` points `git blame` at it.
 

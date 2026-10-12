@@ -8,7 +8,7 @@
   <a href="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml"><img alt="Nightly" src="https://github.com/alexnodeland/lattice/actions/workflows/nightly.yml/badge.svg?branch=main"></a>
   <img alt="Python 3.12, 3.13 and 3.14" src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-B3122E">
   <img alt="Coverage: 100%" src="https://img.shields.io/badge/coverage-100%25-B3122E">
-  <img alt="Typed: pyright strict" src="https://img.shields.io/badge/typed-pyright%20strict-B3122E">
+  <img alt="Typed: ty" src="https://img.shields.io/badge/typed-ty-B3122E">
   <a href="https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-B3122E"></a>
 </p>
 

@@ -4,10 +4,10 @@ from datetime import timedelta
 
 import httpx
 import pytest
-from conftest import BASE, START, FakeClock, log, publish
 
 from oncall.app import Oncall
 from oncall.services import Page, Pager, Rollback
+from tests.conftest import BASE, START, FakeClock, log, publish
 
 # ─── silence: absence, with ticks keeping time ───────────────────────────────
 

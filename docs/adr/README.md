@@ -15,5 +15,6 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0007](0007-a-timeout-on-every-test-and-every-job.md) | A timeout on every test and every job | Accepted |
 | [0008](0008-one-resolution-litellm-held-at-1-83-0.md) | One resolution, with litellm held at 1.83.0 | Accepted |
 | [0009](0009-one-dev-container-at-the-root.md) | One dev container, at the root | Accepted |
+| [0013](0013-ty-replaces-pyright.md) | ty replaces pyright, with its stopgaps in one configuration | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

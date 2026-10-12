@@ -3,6 +3,7 @@
 import asyncio
 from collections import Counter
 from datetime import timedelta
+from typing import override
 
 from artifactr.workspace import InMemoryStorage, Scope
 
@@ -31,6 +32,7 @@ class Partitioned(InMemoryStorage):
         self.cut_off.clear()
         self._healed.set()
 
+    @override
     async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
         self.asked[holder] += 1
         self.holders[key] = holder

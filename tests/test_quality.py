@@ -9,14 +9,16 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).parent.parent
-FOLDERS = ("packages", "examples", "scripts", "tests")
-SUPPRESSION = re.compile(r"#\s*(type:\s*ignore|pyright:\s*ignore|noqa|pragma:\s*no\s*cover)")
+FOLDERS = ("packages", "examples", "scripts", "tests", "typings")
+SUPPRESSION = re.compile(
+    r"#\s*(type:\s*ignore|ty:\s*ignore|pyright:\s*ignore|noqa|pragma:\s*no\s*cover)"
+)
 
 
 def _is_python(path: Path) -> bool:
-    """A Python file: a ``.py`` file, or a script without a suffix that Python runs."""
+    """A Python file: a ``.py`` file, a stub, or a script without a suffix that Python runs."""
     if path.suffix:
-        return path.suffix == ".py"
+        return path.suffix in {".py", ".pyi"}
     with path.open("rb") as file:
         return file.readline().startswith(b"#!/usr/bin/env python")
 
@@ -32,7 +34,7 @@ def _sources() -> list[Path]:
 
 def test_the_examples_and_the_roots_python_are_checked() -> None:
     checked = {path.relative_to(ROOT).parts[0] for path in _sources()}
-    assert {"packages", "examples", "tests"} <= checked
+    assert {"packages", "examples", "tests", "typings"} <= checked
 
 
 @pytest.mark.parametrize("path", _sources(), ids=lambda path: str(path.relative_to(ROOT)))

@@ -196,7 +196,7 @@ earlier = await ws.read(threads={thread.id}, last=50, before_seq=recent[0].seq)
 
 Give `limit` or `last`, not both: a read with both, or with a negative number, is refused with `ValidationFailed`. REST's `GET /v1/workspaces/{workspace_id}/events` takes the same parameters, with `thread_id` repeated for several threads ([Serving](serving.md#rest)), and so does the MCP tool `read_events` ([External agents over MCP](mcp.md#what-a-client-sees)).
 
-Core events form a closed set, so code that handles them can `match` exhaustively and pyright checks it. Applications record their own facts as `AppEvent`s, which any actor can record:
+Core events form a closed set, so code that handles them can `match` exhaustively and a type checker checks it. Applications record their own facts as `AppEvent`s, which any actor can record:
 
 ```python
 from artifactr.core import AppEvent

@@ -37,7 +37,7 @@ class Script:
         self.requests.append(list(messages))
         self.tools.append([tool.name for tool in info.function_tools])
         step = self.steps.pop(0)
-        return step(messages) if callable(step) else step
+        return step if isinstance(step, ModelResponse) else step(messages)
 
     def instructions(self, request: int) -> str:
         last = self.requests[request][-1]

@@ -53,7 +53,7 @@ Every image is pinned to a version, and where a registry publishes only `latest`
 
 lattice's `make install`, at its root, installs the development tools and two git hooks through prek, which run the same tools as CI:
 
-- **pre-commit:** whitespace and file checks, yamllint and shellcheck over stackr's files, ruff's formatter and linter, pyright, and actionlint and zizmor over the workflows
+- **pre-commit:** whitespace and file checks, yamllint and shellcheck over stackr's files, ruff's formatter and linter, ty, and actionlint and zizmor over the workflows
 - **commit-msg:** the message must be a [Conventional Commit](https://www.conventionalcommits.org/), since pull requests are squash-merged and their titles become the changelog
 
 [Contributing](../../project/contributing.md) has the rest of the workflow, and the definition of done.

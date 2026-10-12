@@ -98,7 +98,7 @@ It prints how far the pair agrees with people, then how many threads each evalua
 - **Feedback in, scores out.** [Feedback sources](guides/feedback-sources.md) turn people's feedback into examples, and every verdict becomes [scores](guides/scores.md) named like people's feedback, beside the traces they judge.
 - **Experiments and online evaluation.** Compare systems on a dataset, [in memory or in Langfuse](guides/experiments.md), and judge [live traffic](guides/online.md) sampled by key, within a budget, with results as Langfuse scores or OpenTelemetry events.
 - **End-to-end measures.** Task completion, drop-off and rewrites, defined in terms any application's log can be put in. [Workflow measures](guides/measures.md)
-- **Built to be tested.** A pure core, ports with in-memory adapters, and contract suites that every adapter passes, yours included. evalr itself is held to 100% branch coverage and pyright strict. [Testing with the contracts](guides/testing.md)
+- **Built to be tested.** A pure core, ports with in-memory adapters, and contract suites that every adapter passes, yours included. evalr itself is held to 100% branch coverage and to ty, with every rule an error. [Testing with the contracts](guides/testing.md)
 
 ## Where to go next
 

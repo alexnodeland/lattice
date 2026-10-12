@@ -27,7 +27,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from itertools import batched
 from types import CoroutineType
-from typing import Any
+from typing import Any, Final
 
 from sqlalchemy import (
     ColumnElement,
@@ -44,7 +44,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import InstrumentedAttribute, aliased
+from sqlalchemy.orm import InstrumentedAttribute, Session, aliased
 
 from reflexr.core import (
     HOLDING,
@@ -74,6 +74,7 @@ from reflexr.sql.tables import (
     StateRow,
     WorkspaceRow,
 )
+from reflexr.sql.tenancy import TENANT, TenantSession
 from reflexr.workspace import RUN_LEASE_PREFIX, Clock, Entry, RunPolicy, WorkspaceRef, utc_now
 
 _PAGE = 500
@@ -399,6 +400,11 @@ def _stored_rule(row: RuleRow) -> StoredRule:
     return StoredRule.model_validate(row, from_attributes=True)
 
 
+ACROSS_TENANTS: Final = frozenset({"workspaces", "due_runs"})
+"""The reads that span tenants, the dispatcher's and the scheduler's: the only ones that use
+the ``across_tenants`` engine."""
+
+
 class SqlStorage:
     """Storage in a SQL database, through SQLAlchemy's asyncio extension.
 
@@ -412,6 +418,16 @@ class SqlStorage:
             to the system clock in UTC.
         poll_interval: How often a subscription checks the log for envelopes committed by
             other processes. Commits made through this storage wake its subscriptions at once.
+        row_level_security: Whether each transaction names its tenant to PostgreSQL, whose
+            policies, which the migrations create, then show it only that tenant's rows
+            (:mod:`reflexr.sql.tenancy`).
+        across_tenants: The engine for the two reads that span tenants, ``ACROSS_TENANTS``:
+            the dispatcher's list of workspaces and the scheduler's due runs. It runs as a role
+            the policies don't hold, such as the tables' owner. Required with
+            ``row_level_security``, and ``engine`` without it.
+
+    Raises:
+        ValueError: If ``row_level_security`` is on without ``across_tenants``.
     """
 
     def __init__(
@@ -420,13 +436,25 @@ class SqlStorage:
         *,
         clock: Clock = utc_now,
         poll_interval: timedelta = timedelta(seconds=0.5),
+        row_level_security: bool = False,
+        across_tenants: AsyncEngine | None = None,
     ) -> None:
-        self._engine = engine
-        self._sessions = async_sessionmaker(engine, expire_on_commit=False)
+        if row_level_security and across_tenants is None:
+            raise ValueError("row-level security needs an engine for the reads across tenants")
+        self._sessions = async_sessionmaker(
+            engine,
+            expire_on_commit=False,
+            sync_session_class=TenantSession if row_level_security else Session,
+        )
+        self._across = async_sessionmaker(across_tenants or engine, expire_on_commit=False)
         self._clock = clock
         self._poll_interval = poll_interval.total_seconds()
         self._heads: dict[WorkspaceRef, int] = {}
         self._committed = asyncio.Condition()
+
+    def _session(self, workspace: WorkspaceRef) -> AsyncSession:
+        """A session in a workspace's tenant."""
+        return self._sessions(info={TENANT: workspace.tenant_id})
 
     @asynccontextmanager
     async def transaction(self, workspace: WorkspaceRef) -> AsyncGenerator[_Transaction]:
@@ -434,7 +462,7 @@ class SqlStorage:
 
         Closing the session rolls back whatever it did not commit, and returns its connection.
         """
-        session = self._sessions()
+        session = self._session(workspace)
         try:
             row = await _to_the_end(_lock_workspace(session, workspace))
             yield _Transaction(session, workspace, row, self._clock)
@@ -448,7 +476,7 @@ class SqlStorage:
     @_awaited_to_the_end
     async def head_seq(self, workspace: WorkspaceRef) -> int:
         """Return the log's latest ``seq``, or 0 if it is empty."""
-        async with self._sessions() as session:
+        async with self._session(workspace) as session:
             head = await session.scalar(
                 select(WorkspaceRow.head_seq).where(*_in_workspace(WorkspaceRow, workspace))
             )
@@ -478,7 +506,7 @@ class SqlStorage:
             limit=limit,
             last=last,
         )
-        envelopes = [_envelope(row) for row in await self._all(query)]
+        envelopes = [_envelope(row) for row in await self._all(workspace, query)]
         return envelopes if last is None else envelopes[::-1]
 
     async def subscribe(
@@ -510,7 +538,7 @@ class SqlStorage:
     @_awaited_to_the_end
     async def run(self, workspace: WorkspaceRef, run_id: RunId) -> Run | None:
         """Return a run, or None."""
-        async with self._sessions() as session:
+        async with self._session(workspace) as session:
             row = await session.get(RunRow, (workspace.tenant_id, workspace.workspace_id, run_id))
         return None if row is None else _run(row)
 
@@ -531,7 +559,7 @@ class SqlStorage:
             query = query.where(RunRow.status == status)
         if scope_key is not None:
             query = query.where(RunRow.scope_key == scope_key)
-        return [_run(row) for row in await self._all(query)]
+        return [_run(row) for row in await self._all(workspace, query)]
 
     async def dead_letters(
         self, workspace: WorkspaceRef, *, rule: RuleName | None = None
@@ -540,21 +568,23 @@ class SqlStorage:
         query = _scoped(DeadLetterRow, workspace).order_by(DeadLetterRow.position)
         if rule is not None:
             query = query.where(DeadLetterRow.rule == rule)
-        return [EvaluationError.model_validate(row.body) for row in await self._all(query)]
+        return [
+            EvaluationError.model_validate(row.body) for row in await self._all(workspace, query)
+        ]
 
     async def progress(self, workspace: WorkspaceRef) -> dict[RuleName, RuleProgress]:
         """Return every rule's progress in a workspace."""
         query = _scoped(ProgressRow, workspace).order_by(ProgressRow.position)
-        return {row.rule: _progress(row) for row in await self._all(query)}
+        return {row.rule: _progress(row) for row in await self._all(workspace, query)}
 
     async def schedules(self, workspace: WorkspaceRef) -> dict[str, datetime]:
         """Return the time of each schedule's last tick in a workspace."""
         query = _scoped(ScheduleRow, workspace).order_by(ScheduleRow.position)
-        return {row.name: row.at for row in await self._all(query)}
+        return {row.name: row.at for row in await self._all(workspace, query)}
 
     async def stored_rules(self, workspace: WorkspaceRef) -> list[StoredRule]:
         """Return a workspace's active stored rules, by name, in code-point order."""
-        return [_stored_rule(row) for row in await self._all(_active_rules(workspace))]
+        return [_stored_rule(row) for row in await self._all(workspace, _active_rules(workspace))]
 
     async def workspaces(self) -> list[WorkspaceRef]:
         """Return every workspace with a log."""
@@ -563,7 +593,9 @@ class SqlStorage:
             .where(WorkspaceRow.head_seq > 0)
             .order_by(WorkspaceRow.tenant_id, WorkspaceRow.workspace_id)
         )
-        return [WorkspaceRef(row.tenant_id, row.workspace_id) for row in await self._all(query)]
+        return [
+            WorkspaceRef(row.tenant_id, row.workspace_id) for row in await self._across_all(query)
+        ]
 
     async def due_runs(
         self, *, now: datetime, limit: int, policy: RunPolicy
@@ -600,7 +632,7 @@ class SqlStorage:
         )
         return [
             (WorkspaceRef(row.tenant_id, row.workspace_id), _run(row))
-            for row in await self._all(query)
+            for row in await self._across_all(query)
         ]
 
     @_awaited_to_the_end
@@ -611,7 +643,8 @@ class SqlStorage:
         now = self._clock()
         lease = _lease(workspace, key)
         try:
-            async with self._engine.begin() as connection:
+            async with self._session(workspace) as session, session.begin():
+                connection = await session.connection()
                 taken = await connection.execute(
                     update(LeaseRow)
                     .where(*lease, or_(LeaseRow.holder == holder, LeaseRow.expires_at <= now))
@@ -635,15 +668,15 @@ class SqlStorage:
     @_awaited_to_the_end
     async def release_lease(self, workspace: WorkspaceRef, key: str, holder: str) -> None:
         """Release a lease if ``holder`` has it."""
-        async with self._engine.begin() as connection:
-            await connection.execute(
+        async with self._session(workspace) as session, session.begin():
+            await session.execute(
                 delete(LeaseRow).where(*_lease(workspace, key), LeaseRow.holder == holder)
             )
 
     @_awaited_to_the_end
     async def cursor(self, workspace: WorkspaceRef, name: str) -> int:
         """Return how far a named consumer of the log has got: the ``seq`` saved, or 0."""
-        async with self._sessions() as session:
+        async with self._session(workspace) as session:
             cursor = await session.get(
                 CursorRow, (workspace.tenant_id, workspace.workspace_id, name)
             )
@@ -660,13 +693,19 @@ class SqlStorage:
         new = CursorRow(
             tenant_id=workspace.tenant_id, workspace_id=workspace.workspace_id, name=name, seq=seq
         )
-        async with self._sessions() as session, session.begin():
+        async with self._session(workspace) as session, session.begin():
             cursor = await _locked(session, CursorRow, key, new)
             cursor.seq = max(cursor.seq, seq)
 
     @_awaited_to_the_end
-    async def _all[R: ScopedRow](self, query: Select[R]) -> Sequence[R]:
-        async with self._sessions() as session:
+    async def _all[R: ScopedRow](self, workspace: WorkspaceRef, query: Select[R]) -> Sequence[R]:
+        async with self._session(workspace) as session:
+            return (await session.scalars(query)).all()
+
+    @_awaited_to_the_end
+    async def _across_all[R: ScopedRow](self, query: Select[R]) -> Sequence[R]:
+        """Read across tenants, on the ``across_tenants`` engine."""
+        async with self._across() as session:
             return (await session.scalars(query)).all()
 
 

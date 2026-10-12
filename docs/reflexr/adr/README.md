@@ -63,5 +63,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0059](0059-the-tenant-on-log-records.md) | The tenant on log records | Accepted |
 | [0060](0060-a-nul-character-is-refused-at-the-boundary.md) | A NUL character is refused at the boundary | Accepted |
 | [0061](0061-the-openapi-documents-describe-refusals.md) | The OpenAPI documents describe refusals | Accepted |
+| [0062](0062-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

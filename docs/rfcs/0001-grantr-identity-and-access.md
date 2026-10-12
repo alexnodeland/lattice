@@ -324,7 +324,7 @@ D2 and D6 make v0.1 larger than the minimum, by the maintainer's choice. Custom 
 
 ## Tracking
 
-grantr's RFC-0001 turns these phases into its plan, with a tracking issue.
+[grantr's RFC-0001](../grantr/rfcs/0001-v0.1-implementation-plan.md) turns these phases into its plan, tracked in [#47](https://github.com/alexnodeland/lattice/issues/47).
 
 - [x] Sign-off on D1 to D9 (2026-10-12)
 - [ ] Phase 1: the hook

@@ -110,6 +110,17 @@
           "jsonpath": "$.package[?(@.name.value=='relayr-ai')].version"
         }
       ]
+    },
+    "packages/grantr": {
+      "release-type": "python",
+      "package-name": "grantr",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "/uv.lock",
+          "jsonpath": "$.package[?(@.name.value=='grantr')].version"
+        }
+      ]
     }
   }
 }

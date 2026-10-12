@@ -715,6 +715,8 @@ def default_text(spec: dict[str, Any]) -> str:
     default = spec.get("default")
     if isinstance(default, bool):
         return "yes" if default else "no"
+    if default == "":
+        return "empty"
     return code(" ".join(str(default).split())) if default is not None else "none"
 
 
@@ -837,15 +839,6 @@ def block_versions_env() -> str:
     return table(["Pin", "Value"], rows)
 
 
-def block_template_revisions() -> str:
-    rows = [
-        [name.removesuffix("_rev"), code(spec["default"])]
-        for name, spec in copier_questions().items()
-        if name.endswith("_rev")
-    ]
-    return table(["Library", "Commit the template pins"], rows)
-
-
 # --- the pages ----------------------------------------------------------------------------------
 
 BLOCKS: dict[str, Callable[[], str]] = {
@@ -867,7 +860,6 @@ BLOCKS: dict[str, Callable[[], str]] = {
     "template-questions": block_template_questions,
     "template-derived": block_template_derived,
     "template-files": block_template_files,
-    "template-revisions": block_template_revisions,
     "makefile-targets": block_makefile_targets,
     "makefile-variables": block_makefile_variables,
     "versions-env": block_versions_env,

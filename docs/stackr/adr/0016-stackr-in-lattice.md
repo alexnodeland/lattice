@@ -1,6 +1,6 @@
 # ADR-0016: stackr in lattice
 
-**Status:** Accepted
+**Status:** Accepted; amended by [ADR-0018](0018-the-template-pins-the-libraries-at-its-own-commit.md)
 **Date:** 2026-09-30
 **Deciders:** Alex Nodeland
 

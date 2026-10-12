@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:best-practices"],
+  "ignorePaths": ["**/node_modules/**", "**/__fixtures__/**"],
   "pre-commit": {
     "enabled": true
   },
@@ -47,6 +48,23 @@
       "matchFileNames": ["packages/portalr/web/client/package.json"],
       "matchPackageNames": ["typescript"],
       "allowedVersions": "<7"
+    },
+    {
+      "description": "The template's files are Jinja, which Renovate can't parse; the template's pins move by hand, as its generated applications' Renovate moves theirs.",
+      "matchFileNames": ["packages/stackr/template/**"],
+      "enabled": false
+    },
+    {
+      "description": "Langfuse's web and worker are pinned to the same exact version and move together (stackr ADR-0008).",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["langfuse/langfuse", "langfuse/langfuse-worker"],
+      "groupName": "Langfuse"
+    },
+    {
+      "description": "Chainguard rebuilds MinIO's only free tag, latest, every day; its digest moves once a month (stackr ADR-0008).",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["cgr.dev/chainguard/minio"],
+      "schedule": ["* * 1 * *"]
     }
   ]
 }

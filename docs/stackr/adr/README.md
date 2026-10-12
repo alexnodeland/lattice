@@ -4,7 +4,7 @@ Each record captures one decision: the context that forced it, the options consi
 
 | ADR | Title | Status |
 |---|---|---|
-| [0001](0001-compose-first-with-profiles.md) | Docker Compose first, with profiles | Accepted |
+| [0001](0001-compose-first-with-profiles.md) | Docker Compose first, with profiles | Accepted, amended by [0023](0023-opentofu-for-aws-now.md) |
 | [0002](0002-local-supabase-through-its-cli.md) | Local Supabase, through its CLI | Accepted, amended by [0019](0019-access-with-grantr-in-the-template.md) |
 | [0003](0003-observability-and-gateway-services.md) | The observability and gateway services | Accepted, amended by [0016](0016-stackr-in-lattice.md) |
 | [0004](0004-the-application-template.md) | The application template | Accepted |
@@ -26,5 +26,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0020](0020-one-tenant-attribute-and-prom-label-proxy.md) | One tenant attribute, and prom-label-proxy | Accepted |
 | [0021](0021-the-bridge-in-the-template.md) | The bridge in the template | Accepted |
 | [0022](0022-row-level-security-in-the-template.md) | Row-level security in the template | Accepted |
+| [0023](0023-opentofu-for-aws-now.md) | OpenTofu for AWS, now | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

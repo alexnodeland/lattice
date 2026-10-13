@@ -8,7 +8,7 @@
 
 export type * as Artifactr from "./artifactr";
 export { type ArtifactrStream, artifactr } from "./artifactr";
-export { type Answer, createCommands, type Refusal } from "./commands";
+export { type Answer, createCommands, type Refusal, refusal } from "./commands";
 export { type Change, changes, type Granularity } from "./diff";
 export { type Feedback, type Thumb, thumbs } from "./feedback";
 export type * as ArtifactrApi from "./generated/artifactr.openapi";

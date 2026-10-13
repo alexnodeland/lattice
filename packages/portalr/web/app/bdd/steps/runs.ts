@@ -90,6 +90,7 @@ When("they start a thread of their own", async ({ page, scenario }) => {
   await page.getByLabel("New thread").fill(scenario.thread);
   await page.getByRole("button", { name: "Start" }).click();
   await expect(page.getByRole("heading", { level: 2 })).toHaveText(scenario.thread);
+  scenario.threadUrl = page.url();
 });
 
 Then("its run is {string}", async ({ page, scenario }, status: string) => {

@@ -51,9 +51,16 @@ export const keys = {
   grantr: {
     /** A person's tenants, by Supabase Auth's id for them. */
     memberships: (user: string) => ["grantr", "memberships", user] as const,
-    me: (tenant: string) => ["grantr", tenant, "me"] as const,
+    /** Everything grantr answers in a tenant, which a change to access there makes stale. */
+    tenant: (tenant: string) => ["grantr", tenant] as const,
+    me: (tenant: string) => [...keys.grantr.tenant(tenant), "me"] as const,
     checks: (tenant: string, checks: readonly Check[]) =>
-      ["grantr", tenant, "checks", checks] as const,
+      [...keys.grantr.tenant(tenant), "checks", checks] as const,
+    access: (tenant: string) => [...keys.grantr.tenant(tenant), "access"] as const,
+    members: (tenant: string) => [...keys.grantr.access(tenant), "members"] as const,
+    grants: (tenant: string, ws: string) => [...keys.grantr.access(tenant), "grants", ws] as const,
+    restrictions: (tenant: string, ws: string) =>
+      [...keys.grantr.access(tenant), "restrictions", ws] as const,
   },
 };
 
@@ -229,6 +236,42 @@ export function createQueries(api: Api) {
               api.grantr.POST("/grantr/v1/checks", {
                 params: { header: { "X-Tenant": tenant } },
                 body: [...checks],
+              }),
+            ),
+        }),
+      /** The tenant's members, for those who may add one (`grantr:add_member`). */
+      members: (tenant: string) =>
+        queryOptions({
+          queryKey: keys.grantr.members(tenant),
+          queryFn: () =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/members", {
+                ...named(tenant),
+                params: { path: { tenant } },
+              }),
+            ),
+        }),
+      /** The grants on a workspace and on the threads and artifacts in it. */
+      grants: (tenant: string, ws: string) =>
+        queryOptions({
+          queryKey: keys.grantr.grants(tenant, ws),
+          queryFn: () =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/grants", {
+                ...named(tenant),
+                params: { path: { tenant }, query: { workspace: ws } },
+              }),
+            ),
+        }),
+      /** The threads and artifacts restricted in a workspace. */
+      restrictions: (tenant: string, ws: string) =>
+        queryOptions({
+          queryKey: keys.grantr.restrictions(tenant, ws),
+          queryFn: () =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/restrictions", {
+                ...named(tenant),
+                params: { path: { tenant }, query: { workspace: ws } },
               }),
             ),
         }),

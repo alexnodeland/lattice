@@ -5,7 +5,7 @@
  * reflexr's limits, which an application sets (portalr ADR-0020).
  */
 
-import type { ReflexrApi, Refusal } from "@portalr/client";
+import type { ReflexrApi } from "@portalr/client";
 
 type Rule = ReflexrApi.components["schemas"]["Rule-Input"];
 
@@ -34,7 +34,3 @@ export function read(text: string): { rule: Rule } | { refused: string } {
     return { refused: `That isn't JSON: ${error instanceof Error ? error.message : error}.` };
   }
 }
-
-/** What a field says of a command that wasn't done, after what it would have done. */
-export const refusal = (undone: string, refused: Refusal) =>
-  `${undone}: ${refused.reasons.join("; ")}`;

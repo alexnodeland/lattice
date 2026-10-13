@@ -1,15 +1,18 @@
-"""The audit log's types and actors, as a read of the log names them."""
+"""The audit log's types, and the filter a read of it takes."""
 
+from datetime import UTC, datetime
 from typing import get_args
 
 from grantr.core import (
     Agent,
+    AuditEntry,
     AuditEvent,
+    AuditFilter,
     AuditType,
     RulePrincipal,
     ServicePrincipal,
+    TenantDeleted,
     User,
-    actor_of,
 )
 
 
@@ -20,11 +23,19 @@ def test_every_event_type_is_one_a_read_may_keep() -> None:
     )
 
 
-def test_an_actor_is_named_by_kind_so_a_user_and_a_principal_stay_apart() -> None:
-    assert actor_of(User(id="alice")) == "user:alice"
-    assert actor_of(ServicePrincipal(id="alice")) == "service_principal:alice"
-    assert actor_of(RulePrincipal(workspace="notes", rule="chat:triage")) == (
-        "rule:notes/chat:triage"
-    )
-    assert actor_of(Agent()) == "agent"
-    assert actor_of(None) is None
+def test_a_filter_keeps_one_subjects_changes_and_tells_a_user_from_a_principal() -> None:
+    def by(subject: object) -> AuditEntry:
+        at = datetime(2026, 10, 12, tzinfo=UTC)
+        return AuditEntry.model_validate(
+            {"seq": 1, "at": at, "tenant": "acme", "by": subject, "event": TenantDeleted()}
+        )
+
+    alice = AuditFilter(by=User(id="alice"))
+    assert alice.keeps(by(User(id="alice")))
+    assert not alice.keeps(by(ServicePrincipal(id="alice")))
+    assert not alice.keeps(by(None))
+    rule = AuditFilter(by=RulePrincipal(workspace="a/b", rule="c"))
+    assert not rule.keeps(by(RulePrincipal(workspace="a", rule="b/c")))
+    assert AuditFilter(by=Agent()).keeps(by(Agent()))
+    assert AuditFilter().keeps(by(None))
+    assert not AuditFilter(types=frozenset({"granted"})).keeps(by(None))

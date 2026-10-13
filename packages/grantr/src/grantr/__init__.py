@@ -38,7 +38,6 @@ from grantr.core import (
     UserId,
     Visibility,
     WorkspaceId,
-    actor_of,
 )
 from grantr.grants import Access, Grants, Hooks, InMemoryStorage, Storage, SubjectOf
 
@@ -78,5 +77,4 @@ __all__ = [
     "Visibility",
     "WorkspaceId",
     "__version__",
-    "actor_of",
 ]

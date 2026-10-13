@@ -14,7 +14,6 @@ from contextlib import AbstractAsyncContextManager
 from typing import Protocol
 
 from grantr.core import (
-    EVERY_ENTRY,
     AuditEntry,
     AuditEvent,
     AuditFilter,
@@ -189,7 +188,7 @@ class Storage(Reads, Protocol):
         *,
         after_seq: int = 0,
         limit: int = 100,
-        keep: AuditFilter = EVERY_ENTRY,
+        keep: AuditFilter | None = None,
     ) -> list[AuditEntry]:
         """A tenant's audit entries after ``after_seq``, in order, or the deployment's with None.
 

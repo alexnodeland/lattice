@@ -13,7 +13,8 @@ export interface paths {
          * Deployment Audit
          * @description The deployment's audit log: its operators, granted and revoked.
          *
-         *     ``type`` and ``actor`` keep only some types of entry, or one actor's.
+         *     ``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``
+         *     one subject's changes.
          */
         get: operations["deployment_audit_grantr_v1_audit_get"];
         put?: never;
@@ -147,7 +148,8 @@ export interface paths {
          * Tenant Audit
          * @description A tenant's audit log after ``after_seq``, in order.
          *
-         *     ``type`` and ``actor`` keep only some types of entry, or one actor's.
+         *     ``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``
+         *     one subject's changes.
          */
         get: operations["tenant_audit_grantr_v1_tenants__tenant__audit_get"];
         put?: never;
@@ -871,8 +873,14 @@ export interface operations {
             query?: {
                 after_seq?: number;
                 limit?: number;
+                /** @description Keep only entries of these event types; it may repeat. */
                 type?: components["schemas"]["AuditType"][] | null;
+                /** @description Keep only the changes of one subject, of this kind. */
+                actor_kind?: ("user" | "service_principal" | "rule" | "agent") | null;
+                /** @description That subject's id: a user's or a service principal's, or a rule's name. */
                 actor?: string | null;
+                /** @description A rule's workspace, with `actor_kind=rule`. */
+                workspace?: string | null;
             };
             header?: never;
             path?: never;
@@ -1117,8 +1125,14 @@ export interface operations {
             query?: {
                 after_seq?: number;
                 limit?: number;
+                /** @description Keep only entries of these event types; it may repeat. */
                 type?: components["schemas"]["AuditType"][] | null;
+                /** @description Keep only the changes of one subject, of this kind. */
+                actor_kind?: ("user" | "service_principal" | "rule" | "agent") | null;
+                /** @description That subject's id: a user's or a service principal's, or a rule's name. */
                 actor?: string | null;
+                /** @description A rule's workspace, with `actor_kind=rule`. */
+                workspace?: string | null;
             };
             header?: never;
             path: {

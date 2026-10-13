@@ -2,14 +2,14 @@
 
 grantr appends one entry per change, in the same transaction as the change, with a sequence
 number, the time, the tenant and who made it. Refusals aren't recorded. A key's secret, and its
-digest, never are. A read of the log may keep only some types of event, or one actor's changes
-(:class:`AuditFilter`).
+digest, never are. A read of the log may keep only some types of event, or one subject's
+changes (:class:`AuditFilter`).
 """
 
 from collections.abc import Set
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Annotated, Final, Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,7 +17,7 @@ from grantr.core.grants import Grant
 from grantr.core.ids import TenantId, UserId
 from grantr.core.resources import Resource
 from grantr.core.roles import Role
-from grantr.core.subjects import Member, RulePrincipal, ServicePrincipal, Subject, User
+from grantr.core.subjects import Member, ServicePrincipal, Subject
 
 
 class TenantCreated(BaseModel):
@@ -206,41 +206,20 @@ type AuditType = Literal[
 """An audit event's ``type``: what a read of the log may keep."""
 
 
-def actor_of(by: Subject | None) -> str | None:
-    """Who made a change, as a read of the log names them; None for the first operator.
-
-    ``user:<id>`` and ``service_principal:<id>`` keep a person and a principal with the same id
-    apart; a rule is ``rule:<workspace>/<rule>``, and the agent ``agent``.
-    """
-    match by:
-        case None:
-            return None
-        case User(id=id) | ServicePrincipal(id=id):
-            return f"{by.kind}:{id}"
-        case RulePrincipal(workspace=workspace, rule=rule):
-            return f"rule:{workspace}/{rule}"
-        case _:  # the agent, the one subject left
-            return "agent"
-
-
 @dataclass(frozen=True)
 class AuditFilter:
-    """Which entries a read of the log keeps: of some types, by one actor, or every one.
+    """Which entries a read of the log keeps: of some types, by one subject, or every one.
 
     Args:
         types: The event types to keep; every type when empty.
-        actor: Whom to keep the changes of, as :func:`actor_of` names them; anyone's when None.
+        by: The subject whose changes to keep, such as a user or a rule; anyone's when None.
     """
 
     types: Set[AuditType] = frozenset()
-    actor: str | None = None
+    by: Subject | None = None
 
     def keeps(self, entry: AuditEntry) -> bool:
         """Whether an entry passes the filter."""
         return (not self.types or entry.event.type in self.types) and (
-            self.actor is None or actor_of(entry.by) == self.actor
+            self.by is None or entry.by == self.by
         )
-
-
-EVERY_ENTRY: Final = AuditFilter()
-"""The filter that keeps every entry: a read's default."""

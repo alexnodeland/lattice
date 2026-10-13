@@ -133,8 +133,15 @@ class AuditRow(Base):
     __tablename__ = "grantr_audit"
     __table_args__ = (
         Index("ix_grantr_audit_tenant", "tenant_id", "seq"),
-        Index("ix_grantr_audit_type", "tenant_id", "event_type", "seq"),
-        Index("ix_grantr_audit_actor", "tenant_id", "actor", "seq"),
+        Index("ix_grantr_audit_event_type", "tenant_id", "event_type", "seq"),
+        Index(
+            "ix_grantr_audit_actor",
+            "tenant_id",
+            "actor_kind",
+            "actor_workspace",
+            "actor_id",
+            "seq",
+        ),
     )
 
     # SQLite numbers only an INTEGER primary key itself.
@@ -145,8 +152,12 @@ class AuditRow(Base):
     event_type: Mapped[str]
     """The event's ``type``."""
 
-    actor: Mapped[str | None]
-    """Who made it, as :func:`~grantr.core.actor_of` names them; null for the first operator."""
+    actor_kind: Mapped[str]
+    """Who made it, as a grant's subject is stored: its kind, workspace and id, ``""`` for a part
+    it doesn't have, and ``""`` in all three for the first operator, whom no one granted."""
+
+    actor_workspace: Mapped[str]
+    actor_id: Mapped[str]
 
     body: Mapped[dict[str, Any]] = mapped_column(JSON)
     """The entry's time, maker and event."""

@@ -11,7 +11,6 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
 from grantr.core import (
-    EVERY_ENTRY,
     TENANT,
     AuditEntry,
     AuditEvent,
@@ -278,13 +277,15 @@ class InMemoryStorage(_Reads):
         *,
         after_seq: int = 0,
         limit: int = 100,
-        keep: AuditFilter = EVERY_ENTRY,
+        keep: AuditFilter | None = None,
     ) -> list[AuditEntry]:
         """A tenant's audit entries after ``after_seq``, in order, or the deployment's with None.
 
         It returns the first ``limit`` that ``keep`` keeps.
         """
         entries = [
-            e for e in self._data.log if e.tenant == tenant and e.seq > after_seq and keep.keeps(e)
+            e
+            for e in self._data.log
+            if e.tenant == tenant and e.seq > after_seq and (keep is None or keep.keeps(e))
         ]
         return entries[:limit]

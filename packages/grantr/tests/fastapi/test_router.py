@@ -1,6 +1,7 @@
 """The admin API, over HTTP: each command and list, /me, /checks, and the shapes of refusals."""
 
 import httpx
+import pytest
 
 from grantr.core import Resource, User
 from grantr.grants import Grants
@@ -205,7 +206,7 @@ async def test_a_principal_cant_take_the_libraries_actors_ids(client: httpx.Asyn
     assert [refused.status_code for refused in refusals] == [422, 422, 422]
 
 
-async def test_the_audit_log_is_read_of_some_types_or_by_one_actor(
+async def test_the_audit_log_is_read_of_some_types_or_by_one_subject(
     client: httpx.AsyncClient,
 ) -> None:
     await client.post("/tenants/acme/members", json={"member": BOB}, headers=AS_ALICE)
@@ -216,14 +217,49 @@ async def test_the_audit_log_is_read_of_some_types_or_by_one_actor(
         headers=AS_ALICE,
     )
     assert [e["event"]["type"] for e in typed.json()] == ["member_added", "group_defined"]
+    tenant_by_root = await client.get(
+        "/tenants/acme/audit", params={"actor_kind": "user", "actor": "root"}, headers=AS_ALICE
+    )
+    assert [e["event"]["type"] for e in tenant_by_root.json()] == ["tenant_created"]
+    by_a_rule = await client.get(
+        "/tenants/acme/audit",
+        params={"actor_kind": "rule", "actor": "chat:x", "workspace": "notes"},
+        headers=AS_ALICE,
+    )
+    assert by_a_rule.json() == []
+    by_the_agent = await client.get(
+        "/tenants/acme/audit", params={"actor_kind": "agent"}, headers=AS_ALICE
+    )
+    assert by_the_agent.json() == []
+    assert (await client.put("/operators/carol", headers=AS_ROOT)).status_code == 200
+    granted = await client.get("/audit", params={"type": "granted"}, headers=AS_ROOT)
+    assert [(e["by"], e["event"]["grant"]["to"]) for e in granted.json()] == [
+        (None, {"kind": "user", "id": "root"}),
+        ({"kind": "user", "id": "root"}, {"kind": "user", "id": "carol"}),
+    ]
     by_root = await client.get(
-        "/tenants/acme/audit", params={"actor": "user:root"}, headers=AS_ALICE
+        "/audit", params={"actor_kind": "user", "actor": "root"}, headers=AS_ROOT
     )
-    assert [e["event"]["type"] for e in by_root.json()] == ["tenant_created"]
-    deployment = await client.get(
-        "/audit", params={"type": "granted", "actor": "user:root"}, headers=AS_ROOT
-    )
-    assert deployment.status_code == 200
-    for params in ({"type": "renamed"}, {"actor": ""}):
-        response = await client.get("/tenants/acme/audit", params=params, headers=AS_ALICE)
-        assert response.status_code == 422
+    assert [e["event"]["grant"]["to"]["id"] for e in by_root.json()] == ["carol"]
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"type": "renamed"},
+        {"actor": ""},
+        {"actor": "bob"},
+        {"workspace": "notes"},
+        {"actor_kind": "user"},
+        {"actor_kind": "user", "actor": "bob", "workspace": "notes"},
+        {"actor_kind": "rule", "actor": "chat:x"},
+        {"actor_kind": "agent", "actor": "bob"},
+        {"actor_kind": "service_principal", "actor": "has:colon"},
+        {"actor_kind": "group", "actor": "team"},
+    ],
+)
+async def test_an_audit_filter_that_names_no_subject_is_refused(
+    client: httpx.AsyncClient, params: dict[str, str]
+) -> None:
+    response = await client.get("/tenants/acme/audit", params=params, headers=AS_ALICE)
+    assert response.status_code == 422, params

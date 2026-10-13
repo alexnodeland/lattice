@@ -25,9 +25,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
 
 from grantr.core import (
-    EVERY_ENTRY,
     TENANT,
     TENANT_ID,
+    Agent,
     AuditEntry,
     AuditEvent,
     AuditFilter,
@@ -46,7 +46,6 @@ from grantr.core import (
     User,
     UserId,
     WorkspaceId,
-    actor_of,
 )
 from grantr.sql.tables import (
     DEPLOYMENT,
@@ -120,6 +119,17 @@ def grantee(kind: str, workspace: str, id: str) -> Grantee:
     if kind == "rule":
         return RulePrincipal(workspace=workspace, rule=id)
     return _GRANTEE.validate_python({"kind": kind, "id": id})
+
+
+def actor_columns(by: Subject | None) -> Columns:
+    """The columns an audit entry's maker is stored in: a subject's, or none for no one."""
+    match by:
+        case None:
+            return ("", "", "")
+        case Agent():
+            return (by.kind, "", "")
+        case _:
+            return subject_columns(by)
 
 
 def resource_columns(resource: Resource) -> Columns:
@@ -480,8 +490,14 @@ class _Transaction(_Reads):
             "by": None if by is None else by.model_dump(mode="json"),
             "event": event.model_dump(mode="json"),
         }
+        actor_kind, actor_workspace, actor_id = actor_columns(by)
         row = AuditRow(
-            tenant_id=_scope(tenant), event_type=event.type, actor=actor_of(by), body=body
+            tenant_id=_scope(tenant),
+            event_type=event.type,
+            actor_kind=actor_kind,
+            actor_workspace=actor_workspace,
+            actor_id=actor_id,
+            body=body,
         )
         self._session.add(row)
         await self._session.flush()
@@ -653,20 +669,25 @@ class SqlStorage:
         *,
         after_seq: int = 0,
         limit: int = 100,
-        keep: AuditFilter = EVERY_ENTRY,
+        keep: AuditFilter | None = None,
     ) -> list[AuditEntry]:
         """A tenant's audit entries after ``after_seq``, in order, or the deployment's with None.
 
-        It returns the first ``limit`` that ``keep`` keeps, found by the type's and the actor's
-        indexes.
+        It returns the first ``limit`` that ``keep`` keeps. A single type, or a single actor, is
+        one index's range; a type and an actor together are an index's range and a filter.
         """
         query = select(AuditRow).where(
             AuditRow.tenant_id == _scope(tenant), AuditRow.seq > after_seq
         )
-        if keep.types:
+        if keep is not None and keep.types:
             query = query.where(AuditRow.event_type.in_(sorted(keep.types)))
-        if keep.actor is not None:
-            query = query.where(AuditRow.actor == keep.actor)
+        if keep is not None and keep.by is not None:
+            kind, workspace, id = actor_columns(keep.by)
+            query = query.where(
+                AuditRow.actor_kind == kind,
+                AuditRow.actor_workspace == workspace,
+                AuditRow.actor_id == id,
+            )
         query = query.order_by(AuditRow.seq).limit(limit)
         async with self._session(tenant) as session:
             rows = await _to_the_end(session.scalars(query))

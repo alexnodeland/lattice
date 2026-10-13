@@ -20,7 +20,6 @@ from grantr.core import (
     APPLICATION,
     BUILT_IN,
     DEPLOYMENT,
-    EVERY_ENTRY,
     MEMBER,
     TENANT,
     TENANT_ID,
@@ -385,7 +384,7 @@ class Grants:
         by: Subject,
         after_seq: int = 0,
         limit: int = 100,
-        keep: AuditFilter = EVERY_ENTRY,
+        keep: AuditFilter | None = None,
     ) -> list[AuditEntry]:
         """A tenant's audit log after ``after_seq``, or the deployment's with ``None``.
 

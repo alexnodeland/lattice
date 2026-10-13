@@ -11,7 +11,7 @@ export const posted = (page: Page, by: "You" | "Assistant") =>
 When("they start the thread {string}", async ({ page }, title: string) => {
   await page.getByLabel("New thread").fill(title);
   await page.getByRole("button", { name: "Start" }).click();
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText(title);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
 });
 
 When("they post {string}", async ({ page }, message: string) => {

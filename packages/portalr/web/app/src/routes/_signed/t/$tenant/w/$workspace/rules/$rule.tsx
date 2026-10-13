@@ -1,7 +1,7 @@
 import { keys, Refused, refusal } from "@portalr/client";
-import { Button, TextField } from "@portalr/ui";
+import { Button, ConfirmDialog, PageHeader, TextField, TextLink } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useActionState, useMemo, useState } from "react";
 import { allowedIn } from "../../../../../../../allowed";
 import { read } from "../../../../../../../rules";
@@ -38,12 +38,10 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/$rul
     }
   },
   notFoundComponent: () => (
-    <section aria-labelledby="rule">
-      <h2 id="rule" className="font-semibold text-lg">
-        Rule not found
-      </h2>
+    <>
+      <PageHeader title="Rule not found" />
       <p>There's no rule here by that name: it may have been archived.</p>
-    </section>
+    </>
   ),
   component: RulePage,
 });
@@ -92,31 +90,56 @@ function RulePage() {
     await queryClient.invalidateQueries({ queryKey: keys.reflexr.rule(tenant, workspace, name) });
     return null;
   }, null);
-  const [unarchived, archive, archiving] = useActionState(async () => {
+  const [unarchived, setUnarchived] = useState<string | null>(null);
+  async function archive() {
     const answer = await commands.reflexr.send(tenant, workspace, {
       type: "archive_rule",
       rule: name,
       expected_version: base,
     });
     if (answer.outcome === "refused") {
-      return refusal("The rule wasn't archived", answer);
+      setUnarchived(refusal("The rule wasn't archived", answer));
+      return;
     }
     await navigate({ to: "/t/$tenant/w/$workspace/rules", params: { tenant, workspace } });
-    return null;
-  }, null);
+  }
 
   const stored = held.origin === "stored";
   return (
-    <section aria-labelledby="rule" className="flex flex-col gap-4">
-      <h2 id="rule" className="font-semibold font-mono text-lg">
-        {name}
-      </h2>
+    <section aria-labelledby="rule" className="flex max-w-190 flex-col gap-6">
+      <PageHeader
+        id="rule"
+        title={name}
+        mono
+        crumb={
+          <TextLink
+            render={<Link to="/t/$tenant/w/$workspace/rules" params={{ tenant, workspace }} />}
+          >
+            Rules
+          </TextLink>
+        }
+        meta={
+          stored
+            ? `Stored in this workspace, version ${held.version}.`
+            : "In the application's code, the same in every workspace."
+        }
+        actions={
+          stored &&
+          allowed.has("reflexr:archive_rule") && (
+            <ConfirmDialog
+              label="Archive"
+              title={`Archive ${name}?`}
+              confirm="Archive the rule"
+              onConfirm={archive}
+            >
+              Version {held.version} stops reacting to events in {workspace}. Its runs stay in the
+              log.
+            </ConfirmDialog>
+          )
+        }
+      />
+      {unarchived && <p role="alert">{unarchived}</p>}
       <p>{held.rule.description || "No description."}</p>
-      <p className="text-muted">
-        {stored
-          ? `Stored in this workspace, version ${held.version}.`
-          : "In the application's code, the same in every workspace."}
-      </p>
       {stored && allowed.has("reflexr:update_rule") ? (
         <form aria-label="Edit the rule" className="flex flex-col gap-2" action={save}>
           {current > base && (
@@ -148,16 +171,10 @@ function RulePage() {
         </form>
       ) : (
         <section aria-label="The rule, as reflexr's JSON">
-          <pre className="overflow-x-auto font-mono text-sm">{shown(held.rule)}</pre>
+          <pre className="overflow-x-auto rounded-lg border border-line bg-surface p-4 font-mono text-sm">
+            {shown(held.rule)}
+          </pre>
         </section>
-      )}
-      {stored && allowed.has("reflexr:archive_rule") && (
-        <form aria-label="Archive the rule" className="flex flex-col gap-1" action={archive}>
-          <Button type="submit" variant="secondary" disabled={archiving} className="self-start">
-            Archive
-          </Button>
-          {unarchived && <p role="alert">{unarchived}</p>}
-        </form>
       )}
     </section>
   );

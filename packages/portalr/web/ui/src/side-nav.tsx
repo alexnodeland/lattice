@@ -23,7 +23,10 @@ type NavLinkProps = Omit<ComponentProps<"a">, "className" | "children"> & {
   children: string;
 };
 
-/** One area: its icon, its word, and how many wait there; `aria-current="page"` marks it. */
+/**
+ * One area: its icon, its word, and how many wait there. `aria-current="page"` marks the area
+ * shown, and `aria-current="true"` the area a page inside it belongs to.
+ */
 export function NavLink({ render, icon, count, children, ...props }: NavLinkProps) {
   const link = useRender({
     defaultTagName: "a",
@@ -32,7 +35,7 @@ export function NavLink({ render, icon, count, children, ...props }: NavLinkProp
       {
         "aria-label": count ? `${children}, ${count} waiting for you` : undefined,
         className:
-          "flex items-center gap-2.5 rounded-md px-3 py-2 font-medium text-fg text-sm outline-offset-2 hover:bg-wash focus-visible:outline-2 focus-visible:outline-focus aria-[current=page]:bg-wash aria-[current=page]:font-semibold aria-[current=page]:text-accent",
+          "flex items-center gap-2.5 rounded-md px-3 py-2 font-medium text-fg text-sm outline-offset-2 hover:bg-wash focus-visible:outline-2 focus-visible:outline-focus aria-[current=page]:bg-wash aria-[current=page]:font-semibold aria-[current=page]:text-accent aria-[current=true]:bg-wash aria-[current=true]:font-semibold aria-[current=true]:text-accent",
         children: (
           <>
             {icon && <Icon icon={icon} />}

@@ -85,19 +85,19 @@ Then("the schedule {string} is listed", async ({ page }, schedule: string) => {
 });
 
 Then("they can't install a rule", async ({ page }) => {
-  await expect(page.getByRole("heading", { name: "Rules", level: 2 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Rules", level: 1 })).toBeVisible();
   await expect(page.getByRole("button", { name: "Install" })).toHaveCount(0);
 });
 
 When("they open the rule {string}", async ({ page }, rule: string) => {
   await listed(page, rule).getByRole("link", { name: rule }).click();
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText(rule);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(rule);
 });
 
 When("they open their rule", async ({ page, scenario }) => {
   const rule = own(scenario.rule);
   await listed(page, rule).getByRole("link", { name: rule }).click();
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText(rule);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(rule);
 });
 
 Then("they can't edit or archive it", async ({ page }) => {
@@ -150,5 +150,6 @@ Given(
 
 When("they archive their rule", async ({ page }) => {
   await page.getByRole("button", { name: "Archive" }).click();
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText("Rules");
+  await page.getByRole("alertdialog").getByRole("button", { name: "Archive the rule" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Rules");
 });

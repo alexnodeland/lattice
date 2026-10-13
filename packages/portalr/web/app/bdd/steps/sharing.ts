@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { signIn } from "./app";
+import { account, signIn } from "./app";
 import { started, Then, When } from "./fixtures";
 import { password } from "./people";
 
@@ -31,7 +31,7 @@ async function restrict(page: Page) {
 When("they open the thread they started", async ({ page, scenario }) => {
   const thread = started(scenario.thread);
   await (await threads(page)).getByRole("link", { name: thread, exact: true }).click();
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText(thread);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(thread);
 });
 
 When("they open the thread they started by its address", async ({ page, scenario }) => {
@@ -60,7 +60,7 @@ When(
     try {
       const alice = await other.newPage();
       await signIn(alice, "alice", password("alice"));
-      await expect(alice.getByRole("button", { name: "Sign out" })).toBeVisible();
+      await expect(account(alice)).toBeVisible();
       await alice.goto(started(scenario.threadUrl));
       await restrict(alice);
     } finally {
@@ -97,6 +97,7 @@ Then(
 
 When("they revoke {string}'s {word}", async ({ page }, person: string, role: string) => {
   await holder(page, person, role).getByRole("button", { name: "Revoke" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Revoke the role" }).click();
 });
 
 Then("no one holds a role on it", async ({ page }) => {
@@ -109,12 +110,12 @@ When("they close the dialog", async ({ page }) => {
 });
 
 Then("they can read it, and not post in it", async ({ page, scenario }) => {
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText(started(scenario.thread));
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(started(scenario.thread));
   await expect(page.getByRole("textbox", { name: "Message" })).toHaveCount(0);
 });
 
 Then("they have no thread actions", async ({ page, scenario }) => {
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText(started(scenario.thread));
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(started(scenario.thread));
   await expect(page.getByRole("button", { name: "Thread actions" })).toHaveCount(0);
 });
 

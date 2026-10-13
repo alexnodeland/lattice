@@ -82,8 +82,13 @@ export const keys = {
       [...keys.portalr.tenant(tenant), "scores", window] as const,
     metrics: (tenant: string, metric: Metric, window: TimeSpan) =>
       [...keys.portalr.tenant(tenant), "metrics", metric, window] as const,
+    feedback: (tenant: string, window: TimeSpan, workspace: string | null) =>
+      [...keys.portalr.tenant(tenant), "feedback", window, workspace] as const,
     /** The deployment's tenants, as the signed-in person, `user`, reads them: an operator's. */
     tenants: (user: string) => ["portalr", "deployment", "tenants", user] as const,
+    /** Deep links into the tools for a trace, which only an operator, `user`, reads. */
+    links: (user: string, trace: string) =>
+      ["portalr", "deployment", "links", user, trace] as const,
   },
 };
 
@@ -410,6 +415,33 @@ export function createQueries(api: Api) {
                 },
               }),
             ),
+        }),
+      /**
+       * The tenant's feedback and evaluations over a window, or one workspace's, summed by day
+       * from every score Langfuse holds in it (portalr ADR-0027).
+       */
+      feedback: (tenant: string, window: TimeSpan, workspace: string | null = null) =>
+        queryOptions({
+          queryKey: keys.portalr.feedback(tenant, window, workspace),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/feedback", {
+                ...named(tenant),
+                params: { query: { start: window.start, end: window.end, workspace } },
+              }),
+            ),
+        }),
+      /** An operator's deep links into Langfuse and Grafana for a trace. */
+      links: (user: string, trace: string) =>
+        queryOptions({
+          queryKey: keys.portalr.links(user, trace),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/deployment/links", {
+                params: { query: { trace_id: trace } },
+              }),
+            ),
+          staleTime: Number.POSITIVE_INFINITY,
         }),
       /**
        * Every tenant, with their spend, for an operator; null for anyone else, whom it's refused,

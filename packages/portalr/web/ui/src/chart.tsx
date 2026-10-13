@@ -1,18 +1,21 @@
 /**
- * Charts on Recharts, adapted from Tremor's BarChart and LineChart (Apache-2.0; see NOTICE): only
- * what admin draws, restyled to the kit's tokens. A chart's series take the inks in order, as
- * marks and never as text, three at most, and each has a pattern too, so colour is never its only
- * cue (portalr ADR-0021): solid, then hatched one way, then the other; or a line solid, dashed,
- * then dotted. Each series is named in a legend, and directly at its last point, and the figures
- * are a table beneath, for those who read them rather than look.
+ * Charts on Recharts, adapted from Tremor's BarChart, LineChart and DonutChart (Apache-2.0; see
+ * NOTICE): only what admin draws, restyled to the kit's tokens. A chart's series take the inks in
+ * order, as marks and never as text, three at most, and each has a pattern too, so colour is
+ * never its only cue (portalr ADR-0021): solid, then hatched one way, then the other; or a line
+ * solid, dashed, then dotted. Each series is named in a legend, and directly at its last point,
+ * and the figures are a table beneath, for those who read them rather than look.
  */
 
 import { type ReactNode, useId } from "react";
 import {
   Bar,
   CartesianGrid,
+  Cell,
   LabelList,
   Line,
+  Pie,
+  PieChart,
   BarChart as RechartsBarChart,
   LineChart as RechartsLineChart,
   ReferenceLine,
@@ -202,6 +205,33 @@ function Axes({
   );
 }
 
+/**
+ * A series' pattern past the first, which is solid: its ink hatched at 45°, then at 135°; past
+ * the inks, for what is folded into "Other", the muted ink, dotted.
+ */
+function Hatch({ id, at }: { id: string; at: number }) {
+  if (at >= MAX_SERIES) {
+    return (
+      <pattern id={id} width="4" height="4" patternUnits="userSpaceOnUse">
+        <rect width="4" height="4" fill="var(--muted)" opacity={0.3} />
+        <circle cx="2" cy="2" r="1" fill="var(--muted)" />
+      </pattern>
+    );
+  }
+  return (
+    <pattern
+      id={id}
+      width="6"
+      height="6"
+      patternUnits="userSpaceOnUse"
+      patternTransform={`rotate(${at === 1 ? 45 : 135})`}
+    >
+      <rect width="6" height="6" fill={ink(at)} opacity={0.35} />
+      <line x1="0" y1="0" x2="0" y2="6" stroke={ink(at)} strokeWidth="3" />
+    </pattern>
+  );
+}
+
 /** Where a label is drawn: a mark's corner, and its size, as Recharts gives them. */
 interface Place {
   /** The index's value of the mark's row, such as its day: LabelList's `dataKey` is the index. */
@@ -308,18 +338,7 @@ export function BarChart({
       })
     : data;
   const fill = (at: number) => (at === 0 ? ink(0) : `url(#${pattern(at)})`);
-  const hatch = (at: number) => (
-    <pattern
-      id={pattern(at)}
-      width="6"
-      height="6"
-      patternUnits="userSpaceOnUse"
-      patternTransform={`rotate(${at === 1 ? 45 : 135})`}
-    >
-      <rect width="6" height="6" fill={ink(at)} opacity={0.35} />
-      <line x1="0" y1="0" x2="0" y2="6" stroke={ink(at)} strokeWidth="3" />
-    </pattern>
-  );
+  const hatch = (at: number) => <Hatch id={pattern(at)} at={at} />;
   return (
     <Figure
       label={label}
@@ -346,7 +365,9 @@ export function BarChart({
           barCategoryGap="20%"
           margin={{ top: 16, right: 88, bottom: 0, left: 0 }}
         >
-          <defs>{drawn.map((_, at) => at > 0 && hatch(at))}</defs>
+          <defs>
+            {drawn.map((one, at) => at > 0 && <Hatch key={one.key} id={pattern(at)} at={at} />)}
+          </defs>
           <Axes index={index.key} format={format} />
           {diverging && <ReferenceLine y={0} stroke="var(--edge)" />}
           <Tooltip
@@ -446,5 +467,130 @@ export function LineChart({
         </RechartsLineChart>
       </ResponsiveContainer>
     </Figure>
+  );
+}
+
+/** One part of a whole: its name, and how much of it. */
+export interface Part {
+  readonly name: string;
+  readonly value: number;
+}
+
+/**
+ * A whole in parts, as a donut beside a list of its parts, each with its value and share: the
+ * largest three in the inks, solid, hatched one way, then the other, and the rest folded into
+ * "Other", dotted in the muted ink. The list names every part in the donut; the figures are a
+ * table beneath, as every chart's are.
+ */
+export function DonutChart({
+  label,
+  parts,
+  format = String,
+}: {
+  label: string;
+  parts: readonly Part[];
+  format?: (value: number) => string;
+}) {
+  const id = useId();
+  const caption = useId();
+  const sorted = [...parts].filter((part) => part.value > 0).sort((a, b) => b.value - a.value);
+  const rest = sorted.slice(MAX_SERIES).reduce((sum, part) => sum + part.value, 0);
+  const shown = [
+    ...sorted.slice(0, MAX_SERIES),
+    ...(rest > 0 ? [{ name: "Other", value: rest }] : []),
+  ];
+  const total = shown.reduce((sum, part) => sum + part.value, 0);
+  const share = (value: number) => `${Math.round((value / total) * 100)}%`;
+  const fill = (at: number) => (at === 0 ? ink(0) : `url(#${id}-${at})`);
+  return (
+    <figure aria-labelledby={caption} className="flex flex-col gap-2">
+      <figcaption id={caption} className="font-semibold text-fg text-sm">
+        {label}
+      </figcaption>
+      <div className="flex flex-wrap items-center gap-6">
+        <div className="size-40 shrink-0" aria-hidden="true">
+          <ResponsiveContainer>
+            <PieChart>
+              <defs>
+                {shown.map(
+                  (part, at) => at > 0 && <Hatch key={part.name} id={`${id}-${at}`} at={at} />,
+                )}
+              </defs>
+              <Pie
+                data={[...shown]}
+                dataKey="value"
+                nameKey="name"
+                innerRadius="70%"
+                outerRadius="100%"
+                startAngle={90}
+                endAngle={-270}
+                stroke="var(--surface)"
+                strokeWidth={2}
+                isAnimationActive={false}
+              >
+                {shown.map((part, at) => (
+                  <Cell key={part.name} fill={fill(at)} />
+                ))}
+              </Pie>
+              <Tooltip
+                content={({ active, payload }) => {
+                  const part = payload[0];
+                  return active && part && typeof part.value === "number" ? (
+                    <div className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm shadow-md">
+                      <span className="text-muted">{part.name}</span>{" "}
+                      <span className="font-medium text-fg tabular-nums">
+                        {format(part.value)} · {share(part.value)}
+                      </span>
+                    </div>
+                  ) : null;
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <ul className="flex min-w-48 flex-1 flex-col gap-1.5 text-sm">
+          {shown.map((part, at) => (
+            <li key={part.name} className="flex items-center justify-between gap-4">
+              <span className="inline-flex items-center gap-2 text-fg">
+                <svg aria-hidden="true" width="12" height="12" className="shrink-0">
+                  <defs>{at > 0 && <Hatch id={`${id}-key-${at}`} at={at} />}</defs>
+                  <rect
+                    width="12"
+                    height="12"
+                    rx="2"
+                    fill={at === 0 ? ink(0) : `url(#${id}-key-${at})`}
+                  />
+                </svg>
+                {part.name}
+              </span>
+              <span className="text-muted tabular-nums">
+                {format(part.value)} · {share(part.value)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <details className="text-sm">
+        <summary className="cursor-pointer text-muted">Show the figures</summary>
+        <Table caption={label}>
+          <thead>
+            <tr>
+              <th scope="col">Part</th>
+              <th scope="col">Value</th>
+              <th scope="col">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((part) => (
+              <tr key={part.name}>
+                <th scope="row">{part.name}</th>
+                <td className="tabular-nums">{format(part.value)}</td>
+                <td className="tabular-nums">{share(part.value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </details>
+    </figure>
   );
 }

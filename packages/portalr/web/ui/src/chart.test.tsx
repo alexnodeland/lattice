@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { BarChart, LineChart } from "./chart";
+import { BarChart, DonutChart, LineChart } from "./chart";
 
 const days = { key: "day", name: "Day" };
 
@@ -63,4 +63,32 @@ test("a line chart draws at most three series, each its own dash, with gaps for 
   expect(new Set(dashes).size).toBe(3);
   await figure.getByText("Show the figures").click();
   await expect.element(figure.getByRole("row", { name: "2026-10-12 0.50 – 1.00" })).toBeVisible();
+});
+
+test("a donut shows the largest three parts, folds the rest into Other, and gives each share", async () => {
+  await page.viewport(1024, 768);
+  const screen = await render(
+    <DonutChart
+      label="Feedback by workspace"
+      parts={[
+        { name: "notes", value: 6 },
+        { name: "plans", value: 2 },
+        { name: "ops", value: 1 },
+        { name: "infra", value: 1 },
+        { name: "empty", value: 0 },
+      ]}
+    />,
+  );
+  const figure = screen.getByRole("figure", { name: "Feedback by workspace" });
+  const parts = figure.getByRole("listitem");
+  await expect.element(parts.first()).toHaveTextContent("notes6 · 60%");
+  expect(parts.elements().map((part) => part.textContent)).toEqual([
+    "notes6 · 60%",
+    "plans2 · 20%",
+    "ops1 · 10%",
+    "Other1 · 10%",
+  ]);
+  await figure.getByText("Show the figures").click();
+  await expect.element(figure.getByRole("row", { name: "infra 1 10%" })).toBeVisible();
+  await expect.element(figure.getByRole("row", { name: /^empty/ })).not.toBeInTheDocument();
 });

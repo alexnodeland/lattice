@@ -2,7 +2,7 @@ import { administered } from "@portalr/client";
 import { Account, NavLink, Plain, SideNav, TextLink } from "@portalr/ui";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, Outlet } from "@tanstack/react-router";
-import { House, KeyRound } from "lucide-react";
+import { House, KeyRound, ThumbsUp } from "lucide-react";
 import { allowedNow, anyPart, useAccess } from "../../../access";
 import { Frame } from "../../../frame";
 import { remember } from "../../../last";
@@ -69,6 +69,11 @@ function Tenant() {
           {anyPart(allowed) && (
             <NavLink icon={KeyRound} render={<Link to="/t/$tenant/access" params={{ tenant }} />}>
               Access
+            </NavLink>
+          )}
+          {allowed.has("portalr:read_telemetry") && (
+            <NavLink icon={ThumbsUp} render={<Link to="/t/$tenant/feedback" params={{ tenant }} />}>
+              Feedback
             </NavLink>
           )}
         </SideNav>

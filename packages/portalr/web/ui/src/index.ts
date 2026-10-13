@@ -21,7 +21,15 @@ export {
 } from "./artifacts";
 export { Button } from "./button";
 export { Card } from "./card";
-export { BarChart, type Datum, LineChart, MAX_SERIES, type Series } from "./chart";
+export {
+  BarChart,
+  type Datum,
+  DonutChart,
+  LineChart,
+  MAX_SERIES,
+  type Part,
+  type Series,
+} from "./chart";
 export {
   CommandButton,
   Composer,

@@ -119,6 +119,14 @@ test("every read has its own path", async () => {
     [queries.grantr.catalog(), "/grantr/v1/catalog"],
     [queries.grantr.keyring("acme"), "/grantr/v1/tenants/acme/keys"],
     [queries.portalr.spend("acme"), "/portalr/v1/spend"],
+    [
+      queries.portalr.feedback("acme", {
+        start: "2026-10-07T00:00:00Z",
+        end: "2026-10-14T00:00:00Z",
+      }),
+      "/portalr/v1/feedback",
+    ],
+    [queries.portalr.links("ops", "t1"), "/portalr/v1/deployment/links"],
     [queries.grantr.grants("acme", "ws_1"), "/grantr/v1/tenants/acme/grants"],
     [queries.grantr.restrictions("acme", "ws_1"), "/grantr/v1/tenants/acme/restrictions"],
   ] as const;

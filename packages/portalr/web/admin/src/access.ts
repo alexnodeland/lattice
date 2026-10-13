@@ -30,6 +30,7 @@ export const ACCESS = [
   "grantr:grant",
   "grantr:revoke",
   "grantr:delete_tenant",
+  "portalr:read_telemetry",
 ] as const;
 
 /** Each part of Access, and the action its read takes. */

@@ -20,6 +20,7 @@ Nothing in artifactr requires it, and nothing inside artifactr imports it.
 from artifactr.otel.configure import (
     BAGGAGE_KEYS,
     INSTRUMENTED,
+    URL_ATTRIBUTES,
     Contribution,
     Instrumented,
     LangfuseMode,
@@ -28,12 +29,14 @@ from artifactr.otel.configure import (
     configure_telemetry,
     installed,
     metric_views,
+    redact_access_token,
     telemetry,
 )
 
 __all__ = [
     "BAGGAGE_KEYS",
     "INSTRUMENTED",
+    "URL_ATTRIBUTES",
     "Contribution",
     "Instrumented",
     "LangfuseMode",
@@ -42,5 +45,6 @@ __all__ = [
     "configure_telemetry",
     "installed",
     "metric_views",
+    "redact_access_token",
     "telemetry",
 ]

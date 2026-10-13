@@ -6,14 +6,16 @@ import os
 from collections.abc import Iterator
 from typing import Any
 
+import fastapi
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.testclient import TestClient
 from opentelemetry import baggage, metrics, trace
 from opentelemetry import context as otel_context
 from opentelemetry.instrumentation.httpx import HTTPX2ClientInstrumentor, HTTPXClientInstrumentor
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from pydantic_ai.capabilities import Instrumentation
@@ -21,12 +23,14 @@ from sqlalchemy import text
 
 from reflexr.otel import (
     INSTRUMENTED,
+    URL_ATTRIBUTES,
     TelemetryHandle,
     configure_telemetry,
     installed,
     metric_views,
+    redact_access_token,
 )
-from reflexr.otel.configure import _signal
+from reflexr.otel.configure import _redact_request, _signal
 from reflexr.sql import create_sqlite_engine
 from reflexr.telemetry import SCOPE, Telemetry
 from reflexr.telemetry.attributes import EVENT_TYPE, SESSION_ID, TENANT_ID, WORKSPACE_ID
@@ -211,6 +215,89 @@ def test_fastapi_apps_are_traced(handle: TelemetryHandle, captured: Captured) ->
         assert client.get("/ping").json() == "pong"
     handle.tracer_provider.force_flush()
     assert [span.name for span in captured.spans.get_finished_spans()] == ["GET /ping"]
+
+
+QUERY = "tenant=acme&access_token=s3cret"
+
+
+@pytest.mark.parametrize(
+    ("text", "redacted"),
+    [
+        ("access_token=s3cret&tenant=acme", "access_token=REDACTED&tenant=acme"),
+        (f"/stream?{QUERY}", "/stream?tenant=acme&access_token=REDACTED"),
+        ("ws://host/stream?access_token=s3cret#end", "ws://host/stream?access_token=REDACTED#end"),
+        ("/stream?not_an_access_token=kept", "/stream?not_an_access_token=kept"),
+        ("/s?access%5Ftoken=s3cret&a=%2F", "/s?access%5Ftoken=REDACTED&a=%2F"),
+        ("%61ccess_token=s3cret&b=x+y", "%61ccess_token=REDACTED&b=x+y"),
+        ("/s?access_token=1&access_token=2", "/s?access_token=REDACTED&access_token=REDACTED"),
+        ("/s?tenant=acme&next=%3Faccess_token%3D1", "/s?tenant=acme&next=%3Faccess_token%3D1"),
+        ("/a=b/c", "/a=b/c"),
+    ],
+)
+def test_only_an_access_tokens_value_is_redacted(text: str, redacted: str) -> None:
+    assert redact_access_token(text) == redacted
+
+
+def test_requests_and_websockets_are_traced_without_their_access_tokens(
+    handle: TelemetryHandle, captured: Captured
+) -> None:
+    app = FastAPI()
+
+    @app.get("/items")
+    async def items() -> list[str]:
+        return []
+
+    @app.websocket("/stream")
+    async def stream(websocket: WebSocket) -> None:
+        await websocket.accept()
+        await websocket.close()
+
+    handle.instrument_app(app)
+    with TestClient(app) as client:
+        client.get(f"/items?{QUERY}")
+        with client.websocket_connect(f"/stream?{QUERY}"):
+            pass
+    handle.tracer_provider.force_flush()
+    urls = [
+        str(value)
+        for span in captured.spans.get_finished_spans()
+        for key, value in (span.attributes or {}).items()
+        if key in URL_ATTRIBUTES and "access_token" in str(value)
+    ]
+    assert len(urls) == 2, "the request's and the WebSocket's"
+    assert all("s3cret" not in url and "access_token=REDACTED" in url for url in urls), urls
+
+
+def test_apps_built_after_configuring_are_traced_without_their_access_tokens(
+    captured: Captured,
+) -> None:
+    with configure_telemetry(
+        service_name="docplan", instrument=("fastapi",), **captured.options()
+    ) as handle:
+        app = fastapi.FastAPI()  # built after configuring, so the instrumentation patched it
+
+        @app.get("/items")
+        async def items() -> list[str]:
+            return []
+
+        with TestClient(app) as client:
+            client.get(f"/items?{QUERY}")
+        handle.tracer_provider.force_flush()
+    [span] = [s for s in captured.spans.get_finished_spans() if s.name == "GET /items"]
+    assert (span.attributes or {})["url.query"] == "tenant=acme&access_token=REDACTED"
+
+
+def test_the_older_conventions_url_is_redacted_too(handle: TelemetryHandle) -> None:
+    tracer = handle.tracer_provider.get_tracer("test")
+    with tracer.start_as_current_span("GET /items") as span:
+        span.set_attributes({"http.url": f"http://host/items?{QUERY}", "http.target": "/items"})
+        _redact_request(span, {})
+        assert isinstance(span, ReadableSpan)
+        assert dict(span.attributes or {}) == {
+            "http.url": "http://host/items?tenant=acme&access_token=REDACTED",
+            "http.target": "/items",
+        }
+    _redact_request(trace.INVALID_SPAN, {})  # a span that isn't recorded has nothing to hide
 
 
 async def test_sqlalchemy_engines_are_traced(

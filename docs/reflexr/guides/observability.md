@@ -40,7 +40,7 @@ It sets up:
 - an OTLP handler on the root logger, so `logging` records are exported with the trace and span they were logged in; `logs=False` leaves logging alone
 - a record logged in a span that names a tenant, as `reflexr.tenant.id`, or in any span inside one, carries that attribute too, so stackr's Collector can name its tenant as `tenant.id` ([ADR-0059](../adr/0059-the-tenant-on-log-records.md)); a record logged in a trace the sampler drops carries none
 
-Instrumentation patches libraries, which only reaches objects created through the patched names afterwards. Most applications import `FastAPI` and `create_async_engine` before they configure telemetry, so pass the application to `telemetry.instrument_app(app)` and each engine to `telemetry.instrument_engine(engine)`, or give existing engines as `engines=` when configuring.
+Instrumentation patches libraries, which only reaches objects created through the patched names afterwards. Most applications import `FastAPI` and `create_async_engine` before they configure telemetry, so pass the application to `telemetry.instrument_app(app)` and each engine to `telemetry.instrument_engine(engine)`, or give existing engines as `engines=` when configuring. `instrument_app` redacts an `access_token` in a request's URL, as a WebSocket carries a browser's token, from its span's URL attributes, and `redact_access_token` does the same for an application's own logs ([ADR-0065](../adr/0065-an-access-token-redacted-from-span-urls.md)).
 
 The handle it returns shuts it all down: `telemetry.shutdown()` removes the instrumentation and flushes and shuts down the providers. It is also a context manager, which suits a FastAPI lifespan:
 

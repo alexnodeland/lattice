@@ -51,6 +51,7 @@ from {{ package_name }}.collaboration import Collaboration
 {%- endif %}
 from {{ package_name }}.database import Database, create_schema, open_database
 from {{ package_name }}.gateway import gateway_model
+from {{ package_name }}.redaction import LOG_CONFIG
 from {{ package_name }}.settings import Settings
 from {{ package_name }}.telemetry import TelemetryHandle, configure
 
@@ -264,6 +265,7 @@ def main() -> None:
             host=settings.host,
             port=settings.port,
             timeout_graceful_shutdown=DRAIN,
+            log_config=LOG_CONFIG,
         )
     finally:
         if telemetry is not None:

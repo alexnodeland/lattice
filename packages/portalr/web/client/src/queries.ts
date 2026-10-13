@@ -9,11 +9,12 @@
  */
 
 import { queryOptions } from "@tanstack/react-query";
-import { isKnown } from "./artifactr";
+import * as artifactr from "./artifactr";
 import type * as artifactrV1 from "./generated/artifactr.v1";
 import type { components as Grantr } from "./generated/grantr.openapi";
 import type { components as Portalr } from "./generated/portalr.openapi";
 import type * as reflexrV1 from "./generated/reflexr.v1";
+import * as reflexr from "./reflexr";
 import { type Api, named } from "./rest";
 
 type Check = Grantr["schemas"]["Check"];
@@ -68,6 +69,16 @@ export const keys = {
     groups: (tenant: string) => [...keys.grantr.access(tenant), "groups"] as const,
     roles: (tenant: string) => [...keys.grantr.access(tenant), "roles"] as const,
     keyring: (tenant: string) => [...keys.grantr.access(tenant), "keys"] as const,
+  },
+  portalr: {
+    tenant: (tenant: string) => ["portalr", tenant] as const,
+    spend: (tenant: string) => [...keys.portalr.tenant(tenant), "spend"] as const,
+    scores: (tenant: string, window: TimeSpan) =>
+      [...keys.portalr.tenant(tenant), "scores", window] as const,
+    metrics: (tenant: string, metric: Metric, window: TimeSpan) =>
+      [...keys.portalr.tenant(tenant), "metrics", metric, window] as const,
+    /** The deployment's tenants, as the signed-in person, `user`, reads them: an operator's. */
+    tenants: (user: string) => ["portalr", "deployment", "tenants", user] as const,
   },
   portalr: {
     tenant: (tenant: string) => ["portalr", tenant] as const,
@@ -425,6 +436,66 @@ export function createQueries(api: Api) {
           staleTime: 60_000,
         }),
     },
+    portalr: {
+      /** The tenant's spend against its budget, from its LiteLLM team. */
+      spend: (tenant: string) =>
+        queryOptions({
+          queryKey: keys.portalr.spend(tenant),
+          queryFn: () => body(api.portalr.GET("/portalr/v1/spend", named(tenant))),
+        }),
+      /** The tenant's feedback and evaluation scores in a window, from Langfuse. */
+      scores: (tenant: string, window: TimeSpan) =>
+        queryOptions({
+          queryKey: keys.portalr.scores(tenant, window),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/scores", {
+                ...named(tenant),
+                params: { query: { start: window.start, end: window.end, limit: 1000 } },
+              }),
+            ),
+        }),
+      /** One of the tenant's series over a window, from Prometheus. */
+      metrics: (tenant: string, metric: Metric, window: TimeSpan) =>
+        queryOptions({
+          queryKey: keys.portalr.metrics(tenant, metric, window),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/metrics", {
+                ...named(tenant),
+                params: {
+                  query: {
+                    metric,
+                    start: window.start,
+                    end: window.end,
+                    ...(window.step !== undefined && { step: window.step }),
+                    limit: 1000,
+                  },
+                },
+              }),
+            ),
+        }),
+      /**
+       * Every tenant, with their spend, for an operator; null for anyone else, whom it's refused,
+       * so the one read also says whether the reader is an operator.
+       */
+      tenants: (user: string) =>
+        queryOptions({
+          queryKey: keys.portalr.tenants(user),
+          queryFn: async () => {
+            try {
+              return await body(api.portalr.GET("/portalr/v1/deployment/tenants"));
+            } catch (error) {
+              if (forbidden(error)) {
+                return null;
+              }
+              throw error;
+            }
+          },
+          // Who is an operator changes rarely: a minute, then it's read again.
+          staleTime: 60_000,
+        }),
+    },
   };
 }
 
@@ -433,7 +504,7 @@ export const stale = {
   /** Every event artifactr's schema names is listed, so a new one fails the typecheck here. */
   artifactr(tenant: string, ws: string, envelope: artifactrV1.EventFrame) {
     const { event } = envelope;
-    if (!isKnown(event)) {
+    if (!artifactr.isKnown(event)) {
       return [];
     }
     switch (event.type) {
@@ -476,21 +547,34 @@ export const stale = {
     }
   },
 
-  /** reflexr's rule events make its rules stale, and its run events its runs. */
+  /** reflexr's rule events make its rules stale, its run events its runs, and ticks its schedules. */
   reflexr(tenant: string, ws: string, envelope: reflexrV1.EventFrame) {
-    const { type } = envelope.event;
-    if (type.startsWith("reflexr:rule_")) {
-      const rule = envelope.event.rule;
-      return typeof rule === "string"
-        ? [keys.reflexr.rules(tenant, ws), keys.reflexr.rule(tenant, ws, rule)]
-        : [keys.reflexr.rules(tenant, ws)];
+    const { event } = envelope;
+    if (!reflexr.isKnown(event)) {
+      return [];
     }
-    if (type.startsWith("reflexr:run_")) {
-      return [keys.reflexr.runs(tenant, ws)];
+    switch (event.type) {
+      case "reflexr:rule_fired":
+      case "reflexr:rule_errored":
+      case "reflexr:rule_reset":
+      case "reflexr:rule_installed":
+      case "reflexr:rule_archived":
+        return [keys.reflexr.rules(tenant, ws), keys.reflexr.rule(tenant, ws, event.rule)];
+      case "reflexr:run_started":
+      case "reflexr:run_progressed":
+      case "reflexr:run_retrying":
+      case "reflexr:run_succeeded":
+      case "reflexr:run_dead_lettered":
+      case "reflexr:run_cancelled":
+      case "reflexr:run_requeued":
+      case "reflexr:run_skipped":
+        return [keys.reflexr.runs(tenant, ws)];
+      case "reflexr:tick":
+        return [keys.reflexr.schedules(tenant, ws)];
+      case "reflexr:feedback_given":
+        return [];
+      default:
+        return event satisfies never;
     }
-    if (type === "reflexr:tick") {
-      return [keys.reflexr.schedules(tenant, ws)];
-    }
-    return [];
   },
 };

@@ -75,6 +75,7 @@ test = [
     "fastapi>=0.141",
     "mcp>=2.2",
     "evalr>=0.1.0.dev0",
+    "jsonschema>=4.26",
 ]
 lint = ["ruff>=0.16", "pyright>=1.1.414"]
 dev = [

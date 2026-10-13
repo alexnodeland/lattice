@@ -22,10 +22,10 @@ output "one_off_task_definitions" {
 }
 
 output "run_task_network" {
-  description = "The subnets and security group a one-off task runs in."
+  description = "Where the one-off tasks run: the private subnets, and each task's security groups, comma-separated."
   value = {
-    subnet_ids        = module.network.private_subnet_ids
-    security_group_id = module.network.security_groups.services
+    subnet_ids      = module.network.private_subnet_ids
+    security_groups = local.one_off_groups
   }
 }
 

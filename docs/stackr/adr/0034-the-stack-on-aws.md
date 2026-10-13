@@ -80,14 +80,24 @@ The images' pull request implements these settings, with Compose's defaults.
 - **A task definition is named only once its roles' policies are written,** and `run-task` runs a task again, a few times, when it can't start for want of its secrets or image (`ResourceInitializationError`), as when IAM hasn't yet propagated a new role's policy.
 - **The edge's target groups wait for their listener rules,** since ECS refuses a service whose target group no listener forwards to.
 - **Applying needs AWS CLI v2** where OpenTofu runs. On Floci, `AWS_ENDPOINT_URL` points it there.
-- **Each run waits for the network,** whose route out it needs to pull its image and read its secrets.
+- **Each run waits for the network,** whose route out it needs to pull its image and read its secrets. db-init and db-roles also wait for the security groups' rules: their groups reach nothing else, so without the rule to PostgreSQL, psql times out.
+
+### A security group per service
+
+Each service and one-off task has a group of its own, with a rule from each of its callers, on its port, and nothing else, as RFC-0004 asks. It replaces [ADR-0032](0032-the-edge-the-services-and-the-state-host.md)'s one group for every service.
+
+- **One table in `stack`, `groups.tf`, says who calls whom.** Each line is a service's port and its callers, and the rules, one each way, are made from it. A module makes its own group, and `stack` gives it the rules: the data stores', the state host's and the ALB's. The modules don't know their callers; `stack` does, and one table is one list the tests check whole. A name the table doesn't know fails the plan.
+- **Every task also has the tasks group,** `network`'s, which reaches out over HTTPS alone. Each task needs it: Fargate pulls its image and reads its secrets through it, its logs go to CloudWatch, Langfuse and the telemetry stores reach S3, and LiteLLM its providers. VPC endpoints could take AWS's own traffic off it later. auth-keys needs nothing else. GoTrue's group also reaches its SMTP server, when it has one.
+- **On EC2, the state host is one group** for ClickHouse, Prometheus and prom-label-proxy, and for Prometheus's scrapes and the operators' port forwarding to Grafana, Langfuse and LiteLLM. One rule covers each pair of groups and port, so a scrape of Grafana and a forward to it are one rule. On Fargate, each of the three has its own group, and Prometheus scrapes only itself, so it calls no service.
+- **portalr reads Prometheus through prom-label-proxy, Tempo and Loki, from inside the application,** so the application calls all three, and gets their addresses as `PORTALR_PROXY_URL`, `PORTALR_TEMPO_URL` and `PORTALR_LOKI_URL` (portalr's ADR-0012). The template doesn't push profiles, so only Grafana and the state host's Prometheus call Pyroscope.
+- **The test is the proof:** Floci doesn't enforce security groups (ADR-0025). `tests/stack.tofutest.hcl` lists every rule, and fails on one more or one fewer, and checks that each rule is between the groups its names say.
 
 ### ClickHouse, Prometheus and prom-label-proxy on Fargate, for Floci
 
 - **ClickHouse has no `users.xml`, on Floci only:** without the state host, there is no checkout to mount it from, and no thin image carries it. Its image's own setup makes one user, `langfuse`, from `CLICKHOUSE_USER` and `CLICKHOUSE_PASSWORD`, with the image's full grant, and no admin, so the admin's password isn't made. Langfuse's settings are the same in both places.
 - **Prometheus** takes its metrics by OTLP and remote write, with `compose.yaml`'s flags, and scrapes only itself.
 - **prom-label-proxy** listens on 9091, the state host's port.
-- **The network lets the services reach the three ports** only on Fargate.
+- **Each has a group of its own,** with its callers' rules, on Fargate only.
 
 ### checkov
 
@@ -101,7 +111,6 @@ The images' pull request implements these settings, with Compose's defaults.
 - **The application's settings come from the stack,** and not from a root of the template's. The template's `hosting: aws` root will call `stack` with its image and its own settings.
 - **Langfuse's bucket has no CORS configuration,** which browsers' media uploads to it need. Traces and events don't; the manual gate checks it.
 - **checkov over the plan's JSON waits for tier 2,** which RFC-0004 puts in tier 1: a mocked test makes no plan to scan.
-- **The services still share one security group** ([ADR-0032](0032-the-edge-the-services-and-the-state-host.md)'s design debt), but for GoTrue's SMTP, which has its own. A group per service, from its callers, is [#158](https://github.com/alexnodeland/lattice/issues/158), the next pull request.
 
 ## Options considered
 
@@ -120,6 +129,10 @@ The images' pull request implements these settings, with Compose's defaults.
 | checkov on the stack's directory | Sees the modules combined | Reports every module's findings again, without their skips |
 | **Floci's ClickHouse with the image's one user (chosen)** | No image of stackr's for Floci alone | Floci's ClickHouse has no admin, and Langfuse's user has the full grant |
 | A thin ClickHouse image with `users.xml` | The same users everywhere | One more image, for a service the state host runs from a checkout |
+| **A group per service, from one table in `stack` (chosen)** | Every rule in one place, tested against one list | `stack` holds the rules of the groups other modules make |
+| Each module takes its callers' groups | Each module's rules beside its group | The callers are the stack's to know, and the rules would be in seven places, each tested apart |
+| **The application as portalr's readers' caller (chosen)** | portalr, which reads prom-label-proxy, Tempo and Loki, runs in the application | Rules for an application that doesn't mount portalr |
+| No caller for them | No rule nothing uses | portalr couldn't reach them once mounted |
 | **One `destroyable` switch (chosen)** | One setting a deployment can't half set | No deployment keeps some guards and drops others |
 | A variable per guard | Each guard chosen alone | Five settings that must agree |
 
@@ -129,9 +142,10 @@ The images' pull request implements these settings, with Compose's defaults.
   - that no secret is a setting, and that each secret reaches the services that read it;
   - GoTrue behind its proxy, and its SMTP;
   - the edge's target groups, and each task role's bucket and prefix;
+  - every security group rule, and the groups each joins;
   - what each service waits for, and what a rotation deploys again;
   - the application with and without `grantr`;
   - both places the state host's services run.
 - Easier: one switch makes a deployment one a destroy takes whole.
 - Harder: applying needs the AWS CLI, and the thin images must read the settings above.
-- Next: a security group per service ([#158](https://github.com/alexnodeland/lattice/issues/158)); `envs/prod` and `envs/floci`; the thin images, with the settings above; then tier 2, with checkov over the plan's JSON.
+- Next: `envs/prod` and `envs/floci`; VPC endpoints for AWS's own traffic; the thin images, with the settings above; then tier 2, with checkov over the plan's JSON.

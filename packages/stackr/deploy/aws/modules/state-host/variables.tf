@@ -23,11 +23,6 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "services_security_group_id" {
-  description = "The services' security group: the only one the state host takes traffic from."
-  type        = string
-}
-
 variable "namespace_id" {
   description = "The private DNS namespace its three services are named in."
   type        = string
@@ -104,21 +99,6 @@ variable "final_snapshot" {
   description = "Whether destroying the data volume snapshots it first: off only where nothing is kept."
   type        = bool
   default     = true
-}
-
-variable "service_ports" {
-  description = <<-EOT
-    The services' ports the state host reaches: Prometheus's scrapes (the Collector's metrics,
-    Tempo, Loki, Pyroscope and Grafana), and the admin UIs operators forward to through it
-    (Grafana and Langfuse on 3000, LiteLLM on 4000).
-  EOT
-  type        = set(number)
-  default     = [8888, 3200, 3100, 4040, 3000, 4000]
-
-  validation {
-    condition     = alltrue([for port in var.service_ports : port > 0 && port < 65536 && !contains([22, 3389], port)])
-    error_message = "Service ports are 1 to 65535, and never SSH's or RDP's."
-  }
 }
 
 variable "aws_cli_image" {

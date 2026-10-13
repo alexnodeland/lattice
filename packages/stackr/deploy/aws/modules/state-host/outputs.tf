@@ -15,3 +15,8 @@ output "secret_arns" {
     clickhouse_admin_password = var.clickhouse_admin_password_secret_arn
   }
 }
+
+output "security_group_id" {
+  description = "Its security group, which the stack gives the rules to and from the services."
+  value       = aws_security_group.this.id
+}

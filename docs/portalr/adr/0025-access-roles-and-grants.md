@@ -24,20 +24,25 @@ Each read takes the same action as its changes:
 - **Roles and Grants are parts of Access,** `/t/$tenant/access/roles` and `/grants`, beside members, groups and keys. Each is gated in `beforeLoad`, and reads in `loader`, as ADR-0024's are.
 - **The catalog is the deployment's,** read once and kept (`staleTime` infinite), under a key no tenant's change stales.
 - **Roles** lists the catalog's built-in roles, each with the kinds it may be granted on, and the tenant's custom roles, each with its actions.
-  - A custom role is created under a name that is neither built in nor taken. Its actions are chosen from the catalog's, and it holds at least one.
-  - Each custom role's row has "Change actions", which reads the roles afresh and starts from its actions. A change that takes any away is confirmed, naming them.
+  - A custom role is created under a name no custom role has; grantr refuses a built-in role's name, and the form shows that refusal. Its actions are chosen from the catalog's, grouped by library, and it holds at least one.
+  - Each custom role's row has "Change actions", named "Change triager's actions", which reads the roles afresh and starts from its actions, and brings the form into view. A change that takes any away is confirmed, naming them.
+  - An action the catalog no longer lists isn't offered: a change starts without it, and the confirmation names it as taken away.
+  - The form says that an action added is added wherever the role is granted.
   - Deleting a custom role says that its grants go with it.
   - grantr replaces a role's actions whole: the last to save wins, as with a group's members.
 - **Groups and Roles share one form,** admin's `DefineSet`: create under a free name, or change from a row, with a confirmation naming what a change takes out.
-- **Grants** lists every grant in the tenant: its role, where, and to whom.
-  - It lists them broadest first: the tenant's, then each workspace's, then their threads', artifacts' and rules'.
+- **Grants** lists every grant in the tenant, a table per place: the tenant's, then each workspace's, its own before its threads', artifacts' and rules'.
+  - Each row, or card, is named by whom, the role and where, such as "ops (group) as viewer on thread t_1 in notes".
   - Membership is left out. grantr gives `member` by adding a member and takes it by removing one, so Members shows it.
-  - Revoke shows where `grantr:revoke` is allowed, and is confirmed. grantr refuses revoking a tenant's last owner, and the dialog shows that refusal.
+  - Revoke shows where `grantr:revoke` is allowed, and is confirmed. Its words are "Revoke", and its accessible name the whole grant, through `ConfirmDialog`'s `name`. grantr refuses revoking a tenant's last owner, and the dialog shows that refusal.
 - **A role is granted** from the catalog's built-in roles and, where they may be read, the tenant's custom roles.
-  - Each is offered only on the kinds it may be granted on: a custom role on the catalog's `custom_kinds`.
-  - A grant on a workspace names it; a grant on an item also names the item.
-  - It goes to a member or a group, chosen from the tenant's where either may be read, or typed as `kind:id` where neither may. A rule holds its own role and is never granted one here.
-- **What grantr allows is asked on the tenant.** grantr checks `grant` and `revoke` on each grant's resource, and refuses a role whose actions the granter doesn't hold. The form and Revoke show where the tenant allows them, and a refusal on a narrower resource says so. This is the one place Access's "hide what they may not use" is approximate.
+  - The form starts on no role and no one, each a required choice, so nothing is granted by a click. Choosing a role chooses where again.
+  - Each role is offered only on the kinds it may be granted on: a custom role on the catalog's `custom_kinds`.
+  - A grant on a workspace names it, from artifactr's workspaces as suggestions or typed; a grant on an item also names the item. Each is trimmed.
+  - It goes to a member or a group, chosen from the tenant's where both may be read, or typed as `kind:id`, with what may be read suggested. A rule's role isn't offered here.
+  - Granting owner or admin on the tenant is confirmed first.
+  - What was entered stays after a refusal, which the form shows.
+- **What grantr allows is asked on the tenant,** and that is exact for granting and revoking: a grant on the tenant holds on everything in it. grantr also refuses granting or revoking a role whose actions the granter doesn't hold where it is. Of the roles offered, only owner holds more than an admin, deleting the tenant among them. So owner is offered, and Revoke shown on its grants, only where `grantr:delete_tenant` is allowed.
 - **The scenarios** add, against the same application:
   - alice creates a custom role and deletes it;
   - she grants a service principal she made `viewer` on `notes`, and revokes it.
@@ -48,8 +53,8 @@ Each read takes the same action as its changes:
 |---|---|---|
 | **The catalog, read from grantr (chosen)** | One list, the one `grant` accepts; a contract test holds it | A read more |
 | The lists written into portalr | No read | Drifts from grantr's roles |
-| **Ask on the tenant, and show a refusal (chosen)** | One check per screen | A grant on a workspace the admin can't grant on is offered, then refused |
-| Ask on each resource as it's typed | Exact | A check per keystroke |
+| **Offer owner only where deleting the tenant is allowed (chosen)** | Nothing offered that grantr refuses | One action more asked on each screen |
+| Offer every role, and show grantr's refusal | No action more asked | Owner offered to every admin, and refused each time |
 | **Leave membership out of Grants (chosen)** | Grants shows what was granted; Members shows who belongs | A member's `member` is on another part |
 | List every grant | Complete | A row per member, none of which may be revoked here |
 

@@ -3,14 +3,14 @@ import { Button, ConfirmDialog, ItemTable } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { opening, useAccess } from "../../../../../access";
-import { type Changing, counted, DefineSet, refused } from "../../../../../define-set";
+import { counted, opening, refused, type Said, useAccess } from "../../../../../access";
+import { type Changing, DefineSet } from "../../../../../define-set";
 
 /**
  * A tenant's roles, for whoever may define them: the built-in ones from grantr's catalog, each
  * with where it may be granted, and the tenant's custom ones, each with its actions. A custom role
- * is created under a name neither built in nor taken, from the actions the catalog says one may
- * hold; an existing one's actions are changed from its row, starting from a fresh read, and a
+ * is created under a name not taken, from the actions the catalog says one may hold, grouped by
+ * library; an existing one's actions are changed from its row, starting from a fresh read, and a
  * change that takes any out is confirmed, naming them. A custom role is deleted, with its grants,
  * once confirmed. grantr replaces a role's actions whole: the last to save wins (ADR-0025).
  */
@@ -34,7 +34,7 @@ function Roles() {
   const { data: catalog } = useSuspenseQuery(queries.grantr.catalog());
   const { data: roles } = useSuspenseQuery(queries.grantr.roles(tenant));
   const [changing, setChanging] = useState<Changing | null>(null);
-  const [said, setSaid] = useState<{ said: string; refused: boolean } | null>(null);
+  const [said, setSaid] = useState<Said>(null);
   const custom = [...roles].sort((a, b) => a.name.localeCompare(b.name));
 
   /** Grantr's custom roles now, rather than as last read: a change starts from them. */
@@ -68,7 +68,11 @@ function Roles() {
         keyOf={(role) => role.name}
         actions={(role) => (
           <>
-            <Button variant="secondary" onClick={() => void change(role.name)}>
+            <Button
+              variant="secondary"
+              aria-label={`Change ${role.name}'s actions`}
+              onClick={() => void change(role.name)}
+            >
               Change actions
             </Button>
             <ConfirmDialog
@@ -91,18 +95,34 @@ function Roles() {
       {said && <p role={said.refused ? "alert" : "status"}>{said.said}</p>}
       <DefineSet
         key={changing?.name ?? "new"}
-        noun="role"
-        of="actions"
-        changing={changing}
-        choices={catalog.custom_actions.map((action) => ({ value: action, label: action }))}
-        taken={async (name) => {
-          if (catalog.roles.some((role) => role.name === name)) {
-            return `${name} is a built-in role. Choose another name.`;
-          }
-          return (await fresh()).some((role) => role.name === name)
-            ? `${name} is a role already. Change its actions from its row.`
-            : null;
+        words={{
+          name: "Role",
+          of: "Actions",
+          create: "Create a role",
+          change: (name) => `Change ${name}'s actions`,
+          created: "Create the role",
+          saved: "Save the role",
         }}
+        changing={changing}
+        // Each action under its library, such as reflexr's.
+        picking={{
+          choices: catalog.custom_actions.map((action) => ({
+            value: action,
+            label: action,
+            group: action.slice(0, action.indexOf(":")),
+          })),
+        }}
+        note={
+          <p className="text-muted text-sm">
+            An action added here is added wherever {changing?.name} is granted.
+          </p>
+        }
+        // grantr refuses a built-in role's name, and says so.
+        taken={async (name) =>
+          (await fresh()).some((role) => role.name === name)
+            ? `${name} is a role already. Change its actions from its row.`
+            : null
+        }
         save={async (name, actions) => {
           if (actions.length === 0) {
             return refused("Choose at least one action.");

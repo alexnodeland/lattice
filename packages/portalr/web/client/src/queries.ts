@@ -61,15 +61,18 @@ export const keys = {
       [...keys.grantr.tenant(tenant), "checks", checks] as const,
     access: (tenant: string) => [...keys.grantr.tenant(tenant), "access"] as const,
     members: (tenant: string) => [...keys.grantr.access(tenant), "members"] as const,
-    grants: (tenant: string, ws: string) => [...keys.grantr.access(tenant), "grants", ws] as const,
+    /** A workspace's grants, or with none named, every grant in the tenant, kept apart. */
+    grants: (tenant: string, ws?: string) =>
+      [...keys.grantr.access(tenant), "grants", ws ?? "~tenant"] as const,
     restrictions: (tenant: string, ws: string) =>
       [...keys.grantr.access(tenant), "restrictions", ws] as const,
-    /** Every grant in the tenant, on it and on everything in it, apart from a workspace's. */
-    tenantGrants: (tenant: string) => [...keys.grantr.access(tenant), "tenant-grants"] as const,
     groups: (tenant: string) => [...keys.grantr.access(tenant), "groups"] as const,
     roles: (tenant: string) => [...keys.grantr.access(tenant), "roles"] as const,
-    /** The deployment's catalog of roles, the same in every tenant: no change to access stales it. */
-    catalog: () => ["grantr", "deployment", "catalog"] as const,
+    /**
+     * The deployment's catalog of roles, the same in every tenant: under no tenant's key, so no
+     * change to access stales it, and "~" keeps it from a tenant's name.
+     */
+    catalog: () => ["grantr", "~catalog"] as const,
     keyring: (tenant: string) => [...keys.grantr.access(tenant), "keys"] as const,
   },
   portalr: {
@@ -295,15 +298,18 @@ export function createQueries(api: Api) {
               }),
             ),
         }),
-      /** The grants on a workspace and on the threads and artifacts in it. */
-      grants: (tenant: string, ws: string) =>
+      /**
+       * The grants on a workspace and on the threads and artifacts in it; or, with no workspace,
+       * every grant in the tenant, for those who may grant there (`grantr:grant`).
+       */
+      grants: (tenant: string, ws?: string) =>
         queryOptions({
           queryKey: keys.grantr.grants(tenant, ws),
           queryFn: () =>
             body(
               api.grantr.GET("/grantr/v1/tenants/{tenant}/grants", {
                 ...named(tenant),
-                params: { path: { tenant }, query: { workspace: ws } },
+                params: { path: { tenant }, query: ws === undefined ? {} : { workspace: ws } },
               }),
             ),
         }),
@@ -316,18 +322,6 @@ export function createQueries(api: Api) {
               api.grantr.GET("/grantr/v1/tenants/{tenant}/restrictions", {
                 ...named(tenant),
                 params: { path: { tenant }, query: { workspace: ws } },
-              }),
-            ),
-        }),
-      /** Every grant in the tenant, for those who may grant there (`grantr:grant`). */
-      tenantGrants: (tenant: string) =>
-        queryOptions({
-          queryKey: keys.grantr.tenantGrants(tenant),
-          queryFn: () =>
-            body(
-              api.grantr.GET("/grantr/v1/tenants/{tenant}/grants", {
-                ...named(tenant),
-                params: { path: { tenant } },
               }),
             ),
         }),

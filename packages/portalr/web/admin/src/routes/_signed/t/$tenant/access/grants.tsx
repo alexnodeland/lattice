@@ -1,69 +1,69 @@
-import { type GrantrApi, orThrow, refusal } from "@portalr/client";
+import { type Answer, type GrantrApi, orThrow, refusal } from "@portalr/client";
 import {
   Button,
   Card,
   ConfirmDialog,
+  EmptyState,
   ItemTable,
   SectionTitle,
   SelectField,
   TextField,
 } from "@portalr/ui";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery, useSuspenseQueries } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useActionState, useId, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 import {
   allowedNow,
   byKind,
   fromKey,
   keyOf,
   opening,
+  refused,
+  type Said,
   useAccess,
   where,
   whom,
 } from "../../../../../access";
 
 type Grant = GrantrApi.components["schemas"]["Grant"];
+type AuditEntry = GrantrApi.components["schemas"]["AuditEntry"];
 type Resource = GrantrApi.components["schemas"]["Resource"];
 type ResourceKind = GrantrApi.components["schemas"]["ResourceKind"];
 
-/** The kinds a grant's form grants to: members and groups. A rule holds its own role, granted apart. */
+/** The kinds a grant's form grants to: members and groups. A rule's role isn't offered here. */
 const GRANTEE_KINDS = ["user", "service_principal", "group"] as const;
 
-/** A grant's identity, for a list's key: its role, where, and to whom. */
-const grantKey = (grant: Grant) => `${grant.role}|${where(grant.on)}|${whom(grant.to)}`;
+/** The roles that run the tenant: granting one on it is confirmed first. */
+const RUNS_THE_TENANT = new Set(["owner", "admin"]);
 
-/** The resource a grant is on, from its kind, its workspace and its item. */
-function resourceOf(kind: ResourceKind, workspace: string, id: string): Resource {
-  if (kind === "tenant" || kind === "deployment") {
-    return { kind };
-  }
-  return kind === "workspace" ? { kind, workspace } : { kind, workspace, id };
-}
+/** The kinds of resource in a workspace, and those that are an item in one. */
+const IN_A_WORKSPACE = new Set<ResourceKind>(["workspace", "thread", "artifact", "rule"]);
+const AN_ITEM = new Set<ResourceKind>(["thread", "artifact", "rule"]);
 
-/** How broad each kind of resource is: the tenant before its workspaces, before their items. */
-const BREADTH: Record<ResourceKind, number> = {
-  deployment: 0,
-  tenant: 1,
-  workspace: 2,
-  thread: 3,
-  artifact: 3,
-  rule: 3,
+/** A grant as people read it, for its row's name and key: whom, as what, and where. */
+const said = (grant: Grant) => `${whom(grant.to)} as ${grant.role} on ${where(grant.on)}`;
+
+/** A member or group from a list, as people read it. */
+const whomOf = (grantee: { readonly kind: string; readonly id: string }) => {
+  const known = fromKey(keyOf(grantee), GRANTEE_KINDS);
+  return known ? whom(known) : keyOf(grantee);
 };
 
-/** Resources broadest first, then by workspace, kind and id. */
-const broadest = (a: Resource, b: Resource) =>
-  BREADTH[a.kind] - BREADTH[b.kind] ||
-  (a.workspace ?? "").localeCompare(b.workspace ?? "") ||
-  a.kind.localeCompare(b.kind) ||
-  (a.id ?? "").localeCompare(b.id ?? "");
+/** No read: where grantr doesn't allow a list, the form goes without it. */
+const none = queryOptions({
+  queryKey: ["grantr", "~none"] as const,
+  queryFn: () => null,
+  staleTime: Number.POSITIVE_INFINITY,
+});
 
 /**
  * Every grant in a tenant, on it and on everything in it, for whoever may grant there, but
- * membership, which is Members': each role, where, and to whom, the broadest first, and revoked,
- * once confirmed, where grantr allows. A role is granted to a member or a group, from the
- * built-in roles grantr's catalog lists, each on the kinds it may be granted on, and the tenant's
- * custom roles, where they may be read. grantr checks each grant on its resource; the form shows
- * where the tenant allows granting (ADR-0025).
+ * membership, which is Members': the tenant's grants, then each workspace's, each with whom, its
+ * role and where, and revoked, once confirmed, where grantr allows. A role is granted to a member
+ * or a group, from the built-in roles grantr's catalog lists, each on the kinds it may be granted
+ * on, and the tenant's custom roles, where they may be read. Granting a role that runs the tenant
+ * is confirmed. Owner is offered, and its grants revoked, only to those who hold all it holds,
+ * as grantr refuses anyone else (ADR-0025).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/access/grants")({
   head: ({ params }) => ({ meta: [{ title: `Grants · ${params.tenant} · portalr admin` }] }),
@@ -72,7 +72,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/access/grants")({
     const { queries, queryClient } = context;
     const allowed = await allowedNow(context, params.tenant);
     await Promise.all([
-      queryClient.ensureQueryData(queries.grantr.tenantGrants(params.tenant)),
+      queryClient.ensureQueryData(queries.grantr.grants(params.tenant)),
       queryClient.ensureQueryData(queries.grantr.catalog()),
       allowed.has("grantr:define_role") &&
         queryClient.ensureQueryData(queries.grantr.roles(params.tenant)),
@@ -87,30 +87,107 @@ export const Route = createFileRoute("/_signed/t/$tenant/access/grants")({
 
 function Grants() {
   const { tenant } = Route.useParams();
-  const { queries, commands } = Route.useRouteContext();
-  const { allowed, changed } = useAccess(tenant);
-  const { data: grants } = useSuspenseQuery(queries.grantr.tenantGrants(tenant));
+  const { queries } = Route.useRouteContext();
+  const { allowed } = useAccess(tenant);
+  const [
+    { data: grants },
+    { data: catalog },
+    { data: custom },
+    { data: members },
+    { data: groups },
+  ] = useSuspenseQueries({
+    queries: [
+      queries.grantr.grants(tenant),
+      queries.grantr.catalog(),
+      allowed.has("grantr:define_role") ? queries.grantr.roles(tenant) : none,
+      allowed.has("grantr:add_member") ? queries.grantr.members(tenant) : none,
+      allowed.has("grantr:manage_groups") ? queries.grantr.groups(tenant) : none,
+    ],
+  });
   // Membership is Members' to show and take: grantr gives `member` by adding one.
-  const sorted = [...grants.filter((grant) => grant.role !== "member")].sort(
-    (a, b) =>
-      broadest(a.on, b.on) || a.role.localeCompare(b.role) || whom(a.to).localeCompare(whom(b.to)),
+  const granted = grants.filter((grant) => grant.role !== "member");
+  const places = [...new Set(granted.map((grant) => grant.on.workspace ?? null))].sort((a, b) =>
+    a === null ? -1 : b === null ? 1 : a.localeCompare(b),
   );
+  // Owner holds every action, deleting the tenant among them: only one who may gives or takes it.
+  const owns = allowed.has("grantr:delete_tenant");
+  const roles = [
+    ...catalog.roles.filter((role) => owns || role.name !== "owner"),
+    ...(custom ?? []).map((role) => ({ name: role.name, kinds: catalog.custom_kinds })),
+  ];
+  const listed = [
+    ...[...(members ?? [])].sort(byKind),
+    ...Object.keys(groups ?? {})
+      .sort()
+      .map((id) => ({ kind: "group", id })),
+  ];
   return (
     <div className="flex flex-col gap-6">
-      <ItemTable
-        caption="Grants"
-        columns={[
-          { key: "role", label: "Role", cell: (grant) => grant.role },
-          { key: "on", label: "On", cell: (grant) => where(grant.on) },
-          { key: "to", label: "To", cell: (grant) => whom(grant.to) },
-        ]}
-        items={sorted}
-        keyOf={grantKey}
-        actions={
-          allowed.has("grantr:revoke")
-            ? (grant) => (
+      {places.length === 0 && (
+        <EmptyState title="No grants yet">Grant a role to a member or a group below.</EmptyState>
+      )}
+      {places.map((place) => (
+        <Granted
+          key={place ?? "~tenant"}
+          tenant={tenant}
+          caption={place === null ? "Grants on the tenant" : `Grants in ${place}`}
+          grants={granted.filter((grant) => (grant.on.workspace ?? null) === place)}
+          revokes={allowed.has("grantr:revoke")}
+          owns={owns}
+        />
+      ))}
+      <Granting
+        tenant={tenant}
+        roles={roles}
+        listed={listed}
+        // Both lists read: choose from them. Either not: type, with what was read suggested.
+        typed={members === null || groups === null}
+      />
+    </div>
+  );
+}
+
+/** One place's grants, the workspace's before its items', each revoked once confirmed. */
+function Granted({
+  tenant,
+  caption,
+  grants,
+  revokes,
+  owns,
+}: {
+  tenant: string;
+  caption: string;
+  grants: readonly Grant[];
+  revokes: boolean;
+  owns: boolean;
+}) {
+  const { commands } = Route.useRouteContext();
+  const { changed } = useAccess(tenant);
+  const sorted = [...grants].sort(
+    (a, b) =>
+      Number(AN_ITEM.has(a.on.kind)) - Number(AN_ITEM.has(b.on.kind)) ||
+      where(a.on).localeCompare(where(b.on)) ||
+      whom(a.to).localeCompare(whom(b.to)) ||
+      a.role.localeCompare(b.role),
+  );
+  return (
+    <ItemTable
+      caption={caption}
+      columns={[
+        { key: "to", label: "To", cell: (grant) => whom(grant.to) },
+        { key: "role", label: "Role", cell: (grant) => grant.role },
+        { key: "on", label: "On", cell: (grant) => where(grant.on) },
+      ]}
+      items={sorted}
+      keyOf={said}
+      named={said}
+      actions={
+        revokes
+          ? (grant) =>
+              grant.role === "owner" && !owns ? null : (
                 <ConfirmDialog
-                  label={`Revoke ${grant.role} from ${whom(grant.to)} on ${where(grant.on)}`}
+                  label="Revoke"
+                  name={`Revoke ${said(grant)}`}
                   title={`Revoke ${grant.role} from ${whom(grant.to)}?`}
                   confirm="Revoke"
                   onConfirm={async () =>
@@ -132,117 +209,210 @@ function Grants() {
                   </p>
                 </ConfirmDialog>
               )
-            : undefined
-        }
-        empty={{ title: "No grants yet", body: "Grant a role to a member or a group below." }}
-      />
-      <Granting tenant={tenant} />
-    </div>
+          : undefined
+      }
+      empty={{ title: "No grants here", body: "Grant a role below." }}
+    />
   );
 }
 
-/**
- * A role granted on a resource to a member or a group. Members and groups are chosen from the
- * tenant's where either may be read, and typed as `kind:id` otherwise.
- */
-function Granting({ tenant }: { tenant: string }) {
-  const { queries, commands } = Route.useRouteContext();
-  const { allowed, changed } = useAccess(tenant);
-  const heading = useId();
-  const { data: catalog } = useSuspenseQuery(queries.grantr.catalog());
-  // Each list where grantr allows it, which the loader read: not asked for otherwise.
-  const custom = useQuery({
-    ...queries.grantr.roles(tenant),
-    enabled: allowed.has("grantr:define_role"),
-  });
-  const members = useQuery({
-    ...queries.grantr.members(tenant),
-    enabled: allowed.has("grantr:add_member"),
-  });
-  const groups = useQuery({
-    ...queries.grantr.groups(tenant),
-    enabled: allowed.has("grantr:manage_groups"),
-  });
-  const roles = [
-    ...catalog.roles,
-    ...(custom.data ?? []).map((role) => ({ name: role.name, kinds: catalog.custom_kinds })),
-  ];
-  const [role, setRole] = useState(roles[0]?.name ?? "");
-  const kinds = roles.find((one) => one.name === role)?.kinds ?? [];
-  const [chosenKind, setKind] = useState<ResourceKind | "">("");
-  const kind = chosenKind !== "" && kinds.includes(chosenKind) ? chosenKind : kinds[0];
-  const grantees = [
-    ...[...(members.data ?? [])].sort(byKind),
-    ...Object.keys(groups.data ?? {})
-      .sort()
-      .map((id) => ({ kind: "group" as const, id })),
-  ];
+/** What the grant form holds: each field, as chosen or typed. */
+interface Fields {
+  readonly role: string;
+  readonly kind: string;
+  readonly workspace: string;
+  readonly id: string;
+  readonly to: string;
+}
 
-  const [said, grant, granting] = useActionState(
-    async (_last: { said: string; refused: boolean } | null, form: FormData) => {
-      const to = fromKey(String(form.get("to") ?? ""), GRANTEE_KINDS);
-      if (kind === undefined || to === null) {
-        return {
-          said: "Not granted: name a role, and whom, as user:id, service_principal:id or group:id.",
-          refused: true,
-        };
-      }
-      const on = resourceOf(
-        kind,
-        String(form.get("workspace") ?? ""),
-        String(form.get("id") ?? ""),
+const EMPTY: Fields = { role: "", kind: "", workspace: "", id: "", to: "" };
+
+/**
+ * A role granted on a resource to a member or a group, chosen from `listed`, or typed as
+ * `kind:id` with `listed` suggested. Workspaces are suggested from artifactr's. What was entered
+ * stays after a refusal; choosing another role chooses where again.
+ */
+function Granting({
+  tenant,
+  roles,
+  listed,
+  typed,
+}: {
+  tenant: string;
+  roles: readonly { readonly name: string; readonly kinds: readonly ResourceKind[] }[];
+  listed: readonly { readonly kind: string; readonly id: string }[];
+  typed: boolean;
+}) {
+  const { queries, commands } = Route.useRouteContext();
+  const { changed } = useAccess(tenant);
+  const heading = useId();
+  const suggestedWorkspaces = useId();
+  const suggestedGrantees = useId();
+  // Suggestions alone, so the form works without them.
+  const { data: workspaces } = useQuery(queries.artifactr.workspaces(tenant));
+  const [fields, setFields] = useState<Fields>(EMPTY);
+  const [answered, setAnswered] = useState<Said>(null);
+  const [pending, setPending] = useState(false);
+  const set = (field: keyof Fields) => (value: string) =>
+    setFields((now) =>
+      field === "role" ? { ...now, role: value, kind: "" } : { ...now, [field]: value },
+    );
+  const kinds = roles.find((role) => role.name === fields.role)?.kinds ?? [];
+  const kind = kinds.find((one) => one === fields.kind);
+  const confirmed = kind === "tenant" && RUNS_THE_TENANT.has(fields.role);
+
+  /** Where the fields say, once they name a kind of resource. */
+  const on = (from: ResourceKind): Resource => {
+    const workspace = fields.workspace.trim();
+    if (!IN_A_WORKSPACE.has(from)) {
+      return { kind: from };
+    }
+    return AN_ITEM.has(from)
+      ? { kind: from, workspace, id: fields.id.trim() }
+      : { kind: from, workspace };
+  };
+
+  /** The grant the fields name, sent; or why it can't be. */
+  async function grant(): Promise<Answer<AuditEntry>> {
+    const to = fromKey(fields.to.trim(), GRANTEE_KINDS);
+    if (kind === undefined || to === null) {
+      return refused(
+        "name the role, where, and whom, as user:id, service_principal:id or group:id",
       );
-      const answer = await changed(commands.grantr.grant(tenant, { role, on, to }));
-      return answer.outcome === "done"
-        ? { said: `${whom(to)} holds ${role} on ${where(on)}.`, refused: false }
-        : { said: refusal("Not granted", answer), refused: true };
-    },
-    null,
-  );
+    }
+    return changed(commands.grantr.grant(tenant, { role: fields.role, on: on(kind), to }));
+  }
+
+  /** What a grant done says; the form starts again. */
+  function done(): Said {
+    const to = fromKey(fields.to.trim(), GRANTEE_KINDS);
+    const place = kind ? ` on ${where(on(kind))}` : "";
+    setFields(EMPTY);
+    return { said: `${to ? whom(to) : fields.to} holds ${fields.role}${place}.`, refused: false };
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (confirmed) {
+      return;
+    }
+    setPending(true);
+    const answer = await grant();
+    setAnswered(
+      answer.outcome === "done" ? done() : { said: refusal("Not granted", answer), refused: true },
+    );
+    setPending(false);
+  }
 
   return (
     <Card render={<section aria-labelledby={heading} />} className="flex flex-col gap-3">
       <SectionTitle id={heading}>Grant a role</SectionTitle>
-      <form className="flex flex-col gap-3" action={grant}>
+      <form className="flex flex-col gap-3" onSubmit={(event) => void submit(event)}>
         <SelectField
           label="Role"
           name="role"
-          value={role}
-          onChange={(event) => setRole(event.target.value)}
-          options={roles.map((one) => ({ value: one.name, label: one.name }))}
+          required
+          value={fields.role}
+          onChange={(event) => set("role")(event.target.value)}
+          options={[
+            { value: "", label: "Choose a role…" },
+            ...roles.map((role) => ({ value: role.name, label: role.name })),
+          ]}
         />
-        <SelectField
-          label="On"
-          name="kind"
-          value={kind ?? ""}
-          onChange={(event) => setKind(kinds.find((one) => one === event.target.value) ?? "")}
-          options={kinds.map((one) => ({ value: one, label: one }))}
-        />
-        {kind !== undefined && kind !== "tenant" && kind !== "deployment" && (
-          <TextField label="Workspace" name="workspace" autoComplete="off" required />
+        {fields.role !== "" && (
+          <SelectField
+            label="On"
+            name="kind"
+            required
+            value={kind ?? ""}
+            onChange={(event) => set("kind")(event.target.value)}
+            options={[
+              { value: "", label: "Choose where…" },
+              ...kinds.map((one) => ({ value: one, label: one })),
+            ]}
+          />
         )}
-        {kind !== undefined && !["tenant", "deployment", "workspace"].includes(kind) && (
-          <TextField label={`The ${kind}'s id`} name="id" autoComplete="off" required />
+        {kind !== undefined && IN_A_WORKSPACE.has(kind) && (
+          <>
+            <TextField
+              label="Workspace"
+              name="workspace"
+              autoComplete="off"
+              required
+              list={suggestedWorkspaces}
+              value={fields.workspace}
+              onValueChange={(value) => set("workspace")(String(value))}
+            />
+            <datalist id={suggestedWorkspaces}>
+              {(workspaces ?? []).map((workspace) => (
+                <option key={workspace} value={workspace} />
+              ))}
+            </datalist>
+          </>
         )}
-        {grantees.length > 0 ? (
+        {kind !== undefined && AN_ITEM.has(kind) && (
+          <TextField
+            label={`The ${kind}'s id`}
+            name="id"
+            autoComplete="off"
+            required
+            value={fields.id}
+            onValueChange={(value) => set("id")(String(value))}
+          />
+        )}
+        {typed ? (
+          <>
+            <TextField
+              label="To, as user:id, service_principal:id or group:id"
+              name="to"
+              autoComplete="off"
+              spellCheck={false}
+              required
+              list={suggestedGrantees}
+              value={fields.to}
+              onValueChange={(value) => set("to")(String(value))}
+            />
+            <datalist id={suggestedGrantees}>
+              {listed.map((grantee) => (
+                <option key={keyOf(grantee)} value={keyOf(grantee)} label={whomOf(grantee)} />
+              ))}
+            </datalist>
+          </>
+        ) : (
           <SelectField
             label="To"
             name="to"
-            options={grantees.map((grantee) => ({ value: keyOf(grantee), label: whom(grantee) }))}
-          />
-        ) : (
-          <TextField
-            label="To, as user:id, service_principal:id or group:id"
-            name="to"
-            autoComplete="off"
-            spellCheck={false}
             required
+            value={fields.to}
+            onChange={(event) => set("to")(event.target.value)}
+            options={[
+              { value: "", label: "Choose whom…" },
+              ...listed.map((grantee) => ({ value: keyOf(grantee), label: whomOf(grantee) })),
+            ]}
           />
         )}
-        {said && <p role={said.refused ? "alert" : "status"}>{said.said}</p>}
-        <Button type="submit" disabled={granting} className="self-start">
-          Grant
-        </Button>
+        {answered && <p role={answered.refused ? "alert" : "status"}>{answered.said}</p>}
+        {confirmed ? (
+          <ConfirmDialog
+            label="Grant"
+            title={`Make them ${fields.role} of ${tenant}?`}
+            confirm={`Grant ${fields.role}`}
+            onConfirm={async () => {
+              orThrow("Not granted", await grant());
+              setAnswered(done());
+            }}
+          >
+            <p>
+              {fields.role === "owner"
+                ? `An owner may do anything in ${tenant}, deleting it included.`
+                : `An admin may change who may see and do what in ${tenant}, and run every workspace in it.`}
+            </p>
+          </ConfirmDialog>
+        ) : (
+          <Button type="submit" disabled={pending} className="self-start">
+            Grant
+          </Button>
+        )}
       </form>
     </Card>
   );

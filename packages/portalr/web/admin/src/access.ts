@@ -3,7 +3,13 @@
  * changes take, so a part shows only where its read is allowed, and Access only where one is.
  */
 
-import { allowedIn, changedAccess, type createQueries, type GrantrApi } from "@portalr/client";
+import {
+  allowedIn,
+  changedAccess,
+  type createQueries,
+  type GrantrApi,
+  type Refusal,
+} from "@portalr/client";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, notFound } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
@@ -23,6 +29,7 @@ export const ACCESS = [
   "grantr:define_role",
   "grantr:grant",
   "grantr:revoke",
+  "grantr:delete_tenant",
 ] as const;
 
 /** Each part of Access, and the action its read takes. */
@@ -116,6 +123,19 @@ export function fromKey<K extends "user" | "service_principal" | "group">(
 type Keyed<K extends string> = K extends unknown ? { kind: K; id: string } : never;
 
 const keyed = <K extends string>(kind: K, id: string) => ({ kind, id }) as Keyed<K>;
+
+/** What a form last said: done, or refused, and why. */
+export type Said = { readonly said: string; readonly refused: boolean } | null;
+
+/** A refusal of a form's own, before grantr is asked: no status, and why. */
+export const refused = (reason: string): Refusal => ({
+  outcome: "refused",
+  status: 0,
+  reasons: [reason],
+});
+
+/** "1 member", "2 members". */
+export const counted = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
 const tenantRoute = getRouteApi("/_signed/t/$tenant");
 

@@ -3,12 +3,9 @@ import { Button, Card, ConfirmDialog, ItemTable, SectionTitle, TextField } from 
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useActionState, useId, useState } from "react";
-import { byKind, KIND, opening, useAccess } from "../../../../../access";
+import { byKind, KIND, opening, type Said, useAccess } from "../../../../../access";
 
 type Member = GrantrApi.components["schemas"]["Member"];
-
-/** What a form last said: done, or refused, and why. */
-type Said = { readonly said: string; readonly refused: boolean } | null;
 
 /**
  * A tenant's members, people first, then service principals, for whoever may add one: invited by

@@ -25,10 +25,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
 
 from grantr.core import (
+    EVERY_ENTRY,
     TENANT,
     TENANT_ID,
     AuditEntry,
     AuditEvent,
+    AuditFilter,
     Grant,
     Grantee,
     Group,
@@ -44,6 +46,7 @@ from grantr.core import (
     User,
     UserId,
     WorkspaceId,
+    actor_of,
 )
 from grantr.sql.tables import (
     DEPLOYMENT,
@@ -477,7 +480,9 @@ class _Transaction(_Reads):
             "by": None if by is None else by.model_dump(mode="json"),
             "event": event.model_dump(mode="json"),
         }
-        row = AuditRow(tenant_id=_scope(tenant), body=body)
+        row = AuditRow(
+            tenant_id=_scope(tenant), event_type=event.type, actor=actor_of(by), body=body
+        )
         self._session.add(row)
         await self._session.flush()
         return AuditEntry(seq=row.seq, at=at, tenant=tenant, by=by, event=event)
@@ -643,15 +648,26 @@ class SqlStorage:
             return list(ids)
 
     async def audit(
-        self, tenant: TenantId | None, *, after_seq: int = 0, limit: int = 100
+        self,
+        tenant: TenantId | None,
+        *,
+        after_seq: int = 0,
+        limit: int = 100,
+        keep: AuditFilter = EVERY_ENTRY,
     ) -> list[AuditEntry]:
-        """A tenant's audit entries after ``after_seq``, in order, or the deployment's with None."""
-        query = (
-            select(AuditRow)
-            .where(AuditRow.tenant_id == _scope(tenant), AuditRow.seq > after_seq)
-            .order_by(AuditRow.seq)
-            .limit(limit)
+        """A tenant's audit entries after ``after_seq``, in order, or the deployment's with None.
+
+        It returns the first ``limit`` that ``keep`` keeps, found by the type's and the actor's
+        indexes.
+        """
+        query = select(AuditRow).where(
+            AuditRow.tenant_id == _scope(tenant), AuditRow.seq > after_seq
         )
+        if keep.types:
+            query = query.where(AuditRow.event_type.in_(sorted(keep.types)))
+        if keep.actor is not None:
+            query = query.where(AuditRow.actor == keep.actor)
+        query = query.order_by(AuditRow.seq).limit(limit)
         async with self._session(tenant) as session:
             rows = await _to_the_end(session.scalars(query))
             return [

@@ -4,8 +4,11 @@
 """
 
 from grantr.core.audit import (
+    EVERY_ENTRY,
     AuditEntry,
     AuditEvent,
+    AuditFilter,
+    AuditType,
     Granted,
     GroupDefined,
     GroupDeleted,
@@ -20,6 +23,7 @@ from grantr.core.audit import (
     TenantCreated,
     TenantDeleted,
     Unrestricted,
+    actor_of,
 )
 from grantr.core.errors import Forbidden, GrantrError, Invalid
 from grantr.core.grants import Grant, Membership, Visibility, memberships
@@ -58,6 +62,7 @@ __all__ = [
     "APPLICATION",
     "BUILT_IN",
     "DEPLOYMENT",
+    "EVERY_ENTRY",
     "GRANTR_ACTIONS",
     "ITEMS",
     "MEMBER",
@@ -68,6 +73,8 @@ __all__ = [
     "Agent",
     "AuditEntry",
     "AuditEvent",
+    "AuditFilter",
+    "AuditType",
     "Catalog",
     "Forbidden",
     "Grant",
@@ -106,6 +113,7 @@ __all__ = [
     "UserId",
     "Visibility",
     "WorkspaceId",
+    "actor_of",
     "issue",
     "key_id",
     "memberships",

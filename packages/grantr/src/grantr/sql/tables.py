@@ -125,15 +125,28 @@ class KeyRow(Base):
 
 
 class AuditRow(Base):
-    """An audit entry: its sequence number and tenant, and the rest as JSON."""
+    """An audit entry: its sequence number, tenant, event type and maker, and the rest as JSON.
+
+    A read filters by the type and the maker.
+    """
 
     __tablename__ = "grantr_audit"
-    __table_args__ = (Index("ix_grantr_audit_tenant", "tenant_id", "seq"),)
+    __table_args__ = (
+        Index("ix_grantr_audit_tenant", "tenant_id", "seq"),
+        Index("ix_grantr_audit_type", "tenant_id", "event_type", "seq"),
+        Index("ix_grantr_audit_actor", "tenant_id", "actor", "seq"),
+    )
 
     # SQLite numbers only an INTEGER primary key itself.
     seq: Mapped[int] = mapped_column(
         BigInteger().with_variant(Integer(), "sqlite"), primary_key=True, autoincrement=True
     )
     tenant_id: Mapped[str]
+    event_type: Mapped[str]
+    """The event's ``type``."""
+
+    actor: Mapped[str | None]
+    """Who made it, as :func:`~grantr.core.actor_of` names them; null for the first operator."""
+
     body: Mapped[dict[str, Any]] = mapped_column(JSON)
     """The entry's time, maker and event."""

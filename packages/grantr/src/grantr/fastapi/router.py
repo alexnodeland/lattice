@@ -12,6 +12,8 @@ from starlette.requests import HTTPConnection
 
 from grantr.core import (
     AuditEntry,
+    AuditFilter,
+    AuditType,
     Forbidden,
     Grant,
     Grantee,
@@ -155,6 +157,18 @@ AfterSeq = Annotated[int, Query(ge=0)]
 Limit = Annotated[int, Query(ge=1, le=1000)]
 """Read at most this many audit entries."""
 
+Types = Annotated[list[AuditType] | None, Query(alias="type")]
+"""Keep only entries of these event types; ``type`` may repeat."""
+
+Actor = Annotated[str | None, Query(min_length=1)]
+"""Keep only the changes this actor made, as ``actor_of`` names them: ``user:<id>``,
+``service_principal:<id>``, ``rule:<workspace>/<rule>`` or ``agent``."""
+
+
+def _keep(types: list[AuditType] | None, actor: str | None) -> AuditFilter:
+    return AuditFilter(types=frozenset(types or ()), actor=actor)
+
+
 TenantHeader = Annotated[TenantId | None, Header(alias="X-Tenant")]
 """The tenant a request to ``/me`` or ``/checks`` names."""
 
@@ -259,18 +273,43 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
 
     @router.get("/audit")
     async def deployment_audit(
-        after_seq: AfterSeq = 0, limit: Limit = 100, who: Caller = current
+        after_seq: AfterSeq = 0,
+        limit: Limit = 100,
+        type: Types = None,
+        actor: Actor = None,
+        who: Caller = current,
     ) -> list[AuditEntry]:
-        """The deployment's audit log: its operators, granted and revoked."""
-        return await _or_http(grants.audit(None, by=who.subject, after_seq=after_seq, limit=limit))
+        """The deployment's audit log: its operators, granted and revoked.
+
+        ``type`` and ``actor`` keep only some types of entry, or one actor's.
+        """
+        return await _or_http(
+            grants.audit(
+                None, by=who.subject, after_seq=after_seq, limit=limit, keep=_keep(type, actor)
+            )
+        )
 
     @router.get("/tenants/{tenant}/audit")
     async def tenant_audit(
-        tenant: TenantId, after_seq: AfterSeq = 0, limit: Limit = 100, who: Caller = current
+        tenant: TenantId,
+        after_seq: AfterSeq = 0,
+        limit: Limit = 100,
+        type: Types = None,
+        actor: Actor = None,
+        who: Caller = current,
     ) -> list[AuditEntry]:
-        """A tenant's audit log after ``after_seq``, in order."""
+        """A tenant's audit log after ``after_seq``, in order.
+
+        ``type`` and ``actor`` keep only some types of entry, or one actor's.
+        """
         return await _or_http(
-            grants.audit(tenant, by=by(tenant, who), after_seq=after_seq, limit=limit)
+            grants.audit(
+                tenant,
+                by=by(tenant, who),
+                after_seq=after_seq,
+                limit=limit,
+                keep=_keep(type, actor),
+            )
         )
 
     @router.get("/tenants/{tenant}/members")

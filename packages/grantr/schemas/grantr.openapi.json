@@ -125,6 +125,25 @@
           }
         ]
       },
+      "AuditType": {
+        "enum": [
+          "tenant_created",
+          "tenant_deleted",
+          "member_added",
+          "member_removed",
+          "group_defined",
+          "group_deleted",
+          "role_defined",
+          "role_deleted",
+          "granted",
+          "revoked",
+          "key_issued",
+          "key_revoked",
+          "restricted",
+          "unrestricted"
+        ],
+        "type": "string"
+      },
       "Check": {
         "description": "One question for ``/checks``: may the caller take this action on this resource?",
         "properties": {
@@ -976,7 +995,7 @@
   "paths": {
     "/grantr/v1/audit": {
       "get": {
-        "description": "The deployment's audit log: its operators, granted and revoked.",
+        "description": "The deployment's audit log: its operators, granted and revoked.\n\n``type`` and ``actor`` keep only some types of entry, or one actor's.",
         "operationId": "deployment_audit_grantr_v1_audit_get",
         "parameters": [
           {
@@ -1000,6 +1019,42 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditType"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor"
             }
           }
         ],
@@ -1334,7 +1389,7 @@
     },
     "/grantr/v1/tenants/{tenant}/audit": {
       "get": {
-        "description": "A tenant's audit log after ``after_seq``, in order.",
+        "description": "A tenant's audit log after ``after_seq``, in order.\n\n``type`` and ``actor`` keep only some types of entry, or one actor's.",
         "operationId": "tenant_audit_grantr_v1_tenants__tenant__audit_get",
         "parameters": [
           {
@@ -1368,6 +1423,42 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditType"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor"
             }
           }
         ],

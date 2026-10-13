@@ -12,6 +12,8 @@ export interface paths {
         /**
          * Deployment Audit
          * @description The deployment's audit log: its operators, granted and revoked.
+         *
+         *     ``type`` and ``actor`` keep only some types of entry, or one actor's.
          */
         get: operations["deployment_audit_grantr_v1_audit_get"];
         put?: never;
@@ -144,6 +146,8 @@ export interface paths {
         /**
          * Tenant Audit
          * @description A tenant's audit log after ``after_seq``, in order.
+         *
+         *     ``type`` and ``actor`` keep only some types of entry, or one actor's.
          */
         get: operations["tenant_audit_grantr_v1_tenants__tenant__audit_get"];
         put?: never;
@@ -450,6 +454,8 @@ export interface components {
             tenant: components["schemas"]["TenantId"] | null;
         };
         AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"];
+        /** @enum {string} */
+        AuditType: "tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted";
         /**
          * Check
          * @description One question for ``/checks``: may the caller take this action on this resource?
@@ -865,6 +871,8 @@ export interface operations {
             query?: {
                 after_seq?: number;
                 limit?: number;
+                type?: components["schemas"]["AuditType"][] | null;
+                actor?: string | null;
             };
             header?: never;
             path?: never;
@@ -1109,6 +1117,8 @@ export interface operations {
             query?: {
                 after_seq?: number;
                 limit?: number;
+                type?: components["schemas"]["AuditType"][] | null;
+                actor?: string | null;
             };
             header?: never;
             path: {

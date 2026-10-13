@@ -17,6 +17,8 @@ from grantr.core import (
     Agent,
     AuditEntry,
     AuditEvent,
+    AuditFilter,
+    AuditType,
     Forbidden,
     Grant,
     Grantee,
@@ -36,6 +38,7 @@ from grantr.core import (
     UserId,
     Visibility,
     WorkspaceId,
+    actor_of,
 )
 from grantr.grants import Access, Grants, Hooks, InMemoryStorage, Storage, SubjectOf
 
@@ -48,6 +51,8 @@ __all__ = [
     "Agent",
     "AuditEntry",
     "AuditEvent",
+    "AuditFilter",
+    "AuditType",
     "Forbidden",
     "Grant",
     "Grantee",
@@ -73,4 +78,5 @@ __all__ = [
     "Visibility",
     "WorkspaceId",
     "__version__",
+    "actor_of",
 ]

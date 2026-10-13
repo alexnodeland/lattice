@@ -12,6 +12,9 @@ from grantr.core import (
     DEPLOYMENT,
     TENANT,
     Agent,
+    AuditEntry,
+    AuditFilter,
+    AuditType,
     Forbidden,
     Grant,
     Granted,
@@ -593,6 +596,45 @@ async def test_the_deployments_log_holds_its_operators(grants: Grants) -> None:
         await grants.audit(None, by=ALICE)
     with pytest.raises(Forbidden, match="grantr:read_audit"):
         await grants.audit("acme", by=ROOT)
+
+
+async def test_a_read_of_the_log_keeps_some_types_or_one_actors_changes(grants: Grants) -> None:
+    await _members(grants, BOB)
+    await grants.grant("acme", "admin", on=TENANT, to=BOB, by=ALICE)
+    await grants.define_group("acme", TEAM, frozenset((BOB,)), by=BOB)
+    await grants.delete_group("acme", TEAM, by=BOB)
+    everything = await grants.audit("acme", by=ALICE)
+
+    async def kept(
+        types: frozenset[AuditType] = frozenset(), actor: str | None = None
+    ) -> list[AuditEntry]:
+        return await grants.audit("acme", by=ALICE, keep=AuditFilter(types=types, actor=actor))
+
+    groups = await kept(types=frozenset({"group_defined", "group_deleted"}))
+    assert [e.event.type for e in groups] == ["group_defined", "group_deleted"]
+    assert [e.event.type for e in await kept(actor="user:bob")] == [
+        "group_defined",
+        "group_deleted",
+    ]
+    assert [e.event.type for e in await kept(actor="user:alice")] == ["member_added", "granted"]
+    assert await kept(types=frozenset({"granted"}), actor="user:bob") == []
+    assert await kept(actor="service_principal:bob") == [], "a principal isn't a user"
+    assert await kept() == everything
+
+    bobs = AuditFilter(actor="user:bob")
+    first = await grants.audit("acme", by=ALICE, limit=1, keep=bobs)
+    page = await grants.audit("acme", by=ALICE, after_seq=first[0].seq, keep=bobs)
+    assert [e.event.type for e in [*first, *page]] == ["group_defined", "group_deleted"]
+
+
+async def test_the_deployments_log_keeps_the_first_operators_grant_by_no_one(
+    grants: Grants,
+) -> None:
+    await grants.grant_operator(BOB.id, by=ROOT)
+    by_root = await grants.audit(None, by=ROOT, keep=AuditFilter(actor="user:root"))
+    assert [entry.by for entry in by_root] == [ROOT]
+    granted = await grants.audit(None, by=ROOT, keep=AuditFilter(types=frozenset({"granted"})))
+    assert [entry.by for entry in granted] == [None, ROOT]
 
 
 # ─── the storage ─────────────────────────────────────────────────────────────

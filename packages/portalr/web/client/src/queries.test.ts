@@ -114,6 +114,9 @@ test("every read has its own path", async () => {
     [queries.reflexr.schedules("acme", "ws_1"), "/reflexr/v1/workspaces/ws_1/schedules"],
     [queries.grantr.members("acme"), "/grantr/v1/tenants/acme/members"],
     [queries.grantr.groups("acme"), "/grantr/v1/tenants/acme/groups"],
+    [queries.grantr.grants("acme"), "/grantr/v1/tenants/acme/grants"],
+    [queries.grantr.roles("acme"), "/grantr/v1/tenants/acme/roles"],
+    [queries.grantr.catalog(), "/grantr/v1/catalog"],
     [queries.grantr.keyring("acme"), "/grantr/v1/tenants/acme/keys"],
     [queries.portalr.spend("acme"), "/portalr/v1/spend"],
     [queries.grantr.grants("acme", "ws_1"), "/grantr/v1/tenants/acme/grants"],
@@ -308,4 +311,9 @@ test("the deployment's tenants are an operator's, and null for anyone else", asy
       away.portalr.tenants("bob"),
     ),
   ).rejects.toThrow(/refused the read \(404\)/);
+});
+
+test("a workspace's grants and the tenant's are read apart", () => {
+  expect(keys.grantr.grants("acme")).not.toEqual(keys.grantr.grants("acme", "ws_1"));
+  expect(queries.grantr.grants("acme").queryKey).toEqual(keys.grantr.grants("acme"));
 });

@@ -14,6 +14,13 @@
       "datasourceTemplate": "github-releases",
       "packageNameTemplate": "{{#if (equals depName 'tofu')}}opentofu/opentofu{{else}}terraform-linters/tflint{{/if}}",
       "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "description": "The images stackr's AWS modules name in their variables' defaults, by tag and digest.",
+      "customType": "regex",
+      "managerFilePatterns": ["/^packages/stackr/deploy/aws/modules/.+\\.tf$/"],
+      "matchStrings": ["\"(?<depName>[a-z0-9./-]+):(?<currentValue>[^@\"]+)@(?<currentDigest>sha256:[a-f0-9]{64})\""],
+      "datasourceTemplate": "docker"
     }
   ],
   "packageRules": [

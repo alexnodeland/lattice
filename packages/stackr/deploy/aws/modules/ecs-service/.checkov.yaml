@@ -1,0 +1,11 @@
+# checkov over the ecs-service module (RFC-0004), run by deploy/aws/check. Each check it skips
+# here is skipped for this module only, with its reason; nothing is skipped inline.
+framework:
+  - terraform
+compact: true
+quiet: true
+skip-check:
+  # A customer-managed key per deployment comes later (RFC-0004): AWS's encrypts the logs.
+  - CKV_AWS_158
+  # Container logs stay a short while, a variable: the Collector keeps the stack's own.
+  - CKV_AWS_338

@@ -5,7 +5,7 @@ import { email, password } from "./people";
 /** The workspace the scenarios' runs are in, in acme. */
 const NOTES = "/reflexr/v1/workspaces/notes";
 
-const origin = () => new URL(process.env.PORTALR_APP_URL ?? "http://localhost:8000").origin;
+export const origin = () => new URL(process.env.PORTALR_APP_URL ?? "http://localhost:8000").origin;
 
 /** A person's access token, as Supabase Auth issues it at the application's `/auth/v1`. */
 async function token(request: APIRequestContext, person: string): Promise<string> {
@@ -17,14 +17,14 @@ async function token(request: APIRequestContext, person: string): Promise<string
 }
 
 /** The signed-in person's token, in this page's session. */
-const session = (page: Page) =>
+export const session = (page: Page) =>
   page.evaluate(
     () =>
       (JSON.parse(localStorage.getItem("portalr") ?? "{}") as { access_token: string })
         .access_token,
   );
 
-/** Publish a ticket as the token's person, and wait for the rule's run it sets off: its id. */
+/** Publish a ticket as the token's person, and wait for the run of triage it sets off: its id. */
 async function ticket(
   request: APIRequestContext,
   bearer: string,
@@ -40,7 +40,12 @@ async function ticket(
   let run: string | undefined;
   await expect
     .poll(async () => {
-      const runs = (await (await request.get(`${origin()}${NOTES}/runs`, { headers })).json()) as {
+      // triage's own: a stored rule another scenario installed may match the ticket too.
+      const read = await request.get(`${origin()}${NOTES}/runs`, {
+        headers,
+        params: { rule: "portalr:triage" },
+      });
+      const runs = (await read.json()) as {
         id: string;
         matched: number[];
       }[];

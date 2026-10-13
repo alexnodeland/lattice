@@ -96,6 +96,11 @@ test("every read has its own path", async () => {
     ],
     [queries.reflexr.rules("acme", "ws_1"), "/reflexr/v1/workspaces/ws_1/rules"],
     [queries.reflexr.runs("acme", "ws_1"), "/reflexr/v1/workspaces/ws_1/runs"],
+    [
+      queries.reflexr.rule("acme", "ws_1", "tickets:echo"),
+      "/reflexr/v1/workspaces/ws_1/rules/tickets%3Aecho",
+    ],
+    [queries.reflexr.schedules("acme", "ws_1"), "/reflexr/v1/workspaces/ws_1/schedules"],
   ] as const;
   for (const [options, path] of reads) {
     await client.fetchQuery(options as unknown as Parameters<QueryClient["fetchQuery"]>[0]);
@@ -170,8 +175,8 @@ test("a list's key doesn't prefix its details' or the tail's, so a list refetche
 
 const artifactrFrame = (event: Record<string, unknown>) =>
   ({ type: "event", seq: 1, event }) as unknown as v1.EventFrame;
-const reflexrFrame = (type: string) =>
-  ({ type: "event", seq: 1, event: { type } }) as reflexrV1.EventFrame;
+const reflexrFrame = (type: string, fields: Record<string, unknown> = {}) =>
+  ({ type: "event", seq: 1, event: { type, ...fields } }) as reflexrV1.EventFrame;
 
 test("an artifactr event makes stale the reads it changes", () => {
   expect(
@@ -208,9 +213,18 @@ test("an artifactr event makes stale the reads it changes", () => {
   expect(stale.artifactr("acme", "ws_1", artifactrFrame({ type: "something_new" }))).toEqual([]);
 });
 
-test("reflexr's rule events make its rules stale, and its run events its runs", () => {
+test("reflexr's rule events make its rules stale, its run events its runs, and ticks its schedules", () => {
   expect(stale.reflexr("acme", "ws_1", reflexrFrame("reflexr:rule_installed"))).toEqual([
     keys.reflexr.rules("acme", "ws_1"),
+  ]);
+  expect(
+    stale.reflexr("acme", "ws_1", reflexrFrame("reflexr:rule_archived", { rule: "tickets:echo" })),
+  ).toEqual([
+    keys.reflexr.rules("acme", "ws_1"),
+    keys.reflexr.rule("acme", "ws_1", "tickets:echo"),
+  ]);
+  expect(stale.reflexr("acme", "ws_1", reflexrFrame("reflexr:tick"))).toEqual([
+    keys.reflexr.schedules("acme", "ws_1"),
   ]);
   expect(stale.reflexr("acme", "ws_1", reflexrFrame("reflexr:run_succeeded"))).toEqual([
     keys.reflexr.runs("acme", "ws_1"),

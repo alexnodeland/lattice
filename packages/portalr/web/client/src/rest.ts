@@ -45,6 +45,9 @@ export function createApi(surfaces: Surfaces, session: () => Session): Api {
   return { artifactr, reflexr, grantr };
 }
 
+/** The headers that name a request's tenant. */
+export const named = (tenant: string) => ({ headers: { "X-Tenant": tenant } });
+
 /** What the UIs need of the deployment: its Supabase project, the surfaces and the tools. */
 export type Config = Portalr["schemas"]["Config"];
 

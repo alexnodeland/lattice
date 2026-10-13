@@ -110,6 +110,7 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
   #fromHead: boolean;
   #timer: ReturnType<typeof setTimeout> | null = null;
   readonly #listeners = new Set<() => void>();
+  readonly #live = new Set<(envelope: Extract<Frame, Envelope>) => void>();
   readonly #pending = new Map<string, Pending<Command, R>>();
 
   /** A store, closed until `open`; `state` is what a tail read over REST built, if any. */
@@ -131,6 +132,15 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
   readonly subscribe = (listener: () => void): (() => void) => {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
+  };
+
+  /**
+   * Calls `listener` with each event applied once the store is live, until the returned function
+   * is called: what changes after the reads a screen made, not the replay that caught up to them.
+   */
+  readonly onLiveEvent = (listener: (envelope: Extract<Frame, Envelope>) => void): (() => void) => {
+    this.#live.add(listener);
+    return () => this.#live.delete(listener);
   };
 
   /** Connects, and keeps reconnecting after drops, until `close`. */
@@ -258,6 +268,11 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
           state: this.protocol.apply(this.#current.state, envelope),
           seq: envelope.seq,
         });
+        if (this.#current.status === "live") {
+          for (const listener of this.#live) {
+            listener(envelope);
+          }
+        }
         return;
       }
       case "result":

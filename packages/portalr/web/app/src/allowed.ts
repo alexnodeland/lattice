@@ -4,19 +4,22 @@
  * is no permission.
  */
 
-import type { createQueries } from "@portalr/client";
+import type { createQueries, GrantrApi } from "@portalr/client";
 
-/** One read of grantr's checks for these actions in a workspace, answered as the allowed ones. */
+type Resource = GrantrApi.components["schemas"]["Resource"];
+
+/**
+ * One read of grantr's checks for these actions in a workspace, answered as the allowed ones:
+ * on the workspace, or on `resource` in it, such as a rule, as the server will check them.
+ */
 export function allowedIn(
   queries: ReturnType<typeof createQueries>,
   tenant: string,
   workspace: string,
   actions: readonly string[],
+  resource: Resource = { kind: "workspace", workspace },
 ) {
-  const checks = actions.map((action) => ({
-    action,
-    resource: { kind: "workspace" as const, workspace },
-  }));
+  const checks = actions.map((action) => ({ action, resource }));
   return {
     ...queries.grantr.checks(tenant, checks),
     select: (answers: boolean[]) =>

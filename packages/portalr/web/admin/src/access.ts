@@ -23,7 +23,7 @@ type Resource = GrantrApi.components["schemas"]["Resource"];
  * Every action a tenant's screens in admin ask grantr about, on the tenant, in one read per
  * screen: Access's, and reading the audit log, which puts Audit on the rail.
  */
-export const ACCESS = [
+export const TENANT_ACTIONS = [
   "grantr:add_member",
   "grantr:remove_member",
   "grantr:manage_groups",
@@ -47,7 +47,7 @@ export const PARTS = [
 
 /** The one read of grantr's checks a screen of Access makes. */
 const accessIn = (queries: ReturnType<typeof createQueries>, tenant: string) =>
-  allowedIn(queries, tenant, { kind: "tenant" }, ACCESS);
+  allowedIn(queries, tenant, { kind: "tenant" }, TENANT_ACTIONS);
 
 /** What grantr allows in the tenant, from the checks' cache where they are there. */
 export async function allowedNow(
@@ -62,7 +62,7 @@ export async function allowedNow(
 export async function opening(
   context: Pick<Context, "queries" | "queryClient">,
   tenant: string,
-  reads: (typeof ACCESS)[number],
+  reads: (typeof TENANT_ACTIONS)[number],
 ): Promise<void> {
   if (!(await allowedNow(context, tenant)).has(reads)) {
     throw notFound();

@@ -11,29 +11,35 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import * as artifactr from "./artifactr";
 import type * as artifactrV1 from "./generated/artifactr.v1";
-import type { components as Grantr } from "./generated/grantr.openapi";
+import type {
+  components as Grantr,
+  operations as GrantrOperations,
+} from "./generated/grantr.openapi";
 import type { components as Portalr } from "./generated/portalr.openapi";
 import type * as reflexrV1 from "./generated/reflexr.v1";
 import * as reflexr from "./reflexr";
 import { type Api, named } from "./rest";
 
 type Check = Grantr["schemas"]["Check"];
-type AuditType = Grantr["schemas"]["AuditType"];
+type AuditQuery = NonNullable<
+  GrantrOperations["tenant_audit_grantr_v1_tenants__tenant__audit_get"]["parameters"]["query"]
+>;
 
 /**
- * Which of a tenant's audit entries a read keeps: one type of change, or any, and one subject's
- * changes, by its kind and id, and a rule's workspace, or anyone's (grantr ADR-0030).
+ * Which of a tenant's audit entries a read keeps, as grantr's query takes it: one type of change,
+ * or any, and one subject's changes, by its kind and id, and a rule's workspace, or anyone's
+ * (grantr ADR-0030).
  */
-export interface AuditFilter {
-  readonly type?: AuditType;
-  readonly actor_kind?: "user" | "service_principal" | "rule" | "agent";
-  readonly actor?: string;
-  readonly workspace?: string;
-}
+export type AuditFilter = {
+  readonly type?: Grantr["schemas"]["AuditType"] | undefined;
+} & {
+  readonly [K in "actor_kind" | "actor" | "workspace"]?: NonNullable<AuditQuery[K]> | undefined;
+};
 
-/** How many audit entries a page reads. */
-export const AUDIT_PAGE = 50;
 type Metric = Portalr["schemas"]["Metric"];
+
+/** How many audit entries a page of the audit log reads. */
+export const AUDIT_PAGE = 50;
 
 /** Every query's key: each names its tenant, so two tenants' reads never share a cache entry. */
 export const keys = {
@@ -392,13 +398,14 @@ export function createQueries(api: Api) {
                 ...named(tenant),
                 params: {
                   path: { tenant },
+                  // openapi-fetch leaves out what is null.
                   query: {
                     last: AUDIT_PAGE,
-                    ...(pageParam !== null && { before_seq: pageParam }),
-                    ...(filter.type && { type: [filter.type] }),
-                    ...(filter.actor_kind && { actor_kind: filter.actor_kind }),
-                    ...(filter.actor && { actor: filter.actor }),
-                    ...(filter.workspace && { workspace: filter.workspace }),
+                    before_seq: pageParam,
+                    type: filter.type ? [filter.type] : null,
+                    actor_kind: filter.actor_kind ?? null,
+                    actor: filter.actor ?? null,
+                    workspace: filter.workspace ?? null,
                   },
                 },
               }),

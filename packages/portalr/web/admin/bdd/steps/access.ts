@@ -1,18 +1,10 @@
 import { expect, type Page } from "@playwright/test";
-import { Then, When } from "./fixtures";
+import { madeAs, Then, When } from "./fixtures";
 
 /** A name made afresh for this run, so a scenario runs again against the same application. */
 const fresh = (made: Map<string, string>, what: string) => {
   const name = `${what}-${crypto.randomUUID().slice(0, 8)}`;
   made.set(what, name);
-  return name;
-};
-
-const madeAs = (made: Map<string, string>, what: string) => {
-  const name = made.get(what);
-  if (name === undefined) {
-    throw new Error(`no ${what} was made: make one first`);
-  }
   return name;
 };
 
@@ -167,25 +159,6 @@ When("they revoke its {string}", async ({ page, made }, role: string) => {
 
 Then("it holds no role", async ({ page, made }) => {
   await expect(item(page, "Grants in notes", madeAs(made, "principal"))).toHaveCount(0);
-});
-
-When("they open the audit log, filtered to members added", async ({ page }) => {
-  await page
-    .getByRole("navigation", { name: "Tenant" })
-    .getByRole("link", { name: "Audit" })
-    .click();
-  await page.getByRole("combobox", { name: "Change" }).selectOption("Members added");
-  await page.getByRole("button", { name: "Apply" }).click();
-  await expect(page).toHaveURL(/type=member_added/);
-});
-
-Then("the log says they added it", async ({ page, made }) => {
-  // The log opens on its newest changes: theirs is among them.
-  await expect(
-    page
-      .getByRole("table", { name: "Audit log" })
-      .getByRole("rowheader", { name: `added ${madeAs(made, "principal")} (service principal)` }),
-  ).toBeVisible();
 });
 
 When("they look on a phone, at Access's Members", async ({ page }) => {

@@ -25,7 +25,7 @@ const listed = (names: readonly string[]) => (names.length > 0 ? names.join(", "
 export function said(event: AuditEvent): string {
   switch (event.type) {
     case "tenant_created":
-      return `created the tenant, owned by ${event.owner}`;
+      return `created the tenant, owned by ${who({ kind: "user", id: event.owner })}`;
     case "tenant_deleted":
       return "deleted the tenant";
     case "member_added":
@@ -45,22 +45,24 @@ export function said(event: AuditEvent): string {
     case "revoked":
       return `revoked ${event.grant.role} on ${where(event.grant.on)} from ${whom(event.grant.to)}`;
     case "key_issued":
-      return `issued the key ${event.key} to ${event.principal.id}`;
+      return `issued the key ${event.key} to ${who(event.principal)}`;
     case "key_revoked":
-      return `revoked ${event.principal.id}'s key ${event.key}`;
+      return `revoked the key ${event.key} of ${who(event.principal)}`;
     case "restricted":
       return `restricted ${where(event.on)}`;
     case "unrestricted":
       return `lifted the restriction on ${where(event.on)}`;
-    default:
-      return unknown(event);
+    default: {
+      // Every type is read above: a new type of grantr's fails to typecheck here.
+      const unread: never = event;
+      return unknown(unread);
+    }
   }
 }
 
-/** An event no case above reads: a new type of grantr's fails to typecheck here. */
-function unknown(event: never): string {
-  return `made a change of a kind admin doesn't know: ${JSON.stringify(event)}`;
-}
+/** An event of a type no case reads, named by its type alone. */
+const unknown = (event: { readonly type: string }) =>
+  `made a change of a kind admin doesn't know: ${event.type}`;
 
 /** Each type of change as the filter names it: a record, so a new type of grantr's must be named. */
 const LABELS: Record<AuditType, string> = {
@@ -76,15 +78,15 @@ const LABELS: Record<AuditType, string> = {
   key_revoked: "Keys revoked",
   restricted: "Restrictions",
   unrestricted: "Restrictions lifted",
-  tenant_created: "The tenant created",
-  tenant_deleted: "The tenant deleted",
+  tenant_created: "Tenant created",
+  tenant_deleted: "Tenant deleted",
 };
 
-/** Each type of change, as the filter offers it, grouped by what it changes. */
+/** Each type of change, as the filter offers it, in LABELS' order: by what it changes. */
 export const TYPES = Object.entries(LABELS).map(([value, label]) => ({ value, label }));
 
 /** A type of change from the address, or undefined where it names none grantr has. */
-export const auditType = (value: unknown): AuditType | undefined =>
+const auditType = (value: unknown): AuditType | undefined =>
   Object.keys(LABELS).find((type): type is AuditType => type === value);
 
 /** The kinds of subject the filter offers, as people read them. */
@@ -96,10 +98,27 @@ export const MAKERS = [
   { value: "agent", label: "The agent" },
 ] as const;
 
-const KINDS = ["user", "service_principal", "rule", "agent"] as const;
+/** The kinds of maker grantr filters by: each the filter offers but anyone. */
+const KINDS = MAKERS.flatMap((maker) => (maker.value === "" ? [] : [maker.value]));
 
-/** A string from the address, or undefined for anything else or nothing. */
-const text = (value: unknown) => (typeof value === "string" && value !== "" ? value : undefined);
+/**
+ * A value from the address, as text, trimmed: the router reads `?actor=42` as a number, and
+ * `?actor=true` as a boolean, so those are text too; undefined for anything else, or nothing.
+ */
+function text(value: unknown): string | undefined {
+  const read =
+    typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+      ? String(value).trim()
+      : "";
+  return read === "" ? undefined : read;
+}
+
+/** What grantr takes as a person's or a service principal's id: no `:` or `~`, and no spaces. */
+const ID = "[^:~\\s]+";
+const PRINCIPAL_ID = new RegExp(`^${ID}$`);
+
+/** The id field's pattern: an id, with spaces around it, which the filter trims. */
+export const ID_FIELD = `\\s*${ID}\\s*`;
 
 /**
  * The filter an address keeps, as grantr takes it: a type, and a subject only where its kind has
@@ -109,6 +128,19 @@ export function filterOf(search: Record<string, unknown>): AuditFilter {
   const type = auditType(search.type);
   return { ...(type && { type }), ...makerOf(search) };
 }
+
+/**
+ * The address's search as the route keeps it: each of the filter's keys, undefined where the
+ * filter has none, so a key the address gave and grantr wouldn't take is put out of the search,
+ * which the router otherwise keeps from the address.
+ */
+export const searchOf = (search: Record<string, unknown>): AuditFilter => ({
+  type: undefined,
+  actor_kind: undefined,
+  actor: undefined,
+  workspace: undefined,
+  ...filterOf(search),
+});
 
 /** The subject an address names, where its kind has all it needs, or no one. */
 function makerOf(search: Record<string, unknown>): AuditFilter {
@@ -121,5 +153,5 @@ function makerOf(search: Record<string, unknown>): AuditFilter {
   if (kind === "rule") {
     return actor && workspace ? { actor_kind: kind, actor, workspace } : {};
   }
-  return kind && actor ? { actor_kind: kind, actor } : {};
+  return kind && actor && PRINCIPAL_ID.test(actor) ? { actor_kind: kind, actor } : {};
 }

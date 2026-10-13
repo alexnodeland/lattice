@@ -137,6 +137,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `TabNav`, `TabLink` | An area's parts as tabs of links, the current one marked with `aria-current` |
 | `CheckboxGroup` | Several choices, any of them checked, named by a legend |
 | `SignIn`, `Account` | Signing in, and the account menu over a session, for both UIs |
+| `Moment` | A time in the reader's zone, and how long ago on hover ([ADR-0026](adr/0026-audit.md)) |
 | `Dialog` | A dialog over the page, opened by its caller, with where focus starts and where it returns ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
 | `Menu` | A button and the actions it opens, each of which may be disabled while it's being done |
 | `SelectField` | A labelled choice among a few, as the platform's own select, which submits with its form |

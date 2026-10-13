@@ -47,13 +47,6 @@ Feature: Access
     When they revoke its "viewer"
     Then it holds no role
 
-  Scenario: A change, found in the audit log by its type
-    Given alice has signed in to admin
-    When they open Access's Members
-    And they add a service principal
-    And they open the audit log, filtered to members added
-    Then the log says they added it
-
   Scenario: On a phone, Access is a list of cards
     Given alice has signed in to admin
     When they look on a phone, at Access's Members

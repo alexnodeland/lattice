@@ -4,16 +4,18 @@ import {
   Card,
   EmptyState,
   ItemTable,
+  Moment,
   PageHeader,
   SectionTitle,
   SelectField,
   TextField,
 } from "@portalr/ui";
 import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
-import { createFileRoute, type ErrorComponentProps, useRouter } from "@tanstack/react-router";
+import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 import { type FormEvent, useId, useState } from "react";
 import { opening } from "../../../../access";
-import { actor, filterOf, MAKERS, said, TYPES } from "../../../../audit";
+import { actor, filterOf, ID_FIELD, MAKERS, said, searchOf, TYPES } from "../../../../audit";
+import { ReadFailed } from "../../../../read-failed";
 
 const HEADER = <PageHeader title="Audit" meta="Every change to who may see and do what" />;
 
@@ -24,7 +26,7 @@ const HEADER = <PageHeader title="Audit" meta="Every change to who may see and d
  */
 export const Route = createFileRoute("/_signed/t/$tenant/audit")({
   head: ({ params }) => ({ meta: [{ title: `Audit · ${params.tenant} · portalr admin` }] }),
-  validateSearch: (search: Record<string, unknown>): AuditFilter => filterOf(search),
+  validateSearch: searchOf,
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "grantr:read_audit"),
   loaderDeps: ({ search }) => search,
   loader: ({ context, params, deps }) =>
@@ -45,12 +47,11 @@ function Audit() {
   const { tenant } = Route.useParams();
   const filter = Route.useSearch();
   const { queries } = Route.useRouteContext();
-  const { data, hasNextPage, fetchNextPage, isFetchingNextPage } = useSuspenseInfiniteQuery(
-    queries.grantr.audit(tenant, filter),
-  );
+  const { data, hasNextPage, fetchNextPage, isFetchingNextPage, isFetchNextPageError, error } =
+    useSuspenseInfiniteQuery(queries.grantr.audit(tenant, filter));
   // Each page is oldest first, and each is older than the last: the newest are on top.
   const entries = data.pages.flatMap((page) => [...page].reverse());
-  const filtered = Object.keys(filter).length > 0;
+  const filtered = Object.values(filter).some((value) => value !== undefined);
   return (
     <div className="flex flex-col gap-6">
       {HEADER}
@@ -60,26 +61,34 @@ function Audit() {
         columns={[
           { key: "change", label: "Change", cell: (entry) => said(entry.event) },
           { key: "by", label: "By", cell: (entry) => actor(entry.by) },
-          {
-            key: "at",
-            label: "When",
-            cell: (entry) => <time dateTime={entry.at}>{new Date(entry.at).toLocaleString()}</time>,
-          },
+          { key: "at", label: "When", cell: (entry) => <Moment at={entry.at} /> },
         ]}
         items={entries}
         keyOf={(entry) => String(entry.seq)}
+        named={(entry) => `${said(entry.event)}, ${new Date(entry.at).toLocaleString()}`}
         empty={
           filtered
             ? { title: "No changes match", body: "Change the filter, or clear it." }
             : { title: "No changes yet", body: "Each change to access in the tenant is kept here." }
         }
       />
+      {/* Each page read says how many are shown, so the reader hears it when Show more goes. */}
+      <p role="status" className="sr-only">
+        {entries.length === 1 ? "1 change shown" : `${entries.length} changes shown`}
+      </p>
+      {isFetchNextPageError && (
+        <p role="alert">
+          The changes before these couldn't be read:{" "}
+          {error instanceof Error ? error.message : String(error)}
+        </p>
+      )}
       {hasNextPage && (
         <Button
           variant="secondary"
           className="self-start"
           aria-busy={isFetchingNextPage}
           disabled={isFetchingNextPage}
+          focusableWhenDisabled
           onClick={() => void fetchNextPage()}
         >
           Show more
@@ -126,6 +135,8 @@ function Filter({ filter }: { filter: AuditFilter }) {
             autoComplete="off"
             spellCheck={false}
             required
+            // A person's or a service principal's id, as grantr takes one.
+            {...(kind !== "rule" && { pattern: ID_FIELD })}
           />
         )}
         {kind === "rule" && (
@@ -148,28 +159,23 @@ function Filter({ filter }: { filter: AuditFilter }) {
   );
 }
 
-/** The log's read failed: what failed, and a way to read it again. */
+/** The log's read failed: what failed, a way to read it again, and to clear a filter grantr refused. */
 function Failed({ error, reset }: ErrorComponentProps) {
-  const router = useRouter();
+  const filter = Route.useSearch();
+  const navigate = Route.useNavigate();
   return (
-    <>
-      {HEADER}
-      <EmptyState
-        title="The audit log couldn't be read"
-        action={
-          <Button
-            variant="secondary"
-            onClick={() => {
-              reset();
-              void router.invalidate();
-            }}
-          >
-            Try again
-          </Button>
-        }
-      >
-        <p role="alert">{error instanceof Error ? error.message : String(error)}</p>
-      </EmptyState>
-    </>
+    <ReadFailed title="The audit log couldn't be read" header={HEADER} error={error} reset={reset}>
+      {Object.values(filter).some((value) => value !== undefined) && (
+        <Button
+          variant="secondary"
+          onClick={() => {
+            reset();
+            void navigate({ search: {} });
+          }}
+        >
+          Clear the filter
+        </Button>
+      )}
+    </ReadFailed>
   );
 }

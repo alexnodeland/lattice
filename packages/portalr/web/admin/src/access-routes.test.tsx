@@ -3,203 +3,111 @@
  * part not allowed said in the tenant's frame, and a key's secret gone once its screen is left.
  */
 
-import {
-  type Config,
-  createApi,
-  createCommands,
-  createQueries,
-  createQueryClient,
-  Signed,
-} from "@portalr/client";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { createMemoryHistory, createRouter, RouterProvider } from "@tanstack/react-router";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { page } from "vitest/browser";
-import { render } from "vitest-browser-react";
-import { ACCESS } from "./access";
-import { routeTree } from "./routeTree.gen";
-
-const CONFIG: Config = {
-  supabase: { url: "http://127.0.0.1:9", key: "sb_publishable_x" },
-  surfaces: { artifactr: "/artifactr/v1", reflexr: "/reflexr/v1", grantr: "", portalr: "" },
-  readers: { tempo: false },
-};
-
-/** alice, signed in, as Supabase Auth would say, without asking it. */
-class Alice extends Signed {
-  override signedIn = async () => "alice";
-  override email = () => "alice@example.com";
-}
+import { TENANT_ACTIONS } from "./access";
+import { open as opened } from "./test/admin";
 
 /** Each change Access sent: its method and path, and its body. */
 const sent: { readonly to: string; readonly body: unknown }[] = [];
 const keyring = [{ id: "k_1", principal: { kind: "service_principal", id: "ci" } }];
 
-/** The audit reads Audit made, by their query. */
-const audits: URLSearchParams[] = [];
-
-/** Sixty changes by bob: members added, each between two grants. */
-const LOG = Array.from({ length: 60 }, (_, index) => ({
-  seq: index + 1,
-  at: "2026-10-13T00:00:00Z",
-  by: { kind: "user", id: "bob" },
-  tenant: "acme",
-  event:
-    index % 3 === 0
-      ? { type: "member_added", member: { kind: "service_principal", id: `sp_${index + 1}` } }
-      : {
-          type: "granted",
-          grant: {
-            role: "viewer",
-            on: { kind: "workspace", workspace: "notes" },
-            to: { kind: "user", id: `u_${index + 1}` },
-            tenant: "acme",
-          },
+/** grantr, as far as Access reads it, past who alice is and what she may: the harness answers those. */
+async function access(request: Request, path: string): Promise<Response | undefined> {
+  if (request.method === "PUT" || request.method === "DELETE") {
+    sent.push({ to: `${request.method} ${path}`, body: await request.text() });
+    return Response.json({ at: "2026-10-13T00:00:00Z", by: null, seq: 2, tenant: "acme" });
+  }
+  if (request.method === "POST" && path.endsWith("/grants")) {
+    const body = await request.text();
+    sent.push({ to: `POST ${path}`, body });
+    // grantr refuses granting editor to bob, who holds it.
+    return body.includes('"editor"') && body.includes('"bob"')
+      ? Response.json({ detail: "bob holds editor there already" }, { status: 422 })
+      : Response.json({ at: "2026-10-13T00:00:00Z", by: null, seq: 3, tenant: "acme" });
+  }
+  if (path === "/grantr/v1/tenants/acme/revocations") {
+    const body = await request.text();
+    sent.push({ to: `POST ${path}`, body });
+    // grantr refuses revoking editor: as if alice held less than it gives.
+    return body.includes('"editor"')
+      ? Response.json(
+          { detail: "holds less than editor gives: reflexr:retry_run" },
+          { status: 403 },
+        )
+      : Response.json({ at: "2026-10-13T00:00:00Z", by: null, seq: 4, tenant: "acme" });
+  }
+  if (path === "/grantr/v1/catalog") {
+    return Response.json({
+      roles: [
+        { name: "owner", kinds: ["tenant"] },
+        { name: "editor", kinds: ["workspace"] },
+        { name: "viewer", kinds: ["workspace", "thread", "artifact", "rule"] },
+      ],
+      custom_actions: ["reflexr:retry_run", "reflexr:skip_run"],
+      custom_kinds: ["workspace", "thread", "artifact", "rule"],
+    });
+  }
+  if (path === "/grantr/v1/tenants/acme/roles") {
+    return Response.json([{ name: "triager", actions: ["reflexr:retry_run", "reflexr:skip_run"] }]);
+  }
+  if (path === "/grantr/v1/tenants/acme/grants") {
+    return Response.json([
+      {
+        role: "owner",
+        on: { kind: "tenant" },
+        to: { kind: "user", id: "alice" },
+        tenant: "acme",
+      },
+      { role: "member", on: { kind: "tenant" }, to: { kind: "user", id: "bob" }, tenant: "acme" },
+      {
+        role: "viewer",
+        on: { kind: "thread", workspace: "ws_1", id: "t_1" },
+        to: { kind: "group", id: "ops" },
+        tenant: "acme",
+      },
+      {
+        role: "editor",
+        on: { kind: "workspace", workspace: "ws_1" },
+        to: { kind: "user", id: "bob" },
+        tenant: "acme",
+      },
+    ]);
+  }
+  if (path === "/grantr/v1/tenants/acme/members") {
+    return Response.json([
+      { kind: "service_principal", id: "ci" },
+      { kind: "user", id: "bob" },
+      { kind: "user", id: "alice" },
+    ]);
+  }
+  if (path === "/grantr/v1/tenants/acme/groups") {
+    return Response.json({ ops: [{ kind: "user", id: "bob" }] });
+  }
+  if (path === "/grantr/v1/tenants/acme/keys" && request.method === "GET") {
+    return Response.json(keyring);
+  }
+  if (path === "/grantr/v1/tenants/acme/keys") {
+    keyring.push({ id: "k_2", principal: { kind: "service_principal", id: "ci" } });
+    return Response.json({
+      key: "k_2.s3cr3t",
+      entry: {
+        at: "2026-10-13T00:00:00Z",
+        by: null,
+        seq: 1,
+        tenant: "acme",
+        event: {
+          type: "key_issued",
+          key: "k_2",
+          principal: { kind: "service_principal", id: "ci" },
         },
-}));
-
-/** grantr, as far as Access reads it: alice owns acme, and grantr allows `allowed` there. */
-function grantr(allowed: readonly string[]) {
-  return async (input: RequestInfo | URL, init?: RequestInit) => {
-    const request = new Request(input, init);
-    const path = new URL(request.url).pathname;
-    if (request.method === "PUT" || request.method === "DELETE") {
-      sent.push({ to: `${request.method} ${path}`, body: await request.text() });
-      return Response.json({ at: "2026-10-13T00:00:00Z", by: null, seq: 2, tenant: "acme" });
-    }
-    if (request.method === "POST" && path.endsWith("/grants")) {
-      const body = await request.text();
-      sent.push({ to: `POST ${path}`, body });
-      // grantr refuses granting editor to bob, who holds it.
-      return body.includes('"editor"') && body.includes('"bob"')
-        ? Response.json({ detail: "bob holds editor there already" }, { status: 422 })
-        : Response.json({ at: "2026-10-13T00:00:00Z", by: null, seq: 3, tenant: "acme" });
-    }
-    if (path === "/grantr/v1/tenants/acme/revocations") {
-      const body = await request.text();
-      sent.push({ to: `POST ${path}`, body });
-      // grantr refuses revoking editor: as if alice held less than it gives.
-      return body.includes('"editor"')
-        ? Response.json(
-            { detail: "holds less than editor gives: reflexr:retry_run" },
-            { status: 403 },
-          )
-        : Response.json({ at: "2026-10-13T00:00:00Z", by: null, seq: 4, tenant: "acme" });
-    }
-    if (path === "/grantr/v1/catalog") {
-      return Response.json({
-        roles: [
-          { name: "owner", kinds: ["tenant"] },
-          { name: "editor", kinds: ["workspace"] },
-          { name: "viewer", kinds: ["workspace", "thread", "artifact", "rule"] },
-        ],
-        custom_actions: ["reflexr:retry_run", "reflexr:skip_run"],
-        custom_kinds: ["workspace", "thread", "artifact", "rule"],
-      });
-    }
-    if (path === "/grantr/v1/tenants/acme/roles") {
-      return Response.json([
-        { name: "triager", actions: ["reflexr:retry_run", "reflexr:skip_run"] },
-      ]);
-    }
-    if (path === "/grantr/v1/tenants/acme/grants") {
-      return Response.json([
-        {
-          role: "owner",
-          on: { kind: "tenant" },
-          to: { kind: "user", id: "alice" },
-          tenant: "acme",
-        },
-        { role: "member", on: { kind: "tenant" }, to: { kind: "user", id: "bob" }, tenant: "acme" },
-        {
-          role: "viewer",
-          on: { kind: "thread", workspace: "ws_1", id: "t_1" },
-          to: { kind: "group", id: "ops" },
-          tenant: "acme",
-        },
-        {
-          role: "editor",
-          on: { kind: "workspace", workspace: "ws_1" },
-          to: { kind: "user", id: "bob" },
-          tenant: "acme",
-        },
-      ]);
-    }
-    if (path === "/grantr/v1/tenants/acme/audit") {
-      const query = new URL(request.url).searchParams;
-      audits.push(query);
-      const before = Number(query.get("before_seq") ?? Number.POSITIVE_INFINITY);
-      const kept = LOG.filter(
-        (entry) =>
-          entry.seq < before &&
-          (!query.has("type") || query.getAll("type").includes(entry.event.type)),
-      );
-      return Response.json(kept.slice(Math.max(kept.length - Number(query.get("last")), 0)));
-    }
-    if (path === "/grantr/v1/me") {
-      return Response.json({ memberships: [{ tenant: "acme", user: "alice", roles: ["owner"] }] });
-    }
-    if (path === "/grantr/v1/checks") {
-      const asked: { action: string }[] = await request.json();
-      return Response.json(asked.map(({ action }) => allowed.includes(action)));
-    }
-    if (path === "/grantr/v1/tenants/acme/members") {
-      return Response.json([
-        { kind: "service_principal", id: "ci" },
-        { kind: "user", id: "bob" },
-        { kind: "user", id: "alice" },
-      ]);
-    }
-    if (path === "/grantr/v1/tenants/acme/groups") {
-      return Response.json({ ops: [{ kind: "user", id: "bob" }] });
-    }
-    if (path === "/grantr/v1/tenants/acme/keys" && request.method === "GET") {
-      return Response.json(keyring);
-    }
-    if (path === "/grantr/v1/tenants/acme/keys") {
-      keyring.push({ id: "k_2", principal: { kind: "service_principal", id: "ci" } });
-      return Response.json({
-        key: "k_2.s3cr3t",
-        entry: {
-          at: "2026-10-13T00:00:00Z",
-          by: null,
-          seq: 1,
-          tenant: "acme",
-          event: {
-            type: "key_issued",
-            key: "k_2",
-            principal: { kind: "service_principal", id: "ci" },
-          },
-        },
-      });
-    }
-    return Response.json({ detail: "not here" }, { status: 403 });
-  };
+      },
+    });
+  }
+  return undefined;
 }
 
-async function open(path: string, allowed: readonly string[]) {
-  vi.stubGlobal("fetch", vi.fn(grantr(allowed)));
-  const signed = new Alice(CONFIG, () => undefined);
-  const queryClient = createQueryClient(() => undefined);
-  const api = createApi(CONFIG.surfaces, () => ({ token: "t0k3n" }));
-  const router = createRouter({
-    routeTree,
-    history: createMemoryHistory({ initialEntries: [path] }),
-    context: {
-      config: CONFIG,
-      signed,
-      queries: createQueries(api),
-      commands: createCommands(api, () => undefined),
-      queryClient,
-    },
-  });
-  const screen = await render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-  return { screen, router };
-}
+const open = (path: string, allowed: readonly string[]) => opened(path, allowed, access);
 
 // A desktop's width: the rail beside the page, and each part a table.
 beforeEach(async () => {
@@ -208,7 +116,6 @@ beforeEach(async () => {
 
 afterEach(() => {
   sent.length = 0;
-  audits.length = 0;
   keyring.length = 1;
   vi.unstubAllGlobals();
 });
@@ -227,7 +134,7 @@ test("without removing or revoking, Members has no Remove and Keys no Revoke", a
 });
 
 test("people come first, and no one is offered their own removal", async () => {
-  const { screen } = await open("/t/acme/access/members", ACCESS);
+  const { screen } = await open("/t/acme/access/members", TENANT_ACTIONS);
   const rows = screen.getByRole("table", { name: "Members" }).getByRole("rowheader");
   await expect.element(rows.first()).toHaveTextContent("alice");
   expect(rows.elements().map((row) => row.textContent)).toEqual(["alice", "bob", "ci"]);
@@ -254,7 +161,7 @@ test("with no part allowed, Access is not on the rail", async () => {
 });
 
 test("a key's secret is gone once Keys is left and opened again", async () => {
-  const { screen, router } = await open("/t/acme/access/keys", ACCESS);
+  const { screen, router } = await open("/t/acme/access/keys", TENANT_ACTIONS);
   await screen.getByRole("button", { name: "Issue" }).click();
   const secret = screen.getByRole("textbox", { name: "The key" });
   await expect.element(secret).toHaveValue("k_2.s3cr3t");
@@ -266,7 +173,7 @@ test("a key's secret is gone once Keys is left and opened again", async () => {
 });
 
 test("Done clears a key's secret", async () => {
-  const { screen } = await open("/t/acme/access/keys", ACCESS);
+  const { screen } = await open("/t/acme/access/keys", TENANT_ACTIONS);
   await screen.getByRole("button", { name: "Issue" }).click();
   await expect.element(screen.getByRole("textbox", { name: "The key" })).toBeVisible();
   await screen.getByRole("button", { name: "Done" }).click();
@@ -274,7 +181,7 @@ test("Done clears a key's secret", async () => {
 });
 
 test("Create refuses a group's name that is taken, rather than replace its members", async () => {
-  const { screen } = await open("/t/acme/access/groups", ACCESS);
+  const { screen } = await open("/t/acme/access/groups", TENANT_ACTIONS);
   await screen.getByRole("textbox", { name: "Group" }).fill("ops");
   await screen.getByRole("button", { name: "Create the group" }).click();
   await expect
@@ -284,7 +191,7 @@ test("Create refuses a group's name that is taken, rather than replace its membe
 });
 
 test("Change members starts from the group's members, and confirms whom it takes out", async () => {
-  const { screen } = await open("/t/acme/access/groups", ACCESS);
+  const { screen } = await open("/t/acme/access/groups", TENANT_ACTIONS);
   await expect.element(screen.getByRole("cell", { name: "bob (person)" })).toBeVisible();
   await screen.getByRole("button", { name: "Change ops's members" }).click();
   const bob = screen.getByRole("checkbox", { name: "bob (person)" });
@@ -325,7 +232,7 @@ test("without reading members, a group's members are typed, and checked before s
 });
 
 test("revoking the key just issued clears its secret", async () => {
-  const { screen } = await open("/t/acme/access/keys", ACCESS);
+  const { screen } = await open("/t/acme/access/keys", TENANT_ACTIONS);
   await screen.getByRole("button", { name: "Issue" }).click();
   await expect.element(screen.getByRole("textbox", { name: "The key" })).toBeVisible();
   await screen.getByRole("button", { name: "Revoke k_2" }).click();
@@ -342,7 +249,7 @@ test("without defining roles or granting, Roles and Grants aren't parts", async 
 });
 
 test("with defining roles and granting, Roles and Grants are parts", async () => {
-  const { screen } = await open("/t/acme/access/roles", ACCESS);
+  const { screen } = await open("/t/acme/access/roles", TENANT_ACTIONS);
   const parts = screen.getByRole("navigation", { name: "Access" });
   await expect.element(parts.getByRole("link", { name: "Roles" })).toBeVisible();
   await parts.getByRole("link", { name: "Grants" }).click();
@@ -350,7 +257,7 @@ test("with defining roles and granting, Roles and Grants are parts", async () =>
 });
 
 test("Roles lists the catalog's roles and the custom ones, and refuses a name taken", async () => {
-  const { screen } = await open("/t/acme/access/roles", ACCESS);
+  const { screen } = await open("/t/acme/access/roles", TENANT_ACTIONS);
   const builtIn = screen.getByRole("table", { name: "Built-in roles" });
   await expect.element(builtIn.getByRole("rowheader", { name: "viewer" })).toBeVisible();
   await expect
@@ -370,7 +277,7 @@ test("Roles lists the catalog's roles and the custom ones, and refuses a name ta
 });
 
 test("Change actions starts from the role's, and confirms the actions it takes away", async () => {
-  const { screen } = await open("/t/acme/access/roles", ACCESS);
+  const { screen } = await open("/t/acme/access/roles", TENANT_ACTIONS);
   await screen.getByRole("button", { name: "Change triager's actions" }).click();
   const heading = screen.getByRole("heading", { name: "Change triager's actions" });
   await expect.element(heading).toHaveFocus();
@@ -398,7 +305,7 @@ test("Change actions starts from the role's, and confirms the actions it takes a
 });
 
 test("deleting a custom role says its grants go with it", async () => {
-  const { screen } = await open("/t/acme/access/roles", ACCESS);
+  const { screen } = await open("/t/acme/access/roles", TENANT_ACTIONS);
   await screen.getByRole("button", { name: "Delete triager" }).click();
   const dialog = screen.getByRole("alertdialog", { name: "Delete the role triager?" });
   await expect.element(dialog.getByText("Every grant of triager goes with it.")).toBeVisible();
@@ -408,7 +315,7 @@ test("deleting a custom role says its grants go with it", async () => {
 });
 
 test("Grants groups the tenant's grants and each workspace's, each named by whom and what", async () => {
-  const { screen } = await open("/t/acme/access/grants", ACCESS);
+  const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
   const tenant = screen.getByRole("table", { name: "Grants on the tenant" });
   await expect
     .element(tenant.getByRole("row", { name: "alice (person) as owner on the tenant" }))
@@ -424,7 +331,7 @@ test("Grants groups the tenant's grants and each workspace's, each named by whom
 });
 
 test("the form starts on no role and no one, and a role chooses where again", async () => {
-  const { screen } = await open("/t/acme/access/grants", ACCESS);
+  const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
   await expect.element(screen.getByRole("combobox", { name: "Role" })).toHaveValue("");
   await expect.element(screen.getByRole("combobox", { name: "To" })).toHaveValue("");
   await screen.getByRole("combobox", { name: "Role" }).selectOptions("viewer");
@@ -440,7 +347,7 @@ test("the form starts on no role and no one, and a role chooses where again", as
 });
 
 test("a custom role is granted where custom roles may be, and the ids are trimmed", async () => {
-  const { screen } = await open("/t/acme/access/grants", ACCESS);
+  const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
   await screen.getByRole("combobox", { name: "Role" }).selectOptions("triager");
   const on = screen.getByRole("combobox", { name: "On" });
   expect([...on.element().querySelectorAll("option")].map((option) => option.value)).toEqual([
@@ -470,7 +377,7 @@ test("a custom role is granted where custom roles may be, and the ids are trimme
 });
 
 test("granting a role that runs the tenant is confirmed first", async () => {
-  const { screen } = await open("/t/acme/access/grants", ACCESS);
+  const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
   await screen.getByRole("combobox", { name: "Role" }).selectOptions("owner");
   await screen.getByRole("combobox", { name: "On" }).selectOptions("tenant");
   await screen.getByRole("combobox", { name: "To" }).selectOptions("bob (person)");
@@ -487,7 +394,7 @@ test("granting a role that runs the tenant is confirmed first", async () => {
 });
 
 test("a refused grant says why, and keeps what was entered", async () => {
-  const { screen } = await open("/t/acme/access/grants", ACCESS);
+  const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
   await screen.getByRole("combobox", { name: "Role" }).selectOptions("editor");
   await screen.getByRole("combobox", { name: "On" }).selectOptions("workspace");
   await screen.getByRole("combobox", { name: "Workspace" }).fill("ws_1");
@@ -550,7 +457,7 @@ test("without revoking, Grants has no Revoke", async () => {
 });
 
 test("revoking a grant is confirmed, and sends the grant", async () => {
-  const { screen } = await open("/t/acme/access/grants", ACCESS);
+  const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
   const revoke = screen.getByRole("button", {
     name: "Revoke ops (group) as viewer on thread t_1 in ws_1",
   });
@@ -571,7 +478,7 @@ test("revoking a grant is confirmed, and sends the grant", async () => {
 });
 
 test("a refused revocation keeps the dialog open, and says why", async () => {
-  const { screen } = await open("/t/acme/access/grants", ACCESS);
+  const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
   await screen
     .getByRole("button", { name: "Revoke bob (person) as editor on workspace ws_1" })
     .click();
@@ -580,64 +487,4 @@ test("a refused revocation keeps the dialog open, and says why", async () => {
   await expect
     .element(dialog.getByRole("alert"))
     .toHaveTextContent("Not revoked: holds less than editor gives: reflexr:retry_run");
-});
-
-test("Audit is on the rail where grantr allows reading the log, and not found elsewhere", async () => {
-  const { screen } = await open("/t/acme/audit", ["grantr:add_member"]);
-  await expect.element(screen.getByText("The audit log isn't yours to read here")).toBeVisible();
-  const rail = screen.getByRole("navigation", { name: "Tenant" });
-  await expect.element(rail.getByRole("link", { name: "Access" })).toBeVisible();
-  await expect.element(rail.getByRole("link", { name: "Audit" })).not.toBeInTheDocument();
-  expect(audits).toEqual([]);
-});
-
-test("the log opens on the newest changes, and Show more adds the ones before", async () => {
-  const { screen } = await open("/t/acme", ["grantr:read_audit"]);
-  await screen
-    .getByRole("navigation", { name: "Tenant" })
-    .getByRole("link", { name: "Audit" })
-    .click();
-  const log = screen.getByRole("table", { name: "Audit log" });
-  await expect
-    .element(
-      log.getByRole("rowheader", { name: "granted viewer on workspace notes to u_60 (person)" }),
-    )
-    .toBeVisible();
-  expect(log.getByRole("rowheader").elements()).toHaveLength(50);
-  expect(log.getByRole("rowheader").elements()[0]?.textContent).toMatch(/u_60/);
-  await screen.getByRole("button", { name: "Show more" }).click();
-  await expect
-    .element(log.getByRole("rowheader", { name: "added sp_1 (service principal)" }))
-    .toBeVisible();
-  expect(log.getByRole("rowheader").elements()).toHaveLength(60);
-  expect(audits.map((query) => query.get("before_seq"))).toEqual([null, "11"]);
-  expect(audits.every((query) => query.get("last") === "50")).toBe(true);
-  // The newest on top, down to the first.
-  const rows = log.getByRole("rowheader").elements();
-  expect(rows.at(-1)?.textContent).toBe("added sp_1 (service principal)");
-  await expect.element(screen.getByRole("button", { name: "Show more" })).not.toBeInTheDocument();
-});
-
-test("a filter goes to grantr and into the address", async () => {
-  const { screen, router } = await open("/t/acme/audit", ["grantr:read_audit"]);
-  await screen.getByRole("combobox", { name: "Change" }).selectOptions("Members added");
-  await screen.getByRole("combobox", { name: "Made by" }).selectOptions("A person");
-  await screen.getByRole("textbox", { name: "Their id" }).fill("bob");
-  await screen.getByRole("button", { name: "Apply" }).click();
-  const log = screen.getByRole("table", { name: "Audit log" });
-  await expect
-    .element(log.getByRole("rowheader", { name: /^granted/ }).first())
-    .not.toBeInTheDocument();
-  expect(log.getByRole("rowheader").elements()).toHaveLength(20);
-  expect(router.state.location.search).toEqual({
-    type: "member_added",
-    actor_kind: "user",
-    actor: "bob",
-  });
-  const asked = audits.at(-1);
-  expect(asked?.getAll("type")).toEqual(["member_added"]);
-  expect(asked?.get("actor_kind")).toBe("user");
-  expect(asked?.get("actor")).toBe("bob");
-  await screen.getByRole("button", { name: "Clear" }).click();
-  await expect.element(log.getByRole("rowheader", { name: /^granted/ }).first()).toBeVisible();
 });

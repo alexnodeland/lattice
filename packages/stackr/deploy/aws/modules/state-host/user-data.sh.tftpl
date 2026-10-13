@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# The state host's first boot (RFC-0004): Docker, with its logs rotated, and Compose; the data volume
+# at /data; lattice at commit ${lattice_commit}; and a systemd unit that runs deploy/aws/state-host's
+# Compose at every boot. Each time the unit starts, it reads ClickHouse's passwords from Secrets
+# Manager into /run/stackr/.env, on tmpfs and private: nothing rests on disk, and a rotated secret
+# reaches the host with `systemctl restart stackr-state`.
+set -euo pipefail
+exec >/var/log/stackr-state-host.log 2>&1
+
+# Docker's logs, rotated: three files of 10 MB per container, as on the single host.
+mkdir -p /etc/docker
+echo '{"log-driver": "json-file", "log-opts": {"max-size": "10m", "max-file": "3"}}' >/etc/docker/daemon.json
+apt-get update -q
+DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker.io docker-compose-v2 git
+
+# The data volume, by its id: formatted only when it has no filesystem (blkid's 2), mounted at /data
+# at every boot.
+device=/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${replace(volume_id, "-", "")}
+for _ in $(seq 1 120); do [[ -e $device ]] && break; sleep 5; done
+found=0
+blkid "$device" >/dev/null || found=$?
+case $found in
+  0) ;;
+  2) mkfs.ext4 -q -L stackr-data "$device" ;;
+  *) exit "$found" ;;
+esac
+mkdir -p /data
+grep -q stackr-data /etc/fstab || echo "LABEL=stackr-data /data ext4 defaults,nofail 0 2" >>/etc/fstab
+mount -a
+mkdir -p /data/clickhouse /data/clickhouse-logs /data/prometheus
+chown -R 101:101 /data/clickhouse /data/clickhouse-logs
+chown -R 65534:65534 /data/prometheus
+
+# lattice at one commit, by its SHA.
+git init --quiet /opt/lattice
+git -C /opt/lattice fetch --quiet --depth 1 https://github.com/alexnodeland/lattice '${lattice_commit}'
+git -C /opt/lattice checkout --quiet FETCH_HEAD
+
+# The passwords go from the AWS CLI's output into the file, never onto a command line. The CLI runs
+# on the host's network, the one hop IMDS answers.
+cat >/usr/local/sbin/stackr-state-env <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+secret() {
+  docker run --rm --network host '${aws_cli_image}' secretsmanager get-secret-value \
+    --region '${region}' --secret-id "$1" --query SecretString --output text
+}
+password=$(secret '${secret_arn}')
+admin=$(secret '${admin_arn}')
+umask 077
+printf 'STATE_HOST_ADDRESS=%s\nCLICKHOUSE_PASSWORD=%s\nCLICKHOUSE_ADMIN_PASSWORD=%s\n' \
+  '${address}' "$password" "$admin" >/run/stackr/.env
+SCRIPT
+chmod 0700 /usr/local/sbin/stackr-state-env
+
+cat >/etc/systemd/system/stackr-state.service <<'UNIT'
+[Unit]
+Description=stackr's state host: ClickHouse, Prometheus and prom-label-proxy
+Requires=docker.service
+After=docker.service
+RequiresMountsFor=/data
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+RuntimeDirectory=stackr
+RuntimeDirectoryMode=0700
+WorkingDirectory=/opt/lattice/packages/stackr/deploy/aws/state-host
+ExecStartPre=/usr/local/sbin/stackr-state-env
+ExecStart=/usr/bin/docker compose --env-file /run/stackr/.env up --detach --wait
+ExecStop=/usr/bin/docker compose --env-file /run/stackr/.env down
+TimeoutStartSec=15min
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now stackr-state.service

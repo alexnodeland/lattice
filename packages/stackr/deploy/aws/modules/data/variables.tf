@@ -73,9 +73,9 @@ variable "valkey_auth_token" {
 }
 
 variable "buckets" {
-  description = "The S3 buckets, by role (langfuse, telemetry, backups), each named <name>-<role>-<unique suffix>."
+  description = "The S3 buckets, by role (langfuse, telemetry, backups, access-logs), each named <name>-<role>-<unique suffix>."
   type        = set(string)
-  default     = ["langfuse", "telemetry", "backups"]
+  default     = ["langfuse", "telemetry", "backups", "access-logs"]
 }
 
 variable "force_destroy_buckets" {

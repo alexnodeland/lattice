@@ -67,7 +67,7 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 | `/` | The person's tenants, from grantr's `/me`: none is no access, and one goes straight to it |
 | `/t/$tenant` | The workspaces grantr says they can open there |
 | `/t/$tenant/w/$workspace` | A workspace's threads, and a new one; its artifactr stream is open while any of its routes is |
-| `/t/$tenant/w/$workspace/threads/$thread` | A thread's chat: its messages, its runs as they stream, what a paused run waits on, its proposals, and a message to post |
+| `/t/$tenant/w/$workspace/threads/$thread` | A thread's chat: its messages, its runs as they stream, what a paused run waits on, its proposals, and a message to post where grantr allows; and its menu, to restrict and share it ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
 | `/t/$tenant/w/$workspace/artifacts` | The workspace's artifacts that aren't archived, each by kind and latest version |
 | `/t/$tenant/w/$workspace/artifacts/$artifact` | An artifact through its kind's renderer, its revisions newest first with what each changed, and its open proposals |
 | `/t/$tenant/w/$workspace/proposals` | Every proposal in the workspace, the open ones first, to accept or reject |
@@ -111,6 +111,9 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Card`, `EmptyState`, `Table` | What asks something of the reader; nothing yet, and what to do; rows, named by a caption |
 | `StatusBadge` | How a thing is going, as a shape and a word; only waiting for you in the working colour |
 | `SegmentedFilter` | One filter of a few, side by side |
+| `Dialog` | A dialog over the page, opened by its caller, with where focus starts and where it returns ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
+| `Menu` | A button and the actions it opens, each of which may be disabled while it's being done |
+| `SelectField` | A labelled choice among a few, as the platform's own select, which submits with its form |
 | `Icon`, `Mark`, `Lockup` | A Lucide icon beside its word; portalr's marks |
 
 `gallery.screenshot.test.tsx` pins how they sit together, wide and narrow, in each scheme. It runs in CI alone, against Linux baselines.

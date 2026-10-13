@@ -2,6 +2,15 @@
 # apply knows a value, such as a bucket's ARN in its policy.
 
 mock_provider "aws" {
+  mock_data "aws_caller_identity" {
+    defaults = { account_id = "000000000000" }
+  }
+  mock_data "aws_partition" {
+    defaults = { partition = "aws" }
+  }
+  mock_data "aws_region" {
+    defaults = { region = "us-east-1" }
+  }
   mock_resource "aws_db_instance" {
     defaults = {
       master_user_secret = [{ secret_arn = "arn:aws:secretsmanager:us-east-1:000000000000:secret:rds", kms_key_id = "", secret_status = "active" }]
@@ -159,5 +168,19 @@ run "data_buckets_are_private_encrypted_versioned_tidied_and_tls_only" {
       jsondecode(policy.policy).Statement[0].Effect == "Deny" && jsondecode(policy.policy).Statement[0].Condition.Bool["aws:SecureTransport"] == "false"
     ])
     error_message = "Every bucket refuses requests without TLS."
+  }
+  assert {
+    condition = (
+      length(jsondecode(aws_s3_bucket_policy.this["langfuse"].policy).Statement) == 1
+      && jsondecode(aws_s3_bucket_policy.this["access-logs"].policy).Statement[1] == {
+        Sid       = "ELBAccessLogs"
+        Effect    = "Allow"
+        Principal = { Service = "logdelivery.elasticloadbalancing.amazonaws.com" }
+        Action    = "s3:PutObject"
+        Resource  = "arn:aws:s3:::stackr-mocked/alb/AWSLogs/000000000000/*"
+        Condition = { ArnLike = { "aws:SourceArn" = "arn:aws:elasticloadbalancing:us-east-1:000000000000:loadbalancer/*" } }
+      }
+    )
+    error_message = "ELB's log delivery may write to the access-logs bucket, under alb/, for this account's load balancers only; to no other."
   }
 }

@@ -7,14 +7,18 @@
  * validation when the body isn't a command at all (portalr ADR-0020).
  */
 
+import type { components as Grantr } from "./generated/grantr.openapi";
 import type { components } from "./generated/reflexr.openapi";
 import { type Api, named } from "./rest";
 
 type Command = components["schemas"]["Command"];
 type Result = components["schemas"]["CommandResult"];
+type GrantRequest = Grantr["schemas"]["GrantRequest"];
+type Restriction = Grantr["schemas"]["Restriction"];
+type AuditEntry = Grantr["schemas"]["AuditEntry"];
 
-/** A command's answer: carried out, or refused, with each reason in words. */
-export type Answer = { readonly outcome: "done"; readonly result: Result } | Refusal;
+/** A command's answer: carried out, with what the server answered, or refused, with each reason. */
+export type Answer<R = Result> = { readonly outcome: "done"; readonly result: R } | Refusal;
 
 /** A command that wasn't carried out: the status it was answered with (0 for none), and why. */
 export interface Refusal {
@@ -32,8 +36,20 @@ interface Invalid {
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** Where in a command an invalid value is: its path after the command's own type. */
-const at = (loc: Invalid["loc"]) => loc.slice(loc.indexOf("command") + 2).join(".");
+/**
+ * Where in a body an invalid value is. FastAPI's path starts at `body`; in a command frame it runs
+ * on through `command` and the command's own type, `["body", "command", "install_rule", "rule"]`,
+ * which say nothing a person typed, so the path starts after them. Elsewhere it starts after
+ * `body`. The body itself, or the command, is an empty path.
+ */
+function at(loc: Invalid["loc"]): string {
+  const command = loc.indexOf("command");
+  return (command === -1 ? loc.slice(1) : loc.slice(command + 2)).join(".");
+}
+
+/** What a field or a form says of a command that wasn't done, after what it would have done. */
+export const refusal = (undone: string, refused: Refusal) =>
+  `${undone}: ${refused.reasons.join("; ")}`;
 
 /**
  * Each reason a refusal gives: a rejection's problems or its message, the body's errors, or a
@@ -43,9 +59,10 @@ function reasons(status: number, error: unknown): string[] {
   if (isRecord(error)) {
     const { detail, rejection } = error;
     if (Array.isArray(detail)) {
-      return (detail as Invalid[]).map(({ loc, msg }) =>
-        at(loc) === "" ? msg : `${at(loc)}: ${msg}`,
-      );
+      return (detail as Invalid[]).map(({ loc, msg }) => {
+        const path = at(loc);
+        return path === "" ? msg : `${path}: ${msg}`;
+      });
     }
     if (typeof detail === "string") {
       return [detail];
@@ -62,42 +79,81 @@ function reasons(status: number, error: unknown): string[] {
 }
 
 /**
- * The commands the UIs send over REST, over the given clients. `unsigned` is called when one is
- * refused because no one is signed in, as a read refused so ends the session.
+ * The commands the UIs send over REST, over the given clients: reflexr's, and grantr's changes to
+ * who may see and do what. `unsigned` is called when one is refused because no one is signed in,
+ * as a read refused so ends the session.
  */
 export function createCommands(api: Api, unsigned: () => void = () => {}) {
+  /**
+   * A request's answer, from what openapi-fetch resolves with: `done` if the server says so of
+   * the body it answered.
+   */
+  async function answer<D>(
+    sent: Promise<{ data?: D; error?: unknown; response: Response }>,
+    done: (data: D) => boolean = () => true,
+  ): Promise<Answer<D>> {
+    const answered = await sent.catch(() => null); // fetch throws when nothing answers
+    if (answered === null) {
+      return { outcome: "refused", status: 0, reasons: ["The server couldn't be reached."] };
+    }
+    const { data, error, response } = answered;
+    if (data !== undefined && done(data)) {
+      return { outcome: "done", result: data };
+    }
+    if (response.status === 401) {
+      unsigned();
+    }
+    return {
+      outcome: "refused",
+      status: response.status,
+      reasons: reasons(response.status, data ?? error),
+    };
+  }
+  /** A grantr request in a tenant: its path, and the header that names it, as every read sends. */
+  const inTenant = (tenant: string) => ({ ...named(tenant), params: { path: { tenant } } });
   return {
     reflexr: {
       /** Send one command to a workspace, once: the same `id` makes a retry the same command. */
-      send: async (
+      send: (
         tenant: string,
         ws: string,
         command: Command,
         id: string = crypto.randomUUID(),
-      ): Promise<Answer> => {
-        const answered = await api.reflexr
-          .POST("/workspaces/{workspace_id}/commands", {
+      ): Promise<Answer> =>
+        answer(
+          api.reflexr.POST("/workspaces/{workspace_id}/commands", {
             ...named(tenant),
             params: { path: { workspace_id: ws } },
             body: { type: "command", command_id: id, command },
-          })
-          .catch(() => null); // fetch throws when nothing answers
-        if (answered === null) {
-          return { outcome: "refused", status: 0, reasons: ["The server couldn't be reached."] };
-        }
-        const { data, error, response } = answered;
-        if (data?.ok === true) {
-          return { outcome: "done", result: data };
-        }
-        if (response.status === 401) {
-          unsigned();
-        }
-        return {
-          outcome: "refused",
-          status: response.status,
-          reasons: reasons(response.status, data ?? error),
-        };
-      },
+          }),
+          (result) => result.ok,
+        ),
+    },
+    grantr: {
+      /** Grant a role on a resource, such as a thread, to a member of the tenant. */
+      grant: (tenant: string, request: GrantRequest): Promise<Answer<AuditEntry>> =>
+        answer(
+          api.grantr.POST("/grantr/v1/tenants/{tenant}/grants", {
+            ...inTenant(tenant),
+            body: request,
+          }),
+        ),
+      /** Take a grant back. */
+      revoke: (tenant: string, request: GrantRequest): Promise<Answer<AuditEntry>> =>
+        answer(
+          api.grantr.POST("/grantr/v1/tenants/{tenant}/revocations", {
+            ...inTenant(tenant),
+            body: request,
+          }),
+        ),
+      /** Restrict a thread or artifact to those granted a role on it, or lift that. */
+      restrict: (tenant: string, restriction: Restriction): Promise<Answer<AuditEntry>> =>
+        answer(
+          api.grantr.POST("/grantr/v1/tenants/{tenant}/restrictions", {
+            ...inTenant(tenant),
+            body: restriction,
+          }),
+        ),
     },
   };
 }

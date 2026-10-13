@@ -2,7 +2,11 @@ import { expect } from "@playwright/test";
 import { Given, Then, When } from "./fixtures";
 import { email, password } from "./people";
 
-async function signIn(page: import("@playwright/test").Page, person: string, secret: string) {
+export async function signIn(
+  page: import("@playwright/test").Page,
+  person: string,
+  secret: string,
+) {
   await page.goto("sign-in");
   await page.getByLabel("Email").fill(email(person));
   await page.getByLabel("Password").fill(secret);

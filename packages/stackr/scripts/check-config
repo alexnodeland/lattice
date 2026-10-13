@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Static checks that no service's own validator covers. Run by scripts/validate.
 
-Usage: scripts/check-config {dashboards,supabase,litellm}
+Usage: scripts/check-config {dashboards,supabase,litellm,aws}
 
 dashboards: every dashboard under deploy/grafana/dashboards is valid JSON, has
 a unique uid and a title, and refers only to the data sources Grafana is
@@ -20,6 +20,15 @@ starts without a guardrail it can't load. Every model group a fallback names
 exists, guardrails use integrations that need no licence and valid modes,
 every `os.environ/` reference is set on the litellm service in compose.yaml,
 and no key is written into the file.
+
+aws: the AWS recipe's state host runs ClickHouse, Prometheus and
+prom-label-proxy from a Compose file of its own (deploy/aws/state-host), since
+Compose needs every variable of a file it reads. Its services are compose.yaml's
+but for their ports and their data's paths on the host: the same images, users,
+commands, health checks, settings and mount points. Its Prometheus
+configuration is deploy/prometheus's, with the services' names in the private
+namespace in place of Compose's. GoTrue's proxy, the edge's caddy_image, is the
+single host's Caddy.
 """
 
 from __future__ import annotations
@@ -225,8 +234,71 @@ def check_litellm() -> list[str]:
     return problems
 
 
+STATE_HOST = ROOT / "deploy" / "aws" / "state-host"
+NAMESPACE = "stackr.internal"
+
+
+# What the state host's services must keep from compose.yaml's: only their ports and their data's
+# paths on the host differ.
+STATE_HOST_KEYS = ("image", "user", "command", "entrypoint", "healthcheck")
+EDGE = ROOT / "deploy" / "aws" / "modules" / "edge" / "variables.tf"
+HOST_OVERLAY = ROOT / "deploy" / "host" / "compose.prod.yaml"
+
+
+def volume_targets(service: dict[str, Any]) -> set[str]:
+    """The paths a service's volumes are mounted at, inside its container."""
+    return {volume.split(":")[1] for volume in service.get("volumes", [])}
+
+
+def check_aws() -> list[str]:
+    """Check that the AWS recipe's copies of the stack's settings follow the stack's."""
+    stack = yaml.safe_load((ROOT / "compose.yaml").read_text())["services"]
+    state = yaml.safe_load((STATE_HOST / "compose.yaml").read_text())["services"]
+    problems: list[str] = []
+    for name, service in state.items():
+        where = f"deploy/aws/state-host's {name}"
+        if name not in stack:
+            problems.append(f"{where} isn't a service of compose.yaml")
+            continue
+        for key in STATE_HOST_KEYS:
+            if service.get(key) != stack[name].get(key):
+                problems.append(f"{where}: its {key} isn't compose.yaml's")
+        if set(service.get("environment", {})) != set(stack[name].get("environment", {})):
+            problems.append(f"{where}: its environment's settings aren't compose.yaml's")
+        if volume_targets(service) != volume_targets(stack[name]):
+            problems.append(f"{where}: its volumes aren't mounted where compose.yaml's are")
+    expected = yaml.safe_load((ROOT / "deploy" / "prometheus" / "prometheus.yml").read_text())
+    for job in expected["scrape_configs"]:
+        for static in job.get("static_configs", []):
+            static["targets"] = [
+                target.replace(":", f".{NAMESPACE}:", 1)
+                if not target.startswith("localhost:")
+                else target
+                for target in static["targets"]
+            ]
+    if yaml.safe_load((STATE_HOST / "prometheus.yml").read_text()) != expected:
+        problems.append(
+            "deploy/aws/state-host/prometheus.yml isn't deploy/prometheus/prometheus.yml, "
+            f"with the services named in {NAMESPACE}"
+        )
+    # The overlay's Compose tags (!override, !reset) aren't YAML that PyYAML reads.
+    found = re.search(r"image: (caddy:\S+)", HOST_OVERLAY.read_text())
+    caddy = found[1] if found else "(none in deploy/host/compose.prod.yaml)"
+    if f'"{caddy}"' not in EDGE.read_text():
+        problems.append(f"the edge's caddy_image isn't the single host's Caddy, {caddy}")
+    if not problems:
+        print(f"ok: the state host runs {', '.join(state)} as compose.yaml does")
+        print("ok: GoTrue's proxy runs the single host's Caddy")
+    return problems
+
+
 def main() -> int:
-    checks = {"dashboards": check_dashboards, "supabase": check_supabase, "litellm": check_litellm}
+    checks = {
+        "dashboards": check_dashboards,
+        "supabase": check_supabase,
+        "litellm": check_litellm,
+        "aws": check_aws,
+    }
     if len(sys.argv) != 2 or sys.argv[1] not in checks:
         print(f"usage: scripts/check-config {{{','.join(checks)}}}", file=sys.stderr)
         return 2

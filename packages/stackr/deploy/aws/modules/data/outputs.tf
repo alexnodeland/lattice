@@ -21,6 +21,13 @@ output "security_group_id" {
 }
 
 output "buckets" {
-  description = "The buckets, by role: each one's name and ARN."
+  description = "The buckets, by role: each one's name and ARN, with its policy in place."
   value       = { for role, bucket in aws_s3_bucket.this : role => { name = bucket.id, arn = bucket.arn } }
+  # The ALB checks it may write its access logs when it is created.
+  depends_on = [aws_s3_bucket_policy.this]
+}
+
+output "access_logs_prefix" {
+  description = "Where in the access-logs bucket ELB may write."
+  value       = local.access_logs_prefix
 }

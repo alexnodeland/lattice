@@ -6,7 +6,7 @@ Each record captures one decision: the context that forced it, the options consi
 |---|---|---|
 | [0001](0001-library-with-a-sans-io-core.md) | A library with a sans-IO core, replacing the template | Accepted |
 | [0002](0002-the-name-reflexr.md) | The name reflexr | Accepted |
-| [0003](0003-independent-sibling-of-artifactr.md) | An independent sibling of artifactr, with aligned conventions | Accepted |
+| [0003](0003-independent-sibling-of-artifactr.md) | An independent sibling of artifactr, with aligned conventions | Accepted, amended by lattice 0018 |
 | [0004](0004-tenant-scoped-streams.md) | Tenant-scoped streams with one log each | Superseded by 0016 |
 | [0005](0005-per-rule-cursors.md) | Per-rule cursors: decide exactly, act at least once | Accepted |
 | [0006](0006-rules-as-typed-serializable-data.md) | Rules as typed, serializable data | Accepted, amended by 0041, 0051 and 0053 |

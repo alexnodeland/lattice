@@ -4,18 +4,17 @@
 
 ## What lattice is
 
-lattice is one repository: seven packages, two reference implementations, and one set of tools that checks, releases and documents them. It holds the packages, and changes nothing about what they are downstream. Each keeps its name, `pyproject.toml`, version, dependencies, extras, tests, 100% coverage gate, ADRs, RFCs, changelog and releases, and each installs on its own.
+lattice is one repository: eight packages, two reference implementations, and one set of tools that checks, releases and documents them. It holds the packages, and changes nothing about what they are downstream. Each keeps its name, `pyproject.toml`, version, dependencies, extras, tests, 100% coverage gate, ADRs, RFCs, changelog and releases, and each installs on its own.
 
 ### Goals
 
 - Every package stays installable on its own, and CI proves it on every change.
-- The libraries stay independent ([reflexr ADR-0003](reflexr/adr/0003-independent-sibling-of-artifactr.md)), and checks enforce it, where repository walls used to.
+- The libraries stay independent ([reflexr ADR-0003](reflexr/adr/0003-independent-sibling-of-artifactr.md), as amended by [ADR-0018](adr/0018-lattice-core-what-the-libraries-share.md)), and checks enforce it, where repository walls used to.
 - A change that spans packages lands in one pull request, tested with every package it can break.
 - One of each: lock per language, CI, set of hooks, documentation site, dev container and release process.
 
 ### Non-goals (for now)
 
-- A shared package for the code artifactr and reflexr keep verbatim ([Aligned with reflexr](artifactr/architecture.md#aligned-with-reflexr)). It would be the shared kernel that reflexr ADR-0003 deferred. In lattice, one pull request changes both copies.
 - Publishing to PyPI ([#7](https://github.com/alexnodeland/lattice/issues/7)). Until then, a package installs from its tag, in a subdirectory of lattice ([Releases](#releases)).
 
 ## Layout
@@ -29,7 +28,8 @@ lattice/
 │   ├── relayr/          relayr-ai
 │   ├── grantr/          grantr: src/, tests/, schemas/, compose.yaml, moon.yml, pyproject.toml, README.md, CHANGELOG.md, LICENSE
 │   ├── stackr/          the stack and the application template: compose.yaml, supabase/, deploy/, scripts/, template/, copier.yml, versions.env, Makefile
-│   └── portalr/         the portal: its Python package, and web/ (client, ui, app, admin), the Bun workspace's packages
+│   ├── portalr/         the portal: its Python package, and web/ (client, ui, app, admin), the Bun workspace's packages
+│   └── lattice-core/    lattice-core-ai: what the libraries share and must keep identical (ADR-0018)
 ├── examples/
 │   ├── docplan/         artifactr's reference implementation, and its image
 │   └── oncall/          reflexr's
@@ -60,13 +60,14 @@ lattice/
 
 ## The projects
 
-moon knows fourteen projects: the thirteen below, and `lattice`, the root, which holds the site and lattice's own tests and scripts.
+moon knows fifteen projects: the fourteen below, and `lattice`, the root, which holds the site and lattice's own tests and scripts.
 
 | Project | Path | What it is | Kind | Depends on |
 |---|---|---|---|---|
+| lattice-core | `packages/lattice-core` | What the libraries share and must keep identical; distributed as `lattice-core-ai` ([ADR-0018](adr/0018-lattice-core-what-the-libraries-share.md)) | Library | |
 | evalr | `packages/evalr` | Typed evaluation of agent systems | Library | |
-| artifactr | `packages/artifactr` | Chat applications where people and agents share versioned artifacts; distributed as `artifactr-ai` | Library | evalr |
-| reflexr | `packages/reflexr` | Rules over event streams that run LLM workflows | Library | evalr |
+| artifactr | `packages/artifactr` | Chat applications where people and agents share versioned artifacts; distributed as `artifactr-ai` | Library | evalr, lattice-core |
+| reflexr | `packages/reflexr` | Rules over event streams that run LLM workflows | Library | evalr, lattice-core |
 | relayr | `packages/relayr` | The bridge between artifactr and reflexr; distributed as `relayr-ai` | Library | artifactr, reflexr |
 | grantr | `packages/grantr` | Identity and access for artifactr and reflexr, in stackr's template ([its plan](grantr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
 | stackr | `packages/stackr` | The stack the libraries run on, and the application template | Tool (shell), ships no wheel | artifactr, reflexr, evalr, grantr |
@@ -120,8 +121,8 @@ One resolution means every package agrees on every third-party version. Today th
 
 Every package that ships a wheel is tagged `distribution` in its `moon.yml`, and inherits three tasks that prove it installs outside lattice:
 
-- **`build`** runs `uv build --no-sources --out-dir dist` from the package's directory, so the wheel and sdist are built as they are published, into the project's own `dist/`.
-- **`standalone`** depends on the package's `build` and its dependencies'. [`scripts/standalone.py`](https://github.com/alexnodeland/lattice/blob/main/scripts/standalone.py) installs the wheel with every extra, and the siblings it needs as wheels by path, into a fresh environment outside the workspace; imports every module; and checks the version. uv checks every range between them, so a range that a sibling's version doesn't satisfy fails to resolve.
+- **`build`** runs `uv build --no-sources --out-dir dist` from the package's directory, so the wheel and sdist are built as they are published, into the project's own `dist/`. It runs after its dependencies' `build`, so a package's siblings are built however far down they are.
+- **`standalone`** depends on the package's `build`. [`scripts/standalone.py`](https://github.com/alexnodeland/lattice/blob/main/scripts/standalone.py) installs the wheel with every extra, and the siblings it needs as wheels by path, into a fresh environment outside the workspace; imports every module; and checks the version. uv checks every range between them, so a range that a sibling's version doesn't satisfy fails to resolve.
 - **`deptry`** runs over `src/` from the package's directory. An undeclared import (DEP001, DEP003) or a development dependency used in shipped code (DEP004) fails. DEP002, unused dependencies, stays off, since extras such as `[postgres]` name drivers the library never imports.
 
 `check` includes `standalone` and `deptry`.
@@ -151,7 +152,7 @@ moon runs every task, and only those a change affects; uv and Bun manage the dep
 
 | File | Holds |
 |---|---|
-| `.moon/workspace.yml` | The fourteen projects, by path; `main` as the default branch; moon's version constraint |
+| `.moon/workspace.yml` | The fifteen projects, by path; `main` as the default branch; moon's version constraint |
 | `.moon/tasks/python.yml` | For every Python project: `lint`, `typecheck`, `test`, `format` and `check`. The root's `pyproject.toml` and `uv.lock` are inputs of every task |
 | `.moon/tasks/distribution.yml` | For every project tagged `distribution`: `build`, `standalone` and `deptry` |
 | `.moon/toolchains.yml` | JavaScript, with Bun as its package manager, Bun, and TypeScript. Every setting that would install dependencies or rewrite a `package.json` or `tsconfig.json` is off, and moon installs no Bun of its own: proto does, from `.prototools` |
@@ -238,7 +239,7 @@ One dev container, at the root, for every package ([ADR-0009](adr/0009-one-dev-c
 
 ## Decisions
 
-Every family decision is an ADR in [`adr/`](adr/README.md), whose index lists them with their status, and RFC-0003's own are in its [Decisions](stackr/rfcs/0003-one-repository-lattice.md#decisions) section.
+Every decision of lattice's own is an ADR in [`adr/`](adr/README.md), whose index lists them with their status, and RFC-0003's own are in its [Decisions](stackr/rfcs/0003-one-repository-lattice.md#decisions) section.
 
 ## What comes next
 

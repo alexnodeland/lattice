@@ -89,6 +89,17 @@
         }
       ]
     },
+    "packages/lattice-core": {
+      "release-type": "python",
+      "package-name": "lattice-core",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "/uv.lock",
+          "jsonpath": "$.package[?(@.name.value=='lattice-core-ai')].version"
+        }
+      ]
+    },
     "packages/stackr": {
       "release-type": "python",
       "package-name": "stackr",

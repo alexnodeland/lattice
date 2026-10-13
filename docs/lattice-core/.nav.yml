@@ -1,0 +1,5 @@
+# lattice-core's section of the site, in order. Paths are from docs/lattice-core/.
+nav:
+- Home: index.md
+- Reference: reference.md
+- Changelog: project/changelog.md

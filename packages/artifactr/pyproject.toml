@@ -22,6 +22,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "lattice-core-ai>=0.1.0.dev0",
     "pydantic>=2.13",
     "jsonpatch>=1.33",
     "jsonpointer>=1.9",
@@ -82,9 +83,11 @@ dev = [
     { include-group = "lint" },
 ]
 
-# In lattice, evalr is the checkout's. A built wheel keeps the range in [project] alone.
+# In lattice, evalr and lattice-core are the checkout's. A built wheel keeps the ranges in
+# [project] alone.
 [tool.uv.sources]
 evalr = { workspace = true }
+lattice-core-ai = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]
@@ -93,6 +96,12 @@ build-backend = "uv_build"
 # Distributed as artifactr-ai (ADR-0025); imported as artifactr.
 [tool.uv.build-backend]
 module-name = "artifactr"
+
+# ─── dependencies ─────────────────────────────────────────────────────────────
+
+# deptry can't tell from the workspace's editable install which module lattice-core-ai provides.
+[tool.deptry.package_module_name_map]
+lattice-core-ai = "lattice_core"
 
 # ─── types ────────────────────────────────────────────────────────────────────
 

@@ -344,15 +344,13 @@ async def test_an_unwatched_failure_does_not_warn(
     runner = make_runner(make_agent(Script(fail)), gate)
     handle = (await runner.send(ws, thread.id, "hi")).run
     assert handle is not None
-    while not handle.task.done():
-        await gate_sleep()
+    # Wait for the task's done callbacks without awaiting it, which would retrieve its failure.
+    # A task is done one turn of the loop before they run, and they run in the order they were
+    # added, so the runner's own, which forgets the run and retrieves its failure, runs first.
+    ended = asyncio.Event()
+    handle.task.add_done_callback(lambda _: ended.set())
+    await ended.wait()
     assert runner.running(thread.id) is None
-
-
-async def gate_sleep() -> None:
-    import asyncio
-
-    await asyncio.sleep(0.01)
 
 
 def test_history_messages_are_model_requests_first() -> None:

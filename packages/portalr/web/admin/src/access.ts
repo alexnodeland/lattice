@@ -13,7 +13,10 @@ type Member = GrantrApi.components["schemas"]["Member"];
 type Grantee = GrantrApi.components["schemas"]["Grantee"];
 type Resource = GrantrApi.components["schemas"]["Resource"];
 
-/** Every action Access's screens ask about, once per screen. */
+/**
+ * Every action a tenant's screens in admin ask grantr about, on the tenant, in one read per
+ * screen: Access's, and reading the audit log, which puts Audit on the rail.
+ */
 export const ACCESS = [
   "grantr:add_member",
   "grantr:remove_member",
@@ -23,6 +26,7 @@ export const ACCESS = [
   "grantr:define_role",
   "grantr:grant",
   "grantr:revoke",
+  "grantr:read_audit",
 ] as const;
 
 /** Each part of Access, and the action its read takes. */

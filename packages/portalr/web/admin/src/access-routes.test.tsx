@@ -35,6 +35,29 @@ class Alice extends Signed {
 const sent: { readonly to: string; readonly body: unknown }[] = [];
 const keyring = [{ id: "k_1", principal: { kind: "service_principal", id: "ci" } }];
 
+/** The audit reads Audit made, by their query. */
+const audits: URLSearchParams[] = [];
+
+/** Sixty changes by bob: members added, each between two grants. */
+const LOG = Array.from({ length: 60 }, (_, index) => ({
+  seq: index + 1,
+  at: "2026-10-13T00:00:00Z",
+  by: { kind: "user", id: "bob" },
+  tenant: "acme",
+  event:
+    index % 3 === 0
+      ? { type: "member_added", member: { kind: "service_principal", id: `sp_${index + 1}` } }
+      : {
+          type: "granted",
+          grant: {
+            role: "viewer",
+            on: { kind: "workspace", workspace: "notes" },
+            to: { kind: "user", id: `u_${index + 1}` },
+            tenant: "acme",
+          },
+        },
+}));
+
 /** grantr, as far as Access reads it: alice owns acme, and grantr allows `allowed` there. */
 function grantr(allowed: readonly string[]) {
   return async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -84,6 +107,17 @@ function grantr(allowed: readonly string[]) {
           tenant: "acme",
         },
       ]);
+    }
+    if (path === "/grantr/v1/tenants/acme/audit") {
+      const query = new URL(request.url).searchParams;
+      audits.push(query);
+      const after = Number(query.get("after_seq"));
+      const kept = LOG.filter(
+        (entry) =>
+          entry.seq > after &&
+          (!query.has("type") || query.getAll("type").includes(entry.event.type)),
+      );
+      return Response.json(kept.slice(0, Number(query.get("limit"))));
     }
     if (path === "/grantr/v1/me") {
       return Response.json({ memberships: [{ tenant: "acme", user: "alice", roles: ["owner"] }] });
@@ -157,6 +191,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   sent.length = 0;
+  audits.length = 0;
   keyring.length = 1;
   vi.unstubAllGlobals();
 });
@@ -362,13 +397,13 @@ test("Grants lists each grant by where, and grants a role where the role may be 
   ]);
 });
 
-test("without revoking, Grants has no Revoke; with it, revoking is confirmed", async () => {
-  const without = await open("/t/acme/access/grants", ["grantr:grant"]);
-  await expect.element(without.screen.getByRole("rowheader", { name: "owner" })).toBeVisible();
-  await expect
-    .element(without.screen.getByRole("button", { name: /^Revoke/ }))
-    .not.toBeInTheDocument();
-  without.screen.unmount();
+test("without revoking, Grants has no Revoke", async () => {
+  const { screen } = await open("/t/acme/access/grants", ["grantr:grant"]);
+  await expect.element(screen.getByRole("rowheader", { name: "owner" })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: /^Revoke/ })).not.toBeInTheDocument();
+});
+
+test("revoking a grant is confirmed", async () => {
   const { screen } = await open("/t/acme/access/grants", ACCESS);
   await screen
     .getByRole("button", { name: "Revoke viewer from ops (group) on thread t_1 in ws_1" })
@@ -376,4 +411,60 @@ test("without revoking, Grants has no Revoke; with it, revoking is confirmed", a
   await screen.getByRole("alertdialog").getByRole("button", { name: "Revoke" }).click();
   await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();
   expect(sent.at(-1)?.to).toBe("POST /grantr/v1/tenants/acme/revocations");
+});
+
+test("Audit is on the rail where grantr allows reading the log, and not found elsewhere", async () => {
+  const { screen } = await open("/t/acme/audit", ["grantr:add_member"]);
+  await expect.element(screen.getByText("The audit log isn't yours to read here")).toBeVisible();
+  const rail = screen.getByRole("navigation", { name: "Tenant" });
+  await expect.element(rail.getByRole("link", { name: "Access" })).toBeVisible();
+  await expect.element(rail.getByRole("link", { name: "Audit" })).not.toBeInTheDocument();
+  expect(audits).toEqual([]);
+});
+
+test("the log reads a page at a time, and Show more adds the next", async () => {
+  const { screen } = await open("/t/acme", ["grantr:read_audit"]);
+  await screen
+    .getByRole("navigation", { name: "Tenant" })
+    .getByRole("link", { name: "Audit" })
+    .click();
+  const log = screen.getByRole("table", { name: "Audit log" });
+  await expect
+    .element(log.getByRole("rowheader", { name: "added sp_1 (service principal)" }))
+    .toBeVisible();
+  await expect
+    .element(
+      log.getByRole("rowheader", { name: "granted viewer on workspace notes to u_2 (person)" }),
+    )
+    .toBeVisible();
+  expect(log.getByRole("rowheader").elements()).toHaveLength(50);
+  await screen.getByRole("button", { name: "Show more" }).click();
+  await expect.element(log.getByRole("rowheader", { name: /u_60/ })).toBeVisible();
+  expect(log.getByRole("rowheader").elements()).toHaveLength(60);
+  expect(audits.map((query) => query.get("after_seq"))).toEqual(["0", "50"]);
+  await expect.element(screen.getByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+});
+
+test("a filter goes to grantr and into the address", async () => {
+  const { screen, router } = await open("/t/acme/audit", ["grantr:read_audit"]);
+  await screen.getByRole("combobox", { name: "Change" }).selectOptions("Members added");
+  await screen.getByRole("combobox", { name: "Made by" }).selectOptions("A person");
+  await screen.getByRole("textbox", { name: "Their id" }).fill("bob");
+  await screen.getByRole("button", { name: "Apply" }).click();
+  const log = screen.getByRole("table", { name: "Audit log" });
+  await expect
+    .element(log.getByRole("rowheader", { name: /^granted/ }).first())
+    .not.toBeInTheDocument();
+  expect(log.getByRole("rowheader").elements()).toHaveLength(20);
+  expect(router.state.location.search).toEqual({
+    type: "member_added",
+    actor_kind: "user",
+    actor: "bob",
+  });
+  const asked = audits.at(-1);
+  expect(asked?.getAll("type")).toEqual(["member_added"]);
+  expect(asked?.get("actor_kind")).toBe("user");
+  expect(asked?.get("actor")).toBe("bob");
+  await screen.getByRole("button", { name: "Clear" }).click();
+  await expect.element(log.getByRole("rowheader", { name: /^granted/ }).first()).toBeVisible();
 });

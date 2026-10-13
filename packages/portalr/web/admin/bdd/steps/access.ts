@@ -165,6 +165,28 @@ Then("it holds no role", async ({ page, made }) => {
   await expect(item(page, "Grants", madeAs(made, "principal"))).toHaveCount(0);
 });
 
+When("they open the audit log, filtered to members added", async ({ page }) => {
+  await page
+    .getByRole("navigation", { name: "Tenant" })
+    .getByRole("link", { name: "Audit" })
+    .click();
+  await page.getByRole("combobox", { name: "Change" }).selectOption("Members added");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page).toHaveURL(/type=member_added/);
+});
+
+Then("the log says they added it", async ({ page, made }) => {
+  const change = page
+    .getByRole("table", { name: "Audit log" })
+    .getByRole("rowheader", { name: `added ${madeAs(made, "principal")} (service principal)` });
+  // The log reads from its start, a page at a time: the change is on the last page read.
+  const more = page.getByRole("button", { name: "Show more" });
+  while ((await change.count()) === 0 && (await more.count()) > 0) {
+    await more.click();
+  }
+  await expect(change).toBeVisible();
+});
+
 When("they look on a phone, at Access's Members", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   // On a phone the rail is behind the frame's Menu: the address opens it as directly.

@@ -3,7 +3,7 @@ import type { Server } from "bun";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import type * as v1 from "./generated/artifactr.v1";
 import type * as reflexrV1 from "./generated/reflexr.v1";
-import { createQueries, keys, stale } from "./queries";
+import { AUDIT_PAGE, createQueries, keys, stale } from "./queries";
 import { createApi, readConfig } from "./rest";
 
 interface Seen {
@@ -60,6 +60,15 @@ beforeAll(() => {
         return Response.json(
           (tenant !== null && tenant !== "confused") || forOne ? ME : { memberships: MEMBERSHIPS },
         );
+      }
+      if (url.pathname.endsWith("/audit")) {
+        // Sixty entries: a full page, and then ten.
+        const after = Number(url.searchParams.get("after_seq"));
+        const limit = Number(url.searchParams.get("limit"));
+        const seqs = Array.from({ length: 60 }, (_, index) => index + 1).filter(
+          (seq) => seq > after,
+        );
+        return Response.json(seqs.slice(0, limit).map((seq) => ({ seq })));
       }
       return Response.json(url.pathname.endsWith("/checks") ? [true, false] : []);
     },
@@ -311,4 +320,39 @@ test("the deployment's tenants are an operator's, and null for anyone else", asy
       away.portalr.tenants("bob"),
     ),
   ).rejects.toThrow(/refused the read \(404\)/);
+});
+
+test("the audit log is read a page at a time, with its filter, until a page isn't full", async () => {
+  const client = new QueryClient();
+  const options = queries.grantr.audit("acme", {
+    type: "member_added",
+    actor_kind: "rule",
+    actor: "triage",
+    workspace: "ws_1",
+  });
+  const first = await client.fetchInfiniteQuery(options);
+  expect(first.pages[0]).toHaveLength(AUDIT_PAGE);
+  const request = seen.at(-1);
+  expect(request?.url.pathname).toBe("/grantr/v1/tenants/acme/audit");
+  expect(Object.fromEntries(request?.url.searchParams ?? [])).toEqual({
+    after_seq: "0",
+    limit: String(AUDIT_PAGE),
+    type: "member_added",
+    actor_kind: "rule",
+    actor: "triage",
+    workspace: "ws_1",
+  });
+  expect(options.getNextPageParam(first.pages[0] ?? [], first.pages, 0, first.pageParams)).toBe(
+    AUDIT_PAGE,
+  );
+  const both = await client.fetchInfiniteQuery({ ...options, pages: 2 });
+  expect(both.pages.map((page) => page.length)).toEqual([AUDIT_PAGE, 10]);
+  expect(options.getNextPageParam(both.pages[1] ?? [], both.pages, 0, both.pageParams)).toBe(
+    undefined,
+  );
+});
+
+test("an audit read with no filter asks for every entry", async () => {
+  await new QueryClient().fetchInfiniteQuery(queries.grantr.audit("acme", {}));
+  expect([...(seen.at(-1)?.url.searchParams.keys() ?? [])]).toEqual(["after_seq", "limit"]);
 });

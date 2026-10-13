@@ -8,7 +8,7 @@
  * refetches everything read from it.
  */
 
-import { queryOptions } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import * as artifactr from "./artifactr";
 import type * as artifactrV1 from "./generated/artifactr.v1";
 import type { components as Grantr } from "./generated/grantr.openapi";
@@ -18,6 +18,21 @@ import * as reflexr from "./reflexr";
 import { type Api, named } from "./rest";
 
 type Check = Grantr["schemas"]["Check"];
+type AuditType = Grantr["schemas"]["AuditType"];
+
+/**
+ * Which of a tenant's audit entries a read keeps: one type of change, or any, and one subject's
+ * changes, by its kind and id, and a rule's workspace, or anyone's (grantr ADR-0030).
+ */
+export interface AuditFilter {
+  readonly type?: AuditType;
+  readonly actor_kind?: "user" | "service_principal" | "rule" | "agent";
+  readonly actor?: string;
+  readonly workspace?: string;
+}
+
+/** How many audit entries a page reads. */
+export const AUDIT_PAGE = 50;
 type Metric = Portalr["schemas"]["Metric"];
 
 /** Every query's key: each names its tenant, so two tenants' reads never share a cache entry. */
@@ -71,6 +86,9 @@ export const keys = {
     /** The deployment's catalog of roles, the same in every tenant: no change to access stales it. */
     catalog: () => ["grantr", "deployment", "catalog"] as const,
     keyring: (tenant: string) => [...keys.grantr.access(tenant), "keys"] as const,
+    /** A tenant's audit log, as a filter keeps it: a change to access there adds to it. */
+    audit: (tenant: string, filter: AuditFilter) =>
+      [...keys.grantr.tenant(tenant), "audit", filter] as const,
   },
   portalr: {
     tenant: (tenant: string) => ["portalr", tenant] as const,
@@ -364,6 +382,35 @@ export function createQueries(api: Api) {
                 params: { path: { tenant } },
               }),
             ),
+        }),
+      /**
+       * A tenant's audit log, as `filter` keeps it, a page at a time from its start, each page
+       * read after the last one's sequence number; a page short of a full one is the last
+       * (`grantr:read_audit`).
+       */
+      audit: (tenant: string, filter: AuditFilter) =>
+        infiniteQueryOptions({
+          queryKey: keys.grantr.audit(tenant, filter),
+          initialPageParam: 0,
+          queryFn: ({ pageParam }) =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/audit", {
+                ...named(tenant),
+                params: {
+                  path: { tenant },
+                  query: {
+                    after_seq: pageParam,
+                    limit: AUDIT_PAGE,
+                    ...(filter.type && { type: [filter.type] }),
+                    ...(filter.actor_kind && { actor_kind: filter.actor_kind }),
+                    ...(filter.actor && { actor: filter.actor }),
+                    ...(filter.workspace && { workspace: filter.workspace }),
+                  },
+                },
+              }),
+            ),
+          getNextPageParam: (page) =>
+            page.length < AUDIT_PAGE ? undefined : page[page.length - 1]?.seq,
         }),
       /** The tenant's keys, by public id and principal, never their secrets (`grantr:issue_key`). */
       keyring: (tenant: string) =>

@@ -1,7 +1,7 @@
-# The ALB's security group, and the one every task shares (RFC-0004). The ALB takes 443, and 80 to
-# redirect, from anywhere. Every task reaches out over HTTPS: to the providers' APIs, AWS's and the
-# images' registries. Who reaches whom inside the VPC is the stack module's: each service has a
-# group of its own, with the rules from its callers.
+# The ALB's security group, and the tasks group, which every task has (RFC-0004). The ALB takes
+# 443, and 80 to redirect, from anywhere. Every task reaches out over HTTPS: to the providers' APIs,
+# AWS's and the images' registries. Who reaches whom inside the VPC is the stack module's: each
+# service has a group of its own, with the rules from its callers.
 
 resource "aws_security_group" "alb" {
   name        = "${var.name}-alb"

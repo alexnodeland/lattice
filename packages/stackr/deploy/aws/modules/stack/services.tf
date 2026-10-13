@@ -322,6 +322,10 @@ locals {
       AUTH_AUDIENCE               = "authenticated"
       # GoTrue's key set and admin API, at its private address: the edge refuses /admin.
       AUTH_JWKS_URL = "http://${module.gotrue.address.name}.${local.namespace}:9999/.well-known/jwks.json"
+      # portalr's readers, when the application mounts it: Prometheus through prom-label-proxy.
+      PORTALR_TEMPO_URL = "http://${module.telemetry["tempo"].address.name}.${local.namespace}:3200"
+      PORTALR_LOKI_URL  = "http://${module.telemetry["loki"].address.name}.${local.namespace}:3100"
+      PORTALR_PROXY_URL = "http://prom-label-proxy.${local.namespace}:9091"
     },
     local.grantr ? { AUTH_ADMIN_URL = "http://${module.gotrue.address.name}.${local.namespace}:9999" } : {},
     var.application.environment,

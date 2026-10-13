@@ -68,7 +68,7 @@ run "network_tasks_reach_out_over_https_only" {
   }
   assert {
     condition     = length(aws_security_group.tasks.ingress) == 0
-    error_message = "The group every task shares lets nothing in."
+    error_message = "The tasks group lets nothing in."
   }
 }
 

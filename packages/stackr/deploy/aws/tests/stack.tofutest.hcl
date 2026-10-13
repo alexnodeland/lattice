@@ -232,6 +232,13 @@ run "stack_the_application_without_access" {
     )
     error_message = "Without grantr, the application has one database URL, its owner's."
   }
+  assert {
+    condition = (
+      !contains(keys(aws_security_group.member), "db-roles")
+      && length([for key in keys(aws_vpc_security_group_ingress_rule.call) : key if strcontains(key, "db-roles")]) == 0
+    )
+    error_message = "Without grantr, db-roles has no group and no rule."
+  }
 }
 
 run "stack_the_state_host_on_ec2" {
@@ -518,9 +525,9 @@ run "stack_each_service_takes_only_its_callers" {
       "gotrue/9999/alb", "gotrue/9999/app",
       "litellm/4000/app", "litellm/4000/state-host",
       "langfuse-web/3000/app", "langfuse-web/3000/otel-collector", "langfuse-web/3000/state-host",
-      "otel-collector/4317/app", "otel-collector/4317/litellm", "otel-collector/4318/app", "otel-collector/4318/litellm", "otel-collector/8888/state-host",
-      "tempo/4317/otel-collector", "tempo/3200/grafana", "tempo/3200/state-host",
-      "loki/3100/otel-collector", "loki/3100/grafana", "loki/3100/state-host",
+      "otel-collector/4318/app", "otel-collector/4318/litellm", "otel-collector/8888/state-host",
+      "tempo/4317/otel-collector", "tempo/3200/grafana", "tempo/3200/app", "tempo/3200/state-host",
+      "loki/3100/otel-collector", "loki/3100/grafana", "loki/3100/app", "loki/3100/state-host",
       "pyroscope/4040/grafana", "pyroscope/4040/state-host",
       "grafana/3000/state-host",
       "postgres/5432/langfuse-web", "postgres/5432/langfuse-worker", "postgres/5432/litellm", "postgres/5432/gotrue",
@@ -533,8 +540,15 @@ run "stack_each_service_takes_only_its_callers" {
     error_message = "Each service, data store and the state host takes exactly its callers, on its port, and nothing else."
   }
   assert {
-    condition     = toset(keys(aws_vpc_security_group_egress_rule.call)) == toset(keys(aws_vpc_security_group_ingress_rule.call))
-    error_message = "Each caller reaches out to exactly what takes it in."
+    condition = toset(keys(aws_vpc_security_group_egress_rule.call)) == toset(keys(aws_vpc_security_group_ingress_rule.call)) && alltrue([
+      for key, rule in aws_vpc_security_group_ingress_rule.call :
+      rule.from_port == tonumber(split("/", key)[1]) && rule.to_port == rule.from_port && rule.cidr_ipv4 == null
+      && aws_vpc_security_group_egress_rule.call[key].from_port == rule.from_port && aws_vpc_security_group_egress_rule.call[key].to_port == rule.from_port
+      && aws_vpc_security_group_egress_rule.call[key].cidr_ipv4 == null
+      && aws_vpc_security_group_egress_rule.call[key].security_group_id == rule.referenced_security_group_id
+      && aws_vpc_security_group_egress_rule.call[key].referenced_security_group_id == rule.security_group_id
+    ])
+    error_message = "Each rule is one port, between two groups, and its caller reaches out to exactly what takes it in."
   }
   assert {
     condition = (
@@ -554,8 +568,22 @@ run "stack_each_service_takes_only_its_callers" {
     condition = (
       module.app.security_group_ids == tolist(["sg-tasks", "sg-app"])
       && module.auth_keys.security_group_ids == tolist(["sg-tasks"])
+      && alltrue([
+        for name, service in {
+          gotrue         = module.gotrue, litellm = module.litellm, langfuse-web = module.langfuse_web, langfuse-worker = module.langfuse_worker,
+          otel-collector = module.otel_collector, tempo = module.telemetry["tempo"], loki = module.telemetry["loki"],
+          pyroscope      = module.telemetry["pyroscope"], grafana = module.grafana, db-init = module.db_init, db-roles = module.db_roles[0],
+        } : service.security_group_ids == tolist(["sg-tasks", aws_security_group.member[name].id])
+      ])
     )
-    error_message = "Each task has the group every task shares, and its own; auth-keys only reaches out."
+    error_message = "Each task has the tasks group, and its own; auth-keys only reaches out."
+  }
+  assert {
+    condition = (
+      output.run_task_network.security_groups["db-init"] == "sg-tasks,${aws_security_group.member["db-init"].id}"
+      && output.run_task_network.security_groups["auth-keys"] == "sg-tasks"
+    )
+    error_message = "run-task starts each one-off task in its groups."
   }
 }
 
@@ -565,6 +593,7 @@ run "stack_the_state_services_on_fargate_take_their_callers" {
     source = "./modules/stack"
   }
   variables {
+    valkey           = { port = 6390 }
     state_host       = "fargate"
     ami_id           = null
     lattice_commit   = null
@@ -573,14 +602,22 @@ run "stack_the_state_services_on_fargate_take_their_callers" {
   }
 
   assert {
-    condition = alltrue([for key in [
-      "clickhouse/8123/langfuse-web", "clickhouse/9000/langfuse-worker", "prometheus/9090/prom-label-proxy",
-      "prom-label-proxy/9091/app", "tempo/3200/prometheus", "otel-collector/8888/prometheus",
-    ] : contains(keys(aws_vpc_security_group_ingress_rule.call), key)])
-    error_message = "On Fargate, ClickHouse, Prometheus and prom-label-proxy each take their callers, and Prometheus scrapes."
-  }
-  assert {
-    condition     = length([for key in keys(aws_vpc_security_group_ingress_rule.call) : key if strcontains(key, "state-host")]) == 0
-    error_message = "With no state host, nothing names it."
+    condition = toset(keys(aws_vpc_security_group_ingress_rule.call)) == toset([
+      "app/8000/alb",
+      "gotrue/9999/alb", "gotrue/9999/app",
+      "litellm/4000/app",
+      "langfuse-web/3000/app", "langfuse-web/3000/otel-collector",
+      "otel-collector/4318/app", "otel-collector/4318/litellm",
+      "tempo/4317/otel-collector", "tempo/3200/grafana", "tempo/3200/app",
+      "loki/3100/otel-collector", "loki/3100/grafana", "loki/3100/app",
+      "pyroscope/4040/grafana",
+      "postgres/5432/langfuse-web", "postgres/5432/langfuse-worker", "postgres/5432/litellm", "postgres/5432/gotrue",
+      "postgres/5432/grafana", "postgres/5432/app", "postgres/5432/db-init", "postgres/5432/db-roles",
+      "valkey/6390/langfuse-web", "valkey/6390/langfuse-worker", "valkey/6390/litellm",
+      "clickhouse/8123/langfuse-web", "clickhouse/8123/langfuse-worker", "clickhouse/9000/langfuse-web", "clickhouse/9000/langfuse-worker",
+      "prometheus/9090/otel-collector", "prometheus/9090/tempo", "prometheus/9090/grafana", "prometheus/9090/prom-label-proxy",
+      "prom-label-proxy/9091/app",
+    ])
+    error_message = "On Fargate, ClickHouse, Prometheus and prom-label-proxy each take their callers; Prometheus scrapes nothing, and nothing names a state host."
   }
 }

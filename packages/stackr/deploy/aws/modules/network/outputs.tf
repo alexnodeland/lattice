@@ -24,7 +24,7 @@ output "private_subnet_cidrs" {
 }
 
 output "security_groups" {
-  description = "The ALB's security group, and the one every task shares."
+  description = "The ALB's security group, and the tasks group, which every task has."
   value = {
     alb   = aws_security_group.alb.id
     tasks = aws_security_group.tasks.id

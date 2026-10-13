@@ -867,3 +867,9 @@ async def test_the_deployments_own_tools_list_every_tenant(storage: Storage) -> 
     for tenant in ("globex", "acme"):
         await grants.provision_tenant(tenant, owner=ALICE.id)
     assert await grants.served_tenants() == ["acme", "globex"]
+
+
+async def test_grants_reads_its_catalog_as_a_tenants_roles(grants: Grants) -> None:
+    catalog = grants.catalog()
+    assert {role.name for role in catalog.roles} >= {"owner", "admin", "editor", "viewer"}
+    assert "grantr:create_tenant" not in catalog.custom_actions, "an operator's, no tenant's"

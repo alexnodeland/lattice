@@ -185,6 +185,37 @@ LEVELS: Final[Mapping[ResourceKind, Level]] = {
 """The level a resource of each kind is at."""
 
 
+def _kinds(level: Level) -> list[ResourceKind]:
+    """The kinds of resource at a level, in ``LEVELS``' order."""
+    return [kind for kind, at in LEVELS.items() if at == level]
+
+
+class BuiltInRole(BaseModel):
+    """A built-in role a tenant's admins grant, and the kinds of resource it may be granted on."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    kinds: tuple[ResourceKind, ...]
+
+
+class CatalogView(BaseModel):
+    """What a tenant's roles may be: the built-in ones, and what a custom one may hold.
+
+    It has each built-in role and where it is granted, the actions a custom role may hold, and
+    where one may be granted. The deployment's roles, an operator's and the application's, are
+    granted apart from any tenant, and aren't in it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    roles: tuple[BuiltInRole, ...]
+    custom_actions: tuple[str, ...]
+    """A workspace's admin's actions: a custom role holds some of them."""
+
+    custom_kinds: tuple[ResourceKind, ...]
+
+
 class Role(BaseModel):
     """A tenant's own role: a named set of the actions a workspace's admin holds."""
 
@@ -246,6 +277,28 @@ class Catalog:
                 ("item", "editor"): editor,
                 ("item", "viewer"): viewer,
             },
+        )
+
+    def view(self) -> CatalogView:
+        """The catalog as a tenant's admins read it.
+
+        Each built-in role granted within a tenant comes in the order of where it is granted,
+        with its kinds, then custom roles' actions and kinds.
+        """
+        order = list(LEVELS.values())
+        named: dict[str, list[ResourceKind]] = {}
+        for at, name in sorted(self.built_in, key=lambda key: (order.index(key[0]), key[1])):
+            # A role that holds nothing, such as `rule` without reflexr's catalog, isn't offered.
+            if at != "deployment" and self.built_in[at, name]:
+                named.setdefault(name, []).extend(_kinds(at))
+        return CatalogView(
+            roles=tuple(
+                BuiltInRole(name=name, kinds=tuple(kinds)) for name, kinds in named.items()
+            ),
+            custom_actions=tuple(sorted(self.built_in["workspace", "admin"])),
+            custom_kinds=tuple(
+                kind for at in sorted(CUSTOM_LEVELS, key=order.index) for kind in _kinds(at)
+            ),
         )
 
     def role(

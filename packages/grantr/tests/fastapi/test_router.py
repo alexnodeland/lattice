@@ -263,3 +263,13 @@ async def test_an_audit_filter_that_names_no_subject_is_refused(
 ) -> None:
     response = await client.get("/tenants/acme/audit", params=params, headers=AS_ALICE)
     assert response.status_code == 422, params
+
+
+async def test_anyone_signed_in_reads_the_catalog(client: httpx.AsyncClient) -> None:
+    catalog = (await client.get("/catalog", headers=AS_BOB)).json()
+    roles = {role["name"]: role["kinds"] for role in catalog["roles"]}
+    assert roles["viewer"] == ["workspace", "thread", "artifact", "rule"]
+    assert "operator" not in roles
+    assert "artifactr:open" in catalog["custom_actions"]
+    assert catalog["custom_kinds"] == ["workspace", "thread", "artifact", "rule"]
+    assert (await client.get("/catalog")).status_code == 401

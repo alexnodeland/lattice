@@ -25,6 +25,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/grantr/v1/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Catalog
+         * @description The built-in roles a tenant's admins grant, and what a custom role may hold.
+         *
+         *     Each built-in role comes with where it may be granted. It is the deployment's; any
+         *     caller may read it.
+         */
+        get: operations["catalog_grantr_v1_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/grantr/v1/checks": {
         parameters: {
             query?: never;
@@ -458,6 +481,32 @@ export interface components {
         AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"];
         /** @enum {string} */
         AuditType: "tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted";
+        /**
+         * BuiltInRole
+         * @description A built-in role a tenant's admins grant, and the kinds of resource it may be granted on.
+         */
+        BuiltInRole: {
+            /** Kinds */
+            kinds: components["schemas"]["ResourceKind"][];
+            /** Name */
+            name: string;
+        };
+        /**
+         * CatalogView
+         * @description What a tenant's roles may be: the built-in ones, and what a custom one may hold.
+         *
+         *     It has each built-in role and where it is granted, the actions a custom role may hold, and
+         *     where one may be granted. The deployment's roles, an operator's and the application's, are
+         *     granted apart from any tenant, and aren't in it.
+         */
+        CatalogView: {
+            /** Custom Actions */
+            custom_actions: string[];
+            /** Custom Kinds */
+            custom_kinds: components["schemas"]["ResourceKind"][];
+            /** Roles */
+            roles: components["schemas"]["BuiltInRole"][];
+        };
         /**
          * Check
          * @description One question for ``/checks``: may the caller take this action on this resource?
@@ -904,6 +953,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalog_grantr_v1_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogView"];
                 };
             };
         };

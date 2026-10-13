@@ -7,8 +7,9 @@ Each is optional: an application passes those its stack runs.
 
 from dataclasses import dataclass
 
+from portalr.readers.feedback import Feedback, FeedbackQuery, read_feedback
 from portalr.readers.grafana import Grafana
-from portalr.readers.langfuse import Langfuse, Score
+from portalr.readers.langfuse import Langfuse, Score, Scores
 from portalr.readers.litellm import LiteLLM, Spend, TenantSpend
 from portalr.readers.loki import LogLine, LogQuery, Loki
 from portalr.readers.prometheus import Metric, MetricQuery, Point, Prometheus
@@ -42,6 +43,8 @@ class Readers:
 
 
 __all__ = [
+    "Feedback",
+    "FeedbackQuery",
     "Grafana",
     "Langfuse",
     "LiteLLM",
@@ -55,6 +58,7 @@ __all__ = [
     "Prometheus",
     "Readers",
     "Score",
+    "Scores",
     "Span",
     "Spend",
     "Tempo",
@@ -65,5 +69,6 @@ __all__ = [
     "Unavailable",
     "Unconfigured",
     "Window",
+    "read_feedback",
     "reading",
 ]

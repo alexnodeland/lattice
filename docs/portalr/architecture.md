@@ -24,7 +24,8 @@ An application mounts `portalr_router(resolve_actor=, grants=, readers=, invite=
 | `GET /portalr/v1/traces`, `/traces/{id}` | The tenant's traces, a session's or a run's, and one trace's spans, from Tempo | `portalr:read_telemetry` |
 | `GET /portalr/v1/logs` | The tenant's logs, a thread's or a run's, from Loki | `portalr:read_telemetry` |
 | `GET /portalr/v1/metrics` | `turn_latency`, or `failed_turns` counted over each step, over time, from Prometheus through prom-label-proxy | `portalr:read_telemetry` |
-| `GET /portalr/v1/scores` | The tenant's feedback and evaluation scores, from Langfuse | `portalr:read_telemetry` |
+| `GET /portalr/v1/scores` | The tenant's feedback and evaluation scores, newest first, each with its trace's workspace, from Langfuse, and whether they are all there were (ADR-0027) | `portalr:read_telemetry` |
+| `GET /portalr/v1/feedback` | The tenant's feedback and evaluations in a window of at most 91 days, or one workspace's, summed by day in UTC from its scores, within the read's bounds ([ADR-0027](adr/0027-feedback-and-evaluations.md)) | `portalr:read_telemetry` |
 | `GET /portalr/v1/spend` | The tenant's spend against its budget, from its LiteLLM team | `portalr:read_spend` |
 | `GET /portalr/v1/deployment/tenants` | Every tenant, and their spend from one LiteLLM team list | `portalr:read_deployment` |
 | `GET /portalr/v1/deployment/links` | Deep links into Langfuse and Grafana | `portalr:read_deployment` |
@@ -109,6 +110,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `/t/$tenant/` | Home: members, workspaces, feedback, failed turns and spend, each a card from one read, with its own state |
 | `/t/$tenant/access/members`, `/groups`, `/keys`, `/roles`, `/grants` | Access: members, invited or made as service principals, and removed; groups; keys, a secret shown once, and revoked; roles, built in and custom; and grants, given and revoked. Each part where grantr allows its read, as a table or, on a phone, cards ([ADR-0024](adr/0024-access-members-groups-and-keys.md), [ADR-0025](adr/0025-access-roles-and-grants.md)) |
 | `/t/$tenant/audit` | Audit: grantr's log for the tenant, the newest on top, a sentence per change with who made it and when, filtered by type and maker in the address ([ADR-0026](adr/0026-audit.md)) |
+| `/t/$tenant/feedback` | Feedback: people's thumbs per day, each evaluation's mean per day, each workspace's share and thumbs, and what people said, from portalr's summary, in a window and a workspace the address keeps ([ADR-0027](adr/0027-feedback-and-evaluations.md)) |
 | `/deployment` | Every tenant, for operators, with the deployment's areas alone |
 | `/deployment/` | Home: the tenants, and their spend |
 
@@ -137,6 +139,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `TabNav`, `TabLink` | An area's parts as tabs of links, the current one marked with `aria-current` |
 | `CheckboxGroup` | Several choices, any of them checked, named by a legend |
 | `SignIn`, `Account` | Signing in, and the account menu over a session, for both UIs |
+| `BarChart`, `LineChart`, `DonutChart` | Tremor's charts, adapted, on Recharts: the inks as marks, a pattern and a label per series, and the figures as a table ([ADR-0027](adr/0027-feedback-and-evaluations.md)) |
 | `Moment` | A time in the reader's zone, and how long ago on hover ([ADR-0026](adr/0026-audit.md)) |
 | `Dialog` | A dialog over the page, opened by its caller, with where focus starts and where it returns ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
 | `Menu` | A button and the actions it opens, each of which may be disabled while it's being done |

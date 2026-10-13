@@ -22,11 +22,10 @@ mock_provider "aws" {
 }
 
 variables {
-  name                       = "stackr"
-  vpc_id                     = "vpc-mocked"
-  subnet_ids                 = ["subnet-a", "subnet-b"]
-  services_security_group_id = "sg-services"
-  valkey_auth_token          = "a-mocked-auth-token-of-48-characters-for-valkey00"
+  name              = "stackr"
+  vpc_id            = "vpc-mocked"
+  subnet_ids        = ["subnet-a", "subnet-b"]
+  valkey_auth_token = "a-mocked-auth-token-of-48-characters-for-valkey00"
 }
 
 run "data_postgres_17_encrypted_with_tls_required_and_kept_on_destroy" {
@@ -98,8 +97,8 @@ run "data_valkey_never_evicts_needs_tls_and_its_token_on_its_port" {
     error_message = "Valkey is encrypted in transit and at rest."
   }
   assert {
-    condition     = aws_elasticache_replication_group.this.port == 6401 && aws_vpc_security_group_ingress_rule.this["valkey"].from_port == 6401
-    error_message = "Valkey listens on its port, and the security group lets the services in on it."
+    condition     = aws_elasticache_replication_group.this.port == 6401
+    error_message = "Valkey listens on its port."
   }
   assert {
     condition     = aws_elasticache_replication_group.this.auth_token_wo_version == 2
@@ -118,22 +117,15 @@ run "data_refuses_a_short_auth_token" {
   expect_failures = [var.valkey_auth_token]
 }
 
-run "data_takes_only_the_services_and_reaches_nothing" {
+run "data_reaches_nothing" {
   command = plan
   module {
     source = "./modules/data"
   }
 
   assert {
-    condition = alltrue([
-      for rule in aws_vpc_security_group_ingress_rule.this :
-      rule.referenced_security_group_id == "sg-services" && rule.cidr_ipv4 == null && contains([5432, 6379], rule.from_port)
-    ])
-    error_message = "The data stores take PostgreSQL's and Valkey's ports from the services only."
-  }
-  assert {
-    condition     = length(aws_security_group.this.egress) == 0
-    error_message = "The data stores reach nothing."
+    condition     = length(aws_security_group.this.egress) == 0 && length(aws_security_group.this.ingress) == 0
+    error_message = "The data stores' group reaches nothing, and takes only the rules the stack gives each store's clients."
   }
 }
 

@@ -49,7 +49,7 @@ module "state_services" {
   deployment         = local.task.deployment
   cluster_arn        = local.task.cluster_arn
   subnet_ids         = local.task.subnet_ids
-  security_group_ids = local.task.security_group_ids
+  security_group_ids = local.groups_of[each.key]
   namespace_id       = local.task.namespace_id
   size               = local.sizes[each.key]
   log_retention_days = var.log_retention_days

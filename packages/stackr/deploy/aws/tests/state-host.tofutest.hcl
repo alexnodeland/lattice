@@ -30,7 +30,6 @@ variables {
   subnet_id                            = "subnet-a"
   private_ip                           = "10.40.128.10"
   vpc_id                               = "vpc-mocked"
-  services_security_group_id           = "sg-services"
   namespace_id                         = "ns-mocked"
   clickhouse_password_secret_arn       = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-AbCdEf"
   clickhouse_admin_password_secret_arn = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-AbCdEf"
@@ -66,34 +65,18 @@ run "state_host_imdsv2_encrypted_disks_and_daily_snapshots" {
   }
 }
 
-run "state_host_takes_only_the_services_and_reaches_out_only_over_http_and_https" {
+run "state_host_reaches_out_only_over_http_and_https" {
   command = plan
   module {
     source = "./modules/state-host"
   }
 
   assert {
-    condition = alltrue([
-      for rule in aws_vpc_security_group_ingress_rule.this :
-      rule.referenced_security_group_id == "sg-services" && rule.cidr_ipv4 == null && contains([8123, 9000, 9090, 9091], rule.from_port)
-    ])
-    error_message = "The state host takes ClickHouse's, Prometheus's and prom-label-proxy's ports from the services only."
-  }
-  assert {
     condition = (
       toset([for rule in aws_vpc_security_group_egress_rule.this : rule.from_port]) == toset([80, 443])
       && alltrue([for rule in aws_vpc_security_group_egress_rule.this : rule.cidr_ipv4 == "0.0.0.0/0" && rule.to_port == rule.from_port])
     )
     error_message = "The state host reaches out over HTTP and HTTPS only."
-  }
-  assert {
-    condition = (
-      toset([for rule in aws_vpc_security_group_egress_rule.to_services : rule.from_port]) == toset([8888, 3200, 3100, 4040, 3000, 4000])
-      && alltrue([for rule in aws_vpc_security_group_egress_rule.to_services : rule.referenced_security_group_id == "sg-services" && rule.cidr_ipv4 == null])
-      && toset([for rule in aws_vpc_security_group_ingress_rule.services_from_state_host : rule.from_port]) == toset([8888, 3200, 3100, 4040, 3000, 4000])
-      && alltrue([for rule in aws_vpc_security_group_ingress_rule.services_from_state_host : rule.security_group_id == "sg-services"])
-    )
-    error_message = "Prometheus scrapes, and operators forward to, the services' ports, which take the state host in turn."
   }
   assert {
     condition = (

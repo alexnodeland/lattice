@@ -1,5 +1,5 @@
 # The network (RFC-0004): a VPC across two zones, public subnets for the ALB and one NAT gateway,
-# private subnets for everything else, flow logs, and the ALB's and the services' security groups.
+# private subnets for everything else, flow logs, and the ALB's and the tasks' security groups.
 
 locals {
   public  = { for index, zone in var.zones : zone => cidrsubnet(var.cidr, 4, index) }

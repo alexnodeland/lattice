@@ -1,8 +1,7 @@
-# The ALB's and the services' security groups (RFC-0004). The ALB takes 443, and 80 to redirect,
-# from anywhere, and reaches only the services' ports it forwards to. The services take traffic
-# only from the ALB and from each other, each on the ports they listen on, and reach out only over
-# HTTPS: to the providers' APIs, AWS's and the images' registries. The data stores and the state
-# host make their own groups, with the rules between them and the services.
+# The ALB's security group, and the tasks group, which every task has (RFC-0004). The ALB takes
+# 443, and 80 to redirect, from anywhere. Every task reaches out over HTTPS: to the providers' APIs,
+# AWS's and the images' registries. Who reaches whom inside the VPC is the stack module's: each
+# service has a group of its own, with the rules from its callers.
 
 resource "aws_security_group" "alb" {
   name        = "${var.name}-alb"
@@ -20,54 +19,14 @@ resource "aws_vpc_security_group_ingress_rule" "alb" {
   to_port           = tonumber(each.key)
 }
 
-resource "aws_vpc_security_group_egress_rule" "alb" {
-  for_each                     = { for port in var.alb_target_ports : tostring(port) => port }
-  security_group_id            = aws_security_group.alb.id
-  description                  = "To the services on ${each.key}"
-  referenced_security_group_id = aws_security_group.services.id
-  ip_protocol                  = "tcp"
-  from_port                    = each.value
-  to_port                      = each.value
-}
-
-resource "aws_security_group" "services" {
-  name        = "${var.name}-services"
-  description = "The ECS services: from the ALB, and from each other, on their ports"
+resource "aws_security_group" "tasks" {
+  name        = "${var.name}-tasks"
+  description = "Every ECS task: HTTPS out"
   vpc_id      = aws_vpc.this.id
 }
 
-resource "aws_vpc_security_group_ingress_rule" "from_alb" {
-  for_each                     = { for port in var.alb_target_ports : tostring(port) => port }
-  security_group_id            = aws_security_group.services.id
-  description                  = "${each.key} from the ALB"
-  referenced_security_group_id = aws_security_group.alb.id
-  ip_protocol                  = "tcp"
-  from_port                    = each.value
-  to_port                      = each.value
-}
-
-resource "aws_vpc_security_group_ingress_rule" "between_services" {
-  for_each                     = { for port in var.service_ports : tostring(port) => port }
-  security_group_id            = aws_security_group.services.id
-  description                  = "${each.key} from the services"
-  referenced_security_group_id = aws_security_group.services.id
-  ip_protocol                  = "tcp"
-  from_port                    = each.value
-  to_port                      = each.value
-}
-
-resource "aws_vpc_security_group_egress_rule" "between_services" {
-  for_each                     = { for port in var.service_ports : tostring(port) => port }
-  security_group_id            = aws_security_group.services.id
-  description                  = "To the services on ${each.key}"
-  referenced_security_group_id = aws_security_group.services.id
-  ip_protocol                  = "tcp"
-  from_port                    = each.value
-  to_port                      = each.value
-}
-
-resource "aws_vpc_security_group_egress_rule" "services_https" {
-  security_group_id = aws_security_group.services.id
+resource "aws_vpc_security_group_egress_rule" "tasks_https" {
+  security_group_id = aws_security_group.tasks.id
   description       = "HTTPS out, through the NAT gateway: the providers, AWS and the registries"
   cidr_ipv4         = "0.0.0.0/0"
   ip_protocol       = "tcp"

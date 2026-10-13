@@ -18,7 +18,7 @@ events are wrapped in an :class:`Envelope` with their position in the workspace'
 import re
 from collections.abc import Iterator, Mapping
 from functools import cached_property
-from typing import Annotated, Any, ClassVar, Literal, cast, override
+from typing import Annotated, Any, ClassVar, Final, Literal, cast, get_args, override
 
 from pydantic import (
     AfterValidator,
@@ -26,13 +26,17 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    GetJsonSchemaHandler,
     JsonValue,
     PlainSerializer,
     PlainValidator,
     SerializationInfo,
+    TypeAdapter,
     ValidationError,
     WithJsonSchema,
 )
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import CoreSchema
 
 from reflexr.core.actors import Actor
 from reflexr.core.errors import ValidationFailed
@@ -317,20 +321,36 @@ def _serialize_event(event: Event, info: SerializationInfo) -> dict[str, Any]:
     return dump_event(event, mode="json" if info.mode_is_json() else "python")
 
 
+class _LoggedEventSchema:
+    """Gives an event the JSON Schema of the wire, ``LoggedEvent``, as validated and serialized.
+
+    Each of reflexr's own events is named by its ``type``, and left open to fields a newer
+    version adds, as the protocol's changes within v1 are additive. Their models' own schemas,
+    which an agent's tools show it, keep neither: a model validates an event's fields alone.
+    """
+
+    def __get_pydantic_json_schema__(
+        self, core_schema: CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        schema = handler(TypeAdapter(_LoggedEvent).core_schema)
+        union = handler.resolve_ref_schema(schema)
+        for variant, event in zip(union["anyOf"], _OWN_EVENTS, strict=False):
+            wire = handler.resolve_ref_schema(variant)
+            wire.pop("additionalProperties", None)
+            wire["properties"]["type"] = {"const": event.event_type}
+            if "type" not in wire["required"]:
+                wire["required"].append("type")
+        return schema
+
+
 AnyEvent = Annotated[
     Event,
     PlainValidator(_validate_event),
     PlainSerializer(_serialize_event),
-    WithJsonSchema(
-        {
-            "type": "object",
-            "properties": {"type": {"type": "string", "pattern": _EVENT_NAME}},
-            "required": ["type"],
-            "additionalProperties": True,
-        }
-    ),
+    _LoggedEventSchema(),
 ]
-"""Any event, validated through the registry by its ``"type"``."""
+"""Any event, validated through the registry by its ``"type"``. Its JSON Schema names reflexr's
+own events, and leaves the rest open."""
 
 
 # ─── reflexr's own events ────────────────────────────────────────────────────
@@ -521,6 +541,35 @@ SYSTEM_EVENTS: tuple[type[Event], ...] = (
     Tick,
 )
 """Every event type reflexr itself appends."""
+
+
+_OWN_EVENTS: Final[tuple[type[Event], ...]] = (*get_args(SystemEvent), FeedbackGiven, Tick)
+"""reflexr's own events, which the wire's schema names, in the order ``_LoggedEvent`` has them."""
+
+
+def _others(schema: dict[str, JsonValue]) -> None:
+    """Say another event's ``type`` is none of reflexr's own, so no event matches two."""
+    properties = cast("dict[str, dict[str, JsonValue]]", schema["properties"])
+    properties["type"]["not"] = {"enum": [*sorted(event.event_type for event in _OWN_EVENTS)]}
+
+
+class _OtherEvent(BaseModel):
+    """An event of the application's, or one this version doesn't know, in JSON Schema only.
+
+    Events are validated through the registry, by their ``type``; this only describes the wire.
+    """
+
+    model_config = ConfigDict(
+        frozen=True, extra="allow", title="OtherEvent", json_schema_extra=_others
+    )
+
+    type: Annotated[str, Field(pattern=_EVENT_NAME)]
+
+
+type _LoggedEvent = Annotated[
+    SystemEvent | FeedbackGiven | Tick | _OtherEvent, Field(title="LoggedEvent")
+]
+"""An event as the log holds it, in JSON Schema: one of reflexr's own, or another (lattice #83)."""
 
 
 # ─── envelopes ───────────────────────────────────────────────────────────────

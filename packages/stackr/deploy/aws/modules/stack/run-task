@@ -5,7 +5,7 @@
 # can't start for want of its secrets or image (ResourceInitializationError), as when IAM hasn't
 # yet propagated a new role's policy, is run again, a few times.
 #
-# Environment: CLUSTER, TASK_DEFINITION, SUBNETS (comma-separated), SECURITY_GROUP, AWS_REGION,
+# Environment: CLUSTER, TASK_DEFINITION, SUBNETS and SECURITY_GROUPS (comma-separated), AWS_REGION,
 # and the credentials the provider uses.
 
 set -euo pipefail
@@ -21,7 +21,7 @@ for attempt in $(seq 1 "$attempts"); do
   # The task's ARN, or ECS's reasons for not placing it.
   placed=$(aws ecs run-task --cluster "$CLUSTER" --task-definition "$TASK_DEFINITION" \
     --launch-type FARGATE \
-    --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SECURITY_GROUP],assignPublicIp=DISABLED}" \
+    --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SECURITY_GROUPS],assignPublicIp=DISABLED}" \
     --query "[tasks[0].taskArn || 'none', join(', ', failures[].reason) || '']" --output text)
   read -r task failures <<<"$placed"
   if [[ $task == none || -n $failures ]]; then

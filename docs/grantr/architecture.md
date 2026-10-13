@@ -95,7 +95,7 @@ A service principal's id is a `PrincipalId` ([ADR-0028](adr/0028-a-principals-id
 
 ## The audit log
 
-Every command appends one typed event, such as `Granted` or `MemberRemoved`, to one append-only log for the deployment. Each entry has its sequence number, the time, the tenant it changed (`None` for the operators) and who made it (`None` for the first operator). A tenant's entries are read in order, paged by sequence number, and a read may keep only some event types, or one subject's changes ([ADR-0030](adr/0030-the-audit-log-read-by-type-and-actor.md)). A key's secret and digest are never in it, and refusals aren't recorded.
+Every command appends one typed event, such as `Granted` or `MemberRemoved`, to one append-only log for the deployment. Each entry has its sequence number, the time, the tenant it changed (`None` for the operators) and who made it (`None` for the first operator). A tenant's entries are read oldest first, or newest first, paged by sequence number, and a read may keep only some event types, or one subject's changes ([ADR-0030](adr/0030-the-audit-log-read-by-type-and-actor.md), [ADR-0032](adr/0032-the-audit-log-read-newest-first.md)). A key's secret and digest are never in it, and refusals aren't recorded.
 
 ## The hooks
 
@@ -128,7 +128,7 @@ The contract test, `tests/grants/test_contract.py`, runs every behaviour on this
 - **A check is one query, one more when a grant names a custom role, and one more, by primary key, on a thread or artifact** when a grant around it applies; the subject's groups are a subquery of the first.
 - **The deployment is the tenant `~deployment`,** which no tenant id can be: a tenant id is not empty and has no `~`.
 - **A transaction locks its tenant's row** in `grantr_tenants`, inserting it first if needed; the row's `live` flag says whether the tenant exists.
-- **The audit log's sequence numbers are the database's.** A tenant's transactions run one at a time, so its entries are numbered in the order they commit. Each entry's event type, and its maker in a subject's three columns, are columns too, each indexed after the tenant: a single type, or a single maker, is one index's range, and the two together are an index's range and a filter. Migration 0004 added and filled them.
+- **The audit log's sequence numbers are the database's.** A tenant's transactions run one at a time, so its entries are numbered in the order they commit. Each entry's event type, and its maker in a subject's three columns, are columns too, each indexed after the tenant: a single type, or a single maker, is one index's range, read forwards or backwards, and the two together are an index's range and a filter. Migration 0004 added and filled them.
 - **Every database call is awaited to its end,** even when its caller is cancelled, as in the libraries' SQL storage.
 - **Row-level security is an option** ([ADR-0026](adr/0026-row-level-security-under-the-scoping.md)). With `row_level_security=True`, each transaction names its tenant, or `~deployment`, in `lattice.tenant_id`, and the policies migration 0003 creates on PostgreSQL keep every command to its tenant's rows, and let it read the deployment's grants and group members besides. `migrate(application_role=...)` grants a role that owns nothing the tables. `tenant_grants`, `key` and `tenants`, which span tenants, go to `across_tenants`, an engine as the tables' owner, and nothing else does.
 
@@ -143,7 +143,7 @@ The contract test, `tests/grants/test_contract.py`, runs every behaviour on this
 | `GET /catalog` | The built-in roles a tenant's admins grant, each with where it may be granted, and the actions a custom role may hold, and where ([ADR-0031](adr/0031-the-catalog-read.md)) |
 | `GET`, `POST /tenants`; `DELETE /tenants/{tenant}` | List, create and delete tenants |
 | `PUT`, `DELETE /operators/{user}` | Grant and revoke the operator role |
-| `GET /audit`, `GET /tenants/{tenant}/audit` | The deployment's and a tenant's audit log, paged by `after_seq`, and kept to some types (`type=`, which may repeat) or one subject (`actor_kind=`, `actor=`, and `workspace=` for a rule) |
+| `GET /audit`, `GET /tenants/{tenant}/audit` | The deployment's and a tenant's audit log, oldest first, paged by `after_seq`, or newest first (`newest_first=true`), paged back by `before_seq`, and kept to some types (`type=`, which may repeat) or one subject (`actor_kind=`, `actor=`, and `workspace=` for a rule) |
 | `/tenants/{tenant}/members`, `/groups`, `/roles`, `/grants`, `/revocations`, `/keys`, `/restrictions` | The lists and commands above |
 
 Refusals keep the libraries' shapes, `{"type", "message"}`: 401 `unauthorized` without a caller, 403 `forbidden`, 422 `invalid`, and 400 `tenant_required` when a caller in several tenants names none. Its OpenAPI document is committed in `packages/grantr/schemas/grantr.openapi.json`; `moon run grantr:schema` regenerates it, and a test fails when it drifts.

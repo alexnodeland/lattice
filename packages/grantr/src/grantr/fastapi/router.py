@@ -158,6 +158,12 @@ MAX_CHECKS: Final = 100
 AfterSeq = Annotated[int, Query(ge=0)]
 """Read the audit entries after this sequence number."""
 
+BeforeSeq = Annotated[int | None, Query(ge=1)]
+"""Read only the audit entries before this sequence number."""
+
+NewestFirst = Annotated[bool, Query()]
+"""Read the newest audit entries first, paging back with ``before_seq``."""
+
 Limit = Annotated[int, Query(ge=1, le=1000)]
 """Read at most this many audit entries."""
 
@@ -344,16 +350,27 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
     async def deployment_audit(
         keep: Kept,
         after_seq: AfterSeq = 0,
+        before_seq: BeforeSeq = None,
+        newest_first: NewestFirst = False,
         limit: Limit = 100,
         who: Caller = current,
     ) -> list[AuditEntry]:
         """The deployment's audit log: its operators, granted and revoked.
 
         ``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``
-        one subject's changes.
+        one subject's changes. ``newest_first`` reads back from the newest, and ``before_seq``
+        from before an entry.
         """
         return await _or_http(
-            grants.audit(None, by=who.subject, after_seq=after_seq, limit=limit, keep=keep)
+            grants.audit(
+                None,
+                by=who.subject,
+                after_seq=after_seq,
+                before_seq=before_seq,
+                newest_first=newest_first,
+                limit=limit,
+                keep=keep,
+            )
         )
 
     @router.get("/tenants/{tenant}/audit")
@@ -361,19 +378,24 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         tenant: TenantId,
         keep: Kept,
         after_seq: AfterSeq = 0,
+        before_seq: BeforeSeq = None,
+        newest_first: NewestFirst = False,
         limit: Limit = 100,
         who: Caller = current,
     ) -> list[AuditEntry]:
-        """A tenant's audit log after ``after_seq``, in order.
+        """A tenant's audit log after ``after_seq``, oldest first, or newest first.
 
         ``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``
-        one subject's changes.
+        one subject's changes. ``newest_first`` reads back from the newest, and ``before_seq``
+        from before an entry.
         """
         return await _or_http(
             grants.audit(
                 tenant,
                 by=by(tenant, who),
                 after_seq=after_seq,
+                before_seq=before_seq,
+                newest_first=newest_first,
                 limit=limit,
                 keep=keep,
             )

@@ -586,6 +586,38 @@ async def test_every_change_is_in_the_audit_log_in_order(grants: Grants) -> None
     assert page == entries[3:5]
 
 
+async def test_the_log_reads_newest_first_and_pages_back_with_each_filter(
+    grants: Grants,
+) -> None:
+    await _members(grants, BOB)
+    await grants.define_group("acme", TEAM, frozenset((BOB,)), by=ALICE)
+    await grants.define_group("acme", TEAM, frozenset(), by=ALICE)
+    await grants.delete_group("acme", TEAM, by=ALICE)
+    everything = await grants.audit("acme", by=ALICE)
+    newest = await grants.audit("acme", by=ALICE, newest_first=True)
+    assert newest == everything[::-1]
+
+    first = await grants.audit("acme", by=ALICE, newest_first=True, limit=2)
+    back = await grants.audit(
+        "acme", by=ALICE, newest_first=True, before_seq=first[-1].seq, limit=2
+    )
+    assert [*first, *back] == everything[::-1][:4]
+
+    groups = AuditFilter(types=frozenset({"group_defined"}))
+    latest = await grants.audit("acme", by=ALICE, newest_first=True, limit=1, keep=groups)
+    assert [e.event for e in latest] == [GroupDefined(group="team", members=frozenset())]
+    alices = AuditFilter(by=ALICE)
+    before = await grants.audit(
+        "acme", by=ALICE, newest_first=True, before_seq=latest[0].seq, keep=alices
+    )
+    assert [e.event.type for e in before] == ["group_defined", "member_added"]
+
+    window = await grants.audit(
+        "acme", by=ALICE, after_seq=everything[0].seq, before_seq=everything[-1].seq
+    )
+    assert window == everything[1:-1], "oldest first, between two entries"
+
+
 async def test_the_deployments_log_holds_its_operators(grants: Grants) -> None:
     await grants.grant_operator(BOB.id, by=ROOT)
     entries = await grants.audit(None, by=ROOT)

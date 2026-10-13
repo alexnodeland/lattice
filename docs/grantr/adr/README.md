@@ -37,5 +37,6 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0029](0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md) | A stored rule acts as itself, in its own workspace | Accepted |
 | [0030](0030-the-audit-log-read-by-type-and-actor.md) | The audit log, read by type and by actor | Accepted |
 | [0031](0031-the-catalog-read.md) | The catalog, read | Accepted |
+| [0032](0032-the-audit-log-read-newest-first.md) | The audit log, read newest first | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

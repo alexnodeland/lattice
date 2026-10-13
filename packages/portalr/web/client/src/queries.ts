@@ -481,11 +481,11 @@ export function createQueries(api: Api) {
               api.portalr.GET("/portalr/v1/feedback", {
                 ...named(tenant),
                 params: { query: { start: window.start, end: window.end, workspace } },
-                // Summing a window reads Langfuse at length: kept a while, and tried again once.
-                staleTime: 10 * 60_000,
-                retry: 1,
               }),
             ),
+          // Summing a window reads Langfuse at length: kept a while, and tried again once.
+          staleTime: 10 * 60_000,
+          retry: 1,
         }),
       /** An operator's deep links into Langfuse and Grafana for a trace. */
       links: (user: string, trace: string) =>

@@ -301,6 +301,12 @@ test("portalr's reads name their tenant and window", async () => {
   expect(seen.at(-1)?.url.searchParams.get("step")).toBeNull();
 });
 
+test("a feedback read is kept ten minutes and tried again once", () => {
+  const feedback = queries.portalr.feedback("acme", { start: DAY.start, end: DAY.end });
+  expect(feedback.staleTime).toBe(10 * 60_000);
+  expect(feedback.retry).toBe(1);
+});
+
 test("the deployment's tenants are an operator's, and null for anyone else", async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   expect(await client.fetchQuery(queries.portalr.tenants("alice"))).toEqual({

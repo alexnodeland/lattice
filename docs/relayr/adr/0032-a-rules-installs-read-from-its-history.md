@@ -1,7 +1,7 @@
 # ADR-0032: A rule's installs, read from its history
 
 **Status:** Accepted
-**Date:** 2026-10-13
+**Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0030](0030-drift-proposed-back-to-a-rules-artifact.md): how relayr reads its own installs
 

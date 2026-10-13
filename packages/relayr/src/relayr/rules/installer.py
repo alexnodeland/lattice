@@ -162,12 +162,12 @@ class Installer:
         target = reaction.workspace
         # artifactr validated the revision as a `RuleDraft` when it committed it.
         rule = RuleDraft.model_validate(revision.data).rule
-        installs = await _installs(target, rule.name)
-        if any(install.provenance.get("proposal") == proposal.id for install in installs):
+        drafted = await _drafted_installs(target, revisions)
+        if any(install.provenance.get("proposal") == proposal.id for install in drafted[rule.name]):
             return  # replayed: this acceptance was installed, and may be archived since
         acting = self._outbound.acting(reaction)
         thread = proposal.thread_id
-        name = await _rule_of(target, revisions)
+        name = _rule_of(drafted, revision.artifact_id)
         if name is not None and name != rule.name:
             renamed = f"{name} can't be renamed {rule.name}"
             await _tell(acting, f"{renamed}: archive it, and draft the new rule apart.", thread)
@@ -209,7 +209,8 @@ class Installer:
         if not revision.archived or revision.kind != RuleDraft.kind:
             return
         target = reaction.workspace
-        installed = await _active(target, await _rule_of(target, revisions))
+        drafted = await _drafted_installs(target, revisions)
+        installed = await _active(target, _rule_of(drafted, archived.artifact_id))
         if installed is None:
             return
         acting = self._outbound.acting(reaction)
@@ -266,16 +267,37 @@ async def _installs(workspace: Workspace, rule: RuleName) -> list[reflexr.core.R
     ]
 
 
-async def _rule_of(workspace: Workspace, revisions: list[a.Revision]) -> RuleName | None:
-    """The rule relayr installed from a rule artifact, given its revisions, if it installed one.
+class _Named(BaseModel):
+    name: RuleName
 
-    It is one of the names the artifact's drafts held: almost always one, since an installed
-    rule can't be renamed, but a draft may be renamed before anything installs it.
+
+class _Drafted(BaseModel):
+    """Only the name of a revision's draft: an old revision need not parse as today's rule."""
+
+    rule: _Named
+
+
+async def _drafted_installs(
+    workspace: Workspace, revisions: list[a.Revision]
+) -> dict[RuleName, list[reflexr.core.RuleInstalled]]:
+    """The installs relayr made of each rule a rule artifact's drafts named, by name.
+
+    An installed rule can't be renamed, so this is almost always one name, but a draft may be
+    renamed before anything installs it.
     """
-    artifact_id = revisions[0].artifact_id
-    drafted = {RuleDraft.model_validate(r.data).rule.name for r in revisions}
-    for name in sorted(drafted):
-        installs = await _installs(workspace, name)
+    names = {_Drafted.model_validate(r.data).rule.name for r in revisions}
+    return {name: await _installs(workspace, name) for name in sorted(names)}
+
+
+def _rule_of(
+    drafted: dict[RuleName, list[reflexr.core.RuleInstalled]], artifact_id: str
+) -> RuleName | None:
+    """The rule relayr installed from an artifact, among those its drafts named, if any.
+
+    At most one name has installs from the artifact, since an installed rule can't be renamed;
+    the names are in order, so the answer would be the same however many there were.
+    """
+    for name, installs in drafted.items():
         if any(i.provenance.get("artifact") == artifact_id for i in installs):
             return name
     return None

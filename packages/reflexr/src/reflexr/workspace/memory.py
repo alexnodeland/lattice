@@ -31,8 +31,8 @@ from reflexr.workspace.storage import (
     RunPolicy,
     WorkspaceRef,
     run_lease,
+    stored_rule_of,
     utc_now,
-    version_of,
 )
 
 
@@ -255,7 +255,7 @@ class InMemoryStorage:
 
     async def rule_history(self, workspace: WorkspaceRef, name: RuleName) -> list[Envelope]:
         """Return a stored rule's versions, oldest first."""
-        return [e for e in self._data(workspace).log if version_of(e) == name]
+        return [e for e in self._data(workspace).log if stored_rule_of(e) == name]
 
     async def subscribe(
         self, workspace: WorkspaceRef, *, after_seq: int = 0

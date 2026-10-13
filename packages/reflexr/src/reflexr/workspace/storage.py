@@ -66,7 +66,7 @@ def run_lease(run_id: RunId) -> str:
     return RUN_LEASE_PREFIX + run_id
 
 
-def version_of(envelope: Envelope) -> RuleName | None:
+def stored_rule_of(envelope: Envelope) -> RuleName | None:
     """Return the stored rule an envelope is a version of, or None if it is no rule's version.
 
     A stored rule's versions are its ``reflexr:rule_installed`` and ``reflexr:rule_archived``
@@ -266,10 +266,10 @@ class Storage(Protocol):
         ...
 
     async def rule_history(self, workspace: WorkspaceRef, name: RuleName) -> list[Envelope]:
-        """Return a stored rule's versions, oldest first: the envelopes :func:`version_of` names.
+        """Return a stored rule's versions, oldest first: those :func:`stored_rule_of` names it in.
 
-        A rule's history is read often and is short, so storage should find it without reading
-        the rest of the log, as ``SqlStorage`` does through an index.
+        A storage for production reads them without reading the rest of the log, as
+        ``SqlStorage`` does through an index; ``InMemoryStorage``, for tests, scans its log.
         """
         ...
 

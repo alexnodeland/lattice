@@ -20,8 +20,8 @@ from reflexr.workspace.storage import (
     Transaction,
     WorkspaceRef,
     run_lease,
+    stored_rule_of,
     utc_now,
-    version_of,
 )
 from reflexr.workspace.workspace import (
     ACTIONS,
@@ -73,8 +73,8 @@ __all__ = [
     "WorkspaceRule",
     "Workspaces",
     "run_lease",
+    "stored_rule_of",
     "tick_id",
     "utc_now",
-    "version_of",
     "with_params",
 ]

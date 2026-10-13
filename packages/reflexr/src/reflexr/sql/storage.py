@@ -81,8 +81,8 @@ from reflexr.workspace import (
     Entry,
     RunPolicy,
     WorkspaceRef,
+    stored_rule_of,
     utc_now,
-    version_of,
 )
 
 _PAGE = 500
@@ -165,7 +165,7 @@ class _Transaction:
                     seq=envelope.seq,
                     event_id=envelope.id,
                     event_type=envelope.event_type,
-                    rule=version_of(envelope),
+                    rule=stored_rule_of(envelope),
                     envelope=envelope.model_dump(mode="json"),
                 )
             )

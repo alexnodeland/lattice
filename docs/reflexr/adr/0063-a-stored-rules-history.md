@@ -1,7 +1,7 @@
 # ADR-0063: A stored rule's history, read by its name
 
 **Status:** Accepted
-**Date:** 2026-10-13
+**Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 
 ## Context
@@ -21,16 +21,17 @@ relayr needs that history for its rules from chat ([lattice #137](https://github
 - **`Workspace.rule_history(rule)` returns a stored rule's versions, oldest first:** its install and archive facts, as envelopes, with their actors.
   - An archived rule keeps its history.
   - A rule never stored, such as a code rule, has an empty one.
-  - It asks `reflexr:read_rules` for the rule, as `get_rule` does, since it is that rule's record.
+  - It asks `reflexr:read_rules` for the rule, as `get_rule` does: the history is that rule's record, and a grant on one rule should reach it. `reflexr:read_events` would ask about the whole log, which someone granted only on a rule doesn't hold.
+  - So someone granted `reflexr:read_rules` on a single rule now sees more than `get_rule` shows: its past definitions and provenance, `approved_by` and all, who made each change, and each fact's trace and causation ids. Those are that rule's own record, and nothing about other rules or events.
 - **Every surface has it.**
   - REST: `GET /workspaces/{workspace_id}/rules/{rule}/history`.
   - MCP: the `rule_history` tool, as JSON lines.
-- **`Storage.rule_history(workspace, name)` is a new protocol method.** `version_of(envelope)` says which rule, if any, an envelope is a version of, so every storage agrees on it.
+- **`Storage.rule_history(workspace, name)` is a new protocol method.** `stored_rule_of(envelope)` says which rule, if any, an envelope is a version of, so every storage agrees on it.
   - `InMemoryStorage` scans its log.
-  - `SqlStorage` adds a `rule` column to `reflexr_events`, set from `version_of` on append, and a partial index on the tenant, workspace, rule and `seq`, over the rows that have one. A rule's history is then one range, however long the log.
-- **Migration 0008** adds the column and fills it in one statement. It reads each install and archive fact's `event.rule` from its stored JSON, found through the type index. Then it creates the index. The same statement runs on SQLite and PostgreSQL, as migration 0003's did.
+  - `SqlStorage` adds a `rule` column to `reflexr_events`, set from `stored_rule_of` on append, and a partial index on the tenant, workspace, rule and `seq`, over the rows that have one. A rule's history is then one range, however long the log.
+- **Migration 0008** adds the column and fills it in one statement, which scans the log for the install and archive facts and reads each one's `event.rule` from its stored JSON. Then it creates the index. The same statement runs on SQLite and PostgreSQL, as migration 0003's did.
 - **Provenance stays opaque.** No read filters by it. A caller that wants a rule by where it came from finds the rule's name where it came from: relayr reads the names from the artifact's revisions, then their histories ([relayr ADR-0032](../../relayr/adr/0032-a-rules-installs-read-from-its-history.md)).
-- **No paging.** A rule's versions are its changes, which people make one at a time.
+- **No paging, and no default bound on MCP.** A rule's versions are its changes, which people make one at a time, and read alone. A `last` bound would need storage, `Workspace`, REST and MCP to take it, check it and agree on it, as `read`'s does, for histories that are short.
 
 ## Options considered
 
@@ -45,4 +46,5 @@ relayr needs that history for its rules from chat ([lattice #137](https://github
 
 - Easier: relayr finds its installs however far back they are. portalr's Rules area can show who changed a rule, and when.
 - Harder: a `Storage` implemented outside reflexr implements one more method. A column on the log, null on every other row, and a partial index are kept beside it.
+- Harder: on PostgreSQL, migration 0008 holds `reflexr_events` exclusively while it scans the log twice, to fill the column and to build the index, inside `migrate`'s one transaction. Schedule it for when the log may pause. Building the index `CONCURRENTLY`, outside a transaction, is out of scope.
 - Revisit: paging, if rules come to be changed by machines often enough for a history to grow long.

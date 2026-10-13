@@ -2,12 +2,14 @@
 
 A stored rule's versions are its ``reflexr:rule_installed`` and ``reflexr:rule_archived`` facts
 (ADR-0063). The column is filled from those facts' stored envelopes, whose ``event.rule`` is the
-rule's name, in one statement over ``ix_reflexr_events_type``; every other row keeps it null, and
-the index holds only the rows that have it.
+rule's name, in one statement that scans the log; every other row keeps it null, and the index
+holds only the rows that have it. On PostgreSQL the statement and the index's build hold
+``reflexr_events`` exclusively, inside the migration's transaction: run it when the log may
+pause.
 
 Revision ID: 0008
 Revises: 0007
-Create Date: 2026-10-13
+Create Date: 2026-10-12
 """
 
 from collections.abc import Sequence

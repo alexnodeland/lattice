@@ -239,6 +239,14 @@ async def test_upgrading_fills_the_rule_column_from_each_rules_versions(
             ("prod", 3, None),
             ("prod", 4, "chat:deploys"),
         ], "only a rule's versions name it: not its resets"
+        [index] = [
+            i
+            for i in await connection.run_sync(lambda c: inspect(c).get_indexes("reflexr_events"))
+            if i["name"] == "ix_reflexr_events_rule"
+        ]
+        options = index.get("dialect_options", {})
+        [where] = [value for key, value in options.items() if key.endswith("_where")]
+        assert "rule IS NOT NULL" in str(where), "the index holds only the rows that name a rule"
     history = await SqlStorage(engine).rule_history(WorkspaceRef("acme", "prod"), "chat:deploys")
     assert [e.seq for e in history] == [1, 4]
     async with engine.begin() as connection:

@@ -352,6 +352,20 @@ async def test_a_name_another_artifact_installed_is_refused(ledger: Ledger, stac
     assert (await chat_.notices())[-1].startswith("chat:deploys wasn't installed: ")
 
 
+async def test_a_draft_renamed_before_it_was_installed_archives_its_rule(
+    ledger: Ledger, stack: Stack
+) -> None:
+    chat_ = await chat(stack, ledger)
+    written = a.create_artifact(draft("chat:first"), thread_id=chat_.thread)
+    await chat_.alice.commit(written)  # written directly: nothing installs it
+    await chat_.resolve(await chat_.edited(written.artifact_id, draft()))
+    assert (await chat_.stored()).version == 1
+    await chat_.archive(written.artifact_id)
+    with pytest.raises(reflexr.core.NotFound):
+        await chat_.stored()
+    assert (await chat_.notices())[-1] == "chat:deploys is archived."
+
+
 async def test_a_draft_outside_a_thread_goes_live_untold(ledger: Ledger, stack: Stack) -> None:
     chat_ = await chat(stack, ledger)
     proposal_id = await chat_.propose(a.create_artifact(draft()))
@@ -541,7 +555,8 @@ async def test_an_install_however_far_back_is_still_relayrs(ledger: Ledger, stac
 
     await operator.replay_rule(RULES_FROM_CHAT.name, mode="refire")
     await settled(chat_)
-    assert (await chat_.stored()).version == 1, "the replayed acceptance was installed already"
+    assert (await chat_.stored()).version == 1
+    assert await chat_.notices() == [LIVE.format(1)], "the acceptance was installed already"
     changed = draft(service="billing").rule
     await operator.update_rule(changed, expected_version=1)
     await settled(chat_)

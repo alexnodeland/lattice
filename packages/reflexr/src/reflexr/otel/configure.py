@@ -7,6 +7,7 @@ used: an application that does not use FastAPI or SQLAlchemy does not need them 
 import importlib.util
 import logging
 import os
+import re
 from collections.abc import Callable, Collection, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from types import TracebackType
@@ -233,7 +234,8 @@ class TelemetryHandle:
         """Trace and measure a FastAPI application's requests.
 
         FastAPI's instrumentation only reaches applications whose class it patched first;
-        pass an application here to instrument it whenever it was created.
+        pass an application here to instrument it whenever it was created. An ``access_token``
+        in a request's URL, as a WebSocket carries a browser's token, is redacted from its span.
         """
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
@@ -242,6 +244,7 @@ class TelemetryHandle:
             tracer_provider=self.tracer_provider,
             meter_provider=self.meter_provider,
             exclude_spans=_EXCLUDED_ASGI_SPANS,
+            server_request_hook=_redact_request,
         )
         self._cleanups.append(lambda: FastAPIInstrumentor.uninstrument_app(app))
 
@@ -560,3 +563,28 @@ class _TenancyLogs(LogRecordProcessor):
 def _signal(endpoint: str | None, signal: str) -> str | None:
     """The OTLP/HTTP URL for one signal, or None to let the exporter read the environment."""
     return None if endpoint is None else f"{endpoint.rstrip('/')}/v1/{signal}"
+
+
+# Shared verbatim with artifactr's otel/configure.py: change both. One home for what the packages
+# share is lattice #73.
+URL_ATTRIBUTES: Final = ("url.full", "url.query", "http.url", "http.target")
+"""The span attributes that hold a request's URL, or its query, under the current semantic
+conventions and the older ones."""
+
+_ACCESS_TOKEN: Final = re.compile(r"(^|[?&])access_token=[^&#\s]*")
+
+
+def redact_access_token(text: str) -> str:
+    """Return a URL, a query or a log line with an ``access_token`` parameter's value hidden.
+
+    ``access_token`` is OAuth's query parameter for a bearer token (RFC 6750, section 2.3).
+    """
+    return _ACCESS_TOKEN.sub(r"\1access_token=REDACTED", text)
+
+
+def _redact_request(span: trace.Span, _scope: Mapping[str, Any]) -> None:
+    """Hide an access token in a server span's URL attributes, which are set before this runs."""
+    attributes = (span.attributes if isinstance(span, ReadableSpan) else None) or {}
+    for key in URL_ATTRIBUTES:
+        if isinstance(value := attributes.get(key), str):
+            span.set_attribute(key, redact_access_token(value))

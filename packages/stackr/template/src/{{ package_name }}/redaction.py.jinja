@@ -1,0 +1,39 @@
+"""Access tokens kept out of uvicorn's logs.
+
+A browser can't set headers as it opens a WebSocket, so a WebSocket carries its token in the
+``access_token`` query parameter (``auth.py``). uvicorn writes each request's path, query and all,
+in its access log, and each WebSocket's in its own log, so ``LOG_CONFIG`` redacts the token
+there. The libraries' telemetry redacts it from the spans' URLs.
+"""
+
+import copy
+import logging
+from typing import Any, Final, override
+
+from uvicorn.config import LOGGING_CONFIG
+
+from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.otel import redact_access_token
+
+
+class RedactedLogs(logging.Filter):
+    """Hides access tokens in a log record's arguments, where uvicorn puts each request's path."""
+
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple):
+            record.args = tuple(
+                redact_access_token(a) if isinstance(a, str) else a for a in record.args
+            )
+        return True
+
+
+def _log_config() -> dict[str, Any]:
+    config = copy.deepcopy(LOGGING_CONFIG)
+    config["filters"] = {"redacted": {"()": RedactedLogs}}
+    for handler in config["handlers"].values():
+        handler["filters"] = ["redacted"]
+    return config
+
+
+LOG_CONFIG: Final = _log_config()
+"""uvicorn's logging, with its access log, and its log of WebSockets, redacted."""

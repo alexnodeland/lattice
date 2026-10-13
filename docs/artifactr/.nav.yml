@@ -96,6 +96,13 @@ nav:
     - adr/0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md
     - adr/0059-a-turn-starts-from-an-empty-context.md
     - adr/0060-the-tenant-on-log-records.md
+    - adr/0061-a-nul-character-is-refused-at-the-boundary.md
+    - adr/0062-restricted-items-left-out-of-every-read.md
+    - adr/0063-the-openapi-documents-describe-refusals.md
+    - adr/0064-asking-for-a-threads-next-turn.md
+    - adr/0065-run-started-names-its-messages.md
+    - adr/0066-row-level-security-under-the-scoping.md
+    - adr/0067-an-access-token-redacted-from-span-urls.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

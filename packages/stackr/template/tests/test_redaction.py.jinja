@@ -1,0 +1,31 @@
+"""Access tokens kept out of uvicorn's logs; the libraries keep them out of the spans."""
+
+import logging
+
+from uvicorn.logging import AccessFormatter, DefaultFormatter
+
+from {{ package_name }}.redaction import LOG_CONFIG, RedactedLogs
+
+QUERY = "tenant=acme&access_token=s3cret"
+
+
+def _record(name: str, message: str, *args: object) -> logging.LogRecord:
+    return logging.LogRecord(name, logging.INFO, __file__, 0, message, args, None)
+
+
+def test_uvicorn_logs_requests_and_websockets_without_their_tokens() -> None:
+    request = ("127.0.0.1:5000", "GET", f"/items?{QUERY}", "1.1", 200)
+    access = _record("uvicorn.access", '%s - "%s %s HTTP/%s" %d', *request)
+    websocket = _record(
+        "uvicorn.error", '%s - "WebSocket %s" [accepted]', "127.0.0.1:5000", f"/stream?{QUERY}"
+    )
+    for record in (access, websocket):
+        assert RedactedLogs().filter(record)
+    logged = [
+        AccessFormatter(use_colors=False).format(access),
+        DefaultFormatter().format(websocket),
+    ]
+    assert all("s3cret" not in line and "access_token=REDACTED" in line for line in logged), logged
+    named = _record("app", "%(path)s", {"path": f"/items?{QUERY}"})
+    assert RedactedLogs().filter(named), "a record with named arguments passes as it is"
+    assert all(handler["filters"] == ["redacted"] for handler in LOG_CONFIG["handlers"].values())

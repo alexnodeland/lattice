@@ -84,6 +84,8 @@ Fill in two things after `make env`: `LITELLM_API_KEY`, a tenant's key from `mak
 | `make up` | In the `app` profile: builds its image and runs it beside the stack, at <http://localhost:8800> (`app_port`) |
 | `make down`, `make logs` | Stops the app profile, or follows its logs |
 
+A WebSocket carries its token in the `access_token` query parameter, so the application keeps it out of what it records: uvicorn's access log and its log of WebSockets, through `redaction.py`, and the spans' URLs, through the libraries' `instrument_app` ([artifactr ADR-0067](../../artifactr/adr/0067-an-access-token-redacted-from-span-urls.md)).
+
 With `access=grantr`, the application's own commands set up its tenants, in process, on its database ([grantr ADR-0021](../../grantr/adr/0021-the-deployments-own-tools.md)). Each takes a user's email, which Supabase Auth's admin API looks up with `AUTH_SERVICE_ROLE_KEY`, or their id:
 
 | Command | What it does |

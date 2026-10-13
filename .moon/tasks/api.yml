@@ -17,6 +17,7 @@ tasks:
       - '/package.json'
       - '/bun.lock'
       - '/packages/evalr/src/**/*'
+      - '/packages/lattice-core/src/**/*'
     env:
       # The reference applications' agents run on pydantic-ai's test model: no provider is called.
       DOCPLAN_MODEL: 'test'

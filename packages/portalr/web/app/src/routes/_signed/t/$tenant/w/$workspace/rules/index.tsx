@@ -2,6 +2,7 @@ import { allowedIn, keys, refusal, workspaceOf } from "@portalr/client";
 import {
   Button,
   Card,
+  Moment,
   PageHeader,
   Row,
   RowLink,
@@ -39,9 +40,9 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/")({
   component: Rules,
 });
 
-/** A time the server gave, in the reader's own zone, or never. */
+/** A time the server gave, in the reader's own zone, how long ago on hover; or never. */
 function When({ at }: { at: string | null }) {
-  return at === null ? "never" : <time dateTime={at}>{new Date(at).toLocaleString()}</time>;
+  return at === null ? "never" : <Moment at={at} />;
 }
 
 function Rules() {

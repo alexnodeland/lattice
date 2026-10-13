@@ -36,6 +36,7 @@ tasks:
       - '/examples/oncall/**/*'
       - '/packages/artifactr/src/**/*'
       - '/packages/reflexr/src/**/*'
+      - '/packages/lattice-core/src/**/*'
       - '/packages/*/compose.yaml'
     env:
       # The reference applications' agents run on pydantic-ai's test model: no provider is called.

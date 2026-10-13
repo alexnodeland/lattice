@@ -4,6 +4,7 @@ layer: 'library'
 tags: ['distribution', 'api']
 dependsOn:
   - 'evalr'
+  - 'lattice-core'
 
 tasks:
   api:

@@ -37,6 +37,7 @@ tasks:
       - '/packages/grantr/src/**/*'
       - '/packages/artifactr/src/**/*'
       - '/packages/reflexr/src/**/*'
+      - '/packages/lattice-core/src/**/*'
       - '/packages/stackr/deploy/otel-collector/**/*'
     options:
       cache: false

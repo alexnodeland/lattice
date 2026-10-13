@@ -7,6 +7,7 @@ projects:
   artifactr: 'packages/artifactr'
   reflexr: 'packages/reflexr'
   evalr: 'packages/evalr'
+  lattice-core: 'packages/lattice-core'
   relayr: 'packages/relayr'
   grantr: 'packages/grantr'
   stackr: 'packages/stackr'

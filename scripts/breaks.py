@@ -2,12 +2,12 @@
 
 Usage: scripts/breaks.py BASE   (TITLE and BODY are the pull request's, when there is one)
 
-Each package (`packages/<name>/src/<name>`) is compared with its last release (its newest
-`<name>-v*` tag in BASE) by griffe, as `griffe check` does: once as the working tree has it,
-and once as BASE has it. A break the working tree has and BASE doesn't is the change's own, and
-it must be marked as release-please reads it: `!` after the title's type or scope, or a
-`BREAKING CHANGE:` footer in the body. A package with no release yet has no public API to
-keep, and is skipped.
+Each package (`packages/<name>`, whose module is in `src/`, named as its build backend says) is
+compared with its last release (its newest `<name>-v*` tag in BASE) by griffe, as `griffe check`
+does: once as the working tree has it, and once as BASE has it. A break the working tree has
+and BASE doesn't is the change's own, and it must be marked as release-please reads it: `!`
+after the title's type or scope, or a `BREAKING CHANGE:` footer in the body. A package with no
+release yet has no public API to keep, and is skipped.
 
 griffe compares an attribute's value as text, so a union with a new member, or an edited
 string, reads as a break. Those (`Attribute value was changed`) aren't counted.
@@ -17,6 +17,7 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import griffe
@@ -52,7 +53,15 @@ def _breaks(
     }
 
 
-def _added(name: str, base: str) -> list[griffe.Breakage]:
+def _module(package: Path) -> str | None:
+    """The module a package ships, as its build backend names it, if it ships one from src/."""
+    config = tomllib.loads((package / "pyproject.toml").read_text())
+    backend = config.get("tool", {}).get("uv", {}).get("build-backend", {})
+    module: str = backend.get("module-name", package.name)
+    return module if (package / "src" / module).is_dir() else None
+
+
+def _added(name: str, module: str, base: str) -> list[griffe.Breakage]:
     """The breaks against the package's last release that the working tree adds to BASE's."""
     release = _last_release(name, base)
     if release is None:
@@ -60,9 +69,9 @@ def _added(name: str, base: str) -> list[griffe.Breakage]:
         return []
     # load_git finds the package in a checkout of the ref, so its search path is relative.
     source = Path("packages", name, "src")
-    released = griffe.load_git(name, ref=release, repo=ROOT, search_paths=[source])
-    before = _breaks(released, griffe.load_git(name, ref=base, repo=ROOT, search_paths=[source]))
-    after = _breaks(released, griffe.load(name, search_paths=[ROOT / source]))
+    released = griffe.load_git(module, ref=release, repo=ROOT, search_paths=[source])
+    before = _breaks(released, griffe.load_git(module, ref=base, repo=ROOT, search_paths=[source]))
+    after = _breaks(released, griffe.load(module, search_paths=[ROOT / source]))
     added = [breakage for key, breakage in after.items() if key not in before]
     sys.stdout.write(f"breaks: {name} against {release}: {len(added)} new break(s)\n")
     return added
@@ -71,10 +80,11 @@ def _added(name: str, base: str) -> list[griffe.Breakage]:
 def main() -> int:
     """Report the change's breaks, and fail if any is unmarked."""
     base = sys.argv[1]
-    names = sorted(
-        path.name for path in ROOT.glob("packages/*/src/*") if path.name == path.parents[1].name
-    )
-    added = [breakage for name in names for breakage in _added(name, base)]
+    packages = sorted(path.parent for path in ROOT.glob("packages/*/pyproject.toml"))
+    shipped = {package.name: module for package in packages if (module := _module(package))}
+    added = [
+        breakage for name, module in shipped.items() for breakage in _added(name, module, base)
+    ]
     for breakage in added:
         sys.stdout.write(breakage.explain(style=griffe.ExplanationStyle.GITHUB) + "\n")
     if not added:

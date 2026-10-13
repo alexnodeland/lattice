@@ -12,6 +12,7 @@ from collections.abc import Callable, Collection, Mapping, MutableMapping, Seque
 from dataclasses import dataclass
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Final, Literal, Protocol, Self, cast
+from urllib.parse import unquote_plus
 
 from opentelemetry import context, metrics, trace
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
@@ -287,6 +288,7 @@ class TelemetryHandle:
                 tracer_provider=tracer_provider,
                 meter_provider=meter_provider,
                 exclude_spans=_EXCLUDED_ASGI_SPANS,
+                server_request_hook=_redact_request,
             )
             self._cleanups.append(fastapi.uninstrument)
         if "sqlalchemy" in libraries:
@@ -569,22 +571,31 @@ def _signal(endpoint: str | None, signal: str) -> str | None:
 # share is lattice #73.
 URL_ATTRIBUTES: Final = ("url.full", "url.query", "http.url", "http.target")
 """The span attributes that hold a request's URL, or its query, under the current semantic
-conventions and the older ones."""
+conventions and the older ones. FastAPI's server spans don't set ``url.full``; it is here so
+a span that does is redacted too."""
 
-_ACCESS_TOKEN: Final = re.compile(r"(^|[?&])access_token=[^&#\s]*")
+_PAIR: Final = re.compile(r"(^|[?&])([^=&#?\s]*)=([^&#\s]*)")
 
 
 def redact_access_token(text: str) -> str:
-    """Return a URL, a query or a log line with an ``access_token`` parameter's value hidden.
+    """Return a URL, a query or a path with each ``access_token`` parameter's value hidden.
 
-    ``access_token`` is OAuth's query parameter for a bearer token (RFC 6750, section 2.3).
+    ``access_token`` is OAuth's query parameter for a bearer token (RFC 6750, section 2.3). A
+    parameter is one however its name is encoded, as servers decode it, and every other
+    parameter is kept as it is, byte for byte.
     """
-    return _ACCESS_TOKEN.sub(r"\1access_token=REDACTED", text)
+    return _PAIR.sub(_redacted_pair, text)
+
+
+def _redacted_pair(pair: re.Match[str]) -> str:
+    start, name, _ = pair.groups()
+    return f"{start}{name}=REDACTED" if unquote_plus(name) == "access_token" else pair[0]
 
 
 def _redact_request(span: trace.Span, _scope: Mapping[str, Any]) -> None:
     """Hide an access token in a server span's URL attributes, which are set before this runs."""
     attributes = (span.attributes if isinstance(span, ReadableSpan) else None) or {}
     for key in URL_ATTRIBUTES:
-        if isinstance(value := attributes.get(key), str):
-            span.set_attribute(key, redact_access_token(value))
+        value = attributes.get(key)
+        if isinstance(value, str) and (redacted := redact_access_token(value)) != value:
+            span.set_attribute(key, redacted)

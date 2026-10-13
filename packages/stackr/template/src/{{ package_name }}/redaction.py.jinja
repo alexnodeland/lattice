@@ -27,9 +27,17 @@ class RedactedLogs(logging.Filter):
         return True
 
 
+LOGGERS: Final = ("uvicorn.error", "uvicorn.access")
+"""The loggers uvicorn logs requests' and WebSockets' paths to."""
+
+
 def _log_config() -> dict[str, Any]:
     config = copy.deepcopy(LOGGING_CONFIG)
     config["filters"] = {"redacted": {"()": RedactedLogs}}
+    # On the loggers, so no handler sees a token, however it was added; and on uvicorn's own
+    # handlers, which records from other loggers reach too.
+    for name in LOGGERS:
+        config["loggers"][name]["filters"] = ["redacted"]
     for handler in config["handlers"].values():
         handler["filters"] = ["redacted"]
     return config

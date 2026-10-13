@@ -6,6 +6,7 @@ import os
 from collections.abc import Iterator
 from typing import Any
 
+import fastapi
 import pytest
 from fastapi import FastAPI, WebSocket
 from fastapi.testclient import TestClient
@@ -226,6 +227,11 @@ QUERY = "tenant=acme&access_token=s3cret"
         (f"/stream?{QUERY}", "/stream?tenant=acme&access_token=REDACTED"),
         ("ws://host/stream?access_token=s3cret#end", "ws://host/stream?access_token=REDACTED#end"),
         ("/stream?not_an_access_token=kept", "/stream?not_an_access_token=kept"),
+        ("/s?access%5Ftoken=s3cret&a=%2F", "/s?access%5Ftoken=REDACTED&a=%2F"),
+        ("%61ccess_token=s3cret&b=x+y", "%61ccess_token=REDACTED&b=x+y"),
+        ("/s?access_token=1&access_token=2", "/s?access_token=REDACTED&access_token=REDACTED"),
+        ("/s?tenant=acme&next=%3Faccess_token%3D1", "/s?tenant=acme&next=%3Faccess_token%3D1"),
+        ("/a=b/c", "/a=b/c"),
     ],
 )
 def test_only_an_access_tokens_value_is_redacted(text: str, redacted: str) -> None:
@@ -260,6 +266,25 @@ def test_requests_and_websockets_are_traced_without_their_access_tokens(
     ]
     assert len(urls) == 2, "the request's and the WebSocket's"
     assert all("s3cret" not in url and "access_token=REDACTED" in url for url in urls), urls
+
+
+def test_apps_built_after_configuring_are_traced_without_their_access_tokens(
+    captured: Captured,
+) -> None:
+    with configure_telemetry(
+        service_name="docplan", instrument=("fastapi",), **captured.options()
+    ) as handle:
+        app = fastapi.FastAPI()  # built after configuring, so the instrumentation patched it
+
+        @app.get("/items")
+        async def items() -> list[str]:
+            return []
+
+        with TestClient(app) as client:
+            client.get(f"/items?{QUERY}")
+        handle.tracer_provider.force_flush()
+    [span] = [s for s in captured.spans.get_finished_spans() if s.name == "GET /items"]
+    assert (span.attributes or {})["url.query"] == "tenant=acme&access_token=REDACTED"
 
 
 def test_the_older_conventions_url_is_redacted_too(handle: TelemetryHandle) -> None:

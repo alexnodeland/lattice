@@ -362,13 +362,13 @@ test("Grants lists each grant by where, and grants a role where the role may be 
   ]);
 });
 
-test("without revoking, Grants has no Revoke; with it, revoking is confirmed", async () => {
-  const without = await open("/t/acme/access/grants", ["grantr:grant"]);
-  await expect.element(without.screen.getByRole("rowheader", { name: "owner" })).toBeVisible();
-  await expect
-    .element(without.screen.getByRole("button", { name: /^Revoke/ }))
-    .not.toBeInTheDocument();
-  without.screen.unmount();
+test("without revoking, Grants has no Revoke", async () => {
+  const { screen } = await open("/t/acme/access/grants", ["grantr:grant"]);
+  await expect.element(screen.getByRole("rowheader", { name: "owner" })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: /^Revoke/ })).not.toBeInTheDocument();
+});
+
+test("revoking a grant is confirmed", async () => {
   const { screen } = await open("/t/acme/access/grants", ACCESS);
   await screen
     .getByRole("button", { name: "Revoke viewer from ops (group) on thread t_1 in ws_1" })

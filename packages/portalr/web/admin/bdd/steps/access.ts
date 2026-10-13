@@ -141,7 +141,7 @@ When(
 Then(
   "it holds {string} on the workspace {string}",
   async ({ page, made }, role: string, workspace: string) => {
-    const grant = item(page, `Grants in ${workspace}`, madeAs(made, "principal"));
+    const grant = item(page, `Workspace ${workspace}`, madeAs(made, "principal"));
     await expect(grant).toHaveCount(1);
     await expect(grant).toContainText(role);
     await expect(grant).toContainText(`workspace ${workspace}`);
@@ -158,7 +158,7 @@ When("they revoke its {string}", async ({ page, made }, role: string) => {
 });
 
 Then("it holds no role", async ({ page, made }) => {
-  await expect(item(page, "Grants in notes", madeAs(made, "principal"))).toHaveCount(0);
+  await expect(item(page, "Workspace notes", madeAs(made, "principal"))).toHaveCount(0);
 });
 
 When("they look on a phone, at Access's Members", async ({ page }) => {

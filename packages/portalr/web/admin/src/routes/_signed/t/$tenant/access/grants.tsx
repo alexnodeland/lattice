@@ -49,6 +49,15 @@ const whomOf = (grantee: { readonly kind: string; readonly id: string }) => {
   return known ? whom(known) : keyOf(grantee);
 };
 
+/** Whom the form names, as a dialog's question says it: "olga", or "the group ops". */
+function named(key: string): string {
+  const to = fromKey(key.trim(), GRANTEE_KINDS);
+  if (to === null) {
+    return "them";
+  }
+  return to.kind === "group" ? `the group ${to.id}` : to.id;
+}
+
 /** No read: where grantr doesn't allow a list, the form goes without it. */
 const none = queryOptions({
   queryKey: ["grantr", "~none"] as const,
@@ -130,7 +139,7 @@ function Grants() {
         <Granted
           key={place ?? "~tenant"}
           tenant={tenant}
-          caption={place === null ? "Grants on the tenant" : `Grants in ${place}`}
+          heading={place === null ? "The tenant" : `Workspace ${place}`}
           grants={granted.filter((grant) => (grant.on.workspace ?? null) === place)}
           revokes={allowed.has("grantr:revoke")}
           owns={owns}
@@ -150,13 +159,14 @@ function Grants() {
 /** One place's grants, the workspace's before its items', each revoked once confirmed. */
 function Granted({
   tenant,
-  caption,
+  heading,
   grants,
   revokes,
   owns,
 }: {
   tenant: string;
-  caption: string;
+  /** The place, as its heading names it, and the table under it: "The tenant", "Workspace notes". */
+  heading: string;
   grants: readonly Grant[];
   revokes: boolean;
   owns: boolean;
@@ -170,49 +180,53 @@ function Granted({
       whom(a.to).localeCompare(whom(b.to)) ||
       a.role.localeCompare(b.role),
   );
+  const headingId = useId();
   return (
-    <ItemTable
-      caption={caption}
-      columns={[
-        { key: "to", label: "To", cell: (grant) => whom(grant.to) },
-        { key: "role", label: "Role", cell: (grant) => grant.role },
-        { key: "on", label: "On", cell: (grant) => where(grant.on) },
-      ]}
-      items={sorted}
-      keyOf={said}
-      named={said}
-      actions={
-        revokes
-          ? (grant) =>
-              grant.role === "owner" && !owns ? null : (
-                <ConfirmDialog
-                  label="Revoke"
-                  name={`Revoke ${said(grant)}`}
-                  title={`Revoke ${grant.role} from ${whom(grant.to)}?`}
-                  confirm="Revoke"
-                  onConfirm={async () =>
-                    orThrow(
-                      "Not revoked",
-                      await changed(
-                        commands.grantr.revoke(tenant, {
-                          role: grant.role,
-                          on: grant.on,
-                          to: grant.to,
-                        }),
-                      ),
-                    )
-                  }
-                >
-                  <p>
-                    They lose what {grant.role} holds on {where(grant.on)}, unless it's granted them
-                    another way.
-                  </p>
-                </ConfirmDialog>
-              )
-          : undefined
-      }
-      empty={{ title: "No grants here", body: "Grant a role below." }}
-    />
+    <section aria-labelledby={headingId} className="flex flex-col gap-2">
+      <SectionTitle id={headingId}>{heading}</SectionTitle>
+      <ItemTable
+        labelledBy={headingId}
+        columns={[
+          { key: "to", label: "To", cell: (grant) => whom(grant.to) },
+          { key: "role", label: "Role", cell: (grant) => grant.role },
+          { key: "on", label: "On", cell: (grant) => where(grant.on) },
+        ]}
+        items={sorted}
+        keyOf={said}
+        named={said}
+        actions={
+          revokes
+            ? (grant) =>
+                grant.role === "owner" && !owns ? null : (
+                  <ConfirmDialog
+                    label="Revoke"
+                    name={`Revoke ${said(grant)}`}
+                    title={`Revoke ${grant.role} from ${whom(grant.to)}?`}
+                    confirm="Revoke"
+                    onConfirm={async () =>
+                      orThrow(
+                        "Not revoked",
+                        await changed(
+                          commands.grantr.revoke(tenant, {
+                            role: grant.role,
+                            on: grant.on,
+                            to: grant.to,
+                          }),
+                        ),
+                      )
+                    }
+                  >
+                    <p>
+                      They lose what {grant.role} holds on {where(grant.on)}, unless it's granted
+                      them another way.
+                    </p>
+                  </ConfirmDialog>
+                )
+            : undefined
+        }
+        empty={{ title: "No grants here", body: "Grant a role below." }}
+      />
+    </section>
   );
 }
 
@@ -393,21 +407,23 @@ function Granting({
         )}
         {answered && <p role={answered.refused ? "alert" : "status"}>{answered.said}</p>}
         {confirmed ? (
-          <ConfirmDialog
-            label="Grant"
-            title={`Make them ${fields.role} of ${tenant}?`}
-            confirm={`Grant ${fields.role}`}
-            onConfirm={async () => {
-              orThrow("Not granted", await grant());
-              setAnswered(done());
-            }}
-          >
-            <p>
-              {fields.role === "owner"
-                ? `An owner may do anything in ${tenant}, deleting it included.`
-                : `An admin may change who may see and do what in ${tenant}, and run every workspace in it.`}
-            </p>
-          </ConfirmDialog>
+          <div className="self-start">
+            <ConfirmDialog
+              label="Grant"
+              title={`Make ${named(fields.to)} ${fields.role} of ${tenant}?`}
+              confirm={`Grant ${fields.role}`}
+              onConfirm={async () => {
+                orThrow("Not granted", await grant());
+                setAnswered(done());
+              }}
+            >
+              <p>
+                {fields.role === "owner"
+                  ? `An owner may do anything in ${tenant}, deleting it included.`
+                  : `An admin may change who may see and do what in ${tenant}, and run every workspace in it.`}
+              </p>
+            </ConfirmDialog>
+          </div>
         ) : (
           <Button type="submit" disabled={pending} className="self-start">
             Grant

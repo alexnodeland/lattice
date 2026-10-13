@@ -3,7 +3,7 @@ import { Button, ConfirmDialog, ItemTable } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { counted, opening, refused, type Said, useAccess } from "../../../../../access";
+import { counted, opening, possessive, refused, type Said, useAccess } from "../../../../../access";
 import { type Changing, DefineSet } from "../../../../../define-set";
 
 /**
@@ -70,7 +70,7 @@ function Roles() {
           <>
             <Button
               variant="secondary"
-              aria-label={`Change ${role.name}'s actions`}
+              aria-label={`Change ${possessive(role.name)} actions`}
               onClick={() => void change(role.name)}
             >
               Change actions
@@ -99,7 +99,7 @@ function Roles() {
           name: "Role",
           of: "Actions",
           create: "Create a role",
-          change: (name) => `Change ${name}'s actions`,
+          change: (name) => `Change ${possessive(name)} actions`,
           created: "Create the role",
           saved: "Save the role",
         }}

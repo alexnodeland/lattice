@@ -152,10 +152,25 @@ export class Refused extends Error {
   readonly detail: unknown;
 
   constructor(status: number, detail: unknown) {
-    super(`the server refused the read (${status}): ${JSON.stringify(detail)}`);
+    super(`the server refused the read (${status}): ${why(detail)}`);
     this.status = status;
     this.detail = detail;
   }
+}
+
+/**
+ * Why a read was refused, as people read it: a refusal's `detail`, or its `message`, as the
+ * libraries' `HTTPException`s give them; anything else as it came.
+ */
+function why(body: unknown): string {
+  const detail = typeof body === "object" && body !== null && "detail" in body ? body.detail : body;
+  if (typeof detail === "string") {
+    return detail;
+  }
+  if (typeof detail === "object" && detail !== null && "message" in detail) {
+    return String(detail.message);
+  }
+  return JSON.stringify(body);
 }
 
 /** The query options of every read, over the given clients. */

@@ -144,6 +144,18 @@ test("people come first, and no one is offered their own removal", async () => {
     .not.toBeInTheDocument();
 });
 
+test("a member's row header reads as its row does, between its borders", async () => {
+  const { screen } = await open("/t/acme/access/members", TENANT_ACTIONS);
+  const table = screen.getByRole("table", { name: "Members" });
+  const header = table.getByRole("rowheader", { name: "bob" });
+  await expect.element(header).toBeVisible();
+  const cell = getComputedStyle(table.getByRole("cell", { name: "person" }).first().element());
+  const own = getComputedStyle(header.element());
+  expect(own.fontSize).toBe(cell.fontSize);
+  expect(own.borderTopWidth).toBe(cell.borderTopWidth);
+  expect(own.borderTopStyle).toBe("solid");
+});
+
 test("a part grantr doesn't allow, opened by its address, is not found in the frame", async () => {
   const { screen } = await open("/t/acme/access/keys", ["grantr:add_member"]);
   await expect.element(screen.getByText("There's no such part of Access here")).toBeVisible();
@@ -193,7 +205,7 @@ test("Create refuses a group's name that is taken, rather than replace its membe
 test("Change members starts from the group's members, and confirms whom it takes out", async () => {
   const { screen } = await open("/t/acme/access/groups", TENANT_ACTIONS);
   await expect.element(screen.getByRole("cell", { name: "bob (person)" })).toBeVisible();
-  await screen.getByRole("button", { name: "Change ops's members" }).click();
+  await screen.getByRole("button", { name: "Change ops' members" }).click();
   const bob = screen.getByRole("checkbox", { name: "bob (person)" });
   await expect.element(bob).toBeChecked();
   await screen.getByRole("checkbox", { name: "ci (service principal)" }).click();
@@ -316,11 +328,14 @@ test("deleting a custom role says its grants go with it", async () => {
 
 test("Grants groups the tenant's grants and each workspace's, each named by whom and what", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
-  const tenant = screen.getByRole("table", { name: "Grants on the tenant" });
+  // Each place is headed, visibly, and its table named by its heading.
+  await expect.element(screen.getByRole("heading", { name: "The tenant" })).toBeVisible();
+  await expect.element(screen.getByRole("heading", { name: "Workspace ws_1" })).toBeVisible();
+  const tenant = screen.getByRole("table", { name: "The tenant" });
   await expect
     .element(tenant.getByRole("row", { name: "alice (person) as owner on the tenant" }))
     .toBeVisible();
-  const workspace = screen.getByRole("table", { name: "Grants in ws_1" });
+  const workspace = screen.getByRole("table", { name: "Workspace ws_1" });
   const rows = workspace
     .getByRole("rowheader")
     .elements()
@@ -381,8 +396,12 @@ test("granting a role that runs the tenant is confirmed first", async () => {
   await screen.getByRole("combobox", { name: "Role" }).selectOptions("owner");
   await screen.getByRole("combobox", { name: "On" }).selectOptions("tenant");
   await screen.getByRole("combobox", { name: "To" }).selectOptions("bob (person)");
-  await screen.getByRole("button", { name: "Grant", exact: true }).click();
-  const dialog = screen.getByRole("alertdialog", { name: "Make them owner of acme?" });
+  // The trigger sits at the form's start, as Grant does; the question names whom it makes owner.
+  const trigger = screen.getByRole("button", { name: "Grant", exact: true });
+  await expect.element(trigger).toBeVisible();
+  expect(trigger.element().getBoundingClientRect().width).toBeLessThan(200);
+  await trigger.click();
+  const dialog = screen.getByRole("alertdialog", { name: "Make bob owner of acme?" });
   expect(sent).toEqual([]);
   await dialog.getByRole("button", { name: "Grant owner" }).click();
   await expect
@@ -452,7 +471,7 @@ test("without deleting the tenant, owner isn't offered, nor its grants' Revoke",
 
 test("without revoking, Grants has no Revoke", async () => {
   const { screen } = await open("/t/acme/access/grants", ["grantr:grant"]);
-  await expect.element(screen.getByRole("table", { name: "Grants in ws_1" })).toBeVisible();
+  await expect.element(screen.getByRole("table", { name: "Workspace ws_1" })).toBeVisible();
   await expect.element(screen.getByRole("button", { name: /^Revoke/ })).not.toBeInTheDocument();
 });
 

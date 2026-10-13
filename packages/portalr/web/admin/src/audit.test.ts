@@ -27,9 +27,9 @@ test("each type of change reads as a sentence", () => {
     [{ type: "member_removed", member: bob }, "removed bob (person)"],
     [
       { type: "group_defined", group: "ops", members: [bob, ci] },
-      "set ops's members to bob (person), ci (service principal)",
+      "set ops' members to bob (person), ci (service principal)",
     ],
-    [{ type: "group_defined", group: "ops", members: [] }, "set ops's members to no one"],
+    [{ type: "group_defined", group: "ops", members: [] }, "set ops' members to no one"],
     [{ type: "group_deleted", group: "ops" }, "deleted the group ops"],
     [
       { type: "role_defined", role: { name: "triager", actions: ["b:y", "a:x"] } },

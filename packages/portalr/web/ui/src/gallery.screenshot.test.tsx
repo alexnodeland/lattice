@@ -85,7 +85,7 @@ function Gallery() {
         }
       />
       <div className="flex flex-col gap-6">
-        <Table caption="Runs">
+        <Table name={{ caption: "Runs" }}>
           <thead>
             <tr>
               <th scope="col">Status</th>

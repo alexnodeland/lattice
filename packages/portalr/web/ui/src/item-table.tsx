@@ -1,7 +1,7 @@
 import { type ReactNode, useId } from "react";
 import { Card } from "./card";
 import { EmptyState } from "./empty-state";
-import { Table } from "./table";
+import { type Name, nameOf, Table } from "./table";
 
 /** One of an item table's columns: its own key, its heading, and what it shows of each item. */
 export interface Column<T> {
@@ -13,20 +13,20 @@ export interface Column<T> {
 /**
  * Items as a table from 640 pixels, the breakpoint the app's run lists use, and as a list of
  * cards below, rather than a table scrolled sideways on a phone (portalr ADR-0021). Only one is
- * shown, so only one is in the accessibility tree: the table named by `caption`, each row named
+ * shown, so only one is in the accessibility tree: the table named by `caption`, or by the
+ * heading `labelledBy` names, each row named
  * by its first cell, or the list, named the same, each card headed and named by its first cell,
  * with the others beside their labels and the item's actions last. With no items, it says so.
  */
 export function ItemTable<T>({
-  caption,
   columns,
   items,
   keyOf,
   named,
   actions,
   empty,
-}: {
-  caption: string;
+  ...naming
+}: ({ caption: string } | { labelledBy: string }) & {
   columns: readonly [Column<T>, ...Column<T>[]];
   items: readonly T[];
   keyOf: (item: T) => string;
@@ -38,6 +38,8 @@ export function ItemTable<T>({
   empty: { readonly title: string; readonly body: ReactNode };
 }) {
   const prefix = useId();
+  const tableName: Name =
+    "caption" in naming ? { caption: naming.caption } : { by: naming.labelledBy };
   if (items.length === 0) {
     return <EmptyState title={empty.title}>{empty.body}</EmptyState>;
   }
@@ -49,7 +51,7 @@ export function ItemTable<T>({
   return (
     <>
       <div className="max-sm:hidden">
-        <Table caption={caption}>
+        <Table name={tableName}>
           <thead>
             <tr>
               {columns.map((column) => (
@@ -79,7 +81,7 @@ export function ItemTable<T>({
           </tbody>
         </Table>
       </div>
-      <ul aria-label={caption} className="flex flex-col gap-2 sm:hidden">
+      <ul {...nameOf(tableName)} className="flex flex-col gap-2 sm:hidden">
         {items.map((item, index) => (
           <li key={keyOf(item)} {...name(item, index, "card")}>
             <Card className="flex flex-col gap-2">

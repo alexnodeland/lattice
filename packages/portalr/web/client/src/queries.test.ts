@@ -3,7 +3,7 @@ import type { Server } from "bun";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import type * as v1 from "./generated/artifactr.v1";
 import type * as reflexrV1 from "./generated/reflexr.v1";
-import { AUDIT_PAGE, createQueries, keys, stale } from "./queries";
+import { AUDIT_PAGE, createQueries, keys, Refused, stale } from "./queries";
 import { createApi, readConfig } from "./rest";
 
 interface Seen {
@@ -361,4 +361,17 @@ test("an audit read with no filter asks for every entry", async () => {
 test("a workspace's grants and the tenant's are read apart", () => {
   expect(keys.grantr.grants("acme")).not.toEqual(keys.grantr.grants("acme", "ws_1"));
   expect(queries.grantr.grants("acme").queryKey).toEqual(keys.grantr.grants("acme"));
+});
+
+test("a refusal says why: its detail, or its message, or what came", () => {
+  expect(new Refused(422, { detail: "no such subject" }).message).toBe(
+    "the server refused the read (422): no such subject",
+  );
+  expect(
+    new Refused(403, { detail: { type: "forbidden", message: "not an operator" } }).message,
+  ).toBe("the server refused the read (403): not an operator");
+  expect(new Refused(500, { detail: [{ msg: "x" }] }).message).toBe(
+    'the server refused the read (500): {"detail":[{"msg":"x"}]}',
+  );
+  expect(new Refused(502, null).message).toBe("the server refused the read (502): null");
 });

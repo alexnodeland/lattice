@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Install proto at the version .prototools pins, unless the cache restored it, and then the tools
+# .prototools lists, which proto skips when they're installed already. proto's archive is checked
+# against the digest proto.sha256 pins for it, and every download is retried, so a transient
+# failure of GitHub's release downloads doesn't fail the job (lattice ADR-0017).
+set -euo pipefail
+
+[[ $(uname -s) == Linux ]] || { echo "install: CI's runners are Linux; this is $(uname -s)" >&2; exit 1; }
+version=$(sed -nE 's/^proto = "([^"]+)"$/\1/p' .prototools)
+[[ -n $version ]] || { echo "install: .prototools pins no proto version" >&2; exit 1; }
+arch=$(uname -m)
+digest=$(awk -v version="$version" -v arch="$arch" '$1 == version && $2 == arch { print $3 }' \
+  "$GITHUB_ACTION_PATH/proto.sha256")
+[[ -n $digest ]] || { echo "install: proto.sha256 pins no digest for proto $version on $arch" >&2; exit 1; }
+bin="$HOME/.proto/bin"
+
+if [[ $("$bin/proto" --version 2>/dev/null || true) != "proto $version" ]]; then
+  archive="proto_cli-$arch-unknown-linux-gnu.tar.xz"
+  scratch=$(mktemp -d)
+  trap 'rm -rf "$scratch"' EXIT
+  curl --fail --silent --show-error --location --retry 5 --retry-all-errors --retry-delay 5 \
+    --output "$scratch/$archive" \
+    "https://github.com/moonrepo/proto/releases/download/v$version/$archive"
+  echo "$digest  $scratch/$archive" | sha256sum --check --quiet
+  tar --extract --xz --file "$scratch/$archive" --directory "$scratch"
+  mkdir -p "$bin"
+  install -m 0755 "$scratch/${archive%.tar.xz}/proto" "$scratch/${archive%.tar.xz}/proto-shim" "$bin"
+fi
+echo "$bin" >>"$GITHUB_PATH"
+echo "$HOME/.proto/shims" >>"$GITHUB_PATH"
+"$bin/proto" --version
+
+# The tools' downloads are retried too, a little later each time.
+for attempt in 1 2 3 4; do
+  if "$bin/proto" install; then
+    exit 0
+  fi
+  ((attempt < 4)) || exit 1
+  echo "install: proto install failed; trying again in $((attempt * 15))s" >&2
+  sleep $((attempt * 15))
+done

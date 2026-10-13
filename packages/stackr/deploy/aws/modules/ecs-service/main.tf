@@ -43,7 +43,7 @@ locals {
       awslogs-stream-prefix = var.name
     }
   }
-  service = {
+  main = {
     name                   = var.name
     image                  = var.container.image
     essential              = true
@@ -53,16 +53,18 @@ locals {
     secrets                = [for key, value in var.container.secrets : { name = key, valueFrom = value }]
     readonlyRootFilesystem = var.container.readonly_root_filesystem
     logConfiguration       = local.logs
-    dependsOn              = var.wait == null ? [] : [{ containerName = "wait", condition = "SUCCESS" }]
   }
+  # With a wait, the service's container starts only once the wait has exited 0. ECS's startTimeout
+  # is left unset: Fargate caps it at 120 seconds, and the wait bounds itself.
+  service = merge(local.main, var.wait == null ? {} : { dependsOn = [{ containerName = "wait", condition = "SUCCESS" }] })
   # A container that must end well before the service's starts, such as one that waits for
   # another service to be ready.
   wait = var.wait == null ? [] : [{
-    name        = "wait"
-    image       = var.wait.image
-    essential   = false
-    command     = var.wait.command
-    environment = []
+    name                   = "wait"
+    image                  = var.wait.image
+    essential              = false
+    command                = var.wait.command
+    readonlyRootFilesystem = true
     logConfiguration = merge(local.logs, {
       options = merge(local.logs.options, { awslogs-stream-prefix = "${var.name}-wait" })
     })

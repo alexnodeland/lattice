@@ -108,7 +108,7 @@ run "stack_secrets_are_references_never_settings" {
         module.db_init, module.auth_keys, module.db_roles[0],
         ] : [
         for container in service.containers : [
-          for setting in container.environment :
+          for setting in try(container.environment, []) :
           !can(regex("PASSWORD|SECRET|TOKEN|_KEY$|PASS$|_AUTH$|^DATABASE_(ADMIN_)?URL$|^REDIS_|^GOTRUE_DB_DATABASE_URL$|^SALT$", setting.name))
         ]
       ]
@@ -630,17 +630,26 @@ run "stack_langfuses_worker_starts_after_the_web_servers_migrations" {
 
   assert {
     condition = (
-      [for container in module.langfuse_worker.containers : container.name] == ["langfuse-worker", "wait"]
-      && module.langfuse_worker.containers[0].dependsOn == [{ containerName = "wait", condition = "SUCCESS" }]
-      && module.langfuse_worker.containers[1].essential == false
+      { for container in module.langfuse_worker.containers : container.name => container.dependsOn if container.name == "langfuse-worker" }["langfuse-worker"] == [{ containerName = "wait", condition = "SUCCESS" }]
+      && one([for container in module.langfuse_worker.containers : container.essential if container.name == "wait"]) == false
+      && one([for container in module.langfuse_worker.containers : container.readonlyRootFilesystem if container.name == "wait"])
     )
-    error_message = "The worker starts only once its wait has ended well."
+    error_message = "The worker starts only once its wait, which writes nothing, has ended well."
   }
   assert {
     condition = (
-      strcontains(module.langfuse_worker.containers[1].command[2], "http://langfuse-web.stackr.internal:3000/api/public/health")
-      && strcontains(module.langfuse_worker.containers[1].command[2], "\"version\":\"v?4\\.46\\.0\"")
+      strcontains(one([for container in module.langfuse_worker.containers : container.command[2] if container.name == "wait"]), "http://langfuse-web.stackr.internal:3000/api/public/health")
+      && strcontains(one([for container in module.langfuse_worker.containers : container.command[2] if container.name == "wait"]), "\"version\":\"4.46.0\"")
+      && strcontains(one([for container in module.langfuse_worker.containers : container.command[2] if container.name == "wait"]), "--connect-timeout 3 --max-time 5")
     )
-    error_message = "It waits for the web server to answer as the worker's own version, which it does only once migrated."
+    error_message = "It waits, each try bounded, for the web server to answer as the worker's own version, which it does only once migrated."
+  }
+  assert {
+    condition     = local.langfuse_web_version == local.langfuse_version
+    error_message = "Langfuse's web server and worker are the same version, which the worker waits for."
+  }
+  assert {
+    condition     = alltrue([for container in module.langfuse_web.containers : !contains(keys(container), "dependsOn")])
+    error_message = "A service without a wait has no dependsOn, so its definition doesn't change."
   }
 }

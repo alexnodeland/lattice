@@ -241,9 +241,8 @@ run "ecs_service_waits_for_a_container_that_ends_well" {
 
   assert {
     condition = (
-      jsondecode(aws_ecs_task_definition.this.container_definitions)[0].dependsOn == [{ containerName = "wait", condition = "SUCCESS" }]
-      && jsondecode(aws_ecs_task_definition.this.container_definitions)[1].name == "wait"
-      && jsondecode(aws_ecs_task_definition.this.container_definitions)[1].essential == false
+      one([for container in jsondecode(aws_ecs_task_definition.this.container_definitions) : container.dependsOn if container.name == "litellm"]) == [{ containerName = "wait", condition = "SUCCESS" }]
+      && one([for container in jsondecode(aws_ecs_task_definition.this.container_definitions) : container.essential if container.name == "wait"]) == false
     )
     error_message = "The service's container starts after its wait exits 0."
   }

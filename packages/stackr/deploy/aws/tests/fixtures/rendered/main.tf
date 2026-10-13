@@ -35,8 +35,7 @@ output "caddyfile" {
 output "wait_for_langfuse" {
   description = "Langfuse's worker's wait, as sh runs it."
   value = templatefile("${path.module}/../../../modules/stack/wait-for-langfuse.sh.tftpl", {
-    health          = "http://langfuse-web.stackr.internal:3000/api/public/health"
-    version         = "4.46.0"
-    version_pattern = "4\\.46\\.0"
+    health  = "http://langfuse-web.stackr.internal:3000/api/public/health"
+    version = "4.46.0"
   })
 }

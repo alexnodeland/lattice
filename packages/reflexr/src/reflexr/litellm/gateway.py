@@ -94,6 +94,9 @@ class LiteLLMGateway(AbstractCapability[Reaction[Any]]):
     - the guardrails the rule's policy names
     - the tenant's virtual key, as the request's ``Authorization``, from ``tenant_key``
 
+    An ``extra_body`` the settings already carry is kept beside the gateway's metadata, so a
+    model's ``extra_body={"mock_response": "..."}`` still has the proxy mock its reply.
+
     A request a guardrail blocks fails the attempt with a :class:`GuardrailBlocked`: the run is
     dead-lettered as ``guardrail_blocked``, never retried.
 

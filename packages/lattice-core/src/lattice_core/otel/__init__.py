@@ -1,6 +1,12 @@
-"""OpenTelemetry for applications, in one call: the ``otel`` extra.
+"""OpenTelemetry for applications, in one call.
 
-Each library's ``otel`` module calls :func:`~lattice_core.otel.configure.configure_telemetry` with
-its own contribution, and re-exports the rest, so an application uses the library's. Each name is
-imported from :mod:`lattice_core.otel.configure`, which defines it; nothing here names a library.
+Two modules, each the one path to its names:
+
+- :mod:`lattice_core.otel.contribution`: the contract a library's contribution follows. It
+  needs no extra, so a library's telemetry layer can name it (lattice ADR-0020).
+- :mod:`lattice_core.otel.configure`: :func:`~lattice_core.otel.configure.configure_telemetry`
+  and its handle, the ``otel`` extra. Each library's ``otel`` module calls it with its own
+  contribution, and re-exports the rest, so an application uses the library's.
+
+Nothing here names a library.
 """

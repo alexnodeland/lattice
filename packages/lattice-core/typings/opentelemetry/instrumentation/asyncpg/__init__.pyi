@@ -1,4 +1,4 @@
-"""Minimal type stubs for the parts of opentelemetry-instrumentation-asyncpg artifactr uses."""
+"""Minimal type stubs for the parts of opentelemetry-instrumentation-asyncpg lattice-core uses."""
 
 from collections.abc import Collection
 from typing import Any, override

@@ -1,28 +1,24 @@
-"""reflexr's configure_telemetry: its own contribution, on the setup lattice-core tests."""
+"""reflexr's configure_telemetry: its own contribution, on the setup lattice-core tests.
 
+Only what is reflexr's is tested here, and the redaction once more end to end, since it keeps a
+browser's token out of the traces.
+"""
+
+import inspect
 import logging
-from collections.abc import Iterator
 from typing import Any
 
+import fastapi
 import pytest
-from fastapi import FastAPI, WebSocket
 from fastapi.testclient import TestClient
-from opentelemetry import baggage
-from opentelemetry import context as otel_context
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from sqlalchemy import text
 
-from reflexr.otel import (
-    URL_ATTRIBUTES,
-    TelemetryHandle,
-    configure_telemetry,
-    metric_views,
-)
-from reflexr.sql import create_sqlite_engine
+from lattice_core.otel.configure import configure_telemetry as core_configure_telemetry
+from reflexr.otel import configure_telemetry, metric_views
 from reflexr.telemetry import SCOPE, Telemetry
-from reflexr.telemetry.attributes import EVENT_TYPE, SESSION_ID, TENANT_ID, WORKSPACE_ID
+from reflexr.telemetry.attributes import EVENT_TYPE, TENANT_ID, WORKSPACE_ID
 from reflexr.telemetry.metrics import EVENTS_PUBLISHED
 
 
@@ -57,39 +53,6 @@ class Captured:
 @pytest.fixture
 def captured() -> Captured:
     return Captured()
-
-
-@pytest.fixture
-def handle(captured: Captured) -> Iterator[TelemetryHandle]:
-    with configure_telemetry(
-        service_name="oncall", service_version="1.2.3", environment="test", **captured.options()
-    ) as handle:
-        yield handle
-
-
-def test_spans_carry_the_service_and_the_runs_session(
-    handle: TelemetryHandle, captured: Captured
-) -> None:
-    tracer = handle.tracer_provider.get_tracer("test")
-    token = otel_context.attach(
-        baggage.set_baggage("user.id", "alice", baggage.set_baggage(SESSION_ID, "evt_1"))
-    )
-    try:
-        with tracer.start_as_current_span("query"):
-            pass
-    finally:
-        otel_context.detach(token)
-    handle.tracer_provider.force_flush()
-    [span] = captured.spans.get_finished_spans()
-    assert (
-        dict(span.resource.attributes).items()
-        >= {
-            "service.name": "oncall",
-            "service.version": "1.2.3",
-            "deployment.environment.name": "test",
-        }.items()
-    )
-    assert dict(span.attributes or {}) == {SESSION_ID: "evt_1"}, "only the session is copied"
 
 
 @pytest.mark.parametrize(
@@ -149,64 +112,27 @@ def test_a_record_logged_in_a_tenants_span_carries_its_tenant(captured: Captured
     handle.shutdown()
 
 
-def test_fastapi_apps_are_traced(handle: TelemetryHandle, captured: Captured) -> None:
-    app = FastAPI()
-
-    @app.get("/ping")
-    async def ping() -> str:
-        return "pong"
-
-    handle.instrument_app(app)
-    with TestClient(app) as client:
-        assert client.get("/ping").json() == "pong"
-    handle.tracer_provider.force_flush()
-    assert [span.name for span in captured.spans.get_finished_spans()] == ["GET /ping"]
-
-
 QUERY = "tenant=acme&access_token=s3cret"
 
 
-def test_requests_and_websockets_are_traced_without_their_access_tokens(
-    handle: TelemetryHandle, captured: Captured
+def test_apps_built_after_configuring_are_traced_without_their_access_tokens(
+    captured: Captured,
 ) -> None:
-    app = FastAPI()
+    with configure_telemetry(
+        service_name="oncall", instrument=("fastapi",), **captured.options()
+    ) as handle:
+        app = fastapi.FastAPI()  # built after configuring, so the instrumentation patched it
 
-    @app.get("/items")
-    async def items() -> list[str]:
-        return []
+        @app.get("/items")
+        async def items() -> list[str]:
+            return []
 
-    @app.websocket("/stream")
-    async def stream(websocket: WebSocket) -> None:
-        await websocket.accept()
-        await websocket.close()
-
-    handle.instrument_app(app)
-    with TestClient(app) as client:
-        client.get(f"/items?{QUERY}")
-        with client.websocket_connect(f"/stream?{QUERY}"):
-            pass
-    handle.tracer_provider.force_flush()
-    urls = [
-        str(value)
-        for span in captured.spans.get_finished_spans()
-        for key, value in (span.attributes or {}).items()
-        if key in URL_ATTRIBUTES and "access_token" in str(value)
-    ]
-    assert len(urls) == 2, "the request's and the WebSocket's"
-    assert all("s3cret" not in url and "access_token=REDACTED" in url for url in urls), urls
+        with TestClient(app) as client:
+            client.get(f"/items?{QUERY}")
+        handle.tracer_provider.force_flush()
+    [span] = [s for s in captured.spans.get_finished_spans() if s.name == "GET /items"]
+    assert (span.attributes or {})["url.query"] == "tenant=acme&access_token=REDACTED"
 
 
-async def test_sqlalchemy_engines_are_traced(
-    handle: TelemetryHandle, captured: Captured, tmp_path: Any
-) -> None:
-    engine = create_sqlite_engine(f"sqlite+aiosqlite:///{tmp_path / 'app.db'}")
-    try:
-        handle.instrument_engine(engine)
-        handle.instrument_engine(engine.sync_engine)
-        async with engine.connect() as connection:
-            await connection.execute(text("select 1"))
-    finally:
-        await engine.dispose()
-    handle.tracer_provider.force_flush()
-    names = [span.name for span in captured.spans.get_finished_spans()]
-    assert any(name.startswith("select") or name == "SELECT" for name in names), names
+def test_it_takes_lattice_cores_parameters() -> None:
+    assert inspect.signature(configure_telemetry) == inspect.signature(core_configure_telemetry)

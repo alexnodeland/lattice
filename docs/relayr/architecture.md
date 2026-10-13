@@ -29,7 +29,7 @@ graph LR
 | `relayr.rules` | `RuleDraft`, the `rule` artifact type; `check_draft` and `preview`; `RuleDrafting`, the chat agent's `draft_rule`; and relayr's rules from chat, `RULES_FROM_CHAT` and `RULE_DRIFT`, with `Installer`'s actions, `ALLOWLISTS` and `anyone` | `relayr.events`, `relayr.outbound`, artifactr, reflexr, pydantic, pydantic-ai |
 | `relayr.evals` | `ProposalOutcome`, the `relayr:proposal-outcome` rule and `Outcomes`' action; `proposal_rates`, `rule_conversion` and `history`. The `evals` extra | `relayr.events`, `relayr.ledger`, `relayr.outbound`, `relayr.rules`, artifactr, reflexr, evalr |
 | `relayr.telemetry` | The `relayr` scope's attributes, the counters' registry, and `Telemetry`, through the OpenTelemetry API | the OpenTelemetry API |
-| `relayr.otel` | `telemetry()`, relayr's contribution to the libraries' `configure_telemetry`, and `metric_views`. The `otel` extra | `relayr.telemetry`, the OpenTelemetry SDK |
+| `relayr.otel` | `telemetry()`, relayr's contribution to the libraries' `configure_telemetry`, a lattice-core `Contribution` ([lattice ADR-0020](../adr/0020-the-telemetry-contract-needs-no-extra.md)), and `metric_views`. The `otel` extra | `relayr.telemetry`, `lattice_core.otel.contribution`, the OpenTelemetry SDK |
 | `relayr.langfuse` | `bridged_run` and `bridged_turns`, the libraries' Langfuse contexts with relayr's tags. The `langfuse` extra | `relayr.events`, `relayr.ledger`, `relayr.outbound`, artifactr, reflexr, Langfuse |
 
 `tests/test_layering.py` holds each package to its column, and checks that every name relayr imports from artifactr or reflexr is in its module's `__all__`.

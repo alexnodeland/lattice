@@ -11,12 +11,8 @@ from opentelemetry.sdk.metrics.view import View
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from lattice_core.otel.configure import (
-    Contribution,
-    MetricsDetail,
-    TelemetryHandle,
-    configure_telemetry,
-)
+from lattice_core.otel.configure import TelemetryHandle, configure_telemetry
+from lattice_core.otel.contribution import Contribution, MetricsDetail
 
 TENANT = "demo.tenant.id"
 WORKSPACE = "demo.workspace.id"

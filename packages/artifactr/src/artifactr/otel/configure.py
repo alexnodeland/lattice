@@ -20,15 +20,13 @@ from lattice_core.otel.configure import (
     BAGGAGE_KEYS,
     INSTRUMENTED,
     URL_ATTRIBUTES,
-    Contribution,
-    Instrumented,
     LangfuseMode,
-    TelemetryContribution,
     TelemetryHandle,
     installed,
     redact_access_token,
 )
 from lattice_core.otel.configure import configure_telemetry as _configure_telemetry
+from lattice_core.otel.contribution import Contribution, Instrumented, TelemetryContribution
 
 __all__ = [
     "BAGGAGE_KEYS",
@@ -130,8 +128,8 @@ def configure_telemetry(
       (``OTEL_SEMCONV_STABILITY_OPT_IN=http``, unless it is set already)
     - pydantic-ai's instrumentation settings, which :meth:`TelemetryHandle.capability` wraps
       for an agent
-    - with ``langfuse``, a Langfuse client on the same tracer provider (``artifactr.langfuse``,
-      the ``[langfuse]`` extra), which sends Langfuse whole traces, or only scores
+    - with ``langfuse``, a Langfuse client from the ``[langfuse]`` extra, on the same tracer
+      provider, which sends Langfuse whole traces, or only scores
 
     Nothing in artifactr requires it: it is one way to configure the SDK, which artifactr
     only ever records to through the API.

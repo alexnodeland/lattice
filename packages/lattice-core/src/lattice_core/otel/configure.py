@@ -1,9 +1,9 @@
 """``configure_telemetry``: the OpenTelemetry SDK, exporters and instrumentations in one call.
 
-Each library's own ``configure_telemetry`` calls this one with its contribution, and the
-application's others. The instrumentations import the libraries they instrument, so each is
-imported only when it is used: an application that does not use FastAPI or SQLAlchemy does not
-need them installed.
+Each library's own ``configure_telemetry`` calls this one with the application's contributions,
+and its own last; :mod:`lattice_core.otel.contribution` is the contract they follow. The
+instrumentations import the libraries they instrument, so each is imported only when it is
+used: an application that does not use FastAPI or SQLAlchemy does not need them installed.
 """
 
 import importlib.util
@@ -11,9 +11,8 @@ import logging
 import os
 import re
 from collections.abc import Callable, Collection, Mapping, MutableMapping, Sequence
-from dataclasses import dataclass
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Final, Literal, Protocol, Self, cast
+from typing import TYPE_CHECKING, Any, Final, Literal, Self, cast
 from urllib.parse import unquote_plus
 
 from opentelemetry import context, metrics, trace
@@ -26,23 +25,20 @@ from opentelemetry.sdk._logs import LoggerProvider, LogRecordProcessor, ReadWrit
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, LogRecordExporter
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import MetricReader, PeriodicExportingMetricReader
-from opentelemetry.sdk.metrics.view import View
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import ReadableSpan, SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
 from pydantic_ai.capabilities import Instrumentation
 from pydantic_ai.models.instrumented import InstrumentationSettings
 
+from lattice_core.otel.contribution import Instrumented, MetricsDetail, TelemetryContribution
+
 __all__ = [
     "BAGGAGE_KEYS",
     "INSTRUMENTED",
     "TENANT_SUFFIX",
     "URL_ATTRIBUTES",
-    "Contribution",
-    "Instrumented",
     "LangfuseMode",
-    "MetricsDetail",
-    "TelemetryContribution",
     "TelemetryHandle",
     "configure_telemetry",
     "installed",
@@ -54,9 +50,6 @@ if TYPE_CHECKING:
     from langfuse import Langfuse
     from sqlalchemy import Engine
     from sqlalchemy.ext.asyncio import AsyncEngine
-
-Instrumented = Literal["fastapi", "sqlalchemy", "asyncpg", "httpx"]
-"""A library ``configure_telemetry`` can instrument. ``httpx`` covers httpx and httpx2."""
 
 INSTRUMENTED: tuple[Instrumented, ...] = ("fastapi", "sqlalchemy", "asyncpg", "httpx")
 """Every library ``configure_telemetry`` can instrument."""
@@ -78,9 +71,6 @@ LangfuseMode = Literal["traces", "scores"]
   scores, but no spans: for a Collector that sends Langfuse every trace already
 """
 
-MetricsDetail = Literal["workspace", "tenant", "none"]
-"""How much tenancy detail the libraries' metrics keep: part of the contributions' contract."""
-
 BAGGAGE_KEYS: frozenset[str] = frozenset({"session.id"})
 """The baggage entries copied onto every span: the session, which a library places in baggage
 around the work it traces."""
@@ -90,56 +80,6 @@ _EXCLUDED_ASGI_SPANS: list[Literal["receive", "send"]] = ["receive", "send"]
 _SKIP_SQLALCHEMY_VERSION_CHECK = True
 """The SQLAlchemy instrumentation declares support below 2.1, which the libraries require, but
 works with 2.1 (the tests check), so its version check is skipped."""
-
-
-class TelemetryContribution(Protocol):
-    """What ``configure_telemetry`` reads from a library's contribution: the port.
-
-    It reads these four fields and nothing else, so any value that has them will do: a
-    library's own, which no other library imports, or an application's :class:`Contribution`
-    for its metrics.
-    """
-
-    @property
-    def name(self) -> str:
-        """The library's name, which is its instrumentation scope; one contribution per name."""
-        ...
-
-    @property
-    def metric_views(self) -> Callable[[MetricsDetail], Sequence[View]]:
-        """Return the views that apply the library's metric cardinality policy at a detail."""
-        ...
-
-    @property
-    def should_export_span(self) -> Callable[[ReadableSpan], bool]:
-        """Return whether a span belongs in the library's traces: Langfuse's span filter."""
-        ...
-
-    @property
-    def instrument(self) -> frozenset[str]:
-        """The instrumentations the library advises: those that trace its work.
-
-        Names ``configure_telemetry`` does not know (see :data:`Instrumented`) are ignored.
-        """
-        ...
-
-
-@dataclass(frozen=True)
-class Contribution:
-    """A library's contribution to an application's telemetry.
-
-    Args:
-        name: The library's name, which is its instrumentation scope.
-        metric_views: Returns the views that keep only the attributes the library's metrics
-            may carry at a level of detail.
-        should_export_span: Whether a span belongs in the library's traces.
-        instrument: The instrumentations the library advises.
-    """
-
-    name: str
-    metric_views: Callable[[MetricsDetail], Sequence[View]]
-    should_export_span: Callable[[ReadableSpan], bool]
-    instrument: frozenset[Instrumented]
 
 
 def installed() -> set[Instrumented]:
@@ -339,8 +279,10 @@ def configure_telemetry(
 ) -> TelemetryHandle:
     """Set up OpenTelemetry for an application: providers, OTLP export and instrumentation.
 
-    A library's own ``configure_telemetry`` calls it with the application's contributions and
-    its own, last. It sets up:
+    Call it once per process, with every contribution: a second call builds a second set of
+    providers beside the first. A library's own ``configure_telemetry`` passes the application's
+    contributions first and its own last, so an application's contribution of the same name
+    wins. It sets up:
 
     - tracer, meter and logger providers, with ``service.name``, ``service.version`` and
       ``deployment.environment.name`` on their resource

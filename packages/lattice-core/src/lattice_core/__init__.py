@@ -10,7 +10,8 @@ package (lattice ADR-0018).
   :func:`~lattice_core.text.holds_nul`.
 - :mod:`lattice_core.sql`: SQL helpers for storage on SQLAlchemy's asyncio API, behind the
   ``sql`` extra.
-- :mod:`lattice_core.otel`: OpenTelemetry in one call, behind the ``otel`` extra.
+- :mod:`lattice_core.otel`: OpenTelemetry in one call, behind the ``otel`` extra, and the
+  contract a library's contribution follows, which needs none.
 - :mod:`lattice_core.langfuse`: a Langfuse client's span filters, behind the ``langfuse`` extra.
 - :mod:`lattice_core.litellm`: a model over a LiteLLM proxy, behind the ``litellm`` extra.
 - :mod:`lattice_core.logs`: logging left as the application configured it.

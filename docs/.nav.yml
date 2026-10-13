@@ -27,6 +27,7 @@ nav:
       - adr/0016-a-merge-queue-on-mergify.md
       - adr/0017-ci-installs-its-toolchain-from-a-cache-with-retries.md
       - adr/0018-lattice-core-what-the-libraries-share.md
+      - adr/0020-the-telemetry-contract-needs-no-extra.md
       - Template: adr/template.md
   - Brand: assets/brand/README.md
   - artifactr: artifactr

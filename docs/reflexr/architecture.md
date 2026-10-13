@@ -69,7 +69,7 @@ Dependencies point one way. Each layer is usable without the ones above it, and 
 | Package | Depends on | Responsibility |
 |---|---|---|
 | `reflexr.core` | pydantic, lattice-core's `schema` | Events and envelopes, actors, conditions and their reducers, rules, evaluation, the run lifecycle and retry policy. Pure, synchronous, no I/O. |
-| `reflexr.telemetry` | core, opentelemetry-api | Attribute names, the metric registry and its cardinality policy, and the tracer and instruments. Never configures the SDK. |
+| `reflexr.telemetry` | core, opentelemetry-api, lattice-core's telemetry contract | Attribute names, the metric registry and its cardinality policy, and the tracer and instruments. Never configures the SDK. |
 | `reflexr.scores` (needs evalr, from the `langfuse` or `evals` extra) | core, telemetry, workspace, evalr's core | Feedback types as score configs and feedback as scores, through evalr's mapping with each type's registered name, and the `FeedbackMirror` that follows a log into evalr's `ScoreSink` port. |
 | `reflexr.evals` (extra) | workspace, evalr | evalr's `FeedbackSource` over a workspace's log, `EvaluatorAction`, which runs an evalr evaluator as a rule's action and records its verdicts as feedback, replay experiments and the end-to-end measures. |
 | `reflexr.workspace` | core, telemetry, cronsim, lattice-core's `text` | `Workspaces`, `Workspace` and the rule and schedule statuses it reports, `Workspaces.execute`, which carries out commands once per id, and its `CommandResults` port, the storage protocol, in-memory storage, the `Reactor` (evaluation, execution and schedules), the action port and `Reaction`, and function actions. |
@@ -77,7 +77,7 @@ Dependencies point one way. Each layer is usable without the ones above it, and 
 | `reflexr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic, lattice-core's `sql` | `SqlStorage` on PostgreSQL and SQLite, and its packaged migrations. |
 | `reflexr.fastapi` (extra) | workspace, FastAPI | HTTP ingest, REST reads and administration, and the WebSocket stream protocol, over one command handler. |
 | `reflexr.mcp` (extra) | workspace, mcp | Publishing, reading and administration as MCP tools, and runs as resources. |
-| `reflexr.otel` (extra) | telemetry, the OpenTelemetry SDK and instrumentations | `configure_telemetry`: the SDK behind the API, with the metric views, composed with other libraries' contributions. |
+| `reflexr.otel` (extra) | telemetry, the OpenTelemetry SDK, lattice-core's `otel` | `configure_telemetry`: the SDK behind the API, with the metric views, composed with other libraries' contributions. |
 | `reflexr.langfuse` (extra) | workspace, Langfuse | Whole traces and run attributes in Langfuse; feedback reaches it as scores through evalr's adapters. |
 | `reflexr.litellm` (extra) | workspace, pydantic-ai's OpenAI-compatible models | Models over the LiteLLM proxy, with tenancy, keys and guardrails per request. |
 | `examples/oncall` | every layer | The reference implementation: incident response with a triage agent, a runbook graph, a paging function, every surface and a terminal client. |
@@ -502,11 +502,11 @@ erDiagram
 | MCP | Tenant in resource URIs | The same |
 | Commands | `Runner.execute(workspace, command, command_id=)` returns the `command_result`, remembered in a `CommandResults` port by tenant, workspace, participant and id; every MCP tool that changes something takes `command_id` | The same, as `Workspaces.execute` |
 
-What reflexr and artifactr shared verbatim is in [lattice-core](../lattice-core/index.md), which both depend on ([lattice ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md)): `tag_required`, the NUL search, the SQL helpers, the OpenTelemetry setup with its access-token redaction, Langfuse's span filters, `litellm_model`, and the guard that leaves logging alone as the MCP server is built. reflexr re-exports what it made public. Its `langfuse_client` stays its own: it defaults to reflexr's own span filter.
+What reflexr and artifactr shared verbatim is in [lattice-core](../lattice-core/index.md), which both depend on ([lattice ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md)): `tag_required`, the NUL search, the SQL helpers, the OpenTelemetry setup with its access-token redaction, Langfuse's span filters, `litellm_model`, and the guard that leaves logging alone as the MCP server is built. reflexr re-exports what it made public. Its `langfuse_client` stays its own: it defaults to reflexr's own span filter. The contract a contribution follows, `MetricsDetail` among it, is lattice-core's too, and needs no extra ([lattice ADR-0020](../adr/0020-the-telemetry-contract-needs-no-extra.md)).
 
 ## Dependencies
 
-Python 3.12+. Runtime: `pydantic` and `lattice-core-ai` (core, and workspace's NUL check; [lattice-core](../lattice-core/index.md), from lattice until published); `opentelemetry-api` (telemetry and workspace); `cronsim` (schedules); `pydantic-ai-slim` and `pydantic-graph` (agent). Extras: `sql` (`sqlalchemy[asyncio]` and `alembic`), `postgres` (`sql` and asyncpg) and `sqlite` (`sql` and aiosqlite), `fastapi`, `mcp`, `otel` (the OpenTelemetry SDK, OTLP exporters and instrumentations), `langfuse` (with evalr, for the score mirror and its Langfuse adapters), `litellm` (pydantic-ai's OpenAI-compatible models) and `evals` (evalr). Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical with mkdocstrings for the documentation site.
+Python 3.12+. Runtime: `pydantic` and `lattice-core-ai` (core, and workspace's NUL check; [lattice-core](../lattice-core/index.md), from lattice until published); `opentelemetry-api` (telemetry and workspace); `cronsim` (schedules); `pydantic-ai-slim` and `pydantic-graph` (agent). Extras: `sql` (`sqlalchemy[asyncio]` and `alembic`), `postgres` (`sql` and asyncpg) and `sqlite` (`sql` and aiosqlite), `fastapi`, `mcp`, `otel` (lattice-core's, with the OpenTelemetry SDK, OTLP exporters and instrumentations), `langfuse` (with evalr, for the score mirror and its Langfuse adapters), `litellm` (lattice-core's, with pydantic-ai's OpenAI-compatible models) and `evals` (evalr). Tooling: uv, ruff, pyright in strict mode, pytest, and Zensical with mkdocstrings for the documentation site.
 
 ## Testing
 

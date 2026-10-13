@@ -252,9 +252,7 @@ langfuse = [
     { name = "lattice-core-ai", extra = ["langfuse"] },
 ]
 litellm = [
-    { name = "httpx2" },
     { name = "lattice-core-ai", extra = ["litellm"] },
-    { name = "pydantic-ai-slim", extra = ["openai"] },
 ]
 mcp = [
     { name = "mcp" },
@@ -262,13 +260,6 @@ mcp = [
 ]
 otel = [
     { name = "lattice-core-ai", extra = ["otel"] },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-instrumentation-asyncpg" },
-    { name = "opentelemetry-instrumentation-fastapi" },
-    { name = "opentelemetry-instrumentation-httpx" },
-    { name = "opentelemetry-instrumentation-logging" },
-    { name = "opentelemetry-instrumentation-sqlalchemy" },
-    { name = "opentelemetry-processor-baggage" },
     { name = "opentelemetry-sdk" },
 ]
 postgres = [
@@ -329,7 +320,6 @@ requires-dist = [
     { name = "evalr", marker = "extra == 'evals'", editable = "packages/evalr" },
     { name = "evalr", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/evalr" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.141" },
-    { name = "httpx2", marker = "extra == 'litellm'", specifier = ">=2.7" },
     { name = "jsonpatch", specifier = ">=1.33" },
     { name = "jsonpointer", specifier = ">=1.9" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
@@ -340,17 +330,9 @@ requires-dist = [
     { name = "lattice-core-ai", extras = ["sql"], marker = "extra == 'sql'", editable = "packages/lattice-core" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.2" },
     { name = "opentelemetry-api", specifier = ">=1.28" },
-    { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'otel'", specifier = ">=1.45" },
-    { name = "opentelemetry-instrumentation-asyncpg", marker = "extra == 'otel'", specifier = ">=0.66b0" },
-    { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'otel'", specifier = ">=0.66b0" },
-    { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'otel'", specifier = ">=0.66b0" },
-    { name = "opentelemetry-instrumentation-logging", marker = "extra == 'otel'", specifier = ">=0.66b0" },
-    { name = "opentelemetry-instrumentation-sqlalchemy", marker = "extra == 'otel'", specifier = ">=0.66b0" },
-    { name = "opentelemetry-processor-baggage", marker = "extra == 'otel'", specifier = ">=0.66b0" },
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.45" },
     { name = "pydantic", specifier = ">=2.13" },
     { name = "pydantic-ai-slim", specifier = ">=2.51" },
-    { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'litellm'", specifier = ">=2.51" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
     { name = "starlette", marker = "extra == 'fastapi'", specifier = ">=0.46.0" },
     { name = "starlette", marker = "extra == 'mcp'", specifier = ">=0.27" },
@@ -2282,6 +2264,7 @@ sql = [
 [package.dev-dependencies]
 dev = [
     { name = "aiosqlite" },
+    { name = "asyncpg" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "pyright" },
@@ -2298,6 +2281,7 @@ lint = [
 ]
 test = [
     { name = "aiosqlite" },
+    { name = "asyncpg" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "pytest" },
@@ -2330,6 +2314,7 @@ provides-extras = ["sql", "otel", "langfuse", "litellm"]
 [package.metadata.requires-dev]
 dev = [
     { name = "aiosqlite", specifier = ">=0.22" },
+    { name = "asyncpg", specifier = ">=0.31" },
     { name = "fastapi", specifier = ">=0.141" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "pyright", specifier = ">=1.1.414" },
@@ -2346,6 +2331,7 @@ lint = [
 ]
 test = [
     { name = "aiosqlite", specifier = ">=0.22" },
+    { name = "asyncpg", specifier = ">=0.31" },
     { name = "fastapi", specifier = ">=0.141" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "pytest", specifier = ">=9.1" },
@@ -4069,9 +4055,7 @@ langfuse = [
     { name = "lattice-core-ai", extra = ["langfuse"] },
 ]
 litellm = [
-    { name = "httpx2" },
     { name = "lattice-core-ai", extra = ["litellm"] },
-    { name = "pydantic-ai-slim", extra = ["openai"] },
 ]
 mcp = [
     { name = "mcp" },
@@ -4079,13 +4063,6 @@ mcp = [
 ]
 otel = [
     { name = "lattice-core-ai", extra = ["otel"] },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-instrumentation-asyncpg" },
-    { name = "opentelemetry-instrumentation-fastapi" },
-    { name = "opentelemetry-instrumentation-httpx" },
-    { name = "opentelemetry-instrumentation-logging" },
-    { name = "opentelemetry-instrumentation-sqlalchemy" },
-    { name = "opentelemetry-processor-baggage" },
     { name = "opentelemetry-sdk" },
 ]
 postgres = [
@@ -4153,7 +4130,6 @@ requires-dist = [
     { name = "evalr", marker = "extra == 'evals'", editable = "packages/evalr" },
     { name = "evalr", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/evalr" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.141" },
-    { name = "httpx2", marker = "extra == 'litellm'", specifier = ">=2.7" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
     { name = "lattice-core-ai", editable = "packages/lattice-core" },
     { name = "lattice-core-ai", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/lattice-core" },
@@ -4162,17 +4138,9 @@ requires-dist = [
     { name = "lattice-core-ai", extras = ["sql"], marker = "extra == 'sql'", editable = "packages/lattice-core" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.2" },
     { name = "opentelemetry-api", specifier = ">=1.45" },
-    { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'otel'", specifier = ">=1.45" },
-    { name = "opentelemetry-instrumentation-asyncpg", marker = "extra == 'otel'", specifier = ">=0.66b0" },
-    { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'otel'", specifier = ">=0.66b0" },
-    { name = "opentelemetry-instrumentation-httpx", marker = "extra == 'otel'", specifier = ">=0.66b0" },
-    { name = "opentelemetry-instrumentation-logging", marker = "extra == 'otel'", specifier = ">=0.66b0" },
-    { name = "opentelemetry-instrumentation-sqlalchemy", marker = "extra == 'otel'", specifier = ">=0.66b0" },
-    { name = "opentelemetry-processor-baggage", marker = "extra == 'otel'", specifier = ">=0.66b0" },
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.45" },
     { name = "pydantic", specifier = ">=2.13" },
     { name = "pydantic-ai-slim", specifier = ">=2.51" },
-    { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'litellm'", specifier = ">=2.51" },
     { name = "pydantic-core", specifier = ">=2.46.0" },
     { name = "pydantic-graph", specifier = ">=2.51" },
     { name = "reflexr", extras = ["sql"], marker = "extra == 'postgres'" },
@@ -4348,6 +4316,7 @@ langfuse = [
     { name = "reflexr", extra = ["langfuse"] },
 ]
 otel = [
+    { name = "lattice-core-ai" },
     { name = "opentelemetry-sdk" },
 ]
 postgres = [
@@ -4402,6 +4371,7 @@ requires-dist = [
     { name = "evalr", marker = "extra == 'evals'", editable = "packages/evalr" },
     { name = "evalr", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/evalr" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
+    { name = "lattice-core-ai", marker = "extra == 'otel'", editable = "packages/lattice-core" },
     { name = "lattice-core-ai", extras = ["sql"], marker = "extra == 'sql'", editable = "packages/lattice-core" },
     { name = "opentelemetry-api", specifier = ">=1.45" },
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.45" },

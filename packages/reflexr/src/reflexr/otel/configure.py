@@ -19,15 +19,13 @@ from lattice_core.otel.configure import (
     BAGGAGE_KEYS,
     INSTRUMENTED,
     URL_ATTRIBUTES,
-    Contribution,
-    Instrumented,
     LangfuseMode,
-    TelemetryContribution,
     TelemetryHandle,
     installed,
     redact_access_token,
 )
 from lattice_core.otel.configure import configure_telemetry as _configure_telemetry
+from lattice_core.otel.contribution import Contribution, Instrumented, TelemetryContribution
 from reflexr.telemetry import METRICS, SCOPE, MetricsDetail, is_trace_scope, kept_attributes
 
 __all__ = [
@@ -131,8 +129,8 @@ def configure_telemetry(
       (``OTEL_SEMCONV_STABILITY_OPT_IN=http``, unless it is set already)
     - pydantic-ai's instrumentation settings, which :meth:`TelemetryHandle.capability` wraps
       for an agent
-    - with ``langfuse``, a Langfuse client on the same tracer provider (``reflexr.langfuse``,
-      the ``[langfuse]`` extra), which sends Langfuse whole traces, or only scores
+    - with ``langfuse``, a Langfuse client from the ``[langfuse]`` extra, on the same tracer
+      provider, which sends Langfuse whole traces, or only scores
 
     Nothing in reflexr requires it: it is one way to configure the SDK, which reflexr
     only ever records to through the API.

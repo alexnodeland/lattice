@@ -37,6 +37,23 @@ The `sql` extra.
 
 ## lattice_core.otel
 
+::: lattice_core.otel
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members: false
+
+### lattice_core.otel.contribution
+
+No extra.
+
+::: lattice_core.otel.contribution
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+### lattice_core.otel.configure
+
 The `otel` extra.
 
 ::: lattice_core.otel.configure

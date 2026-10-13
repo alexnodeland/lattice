@@ -44,22 +44,9 @@ langfuse = [
     # score adapters, which send the mirror's scores to Langfuse.
     "evalr[langfuse]>=0.1.0.dev0",
 ]
-litellm = [
-    "lattice-core-ai[litellm]>=0.1.0.dev0",
-    "pydantic-ai-slim[openai]>=2.51",
-    "httpx2>=2.7",
-]
-otel = [
-    "lattice-core-ai[otel]>=0.1.0.dev0",
-    "opentelemetry-exporter-otlp-proto-http>=1.45",
-    "opentelemetry-instrumentation-asyncpg>=0.66b0",
-    "opentelemetry-instrumentation-fastapi>=0.66b0",
-    "opentelemetry-instrumentation-httpx>=0.66b0",
-    "opentelemetry-instrumentation-logging>=0.66b0",
-    "opentelemetry-instrumentation-sqlalchemy>=0.66b0",
-    "opentelemetry-processor-baggage>=0.66b0",
-    "opentelemetry-sdk>=1.45",
-]
+litellm = ["lattice-core-ai[litellm]>=0.1.0.dev0"]
+# The SDK's setup is lattice-core's; this package imports the SDK for its own views.
+otel = ["lattice-core-ai[otel]>=0.1.0.dev0", "opentelemetry-sdk>=1.45"]
 
 [project.urls]
 Homepage = "https://lattice.alexnodeland.com/reflexr/"

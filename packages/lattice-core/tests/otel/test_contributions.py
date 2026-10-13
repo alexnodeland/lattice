@@ -13,7 +13,8 @@ from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from lattice_core.otel.configure import Contribution, TelemetryHandle, configure_telemetry
+from lattice_core.otel.configure import TelemetryHandle, configure_telemetry
+from lattice_core.otel.contribution import Contribution
 from tests.otel.conftest import DEMO, KIND, REQUESTS, SIBLING, TENANT, WORKSPACE, Captured
 
 QUIET: dict[str, Any] = {"instrument": (), "logs": False, "set_global": False}

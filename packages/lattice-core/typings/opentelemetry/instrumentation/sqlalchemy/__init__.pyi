@@ -1,4 +1,4 @@
-"""Minimal type stubs for the parts of opentelemetry-instrumentation-sqlalchemy artifactr uses."""
+"""Minimal stubs for the parts of opentelemetry-instrumentation-sqlalchemy lattice-core uses."""
 
 from collections.abc import Collection
 from typing import Any, override

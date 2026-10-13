@@ -45,12 +45,16 @@ def key_set() -> str:
 
 
 def signed_by(token: str, keys: str) -> bool:
-    """Whether a token names, by its `kid`, a key the key set has."""
+    """Whether a token is signed, and verifies, with the key of the key set its `kid` names."""
     try:
         kid = jwt.get_unverified_header(token).get("kid")
-        return any(jwk.get("kid") == kid for jwk in json.loads(keys))
-    except (jwt.InvalidTokenError, ValueError):
+        named = [jwk for jwk in json.loads(keys) if kid is not None and jwk.get("kid") == kid]
+        if not named:
+            return False
+        jwt.decode(token, jwt.PyJWK(named[0], algorithm="ES256").key, algorithms=["ES256"])
+    except (jwt.InvalidTokenError, ValueError, KeyError, TypeError):
         return False
+    return True
 
 
 def service_role_key(keys: str) -> str:

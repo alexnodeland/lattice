@@ -1,6 +1,6 @@
 import type { PortalrApi } from "@portalr/client";
 import { expect, test } from "vitest";
-import { byWorkspace, comments, daysIn, thumbsByDay, trends, windowOf } from "./feedback";
+import { byWorkspace, comments, daysIn, shownOf, thumbsByDay, trends, windowOf } from "./feedback";
 
 type Score = PortalrApi.components["schemas"]["Score"];
 
@@ -15,9 +15,10 @@ const score = (at: string, value: Score["value"], extra: Partial<Score> = {}): S
   ...extra,
 });
 
-test("a window is whole days in UTC, ending today", () => {
+test("a window is whole days in UTC, ending today, the same all day", () => {
   const window = windowOf(7, new Date("2026-10-13T09:30:00Z"));
-  expect(window).toEqual({ start: "2026-10-07T00:00:00.000Z", end: "2026-10-13T09:30:00.000Z" });
+  expect(window).toEqual({ start: "2026-10-07T00:00:00.000Z", end: "2026-10-14T00:00:00.000Z" });
+  expect(windowOf(7, new Date("2026-10-13T23:59:00Z"))).toEqual(window);
   expect(daysIn(window)).toEqual([
     "2026-10-07",
     "2026-10-08",
@@ -89,4 +90,11 @@ test("each workspace's thumbs and evaluations, the busiest first, and comments n
     { workspace: "plans", up: 0, down: 0, evaluated: 1 },
   ]);
   expect(comments(scores).map((one) => one.comment)).toEqual(["great", "wrong"]);
+});
+
+test("the address keeps a window Feedback offers, and a workspace", () => {
+  expect(shownOf({})).toEqual({ days: 7 });
+  expect(shownOf({ days: 30, workspace: "notes" })).toEqual({ days: 30, workspace: "notes" });
+  expect(shownOf({ days: "90", workspace: "" })).toEqual({ days: 90 });
+  expect(shownOf({ days: 12 })).toEqual({ days: 7 });
 });

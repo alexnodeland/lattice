@@ -13,15 +13,34 @@ type Score = PortalrApi.components["schemas"]["Score"];
 export const WINDOWS = [7, 30, 90] as const;
 export type Days = (typeof WINDOWS)[number];
 
+/** What Feedback's address keeps: the window, in days, and the workspace, if one is chosen. */
+export interface Shown {
+  readonly days: Days;
+  readonly workspace?: string;
+}
+
+/** The address's window and workspace: a window Feedback doesn't offer is its default. */
+export function shownOf(search: Record<string, unknown>): Shown {
+  const days = WINDOWS.find((one) => String(one) === String(search.days)) ?? WINDOWS[0];
+  const workspace = search.workspace;
+  return typeof workspace === "string" && workspace !== "" ? { days, workspace } : { days };
+}
+
 /** The most series one chart draws; the rest are in the table beneath it (ADR-0021's inks). */
 export const SERIES = 3;
 
 const DAY = 86_400_000;
 
-/** A window of whole days in UTC, ending with today's, as far as `now`. */
+/**
+ * A window of whole days in UTC, ending with today's: the same all day, so a read of it is one
+ * query, whenever in the day it is made.
+ */
 export function windowOf(days: Days, now: Date): TimeSpan {
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  return { start: new Date(today - (days - 1) * DAY).toISOString(), end: now.toISOString() };
+  return {
+    start: new Date(today - (days - 1) * DAY).toISOString(),
+    end: new Date(today + DAY).toISOString(),
+  };
 }
 
 /** A moment's day, in UTC: `2026-10-13`. */
@@ -30,7 +49,7 @@ export const dayOf = (at: string) => at.slice(0, 10);
 /** Each day of a window, oldest first. */
 export function daysIn(window: TimeSpan): string[] {
   const days: string[] = [];
-  for (let at = Date.parse(window.start); at <= Date.parse(window.end); at += DAY) {
+  for (let at = Date.parse(window.start); at < Date.parse(window.end); at += DAY) {
     days.push(new Date(at).toISOString().slice(0, 10));
   }
   return days;

@@ -96,6 +96,10 @@ nav:
     - adr/0057-reserved-publishers.md
     - adr/0058-an-mcp-client-acts-for-its-person.md
     - adr/0059-the-tenant-on-log-records.md
+    - adr/0060-a-nul-character-is-refused-at-the-boundary.md
+    - adr/0061-the-openapi-documents-describe-refusals.md
+    - adr/0062-row-level-security-under-the-scoping.md
+    - adr/0063-a-stored-rules-history.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

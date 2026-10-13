@@ -2,9 +2,12 @@
 
 grantr appends one entry per change, in the same transaction as the change, with a sequence
 number, the time, the tenant and who made it. Refusals aren't recorded. A key's secret, and its
-digest, never are.
+digest, never are. A read of the log may keep only some types of event, or one subject's
+changes (:class:`AuditFilter`).
 """
 
+from collections.abc import Set
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated, Literal
 
@@ -182,3 +185,41 @@ class AuditEntry(BaseModel):
     """Who made the change; ``None`` for the first operator, whom no one granted."""
 
     event: AuditEvent
+
+
+type AuditType = Literal[
+    "tenant_created",
+    "tenant_deleted",
+    "member_added",
+    "member_removed",
+    "group_defined",
+    "group_deleted",
+    "role_defined",
+    "role_deleted",
+    "granted",
+    "revoked",
+    "key_issued",
+    "key_revoked",
+    "restricted",
+    "unrestricted",
+]
+"""An audit event's ``type``: what a read of the log may keep."""
+
+
+@dataclass(frozen=True)
+class AuditFilter:
+    """Which entries a read of the log keeps: of some types, by one subject, or every one.
+
+    Args:
+        types: The event types to keep; every type when empty.
+        by: The subject whose changes to keep, such as a user or a rule; anyone's when None.
+    """
+
+    types: Set[AuditType] = frozenset()
+    by: Subject | None = None
+
+    def keeps(self, entry: AuditEntry) -> bool:
+        """Whether an entry passes the filter."""
+        return (not self.types or entry.event.type in self.types) and (
+            self.by is None or entry.by == self.by
+        )

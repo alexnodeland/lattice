@@ -68,6 +68,6 @@ Give the outbound adapter relayr's `ALLOWLISTS` with your own, so the drift rule
 
 - An artifact installs one rule. A change of the rule's name is refused: archive it, and draft the new rule apart.
 - Only an accepted proposal installs. A person who writes to a `rule` artifact directly installs nothing.
-- relayr knows which rule an artifact installed from its own installs, in reflexr's log, never from a stored rule's provenance, which anyone allowed to install can claim.
+- relayr knows which rule an artifact installed from its own installs, in the rule's history in reflexr, however long ago, never from a stored rule's provenance, which anyone allowed to install can claim ([ADR-0032](../adr/0032-a-rules-installs-read-from-its-history.md)).
 - A name another artifact installed, and anything reflexr's checks refuse, are reported in a notice, with reflexr's problems.
 - Stored rules keep to reflexr's limits: a throttle and a timeout, only the actions `StoredRules` allows, and no predicates ([reflexr RFC-0003](../../reflexr/rfcs/0003-managing-rules-at-runtime.md)).

@@ -1,6 +1,6 @@
 # ADR-0030: Drift proposed back to a rule's artifact
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0032](0032-a-rules-installs-read-from-its-history.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0028](0028-rules-from-chat.md): how relayr finds the rule an artifact installed

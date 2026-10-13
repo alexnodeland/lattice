@@ -120,6 +120,10 @@ run "state_host_names_its_three_services_at_its_fixed_address" {
   }
 
   assert {
+    condition     = aws_ec2_subnet_cidr_reservation.this.cidr_block == "10.40.128.10/32" && aws_ec2_subnet_cidr_reservation.this.reservation_type == "explicit"
+    error_message = "The fixed address is reserved in its subnet, so no task takes it."
+  }
+  assert {
     condition     = toset(keys(aws_service_discovery_instance.this)) == toset(["clickhouse", "prometheus", "prom-label-proxy"])
     error_message = "ClickHouse, Prometheus and prom-label-proxy are each named."
   }

@@ -4,14 +4,18 @@ Tenants, members, groups, roles, grants, keys and the audit log; and ``/me`` and
 """
 
 from collections.abc import Awaitable, Callable
-from typing import Annotated, Any, Final, NamedTuple
+from typing import Annotated, Any, Final, Literal, NamedTuple
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict
+from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 from starlette.requests import HTTPConnection
 
 from grantr.core import (
+    Agent,
     AuditEntry,
+    AuditFilter,
+    AuditType,
     Forbidden,
     Grant,
     Grantee,
@@ -23,6 +27,7 @@ from grantr.core import (
     PrincipalId,
     Resource,
     Role,
+    RulePrincipal,
     ServicePrincipal,
     Subject,
     TenantId,
@@ -155,6 +160,74 @@ AfterSeq = Annotated[int, Query(ge=0)]
 Limit = Annotated[int, Query(ge=1, le=1000)]
 """Read at most this many audit entries."""
 
+ActorKind = Literal["user", "service_principal", "rule", "agent"]
+"""The kinds of subject that make changes to access."""
+
+_MEMBER: TypeAdapter[Member] = TypeAdapter(Member)
+
+
+def _invalid(field: str, message: str, given: object) -> RequestValidationError:
+    """A 422 for a query parameter, as FastAPI words its own."""
+    return RequestValidationError(
+        [{"type": "value_error", "loc": ("query", field), "msg": message, "input": given}]
+    )
+
+
+def _actor(kind: ActorKind | None, id: str | None, workspace: str | None) -> Subject | None:
+    """The subject the actor parameters name, or None for anyone; a 422 if they name none."""
+    match kind:
+        case None if id is None and workspace is None:
+            return None
+        case None:
+            raise _invalid("actor_kind", "actor_kind is required with actor or workspace", kind)
+        case "agent" if id is None and workspace is None:
+            return Agent()
+        case "rule" if id is not None and workspace is not None:
+            return RulePrincipal(workspace=workspace, rule=id)
+        case "user" | "service_principal" if id is not None and workspace is None:
+            try:
+                return _MEMBER.validate_python({"kind": kind, "id": id})
+            except ValidationError as error:
+                raise _invalid("actor", str(error.errors()[0]["msg"]), id) from error
+        case _:
+            wants = {
+                "agent": "neither actor nor workspace",
+                "rule": "actor, the rule's name, and workspace",
+                "user": "actor, and no workspace",
+                "service_principal": "actor, and no workspace",
+            }[kind]
+            raise _invalid("actor", f"actor_kind {kind} takes {wants}", id)
+
+
+def audit_filter(
+    types: Annotated[
+        list[AuditType] | None,
+        Query(alias="type", description="Keep only entries of these event types; it may repeat."),
+    ] = None,
+    actor_kind: Annotated[
+        ActorKind | None,
+        Query(description="Keep only the changes of one subject, of this kind."),
+    ] = None,
+    actor: Annotated[
+        str | None,
+        Query(
+            min_length=1,
+            description="That subject's id: a user's or a service principal's, or a rule's name.",
+        ),
+    ] = None,
+    workspace: Annotated[
+        str | None,
+        Query(min_length=1, description="A rule's workspace, with `actor_kind=rule`."),
+    ] = None,
+) -> AuditFilter:
+    """Which entries a read of the audit log keeps, from its query."""
+    return AuditFilter(types=frozenset(types or ()), by=_actor(actor_kind, actor, workspace))
+
+
+Kept = Annotated[AuditFilter, Depends(audit_filter)]
+"""The entries a read of the audit log keeps."""
+
+
 TenantHeader = Annotated[TenantId | None, Header(alias="X-Tenant")]
 """The tenant a request to ``/me`` or ``/checks`` names."""
 
@@ -259,18 +332,41 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
 
     @router.get("/audit")
     async def deployment_audit(
-        after_seq: AfterSeq = 0, limit: Limit = 100, who: Caller = current
+        keep: Kept,
+        after_seq: AfterSeq = 0,
+        limit: Limit = 100,
+        who: Caller = current,
     ) -> list[AuditEntry]:
-        """The deployment's audit log: its operators, granted and revoked."""
-        return await _or_http(grants.audit(None, by=who.subject, after_seq=after_seq, limit=limit))
+        """The deployment's audit log: its operators, granted and revoked.
+
+        ``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``
+        one subject's changes.
+        """
+        return await _or_http(
+            grants.audit(None, by=who.subject, after_seq=after_seq, limit=limit, keep=keep)
+        )
 
     @router.get("/tenants/{tenant}/audit")
     async def tenant_audit(
-        tenant: TenantId, after_seq: AfterSeq = 0, limit: Limit = 100, who: Caller = current
+        tenant: TenantId,
+        keep: Kept,
+        after_seq: AfterSeq = 0,
+        limit: Limit = 100,
+        who: Caller = current,
     ) -> list[AuditEntry]:
-        """A tenant's audit log after ``after_seq``, in order."""
+        """A tenant's audit log after ``after_seq``, in order.
+
+        ``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``
+        one subject's changes.
+        """
         return await _or_http(
-            grants.audit(tenant, by=by(tenant, who), after_seq=after_seq, limit=limit)
+            grants.audit(
+                tenant,
+                by=by(tenant, who),
+                after_seq=after_seq,
+                limit=limit,
+                keep=keep,
+            )
         )
 
     @router.get("/tenants/{tenant}/members")

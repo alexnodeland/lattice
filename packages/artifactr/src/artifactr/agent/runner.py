@@ -389,7 +389,11 @@ class Runner[AppDepsT]:
         return self.live.watch(run_id)
 
     def running(self, thread_id: ThreadId) -> RunHandle | None:
-        """Return this process's run in a thread, if there is one."""
+        """Return this process's run in a thread, if there is one.
+
+        A run is forgotten as its task's done callbacks run, the loop's turn after the task is
+        done, and before anything awaiting the task resumes.
+        """
         return next((h for h in self._runs.values() if h.thread_id == thread_id), None)
 
     async def _carry_out(self, workspace: Workspace, command: Command | StopRun) -> Outcome:

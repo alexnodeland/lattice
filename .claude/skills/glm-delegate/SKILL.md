@@ -15,7 +15,7 @@ Everything runs through one script, which needs `ZAI_API_KEY` and `claude` on PA
 
 ```bash
 G=.claude/skills/glm-delegate/scripts/glm.py
-python3 $G status                                  # check before a batch of work
+python3 $G status [--hours 168]                    # quota, usage by model/tool, model picks
 python3 $G run --mode code     [opts] "task"       # edits files in --cwd
 python3 $G run --mode research [opts] "question"   # web search, read-only
 python3 $G run --mode ask      [opts] "prompt"     # no tools
@@ -51,6 +51,11 @@ Before each run it reads the live quota (`/api/monitor/usage/quota/limit`) and:
 - **Caps web calls** in research mode at `--max-searches` (default 6), leaving a reserve of 10 monthly calls.
 - **Runs one delegation at a time** (Lite is sized for one project), and later calls wait for the lock.
 - **Logs** each run's estimated credits to `~/.cache/glm-delegate/ledger.jsonl` and prints the quota afterwards.
+
+`status` also reports Z.ai's own meter for the last `--hours` (default 24): tokens
+per model and calls per MCP tool, from the same monitor endpoints as Z.ai's
+`glm-plan-usage` plugin. That plugin only works when Claude Code itself runs on
+GLM, which is why this skill doesn't depend on it.
 
 You can tune the thresholds with the env vars `GLM_STOP_5H_PCT`, `GLM_STOP_WEEK_PCT`,
 `GLM_DOWNGRADE_5H_PCT`, `GLM_DOWNGRADE_5H_PEAK_PCT`, `GLM_WEEK_PACE_SLACK_PCT` and `GLM_MCP_RESERVE`.

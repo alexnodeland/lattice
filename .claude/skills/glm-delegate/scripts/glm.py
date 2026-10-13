@@ -28,11 +28,12 @@ import sys
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
 ANTHROPIC_ENDPOINT = "https://api.z.ai/api/anthropic"
-QUOTA_URL = "https://api.z.ai/api/monitor/usage/quota/limit"
+MONITOR_URL = "https://api.z.ai/api/monitor/usage"
 SEARCH_MCP = "https://api.z.ai/api/mcp/web_search_prime/mcp"
 READER_MCP = "https://api.z.ai/api/mcp/web_reader/mcp"
 
@@ -125,19 +126,32 @@ def api_key() -> str:
 # ---------------------------------------------------------------- quota
 
 
-def fetch_quota() -> dict | None:
-    """Fetch quota, reset windows, and MCP usage from the API."""
-    req = urllib.request.Request(QUOTA_URL, headers={"Authorization": f"Bearer {api_key()}"})
+def monitor_get(path: str, params: dict | None = None) -> dict | None:
+    """GET one of the plan's usage-monitor endpoints and return its data, or None."""
+    url = f"{MONITOR_URL}/{path}"
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(
+        url, headers={"Authorization": f"Bearer {api_key()}", "Accept-Language": "en-US,en"}
+    )
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             body = json.load(resp)
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-        print(f"glm-delegate: quota check failed ({exc}); using local ledger only", file=sys.stderr)
+        print(f"glm-delegate: {path} check failed ({exc})", file=sys.stderr)
         return None
     if not body.get("success"):
-        print(f"glm-delegate: quota check refused: {body.get('msg')}", file=sys.stderr)
+        print(f"glm-delegate: {path} check refused: {body.get('msg')}", file=sys.stderr)
         return None
-    data = body["data"]
+    return body.get("data")
+
+
+def fetch_quota() -> dict | None:
+    """Fetch quota, reset windows, and MCP usage from the API."""
+    data = monitor_get("quota/limit")
+    if data is None:
+        print("glm-delegate: quota unknown; using the local ledger only", file=sys.stderr)
+        return None
     out = {"level": data.get("level", "lite"), "5h": None, "week": None, "mcp": None}
     for lim in data.get("limits", []):
         reset = lim.get("nextResetTime")
@@ -151,6 +165,30 @@ def fetch_quota() -> dict | None:
             entry.update(remaining=lim.get("remaining"), total=lim.get("usage"))
             out["mcp"] = entry
     return out
+
+
+def fetch_usage(hours: int) -> dict | None:
+    """Fetch the plan's own meter of tokens per model and calls per MCP tool."""
+    # The monitor takes and buckets times in China/Singapore time (UTC+8), by the hour.
+    now = dt.datetime.now(SGT)
+    params = {
+        "startTime": (now - dt.timedelta(hours=hours)).strftime("%Y-%m-%d %H:00:00"),
+        "endTime": now.strftime("%Y-%m-%d %H:59:59"),
+    }
+    models = monitor_get("model-usage", params)
+    tools = monitor_get("tool-usage", params)
+    if models is None and tools is None:
+        return None
+    m_total = (models or {}).get("totalUsage") or {}
+    t_total = (tools or {}).get("totalUsage") or {}
+    return {
+        "calls": m_total.get("totalModelCallCount", 0),
+        "models": [(m["modelName"], m["totalTokens"]) for m in m_total.get("modelSummaryList", [])],
+        "tools": [
+            (t.get("toolNameI18n") or t["toolCode"], t["totalUsageCount"])
+            for t in t_total.get("toolSummaryList", [])
+        ],
+    }
 
 
 def is_peak(now: dt.datetime | None = None) -> bool:
@@ -285,7 +323,7 @@ def single_run():
 # ---------------------------------------------------------------- commands
 
 
-def cmd_status(_args: argparse.Namespace) -> None:
+def cmd_status(args: argparse.Namespace) -> None:
     """Print quota, peak window, and the model each mode would use."""
     q = fetch_quota()
     peak = is_peak()
@@ -313,6 +351,13 @@ def cmd_status(_args: argparse.Namespace) -> None:
                 f"web search/reader calls: {m.get('remaining')} of {m.get('total')} left "
                 f"this month, {fmt_reset(m['reset_ms'])}"
             )
+    usage = fetch_usage(args.hours)
+    if usage:
+        span = f"{args.hours}h" if args.hours < 48 else f"{args.hours / 24:.0f}d"
+        models = ", ".join(f"{name} {tokens:,} tokens" for name, tokens in usage["models"])
+        print(f"last {span} (Z.ai meter): {models or 'no model use'}; {usage['calls']} calls")
+        if usage["tools"]:
+            print("  tools: " + ", ".join(f"{name} {n}" for name, n in usage["tools"]))
     print(
         f"ledger: ~{ledger_since(5):.0f} credits in the last 5h, "
         f"~{ledger_since(168):.0f} in the last 7d (estimated)"
@@ -577,7 +622,10 @@ def main() -> None:
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("status", help="quota, peak window, and the model each mode would use")
+    st = sub.add_parser("status", help="quota, recent usage, and the model each mode would use")
+    st.add_argument(
+        "--hours", type=int, default=24, help="usage window from Z.ai's meter (max 720 = 30d)"
+    )
 
     r = sub.add_parser("run", help="delegate a task to GLM")
     r.add_argument("prompt", nargs="*", help="the task (or use --prompt-file / stdin)")

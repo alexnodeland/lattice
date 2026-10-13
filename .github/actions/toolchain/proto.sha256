@@ -1,0 +1,5 @@
+# The SHA-256 of proto's release archive for Linux, by proto's version and the machine's
+# architecture, as the release's assets list them. `install` checks each download against it, so
+# a bump of proto in .prototools fails until its digests are added here (lattice ADR-0017).
+0.63.1 x86_64 f4712f107ab31403ca3454e3cefcc96433f8970dbedc3cb310624ca537a64ea0
+0.63.1 aarch64 8809a83ebd818aeb34d9144a55c1726dd959212bc745ed9c6c0f9367a153893b

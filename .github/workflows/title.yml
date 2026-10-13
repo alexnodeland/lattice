@@ -47,9 +47,7 @@ jobs:
         with:
           fetch-depth: 0 # the release tags, and the base branch to compare with
           persist-credentials: false
-      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
-        with:
-          auto-install: true
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       # The checkout is the pull request's merge commit, so its first parent is the base it merges
       # into, as CI tested it.
       - name: Public APIs

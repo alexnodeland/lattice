@@ -4,7 +4,7 @@
 **Date:** 2026-10-13
 **Deciders:** Alex Nodeland
 
-Builds the first part of the thin images of [RFC-0004](../rfcs/0004-hosting-recipes.md)'s phase 3: the six that carry a service's configuration, for the settings [ADR-0034](0034-the-stack-on-aws.md) gives them. `stackr-db-init` and `stackr-auth-keys` follow in their own pull request, and the release that publishes the images after them.
+Builds the first part of the thin images of [RFC-0004](../rfcs/0004-hosting-recipes.md)'s phase 3: the six that carry a service's configuration, for the settings [ADR-0034](0034-the-stack-on-aws.md) gives them. It amends ADR-0034's table of those settings, for the telemetry stores' S3. `stackr-db-init` and `stackr-auth-keys` follow in their own pull request, and the release that publishes the images after them.
 
 ## Context
 
@@ -15,8 +15,9 @@ Building the images settled the rest: where they're built from, how each tool ta
 ## Decision
 
 - **Six images now:** `stackr-otel-collector`, `stackr-tempo`, `stackr-loki`, `stackr-pyroscope`, `stackr-grafana` and `stackr-litellm`. Each is the image `compose.yaml` pins, with stackr's configuration copied in, and its command set to read it.
-- **Each Dockerfile is beside its configuration,** as `deploy/<service>/Dockerfile`, built from lattice's root, since Grafana's carries artifactr's and reflexr's dashboards. Each has its own `Dockerfile.dockerignore`, which lets in its files alone, as lattice's other images do.
-- **The bases are `compose.yaml`'s.** `scripts/check-config aws` fails when a Dockerfile's `FROM` isn't an image `compose.yaml` pins, so Renovate's moves of the two stay together.
+- **Each Dockerfile is beside its configuration,** as `deploy/<service>/Dockerfile`, labelled with lattice's repository, built from lattice's root, since Grafana's carries artifactr's and reflexr's dashboards. Each has its own `Dockerfile.dockerignore`, which lets in its files alone, as lattice's other images do.
+- **Each base is its service's image, as `compose.yaml` pins it.** `scripts/check-config aws` fails when `deploy/<service>/Dockerfile`'s `FROM` isn't `<service>`'s image in `compose.yaml`, so Renovate's moves of the two stay together. LiteLLM's is now its non-root image, in both.
+- **Their files are read-only:** each `COPY` gives them `a=rX`, and `--link` where the destination's directories are the image's own to make.
 - **One file per service, as RFC-0004 asks.** It reads the AWS recipe's settings from the environment, with one machine's values by default, so Compose mounts the same file and changes nothing else:
   - the Collector reads `${env:TEMPO_ADDRESS:-tempo}` and its other peers so;
   - Tempo, Loki and Pyroscope read theirs with `-config.expand-env=true`, which `compose.yaml` now passes them too. Each file holds both its local disk and S3, and the environment chooses: `TEMPO_BACKEND`, `LOKI_OBJECT_STORE` and `PYROSCOPE_BACKEND`;
@@ -24,11 +25,11 @@ Building the images settled the rest: where they're built from, how each tool ta
   - LiteLLM's file already reads everything that differs from the environment.
 - **No tool needed a file for AWS alone.**
 - **`deploy/build-images` builds and checks them,** for the machine's architecture:
-  - the Collector's, Tempo's and Loki's configuration, by the tool's own check, on one machine's settings and on the AWS recipe's;
+  - the Collector's, Tempo's, Loki's and Pyroscope's configuration, by the tool's own check, on one machine's settings and on the AWS recipe's;
   - that each image starts and answers its health check, on a Docker network of its own, which publishes no port and has no route out; LiteLLM's beside a Valkey, which it needs to start;
-  - that Grafana has its four data sources and the three folders of dashboards.
+  - that Grafana's four data sources are at their addresses, Compose's and then the AWS recipe's, and that it has the three folders of dashboards.
 - **The checks' helpers, curl and Valkey, are `compose.yaml`'s pins too.**
-- **CI builds them natively on both architectures,** on `ubuntu-24.04` and `ubuntu-24.04-arm`, in a "Thin images" job, when they or the files they carry change, and nightly. It publishes nothing.
+- **CI builds them natively on both architectures,** on `ubuntu-24.04` and `ubuntu-24.04-arm`, in a "Thin images" job, whenever stackr, or a project it depends on, changes (`scripts/affected.py`), and nightly. It publishes nothing.
 
 ## Options considered
 
@@ -36,7 +37,7 @@ Building the images settled the rest: where they're built from, how each tool ta
 |---|---|---|
 | **Native runners per architecture (chosen)** | Each image built and run where it will run; no emulation | Two runners per change |
 | One runner, the other architecture under QEMU | One job | Slow, and a check under emulation shows less |
-| **Dockerfiles beside each configuration (chosen)** | A service's files in one place | Eight directories with a Dockerfile |
+| **Dockerfiles beside each configuration (chosen)** | A service's files in one place | A Dockerfile in each image's directory |
 | A `deploy/images/` directory | The images together | Each image's files far from its Dockerfile |
 | **One file per service, the backend from the environment (chosen)** | One file for Compose and AWS, as the RFC asks | Each file carries both backends |
 | A file for AWS alone, in the image | Each file simpler | Two files to keep in step |

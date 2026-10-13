@@ -55,8 +55,6 @@ tasks:
     command: 'deploy/build-images'
     inputs:
       - 'deploy/build-images'
-      - 'deploy/*/Dockerfile'
-      - 'deploy/*/Dockerfile.dockerignore'
       - 'deploy/otel-collector/**/*'
       - 'deploy/tempo/**/*'
       - 'deploy/loki/**/*'

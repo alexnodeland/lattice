@@ -460,7 +460,7 @@ The LLM gateway port: the LiteLLM proxy's OpenAI-compatible API.
 | Property | Value |
 |---|---|
 | Profiles | `gateway` |
-| Image | `ghcr.io/berriai/litellm`, pinned by tag and digest in `compose.yaml` |
+| Image | `ghcr.io/berriai/litellm-non_root`, pinned by tag and digest in `compose.yaml` |
 | Published ports | 4400 (`LITELLM_PORT`) → 4000 |
 | Networks | `stackr`, `supabase_network_stackr-supabase` |
 | Volumes | `./deploy/litellm/config.yaml` → `/etc/litellm/config.yaml` (read-only) |

@@ -4,6 +4,7 @@
 # exemplars. Its blocks are on a local volume on one machine, and in S3 on AWS
 # (stackr ADR-0034), as the environment says: Tempo reads it with
 # -config.expand-env=true, and each setting has one machine's value by default.
+# Expanded, a literal $ is written $$.
 stream_over_http_enabled: true
 
 server:

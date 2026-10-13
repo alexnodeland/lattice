@@ -173,6 +173,9 @@ run "stack_services_find_each_other_and_their_storage" {
       && { for setting in module.telemetry["pyroscope"].containers[0].environment : setting.name => setting.value }["PYROSCOPE_BACKEND"] == "s3"
       && { for setting in module.telemetry["loki"].containers[0].environment : setting.name => setting.value }["S3_ENDPOINT"] == "s3.us-east-1.amazonaws.com"
       && { for setting in module.telemetry["loki"].containers[0].environment : setting.name => setting.value }["S3_INSECURE"] == "false"
+      && { for setting in module.telemetry["loki"].containers[0].environment : setting.name => setting.value }["S3_PATH_STYLE"] == "false"
+      && { for setting in module.telemetry["pyroscope"].containers[0].environment : setting.name => setting.value }["S3_BUCKET_LOOKUP_TYPE"] == "virtual-hosted-style"
+      && !contains([for setting in module.telemetry["tempo"].containers[0].environment : setting.name], "AWS_ENDPOINT_URL")
       && { for setting in module.telemetry["loki"].containers[0].environment : setting.name => setting.value }["S3_BUCKET"] == "stackr-mocked"
     )
     error_message = "Tempo, Loki and Pyroscope keep their blocks in S3, in the telemetry bucket, each under its own prefix, over TLS."
@@ -289,6 +292,7 @@ run "stack_the_state_host_on_fargate_for_floci" {
       { for setting in module.telemetry["tempo"].containers[0].environment : setting.name => setting.value }["S3_ENDPOINT"] == "floci:4566"
       && { for setting in module.telemetry["tempo"].containers[0].environment : setting.name => setting.value }["S3_INSECURE"] == "true"
       && { for setting in module.telemetry["tempo"].containers[0].environment : setting.name => setting.value }["S3_PATH_STYLE"] == "true"
+      && { for setting in module.telemetry["pyroscope"].containers[0].environment : setting.name => setting.value }["S3_BUCKET_LOOKUP_TYPE"] == "path-style"
     )
     error_message = "On Floci, the telemetry stores reach its S3 by host and port, over HTTP, with buckets as paths."
   }
@@ -420,7 +424,8 @@ run "stack_wires_the_edge_and_scopes_storage" {
   assert {
     condition = (
       jsondecode(module.telemetry["tempo"].task_role_policy).Statement[1].Resource == "arn:aws:s3:::stackr-mocked/tempo/*"
-      && jsondecode(module.telemetry["tempo"].task_role_policy).Statement[0].Condition.StringLike["s3:prefix"] == ["tempo/*"]
+      && jsondecode(module.telemetry["tempo"].task_role_policy).Statement[0].Condition.StringLike["s3:prefix"] == ["tempo", "tempo/*"]
+      && jsondecode(module.langfuse_web.task_role_policy).Statement[0].Condition.StringLike["s3:prefix"] == ["*"]
       && jsondecode(module.telemetry["loki"].task_role_policy).Statement[1].Resource == "arn:aws:s3:::stackr-mocked/loki/*"
       && jsondecode(module.langfuse_web.task_role_policy).Statement[1].Resource == "arn:aws:s3:::stackr-mocked/*"
       && module.litellm.task_role_policy == null

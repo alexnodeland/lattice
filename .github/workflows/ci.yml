@@ -110,7 +110,7 @@ jobs:
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv run --no-project python scripts/affected.py image
 
-  # stackr's thin images (RFC-0004, stackr ADR-0034), built natively for each architecture the AWS
+  # stackr's thin images (RFC-0004, stackr ADR-0035), built natively for each architecture the AWS
   # recipe runs on, Fargate's arm64 and the runners' amd64, and each checked as it starts.
   # Nothing is published: the release does that.
   thin-images:

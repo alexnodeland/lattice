@@ -1,6 +1,6 @@
 # ADR-0034: The stack on AWS
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0035](0035-the-thin-images.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 
@@ -58,7 +58,7 @@ Each thin image reads what differs on AWS from its environment. It defaults to C
 | Image | Settings |
 |---|---|
 | `stackr-otel-collector` | `TEMPO_ADDRESS`, `PROMETHEUS_ADDRESS`, `LOKI_ADDRESS`, `LANGFUSE_ADDRESS`; `STACKR_ENVIRONMENT`, `STACKR_TRACES_EXPORTERS`; `LANGFUSE_OTLP_AUTH`, a secret |
-| `stackr-tempo`, `stackr-loki`, `stackr-pyroscope` | `PROMETHEUS_ADDRESS`, for Tempo's metrics; their S3 backend, by each one's name for it (`TEMPO_BACKEND=s3`, `LOKI_OBJECT_STORE=aws`, `PYROSCOPE_BACKEND=s3`); `S3_BUCKET`, `S3_REGION`, and `S3_PREFIX`, its own under the telemetry bucket (`tempo`, `loki`, `pyroscope`: letters alone, as Pyroscope takes a prefix); and `S3_ENDPOINT`, `S3_INSECURE` and `S3_PATH_STYLE`, S3's host and port, plain HTTP, and buckets as paths, which only Floci's needs. Their task roles reach only `<prefix>/*` |
+| `stackr-tempo`, `stackr-loki`, `stackr-pyroscope` | `PROMETHEUS_ADDRESS`, for Tempo's metrics; their S3 backend, by each one's name for it (`TEMPO_BACKEND=s3`, `LOKI_OBJECT_STORE=aws`, `PYROSCOPE_BACKEND=s3`); `S3_BUCKET`, `S3_REGION`, and `S3_PREFIX`, its own under the telemetry bucket (`tempo`, `loki`, `pyroscope`, with no trailing slash: Pyroscope joins a prefix to its keys with one, so a slash of its own would make an empty segment); and `S3_ENDPOINT`, `S3_INSECURE` and `S3_PATH_STYLE` (`S3_BUCKET_LOOKUP_TYPE`, as Pyroscope names it), S3's host and port, plain HTTP, and buckets as paths, which only Floci's needs. They reach S3 at `S3_ENDPOINT` alone, so they get no `AWS_ENDPOINT_URL`. Their task roles may list their prefix and below it, and reach the objects under `<prefix>/` |
 | `stackr-grafana` | `TEMPO_ADDRESS`, `LOKI_ADDRESS`, `PYROSCOPE_ADDRESS`, `PROMETHEUS_ADDRESS`; `GF_DATABASE_*`, on RDS, with `GF_DATABASE_SSL_MODE`; its admin's and its database's passwords, secrets |
 | `stackr-litellm` | `compose.yaml`'s settings, with `DATABASE_URL`, `REDIS_URL` and its keys as secrets, and one `<PROVIDER>_API_KEY` secret for each of `gateway_providers`, which an operator writes |
 | `stackr-db-init` | `PG*`, as RDS's master, `postgres`, with `PGSSLMODE` and `PGPASSWORD` from RDS's own secret; the roles' passwords, as on one machine, with `GRAFANA_DB_PASSWORD`; and the application's database, `APP_DB_NAME` and `APP_DB_PASSWORD`, its owner's, which may create roles for `db-roles` |

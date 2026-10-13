@@ -1,2 +1,3 @@
+# What stackr-tempo's image is built from, out of lattice's root: its own files alone.
 *
 !packages/stackr/deploy/tempo/tempo.yaml

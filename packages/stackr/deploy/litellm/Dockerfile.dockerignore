@@ -1,2 +1,3 @@
+# What stackr-litellm's image is built from, out of lattice's root: its own files alone.
 *
 !packages/stackr/deploy/litellm/config.yaml

@@ -27,7 +27,8 @@ locals {
   )
 
   # What a service's task role may do in a bucket: under a prefix of it, or all of it. A prefix is
-  # letters alone, as Pyroscope takes one, and each store puts its objects under <prefix>/.
+  # letters alone, with no trailing slash: Pyroscope joins it to its keys with one, so a slash of
+  # its own would make an empty segment. Each store's objects are under <prefix>/.
   storage = {
     langfuse  = { bucket = module.data.buckets["langfuse"], prefix = "" }
     tempo     = { bucket = module.data.buckets["telemetry"], prefix = "tempo" }
@@ -35,6 +36,8 @@ locals {
     pyroscope = { bucket = module.data.buckets["telemetry"], prefix = "pyroscope" }
   }
   objects = { for service, storage in local.storage : service => storage.prefix == "" ? "*" : "${storage.prefix}/*" }
+  # What it may list: its prefix itself, as a store lists it, and below it.
+  listed = { for service, storage in local.storage : service => storage.prefix == "" ? ["*"] : [storage.prefix, "${storage.prefix}/*"] }
   storage_policy = { for service, storage in local.storage : service => jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -42,7 +45,7 @@ locals {
         Effect    = "Allow"
         Action    = "s3:ListBucket"
         Resource  = storage.bucket.arn
-        Condition = { StringLike = { "s3:prefix" = [local.objects[service]] } }
+        Condition = { StringLike = { "s3:prefix" = local.listed[service] } }
       },
       {
         Effect   = "Allow"
@@ -104,7 +107,6 @@ module "telemetry" {
     image = var.images[each.key]
     port  = each.value
     environment = merge(
-      local.endpoint,
       {
         S3_BUCKET     = local.storage[each.key].bucket.name
         S3_REGION     = local.region
@@ -112,6 +114,8 @@ module "telemetry" {
         S3_ENDPOINT   = local.s3.endpoint
         S3_INSECURE   = local.s3.insecure
         S3_PATH_STYLE = local.s3.path_style
+        # Pyroscope's name for the same choice.
+        S3_BUCKET_LOOKUP_TYPE = local.s3.path_style == "true" ? "path-style" : "virtual-hosted-style"
       },
       # Each store's own name for its S3 backend; on one machine, its local disk.
       { tempo = { TEMPO_BACKEND = "s3" }, loki = { LOKI_OBJECT_STORE = "aws" }, pyroscope = { PYROSCOPE_BACKEND = "s3" } }[each.key],
@@ -257,9 +261,8 @@ module "litellm" {
   size               = local.sizes.litellm
   log_retention_days = var.log_retention_days
   container = {
-    image   = var.images.litellm
-    port    = 4000
-    command = ["--config", "/etc/litellm/config.yaml", "--port", "4000"]
+    image = var.images.litellm
+    port  = 4000
     environment = {
       LITELLM_OTEL_V2                         = "true"
       OTEL_EXPORTER_OTLP_ENDPOINT             = "http://${module.otel_collector.address.name}.${local.namespace}:4318"

@@ -462,7 +462,7 @@ services:
   # The LLM gateway port: an OpenAI-compatible API in front of the providers
   # and local model servers in deploy/litellm/config.yaml (ADR-0010).
   litellm:
-    image: ghcr.io/berriai/litellm:v1.103.0@sha256:bd089afdcd35b894b14a93f9743cdc8b591f82da1a38dd43a010a7b0c9de5fd7
+    image: ghcr.io/berriai/litellm-non_root:v1.103.0@sha256:fda2894415d89350ca6a16195c935726382354d2194ebb1ce43e6bd5480b06ce
     profiles: [gateway]
     restart: unless-stopped
     command: ["--config", "/etc/litellm/config.yaml", "--port", "4000"]

@@ -49,6 +49,11 @@ answers() {
   fi
 }
 
+# What a service answers, asked from beside it.
+ask() {
+  docker run --rm --network "$network" --label "stackr-images=$network" "$curl_image" --silent --fail "$@"
+}
+
 # The AWS recipe's storage, as the stack gives it: S3, which the check can't reach.
 s3=(--env S3_BUCKET=stackr-telemetry --env S3_REGION=us-east-1 --env S3_ENDPOINT=s3.us-east-1.amazonaws.com
   --env S3_INSECURE=false --env S3_PATH_STYLE=false)
@@ -83,17 +88,32 @@ for image in "${images[@]}"; do
       answers loki http://loki:3100/ready "$tag"
       ;;
     pyroscope)
+      # Pyroscope reads and checks its configuration before it prints its version.
+      once "${s3[@]}" --env PYROSCOPE_BACKEND=s3 --env S3_PREFIX=pyroscope --env S3_BUCKET_LOOKUP_TYPE=virtual-hosted-style \
+        "$tag" -config.file=/etc/pyroscope/config.yaml -config.expand-env=true -version >/dev/null ||
+        fail "$image's configuration, on S3"
       answers pyroscope http://pyroscope:4040/ready "$tag"
       ;;
     grafana)
-      answers grafana http://grafana:3000/api/health --env GF_SECURITY_ADMIN_PASSWORD=check "$tag"
-      provisioned=$(docker run --rm --network "$network" --label "stackr-images=$network" "$curl_image" \
-        --silent --fail --user admin:check http://grafana:3000/api/datasources)
-      for uid in prometheus tempo loki pyroscope; do
-        [[ $provisioned == *"\"uid\":\"$uid\""* ]] || fail "grafana has no $uid data source"
+      # Its data sources at Compose's names, then at the AWS recipe's, and its dashboards.
+      for names in compose aws; do
+        settings=(--env GF_SECURITY_ADMIN_PASSWORD=check)
+        suffix=
+        if [[ $names == aws ]]; then
+          suffix=.stackr.internal
+          settings+=(--env "PROMETHEUS_ADDRESS=prometheus$suffix" --env "TEMPO_ADDRESS=tempo$suffix"
+            --env "LOKI_ADDRESS=loki$suffix" --env "PYROSCOPE_ADDRESS=pyroscope$suffix")
+        fi
+        answers "grafana-$names" "http://grafana-$names:3000/api/health" "${settings[@]}" "$tag"
+        provisioned=$(ask --user admin:check "http://grafana-$names:3000/api/datasources")
+        for source in prometheus:9090 tempo:3200 loki:3100 pyroscope:4040; do
+          uid=${source%%:*}
+          [[ $provisioned == *"\"uid\":\"$uid\""*"\"url\":\"http://$uid$suffix:${source#*:}\""* ||
+            $provisioned == *"\"url\":\"http://$uid$suffix:${source#*:}\""*"\"uid\":\"$uid\""* ]] ||
+            fail "grafana's $uid data source isn't at http://$uid$suffix:${source#*:}"
+        done
       done
-      dashboards=$(docker run --rm --network "$network" --label "stackr-images=$network" "$curl_image" \
-        --silent --fail --user admin:check 'http://grafana:3000/api/search?type=dash-db')
+      dashboards=$(ask --user admin:check 'http://grafana-compose:3000/api/search?type=dash-db')
       for folder in stackr artifactr reflexr; do
         [[ $dashboards == *"\"folderTitle\":\"$folder\""* ]] || fail "grafana has no $folder dashboards"
       done

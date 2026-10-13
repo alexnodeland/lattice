@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
-import { ACCESS, anyPart, byKind, fromKey, keyOf, PARTS, where, who, whom } from "./access";
+import { anyPart, byKind, fromKey, keyOf, PARTS, TENANT_ACTIONS, where, who, whom } from "./access";
 
 test("each part of Access reads with an action Access asks about", () => {
   for (const { reads } of PARTS) {
-    expect(ACCESS).toContain(reads);
+    expect(TENANT_ACTIONS).toContain(reads);
   }
 });
 

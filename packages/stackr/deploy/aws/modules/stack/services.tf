@@ -330,7 +330,7 @@ module "gotrue" {
     secrets = merge(
       {
         GOTRUE_DB_DATABASE_URL = "${local.database["database-gotrue"]}:url::"
-        GOTRUE_JWT_KEYS        = "${local.secret["auth-keys"]}:jwt_keys::"
+        GOTRUE_JWT_KEYS        = local.secret["auth-jwt-keys"]
         GOTRUE_JWT_SECRET      = local.secret["gotrue-jwt-secret"]
       },
       var.auth_smtp == null ? {} : { GOTRUE_SMTP_PASS = local.secret["auth-smtp-password"] },
@@ -375,7 +375,7 @@ locals {
       LANGFUSE_PUBLIC_KEY = "${local.secret["langfuse-keys"]}:public::"
       LANGFUSE_SECRET_KEY = "${local.secret["langfuse-keys"]}:secret::"
     },
-    local.grantr ? { AUTH_SERVICE_ROLE_KEY = "${local.secret["auth-keys"]}:service_role_key::" } : {},
+    local.grantr ? { AUTH_SERVICE_ROLE_KEY = local.secret["auth-service-role-key"] } : {},
     var.application.secrets,
   )
 }

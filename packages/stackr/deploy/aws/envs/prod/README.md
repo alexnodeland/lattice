@@ -97,6 +97,22 @@ A deployment's `name` must be unique in the account: it names its resources, and
 
    LiteLLM starts once each provider's key has a value, and GoTrue once its SMTP password does.
 
+## Rotating GoTrue's keys
+
+auth-keys keeps a key set once it is written, since a new one ends every session signed with the old. To rotate it, remove it, and run auth-keys again: it writes a new key set, finds the service role's key no longer verifies, and writes that again too. GoTrue and the application then deploy again, and everyone signs in anew.
+
+```sh
+aws secretsmanager delete-secret --secret-id <name>/auth-jwt-keys --force-delete-without-recovery
+tofu apply -var-file=<deployment>.tfvars -replace=module.stack.terraform_data.auth_keys
+```
+
+The apply makes the secret again, with no value, for auth-keys to write. To bring a key set of your own instead, write it, and run auth-keys again the same way, which keeps it:
+
+```sh
+aws secretsmanager put-secret-value --secret-id <name>/auth-jwt-keys --secret-string file://jwt-keys.json
+tofu apply -var-file=<deployment>.tfvars -replace=module.stack.terraform_data.auth_keys
+```
+
 ## The admin UIs
 
 Operators reach Grafana, Langfuse and LiteLLM's admin UI with SSM port forwarding through the state host, which opens no port: AWS CLI v2 with the Session Manager plugin.

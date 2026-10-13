@@ -28,7 +28,8 @@ from _auth_keys import key_set, service_role_key, signed_by
 def current(secrets: Any, arn: str) -> str | None:
     """A secret's value, or None while it has none."""
     try:
-        return secrets.get_secret_value(SecretId=arn)["SecretString"]
+        # Secrets Manager refuses to read a secret with no value; Floci answers without one.
+        return secrets.get_secret_value(SecretId=arn).get("SecretString") or None
     except ClientError as error:
         # An empty secret has no current version: Secrets Manager says it can't find one.
         if error.response.get("Error", {}).get("Code") == "ResourceNotFoundException":

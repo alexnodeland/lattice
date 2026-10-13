@@ -13,7 +13,7 @@ grantr decides who may do what in a tenant. artifactr and reflexr ask it, throug
 | `grantr.core` | The model and its types, grantr's catalog, the built-in roles, the rule every check follows, the audit events, and service principal keys. No I/O and no async | pydantic |
 | `grantr.telemetry` | The check counter, slow checks' spans and the audit log's copy, through the OpenTelemetry API | `grantr.core`, the OpenTelemetry API |
 | `grantr.grants` | `Grants`, with its checks, the hooks, the commands that change access and the lists an admin reads; the storage port, `Storage`; and `InMemoryStorage` | `grantr.core`, `grantr.telemetry`, the OpenTelemetry API |
-| `grantr.sql` | `SqlStorage`, its tables and Alembic migrations, and `create_sqlite_engine`. The `sql`, `sqlite` and `postgres` extras | `grantr.core`, pydantic, SQLAlchemy, Alembic |
+| `grantr.sql` | `SqlStorage`, its tables and Alembic migrations, and `create_sqlite_engine`. The `sql`, `sqlite` and `postgres` extras | `grantr.core`, pydantic, SQLAlchemy, Alembic, and lattice-core's `sql`, which holds the SQLite engine, the tenant session and the session helpers the libraries share ([lattice ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md)) |
 | `grantr.testing` | `matrix`, every role against every action, as a table to commit | `grantr.core` |
 | `grantr.fastapi` | `grantr_router`, the admin API, and its OpenAPI document. The `fastapi` extra | `grantr.core`, `grantr.grants`, FastAPI |
 

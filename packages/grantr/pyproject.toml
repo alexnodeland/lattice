@@ -27,7 +27,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-sql = ["sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
+sql = ["lattice-core-ai[sql]>=0.1.0.dev0", "sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
 sqlite = ["grantr[sql]", "aiosqlite>=0.22"]
 postgres = ["grantr[sql]", "asyncpg>=0.31"]
 fastapi = ["fastapi>=0.141", "starlette>=0.46.0"]
@@ -56,9 +56,19 @@ dev = [
     { include-group = "lint" },
 ]
 
+# In lattice, lattice-core is the checkout's. A built wheel keeps the range in [project] alone.
+[tool.uv.sources]
+lattice-core-ai = { workspace = true }
+
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
+
+# ─── dependencies ─────────────────────────────────────────────────────────────
+
+# deptry can't tell from the workspace's editable install which module lattice-core-ai provides.
+[tool.deptry.package_module_name_map]
+lattice-core-ai = "lattice_core"
 
 # ─── types ────────────────────────────────────────────────────────────────────
 

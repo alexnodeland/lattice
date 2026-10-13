@@ -5,6 +5,7 @@ tags: ['distribution']
 dependsOn:
   - 'artifactr'
   - 'evalr'
+  - 'lattice-core'
   - 'reflexr'
 
 tasks:

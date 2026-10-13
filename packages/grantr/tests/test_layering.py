@@ -25,7 +25,10 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"grantr.core", "grantr.grants", "grantr.fastapi"},
         {"fastapi", "starlette", "pydantic"},
     ),
-    "sql": ({"grantr.core", "grantr.sql"}, {"pydantic", "sqlalchemy", "alembic"}),
+    "sql": (
+        {"grantr.core", "grantr.sql"},
+        {"pydantic", "sqlalchemy", "alembic", "lattice_core.sql"},
+    ),
 }
 
 IO = {"asyncio", "socket", "os", "pathlib", "subprocess", "io", "logging", "sqlite3"}

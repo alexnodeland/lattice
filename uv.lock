@@ -271,15 +271,18 @@ otel = [
 postgres = [
     { name = "alembic" },
     { name = "asyncpg" },
+    { name = "lattice-core-ai", extra = ["sql"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 sql = [
     { name = "alembic" },
+    { name = "lattice-core-ai", extra = ["sql"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 sqlite = [
     { name = "aiosqlite" },
     { name = "alembic" },
+    { name = "lattice-core-ai", extra = ["sql"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 
@@ -328,6 +331,7 @@ requires-dist = [
     { name = "jsonpointer", specifier = ">=1.9" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
     { name = "lattice-core-ai", editable = "packages/lattice-core" },
+    { name = "lattice-core-ai", extras = ["sql"], marker = "extra == 'sql'", editable = "packages/lattice-core" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.2" },
     { name = "opentelemetry-api", specifier = ">=1.28" },
     { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'otel'", specifier = ">=1.45" },
@@ -1464,15 +1468,18 @@ fastapi = [
 postgres = [
     { name = "alembic" },
     { name = "asyncpg" },
+    { name = "lattice-core-ai", extra = ["sql"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 sql = [
     { name = "alembic" },
+    { name = "lattice-core-ai", extra = ["sql"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 sqlite = [
     { name = "aiosqlite" },
     { name = "alembic" },
+    { name = "lattice-core-ai", extra = ["sql"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 
@@ -1512,6 +1519,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.141" },
     { name = "grantr", extras = ["sql"], marker = "extra == 'postgres'" },
     { name = "grantr", extras = ["sql"], marker = "extra == 'sqlite'" },
+    { name = "lattice-core-ai", extras = ["sql"], marker = "extra == 'sql'", editable = "packages/lattice-core" },
     { name = "opentelemetry-api", specifier = ">=1.28" },
     { name = "pydantic", specifier = ">=2.13" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
@@ -2241,10 +2249,17 @@ dependencies = [
     { name = "pydantic" },
 ]
 
+[package.optional-dependencies]
+sql = [
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
+
 [package.dev-dependencies]
 dev = [
+    { name = "aiosqlite" },
     { name = "pyright" },
     { name = "pytest" },
+    { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
     { name = "ruff" },
@@ -2254,18 +2269,26 @@ lint = [
     { name = "ruff" },
 ]
 test = [
+    { name = "aiosqlite" },
     { name = "pytest" },
+    { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2.13" }]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.13" },
+    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
+]
+provides-extras = ["sql"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "aiosqlite", specifier = ">=0.22" },
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1" },
+    { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "pytest-cov", specifier = ">=7.1" },
     { name = "pytest-timeout", specifier = ">=2.4" },
     { name = "ruff", specifier = ">=0.16" },
@@ -2275,7 +2298,9 @@ lint = [
     { name = "ruff", specifier = ">=0.16" },
 ]
 test = [
+    { name = "aiosqlite", specifier = ">=0.22" },
     { name = "pytest", specifier = ">=9.1" },
+    { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "pytest-cov", specifier = ">=7.1" },
     { name = "pytest-timeout", specifier = ">=2.4" },
 ]
@@ -4013,15 +4038,18 @@ otel = [
 postgres = [
     { name = "alembic" },
     { name = "asyncpg" },
+    { name = "lattice-core-ai", extra = ["sql"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 sql = [
     { name = "alembic" },
+    { name = "lattice-core-ai", extra = ["sql"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 sqlite = [
     { name = "aiosqlite" },
     { name = "alembic" },
+    { name = "lattice-core-ai", extra = ["sql"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 
@@ -4075,6 +4103,7 @@ requires-dist = [
     { name = "httpx2", marker = "extra == 'litellm'", specifier = ">=2.7" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
     { name = "lattice-core-ai", editable = "packages/lattice-core" },
+    { name = "lattice-core-ai", extras = ["sql"], marker = "extra == 'sql'", editable = "packages/lattice-core" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.2" },
     { name = "opentelemetry-api", specifier = ">=1.45" },
     { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'otel'", specifier = ">=1.45" },
@@ -4268,15 +4297,18 @@ otel = [
 postgres = [
     { name = "alembic" },
     { name = "asyncpg" },
+    { name = "lattice-core-ai", extra = ["sql"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 sql = [
     { name = "alembic" },
+    { name = "lattice-core-ai", extra = ["sql"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 sqlite = [
     { name = "aiosqlite" },
     { name = "alembic" },
+    { name = "lattice-core-ai", extra = ["sql"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 
@@ -4314,6 +4346,7 @@ requires-dist = [
     { name = "evalr", marker = "extra == 'evals'", editable = "packages/evalr" },
     { name = "evalr", extras = ["langfuse"], marker = "extra == 'langfuse'", editable = "packages/evalr" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
+    { name = "lattice-core-ai", extras = ["sql"], marker = "extra == 'sql'", editable = "packages/lattice-core" },
     { name = "opentelemetry-api", specifier = ">=1.45" },
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.45" },
     { name = "pydantic", specifier = ">=2.13" },

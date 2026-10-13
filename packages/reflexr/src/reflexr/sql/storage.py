@@ -13,11 +13,8 @@ connection, which on SQLite can keep the database's write lock, or the pool's on
 
 import asyncio
 import contextlib
-import functools
 from collections.abc import (
     AsyncGenerator,
-    Awaitable,
-    Callable,
     Collection,
     Iterable,
     Mapping,
@@ -26,8 +23,7 @@ from collections.abc import (
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from itertools import batched
-from types import CoroutineType
-from typing import Any, Final
+from typing import Final
 
 from sqlalchemy import (
     ColumnElement,
@@ -46,6 +42,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import InstrumentedAttribute, Session, aliased
 
+from lattice_core.sql.sessions import awaited_to_the_end, lock_row, to_the_end
+from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 from reflexr.core import (
     HOLDING,
     WAITING,
@@ -74,7 +72,6 @@ from reflexr.sql.tables import (
     StateRow,
     WorkspaceRow,
 )
-from reflexr.sql.tenancy import TENANT, TenantSession
 from reflexr.workspace import (
     RUN_LEASE_PREFIX,
     Clock,
@@ -92,38 +89,6 @@ _CHUNK = 500
 """How many keys one ``IN`` clause lists, well within every driver's parameter limit."""
 
 
-# Shared verbatim with artifactr's src/artifactr/sql/storage.py, grantr's
-# src/grantr/sql/storage.py and relayr's src/relayr/sql/ledger.py; change all four.
-async def _to_the_end[T](call: Awaitable[T]) -> T:
-    """Await a database call to its end; a cancellation that came meanwhile is raised after."""
-    task = asyncio.ensure_future(call)
-    cancelled: asyncio.CancelledError | None = None
-    while not task.done():
-        try:
-            await asyncio.wait([task])
-        except asyncio.CancelledError as error:
-            cancelled = error
-    if cancelled is not None:
-        if not task.cancelled():
-            task.exception()
-        raise cancelled
-    return task.result()
-
-
-# Shared verbatim with artifactr's src/artifactr/sql/storage.py, grantr's
-# src/grantr/sql/storage.py and relayr's src/relayr/sql/ledger.py; change all four.
-def _awaited_to_the_end[**P, T](
-    method: Callable[P, Awaitable[T]],
-) -> Callable[P, "CoroutineType[Any, Any, T]"]:  # subscriptable at run time from Python 3.13
-    """Await every call of a method to its end, with :func:`_to_the_end`."""
-
-    @functools.wraps(method)
-    async def call(*args: P.args, **kwargs: P.kwargs) -> T:
-        return await _to_the_end(method(*args, **kwargs))
-
-    return call
-
-
 class _Transaction:
     """Reads and writes one workspace's rows in the session that holds its row's lock.
 
@@ -139,7 +104,7 @@ class _Transaction:
         self._workspace = workspace
         self._clock = clock
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def append(self, entries: Sequence[Entry]) -> list[Envelope]:
         envelopes: list[Envelope] = []
         workspace = self._workspace
@@ -173,28 +138,28 @@ class _Transaction:
             envelopes.append(envelope)
         return envelopes
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def envelope(self, event_id: EventId) -> Envelope | None:
         row = await self._session.scalar(
             _scoped(EventRow, self._ref).where(EventRow.event_id == event_id)
         )
         return None if row is None else _envelope(row)
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def head_seq(self) -> int:
         return self._workspace.head_seq
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def read(self, *, after_seq: int, limit: int) -> list[Envelope]:
         rows = await self._session.scalars(_log(self._ref, after_seq=after_seq, limit=limit))
         return [_envelope(row) for row in rows]
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def progress(self, rule: RuleName) -> RuleProgress | None:
         row = await self._session.get(ProgressRow, self._pk(rule))
         return None if row is None else _progress(row)
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def save_progress(self, rule: RuleName, progress: RuleProgress) -> None:
         row = await self._session.get(ProgressRow, self._pk(rule))
         if row is None:
@@ -202,14 +167,14 @@ class _Transaction:
             self._session.add(row)
         row.body = progress.model_dump(mode="json")
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def states(
         self, rule: RuleName, keys: Collection[ScopeKey]
     ) -> dict[ScopeKey, ScopeState]:
         rows = await self._states(rule, keys)
         return {key: ScopeState.model_validate(rows[key].body) for key in keys if key in rows}
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def save_states(self, rule: RuleName, states: Mapping[ScopeKey, ScopeState]) -> None:
         rows = await self._states(rule, states)
         for key, state in states.items():
@@ -223,18 +188,18 @@ class _Transaction:
         query = _scoped(StateRow, self._ref).where(StateRow.rule == rule)
         return {row.scope_key: row for row in await self._in(query, StateRow.scope_key, keys)}
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def clear_states(self, rule: RuleName) -> None:
         await self._session.execute(
             delete(StateRow).where(*_in_workspace(StateRow, self._ref), StateRow.rule == rule)
         )
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def run(self, run_id: RunId) -> Run | None:
         row = await self._session.get(RunRow, self._pk(run_id))
         return None if row is None else _run(row)
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def save_runs(self, runs: Sequence[Run]) -> None:
         # The last version of each run wins, in the order the runs first appear.
         latest = {run.id: run for run in runs}
@@ -252,7 +217,7 @@ class _Transaction:
             row.next_attempt_at = run.next_attempt_at
             row.body = run.model_dump(mode="json")
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def scope_runs(self, rule: RuleName, scope_key: ScopeKey) -> list[Run]:
         query = (
             _scoped(RunRow, self._ref)
@@ -261,7 +226,7 @@ class _Transaction:
         )
         return [_run(row) for row in await self._session.scalars(query)]
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def dead_letter(self, errors: Sequence[EvaluationError]) -> None:
         self._session.add_all(
             DeadLetterRow(
@@ -273,12 +238,12 @@ class _Transaction:
             for error in errors
         )
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def schedule(self, name: str) -> datetime | None:
         row = await self._session.get(ScheduleRow, self._pk(name))
         return None if row is None else row.at
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def save_schedule(self, name: str, at: datetime) -> None:
         row = await self._session.get(ScheduleRow, self._pk(name))
         if row is None:
@@ -286,17 +251,17 @@ class _Transaction:
             self._session.add(row)
         row.at = at
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def stored_rule(self, name: RuleName) -> StoredRule | None:
         row = await self._session.get(RuleRow, self._pk(name))
         return None if row is None else _stored_rule(row)
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def stored_rules(self) -> list[StoredRule]:
         rows = await self._session.scalars(_active_rules(self._ref))
         return [_stored_rule(row) for row in rows]
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def save_stored_rule(self, stored: StoredRule) -> None:
         name = stored.rule.name
         row = await self._session.get(RuleRow, self._pk(name))
@@ -341,20 +306,7 @@ async def _lock_workspace(session: AsyncSession, ref: WorkspaceRef) -> Workspace
         head_ts=None,
         last_position=0,
     )
-    return await _locked(session, WorkspaceRow, (ref.tenant_id, ref.workspace_id), new)
-
-
-async def _locked[R: ScopedRow](
-    session: AsyncSession, model: type[R], key: tuple[str, ...], new: R
-) -> R:
-    """Lock a row (``SELECT ... FOR UPDATE``), inserting ``new`` first if it does not exist."""
-    while (row := await session.get(model, key, with_for_update=True)) is None:
-        # A concurrent transaction may insert the row first. Then this insert fails, and the
-        # next lookup waits for that transaction to end and locks its row instead.
-        with contextlib.suppress(IntegrityError):
-            async with session.begin_nested():
-                session.add(new)
-    return row
+    return await lock_row(session, WorkspaceRow, (ref.tenant_id, ref.workspace_id), new)
 
 
 def _in_workspace(model: type[ScopedRow], ref: WorkspaceRef) -> tuple[ColumnElement[bool], ...]:
@@ -463,7 +415,7 @@ class SqlStorage:
 
     def _session(self, workspace: WorkspaceRef) -> AsyncSession:
         """A session in a workspace's tenant."""
-        return self._sessions(info={TENANT: workspace.tenant_id})
+        return self._sessions(info={TENANT_KEY: workspace.tenant_id})
 
     @asynccontextmanager
     async def transaction(self, workspace: WorkspaceRef) -> AsyncGenerator[_Transaction]:
@@ -473,16 +425,16 @@ class SqlStorage:
         """
         session = self._session(workspace)
         try:
-            row = await _to_the_end(_lock_workspace(session, workspace))
+            row = await to_the_end(_lock_workspace(session, workspace))
             yield _Transaction(session, workspace, row, self._clock)
-            await _to_the_end(session.commit())
+            await to_the_end(session.commit())
         finally:
-            await _to_the_end(session.close())
+            await to_the_end(session.close())
         async with self._committed:
             self._heads[workspace] = max(row.head_seq, self._heads.get(workspace, 0))
             self._committed.notify_all()
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def head_seq(self, workspace: WorkspaceRef) -> int:
         """Return the log's latest ``seq``, or 0 if it is empty."""
         async with self._session(workspace) as session:
@@ -549,7 +501,7 @@ class SqlStorage:
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(committed, self._poll_interval)
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def run(self, workspace: WorkspaceRef, run_id: RunId) -> Run | None:
         """Return a run, or None."""
         async with self._session(workspace) as session:
@@ -649,7 +601,7 @@ class SqlStorage:
             for row in await self._across_all(query)
         ]
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def acquire_lease(
         self, workspace: WorkspaceRef, key: str, holder: str, ttl: timedelta
     ) -> bool:
@@ -679,7 +631,7 @@ class SqlStorage:
             return False
         return True
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def release_lease(self, workspace: WorkspaceRef, key: str, holder: str) -> None:
         """Release a lease if ``holder`` has it."""
         async with self._session(workspace) as session, session.begin():
@@ -687,7 +639,7 @@ class SqlStorage:
                 delete(LeaseRow).where(*_lease(workspace, key), LeaseRow.holder == holder)
             )
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def cursor(self, workspace: WorkspaceRef, name: str) -> int:
         """Return how far a named consumer of the log has got: the ``seq`` saved, or 0."""
         async with self._session(workspace) as session:
@@ -696,7 +648,7 @@ class SqlStorage:
             )
         return 0 if cursor is None else cursor.seq
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def save_cursor(self, workspace: WorkspaceRef, name: str, seq: int) -> None:
         """Save how far a named consumer of the log has got; a cursor only moves forward.
 
@@ -708,15 +660,15 @@ class SqlStorage:
             tenant_id=workspace.tenant_id, workspace_id=workspace.workspace_id, name=name, seq=seq
         )
         async with self._session(workspace) as session, session.begin():
-            cursor = await _locked(session, CursorRow, key, new)
+            cursor = await lock_row(session, CursorRow, key, new)
             cursor.seq = max(cursor.seq, seq)
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def _all[R: ScopedRow](self, workspace: WorkspaceRef, query: Select[R]) -> Sequence[R]:
         async with self._session(workspace) as session:
             return (await session.scalars(query)).all()
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def _across_all[R: ScopedRow](self, query: Select[R]) -> Sequence[R]:
         """Read across tenants, on the ``across_tenants`` engine."""
         async with self._across() as session:

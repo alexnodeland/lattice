@@ -124,6 +124,9 @@ plugins:
             filters: ["!^_", "!^model_config$"]
             heading_level: 3
             members_order: source
+            # The packages re-export what they share from lattice-core, so their pages resolve its
+            # names, which griffe finds only in modules it has loaded.
+            preload_modules: [lattice_core]
             merge_init_into_class: true
             separate_signature: true
             show_root_heading: true

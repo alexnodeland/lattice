@@ -7,9 +7,9 @@ grantr has checked already, and is quoted.
 
 import json
 from datetime import datetime
-from typing import Annotated, Final
+from typing import Annotated, Final, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 ID: Final = r"^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$"
 """What an id in a query may be: a thread, run, session or trace id, as the document says."""
@@ -24,11 +24,22 @@ def quoted(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-class Window(BaseModel):
-    """A span of time, and how many results to return from it."""
+class Span(BaseModel):
+    """A span of time: its start, and its end, after it."""
 
     model_config = ConfigDict(frozen=True)
 
     start: datetime
     end: datetime
+
+    @model_validator(mode="after")
+    def _ends_after_it_starts(self) -> Self:
+        if self.end <= self.start:
+            raise ValueError("a span ends after it starts")
+        return self
+
+
+class Window(Span):
+    """A span of time, and how many results to return from it."""
+
     limit: Annotated[int, Field(ge=1, le=1000)] = 100

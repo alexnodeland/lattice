@@ -1,6 +1,48 @@
 {
   "components": {
     "schemas": {
+      "Comment": {
+        "description": "What a person wrote, on which trace, in which workspace, and when.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "trace_id",
+          "workspace",
+          "timestamp"
+        ],
+        "title": "Comment",
+        "type": "object"
+      },
       "Config": {
         "description": "``config.json``: what the UIs need of the deployment they run in.",
         "properties": {
@@ -67,7 +109,7 @@
         "type": "object"
       },
       "Evaluation": {
-        "description": "One evaluator's score of one name, over the window, and per day.",
+        "description": "One evaluator's score of one name, per day, and over the window.",
         "properties": {
           "count": {
             "title": "Count",
@@ -103,7 +145,7 @@
         "properties": {
           "comments": {
             "items": {
-              "$ref": "#/components/schemas/Score"
+              "$ref": "#/components/schemas/Comment"
             },
             "title": "Comments",
             "type": "array"
@@ -128,7 +170,7 @@
           },
           "workspaces": {
             "items": {
-              "$ref": "#/components/schemas/Place"
+              "$ref": "#/components/schemas/WorkspaceTotals"
             },
             "title": "Workspaces",
             "type": "array"
@@ -513,42 +555,6 @@
         "title": "Ok[list[TraceSummary]]",
         "type": "object"
       },
-      "Place": {
-        "description": "One workspace's thumbs and evaluations; None for traces tagged with no workspace.",
-        "properties": {
-          "down": {
-            "title": "Down",
-            "type": "integer"
-          },
-          "evaluated": {
-            "title": "Evaluated",
-            "type": "integer"
-          },
-          "up": {
-            "title": "Up",
-            "type": "integer"
-          },
-          "workspace": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Workspace"
-          }
-        },
-        "required": [
-          "workspace",
-          "up",
-          "down",
-          "evaluated"
-        ],
-        "title": "Place",
-        "type": "object"
-      },
       "Point": {
         "description": "A value at a moment.",
         "properties": {
@@ -905,7 +911,7 @@
         "type": "object"
       },
       "Thumbs": {
-        "description": "People's thumbs on one day.",
+        "description": "People's thumbs on one day, in UTC.",
         "properties": {
           "day": {
             "format": "date",
@@ -1034,6 +1040,42 @@
           }
         },
         "title": "Unconfigured",
+        "type": "object"
+      },
+      "WorkspaceTotals": {
+        "description": "One workspace's thumbs and evaluations; None for traces tagged with no workspace.",
+        "properties": {
+          "down": {
+            "title": "Down",
+            "type": "integer"
+          },
+          "evaluated": {
+            "title": "Evaluated",
+            "type": "integer"
+          },
+          "up": {
+            "title": "Up",
+            "type": "integer"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "workspace",
+          "up",
+          "down",
+          "evaluated"
+        ],
+        "title": "WorkspaceTotals",
         "type": "object"
       }
     }
@@ -1233,8 +1275,8 @@
     },
     "/portalr/v1/feedback": {
       "get": {
-        "description": "The tenant's feedback and evaluations from Langfuse, or one workspace's, by day.\n\nEvery score in the window is read and summed: ``complete`` is false where there were more\nthan one read takes.",
-        "operationId": "feedback_by_day_portalr_v1_feedback_get",
+        "description": "The tenant's feedback and evaluations from Langfuse, or one workspace's, by day.\n\nThe window is at most 91 days. Every score in it is read and summed, within the read's\nbounds: ``complete`` is false where one was reached.",
+        "operationId": "feedback_portalr_v1_feedback_get",
         "parameters": [
           {
             "in": "query",
@@ -1254,18 +1296,6 @@
               "format": "date-time",
               "title": "End",
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 100,
-              "maximum": 1000,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
             }
           },
           {
@@ -1325,7 +1355,7 @@
                       "$ref": "#/components/schemas/Unconfigured"
                     }
                   ],
-                  "title": "Response Feedback By Day Portalr V1 Feedback Get"
+                  "title": "Response Feedback Portalr V1 Feedback Get"
                 }
               }
             },
@@ -1372,7 +1402,7 @@
             "description": "Refused"
           }
         },
-        "summary": "Feedback By Day"
+        "summary": "Feedback"
       }
     },
     "/portalr/v1/invites": {

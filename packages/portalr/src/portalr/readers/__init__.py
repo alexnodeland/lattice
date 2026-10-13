@@ -7,7 +7,7 @@ Each is optional: an application passes those its stack runs.
 
 from dataclasses import dataclass
 
-from portalr.readers.feedback import Feedback, FeedbackQuery, feedback
+from portalr.readers.feedback import Feedback, FeedbackQuery, read_feedback
 from portalr.readers.grafana import Grafana
 from portalr.readers.langfuse import Langfuse, Score
 from portalr.readers.litellm import LiteLLM, Spend, TenantSpend
@@ -68,6 +68,6 @@ __all__ = [
     "Unavailable",
     "Unconfigured",
     "Window",
-    "feedback",
+    "read_feedback",
     "reading",
 ]

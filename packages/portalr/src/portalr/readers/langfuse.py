@@ -6,18 +6,22 @@ so a read takes two steps, as lattice RFC-0002 allows: the tenant's traces in th
 the observations API filtered on the tag, then those traces' scores. Each observation's tags are
 checked again, and each score must be on one of those traces. A trace's ``workspace:<id>`` tag,
 which artifactr's and reflexr's traces carry, names each score's workspace.
+
+A read is bounded: so many pages of traces, so many scores, so long in all; past any bound, it
+answers what it read, and says it is partial (portalr ADR-0027).
 """
 
+import asyncio
 import json
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated, Final, Literal
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from portalr.readers.http import read
-from portalr.readers.query import Window
+from portalr.readers.query import Span, Window
 from portalr.readers.reading import Ok, Unavailable
 from portalr.tenant import Tenant
 
@@ -25,13 +29,26 @@ TRACES_PER_READ: Final = 50
 """How many traces one request for scores names, to keep its URL short."""
 
 MOST_SCORES: Final = 50_000
-"""The most scores an aggregate read takes from Langfuse: past it, the read says it is partial."""
+"""The most scores a read takes from Langfuse: past it, the read is partial."""
 
 TRACES_PER_PAGE: Final = 1000
 """How many traces one page of the observations API returns, the most it allows."""
 
+MOST_TRACE_PAGES: Final = 20
+"""The most pages of traces a read takes, 20,000 traces: past it, the read is partial."""
+
 SCORES_PER_PAGE: Final = 100
 """How many scores one page of the score API returns, the most it allows."""
+
+BATCHES_AT_ONCE: Final = 4
+"""How many requests for scores a read has open at once."""
+
+DEADLINE: Final = 20.0
+"""How long a read may take, in seconds: past it, the read answers what it has, partial."""
+
+LOOKBACK: Final = timedelta(days=7)
+"""How far before a window a trace may start and still be scored in it: a late thumb, or an
+evaluator's verdict on yesterday's turn, is counted on the day it was given."""
 
 
 def tenant_tag(tenant: Tenant) -> str:
@@ -70,6 +87,7 @@ class Score(BaseModel):
 
 class _Observation(BaseModel):
     trace_id: Annotated[str, Field(validation_alias="traceId")]
+    start: Annotated[datetime, Field(validation_alias="startTime")]
     tags: list[str] | None = None
 
 
@@ -123,10 +141,8 @@ _OBSERVATIONS: Final = TypeAdapter(_Observations)
 _SCORES: Final = TypeAdapter(_Scores)
 
 
-def trace_parameters(
-    tenant: Tenant, window: Window, workspace: str | None = None
-) -> dict[str, str | int]:
-    """The observations API's parameters: each root observation in the window with the tags.
+def trace_parameters(tenant: Tenant, span: Span, workspace: str | None = None) -> dict[str, str]:
+    """The observations API's parameters: each root observation in the span with the tags.
 
     The tenant's tag, and the workspace's, if one is named.
     """
@@ -138,31 +154,37 @@ def trace_parameters(
             "type": "datetime",
             "column": "startTime",
             "operator": ">=",
-            "value": window.start.isoformat(),
+            "value": span.start.isoformat(),
         },
-        {
-            "type": "datetime",
-            "column": "startTime",
-            "operator": "<",
-            "value": window.end.isoformat(),
-        },
+        {"type": "datetime", "column": "startTime", "operator": "<", "value": span.end.isoformat()},
     ]
-    return {
-        "fields": "core,trace_context",
-        "limit": window.limit,
-        "filter": json.dumps(conditions),
-    }
+    return {"fields": "core,trace_context", "filter": json.dumps(conditions)}
 
 
-def score_parameters(traces: list[str], window: Window) -> dict[str, str | int]:
-    """The score API's parameters: these traces' scores in the window, with what they are on."""
+def score_parameters(traces: list[str], span: Span) -> dict[str, str]:
+    """The score API's parameters: these traces' scores in the span, with what they are on."""
     return {
         "traceId": ",".join(traces),
         "fields": "subject,details",
-        "fromTimestamp": window.start.isoformat(),
-        "toTimestamp": window.end.isoformat(),
-        "limit": min(window.limit, 100),
+        "fromTimestamp": span.start.isoformat(),
+        "toTimestamp": span.end.isoformat(),
     }
+
+
+@dataclass(frozen=True)
+class Scores:
+    """The scores a read took, and whether they are all there were."""
+
+    scores: list[Score]
+    complete: bool
+
+
+@dataclass
+class _Traces:
+    """A tenant's traces, each with when it started and its workspace, and whether all were read."""
+
+    found: dict[str, tuple[datetime, str | None]]
+    complete: bool
 
 
 @dataclass(frozen=True)
@@ -180,26 +202,75 @@ class Langfuse:
     client: httpx.AsyncClient = field(default_factory=httpx.AsyncClient)
 
     async def scores(self, tenant: Tenant, window: Window) -> Ok[list[Score]] | Unavailable:
-        """The tenant's scores in the window, newest first, as many as the window's limit."""
-        every = await self.every_score(tenant, window)
+        """The tenant's scores in the window, newest first, as many as the window's limit.
+
+        Its newest traces are read first, so a read that stops at the limit holds the newest.
+        """
+        every = await self.every_score(tenant, window, most=window.limit)
         if isinstance(every, Unavailable):
             return every
-        newest = sorted(every.data, key=lambda score: score.timestamp, reverse=True)
+        newest = sorted(every.data.scores, key=lambda score: score.timestamp, reverse=True)
         return Ok(data=newest[: window.limit])
 
     async def every_score(
-        self, tenant: Tenant, window: Window, workspace: str | None = None
-    ) -> Ok[list[Score]] | Unavailable:
-        """Every score on the tenant's traces in the window, or the workspace's, paged to the end.
+        self,
+        tenant: Tenant,
+        span: Span,
+        workspace: str | None = None,
+        *,
+        most: int = MOST_SCORES,
+    ) -> Ok[Scores] | Unavailable:
+        """The scores given in the span on the tenant's traces, or the workspace's, up to `most`.
 
-        Past ``MOST_SCORES`` it stops, and the read is partial: ``Feedback.complete`` says so.
+        Its traces are those started up to ``LOOKBACK`` before the span, newest first, read so
+        many pages at most; their scores are read ``BATCHES_AT_ONCE`` requests at a time, each
+        paged to its end. Past a bound, or the ``DEADLINE``, it answers what it read, partial.
         """
-        workspaces: dict[str, str | None] = {}
+        found: list[Score] = []
+        complete = True
+        try:
+            async with asyncio.timeout(DEADLINE):
+                traced = await self._traces(tenant, span, workspace)
+                if isinstance(traced, Unavailable):
+                    return traced
+                complete = traced.complete
+                newest = sorted(
+                    traced.found, key=lambda trace: traced.found[trace][0], reverse=True
+                )
+                gate = asyncio.Semaphore(BATCHES_AT_ONCE)
+
+                async def batch(traces: list[str]) -> Unavailable | None:
+                    async with gate:
+                        if len(found) >= most:
+                            return None
+                        return await self._scores_of(traces, traced, span, found, most)
+
+                async with asyncio.TaskGroup() as group:
+                    tasks = [
+                        group.create_task(batch(newest[at : at + TRACES_PER_READ]))
+                        for at in range(0, len(newest), TRACES_PER_READ)
+                    ]
+                for task in tasks:
+                    if (refused := task.result()) is not None:
+                        return refused
+        except TimeoutError:
+            complete = False
+        complete = complete and len(found) < most
+        return Ok(data=Scores(scores=found[:most], complete=complete))
+
+    async def _traces(
+        self, tenant: Tenant, span: Span, workspace: str | None
+    ) -> _Traces | Unavailable:
+        """The tenant's traces that may be scored in the span: started up to ``LOOKBACK`` before."""
+        looked = Span(start=span.start - LOOKBACK, end=span.end)
+        tag = tenant_tag(tenant)
+        traces = _Traces(found={}, complete=True)
         cursor: str | None = None
-        while True:
+        seen: set[str] = set()
+        for _ in range(MOST_TRACE_PAGES):
             params = {
-                **trace_parameters(tenant, window, workspace),
-                "limit": TRACES_PER_PAGE,
+                **trace_parameters(tenant, looked, workspace),
+                "limit": str(TRACES_PER_PAGE),
                 **({"cursor": cursor} if cursor else {}),
             }
             observed = await read(
@@ -217,47 +288,57 @@ class Langfuse:
                 return Unavailable(
                     reason="langfuse answered observations without their traces' tags"
                 )
-            tag = tenant_tag(tenant)
-            workspaces |= {
-                o.trace_id: workspace_of(o.tags) for o in observed.data if o.tags and tag in o.tags
+            # Each trace's tags checked again: the tenant's, and the workspace's, if one is named.
+            traces.found |= {
+                o.trace_id: (o.start, workspace_of(o.tags))
+                for o in observed.data
+                if o.tags
+                and tag in o.tags
+                and (workspace is None or workspace_of(o.tags) == workspace)
             }
             cursor = observed.meta.cursor if observed.meta else None
             if not cursor:
-                break
-        traces = sorted(workspaces)
-        mine: list[Score] = []
-        for at in range(0, len(traces), TRACES_PER_READ):
-            batch = traces[at : at + TRACES_PER_READ]
-            cursor = None
-            while len(mine) < MOST_SCORES:
-                params = {
-                    **score_parameters(batch, window),
-                    "limit": SCORES_PER_PAGE,
-                    **({"cursor": cursor} if cursor else {}),
-                }
-                page = await read(
-                    self.client,
-                    "langfuse",
-                    f"{self.url}/api/public/v3/scores",
-                    _SCORES,
-                    params=params,
+                return traces
+            if cursor in seen:
+                # A page that sends back to one already read: what was read is what there is.
+                traces.complete = False
+                return traces
+            seen.add(cursor)
+        traces.complete = False
+        return traces
+
+    async def _scores_of(
+        self, batch: list[str], traced: _Traces, span: Span, found: list[Score], most: int
+    ) -> Unavailable | None:
+        """The batch's scores in the span, paged to the end or to `most`, added to `found`."""
+        cursor: str | None = None
+        seen: set[str] = set()
+        while len(found) < most:
+            params = {
+                **score_parameters(batch, span),
+                "limit": str(SCORES_PER_PAGE),
+                **({"cursor": cursor} if cursor else {}),
+            }
+            page = await read(
+                self.client, "langfuse", f"{self.url}/api/public/v3/scores", _SCORES, params=params
+            )
+            if page is None or isinstance(page, Unavailable):
+                return page or Unavailable(reason="langfuse has no scores API at that address")
+            found += [
+                Score(
+                    trace_id=trace,
+                    evaluator=score.evaluator,
+                    workspace=traced.found[trace][1],
+                    **score.model_dump(exclude={"subject", "metadata"}),
                 )
-                if page is None or isinstance(page, Unavailable):
-                    return page or Unavailable(reason="langfuse has no scores API at that address")
-                mine += [
-                    Score(
-                        trace_id=trace,
-                        evaluator=score.evaluator,
-                        workspace=workspaces[trace],
-                        **score.model_dump(exclude={"subject", "metadata"}),
-                    )
-                    for score in page.data
-                    if (trace := score.subject.trace if score.subject else None) in batch
-                ]
-                cursor = page.meta.cursor if page.meta else None
-                if not cursor:
-                    break
-        return Ok(data=mine)
+                for score in page.data
+                if (trace := score.subject.trace if score.subject else None) in batch
+            ]
+            cursor = page.meta.cursor if page.meta else None
+            if not cursor or cursor in seen:
+                return None
+            seen.add(cursor)
+        return None
 
     def trace_link(self, trace_id: str) -> str:
         """Langfuse's page for a trace."""

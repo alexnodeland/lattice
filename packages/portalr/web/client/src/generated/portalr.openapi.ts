@@ -70,13 +70,13 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Feedback By Day
+         * Feedback
          * @description The tenant's feedback and evaluations from Langfuse, or one workspace's, by day.
          *
-         *     Every score in the window is read and summed: ``complete`` is false where there were more
-         *     than one read takes.
+         *     The window is at most 91 days. Every score in it is read and summed, within the read's
+         *     bounds: ``complete`` is false where one was reached.
          */
-        get: operations["feedback_by_day_portalr_v1_feedback_get"];
+        get: operations["feedback_portalr_v1_feedback_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -233,6 +233,25 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * Comment
+         * @description What a person wrote, on which trace, in which workspace, and when.
+         */
+        Comment: {
+            /** Id */
+            id: string;
+            /** Text */
+            text: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Trace Id */
+            trace_id: string;
+            /** Workspace */
+            workspace: string | null;
+        };
+        /**
          * Config
          * @description ``config.json``: what the UIs need of the deployment they run in.
          */
@@ -256,7 +275,7 @@ export interface components {
         };
         /**
          * Evaluation
-         * @description One evaluator's score of one name, over the window, and per day.
+         * @description One evaluator's score of one name, per day, and over the window.
          */
         Evaluation: {
             /** Count */
@@ -274,7 +293,7 @@ export interface components {
          */
         Feedback: {
             /** Comments */
-            comments: components["schemas"]["Score"][];
+            comments: components["schemas"]["Comment"][];
             /** Complete */
             complete: boolean;
             /** Days */
@@ -282,7 +301,7 @@ export interface components {
             /** Evaluations */
             evaluations: components["schemas"]["Evaluation"][];
             /** Workspaces */
-            workspaces: components["schemas"]["Place"][];
+            workspaces: components["schemas"]["WorkspaceTotals"][];
         };
         /**
          * FieldError
@@ -440,20 +459,6 @@ export interface components {
             status: "ok";
         };
         /**
-         * Place
-         * @description One workspace's thumbs and evaluations; None for traces tagged with no workspace.
-         */
-        Place: {
-            /** Down */
-            down: number;
-            /** Evaluated */
-            evaluated: number;
-            /** Up */
-            up: number;
-            /** Workspace */
-            workspace: string | null;
-        };
-        /**
          * Point
          * @description A value at a moment.
          */
@@ -605,7 +610,7 @@ export interface components {
         };
         /**
          * Thumbs
-         * @description People's thumbs on one day.
+         * @description People's thumbs on one day, in UTC.
          */
         Thumbs: {
             /**
@@ -669,6 +674,20 @@ export interface components {
              * @enum {string}
              */
             status: "unconfigured";
+        };
+        /**
+         * WorkspaceTotals
+         * @description One workspace's thumbs and evaluations; None for traces tagged with no workspace.
+         */
+        WorkspaceTotals: {
+            /** Down */
+            down: number;
+            /** Evaluated */
+            evaluated: number;
+            /** Up */
+            up: number;
+            /** Workspace */
+            workspace: string | null;
         };
     };
     responses: never;
@@ -815,12 +834,11 @@ export interface operations {
             };
         };
     };
-    feedback_by_day_portalr_v1_feedback_get: {
+    feedback_portalr_v1_feedback_get: {
         parameters: {
             query: {
                 start: string;
                 end: string;
-                limit?: number;
                 workspace?: components["schemas"]["Id"] | null;
             };
             header?: {

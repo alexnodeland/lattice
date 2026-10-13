@@ -107,6 +107,10 @@ async def test_each_tools_read(client: httpx.AsyncClient, stack: Stack) -> None:
     assert summary.json()["status"] == "ok"
     assert summary.json()["data"]["complete"] is True
     assert '"workspace:notes"' in stack.langfuse.last.url.params["filter"]
+    too_long = {"start": "2026-07-01T00:00:00Z", "end": "2026-10-12T00:00:00Z"}
+    assert (await client.get("/v1/feedback", params=too_long, headers=alice)).status_code == 422
+    backwards = {"start": WINDOW["end"], "end": WINDOW["start"]}
+    assert (await client.get("/v1/feedback", params=backwards, headers=alice)).status_code == 422
     assert (await client.get("/v1/spend", headers=alice)).json() == {
         "status": "ok",
         "data": {"spend": 2.0, "max_budget": None, "budget_duration": None},

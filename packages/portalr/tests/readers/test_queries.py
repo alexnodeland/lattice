@@ -56,15 +56,16 @@ def test_every_metric_goes_through_the_proxy_with_the_tenant() -> None:
 
 def test_every_score_read_filters_on_the_tenants_tag() -> None:
     assert tenant_tag(ACME) == "tenant:acme"
-    sent = trace_parameters(ACME, Window(start=START, end=END, limit=10))
+    sent = trace_parameters(ACME, Window(start=START, end=END, limit=10), workspace="notes")
     conditions = json.loads(str(sent["filter"]))
     assert {
         "type": "arrayOptions",
         "column": "traceTags",
         "operator": "all of",
-        "value": ["tenant:acme"],
+        "value": ["tenant:acme", "workspace:notes"],
     } in conditions
-    assert sent["limit"] == 10
+    # Each read pages its own: no limit in the conditions.
+    assert "limit" not in sent
 
 
 def test_spend_is_read_from_the_tenants_team() -> None:

@@ -27,6 +27,7 @@ from tests.tools import Tool, fails, json
 ACME = allowed("acme")
 START = datetime(2026, 10, 12, tzinfo=UTC)
 END = START + timedelta(hours=1)
+AT = "2026-10-12T00:00:00Z"
 
 
 async def test_loki_reads_the_tenants_logs_newest_first() -> None:
@@ -95,10 +96,14 @@ async def test_prometheus_answering_nonsense_or_nothing_is_unavailable() -> None
 async def test_langfuse_reads_the_tenants_scores_newest_first_and_links_for_operators() -> None:
     observations = {
         "data": [
-            {"traceId": "t1", "tags": ["tenant:acme"]},
-            {"traceId": "t2", "tags": ["tenant:acme", "thread:thr_1", "workspace:notes"]},
+            {"traceId": "t1", "startTime": AT, "tags": ["tenant:acme"]},
+            {
+                "traceId": "t2",
+                "startTime": AT,
+                "tags": ["tenant:acme", "thread:thr_1", "workspace:notes"],
+            },
             # Langfuse ignored the filter: another tenant's trace is left out.
-            {"traceId": "t3", "tags": ["tenant:globex"]},
+            {"traceId": "t3", "startTime": AT, "tags": ["tenant:globex"]},
         ]
     }
     scores = {
@@ -173,7 +178,11 @@ async def test_langfuse_reads_the_tenants_scores_newest_first_and_links_for_oper
 
 
 async def test_langfuse_names_at_most_fifty_traces_a_request() -> None:
-    observations = {"data": [{"traceId": f"t{n:03}", "tags": ["tenant:acme"]} for n in range(120)]}
+    observations = {
+        "data": [
+            {"traceId": f"t{n:03}", "startTime": AT, "tags": ["tenant:acme"]} for n in range(120)
+        ]
+    }
     tool = Tool(
         {
             "/api/public/v2/observations": json(observations),
@@ -183,7 +192,8 @@ async def test_langfuse_names_at_most_fifty_traces_a_request() -> None:
     langfuse = Langfuse("http://langfuse", project="p1", client=tool.client())
     assert await langfuse.scores(ACME, Window(start=START, end=END)) == Ok(data=[])
     named = [request.url.params["traceId"].split(",") for request in tool.requests[1:]]
-    assert [len(traces) for traces in named] == [50, 50, 20]
+    # Asked a few at a time, so in any order.
+    assert sorted(len(traces) for traces in named) == [20, 50, 50]
 
 
 async def test_langfuse_without_its_apis_or_tags_is_unavailable() -> None:
@@ -192,13 +202,15 @@ async def test_langfuse_without_its_apis_or_tags_is_unavailable() -> None:
         reason="langfuse has no observations API at that address"
     )
     traced = {
-        "/api/public/v2/observations": json({"data": [{"traceId": "t1", "tags": ["tenant:acme"]}]})
+        "/api/public/v2/observations": json(
+            {"data": [{"traceId": "t1", "startTime": AT, "tags": ["tenant:acme"]}]}
+        )
     }
     no_scores = Langfuse("http://langfuse", project="p1", client=Tool(traced).client())
     assert await no_scores.scores(ACME, Window(start=START, end=END)) == Unavailable(
         reason="langfuse has no scores API at that address"
     )
-    untagged = {"/api/public/v2/observations": json({"data": [{"traceId": "t1"}]})}
+    untagged = {"/api/public/v2/observations": json({"data": [{"traceId": "t1", "startTime": AT}]})}
     langfuse = Langfuse("http://langfuse", project="p1", client=Tool(untagged).client())
     assert await langfuse.scores(ACME, Window(start=START, end=END)) == Unavailable(
         reason="langfuse answered observations without their traces' tags"

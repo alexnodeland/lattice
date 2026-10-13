@@ -1,9 +1,8 @@
-import { keys, Refused, refusal } from "@portalr/client";
+import { allowedIn, keys, Refused, refusal } from "@portalr/client";
 import { Button, ConfirmDialog, PageHeader, TextField, TextLink } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useActionState, useMemo, useState } from "react";
-import { allowedIn } from "../../../../../../../allowed";
 import { read } from "../../../../../../../rules";
 
 const ACTIONS = ["reflexr:update_rule", "reflexr:archive_rule"] as const;

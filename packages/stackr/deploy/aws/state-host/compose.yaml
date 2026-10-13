@@ -2,7 +2,7 @@
 # that need a disk that outlives a task, under Compose and systemd on one EC2 instance, with their
 # data on its EBS volume at /data. They are compose.yaml's but for their ports and their data's
 # paths on the host, which scripts/check-config holds them to. Each port binds the instance's
-# private address, STATE_HOST_ADDRESS, which only the services' security group reaches.
+# private address, STATE_HOST_ADDRESS, which only the groups of the services that use it reach.
 # ClickHouse's users are deploy/clickhouse/users.xml's, as on one machine (ADR-0031): an admin, and
 # Langfuse's, on its own database. The address and both passwords are in /run/stackr/.env, which
 # the stackr-state unit writes from Secrets Manager each time it starts.

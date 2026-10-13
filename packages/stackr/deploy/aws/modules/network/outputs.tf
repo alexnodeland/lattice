@@ -24,10 +24,10 @@ output "private_subnet_cidrs" {
 }
 
 output "security_groups" {
-  description = "The ALB's and the services' security groups."
+  description = "The ALB's security group, and the tasks group, which every task has."
   value = {
-    alb      = aws_security_group.alb.id
-    services = aws_security_group.services.id
+    alb   = aws_security_group.alb.id
+    tasks = aws_security_group.tasks.id
   }
 }
 

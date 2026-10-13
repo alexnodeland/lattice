@@ -130,8 +130,9 @@ jobs:
       # library is affected.
       - run: bun install --frozen-lockfile
       - run: uv run --no-project python scripts/affected.py api
-      # app's scenarios, through playwright-bdd in Chromium, against portalr's test application
-      # with Supabase Auth (portalr ADR-0013); the task installs Chromium when it runs.
+      # app's and admin's scenarios, through playwright-bdd in Chromium, against portalr's test
+      # application with Supabase Auth (portalr ADR-0013, ADR-0023); ui's one task installs
+      # Chromium for both.
       - run: uv run --no-project python scripts/affected.py bdd
       # Schemathesis's JUnit report for each library, to read what failed.
       - name: Upload the reports
@@ -141,13 +142,13 @@ jobs:
           name: acceptance-reports
           path: .api-reports/
           retention-days: 7
-      # Playwright's traces of the app's failed scenarios, to step through what they saw.
+      # Playwright's traces of app's and admin's failed scenarios, to step through what they saw.
       - name: Upload the scenarios' traces
-        if: failure() && hashFiles('packages/portalr/web/app/test-results/**') != ''
+        if: failure() && hashFiles('packages/portalr/web/*/test-results/**') != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bdd-traces
-          path: packages/portalr/web/app/test-results/
+          path: packages/portalr/web/*/test-results/
           retention-days: 7
 
   # stackr's AWS recipe, tier 1 (stackr RFC-0004): OpenTofu, TFLint, checkov, and the modules'

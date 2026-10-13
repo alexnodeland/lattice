@@ -6,6 +6,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@supabase/auth-js": "2.117.3",
     "diff": "9.0.0",
     "openapi-fetch": "0.17.0"
   },

@@ -3215,21 +3215,21 @@ dependencies = [
 
 [package.dev-dependencies]
 app = [
-    { name = "artifactr-ai" },
+    { name = "artifactr-ai", extra = ["otel"] },
     { name = "pyjwt" },
-    { name = "reflexr" },
+    { name = "reflexr", extra = ["otel"] },
     { name = "uvicorn" },
     { name = "websockets" },
 ]
 dev = [
-    { name = "artifactr-ai" },
+    { name = "artifactr-ai", extra = ["otel"] },
     { name = "pyjwt" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
-    { name = "reflexr" },
+    { name = "reflexr", extra = ["otel"] },
     { name = "ruff" },
     { name = "uvicorn" },
     { name = "websockets" },
@@ -3256,21 +3256,21 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 app = [
-    { name = "artifactr-ai", editable = "packages/artifactr" },
+    { name = "artifactr-ai", extras = ["otel"], editable = "packages/artifactr" },
     { name = "pyjwt", specifier = ">=2.15" },
-    { name = "reflexr", editable = "packages/reflexr" },
+    { name = "reflexr", extras = ["otel"], editable = "packages/reflexr" },
     { name = "uvicorn", specifier = ">=0.54" },
     { name = "websockets", specifier = ">=15" },
 ]
 dev = [
-    { name = "artifactr-ai", editable = "packages/artifactr" },
+    { name = "artifactr-ai", extras = ["otel"], editable = "packages/artifactr" },
     { name = "pyjwt", specifier = ">=2.15" },
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "pytest-cov", specifier = ">=7.1" },
     { name = "pytest-timeout", specifier = ">=2.4" },
-    { name = "reflexr", editable = "packages/reflexr" },
+    { name = "reflexr", extras = ["otel"], editable = "packages/reflexr" },
     { name = "ruff", specifier = ">=0.16" },
     { name = "uvicorn", specifier = ">=0.54" },
     { name = "websockets", specifier = ">=15" },
@@ -3945,6 +3945,7 @@ dev = [
     { name = "fastapi" },
     { name = "httpx" },
     { name = "hypothesis" },
+    { name = "jsonschema" },
     { name = "mcp" },
     { name = "opentelemetry-sdk" },
     { name = "pyright" },
@@ -3965,6 +3966,7 @@ test = [
     { name = "fastapi" },
     { name = "httpx" },
     { name = "hypothesis" },
+    { name = "jsonschema" },
     { name = "mcp" },
     { name = "opentelemetry-sdk" },
     { name = "pytest" },
@@ -4015,6 +4017,7 @@ dev = [
     { name = "fastapi", specifier = ">=0.141" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "hypothesis", specifier = ">=6.168" },
+    { name = "jsonschema", specifier = ">=4.26" },
     { name = "mcp", specifier = ">=2.2" },
     { name = "opentelemetry-sdk", specifier = ">=1.45" },
     { name = "pyright", specifier = ">=1.1.414" },
@@ -4035,6 +4038,7 @@ test = [
     { name = "fastapi", specifier = ">=0.141" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "hypothesis", specifier = ">=6.168" },
+    { name = "jsonschema", specifier = ">=4.26" },
     { name = "mcp", specifier = ">=2.2" },
     { name = "opentelemetry-sdk", specifier = ">=1.45" },
     { name = "pytest", specifier = ">=9.1" },

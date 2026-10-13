@@ -1,7 +1,7 @@
 /** Who the reader is, as the server attributes their messages and feedback in a tenant. */
 
-import type { createQueries } from "@portalr/client";
 import { useSuspenseQuery } from "@tanstack/react-query";
+import type { createQueries } from "./queries";
 
 /** The id grantr knows the signed-in person, `user`, by in `tenant`, from their memberships. */
 export function useMe(

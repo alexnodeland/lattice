@@ -5,7 +5,7 @@
  * self-hosted faces loaded, so they don't move between runs.
  */
 
-import { MessageSquare, Play, Plus, ScrollText, Zap } from "lucide-react";
+import { House, KeyRound, MessageSquare, Play, Plus, ScrollText, Zap } from "lucide-react";
 import { expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
@@ -20,8 +20,9 @@ import { Icon } from "./icon";
 import { PageHeader } from "./page-header";
 import { SegmentedFilter } from "./segmented-filter";
 import { NavLink, SideNav } from "./side-nav";
+import { StatCard } from "./stat-card";
 import { StatusBadge } from "./status-badge";
-import { Switcher } from "./switcher";
+import { Switcher, TenantSwitcher } from "./switcher";
 import { Table } from "./table";
 import { dark } from "./test/colours";
 import { TextField } from "./text-field";
@@ -171,6 +172,69 @@ function Sharing() {
   );
 }
 
+/** admin's frame, with its tenant switch and Home's cards, each in a state it can show. */
+function AdminGallery() {
+  return (
+    <AppShell
+      ui="admin"
+      home={<a href="#home" />}
+      switcher={
+        <TenantSwitcher
+          tenant="acme"
+          tenants={[{ id: "acme" }, { id: "globex" }]}
+          onTenant={() => undefined}
+          everyTenant={<a href="#deployment" />}
+        />
+      }
+      account={
+        <AccountMenu
+          name="Alex Nodeland"
+          appearance="system"
+          onAppearance={() => undefined}
+          onSignOut={() => undefined}
+        />
+      }
+      nav={
+        <SideNav label="Tenant">
+          <NavLink href="#home" icon={House} aria-current="page">
+            Home
+          </NavLink>
+          <NavLink href="#access" icon={KeyRound}>
+            Access
+          </NavLink>
+        </SideNav>
+      }
+    >
+      <PageHeader title="acme" meta="How the tenant is doing" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <StatCard title="Members" figure="5">
+          4 people and 1 service principal
+        </StatCard>
+        <StatCard title="Feedback" figure="1,000+">
+          pieces of feedback in the last week; 640 of 800 thumbs up
+        </StatCard>
+        <StatCard
+          title="Spend"
+          figure="$85.00"
+          badge={<StatusBadge tone="near">Near budget</StatusBadge>}
+        >
+          of $100.00, every 30 days
+        </StatCard>
+        <StatCard
+          title="Failed turns"
+          figure={null}
+          badge={<StatusBadge tone="failed">Unavailable</StatusBadge>}
+        >
+          Prometheus isn't answering: timed out
+        </StatCard>
+        <StatCard title="Workspaces" figure={null} busy>
+          Reading…
+        </StatCard>
+      </div>
+    </AppShell>
+  );
+}
+
 /** Lay the gallery out at a width, with the faces loaded before the shot (motion is reduced). */
 async function shown(width: number, height: number, dialog = false) {
   await page.viewport(width, height);
@@ -232,4 +296,15 @@ test("a destructive action, asked first", async () => {
   await screen.getByRole("button", { name: "Delete acme" }).click();
   await screen.getByRole("textbox", { name: "Type acme to confirm" }).fill("acme");
   await matches("gallery-confirm");
+});
+
+test("admin's frame, with Home's cards in their states", async () => {
+  await page.viewport(1280, 900);
+  onTestFinished(() => page.viewport(414, 896));
+  await render(<AdminGallery />);
+  await Promise.all([
+    document.fonts.load('1em "Schibsted Grotesk"'),
+    document.fonts.load('1em "Fragment Mono"'),
+  ]);
+  await matches("gallery-admin");
 });

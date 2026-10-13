@@ -7,3 +7,12 @@ dependsOn:
 workspace:
   inheritedTasks:
     exclude: ['build'] # its source is built into app and admin
+
+tasks:
+  # Chromium's headless shell for Playwright, with what it needs of the system, for app's and
+  # admin's scenarios: one task, so the two never install it at once.
+  chromium:
+    description: 'Install Chromium for the scenarios'
+    command: 'bun x --bun --no-install playwright install --with-deps --only-shell chromium'
+    options:
+      cache: false

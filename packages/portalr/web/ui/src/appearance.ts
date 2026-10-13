@@ -4,8 +4,8 @@
  * ui's `scheme.js` sets it again before the first paint of every page.
  */
 
-import type { Appearance } from "@portalr/ui";
 import { useState } from "react";
+import type { Appearance } from "./account-menu";
 
 const KEY = "portalr-appearance";
 

@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { Switcher } from "./switcher";
+import { Switcher, TenantSwitcher } from "./switcher";
 import { contrast, token } from "./test/colours";
 
 function Rendered({ onTenant = vi.fn(), onWorkspace = vi.fn() }) {
@@ -87,4 +87,36 @@ test("its menu can link to every workspace in the tenant", async () => {
   await expect
     .element(screen.getByRole("menuitem", { name: "Every workspace in acme" }))
     .toHaveAttribute("href", "#every");
+});
+
+test("the tenant switcher names a tenant, or every tenant, and hands over another", async () => {
+  const onTenant = vi.fn();
+  const screen = await render(
+    <TenantSwitcher
+      tenant="acme"
+      tenants={[{ id: "acme" }, { id: "globex" }]}
+      onTenant={onTenant}
+      everyTenant={<a href="#deployment" />}
+    />,
+  );
+  await screen.getByRole("button", { name: "Tenant: acme" }).click();
+  const menu = screen.getByRole("menu");
+  await expect
+    .element(menu.getByRole("menuitemradio", { name: "acme" }))
+    .toHaveAttribute("aria-checked", "true");
+  await expect
+    .element(menu.getByRole("menuitem", { name: "All tenants" }))
+    .toHaveAttribute("href", "#deployment");
+  await menu.getByRole("menuitemradio", { name: "globex" }).click();
+  expect(onTenant).toHaveBeenCalledExactlyOnceWith("globex");
+});
+
+test("every tenant is named so, and offered only to whoever may see them", async () => {
+  const screen = await render(
+    <TenantSwitcher tenant={null} tenants={[{ id: "acme" }]} onTenant={vi.fn()} />,
+  );
+  await screen.getByRole("button", { name: "Tenant: All tenants" }).click();
+  await expect
+    .element(screen.getByRole("menuitem", { name: "All tenants" }))
+    .not.toBeInTheDocument();
 });

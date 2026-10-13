@@ -111,7 +111,9 @@ async def test_prometheus_through_the_proxy_reads_a_tenants_series_only(
     client: httpx.AsyncClient,
 ) -> None:
     proxied = Prometheus(url("PORTALR_PROXY_URL"), client)
-    query = MetricQuery(start=START, end=END, metric="failed_runs", step=60)
+    # Each point counts the failures in the five minutes before it: the seeded samples are a
+    # minute apart, and an increase needs two in its step.
+    query = MetricQuery(start=START, end=END, metric="failed_turns", step=300)
 
     def peak(answer: object) -> float:
         return (
@@ -120,8 +122,8 @@ async def test_prometheus_through_the_proxy_reads_a_tenants_series_only(
 
     acme = await eventually(lambda: proxied.series(ACME, query), lambda a: peak(a) > 0)
     globex = await eventually(lambda: proxied.series(GLOBEX, query), lambda a: peak(a) > 0)
-    # acme fails once a minute, and globex a hundred times: neither's rate holds the other's.
-    assert peak(acme) < 0.1 < 1 < peak(globex)
+    # acme fails once a minute, and globex a hundred times: neither's count holds the other's.
+    assert peak(acme) < 50 < peak(globex)
 
 
 @pytest.mark.usefixtures("ids")
@@ -131,7 +133,7 @@ async def test_the_proxy_keeps_any_query_to_its_tenant(client: httpx.AsyncClient
 
     async def rates(selector: str) -> dict[str, float]:
         """Each tenant's rate that a query as acme answers; none if the proxy refuses it."""
-        promql = f"sum by (tenant_id) (rate(artifactr_runs_total{{{selector}}}[5m]))"
+        promql = f"sum by (tenant_id) (rate(artifactr_turns_total{{{selector}}}[5m]))"
         answer = await client.get(
             f"{proxy}/api/v1/query", params={"query": promql, "tenant_id": "acme"}
         )

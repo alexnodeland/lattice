@@ -18,11 +18,6 @@ variable "subnet_ids" {
   type        = list(string)
 }
 
-variable "services_security_group_id" {
-  description = "The services' security group: the only one the data stores take traffic from."
-  type        = string
-}
-
 variable "postgres" {
   description = "RDS for PostgreSQL: its size, its backups, and what a destroy may do to it."
   type = object({

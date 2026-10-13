@@ -232,6 +232,13 @@ run "stack_the_application_without_access" {
     )
     error_message = "Without grantr, the application has one database URL, its owner's."
   }
+  assert {
+    condition = (
+      !contains(keys(aws_security_group.member), "db-roles")
+      && length([for key in keys(aws_vpc_security_group_ingress_rule.call) : key if strcontains(key, "db-roles")]) == 0
+    )
+    error_message = "Without grantr, db-roles has no group and no rule."
+  }
 }
 
 run "stack_the_state_host_on_ec2" {
@@ -446,8 +453,11 @@ run "stack_gotrue_reaches_its_smtp_server" {
   }
 
   assert {
-    condition     = length(aws_security_group.gotrue_smtp) == 1 && aws_vpc_security_group_egress_rule.gotrue_smtp[0].from_port == 587 && length(module.gotrue.security_group_ids) == 2
-    error_message = "With SMTP, GoTrue alone reaches out on its port."
+    condition = (
+      aws_vpc_security_group_egress_rule.gotrue_smtp[0].from_port == 587
+      && aws_vpc_security_group_egress_rule.gotrue_smtp[0].security_group_id == aws_security_group.member["gotrue"].id
+    )
+    error_message = "With SMTP, GoTrue alone reaches out on its port, from its own group."
   }
 }
 
@@ -472,4 +482,142 @@ run "stack_refuses_the_state_host_on_fargate_outside_floci" {
     state_host = "fargate"
   }
   expect_failures = [var.state_host]
+}
+
+run "stack_each_service_takes_only_its_callers" {
+  command = plan
+  module {
+    source = "./modules/stack"
+  }
+  # Each group its own id, so a rule between the wrong two would show.
+  override_resource {
+    target = aws_security_group.member["app"]
+    values = { id = "sg-app" }
+  }
+  override_resource {
+    target = aws_security_group.member["gotrue"]
+    values = { id = "sg-gotrue" }
+  }
+  override_resource {
+    target = aws_security_group.member["db-init"]
+    values = { id = "sg-db-init" }
+  }
+  override_resource {
+    target = aws_security_group.member["tempo"]
+    values = { id = "sg-tempo" }
+  }
+  override_resource {
+    target = module.data.aws_security_group.this
+    values = { id = "sg-data" }
+  }
+  override_resource {
+    target = module.state_host[0].aws_security_group.this
+    values = { id = "sg-state-host" }
+  }
+  override_module {
+    target  = module.network
+    outputs = { security_groups = { alb = "sg-alb", tasks = "sg-tasks" }, vpc_id = "vpc-mocked", public_subnet_ids = ["subnet-a", "subnet-b"], private_subnet_ids = ["subnet-c", "subnet-d"], public_subnet_cidrs = ["10.40.0.0/20", "10.40.16.0/20"], private_subnet_cidrs = ["10.40.128.0/20", "10.40.144.0/20"], vpc_cidr = "10.40.0.0/16" }
+  }
+
+  assert {
+    condition = toset(keys(aws_vpc_security_group_ingress_rule.call)) == toset([
+      "app/8000/alb",
+      "gotrue/9999/alb", "gotrue/9999/app",
+      "litellm/4000/app", "litellm/4000/state-host",
+      "langfuse-web/3000/app", "langfuse-web/3000/otel-collector", "langfuse-web/3000/state-host",
+      "otel-collector/4318/app", "otel-collector/4318/litellm", "otel-collector/8888/state-host",
+      "tempo/4317/otel-collector", "tempo/3200/grafana", "tempo/3200/app", "tempo/3200/state-host",
+      "loki/3100/otel-collector", "loki/3100/grafana", "loki/3100/app", "loki/3100/state-host",
+      "pyroscope/4040/grafana", "pyroscope/4040/state-host",
+      "grafana/3000/state-host",
+      "postgres/5432/langfuse-web", "postgres/5432/langfuse-worker", "postgres/5432/litellm", "postgres/5432/gotrue",
+      "postgres/5432/grafana", "postgres/5432/app", "postgres/5432/db-init", "postgres/5432/db-roles",
+      "valkey/6379/langfuse-web", "valkey/6379/langfuse-worker", "valkey/6379/litellm",
+      "state-host/8123/langfuse-web", "state-host/8123/langfuse-worker", "state-host/9000/langfuse-web", "state-host/9000/langfuse-worker",
+      "state-host/9090/otel-collector", "state-host/9090/tempo", "state-host/9090/grafana",
+      "state-host/9091/app",
+    ])
+    error_message = "Each service, data store and the state host takes exactly its callers, on its port, and nothing else."
+  }
+  assert {
+    condition = toset(keys(aws_vpc_security_group_egress_rule.call)) == toset(keys(aws_vpc_security_group_ingress_rule.call)) && alltrue([
+      for key, rule in aws_vpc_security_group_ingress_rule.call :
+      rule.from_port == tonumber(split("/", key)[1]) && rule.to_port == rule.from_port && rule.cidr_ipv4 == null
+      && aws_vpc_security_group_egress_rule.call[key].from_port == rule.from_port && aws_vpc_security_group_egress_rule.call[key].to_port == rule.from_port
+      && aws_vpc_security_group_egress_rule.call[key].cidr_ipv4 == null
+      && aws_vpc_security_group_egress_rule.call[key].security_group_id == rule.referenced_security_group_id
+      && aws_vpc_security_group_egress_rule.call[key].referenced_security_group_id == rule.security_group_id
+    ])
+    error_message = "Each rule is one port, between two groups, and its caller reaches out to exactly what takes it in."
+  }
+  assert {
+    condition = (
+      aws_vpc_security_group_ingress_rule.call["gotrue/9999/app"].security_group_id == "sg-gotrue"
+      && aws_vpc_security_group_ingress_rule.call["gotrue/9999/app"].referenced_security_group_id == "sg-app"
+      && aws_vpc_security_group_egress_rule.call["gotrue/9999/app"].security_group_id == "sg-app"
+      && aws_vpc_security_group_egress_rule.call["gotrue/9999/app"].referenced_security_group_id == "sg-gotrue"
+      && aws_vpc_security_group_ingress_rule.call["app/8000/alb"].referenced_security_group_id == "sg-alb"
+      && aws_vpc_security_group_ingress_rule.call["postgres/5432/db-init"].security_group_id == "sg-data"
+      && aws_vpc_security_group_ingress_rule.call["postgres/5432/db-init"].referenced_security_group_id == "sg-db-init"
+      && aws_vpc_security_group_ingress_rule.call["state-host/9090/tempo"].security_group_id == "sg-state-host"
+      && aws_vpc_security_group_ingress_rule.call["state-host/9090/tempo"].referenced_security_group_id == "sg-tempo"
+    )
+    error_message = "Each rule is between the groups its names say."
+  }
+  assert {
+    condition = (
+      module.app.security_group_ids == tolist(["sg-tasks", "sg-app"])
+      && module.auth_keys.security_group_ids == tolist(["sg-tasks"])
+      && alltrue([
+        for name, service in {
+          gotrue         = module.gotrue, litellm = module.litellm, langfuse-web = module.langfuse_web, langfuse-worker = module.langfuse_worker,
+          otel-collector = module.otel_collector, tempo = module.telemetry["tempo"], loki = module.telemetry["loki"],
+          pyroscope      = module.telemetry["pyroscope"], grafana = module.grafana, db-init = module.db_init, db-roles = module.db_roles[0],
+        } : service.security_group_ids == tolist(["sg-tasks", aws_security_group.member[name].id])
+      ])
+    )
+    error_message = "Each task has the tasks group, and its own; auth-keys only reaches out."
+  }
+  assert {
+    condition = (
+      output.run_task_network.security_groups["db-init"] == "sg-tasks,${aws_security_group.member["db-init"].id}"
+      && output.run_task_network.security_groups["auth-keys"] == "sg-tasks"
+    )
+    error_message = "run-task starts each one-off task in its groups."
+  }
+}
+
+run "stack_the_state_services_on_fargate_take_their_callers" {
+  command = plan
+  module {
+    source = "./modules/stack"
+  }
+  variables {
+    valkey           = { port = 6390 }
+    state_host       = "fargate"
+    ami_id           = null
+    lattice_commit   = null
+    destroyable      = true
+    aws_endpoint_url = "http://floci:4566"
+  }
+
+  assert {
+    condition = toset(keys(aws_vpc_security_group_ingress_rule.call)) == toset([
+      "app/8000/alb",
+      "gotrue/9999/alb", "gotrue/9999/app",
+      "litellm/4000/app",
+      "langfuse-web/3000/app", "langfuse-web/3000/otel-collector",
+      "otel-collector/4318/app", "otel-collector/4318/litellm",
+      "tempo/4317/otel-collector", "tempo/3200/grafana", "tempo/3200/app",
+      "loki/3100/otel-collector", "loki/3100/grafana", "loki/3100/app",
+      "pyroscope/4040/grafana",
+      "postgres/5432/langfuse-web", "postgres/5432/langfuse-worker", "postgres/5432/litellm", "postgres/5432/gotrue",
+      "postgres/5432/grafana", "postgres/5432/app", "postgres/5432/db-init", "postgres/5432/db-roles",
+      "valkey/6390/langfuse-web", "valkey/6390/langfuse-worker", "valkey/6390/litellm",
+      "clickhouse/8123/langfuse-web", "clickhouse/8123/langfuse-worker", "clickhouse/9000/langfuse-web", "clickhouse/9000/langfuse-worker",
+      "prometheus/9090/otel-collector", "prometheus/9090/tempo", "prometheus/9090/grafana", "prometheus/9090/prom-label-proxy",
+      "prom-label-proxy/9091/app",
+    ])
+    error_message = "On Fargate, ClickHouse, Prometheus and prom-label-proxy each take their callers; Prometheus scrapes nothing, and nothing names a state host."
+  }
 }

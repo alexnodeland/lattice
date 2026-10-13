@@ -81,7 +81,7 @@ module "telemetry" {
   deployment         = local.task.deployment
   cluster_arn        = local.task.cluster_arn
   subnet_ids         = local.task.subnet_ids
-  security_group_ids = local.task.security_group_ids
+  security_group_ids = local.groups_of[each.key]
   namespace_id       = local.task.namespace_id
   size               = local.sizes[each.key]
   log_retention_days = var.log_retention_days
@@ -109,7 +109,7 @@ module "otel_collector" {
   deployment         = local.task.deployment
   cluster_arn        = local.task.cluster_arn
   subnet_ids         = local.task.subnet_ids
-  security_group_ids = local.task.security_group_ids
+  security_group_ids = local.groups_of["otel-collector"]
   namespace_id       = local.task.namespace_id
   size               = local.sizes["otel-collector"]
   log_retention_days = var.log_retention_days
@@ -135,7 +135,7 @@ module "grafana" {
   deployment         = local.task.deployment
   cluster_arn        = local.task.cluster_arn
   subnet_ids         = local.task.subnet_ids
-  security_group_ids = local.task.security_group_ids
+  security_group_ids = local.groups_of["grafana"]
   namespace_id       = local.task.namespace_id
   size               = local.sizes.grafana
   log_retention_days = var.log_retention_days
@@ -169,7 +169,7 @@ module "langfuse_web" {
   deployment         = local.task.deployment
   cluster_arn        = local.task.cluster_arn
   subnet_ids         = local.task.subnet_ids
-  security_group_ids = local.task.security_group_ids
+  security_group_ids = local.groups_of["langfuse-web"]
   namespace_id       = local.task.namespace_id
   size               = local.sizes["langfuse-web"]
   log_retention_days = var.log_retention_days
@@ -203,7 +203,7 @@ module "langfuse_worker" {
   deployment         = local.task.deployment
   cluster_arn        = local.task.cluster_arn
   subnet_ids         = local.task.subnet_ids
-  security_group_ids = local.task.security_group_ids
+  security_group_ids = local.groups_of["langfuse-worker"]
   namespace_id       = local.task.namespace_id
   size               = local.sizes["langfuse-worker"]
   log_retention_days = var.log_retention_days
@@ -223,7 +223,7 @@ module "litellm" {
   deployment         = local.task.deployment
   cluster_arn        = local.task.cluster_arn
   subnet_ids         = local.task.subnet_ids
-  security_group_ids = local.task.security_group_ids
+  security_group_ids = local.groups_of["litellm"]
   namespace_id       = local.task.namespace_id
   size               = local.sizes.litellm
   log_retention_days = var.log_retention_days
@@ -256,31 +256,14 @@ module "litellm" {
 
 # GoTrue, behind its proxy in its task (ADR-0032): the proxy takes its port and the edge's target
 # group, and GoTrue listens on the task's loopback, keying its rate limits on the one address the
-# proxy passes it. With SMTP, it also reaches the SMTP server, from a group of its own.
-resource "aws_security_group" "gotrue_smtp" {
-  count       = var.auth_smtp == null ? 0 : 1
-  name        = "${var.name}-gotrue-smtp"
-  description = "GoTrue: out to its SMTP server"
-  vpc_id      = module.network.vpc_id
-}
-
-resource "aws_vpc_security_group_egress_rule" "gotrue_smtp" {
-  count             = var.auth_smtp == null ? 0 : 1
-  security_group_id = aws_security_group.gotrue_smtp[0].id
-  description       = "SMTP out, through the NAT gateway"
-  cidr_ipv4         = "0.0.0.0/0"
-  ip_protocol       = "tcp"
-  from_port         = var.auth_smtp.port
-  to_port           = var.auth_smtp.port
-}
-
+# proxy passes it.
 module "gotrue" {
   source             = "../ecs-service"
   name               = "gotrue"
   deployment         = local.task.deployment
   cluster_arn        = local.task.cluster_arn
   subnet_ids         = local.task.subnet_ids
-  security_group_ids = concat(local.task.security_group_ids, aws_security_group.gotrue_smtp[*].id)
+  security_group_ids = local.groups_of.gotrue
   namespace_id       = local.task.namespace_id
   size               = local.sizes.gotrue
   log_retention_days = var.log_retention_days
@@ -339,6 +322,10 @@ locals {
       AUTH_AUDIENCE               = "authenticated"
       # GoTrue's key set and admin API, at its private address: the edge refuses /admin.
       AUTH_JWKS_URL = "http://${module.gotrue.address.name}.${local.namespace}:9999/.well-known/jwks.json"
+      # portalr's readers, when the application mounts it: Prometheus through prom-label-proxy.
+      PORTALR_TEMPO_URL = "http://${module.telemetry["tempo"].address.name}.${local.namespace}:3200"
+      PORTALR_LOKI_URL  = "http://${module.telemetry["loki"].address.name}.${local.namespace}:3100"
+      PORTALR_PROXY_URL = "http://prom-label-proxy.${local.namespace}:9091"
     },
     local.grantr ? { AUTH_ADMIN_URL = "http://${module.gotrue.address.name}.${local.namespace}:9999" } : {},
     var.application.environment,
@@ -367,7 +354,7 @@ module "app" {
   deployment         = local.task.deployment
   cluster_arn        = local.task.cluster_arn
   subnet_ids         = local.task.subnet_ids
-  security_group_ids = local.task.security_group_ids
+  security_group_ids = local.groups_of["app"]
   namespace_id       = local.task.namespace_id
   size               = local.sizes.app
   log_retention_days = var.log_retention_days

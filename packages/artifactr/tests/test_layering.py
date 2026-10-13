@@ -71,7 +71,13 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # The LiteLLM adapter: a model over the proxy, and a capability for each request.
     "litellm": (
         {*INNER, "artifactr.litellm"},
-        {"pydantic_ai", "opentelemetry.propagate", "lattice_core.litellm", *OTEL_API},
+        {
+            "pydantic_ai",
+            "opentelemetry.propagate",
+            "lattice_core.litellm",
+            "lattice_core.tags",
+            *OTEL_API,
+        },
     ),
     # The Langfuse adapter: a TurnContext, a span filter and the client. Scores are evalr's.
     "langfuse": (

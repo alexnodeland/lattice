@@ -3,10 +3,9 @@
 import json
 
 import httpx2
-import pytest
 from pydantic_ai import Agent
 
-from lattice_core.litellm import litellm_model, request_tags
+from lattice_core.litellm import litellm_model
 
 
 def test_a_model_names_the_proxys_group() -> None:
@@ -44,21 +43,3 @@ async def test_a_model_calls_the_proxy_through_its_http_client_with_its_settings
     assert result.output == "Done."
     [body] = bodies
     assert (body["model"], body["temperature"]) == ("claude-sonnet", 0.0)
-
-
-@pytest.mark.parametrize(
-    ("tenant", "workspace", "pair"),
-    [
-        ("acme", "launch", "acme/launch"),
-        ("acme/eu", "q3,plan", "acme%2Feu/q3%2Cplan"),
-        ("a b", "naïve~x", "a%20b/na%C3%AFve~x"),
-    ],
-)
-def test_a_requests_tags_name_its_tenant_its_workspace_and_both(
-    tenant: str, workspace: str, pair: str
-) -> None:
-    assert request_tags(tenant, workspace) == [
-        f"tenant:{tenant}",
-        f"workspace:{workspace}",
-        f"tenant-workspace:{pair}",
-    ]

@@ -6,6 +6,8 @@ package (lattice ADR-0018).
 
 - :mod:`lattice_core.schema`: JSON Schema helpers for Pydantic models, such as
   :func:`~lattice_core.schema.tag_required`.
+- :mod:`lattice_core.tags`: the tags that file a model request's spend under its tenant and
+  workspace.
 - :mod:`lattice_core.text`: checks on text before it is stored, such as
   :func:`~lattice_core.text.holds_nul`.
 - :mod:`lattice_core.sql`: SQL helpers for storage on SQLAlchemy's asyncio API, behind the

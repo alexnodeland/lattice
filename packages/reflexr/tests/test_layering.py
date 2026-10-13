@@ -55,7 +55,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     ),
     "litellm": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.litellm"},
-        {"pydantic_ai", "opentelemetry", "lattice_core.litellm"},
+        {"pydantic_ai", "opentelemetry", "lattice_core.litellm", "lattice_core.tags"},
     ),
     "agent": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.agent"},

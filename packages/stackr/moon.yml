@@ -50,6 +50,21 @@ tasks:
       - 'deploy/host/compose.prod.yaml'
       - '/.prototools'
 
+  images:
+    description: "Build the AWS recipe's thin images for this machine, and check each starts on its configuration"
+    command: 'deploy/build-images'
+    inputs:
+      - 'deploy/build-images'
+      - 'deploy/otel-collector/**/*'
+      - 'deploy/tempo/**/*'
+      - 'deploy/loki/**/*'
+      - 'deploy/pyroscope/**/*'
+      - 'deploy/grafana/**/*'
+      - 'deploy/litellm/**/*'
+      - 'compose.yaml'
+      - '/packages/artifactr/deploy/grafana/**/*'
+      - '/packages/reflexr/deploy/grafana/**/*'
+
   check:
     description: "Run the project's checks, as CI does"
     command: 'noop'

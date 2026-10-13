@@ -1,6 +1,8 @@
 # Grafana's data sources, with fixed uids so dashboards and links can refer to
 # them: prometheus, tempo, loki and pyroscope. The libraries' dashboards use
-# these uids.
+# these uids. Each one's address is in the environment, which Grafana expands
+# here: Compose's names on one machine (compose.yaml), and the AWS recipe's
+# (stackr ADR-0034).
 apiVersion: 1
 
 prune: true
@@ -10,7 +12,7 @@ datasources:
     uid: prometheus
     type: prometheus
     access: proxy
-    url: http://prometheus:9090
+    url: http://${PROMETHEUS_ADDRESS}:9090
     isDefault: true
     editable: false
     jsonData:
@@ -34,7 +36,7 @@ datasources:
     uid: tempo
     type: tempo
     access: proxy
-    url: http://tempo:3200
+    url: http://${TEMPO_ADDRESS}:3200
     editable: false
     jsonData:
       # Trace to logs: the logs of the same service, around the span's time,
@@ -90,7 +92,7 @@ datasources:
     uid: loki
     type: loki
     access: proxy
-    url: http://loki:3100
+    url: http://${LOKI_ADDRESS}:3100
     editable: false
     jsonData:
       # Log lines that carry a trace id link to the trace in Tempo. OTLP logs
@@ -107,5 +109,5 @@ datasources:
     uid: pyroscope
     type: grafana-pyroscope-datasource
     access: proxy
-    url: http://pyroscope:4040
+    url: http://${PYROSCOPE_ADDRESS}:4040
     editable: false

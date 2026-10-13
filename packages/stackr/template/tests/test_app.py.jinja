@@ -19,6 +19,7 @@ import {{ package_name }}.telemetry
 from {{ package_name }}.app import DRAIN
 from {{ package_name }}.database import Database, create_schema, open_database
 from {{ package_name }}.gateway import Guardrails, TenantKeys, gateway_model
+from {{ package_name }}.redaction import LOG_CONFIG
 from {{ package_name }}.settings import GatewaySettings, Settings
 from {{ package_name }}.telemetry import configure
 
@@ -230,6 +231,7 @@ def test_main_serves_with_telemetry(monkeypatch: pytest.MonkeyPatch, tmp_path: P
         "host": "127.0.0.1",
         "port": 9000,
         "timeout_graceful_shutdown": DRAIN,
+        "log_config": LOG_CONFIG,
     }
     assert shut_down == [True]
 
@@ -241,4 +243,9 @@ def test_main_serves_without_telemetry(monkeypatch: pytest.MonkeyPatch) -> None:
     for unset in ("APP_HOST", "APP_PORT", "OTEL_EXPORTER_OTLP_ENDPOINT"):
         monkeypatch.delenv(unset, raising=False)
     {{ package_name }}.app.main()
-    assert served == {"host": "127.0.0.1", "port": {{ app_port }}, "timeout_graceful_shutdown": DRAIN}
+    assert served == {
+        "host": "127.0.0.1",
+        "port": {{ app_port }},
+        "timeout_graceful_shutdown": DRAIN,
+        "log_config": LOG_CONFIG,
+    }

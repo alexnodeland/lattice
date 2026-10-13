@@ -26,6 +26,7 @@ from grantr.core import (
     Agent,
     AuditEntry,
     AuditEvent,
+    AuditFilter,
     Catalog,
     Forbidden,
     Grant,
@@ -377,9 +378,18 @@ class Grants:
         return await self._storage.keys(tenant)
 
     async def audit(
-        self, tenant: TenantId | None, *, by: Subject, after_seq: int = 0, limit: int = 100
+        self,
+        tenant: TenantId | None,
+        *,
+        by: Subject,
+        after_seq: int = 0,
+        limit: int = 100,
+        keep: AuditFilter | None = None,
     ) -> list[AuditEntry]:
         """A tenant's audit log after ``after_seq``, or the deployment's with ``None``.
+
+        It returns the first ``limit`` entries ``keep`` keeps: of some types, by one actor, or
+        every one.
 
         Raises:
             Forbidden: If ``by`` may not read it: ``grantr:read_audit`` on the tenant, or
@@ -389,7 +399,7 @@ class Grants:
             await self._require(self._storage, None, by, "grantr:grant_operator", DEPLOYMENT)
         else:
             await self._require(self._storage, tenant, by, "grantr:read_audit", TENANT)
-        return await self._storage.audit(tenant, after_seq=after_seq, limit=limit)
+        return await self._storage.audit(tenant, after_seq=after_seq, limit=limit, keep=keep)
 
     # ─── commands ────────────────────────────────────────────────────────────
 

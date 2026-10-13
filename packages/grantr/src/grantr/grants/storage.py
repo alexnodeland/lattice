@@ -16,6 +16,7 @@ from typing import Protocol
 from grantr.core import (
     AuditEntry,
     AuditEvent,
+    AuditFilter,
     Grant,
     Grantee,
     Group,
@@ -182,7 +183,15 @@ class Storage(Reads, Protocol):
         ...
 
     async def audit(
-        self, tenant: TenantId | None, *, after_seq: int = 0, limit: int = 100
+        self,
+        tenant: TenantId | None,
+        *,
+        after_seq: int = 0,
+        limit: int = 100,
+        keep: AuditFilter | None = None,
     ) -> list[AuditEntry]:
-        """A tenant's audit entries after ``after_seq``, in order, or the deployment's with None."""
+        """A tenant's audit entries after ``after_seq``, in order, or the deployment's with None.
+
+        It returns the first ``limit`` that ``keep`` keeps.
+        """
         ...

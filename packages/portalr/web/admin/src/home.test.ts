@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { figure } from "./format";
 import {
   budget,
   counted,
@@ -7,7 +8,6 @@ import {
   duration,
   failuresSaid,
   feedbackSaid,
-  figure,
   LIMIT,
   membersSaid,
   type ScoresReading,

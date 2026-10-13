@@ -33,9 +33,9 @@
   /*
    * A chart's series, in this order and no more: the inks as marks, never as text (ADR-0021).
    * Each pair passes the dataviz palette check in its scheme (lightness, chroma, colour-blind
-   * separation); light cyan is under 3:1 on the surface, so every series is labelled too.
+   * separation), and is 3:1 or more on the surface; every series is labelled too.
    */
-  --chart-1: light-dark(#009fe3, #1a9fd6);
+  --chart-1: light-dark(#0096d6, #1a9fd6);
   --chart-2: light-dark(#e4007c, #ea3a8c);
   --chart-3: light-dark(#6b2fa0, #9b6ad2);
   /* Behind a drawer or a dialog. */

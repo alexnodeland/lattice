@@ -9,53 +9,67 @@ import {
   Moment,
   PageHeader,
   SelectField,
+  StatusBadge,
   TextLink,
 } from "@portalr/ui";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
-import { useMemo } from "react";
+import {
+  createFileRoute,
+  type ErrorComponentProps,
+  type SearchSchemaInput,
+} from "@tanstack/react-router";
 import { opening } from "../../../../access";
 import { type Shown, shownOf, WINDOWS, windowOf } from "../../../../feedback";
-import { figure } from "../../../../home";
+import { figure } from "../../../../format";
 import { ReadFailed } from "../../../../read-failed";
 
 type Summary = PortalrApi.components["schemas"]["Feedback"];
-type Score = PortalrApi.components["schemas"]["Score"];
+type Comment = PortalrApi.components["schemas"]["Comment"];
+type Evaluation = Summary["evaluations"][number];
 
 const HEADER = <PageHeader title="Feedback" meta="What people and evaluators said of the agent" />;
 
 /** A mean as people read it: two places. */
 const mean = (value: number) => value.toFixed(2);
 
-/** A day as an axis reads it: `10-13`. */
+/** A day as an axis reads it, in UTC: `10-13`. */
 const short = (day: string) => day.slice(5);
 
-/** Where a trace is in no workspace. */
-const NOWHERE = "In no workspace";
+/** What the axes and tables call a day: one in UTC, as portalr sums them. */
+const DAY = { key: "day", name: "Day (UTC)" } as const;
+
+/** Where a trace is in no workspace, and the key it is kept under, which no workspace has. */
+const NOWHERE = { key: "~none", name: "In no workspace" } as const;
+
+/** An evaluation's name, as its line and its row say it. */
+const named = (evaluation: Evaluation) => `${evaluation.evaluator} · ${evaluation.name}`;
+
+/**
+ * The id the operators' Langfuse link is read for, once: each trace's link is it, with the
+ * trace's own id in its place.
+ */
+const TEMPLATE = "portalr-trace";
 
 /**
  * A tenant's feedback and evaluations from Langfuse, for whoever may read its telemetry, summed
- * by day by portalr from every score in the window: people's thumbs per day, each evaluation's
- * mean per day, each workspace's share, and what people said, with Langfuse's page for each for
- * operators. The window and a workspace are in the address, so a view can be linked to (portalr
- * ADR-0027).
+ * by day, in UTC, by portalr: people's thumbs per day, each evaluation's mean per day, each
+ * workspace's share, and what people said, with Langfuse's page for each for operators. The window
+ * and a workspace are in the address, so a view can be linked to (portalr ADR-0027).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/feedback")({
   head: ({ params }) => ({ meta: [{ title: `Feedback · ${params.tenant} · portalr admin` }] }),
-  validateSearch: (search: Record<string, unknown>): Shown => shownOf(search),
+  // What a link may give, each of it optional; what the address gives, read with `shownOf`.
+  validateSearch: (search: Shown & SearchSchemaInput): Required<Shown> => shownOf(search),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "portalr:read_telemetry"),
-  loaderDeps: ({ search }) => search,
-  loader: ({ context, params, deps }) => {
-    // The router types a search of optional keys as `{}`: read it again, as the route keeps it.
-    const { days, workspace } = shownOf(deps);
-    return context.queryClient.ensureQueryData(
-      context.queries.portalr.feedback(
-        params.tenant,
-        windowOf(days, new Date()),
-        workspace ?? null,
-      ),
-    );
-  },
+  // The window, worked out once, from the day it is: the same all day.
+  loaderDeps: ({ search }: { search: Required<Shown> }) => ({
+    window: windowOf(search.days, new Date()),
+    workspace: search.workspace,
+  }),
+  loader: ({ context, params, deps }) =>
+    context.queryClient.ensureQueryData(
+      context.queries.portalr.feedback(params.tenant, deps.window, deps.workspace ?? null),
+    ),
   component: Feedback,
   notFoundComponent: () => (
     <>
@@ -74,11 +88,10 @@ export const Route = createFileRoute("/_signed/t/$tenant/feedback")({
 function Feedback() {
   const { tenant } = Route.useParams();
   const shown = Route.useSearch();
+  const { window, workspace } = Route.useLoaderDeps();
   const { queries } = Route.useRouteContext();
-  const days = shown.days ?? WINDOWS[0];
-  const window = useMemo(() => windowOf(days, new Date()), [days]);
   const { data: reading } = useSuspenseQuery(
-    queries.portalr.feedback(tenant, window, shown.workspace ?? null),
+    queries.portalr.feedback(tenant, window, workspace ?? null),
   );
   if (reading.status === "unconfigured") {
     return (
@@ -104,17 +117,15 @@ function Feedback() {
   return (
     <div className="flex flex-col gap-6">
       {HEADER}
-      <Filter
-        shown={shown}
-        workspaces={summary.workspaces.flatMap((place) => place.workspace ?? [])}
-      />
+      <Filter tenant={tenant} shown={shown} />
       {!summary.complete && (
-        <p role="status" className="text-muted text-sm">
-          Langfuse holds more scores in this window than one read takes: these are sums of those
-          read. Choose a shorter window, or a workspace, to see them all.
+        <p role="status" className="flex flex-wrap items-center gap-2 text-muted text-sm">
+          <StatusBadge tone="stopped">Partial</StatusBadge>
+          The read stopped at one of its bounds: some days, scores and comments may be missing. A
+          shorter window, or one workspace, may read them all.
         </p>
       )}
-      <Charts summary={summary} everywhere={shown.workspace === undefined} />
+      <Charts summary={summary} everywhere={workspace === undefined} />
       <Comments comments={summary.comments} />
     </div>
   );
@@ -123,25 +134,32 @@ function Feedback() {
 /** The thumbs per day, each evaluation's mean per day, and, for every workspace, each one's share. */
 function Charts({ summary, everywhere }: { summary: Summary; everywhere: boolean }) {
   const drawn = summary.evaluations.slice(0, MAX_SERIES);
-  const named = (evaluation: Summary["evaluations"][number]) =>
-    `${evaluation.evaluator} · ${evaluation.name}`;
   const thumbed = summary.workspaces.filter((place) => place.up + place.down > 0);
+  const thumbs = summary.days.some((day) => day.up + day.down > 0);
   return (
     <>
-      <BarChart
-        label="People's thumbs per day"
-        index={{ key: "day", name: "Day" }}
-        series={[
-          { key: "up", name: "Thumbs up" },
-          { key: "down", name: "Thumbs down" },
-        ]}
-        data={summary.days.map((day) => ({ day: short(day.day), up: day.up, down: day.down }))}
-        diverging
-      />
+      {thumbs ? (
+        <BarChart
+          label="People's thumbs per day"
+          index={DAY}
+          series={[
+            { key: "up", name: "Thumbs up" },
+            { key: "down", name: "Thumbs down" },
+          ]}
+          data={summary.days.map((day) => ({ day: short(day.day), up: day.up, down: day.down }))}
+          format={figure}
+          diverging
+        />
+      ) : (
+        <EmptyState title="No feedback in this window">
+          People's thumbs on the agent's messages, artifacts, turns and runs are counted here, each
+          day.
+        </EmptyState>
+      )}
       {drawn.length > 0 ? (
         <LineChart
           label="Each evaluation's mean per day"
-          index={{ key: "day", name: "Day" }}
+          index={DAY}
           series={drawn.map((evaluation) => ({ key: named(evaluation), name: named(evaluation) }))}
           data={summary.days.map((day, at) =>
             Object.fromEntries([
@@ -172,23 +190,28 @@ function Charts({ summary, everywhere }: { summary: Summary; everywhere: boolean
         <DonutChart
           label="People's thumbs by workspace"
           parts={thumbed.map((place) => ({
-            name: place.workspace ?? NOWHERE,
+            key: place.workspace ?? NOWHERE.key,
+            name: place.workspace ?? NOWHERE.name,
             value: place.up + place.down,
           }))}
           format={figure}
         />
       )}
-      {everywhere && (
+      {everywhere && summary.workspaces.length > 0 && (
         <ItemTable
           caption="By workspace"
           columns={[
-            { key: "workspace", label: "Workspace", cell: (place) => place.workspace ?? NOWHERE },
+            {
+              key: "workspace",
+              label: "Workspace",
+              cell: (place) => place.workspace ?? NOWHERE.name,
+            },
             { key: "up", label: "Thumbs up", cell: (place) => figure(place.up) },
             { key: "down", label: "Thumbs down", cell: (place) => figure(place.down) },
             { key: "evaluated", label: "Evaluations", cell: (place) => figure(place.evaluated) },
           ]}
           items={summary.workspaces}
-          keyOf={(place) => place.workspace ?? "~none"}
+          keyOf={(place) => place.workspace ?? NOWHERE.key}
           empty={{ title: "No feedback yet", body: "Thumbs and evaluations appear here." }}
         />
       )}
@@ -196,69 +219,72 @@ function Charts({ summary, everywhere }: { summary: Summary; everywhere: boolean
   );
 }
 
-/** What people wrote beside a thumb, newest first, each with its trace, and, for operators, Langfuse's page. */
-function Comments({ comments }: { comments: readonly Score[] }) {
+/** What people wrote, newest first, each with its trace, and, for operators, Langfuse's page. */
+function Comments({ comments }: { comments: readonly Comment[] }) {
   const { queries, user } = Route.useRouteContext();
   // An operator reads every tenant; the switch reads this too, so it is cached.
   const { data: every } = useQuery(queries.portalr.tenants(user));
   const operator = every !== null && every !== undefined;
+  // Langfuse's page for a trace, read once, for operators alone.
+  const { data: links } = useQuery({
+    ...queries.portalr.links(user, TEMPLATE),
+    enabled: operator,
+  });
+  const template = links?.langfuse_trace ?? null;
   return (
     <ItemTable
       caption="What people said"
       columns={[
-        { key: "comment", label: "Comment", cell: (score) => score.comment },
-        {
-          key: "thumb",
-          label: "Thumb",
-          cell: (score) => (score.value === true ? "Up" : score.value === false ? "Down" : "–"),
-        },
-        { key: "workspace", label: "Workspace", cell: (score) => score.workspace ?? "–" },
-        { key: "at", label: "When", cell: (score) => <Moment at={score.timestamp} /> },
+        { key: "comment", label: "Comment", cell: (comment) => comment.text },
+        { key: "workspace", label: "Workspace", cell: (comment) => comment.workspace ?? "–" },
+        { key: "at", label: "When", cell: (comment) => <Moment at={comment.timestamp} /> },
         {
           key: "trace",
           label: "Trace",
-          cell: (score) =>
-            operator ? (
-              <InLangfuse trace={score.trace_id} />
+          cell: (comment) => {
+            const id = <code className="font-mono text-xs">{comment.trace_id}</code>;
+            return template ? (
+              <TextLink
+                href={template.replace(TEMPLATE, encodeURIComponent(comment.trace_id))}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {id}
+              </TextLink>
             ) : (
-              <code className="font-mono text-xs">{score.trace_id}</code>
-            ),
+              id
+            );
+          },
         },
       ]}
       items={comments}
-      keyOf={(score) => score.id}
+      keyOf={(comment) => comment.id}
       empty={{ title: "No comments yet", body: "What people write beside a thumb is shown here." }}
     />
   );
 }
 
-/** A trace's id, as a link to its page in Langfuse, which only an operator may follow. */
-function InLangfuse({ trace }: { trace: string }) {
-  const { queries, user } = Route.useRouteContext();
-  const { data: links } = useQuery(queries.portalr.links(user, trace));
-  const id = <code className="font-mono text-xs">{trace}</code>;
-  return links?.langfuse_trace ? (
-    <TextLink href={links.langfuse_trace} target="_blank" rel="noreferrer">
-      {id}
-    </TextLink>
-  ) : (
-    id
-  );
-}
-
 /** The window, and a workspace, or every one: choosing either puts it in the address. */
-function Filter({ shown, workspaces }: { shown: Shown; workspaces: readonly string[] }) {
+function Filter({ tenant, shown }: { tenant: string; shown: Required<Shown> }) {
   const navigate = Route.useNavigate();
+  const { queries } = Route.useRouteContext();
+  // The tenant's workspaces, as artifactr lists them: a suggestion, the form works without it.
+  const { data: workspaces } = useQuery(queries.artifactr.workspaces(tenant));
   const go = (next: Partial<Record<keyof Shown, string>>) =>
     void navigate({ search: shownOf({ ...shown, ...next }) });
-  const offered = [...new Set([...workspaces, ...(shown.workspace ? [shown.workspace] : [])])];
+  const offered = [
+    ...new Set([...(workspaces ?? []), ...(shown.workspace ? [shown.workspace] : [])]),
+  ];
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <SelectField
         label="Window"
-        value={String(shown.days ?? WINDOWS[0])}
+        value={String(shown.days)}
         onChange={(event) => go({ days: event.target.value })}
-        options={WINDOWS.map((days) => ({ value: String(days), label: `The last ${days} days` }))}
+        options={WINDOWS.map((days) => ({
+          value: String(days),
+          label: `The last ${days} days, in UTC`,
+        }))}
       />
       <SelectField
         label="Workspace"
@@ -266,7 +292,7 @@ function Filter({ shown, workspaces }: { shown: Shown; workspaces: readonly stri
         onChange={(event) => go({ workspace: event.target.value })}
         options={[
           { value: "", label: "Every workspace" },
-          ...offered.sort().map((workspace) => ({ value: workspace, label: workspace })),
+          ...offered.sort().map((one) => ({ value: one, label: one })),
         ]}
       />
     </div>

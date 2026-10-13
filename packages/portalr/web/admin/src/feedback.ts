@@ -10,11 +10,11 @@ export const WINDOWS = [7, 30, 90] as const;
 export type Days = (typeof WINDOWS)[number];
 
 /** What Feedback's address keeps: the window, in days, and the workspace, if one is chosen. */
-export interface Shown {
+export type Shown = {
   /** Always given by `shownOf`; optional for a link, which may leave it out. */
   readonly days?: Days;
   readonly workspace?: string | undefined;
-}
+};
 
 /**
  * The address's window and workspace: a window Feedback doesn't offer is its default, and a

@@ -16,10 +16,19 @@ const days = (count: number, from = new Date()) =>
     new Date(from.getTime() - (count - 1 - back) * 86_400_000).toISOString().slice(0, 10),
   );
 
+/** How the next summary differs from a week's: none, no thumbs, partial, or many evaluations. */
+let shape: "week" | "quiet" | "partial" | "busy" = "week";
+
 /** portalr's summary of a week: thumbs on two days, two evaluations, and two workspaces. */
 function summary() {
   const week = days(7);
-  return {
+  const evaluation = (evaluator: string) => ({
+    evaluator,
+    name: evaluator,
+    count: 1,
+    days: week.map((day, at) => ({ day, count: at === 6 ? 1 : 0, mean: at === 6 ? 0.5 : null })),
+  });
+  const base = {
     days: week.map((day, at) => ({
       day,
       up: at === 6 ? 3 : at === 5 ? 1 : 0,
@@ -46,23 +55,36 @@ function summary() {
     comments: [
       {
         id: "s1",
+        text: "It missed the deadline",
         trace_id: "t_1",
-        name: "thumbs",
-        data_type: "BOOLEAN",
-        value: false,
-        source: "API",
-        timestamp: `${week[6]}T09:00:00Z`,
-        comment: "It missed the deadline",
-        evaluator: null,
         workspace: "notes",
+        timestamp: `${week[6]}T09:00:00Z`,
       },
     ],
     complete: true,
   };
+  switch (shape) {
+    case "quiet":
+      return {
+        ...base,
+        days: week.map((day) => ({ day, up: 0, down: 0 })),
+        evaluations: [],
+        workspaces: [],
+        comments: [],
+      };
+    case "partial":
+      return { ...base, complete: false };
+    case "busy":
+      return { ...base, evaluations: ["a", "b", "c", "d", "e"].map(evaluation) };
+    default:
+      return base;
+  }
 }
 
 let langfuse: "ok" | "unconfigured" | "unavailable" = "ok";
 let operator = false;
+/** How many times the operators' link was read. */
+let links = 0;
 
 async function portalr(request: Request, path: string): Promise<Response | undefined> {
   if (path === "/portalr/v1/feedback") {
@@ -84,8 +106,12 @@ async function portalr(request: Request, path: string): Promise<Response | undef
         );
   }
   if (path === "/portalr/v1/deployment/links") {
+    links += 1;
     const trace = new URL(request.url).searchParams.get("trace_id");
     return Response.json({ langfuse_trace: `http://langfuse.test/traces/${trace}` });
+  }
+  if (path === "/artifactr/v1/workspaces") {
+    return Response.json(["notes", "plans"]);
   }
   return undefined;
 }
@@ -101,6 +127,8 @@ afterEach(() => {
   reads.length = 0;
   langfuse = "ok";
   operator = false;
+  shape = "week";
+  links = 0;
   vi.unstubAllGlobals();
 });
 
@@ -142,7 +170,7 @@ test("the week's thumbs, evaluations and workspaces, from portalr's summary", as
 
 test("a workspace and a window go to portalr and into the address", async () => {
   const { screen, router } = await open("/t/acme/feedback");
-  await screen.getByRole("combobox", { name: "Window" }).selectOptions("The last 30 days");
+  await screen.getByRole("combobox", { name: "Window" }).selectOptions("The last 30 days, in UTC");
   await screen.getByRole("combobox", { name: "Workspace" }).selectOptions("notes");
   await expect.poll(() => reads.at(-1)?.get("workspace")).toBe("notes");
   expect(router.state.location.search).toMatchObject({ days: 30, workspace: "notes" });
@@ -162,6 +190,7 @@ test("for an operator, each comment's trace opens in Langfuse", async () => {
     .getByRole("table", { name: "What people said" })
     .getByRole("link", { name: "t_1" });
   await expect.element(link).toHaveAttribute("href", "http://langfuse.test/traces/t_1");
+  expect(links).toBe(1);
 });
 
 test("Langfuse not configured says so", async () => {
@@ -174,4 +203,49 @@ test("Langfuse not answering says why", async () => {
   langfuse = "unavailable";
   const { screen } = await open("/t/acme/feedback?days=30");
   await expect.element(screen.getByRole("alert")).toHaveTextContent("langfuse answered 502");
+});
+
+test("the workspaces offered are the tenant's, as artifactr lists them", async () => {
+  const { screen } = await open("/t/acme/feedback");
+  const workspace = screen.getByRole("combobox", { name: "Workspace" });
+  await expect
+    .poll(() => [...workspace.element().querySelectorAll("option")].map((o) => o.value))
+    .toEqual(["", "notes", "plans"]);
+  await expect
+    .element(screen.getByRole("combobox", { name: "Window" }))
+    .toHaveTextContent("The last 7 days, in UTCThe last 30 days, in UTCThe last 90 days, in UTC");
+});
+
+test("a partial summary says so, with a badge", async () => {
+  shape = "partial";
+  const { screen } = await open("/t/acme/feedback");
+  await expect.element(screen.getByRole("status").filter({ hasText: "Partial" })).toBeVisible();
+});
+
+test("a window with no feedback says so, not with an empty chart", async () => {
+  shape = "quiet";
+  const { screen } = await open("/t/acme/feedback");
+  await expect.element(screen.getByText("No feedback in this window")).toBeVisible();
+  await expect
+    .element(screen.getByRole("figure", { name: "People's thumbs per day" }))
+    .not.toBeInTheDocument();
+  await expect.element(screen.getByText("No evaluations in this window")).toBeVisible();
+});
+
+test("more evaluations than a chart draws are all in a table", async () => {
+  shape = "busy";
+  const { screen } = await open("/t/acme/feedback");
+  const legend = screen.getByRole("figure", { name: "Each evaluation's mean per day" });
+  await expect.element(legend.getByRole("listitem")).toHaveLength(3);
+  const every = screen.getByRole("table", { name: "Every evaluation" });
+  expect(every.getByRole("rowheader").elements()).toHaveLength(5);
+});
+
+test("on a phone, the tables are cards", async () => {
+  await page.viewport(390, 844);
+  const { screen } = await open("/t/acme/feedback");
+  await expect.element(screen.getByRole("list", { name: "What people said" })).toBeVisible();
+  await expect
+    .element(screen.getByRole("table", { name: "What people said" }))
+    .not.toBeInTheDocument();
 });

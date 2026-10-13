@@ -7,6 +7,7 @@
 
 import type { GrantrApi, PortalrApi, TimeSpan } from "@portalr/client";
 import type { Tone } from "@portalr/ui";
+import { figure, numbers } from "./format";
 
 type Schemas = PortalrApi.components["schemas"];
 
@@ -33,12 +34,6 @@ export interface Said {
 
 /** The most a read returns: a figure at it may be more, so it shows as at least that. */
 export const LIMIT = 1000;
-
-const numbers = new Intl.NumberFormat("en-US");
-
-/** A count, as a figure: grouped, and with a `+` where it reached what a read returns. */
-export const figure = (count: number, limit?: number) =>
-  limit !== undefined && count >= limit ? `${numbers.format(limit)}+` : numbers.format(count);
 
 /** A count of something, with its noun as one or many. */
 export const counted = (count: number, one: string, many = `${one}s`) =>

@@ -481,6 +481,9 @@ export function createQueries(api: Api) {
               api.portalr.GET("/portalr/v1/feedback", {
                 ...named(tenant),
                 params: { query: { start: window.start, end: window.end, workspace } },
+                // Summing a window reads Langfuse at length: kept a while, and tried again once.
+                staleTime: 10 * 60_000,
+                retry: 1,
               }),
             ),
         }),

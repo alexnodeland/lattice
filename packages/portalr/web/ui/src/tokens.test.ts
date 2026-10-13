@@ -75,9 +75,8 @@ test("a page asks for a scheme with data-theme", () => {
   expect(token("accent")).toBe(dark ? "rgb(107, 47, 160)" : "rgb(226, 204, 245)");
 });
 
-test("a chart's series stand out from the surface, light cyan nearly so, and labelled", () => {
+test("a chart's series stand out from the surface", () => {
   for (const series of ["chart-1", "chart-2", "chart-3"]) {
-    const floor = series === "chart-1" && !dark ? 2.9 : 3;
-    expect(contrast(token(series), token("surface"))).toBeGreaterThanOrEqual(floor);
+    expect(contrast(token(series), token("surface"))).toBeGreaterThanOrEqual(3);
   }
 });

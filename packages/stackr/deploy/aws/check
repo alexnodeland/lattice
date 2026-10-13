@@ -10,8 +10,8 @@
 # TFLint with AWS's ruleset; checkov over each module, with the skips and their reasons in that
 # module's .checkov.yaml; the modules' tests, against a mocked AWS (tests/), which validate each
 # module as they plan it, with the providers the committed lock file names; and the modules'
-# templates, rendered: shellcheck over the state host's user data, and GoTrue's proxy, run in
-# Docker (tests/auth-proxy).
+# templates, rendered: shellcheck over the state host's user data and Langfuse's worker's wait,
+# and GoTrue's proxy, run in Docker (tests/auth-proxy).
 # The providers download once, into TF_PLUGIN_CACHE_DIR. TFLint fetches its AWS ruleset from
 # GitHub, with GITHUB_TOKEN when it is set.
 
@@ -84,6 +84,8 @@ if tofu -chdir="$fixture" init -backend=false -input=false >/dev/null &&
   tofu -chdir="$fixture" output -state="$rendered/state" -raw user_data >"$rendered/user-data.sh"
   tofu -chdir="$fixture" output -state="$rendered/state" -raw caddyfile >"$rendered/Caddyfile"
   shellcheck --shell=bash "$rendered/user-data.sh" || fail "shellcheck: the state host's user data"
+  tofu -chdir="$fixture" output -state="$rendered/state" -raw wait_for_langfuse >"$rendered/wait-for-langfuse.sh"
+  shellcheck --shell=sh "$rendered/wait-for-langfuse.sh" || fail "shellcheck: Langfuse's worker's wait"
   tests/auth-proxy "$rendered/Caddyfile" || fail "GoTrue's proxy"
 else
   fail "rendering the templates"

@@ -140,6 +140,7 @@ The contract test, `tests/grants/test_contract.py`, runs every behaviour on this
 |---|---|
 | `GET /me` | With `X-Tenant`, the caller's roles there and the workspaces they can open; without, their memberships |
 | `POST /checks` | A batch of up to 100 `{action, resource}` questions, answered in order |
+| `GET /catalog` | The built-in roles a tenant's admins grant, each with where it may be granted, and the actions a custom role may hold, and where ([ADR-0031](adr/0031-the-catalog-read.md)) |
 | `GET`, `POST /tenants`; `DELETE /tenants/{tenant}` | List, create and delete tenants |
 | `PUT`, `DELETE /operators/{user}` | Grant and revoke the operator role |
 | `GET /audit`, `GET /tenants/{tenant}/audit` | The deployment's and a tenant's audit log, paged by `after_seq`, and kept to some types (`type=`, which may repeat) or one subject (`actor_kind=`, `actor=`, and `workspace=` for a rule) |

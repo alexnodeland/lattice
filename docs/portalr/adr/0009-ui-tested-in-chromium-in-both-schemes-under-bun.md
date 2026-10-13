@@ -20,6 +20,7 @@ Phase 2 also brings `ui`'s tokens, from portalr's brand ([lattice ADR-0014](../.
 - **Components merge classes with `cn()`,** shadcn's: `clsx` and `tailwind-merge`, so a caller's class overrides the component's own of its kind.
 - **The first primitives are Base UI's `Button` and `Switch`,** styled with the tokens in the shape of shadcn's copied components: a primary button in the working colour, a secondary one on the surface, and a switch whose track takes the working colour.
 - **Chromium is Playwright's headless shell,** installed by `make install`, the dev container and CI's Check, Tests and Nightly jobs (`playwright install --only-shell chromium`).
+- **Vitest's browser server listens on 127.0.0.1** (`test.api.host`), in ui's, app's and admin's configurations, not on `localhost`. Their tests run at once, and each server starts on Vitest's one browser port: on `localhost`, one bound `::1` and another `127.0.0.1` on the same port, and a Chromium reached the wrong server, whose session it wasn't, so it never connected however long it waited.
 
 ## Options considered
 

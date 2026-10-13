@@ -164,3 +164,16 @@ def test_portalrs_admin_reads_are_its_tenants_owners_and_admins_and_operators() 
         name for (_, name), actions in CATALOG.built_in.items() if DEPLOYMENT_READS & actions
     }
     assert holders == {"operator"}
+
+
+def test_the_catalog_reads_as_the_roles_a_tenants_admins_grant() -> None:
+    view = CATALOG.view()
+    assert [(role.name, role.kinds) for role in view.roles] == [
+        ("admin", ("tenant", "workspace")),
+        ("owner", ("tenant",)),
+        ("editor", ("workspace", "thread", "artifact", "rule")),
+        ("viewer", ("workspace", "thread", "artifact", "rule")),
+    ], "in the order of where each is granted; no deployment role, member or rule"
+    assert set(view.custom_actions) == CATALOG.built_in["workspace", "admin"]
+    assert list(view.custom_actions) == sorted(view.custom_actions)
+    assert view.custom_kinds == ("workspace", "thread", "artifact", "rule")

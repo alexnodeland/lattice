@@ -352,6 +352,20 @@ async def test_a_name_another_artifact_installed_is_refused(ledger: Ledger, stac
     assert (await chat_.notices())[-1].startswith("chat:deploys wasn't installed: ")
 
 
+async def test_a_draft_renamed_before_it_was_installed_archives_its_rule(
+    ledger: Ledger, stack: Stack
+) -> None:
+    chat_ = await chat(stack, ledger)
+    written = a.create_artifact(draft("chat:first"), thread_id=chat_.thread)
+    await chat_.alice.commit(written)  # written directly: nothing installs it
+    await chat_.resolve(await chat_.edited(written.artifact_id, draft()))
+    assert (await chat_.stored()).version == 1
+    await chat_.archive(written.artifact_id)
+    with pytest.raises(reflexr.core.NotFound):
+        await chat_.stored()
+    assert (await chat_.notices())[-1] == "chat:deploys is archived."
+
+
 async def test_a_draft_outside_a_thread_goes_live_untold(ledger: Ledger, stack: Stack) -> None:
     chat_ = await chat(stack, ledger)
     proposal_id = await chat_.propose(a.create_artifact(draft()))
@@ -525,3 +539,29 @@ async def test_a_rule_whose_artifact_is_archived_drifts_alone(ledger: Ledger, st
     await (await chat_.automation()).install_rule(draft(service="x").rule)
     await settled(chat_)
     assert await proposals(chat_) == []
+
+
+async def test_an_install_however_far_back_is_still_relayrs(ledger: Ledger, stack: Stack) -> None:
+    chat_ = await chat(stack, ledger)
+    artifact_id, proposal_id = await chat_.drafted()
+    await chat_.resolve(proposal_id)
+    operator = await chat_.automation()
+    other = draft("chat:other").rule
+    await operator.install_rule(other)
+    for version in range(2, 1_003):  # more installs since than any window of the log's tail
+        await operator.update_rule(other, expected_version=version - 1, provenance={"n": version})
+    # The drift rule passes over each, in order: one run a round, since they share a scope.
+    await chat_.app.reactor.settle(max_rounds=2_000)
+
+    await operator.replay_rule(RULES_FROM_CHAT.name, mode="refire")
+    await settled(chat_)
+    assert (await chat_.stored()).version == 1
+    assert await chat_.notices() == [LIVE.format(1)], "the acceptance was installed already"
+    changed = draft(service="billing").rule
+    await operator.update_rule(changed, expected_version=1)
+    await settled(chat_)
+    [drift] = await proposals(chat_)
+    assert drift.artifact_id == artifact_id, "the change is proposed to the rule's artifact"
+    await chat_.archive(artifact_id)
+    with pytest.raises(reflexr.core.NotFound):
+        await chat_.stored()

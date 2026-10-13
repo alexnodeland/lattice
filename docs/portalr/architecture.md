@@ -99,7 +99,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 
 ## The kit's look
 
-`ui`'s tokens are lattice ADR-0014's, with `--edge`, `--wash`, `--accent-hover` and `--scrim` beside them, each pair's contrast asserted in both schemes ([ADR-0019](adr/0019-the-kits-look.md)). Its typefaces, Schibsted Grotesk and Fragment Mono, are served from the UIs' own origin. The frame and its parts:
+`ui`'s tokens are lattice ADR-0014's, with `--edge`, `--wash`, `--accent-hover` and `--scrim` beside them ([ADR-0019](adr/0019-the-kits-look.md)), and `--danger`, for destructive actions alone ([ADR-0021](adr/0021-the-areas-on-the-frame-and-what-admin-needs.md)), each pair's contrast asserted in both schemes. Its typefaces, Schibsted Grotesk and Fragment Mono, are served from the UIs' own origin. The frame and its parts:
 
 | Component | What it is |
 |---|---|
@@ -109,7 +109,10 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `AccountMenu` | Who is signed in, their scheme, and signing out |
 | `PageHeader` | A page's way back, its one heading, a line about it, and its actions |
 | `Card`, `EmptyState`, `Table` | What asks something of the reader; nothing yet, and what to do; rows, named by a caption |
-| `StatusBadge` | How a thing is going, as a shape and a word; only waiting for you in the working colour |
+| `Rows`, `Row`, `RowLink`, `SectionTitle` | A lined list, each row's link stretched over it; a section's heading |
+| `Plain` | A page outside the frame: the lockup as a link home, the account if signed in, and one column |
+| `StatusBadge` | How a thing is going, as a shape and a word; only waiting for you in the working colour; a budget near or over as a word and a shape of its own, with no warning colour |
+| `ConfirmDialog` | A destructive action, asked first: what will be lost, the focus on Cancel, and a name to type where asked |
 | `SegmentedFilter` | One filter of a few, side by side |
 | `Dialog` | A dialog over the page, opened by its caller, with where focus starts and where it returns ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
 | `Menu` | A button and the actions it opens, each of which may be disabled while it's being done |
@@ -117,6 +120,8 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Icon`, `Mark`, `Lockup` | A Lucide icon beside its word; portalr's marks |
 
 `gallery.screenshot.test.tsx` pins how they sit together, wide and narrow, in each scheme. It runs in CI alone, against Linux baselines.
+
+Every area of a workspace renders in `AppShell`. The screens outside one are ui's `Plain` page: choosing a tenant or a workspace, with the account, and what went wrong, without it. Signing in is a card of its own. `admin` renders its frame, with its own mark.
 
 ## The wheel
 

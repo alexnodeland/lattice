@@ -84,14 +84,17 @@ export function Diff({
         switch (change.kind) {
           case "added":
             return (
-              <ins key={key} className="bg-paper text-accent underline decoration-accent">
+              <ins
+                key={key}
+                className="rounded-sm bg-wash px-0.5 text-fg underline decoration-2 decoration-accent underline-offset-3"
+              >
                 <span className="sr-only">added: </span>
                 {change.text}
               </ins>
             );
           case "removed":
             return (
-              <del key={key} className="text-muted line-through">
+              <del key={key} className="mr-1 text-muted line-through">
                 <span className="sr-only">removed: </span>
                 {change.text}
               </del>

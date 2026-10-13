@@ -201,6 +201,7 @@ Every path is relative to the router's prefix, `/v1` above:
 | `GET /workspaces/{workspace_id}/dead-letters?rule=` | The envelopes rules could not evaluate, oldest first |
 | `GET /workspaces/{workspace_id}/rules` | Each of the workspace's rules, code rules first: its `origin`, `code` or `stored`, and a stored rule's `version`; whether it is `enabled`; and its `cursor`, its `lag` behind the head of the log, its `generation`, and its number of `dead_letters` |
 | `GET /workspaces/{workspace_id}/rules/{rule}` | One of the workspace's rules: its definition, its `origin`, and a stored rule's `version` and `provenance` |
+| `GET /workspaces/{workspace_id}/rules/{rule}/history` | A stored rule's versions, oldest first: its install and archive facts, as envelopes. An archived rule keeps its history, and a rule never stored has an empty one |
 | `GET /workspaces/{workspace_id}/schedules` | Each schedule that ticks in the workspace, with its `last_tick` and `next_tick` |
 | `GET /rules` | The rules registered in code, as JSON: the same for every tenant, and visible to every authenticated caller ([Multi-tenancy and security](security.md#tenants-and-workspaces)) |
 | `GET /schedules` | The registered schedules, likewise |

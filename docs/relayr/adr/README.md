@@ -35,7 +35,8 @@ ADR-0001 to ADR-0007 record the decisions D1 to D7 of [stackr RFC-0002](../../st
 | [0027](0027-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted |
 | [0028](0028-rules-from-chat.md) | Rules from chat | Accepted, amended by 0030 |
 | [0029](0029-an-allowlist-for-a-whole-rule-namespace.md) | An allowlist for a whole rule namespace | Accepted |
-| [0030](0030-drift-proposed-back-to-a-rules-artifact.md) | Drift proposed back to a rule's artifact | Accepted |
+| [0030](0030-drift-proposed-back-to-a-rules-artifact.md) | Drift proposed back to a rule's artifact | Accepted, amended by 0032 |
 | [0031](0031-proposal-outcomes-and-the-measures.md) | Proposal outcomes, and the measures | Accepted |
+| [0032](0032-a-rules-installs-read-from-its-history.md) | A rule's installs, read from its history | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

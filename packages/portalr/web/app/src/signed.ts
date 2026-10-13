@@ -4,15 +4,29 @@
  */
 
 import type { Config, Session, StreamSession } from "@portalr/client";
-import { GoTrueClient } from "@supabase/auth-js";
+import { type Session as AuthSession, GoTrueClient } from "@supabase/auth-js";
 import { authUrl } from "./deployment";
+
+/** What the app keeps of a session: its token, and who it is for. */
+interface Current {
+  readonly token: string;
+  readonly user: string;
+  readonly email: string | null;
+}
+
+const kept = (session: AuthSession | null): Current | null =>
+  session && {
+    token: session.access_token,
+    user: session.user.id,
+    email: session.user.email ?? null,
+  };
 
 /** What a session did that a stream must follow: its token was refreshed, or it ended. */
 export type Change = "refreshed" | "ended";
 
 export class Signed {
   readonly auth: GoTrueClient;
-  private current: { readonly token: string; readonly user: string } | null = null;
+  private current: Current | null = null;
   private readonly watchers = new Set<(change: Change) => void>();
 
   /** `onSignedOut` runs when the session ends: here, in another tab, or as it expires. */
@@ -25,7 +39,7 @@ export class Signed {
       autoRefreshToken: true,
     });
     this.auth.onAuthStateChange((event, session) => {
-      this.current = session && { token: session.access_token, user: session.user.id };
+      this.current = kept(session);
       if (event === "TOKEN_REFRESHED") {
         this.tell("refreshed");
       }
@@ -40,8 +54,13 @@ export class Signed {
   async signedIn(): Promise<string | null> {
     const { data } = await this.auth.getSession();
     const { session } = data;
-    this.current = session && { token: session.access_token, user: session.user.id };
+    this.current = kept(session);
     return this.current?.user ?? null;
+  }
+
+  /** The signed-in person's email, as Supabase Auth has it, to name them by; or null. */
+  email(): string | null {
+    return this.current?.email ?? null;
   }
 
   /** End the session in this browser alone: another tab's or device's stays. */

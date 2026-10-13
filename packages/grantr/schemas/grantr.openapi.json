@@ -125,6 +125,25 @@
           }
         ]
       },
+      "AuditType": {
+        "enum": [
+          "tenant_created",
+          "tenant_deleted",
+          "member_added",
+          "member_removed",
+          "group_defined",
+          "group_deleted",
+          "role_defined",
+          "role_deleted",
+          "granted",
+          "revoked",
+          "key_issued",
+          "key_revoked",
+          "restricted",
+          "unrestricted"
+        ],
+        "type": "string"
+      },
       "Check": {
         "description": "One question for ``/checks``: may the caller take this action on this resource?",
         "properties": {
@@ -976,7 +995,7 @@
   "paths": {
     "/grantr/v1/audit": {
       "get": {
-        "description": "The deployment's audit log: its operators, granted and revoked.",
+        "description": "The deployment's audit log: its operators, granted and revoked.\n\n``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``\none subject's changes.",
         "operationId": "deployment_audit_grantr_v1_audit_get",
         "parameters": [
           {
@@ -1000,6 +1019,89 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "description": "Keep only entries of these event types; it may repeat.",
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditType"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep only entries of these event types; it may repeat.",
+              "title": "Type"
+            }
+          },
+          {
+            "description": "Keep only the changes of one subject, of this kind.",
+            "in": "query",
+            "name": "actor_kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "user",
+                    "service_principal",
+                    "rule",
+                    "agent"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep only the changes of one subject, of this kind.",
+              "title": "Actor Kind"
+            }
+          },
+          {
+            "description": "That subject's id: a user's or a service principal's, or a rule's name.",
+            "in": "query",
+            "name": "actor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "That subject's id: a user's or a service principal's, or a rule's name.",
+              "title": "Actor"
+            }
+          },
+          {
+            "description": "A rule's workspace, with `actor_kind=rule`.",
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A rule's workspace, with `actor_kind=rule`.",
+              "title": "Workspace"
             }
           }
         ],
@@ -1334,7 +1436,7 @@
     },
     "/grantr/v1/tenants/{tenant}/audit": {
       "get": {
-        "description": "A tenant's audit log after ``after_seq``, in order.",
+        "description": "A tenant's audit log after ``after_seq``, in order.\n\n``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``\none subject's changes.",
         "operationId": "tenant_audit_grantr_v1_tenants__tenant__audit_get",
         "parameters": [
           {
@@ -1368,6 +1470,89 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "description": "Keep only entries of these event types; it may repeat.",
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditType"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep only entries of these event types; it may repeat.",
+              "title": "Type"
+            }
+          },
+          {
+            "description": "Keep only the changes of one subject, of this kind.",
+            "in": "query",
+            "name": "actor_kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "user",
+                    "service_principal",
+                    "rule",
+                    "agent"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep only the changes of one subject, of this kind.",
+              "title": "Actor Kind"
+            }
+          },
+          {
+            "description": "That subject's id: a user's or a service principal's, or a rule's name.",
+            "in": "query",
+            "name": "actor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "That subject's id: a user's or a service principal's, or a rule's name.",
+              "title": "Actor"
+            }
+          },
+          {
+            "description": "A rule's workspace, with `actor_kind=rule`.",
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A rule's workspace, with `actor_kind=rule`.",
+              "title": "Workspace"
             }
           }
         ],

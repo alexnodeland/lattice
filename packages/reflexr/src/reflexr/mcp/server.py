@@ -358,6 +358,17 @@ class ReflexrMcp:
             return (await _tool(workspace.get_rule(rule))).model_dump_json()
 
         @server.tool()
+        async def rule_history(workspace_id: str, rule: str, ctx: Context) -> str:
+            """Read a stored rule's versions, oldest first, as JSON lines.
+
+            Each is its ``reflexr:rule_installed`` or ``reflexr:rule_archived`` fact, with who
+            made the change and, for an install, its provenance.
+            """
+            workspace = await self._workspace(ctx, workspace_id)
+            found = await _tool(workspace.rule_history(rule))
+            return "\n".join(e.model_dump_json() for e in found) or f"{rule} has no versions."
+
+        @server.tool()
         async def schedule_status(workspace_id: str, ctx: Context) -> str:
             """Show each schedule that ticks in a workspace: when it last ticked and ticks next."""
             workspace = await self._workspace(ctx, workspace_id)

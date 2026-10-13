@@ -218,6 +218,60 @@ async def test_an_update_resets_the_rule_only_when_its_condition_or_scope_change
         await relayr.update_rule(deploys(), expected_version=2)
 
 
+async def test_a_stored_rules_history_is_its_versions_alone_and_outlives_archiving(
+    workspaces: Workspaces, relayr: Workspace
+) -> None:
+    operator = await workspaces.open("acme", "prod", actor=UserActor(id="usr_ops"))
+    rule = deploys()
+    await relayr.install_rule(rule, provenance=PROVENANCE)
+    await relayr.install_rule(deploys("chat:releases"))
+    await relayr.publish_many([Deploy(service="auth") for _ in range(3)])
+    billing = deploys(service="billing")
+    await operator.update_rule(billing, expected_version=1, provenance={"source": "console"})
+    await operator.archive_rule("chat:deploys", expected_version=2, reason="done")
+    await relayr.install_rule(rule, provenance=PROVENANCE)
+    history = await operator.rule_history("chat:deploys")
+    assert [(e.seq, e.actor, e.event) for e in history] == [
+        (
+            1,
+            RELAYR,
+            RuleInstalled(
+                rule="chat:deploys",
+                version=1,
+                spec=rule.model_dump(mode="json"),
+                provenance=PROVENANCE,
+            ),
+        ),
+        (
+            6,
+            operator.actor,
+            RuleInstalled(
+                rule="chat:deploys",
+                version=2,
+                spec=billing.model_dump(mode="json"),
+                provenance={"source": "console"},
+            ),
+        ),
+        (
+            8,
+            operator.actor,
+            RuleArchived(rule="chat:deploys", version=3, reason="done", cancelled=0),
+        ),
+        (
+            9,
+            RELAYR,
+            RuleInstalled(
+                rule="chat:deploys",
+                version=4,
+                spec=rule.model_dump(mode="json"),
+                provenance=PROVENANCE,
+            ),
+        ),
+    ], "its installs and archives, and none of the resets, events or other rules between them"
+    assert [e.seq for e in await relayr.rule_history("chat:releases")] == [2]
+    assert await relayr.rule_history("app:deploys") == [], "a rule never stored has no history"
+
+
 async def test_archiving_cancels_unfinished_runs_and_installing_again_starts_afresh(
     workspaces: Workspaces, relayr: Workspace, telemetry: Telemetry
 ) -> None:

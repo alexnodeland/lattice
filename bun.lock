@@ -16,6 +16,7 @@
       "name": "@portalr/admin",
       "dependencies": {
         "@portalr/ui": "workspace:*",
+        "lucide-react": "1.55.0",
         "react": "19.3.0",
         "react-dom": "19.3.0",
       },
@@ -35,6 +36,7 @@
         "@supabase/auth-js": "2.117.3",
         "@tanstack/react-query": "5.104.1",
         "@tanstack/react-router": "1.170.41",
+        "lucide-react": "1.55.0",
         "react": "19.3.0",
         "react-dom": "19.3.0",
       },

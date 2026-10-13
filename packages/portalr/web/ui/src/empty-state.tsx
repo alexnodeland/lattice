@@ -1,4 +1,5 @@
 import { type ReactNode, useId } from "react";
+import { SectionTitle } from "./section-title";
 
 /** Nothing to show yet: what will be here, in a sentence, and the one thing to do about it. */
 export function EmptyState({
@@ -18,9 +19,7 @@ export function EmptyState({
       aria-labelledby={heading}
       className="flex max-w-xl flex-col items-start gap-3 rounded-lg border border-line bg-surface p-8"
     >
-      <h2 id={heading} className="font-bold text-fg text-lg tracking-tight">
-        {title}
-      </h2>
+      <SectionTitle id={heading}>{title}</SectionTitle>
       <div className="text-base text-muted">{children}</div>
       {action}
     </section>

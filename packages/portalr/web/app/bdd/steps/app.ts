@@ -1,12 +1,8 @@
-import { expect } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { Given, Then, When } from "./fixtures";
 import { email, password } from "./people";
 
-export async function signIn(
-  page: import("@playwright/test").Page,
-  person: string,
-  secret: string,
-) {
+export async function signIn(page: Page, person: string, secret: string) {
   await page.goto("sign-in");
   await page.getByLabel("Email").fill(email(person));
   await page.getByLabel("Password").fill(secret);
@@ -17,9 +13,12 @@ When("{word} signs in", async ({ page }, person: string) => {
   await signIn(page, person, password(person));
 });
 
+/** The account's menu, which holds signing out: every signed-in screen has it. */
+export const account = (page: Page) => page.getByRole("button", { name: /^Account: / });
+
 Given("{word} has signed in", async ({ page }, person: string) => {
   await signIn(page, person, password(person));
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(account(page)).toBeVisible();
 });
 
 When(
@@ -44,11 +43,19 @@ When("they open the workspace {string}", async ({ page }, workspace: string) => 
 });
 
 When("they go back to every workspace in {string}", async ({ page }, tenant: string) => {
-  await page.getByRole("link", { name: `Every workspace in ${tenant}` }).click();
+  await page.getByRole("button", { name: /^Workspace: / }).click();
+  await page.getByRole("menuitem", { name: `Every workspace in ${tenant}` }).click();
 });
 
 When("they sign out", async ({ page }) => {
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await account(page).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+});
+
+Then("they are in the workspace {string}", async ({ page }, workspace: string) => {
+  await expect(page.getByRole("button", { name: /^Workspace: / })).toHaveAccessibleName(
+    new RegExp(`, ${workspace}$`),
+  );
 });
 
 Then("they see the page {string}", async ({ page }, title: string) => {

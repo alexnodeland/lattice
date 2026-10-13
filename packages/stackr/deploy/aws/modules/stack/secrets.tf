@@ -23,10 +23,11 @@ module "secrets" {
     # ClickHouse's admin is the state host's users.xml's: Floci's ClickHouse has none.
     { for key, secret in { clickhouse-admin-password = {} } : key => secret if var.state_host == "ec2" },
   ) : key => merge(secret, { version = lookup(var.secret_versions, key, 1) }) }
-  # GoTrue's key set and the service role's key, which the auth-keys task writes; and the
+  # GoTrue's key set and the service role's key, which the auth-keys task writes, each a secret of
+  # its own, as GoTrue and the application read them whole; and the
   # operator's.
   written_elsewhere = setunion(
-    ["auth-keys"],
+    ["auth-jwt-keys", "auth-service-role-key"],
     [for provider in var.gateway_providers : "litellm-${provider}-api-key"],
     var.auth_smtp == null ? [] : ["auth-smtp-password"],
   )

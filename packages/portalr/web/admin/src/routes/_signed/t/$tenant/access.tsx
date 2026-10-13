@@ -1,13 +1,8 @@
-import { Button, EmptyState, PageHeader, TabLink, TabNav } from "@portalr/ui";
-import {
-  createFileRoute,
-  type ErrorComponentProps,
-  Link,
-  Outlet,
-  useRouter,
-} from "@tanstack/react-router";
+import { EmptyState, PageHeader, TabLink, TabNav } from "@portalr/ui";
+import { createFileRoute, type ErrorComponentProps, Link, Outlet } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { PARTS, useAccess } from "../../../../access";
+import { ReadFailed } from "../../../../read-failed";
 
 /**
  * Who may see and do what in a tenant: its members, groups and keys, each a part shown where
@@ -55,26 +50,12 @@ function Parts({ children }: { children: ReactNode }) {
 
 /** A part whose read failed: what failed, and a way to read it again. */
 function Failed({ error, reset }: ErrorComponentProps) {
-  const router = useRouter();
   return (
-    <>
-      <PageHeader title="Access" meta="Who may see and do what in the tenant" />
-      <EmptyState
-        title="This part of Access couldn't be read"
-        action={
-          <Button
-            variant="secondary"
-            onClick={() => {
-              reset();
-              void router.invalidate();
-            }}
-          >
-            Try again
-          </Button>
-        }
-      >
-        <p role="alert">{error instanceof Error ? error.message : String(error)}</p>
-      </EmptyState>
-    </>
+    <ReadFailed
+      title="This part of Access couldn't be read"
+      header={<PageHeader title="Access" meta="Who may see and do what in the tenant" />}
+      error={error}
+      reset={reset}
+    />
   );
 }

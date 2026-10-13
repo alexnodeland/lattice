@@ -1,0 +1,8 @@
+# The workspace's manifests, which `uv sync --locked` checks the lock against, and the command.
+*
+!pyproject.toml
+!uv.lock
+!packages/*/pyproject.toml
+!examples/*/pyproject.toml
+!packages/stackr/scripts/auth-keys
+!packages/stackr/scripts/_auth_keys.py

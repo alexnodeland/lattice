@@ -214,6 +214,10 @@ run "stack_the_application_with_grantr" {
     )
     error_message = "db-init, auth-keys and db-roles are one-off tasks; db-roles is the application's admin command."
   }
+  assert {
+    condition     = { for setting in module.db_init.containers[0].environment : setting.name => setting.value }["APP_DB_CREATES_ROLES"] == "true"
+    error_message = "With grantr, the application's owner may create the role db-roles makes."
+  }
 }
 
 run "stack_the_application_without_access" {
@@ -246,6 +250,10 @@ run "stack_the_application_without_access" {
       && length([for key in keys(aws_vpc_security_group_ingress_rule.call) : key if strcontains(key, "db-roles")]) == 0
     )
     error_message = "Without grantr, db-roles has no group and no rule."
+  }
+  assert {
+    condition     = !contains([for setting in module.db_init.containers[0].environment : setting.name], "APP_DB_CREATES_ROLES")
+    error_message = "Without grantr, the application's owner may not create roles."
   }
 }
 
@@ -350,7 +358,8 @@ run "stack_each_secret_reaches_the_services_that_read_it" {
         gotrue-jwt-secret         = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/gotrue-jwt-secret-AAAAAA"
         clickhouse-password       = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-password-AAAAAA"
         clickhouse-admin-password = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-password-AAAAAA"
-        auth-keys                 = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-keys-AAAAAA"
+        auth-jwt-keys             = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-jwt-keys-AAAAAA"
+        auth-service-role-key     = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-service-role-key-AAAAAA"
       }
     }
   }
@@ -372,12 +381,28 @@ run "stack_each_secret_reaches_the_services_that_read_it" {
     condition = (
       { for secret in module.litellm.containers[0].secrets : secret.name => secret.valueFrom }["LITELLM_MASTER_KEY"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/litellm-master-key-AAAAAA"
       && { for secret in module.litellm.containers[0].secrets : secret.name => secret.valueFrom }["DATABASE_URL"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-litellm-AAAAAA:url::"
-      && { for secret in module.gotrue.containers[0].secrets : secret.name => secret.valueFrom }["GOTRUE_JWT_KEYS"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-keys-AAAAAA:jwt_keys::"
+      && { for secret in module.gotrue.containers[0].secrets : secret.name => secret.valueFrom }["GOTRUE_JWT_KEYS"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-jwt-keys-AAAAAA"
+      && { for secret in module.app.containers[0].secrets : secret.name => secret.valueFrom }["AUTH_SERVICE_ROLE_KEY"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-service-role-key-AAAAAA"
       && { for secret in module.app.containers[0].secrets : secret.name => secret.valueFrom }["DATABASE_URL"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-app-AAAAAA:url::"
       && { for secret in module.app.containers[0].secrets : secret.name => secret.valueFrom }["DATABASE_ADMIN_URL"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-app-owner-AAAAAA:url::"
       && { for secret in module.db_init.containers[0].secrets : secret.name => secret.valueFrom }["GRAFANA_DB_PASSWORD"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-grafana-AAAAAA:password::"
     )
     error_message = "Each service reads its own secrets: LiteLLM its master key and database, GoTrue the key set, the application its two roles, db-init each role's password."
+  }
+  assert {
+    condition = (
+      jsondecode(module.auth_keys.task_role_policy).Statement == [{
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue", "secretsmanager:PutSecretValue"]
+        Resource = [
+          "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-jwt-keys-AAAAAA",
+          "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-service-role-key-AAAAAA",
+        ]
+      }]
+      && { for setting in module.auth_keys.containers[0].environment : setting.name => setting.value }["AUTH_JWT_KEYS_ARN"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-jwt-keys-AAAAAA"
+      && { for setting in module.auth_keys.containers[0].environment : setting.name => setting.value }["AUTH_SERVICE_ROLE_KEY_ARN"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-service-role-key-AAAAAA"
+    )
+    error_message = "auth-keys reads and writes its two secrets, named in its settings, and no other."
   }
   assert {
     condition = module.state_host[0].secret_arns == {
@@ -670,4 +695,32 @@ run "stack_langfuses_worker_starts_after_the_web_servers_migrations" {
     condition     = alltrue([for container in module.langfuse_web.containers : !contains(keys(container), "dependsOn")])
     error_message = "A service without a wait has no dependsOn, so its definition doesn't change."
   }
+}
+
+run "stack_refuses_an_application_named_as_the_stacks_own" {
+  command = plan
+  module {
+    source = "./modules/stack"
+  }
+  variables {
+    application = {
+      name  = "grafana"
+      image = "ghcr.io/example/acme@sha256:0000000000000000000000000000000000000000000000000000000000000009"
+    }
+  }
+  expect_failures = [var.application]
+}
+
+run "stack_refuses_an_application_named_as_rds_own" {
+  command = plan
+  module {
+    source = "./modules/stack"
+  }
+  variables {
+    application = {
+      name  = "rds-tools"
+      image = "ghcr.io/example/acme@sha256:0000000000000000000000000000000000000000000000000000000000000009"
+    }
+  }
+  expect_failures = [var.application]
 }

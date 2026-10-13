@@ -40,9 +40,9 @@ RFC-0004's `stack` holds the cluster, the private namespace, every Fargate servi
 - **The `secrets` module makes most of them,** and gains a `template` for a secret that isn't JSON, such as `sk-{password}`, and a `{password_sha256}` placeholder, 64 hexadecimal characters, for Langfuse's encryption key. It refuses a template without either placeholder, which would be written as it is.
 - **The databases' secrets are a second instance of it,** since their URLs carry RDS's address. Each is JSON, with the role's `password`, which `db-init` reads, and its `url`, which its service reads. Their keys start with `database-`, so the two instances never collide.
 - **Two are written in `stack`,** from ephemeral passwords of their own, with `secret_string_wo`:
-  - **Valkey's,** with its token and the connection strings for Langfuse (database 0) and LiteLLM (database 1). ElastiCache is given the same ephemeral token, so nothing reads a secret back, which a mocked test couldn't do.
+  - **Valkey's,** with its token and the connection strings for Langfuse (database 0) and LiteLLM (database 1). ElastiCache is given the same ephemeral token, so nothing reads a secret back, which a mocked test couldn't do. The two are written in one apply. If one stops after ElastiCache is made but before the secret is written, the next apply's password differs from ElastiCache's: raising Valkey's version writes both again.
   - **Langfuse's project keys,** `public` and `secret`, with `otlp_auth`, the Collector's Basic credential, made of both.
-- **`secret_versions` rotates a secret by its key.** It refuses Langfuse's salt and encryption key, and LiteLLM's salt key, which encrypt data and never change.
+- **`secret_versions` rotates a secret by its key.** It refuses Langfuse's salt and encryption key, and LiteLLM's salt key, which encrypt data, and Langfuse's project keys, which its first start makes its project with: none of them changes.
 - **The services read a secret only once it is written.** The ARNs they are given come from the secret versions.
 
 ### The thin images' environment
@@ -70,6 +70,7 @@ The images' pull request implements these settings, with Compose's defaults.
 - **The services wait for the runs they need.** `ecs-service` gains `after`, the runs a service waits for, which become its `triggers`. Only its ECS service waits, not its task definition, and a new run deploys it again, so GoTrue restarts with a new key set. A module's `depends_on` would defer its data sources to the apply, and with them every policy the tests read.
 - **The edge's target groups wait for their listener rules,** since ECS refuses a service whose target group no listener forwards to.
 - **Applying needs AWS CLI v2** where OpenTofu runs. On Floci, `AWS_ENDPOINT_URL` points it there.
+- **Each run waits for the network,** whose route out it needs to pull its image and read its secrets.
 
 ### ClickHouse, Prometheus and prom-label-proxy on Fargate, for Floci
 
@@ -88,6 +89,7 @@ The images' pull request implements these settings, with Compose's defaults.
 - **`envs/prod` and `envs/floci` are their own pull request,** after this one, to keep each under review's size.
 - **The one-off tasks run from where OpenTofu runs,** which needs the AWS CLI there. The RFC said only "by run-task".
 - **The application's settings come from the stack,** and not from a root of the template's. The template's `hosting: aws` root will call `stack` with its image and its own settings.
+- **Langfuse's bucket has no CORS configuration,** which browsers' media uploads to it need. Traces and events don't; the manual gate checks it.
 - **The services still share one security group** ([ADR-0032](0032-the-edge-the-services-and-the-state-host.md)'s design debt): a group per service, from its callers, comes after the roots.
 
 ## Options considered

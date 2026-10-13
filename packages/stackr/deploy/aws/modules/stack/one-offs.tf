@@ -63,6 +63,8 @@ resource "terraform_data" "db_init" {
     command     = "${path.module}/run-task"
     environment = merge(local.run_task, { TASK_DEFINITION = module.db_init.task_definition_arn })
   }
+  # Each run needs the private subnets' route out, to pull its image and read its secrets.
+  depends_on = [module.network]
 }
 
 module "auth_keys" {
@@ -98,6 +100,7 @@ resource "terraform_data" "auth_keys" {
     command     = "${path.module}/run-task"
     environment = merge(local.run_task, { TASK_DEFINITION = module.auth_keys.task_definition_arn })
   }
+  depends_on = [module.network]
 }
 
 module "db_roles" {
@@ -130,4 +133,5 @@ resource "terraform_data" "db_roles" {
     command     = "${path.module}/run-task"
     environment = merge(local.run_task, { TASK_DEFINITION = module.db_roles[0].task_definition_arn })
   }
+  depends_on = [module.network]
 }

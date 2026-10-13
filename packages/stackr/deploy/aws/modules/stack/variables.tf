@@ -170,16 +170,18 @@ variable "aws_endpoint_url" {
 variable "secret_versions" {
   description = <<-EOT
     Each generated secret's version, by its key, 1 by default: raising one writes it again with a
-    new password, and reruns the one-off tasks that read it. `valkey` is Valkey's token and its
-    connection strings; `langfuse-keys` Langfuse's project keys. Langfuse's salt and encryption
-    key, and LiteLLM's salt key, encrypt data, and never change.
+    new password, and reruns the one-off tasks that read it. `valkey` is Valkey's token, with its
+    connection strings: raising it also mends an apply that stopped after ElastiCache was made but
+    before its secret was written, which leaves the two with different tokens. Langfuse's salt and
+    encryption key, and LiteLLM's salt key, encrypt data, and Langfuse's project keys
+    (`langfuse-keys`) make its project once: none of them changes.
   EOT
   type        = map(number)
   default     = {}
 
   validation {
-    condition     = length(setintersection(keys(var.secret_versions), ["langfuse-salt", "langfuse-encryption-key", "litellm-salt-key"])) == 0
-    error_message = "Langfuse's salt and encryption key, and LiteLLM's salt key, encrypt data: they never change."
+    condition     = length(setintersection(keys(var.secret_versions), ["langfuse-salt", "langfuse-encryption-key", "litellm-salt-key", "langfuse-keys"])) == 0
+    error_message = "Langfuse's salt and encryption key, and LiteLLM's salt key, encrypt data, and Langfuse makes its project with its keys once: they never change."
   }
 }
 

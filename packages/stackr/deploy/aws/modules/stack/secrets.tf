@@ -97,7 +97,8 @@ resource "aws_secretsmanager_secret_version" "langfuse_keys" {
     secret    = "sk-lf-${ephemeral.random_password.langfuse_key["secret"].result}"
     otlp_auth = base64encode("pk-lf-${ephemeral.random_password.langfuse_key["public"].result}:sk-lf-${ephemeral.random_password.langfuse_key["secret"].result}")
   })
-  secret_string_wo_version = lookup(var.secret_versions, "langfuse-keys", 1)
+  # Langfuse makes its project with them on its first start, and never again.
+  secret_string_wo_version = 1
 }
 
 locals {

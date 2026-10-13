@@ -42,17 +42,20 @@ const NOWHERE = "In no workspace";
  */
 export const Route = createFileRoute("/_signed/t/$tenant/feedback")({
   head: ({ params }) => ({ meta: [{ title: `Feedback · ${params.tenant} · portalr admin` }] }),
-  validateSearch: shownOf,
+  validateSearch: (search: Record<string, unknown>): Shown => shownOf(search),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "portalr:read_telemetry"),
   loaderDeps: ({ search }) => search,
-  loader: ({ context, params, deps }) =>
-    context.queryClient.ensureQueryData(
+  loader: ({ context, params, deps }) => {
+    // The router types a search of optional keys as `{}`: read it again, as the route keeps it.
+    const { days, workspace } = shownOf(deps);
+    return context.queryClient.ensureQueryData(
       context.queries.portalr.feedback(
         params.tenant,
-        windowOf(deps.days, new Date()),
-        deps.workspace ?? null,
+        windowOf(days, new Date()),
+        workspace ?? null,
       ),
-    ),
+    );
+  },
   component: Feedback,
   notFoundComponent: () => (
     <>
@@ -72,7 +75,8 @@ function Feedback() {
   const { tenant } = Route.useParams();
   const shown = Route.useSearch();
   const { queries } = Route.useRouteContext();
-  const window = useMemo(() => windowOf(shown.days, new Date()), [shown.days]);
+  const days = shown.days ?? WINDOWS[0];
+  const window = useMemo(() => windowOf(days, new Date()), [days]);
   const { data: reading } = useSuspenseQuery(
     queries.portalr.feedback(tenant, window, shown.workspace ?? null),
   );
@@ -252,7 +256,7 @@ function Filter({ shown, workspaces }: { shown: Shown; workspaces: readonly stri
     <div className="grid gap-3 sm:grid-cols-2">
       <SelectField
         label="Window"
-        value={String(shown.days)}
+        value={String(shown.days ?? WINDOWS[0])}
         onChange={(event) => go({ days: event.target.value })}
         options={WINDOWS.map((days) => ({ value: String(days), label: `The last ${days} days` }))}
       />

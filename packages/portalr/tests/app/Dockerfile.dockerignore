@@ -9,6 +9,8 @@
 !packages/portalr/README.md
 !packages/portalr/LICENSE
 !packages/portalr/web/ui/src/fonts/OFL-*.txt
+!packages/portalr/web/ui/NOTICE
+!packages/portalr/web/ui/licenses/
 !packages/portalr/src/
 !packages/portalr/tests/__init__.py
 !packages/portalr/tests/app/

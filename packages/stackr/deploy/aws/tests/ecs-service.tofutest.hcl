@@ -229,3 +229,21 @@ run "ecs_service_starts_again_after_the_runs_it_waits_for" {
     error_message = "A new run of a one-off it waits for deploys the service again, with new tasks."
   }
 }
+
+run "ecs_service_waits_for_a_container_that_ends_well" {
+  command = plan
+  module {
+    source = "./modules/ecs-service"
+  }
+  variables {
+    wait = { image = "curlimages/curl:8", command = ["sh", "-c", "exit 0"] }
+  }
+
+  assert {
+    condition = (
+      one([for container in jsondecode(aws_ecs_task_definition.this.container_definitions) : container.dependsOn if container.name == "litellm"]) == [{ containerName = "wait", condition = "SUCCESS" }]
+      && one([for container in jsondecode(aws_ecs_task_definition.this.container_definitions) : container.essential if container.name == "wait"]) == false
+    )
+    error_message = "The service's container starts after its wait exits 0."
+  }
+}

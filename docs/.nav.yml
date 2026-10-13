@@ -25,6 +25,7 @@ nav:
       - adr/0014-portalrs-and-grantrs-marks.md
       - adr/0015-acceptance-tests-against-the-reference-applications.md
       - adr/0016-a-merge-queue-on-mergify.md
+      - adr/0017-ci-installs-its-toolchain-from-a-cache-with-retries.md
       - Template: adr/template.md
   - Brand: assets/brand/README.md
   - artifactr: artifactr

@@ -71,10 +71,11 @@ tasks:
       runInCI: false
 
   workflows:
-    description: 'Lint the workflows with actionlint and zizmor'
-    script: 'uv run actionlint && uv run zizmor --quiet .github/workflows'
+    description: 'Lint the workflows and actions with actionlint and zizmor'
+    script: 'uv run actionlint && uv run zizmor --quiet .github'
     inputs:
       - '.github/workflows/**/*'
+      - '.github/actions/**/*'
       - 'uv.lock'
 
   # One knip run over the Bun workspace: unused files, exports and dependencies in every web

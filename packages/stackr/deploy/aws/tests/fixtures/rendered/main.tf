@@ -1,6 +1,6 @@
 # The modules' templates, rendered with sample values for deploy/aws/check: the state host's user
-# data, which shellcheck reads, and GoTrue's proxy's Caddyfile, which tests/auth-proxy runs. Needs
-# no provider, and creates nothing.
+# data and Langfuse's worker's wait, which shellcheck reads, and GoTrue's proxy's Caddyfile, which
+# tests/auth-proxy runs. Needs no provider, and creates nothing.
 terraform {
   required_version = ">= 1.13"
 }
@@ -29,5 +29,13 @@ output "caddyfile" {
     port            = 9999
     gotrue_port     = 9998
     trusted_proxies = var.trusted_proxies
+  })
+}
+
+output "wait_for_langfuse" {
+  description = "Langfuse's worker's wait, as sh runs it."
+  value = templatefile("${path.module}/../../../modules/stack/wait-for-langfuse.sh.tftpl", {
+    health  = "http://langfuse-web.stackr.internal:3000/api/public/health"
+    version = "4.46.0"
   })
 }

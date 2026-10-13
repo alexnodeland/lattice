@@ -373,6 +373,8 @@ export interface components {
         };
         /** @enum {string} */
         Metric: "turn_latency" | "failed_turns";
+        /** Format: date-time */
+        Moment: string;
         /**
          * NewInvite
          * @description Whom to invite to the tenant ``X-Tenant`` names.
@@ -837,8 +839,8 @@ export interface operations {
     feedback_portalr_v1_feedback_get: {
         parameters: {
             query: {
-                start: string;
-                end: string;
+                start: components["schemas"]["Moment"];
+                end: components["schemas"]["Moment"];
                 workspace?: components["schemas"]["Id"] | null;
             };
             header?: {
@@ -970,8 +972,8 @@ export interface operations {
     logs_portalr_v1_logs_get: {
         parameters: {
             query: {
-                start: string;
-                end: string;
+                start: components["schemas"]["Moment"];
+                end: components["schemas"]["Moment"];
                 limit?: number;
                 thread?: components["schemas"]["Id"] | null;
                 run?: components["schemas"]["Id"] | null;
@@ -1034,8 +1036,8 @@ export interface operations {
     metrics_portalr_v1_metrics_get: {
         parameters: {
             query: {
-                start: string;
-                end: string;
+                start: components["schemas"]["Moment"];
+                end: components["schemas"]["Moment"];
                 limit?: number;
                 metric: components["schemas"]["Metric"];
                 step?: number;
@@ -1098,8 +1100,8 @@ export interface operations {
     scores_portalr_v1_scores_get: {
         parameters: {
             query: {
-                start: string;
-                end: string;
+                start: components["schemas"]["Moment"];
+                end: components["schemas"]["Moment"];
                 limit?: number;
             };
             header?: {
@@ -1218,8 +1220,8 @@ export interface operations {
     traces_portalr_v1_traces_get: {
         parameters: {
             query: {
-                start: string;
-                end: string;
+                start: components["schemas"]["Moment"];
+                end: components["schemas"]["Moment"];
                 limit?: number;
                 session?: components["schemas"]["Id"] | null;
                 run?: components["schemas"]["Id"] | null;

@@ -14,7 +14,7 @@ answers what it read, and says it is partial (portalr ADR-0027).
 import asyncio
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Final, Literal
 
 import httpx
@@ -45,6 +45,9 @@ BATCHES_AT_ONCE: Final = 4
 
 DEADLINE: Final = 20.0
 """How long a read may take, in seconds: past it, the read answers what it has, partial."""
+
+EARLIEST: Final = datetime.min.replace(tzinfo=UTC)
+"""The earliest moment there is, which a lookback stops at."""
 
 LOOKBACK: Final = timedelta(days=7)
 """How far before a window a trace may start and still be scored in it: a late thumb, or an
@@ -262,7 +265,8 @@ class Langfuse:
         self, tenant: Tenant, span: Span, workspace: str | None
     ) -> _Traces | Unavailable:
         """The tenant's traces that may be scored in the span: started up to ``LOOKBACK`` before."""
-        looked = Span(start=span.start - LOOKBACK, end=span.end)
+        # A week before the start, or as far back as there is.
+        looked = Span(start=span.start - min(LOOKBACK, span.start - EARLIEST), end=span.end)
         tag = tenant_tag(tenant)
         traces = _Traces(found={}, complete=True)
         cursor: str | None = None

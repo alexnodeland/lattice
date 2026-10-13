@@ -361,6 +361,10 @@
         ],
         "type": "string"
       },
+      "Moment": {
+        "format": "date-time",
+        "type": "string"
+      },
       "NewInvite": {
         "description": "Whom to invite to the tenant ``X-Tenant`` names.",
         "properties": {
@@ -1283,9 +1287,7 @@
             "name": "start",
             "required": true,
             "schema": {
-              "format": "date-time",
-              "title": "Start",
-              "type": "string"
+              "$ref": "#/components/schemas/Moment"
             }
           },
           {
@@ -1293,9 +1295,7 @@
             "name": "end",
             "required": true,
             "schema": {
-              "format": "date-time",
-              "title": "End",
-              "type": "string"
+              "$ref": "#/components/schemas/Moment"
             }
           },
           {
@@ -1512,9 +1512,7 @@
             "name": "start",
             "required": true,
             "schema": {
-              "format": "date-time",
-              "title": "Start",
-              "type": "string"
+              "$ref": "#/components/schemas/Moment"
             }
           },
           {
@@ -1522,9 +1520,7 @@
             "name": "end",
             "required": true,
             "schema": {
-              "format": "date-time",
-              "title": "End",
-              "type": "string"
+              "$ref": "#/components/schemas/Moment"
             }
           },
           {
@@ -1672,9 +1668,7 @@
             "name": "start",
             "required": true,
             "schema": {
-              "format": "date-time",
-              "title": "Start",
-              "type": "string"
+              "$ref": "#/components/schemas/Moment"
             }
           },
           {
@@ -1682,9 +1676,7 @@
             "name": "end",
             "required": true,
             "schema": {
-              "format": "date-time",
-              "title": "End",
-              "type": "string"
+              "$ref": "#/components/schemas/Moment"
             }
           },
           {
@@ -1820,9 +1812,7 @@
             "name": "start",
             "required": true,
             "schema": {
-              "format": "date-time",
-              "title": "Start",
-              "type": "string"
+              "$ref": "#/components/schemas/Moment"
             }
           },
           {
@@ -1830,9 +1820,7 @@
             "name": "end",
             "required": true,
             "schema": {
-              "format": "date-time",
-              "title": "End",
-              "type": "string"
+              "$ref": "#/components/schemas/Moment"
             }
           },
           {
@@ -2044,9 +2032,7 @@
             "name": "start",
             "required": true,
             "schema": {
-              "format": "date-time",
-              "title": "Start",
-              "type": "string"
+              "$ref": "#/components/schemas/Moment"
             }
           },
           {
@@ -2054,9 +2040,7 @@
             "name": "end",
             "required": true,
             "schema": {
-              "format": "date-time",
-              "title": "End",
-              "type": "string"
+              "$ref": "#/components/schemas/Moment"
             }
           },
           {

@@ -287,3 +287,18 @@ async def test_a_langfuse_without_its_score_api_is_unavailable() -> None:
     assert await read_feedback(down, ACME, WINDOW) == Unavailable(
         reason="langfuse has no observations API at that address"
     )
+
+
+def test_a_moment_with_no_zone_is_in_utc() -> None:
+    naive = FeedbackQuery.model_validate(
+        {"start": "2026-10-11T00:00:00", "end": "2026-10-12T00:00:00Z"}
+    )
+    assert naive.start == START
+
+
+async def test_a_window_at_the_start_of_time_looks_back_no_further() -> None:
+    tool = Tool({"/api/public/v2/observations": json({"data": []})})
+    langfuse = Langfuse("http://langfuse", project="p1", client=tool.client())
+    earliest = datetime.min.replace(tzinfo=UTC)
+    read = await langfuse.every_score(ACME, Span(start=earliest, end=earliest + timedelta(days=1)))
+    assert read == Ok(data=Scores(scores=[], complete=True))

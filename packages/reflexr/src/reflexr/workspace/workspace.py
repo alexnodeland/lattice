@@ -21,12 +21,13 @@ from collections.abc import (
 from contextlib import AbstractContextManager, aclosing
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Final, Literal, assert_never, cast
+from typing import Final, Literal, assert_never
 
 from opentelemetry.metrics import MeterProvider
 from opentelemetry.trace import Span, SpanKind, TracerProvider
 from pydantic import BaseModel, ConfigDict, JsonValue
 
+from lattice_core.text import holds_nul
 from reflexr.core import (
     DEFAULT_REGISTRY,
     FINISHED,
@@ -1528,7 +1529,6 @@ def _check_name(name: str) -> str:
         raise ValidationFailed(str(error), []) from None
 
 
-# Shared verbatim with artifactr's src/artifactr/workspace/workspace.py; change both.
 def _check_text(*values: object) -> None:
     """Refuse a NUL character in any string ``values`` hold, as models, mappings or collections.
 
@@ -1538,17 +1538,8 @@ def _check_text(*values: object) -> None:
     Raises:
         ValidationFailed: If a string holds a NUL character.
     """
-    pending: list[object] = list(values)  # a stack, so deep data can't exhaust recursion
-    while pending:
-        value = pending.pop()
-        found = value.model_dump() if isinstance(value, BaseModel) else value
-        if isinstance(found, str):
-            if "\x00" in found:
-                raise ValidationFailed("text cannot hold a NUL character", [])
-        elif isinstance(found, Mapping):
-            pending += cast("Mapping[object, object]", found).items()
-        elif isinstance(found, Collection) and not isinstance(found, bytes):
-            pending += cast("Collection[object]", found)
+    if holds_nul(*values):
+        raise ValidationFailed("text cannot hold a NUL character", [])
 
 
 def _check_page(

@@ -26,6 +26,7 @@ nav:
       - adr/0015-acceptance-tests-against-the-reference-applications.md
       - adr/0016-a-merge-queue-on-mergify.md
       - adr/0017-ci-installs-its-toolchain-from-a-cache-with-retries.md
+      - adr/0018-lattice-core-what-the-libraries-share.md
       - Template: adr/template.md
   - Brand: assets/brand/README.md
   - artifactr: artifactr
@@ -35,6 +36,7 @@ nav:
   - grantr: grantr
   - stackr: stackr
   - portalr: portalr
+  - lattice-core: lattice-core
   - Project:
       - Contributing: project/contributing.md
       - Code of conduct: project/code-of-conduct.md

@@ -17,6 +17,7 @@ members = [
     "evalr",
     "grantr",
     "lattice",
+    "lattice-core-ai",
     "oncall",
     "portalr",
     "reflexr",
@@ -231,6 +232,7 @@ source = { editable = "packages/artifactr" }
 dependencies = [
     { name = "jsonpatch" },
     { name = "jsonpointer" },
+    { name = "lattice-core-ai" },
     { name = "opentelemetry-api" },
     { name = "pydantic" },
     { name = "pydantic-ai-slim" },
@@ -325,6 +327,7 @@ requires-dist = [
     { name = "jsonpatch", specifier = ">=1.33" },
     { name = "jsonpointer", specifier = ">=1.9" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
+    { name = "lattice-core-ai", editable = "packages/lattice-core" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.2" },
     { name = "opentelemetry-api", specifier = ">=1.28" },
     { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'otel'", specifier = ">=1.45" },
@@ -2231,6 +2234,53 @@ docs = [
 ]
 
 [[package]]
+name = "lattice-core-ai"
+version = "0.1.0.dev0"
+source = { editable = "packages/lattice-core" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-timeout" },
+    { name = "ruff" },
+]
+lint = [
+    { name = "pyright" },
+    { name = "ruff" },
+]
+test = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-timeout" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.13" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pyright", specifier = ">=1.1.414" },
+    { name = "pytest", specifier = ">=9.1" },
+    { name = "pytest-cov", specifier = ">=7.1" },
+    { name = "pytest-timeout", specifier = ">=2.4" },
+    { name = "ruff", specifier = ">=0.16" },
+]
+lint = [
+    { name = "pyright", specifier = ">=1.1.414" },
+    { name = "ruff", specifier = ">=0.16" },
+]
+test = [
+    { name = "pytest", specifier = ">=9.1" },
+    { name = "pytest-cov", specifier = ">=7.1" },
+    { name = "pytest-timeout", specifier = ">=2.4" },
+]
+
+[[package]]
 name = "litellm"
 version = "1.83.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3922,6 +3972,7 @@ version = "0.1.0.dev0"
 source = { editable = "packages/reflexr" }
 dependencies = [
     { name = "cronsim" },
+    { name = "lattice-core-ai" },
     { name = "opentelemetry-api" },
     { name = "pydantic" },
     { name = "pydantic-ai-slim" },
@@ -4023,6 +4074,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.141" },
     { name = "httpx2", marker = "extra == 'litellm'", specifier = ">=2.7" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
+    { name = "lattice-core-ai", editable = "packages/lattice-core" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.2" },
     { name = "opentelemetry-api", specifier = ">=1.45" },
     { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'otel'", specifier = ">=1.45" },

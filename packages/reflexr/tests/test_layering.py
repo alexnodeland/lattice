@@ -14,11 +14,12 @@ SRC = Path(__file__).parent.parent / "src" / "reflexr"
 
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (reflexr packages it may import, third-party packages it may import)
-    "core": ({"reflexr.core"}, {"pydantic", "pydantic_core"}),
+    # lattice-core's helpers, shared with artifactr (lattice ADR-0018).
+    "core": ({"reflexr.core"}, {"pydantic", "pydantic_core", "lattice_core.schema"}),
     "telemetry": ({"reflexr.core", "reflexr.telemetry"}, {"opentelemetry"}),
     "workspace": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace"},
-        {"pydantic", "opentelemetry", "cronsim"},
+        {"pydantic", "opentelemetry", "cronsim", "lattice_core.text"},
     ),
     "fastapi": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.fastapi"},

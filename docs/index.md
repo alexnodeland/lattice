@@ -26,6 +26,7 @@ Libraries for applications in which people and agents work together, and the sta
 | [grantr](grantr/index.md) | Identity and access for artifactr and reflexr: tenants, members, groups, roles and service principals, checked before every command and read |
 | [stackr](stackr/index.md) | The infrastructure the libraries run on, and an application template |
 | [portalr](portalr/index.md) | The portal into an application: an app UI to chat with its agents and see their artifacts, proposals and runs, and an admin UI to run it |
+| [lattice-core](lattice-core/index.md) | What the packages share and must keep identical: infrastructure each depends on and re-exports, never imported by an application |
 
 artifactr, reflexr, evalr and grantr have reached v0.1. relayr's [plan](relayr/rfcs/0001-v0.1-implementation-plan.md) is finishing rules from chat, then evaluation and its docs. portalr's [plan](portalr/rfcs/0001-v0.1-implementation-plan.md) is building the app's areas and then the admin UI. stackr's template is built, and its [hosting recipes](stackr/rfcs/0004-hosting-recipes.md) are being built.
 

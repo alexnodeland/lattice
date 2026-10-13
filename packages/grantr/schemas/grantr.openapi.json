@@ -1050,7 +1050,7 @@
   "paths": {
     "/grantr/v1/audit": {
       "get": {
-        "description": "The deployment's audit log: its operators, granted and revoked.\n\n``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``\none subject's changes. ``newest_first`` reads back from the newest, and ``before_seq``\nfrom before an entry.",
+        "description": "The deployment's audit log: its operators, granted and revoked.\n\n``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``\none subject's changes. It reads the window ``after_seq < seq < before_seq``: the first\n``limit``, or the last ``last``, oldest first; a client pages back with ``last`` and its\noldest entry's ``seq`` as ``before_seq``.",
         "operationId": "deployment_audit_grantr_v1_audit_get",
         "parameters": [
           {
@@ -1071,7 +1071,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "minimum": 1,
+                  "minimum": 0,
                   "type": "integer"
                 },
                 {
@@ -1083,24 +1083,38 @@
           },
           {
             "in": "query",
-            "name": "newest_first",
+            "name": "limit",
             "required": false,
             "schema": {
-              "default": false,
-              "title": "Newest First",
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "maximum": 1000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
             }
           },
           {
             "in": "query",
-            "name": "limit",
+            "name": "last",
             "required": false,
             "schema": {
-              "default": 100,
-              "maximum": 1000,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 1000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last"
             }
           },
           {
@@ -1537,7 +1551,7 @@
     },
     "/grantr/v1/tenants/{tenant}/audit": {
       "get": {
-        "description": "A tenant's audit log after ``after_seq``, oldest first, or newest first.\n\n``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``\none subject's changes. ``newest_first`` reads back from the newest, and ``before_seq``\nfrom before an entry.",
+        "description": "A tenant's audit log in the window ``after_seq < seq < before_seq``, oldest first.\n\n``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``\none subject's changes. It reads the window ``after_seq < seq < before_seq``: the first\n``limit``, or the last ``last``, oldest first; a client pages back with ``last`` and its\noldest entry's ``seq`` as ``before_seq``.",
         "operationId": "tenant_audit_grantr_v1_tenants__tenant__audit_get",
         "parameters": [
           {
@@ -1568,7 +1582,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "minimum": 1,
+                  "minimum": 0,
                   "type": "integer"
                 },
                 {
@@ -1580,24 +1594,38 @@
           },
           {
             "in": "query",
-            "name": "newest_first",
+            "name": "limit",
             "required": false,
             "schema": {
-              "default": false,
-              "title": "Newest First",
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "maximum": 1000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
             }
           },
           {
             "in": "query",
-            "name": "limit",
+            "name": "last",
             "required": false,
             "schema": {
-              "default": 100,
-              "maximum": 1000,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 1000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last"
             }
           },
           {

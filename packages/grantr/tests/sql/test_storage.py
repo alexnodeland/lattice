@@ -4,7 +4,8 @@ import asyncio
 from pathlib import Path
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.pool import NullPool
 
@@ -12,6 +13,7 @@ from grantr.core import (
     DEPLOYMENT,
     TENANT,
     Agent,
+    AuditFilter,
     Forbidden,
     Grant,
     Grantee,
@@ -27,12 +29,14 @@ from grantr.sql.storage import (
     Columns,
     _scope,
     _to_the_end,
+    audit_query,
     grantee,
     resource,
     resource_columns,
     subject_columns,
 )
 from grantr.sql.tables import TenantRow
+from tests.databases import empty_database
 
 
 @pytest.mark.parametrize(
@@ -177,3 +181,37 @@ async def test_one_of_two_concurrent_creations_of_a_tenant_wins(engine: AsyncEng
     ]
     results = await asyncio.gather(*attempts, return_exceptions=True)
     assert sorted(type(result).__name__ for result in results) == ["AuditEntry", "Invalid"]
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize(
+    ("keep", "index"),
+    [
+        (AuditFilter(types=frozenset({"granted"})), "ix_grantr_audit_event_type"),
+        (AuditFilter(by=User(id="bob")), "ix_grantr_audit_actor"),
+    ],
+)
+async def test_a_page_back_reads_the_type_or_the_actor_index_on_postgresql(
+    tmp_path: Path, keep: AuditFilter, index: str
+) -> None:
+    """On a long log, a page back by type or by maker is that index's range: the window's end,
+    ``seq < before_seq``, keeps it so on PostgreSQL."""
+    query = audit_query("acme", before_seq=4000, last=10, keep=keep)
+    compiled = query.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True})
+    async with empty_database("postgres", tmp_path) as engine:
+        await create_schema(engine)
+        async with engine.begin() as connection:
+            # A tenant's long log, mostly others' members added: a granted, or bob's, is rare.
+            await connection.execute(
+                text(
+                    "INSERT INTO grantr_audit"
+                    " (tenant_id, event_type, actor_kind, actor_workspace, actor_id, body)"
+                    " SELECT 'acme',"
+                    " CASE WHEN n % 100 = 0 THEN 'granted' ELSE 'member_added' END,"
+                    " 'user', '', CASE WHEN n % 100 = 1 THEN 'bob' ELSE 'u' || n END, '{}'"
+                    " FROM generate_series(1, 5000) AS n"
+                )
+            )
+            await connection.execute(text("ANALYZE grantr_audit"))
+            plan = await connection.execute(text(f"EXPLAIN {compiled}"))
+            assert index in "\n".join(row[0] for row in plan)

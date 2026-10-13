@@ -188,13 +188,13 @@ class Storage(Reads, Protocol):
         *,
         after_seq: int = 0,
         before_seq: int | None = None,
-        newest_first: bool = False,
-        limit: int = 100,
+        limit: int | None = None,
+        last: int | None = None,
         keep: AuditFilter | None = None,
     ) -> list[AuditEntry]:
-        """A tenant's audit entries after ``after_seq``, or the deployment's with None.
+        """A tenant's audit entries in the window ``after_seq < seq < before_seq``, in order.
 
-        It returns the first ``limit`` that ``keep`` keeps, before ``before_seq`` if it is given,
-        oldest first, or newest first with ``newest_first``.
+        The deployment's with None. Of those ``keep`` keeps: the first ``limit``, the last
+        ``last``, still oldest first, or every one with neither.
         """
         ...

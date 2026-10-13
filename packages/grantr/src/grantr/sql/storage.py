@@ -19,7 +19,7 @@ from types import CoroutineType
 from typing import Any, Final
 
 from pydantic import TypeAdapter
-from sqlalchemy import ColumnElement, and_, delete, false, or_, select, update
+from sqlalchemy import ColumnElement, Select, and_, delete, false, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
@@ -669,36 +669,56 @@ class SqlStorage:
         *,
         after_seq: int = 0,
         before_seq: int | None = None,
-        newest_first: bool = False,
-        limit: int = 100,
+        limit: int | None = None,
+        last: int | None = None,
         keep: AuditFilter | None = None,
     ) -> list[AuditEntry]:
-        """A tenant's audit entries after ``after_seq``, or the deployment's with None.
+        """A tenant's audit entries in the window ``after_seq < seq < before_seq``, in order.
 
-        It returns the first ``limit`` that ``keep`` keeps, before ``before_seq`` if it is given,
-        oldest first, or newest first with ``newest_first``. A single type, or a single actor, is
-        one index's range, read forwards or backwards; a type and an actor together are an
-        index's range and a filter.
+        The deployment's with None. Of those ``keep`` keeps: the first ``limit``, the last
+        ``last``, still oldest first, or every one with neither; the last are read backwards
+        from the window's end. A single type, or a single actor, is one index's range; a type
+        and an actor together are an index's range and a filter. On PostgreSQL that holds for a
+        window's either end; SQLite may scan the tenant's index instead.
         """
-        query = select(AuditRow).where(
-            AuditRow.tenant_id == _scope(tenant), AuditRow.seq > after_seq
+        query = audit_query(
+            tenant, after_seq=after_seq, before_seq=before_seq, limit=limit, last=last, keep=keep
         )
-        if before_seq is not None:
-            query = query.where(AuditRow.seq < before_seq)
-        if keep is not None and keep.types:
-            query = query.where(AuditRow.event_type.in_(sorted(keep.types)))
-        if keep is not None and keep.by is not None:
-            kind, workspace, id = actor_columns(keep.by)
-            query = query.where(
-                AuditRow.actor_kind == kind,
-                AuditRow.actor_workspace == workspace,
-                AuditRow.actor_id == id,
-            )
-        order = AuditRow.seq.desc() if newest_first else AuditRow.seq
-        query = query.order_by(order).limit(limit)
         async with self._session(tenant) as session:
-            rows = await _to_the_end(session.scalars(query))
+            rows = list(await _to_the_end(session.scalars(query)))
+            if last is not None:
+                rows.reverse()
             return [
                 AuditEntry.model_validate({**row.body, "seq": row.seq, "tenant": tenant})
                 for row in rows
             ]
+
+
+def audit_query(
+    tenant: TenantId | None,
+    *,
+    after_seq: int = 0,
+    before_seq: int | None = None,
+    limit: int | None = None,
+    last: int | None = None,
+    keep: AuditFilter | None = None,
+) -> Select[AuditRow]:
+    """The query :meth:`SqlStorage.audit` reads: the window, the filter, and the first or last.
+
+    The last are ordered backwards from the window's end, for the caller to turn around.
+    """
+    query = select(AuditRow).where(AuditRow.tenant_id == _scope(tenant), AuditRow.seq > after_seq)
+    if before_seq is not None:
+        query = query.where(AuditRow.seq < before_seq)
+    if keep is not None and keep.types:
+        query = query.where(AuditRow.event_type.in_(sorted(keep.types)))
+    if keep is not None and keep.by is not None:
+        kind, workspace, id = actor_columns(keep.by)
+        query = query.where(
+            AuditRow.actor_kind == kind,
+            AuditRow.actor_workspace == workspace,
+            AuditRow.actor_id == id,
+        )
+    if last is not None:
+        return query.order_by(AuditRow.seq.desc()).limit(last)
+    return query.order_by(AuditRow.seq).limit(limit)

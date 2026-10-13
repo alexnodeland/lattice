@@ -267,25 +267,22 @@ async def test_a_run_that_ended_meanwhile_is_left_as_it_ended(gate: Gate) -> Non
     assert (await ws.run("run_done")).status == "completed"
 
 
-TTL = timedelta(seconds=2)
-"""A claim ttl a test outlasts, renewed every two thirds of a second. A claim lapses a whole ttl
-after its last renewal began, so a process starved for longer loses it, rightly: under CI's load,
-a 300 ms ttl lapsed before the run reached its tool."""
-
-
 async def test_a_run_whose_claim_lapses_is_stopped_at_its_deadline(
     gate: Gate, app_tools: FunctionToolset[Session[Gate]], caplog: pytest.LogCaptureFixture
 ) -> None:
+    # A claim ttl a test outlasts. The claim survives a stall of up to about two thirds of it, so
+    # a slow start doesn't lose it.
+    ttl = timedelta(seconds=2)
     storage = Partitioned(in_flight=True)
     ws = await Workspaces(storage).open("tenant", "ws", actor=ALICE)
     thread = await ws.create_thread()
-    runner = Runner(make_agent(Script(call("hold")), tools=[app_tools]), app=gate, claim_ttl=TTL)
+    runner = Runner(make_agent(Script(call("hold")), tools=[app_tools]), app=gate, claim_ttl=ttl)
     handle = started(await runner.send(ws, thread.id, "Hold on"))
-    async with asyncio.timeout(5 * TTL.total_seconds()):
-        # Cut off once the run holds its tool open, so it is the cut-off, not a slow start, that
-        # makes the claim lapse.
+    async with asyncio.timeout(5):
         await gate.entered.wait()
-        storage.cut_off.add(storage.holders[f"thread:{thread.id}"])  # its next renewal hangs
+    # Only once the run holds its tool: its next renewal hangs, and its claim lapses.
+    storage.cut_off.add(storage.holders[f"thread:{thread.id}"])
+    async with asyncio.timeout(2 * ttl.total_seconds()):
         await asyncio.gather(handle.task, return_exceptions=True)
     assert handle.task.cancelled()
     assert types(await ws.read()) == [

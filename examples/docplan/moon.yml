@@ -32,5 +32,8 @@ tasks:
       - '/packages/evalr/README.md'
       - '/packages/evalr/LICENSE'
       - '/packages/evalr/src/**/*'
+      - '/packages/lattice-core/README.md'
+      - '/packages/lattice-core/LICENSE'
+      - '/packages/lattice-core/src/**/*'
     options:
       mutex: 'reference-app'

@@ -1,0 +1,5 @@
+# lattice-core: what the libraries share and must keep identical. It imports none of them.
+language: 'python'
+layer: 'library'
+tags: ['distribution']
+dependsOn: []

@@ -78,9 +78,9 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 
 | Package | Depends on | Role | Responsibility |
 |---|---|---|---|
-| `artifactr.core` | pydantic, jsonpatch | Inner | Every rule. Pure, synchronous, no I/O, no pydantic-ai, no OpenTelemetry. |
+| `artifactr.core` | pydantic, jsonpatch, lattice-core's `schema` | Inner | Every rule. Pure, synchronous, no I/O, no pydantic-ai, no OpenTelemetry. |
 | `artifactr.telemetry` | core, the OpenTelemetry API | Inner; its port is the OpenTelemetry API | Span attribution, the metric registry, and recording through the API. |
-| `artifactr.workspace` | core, telemetry | Inner; owns the `Storage` port | `Workspaces`, `Workspace`, storage protocols, in-memory storage. |
+| `artifactr.workspace` | core, telemetry, lattice-core's `text` | Inner; owns the `Storage` port | `Workspaces`, `Workspace`, storage protocols, in-memory storage. |
 | `artifactr.agent` | workspace, telemetry, pydantic-ai | Inner; owns the `TurnContext`, `TurnEvaluator` and `CommandResults` ports | The `ArtifactWorkspace` capability, `Session`, `Runner`, live-output helpers, and the memory of commands' results. |
 | `artifactr.scores` (needs evalr, from the `langfuse` or `evals` extra) | telemetry, workspace, evalr's core | Uses evalr's `ScoreSink` and `ScoreConfigStore` ports | Feedback as scores, named as each type is registered, and the mirror that records a workspace's feedback in a sink. |
 | `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | Adapter for `Storage` | Durable storage on PostgreSQL and SQLite, and its migrations. |
@@ -549,7 +549,7 @@ reflexr, the sibling library for event-driven agents, is released on its own, an
 | MCP | Tenant in resource URIs | The same |
 | Commands | `Runner.execute(workspace, command, command_id=)` returns the `command_result`, remembered in a `CommandResults` port by tenant, workspace, participant and id; every MCP tool that changes something takes `command_id` | The same, as `Workspaces.execute` |
 
-Some code is shared verbatim, at the same path under `src/reflexr/`, and each copy's docstring says so. A change to one is made to both:
+What artifactr and reflexr shared verbatim moves into [lattice-core](../lattice-core/index.md), which both depend on ([lattice ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md)): `tag_required` and the NUL search are there already. Until the rest moves, it is copied at the same path under `src/reflexr/`, each copy's docstring says so, and a change to one is made to both:
 
 - `_logging_left_alone`, in `src/artifactr/mcp/server.py`
 - `litellm_model`, in `src/artifactr/litellm/gateway.py`
@@ -562,6 +562,7 @@ Some code is shared verbatim, at the same path under `src/reflexr/`, and each co
 | Dependency | Used for | Current major (2026-09) |
 |---|---|---|
 | pydantic | Artifact types, commands, events, JSON Schema | 2.13 |
+| lattice-core-ai | What artifactr shares with lattice's other packages ([lattice-core](../lattice-core/index.md)); from lattice until published | 0.1 |
 | jsonpatch | RFC 6902 apply and diff in core | 1.33 |
 | pydantic-ai-slim | Agent runtime: capabilities, toolsets, deferred tools, message history | 2.51 |
 | SQLAlchemy (asyncio) | SQL storage | 2.1 |

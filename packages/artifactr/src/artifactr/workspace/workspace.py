@@ -22,7 +22,6 @@ from collections.abc import (
     Callable,
     Collection,
     Iterable,
-    Mapping,
     Sequence,
 )
 from datetime import timedelta
@@ -116,6 +115,7 @@ from artifactr.telemetry.attributes import (
 from artifactr.telemetry.metrics import COMMANDS, COMMIT_DURATION
 from artifactr.telemetry.traces import untraced
 from artifactr.workspace.storage import HistoryChunk, Scope, Storage
+from lattice_core.text import holds_nul
 
 logger = logging.getLogger("artifactr.workspace")
 
@@ -1058,7 +1058,6 @@ def _access(command: Command) -> Access:
             return Access(action=action)
 
 
-# Shared verbatim with reflexr's src/reflexr/workspace/workspace.py; change both.
 def _check_text(*values: object) -> None:
     """Refuse a NUL character in any string ``values`` hold, as models, mappings or collections.
 
@@ -1068,17 +1067,8 @@ def _check_text(*values: object) -> None:
     Raises:
         ValidationFailed: If a string holds a NUL character.
     """
-    pending: list[object] = list(values)  # a stack, so deep data can't exhaust recursion
-    while pending:
-        value = pending.pop()
-        found = value.model_dump() if isinstance(value, BaseModel) else value
-        if isinstance(found, str):
-            if "\x00" in found:
-                raise ValidationFailed("text cannot hold a NUL character", [])
-        elif isinstance(found, Mapping):
-            pending += cast("Mapping[object, object]", found).items()
-        elif isinstance(found, Collection) and not isinstance(found, bytes):
-            pending += cast("Collection[object]", found)
+    if holds_nul(*values):
+        raise ValidationFailed("text cannot hold a NUL character", [])
 
 
 def _not_hidden(access: Access, hidden: Hides) -> None:

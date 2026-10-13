@@ -9,6 +9,10 @@ tasks:
     command: 'uv build --quiet --no-sources --out-dir dist'
     outputs:
       - 'dist/**/*'
+    # A package's siblings are built first, theirs before them, so its standalone install finds
+    # every wheel it needs, however far down: relayr needs lattice-core's through artifactr.
+    deps:
+      - '^:build'
 
   standalone:
     description: 'Install the wheel, its extras and its siblings, outside the workspace, and import it'
@@ -17,7 +21,6 @@ tasks:
       - '/scripts/standalone.py'
     deps:
       - 'build'
-      - '^:build'
 
   # deptry over the shipped code, run from the package's directory so that its default exclusion
   # of tests/ applies. DEP002 (unused) stays off, since extras such as [postgres] name drivers the

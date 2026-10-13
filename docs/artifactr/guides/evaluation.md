@@ -166,7 +166,8 @@ evalr is not on PyPI yet. In lattice, artifactr's development environment takes 
 === "pip"
 
     ```bash
-    pip install "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" \
+    pip install "lattice-core-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/lattice-core" \
+      "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" \
       "artifactr-ai[evals] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"
     ```
 

@@ -47,6 +47,10 @@ variable "state_host" {
     condition     = contains(["ec2", "fargate"], var.state_host)
     error_message = "The state host is ec2 or fargate."
   }
+  validation {
+    condition     = var.state_host == "ec2" || (var.destroyable && var.aws_endpoint_url != null)
+    error_message = "The state host's services run on Fargate only on Floci: destroyable, with its aws_endpoint_url."
+  }
 }
 
 variable "ami_id" {
@@ -169,19 +173,33 @@ variable "aws_endpoint_url" {
 
 variable "secret_versions" {
   description = <<-EOT
-    Each generated secret's version, by its key, 1 by default: raising one writes it again with a
-    new password, and reruns the one-off tasks that read it. `valkey` is Valkey's token, with its
-    connection strings: raising it also mends an apply that stopped after ElastiCache was made but
-    before its secret was written, which leaves the two with different tokens. Langfuse's salt and
-    encryption key, and LiteLLM's salt key, encrypt data, and Langfuse's project keys
-    (`langfuse-keys`) make its project once: none of them changes.
+    The version of each secret that may rotate, by its key, 1 by default. Raising one writes it
+    again with a new password; db-init runs again for a database's, and each service that reads it
+    is deployed again with new tasks. Replacing what a secret's value names, such as RDS behind a
+    database's URL, needs its version raised too: the secret is written only when it is.
+
+    `valkey` is Valkey's token, with its connection strings. Raising it also mends an apply that
+    stopped after ElastiCache was made but before its secret was written, which leaves the two
+    with different tokens.
+
+    The others never change: Langfuse's salt and encryption key, and LiteLLM's salt key, encrypt
+    data; Langfuse's project keys and admin password, and Grafana's admin password, are read on
+    their first start only; and ClickHouse's passwords reach the state host only when its unit
+    restarts.
   EOT
   type        = map(number)
   default     = {}
 
   validation {
-    condition     = length(setintersection(keys(var.secret_versions), ["langfuse-salt", "langfuse-encryption-key", "litellm-salt-key", "langfuse-keys"])) == 0
-    error_message = "Langfuse's salt and encryption key, and LiteLLM's salt key, encrypt data, and Langfuse makes its project with its keys once: they never change."
+    condition = length(setsubtract(keys(var.secret_versions), [
+      "langfuse-nextauth-secret", "litellm-master-key", "gotrue-jwt-secret", "valkey",
+      "database-langfuse", "database-litellm", "database-gotrue", "database-grafana", "database-app-owner", "database-app",
+    ])) == 0
+    error_message = "Only these rotate: langfuse-nextauth-secret, litellm-master-key, gotrue-jwt-secret, valkey, and the database-* secrets (see the description for why the others don't)."
+  }
+  validation {
+    condition     = alltrue([for version in values(var.secret_versions) : version >= 1 && floor(version) == version])
+    error_message = "A version is a whole number, from 1."
   }
 }
 
@@ -220,4 +238,14 @@ variable "log_retention_days" {
   description = "How long the services' container logs stay in CloudWatch Logs."
   type        = number
   default     = 14
+}
+
+variable "run_task_environment" {
+  description = <<-EOT
+    What the AWS CLI that runs the one-off tasks needs, beside the environment OpenTofu runs in:
+    the provider's credentials, when the provider is given them other than through that
+    environment, such as AWS_PROFILE. Never a secret's value.
+  EOT
+  type        = map(string)
+  default     = {}
 }

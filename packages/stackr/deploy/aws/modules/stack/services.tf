@@ -1,25 +1,23 @@
 # Every service on Fargate (RFC-0004), each through ecs-service, with the settings compose.yaml
-# gives it, its peers at their names in the namespace, and its secrets by reference. The thin
-# images read their peers' names and their storage from the environment (ADR-0034).
+# gives it, the peers it calls at their names in the namespace, and its secrets by reference. The
+# thin images read their peers' names and their storage from the environment (ADR-0034).
+#
+# Each service waits, through `after`, for the one-off runs it needs and the versions of the
+# secrets it reads: a new run, or a rotated secret, deploys it again with new tasks.
 
 locals {
-  service = {
-    deployment         = var.name
-    cluster_arn        = aws_ecs_cluster.this.arn
-    subnet_ids         = module.network.private_subnet_ids
-    security_group_ids = [module.network.security_groups.services]
-    namespace_id       = aws_service_discovery_private_dns_namespace.this.id
-  }
-  # The thin images' peers, at their names in the namespace; on one machine, Compose's names.
-  peers = {
-    TEMPO_ADDRESS      = local.address.tempo
-    PROMETHEUS_ADDRESS = local.address.prometheus
-    LOKI_ADDRESS       = local.address.loki
-    PYROSCOPE_ADDRESS  = local.address.pyroscope
-    LANGFUSE_ADDRESS   = local.address.langfuse-web
-  }
+  # The state host's services, which are named where they run, on EC2 or on Fargate.
+  dns = { for name in ["prometheus", "clickhouse"] : name => "${name}.${local.namespace}" }
+
   # Where AWS is, for a client that is told: only where it isn't AWS's own.
   endpoint = var.aws_endpoint_url == null ? {} : { AWS_ENDPOINT_URL = var.aws_endpoint_url }
+
+  # The state host's services, which Langfuse and the Collector need: the instance, or the three
+  # services on Fargate. Neither says when ClickHouse is up inside them (ADR-0034).
+  state = merge(
+    { for host in module.state_host : "state-host" => host.instance_id },
+    { for name, service in module.state_services : "state/${name}" => service.service_arn },
+  )
 
   # What a service's task role may do in a bucket: under a prefix of it, or all of it.
   storage = {
@@ -44,12 +42,6 @@ locals {
       },
     ]
   }) }
-  # Tempo's, Loki's and Pyroscope's blocks, each under its own prefix of the telemetry bucket.
-  telemetry_storage = { for service in ["tempo", "loki", "pyroscope"] : service => merge(local.endpoint, {
-    S3_BUCKET = local.storage[service].bucket.name
-    S3_REGION = local.region
-    S3_PREFIX = local.storage[service].prefix
-  }) }
 
   # Langfuse's web and worker share their settings, as in compose.yaml.
   langfuse_environment = merge(
@@ -58,8 +50,8 @@ locals {
       NEXTAUTH_URL               = "http://localhost:3000"
       TELEMETRY_ENABLED          = "false"
       HOSTNAME                   = "0.0.0.0"
-      CLICKHOUSE_URL             = "http://${local.address.clickhouse}:8123"
-      CLICKHOUSE_MIGRATION_URL   = "clickhouse://${local.address.clickhouse}:9000"
+      CLICKHOUSE_URL             = "http://${local.dns.clickhouse}:8123"
+      CLICKHOUSE_MIGRATION_URL   = "clickhouse://${local.dns.clickhouse}:9000"
       CLICKHOUSE_USER            = "langfuse"
       CLICKHOUSE_CLUSTER_ENABLED = "false"
     },
@@ -82,84 +74,103 @@ locals {
   }
 }
 
+module "telemetry" {
+  source             = "../ecs-service"
+  for_each           = { tempo = 3200, loki = 3100, pyroscope = 4040 }
+  name               = each.key
+  deployment         = local.task.deployment
+  cluster_arn        = local.task.cluster_arn
+  subnet_ids         = local.task.subnet_ids
+  security_group_ids = local.task.security_group_ids
+  namespace_id       = local.task.namespace_id
+  size               = local.sizes[each.key]
+  log_retention_days = var.log_retention_days
+  # Its blocks under its own prefix of the telemetry bucket; Tempo also writes its metrics to
+  # Prometheus.
+  container = {
+    image = var.images[each.key]
+    port  = each.value
+    environment = merge(
+      local.endpoint,
+      {
+        S3_BUCKET = local.storage[each.key].bucket.name
+        S3_REGION = local.region
+        S3_PREFIX = local.storage[each.key].prefix
+      },
+      each.key == "tempo" ? { PROMETHEUS_ADDRESS = local.dns.prometheus } : {},
+    )
+  }
+  task_role_policy_json = local.storage_policy[each.key]
+}
+
 module "otel_collector" {
   source             = "../ecs-service"
   name               = "otel-collector"
-  deployment         = local.service.deployment
-  cluster_arn        = local.service.cluster_arn
-  subnet_ids         = local.service.subnet_ids
-  security_group_ids = local.service.security_group_ids
-  namespace_id       = local.service.namespace_id
+  deployment         = local.task.deployment
+  cluster_arn        = local.task.cluster_arn
+  subnet_ids         = local.task.subnet_ids
+  security_group_ids = local.task.security_group_ids
+  namespace_id       = local.task.namespace_id
   size               = local.sizes["otel-collector"]
   log_retention_days = var.log_retention_days
   container = {
     image = var.images.otel_collector
     port  = 4318
-    environment = merge(local.peers, {
+    environment = {
+      TEMPO_ADDRESS           = "${module.telemetry["tempo"].address.name}.${local.namespace}"
+      LOKI_ADDRESS            = "${module.telemetry["loki"].address.name}.${local.namespace}"
+      PROMETHEUS_ADDRESS      = local.dns.prometheus
+      LANGFUSE_ADDRESS        = "${module.langfuse_web.address.name}.${local.namespace}"
       STACKR_ENVIRONMENT      = var.environment
       STACKR_TRACES_EXPORTERS = "[otlp_grpc/tempo, otlp_http/langfuse]"
-    })
+    }
     secrets = { LANGFUSE_OTLP_AUTH = "${local.secret["langfuse-keys"]}:otlp_auth::" }
   }
-}
-
-module "telemetry" {
-  source             = "../ecs-service"
-  for_each           = { tempo = 3200, loki = 3100, pyroscope = 4040 }
-  name               = each.key
-  deployment         = local.service.deployment
-  cluster_arn        = local.service.cluster_arn
-  subnet_ids         = local.service.subnet_ids
-  security_group_ids = local.service.security_group_ids
-  namespace_id       = local.service.namespace_id
-  size               = local.sizes[each.key]
-  log_retention_days = var.log_retention_days
-  container = {
-    image       = var.images[each.key]
-    port        = each.value
-    environment = merge(local.peers, local.telemetry_storage[each.key])
-  }
-  task_role_policy_json = local.storage_policy[each.key]
+  after = local.state
 }
 
 module "grafana" {
   source             = "../ecs-service"
   name               = "grafana"
-  deployment         = local.service.deployment
-  cluster_arn        = local.service.cluster_arn
-  subnet_ids         = local.service.subnet_ids
-  security_group_ids = local.service.security_group_ids
-  namespace_id       = local.service.namespace_id
+  deployment         = local.task.deployment
+  cluster_arn        = local.task.cluster_arn
+  subnet_ids         = local.task.subnet_ids
+  security_group_ids = local.task.security_group_ids
+  namespace_id       = local.task.namespace_id
   size               = local.sizes.grafana
   log_retention_days = var.log_retention_days
   container = {
     image = var.images.grafana
     port  = 3000
     # Its users and alert state on RDS, which db-init creates, so a replaced task keeps them.
-    environment = merge(local.peers, {
+    environment = {
+      TEMPO_ADDRESS          = "${module.telemetry["tempo"].address.name}.${local.namespace}"
+      LOKI_ADDRESS           = "${module.telemetry["loki"].address.name}.${local.namespace}"
+      PYROSCOPE_ADDRESS      = "${module.telemetry["pyroscope"].address.name}.${local.namespace}"
+      PROMETHEUS_ADDRESS     = local.dns.prometheus
       GF_SECURITY_ADMIN_USER = "admin"
       GF_DATABASE_TYPE       = "postgres"
       GF_DATABASE_HOST       = local.postgres
       GF_DATABASE_NAME       = "grafana"
       GF_DATABASE_USER       = "grafana"
       GF_DATABASE_SSL_MODE   = var.tls_to_data ? "require" : "disable"
-    })
+    }
     secrets = {
       GF_SECURITY_ADMIN_PASSWORD = local.secret["grafana-admin-password"]
       GF_DATABASE_PASSWORD       = "${local.database["database-grafana"]}:password::"
     }
   }
-  after = { db-init = terraform_data.db_init.id }
+  after = merge({ db-init = terraform_data.db_init.id }, local.versions_of.grafana)
 }
 
 module "langfuse_web" {
   source             = "../ecs-service"
   name               = "langfuse-web"
-  deployment         = local.service.deployment
-  cluster_arn        = local.service.cluster_arn
-  subnet_ids         = local.service.subnet_ids
-  security_group_ids = local.service.security_group_ids
-  namespace_id       = local.service.namespace_id
+  deployment         = local.task.deployment
+  cluster_arn        = local.task.cluster_arn
+  subnet_ids         = local.task.subnet_ids
+  security_group_ids = local.task.security_group_ids
+  namespace_id       = local.task.namespace_id
   size               = local.sizes["langfuse-web"]
   log_retention_days = var.log_retention_days
   container = {
@@ -183,17 +194,17 @@ module "langfuse_web" {
     })
   }
   task_role_policy_json = local.storage_policy.langfuse
-  after                 = { db-init = terraform_data.db_init.id }
+  after                 = merge({ db-init = terraform_data.db_init.id }, local.state, local.versions_of.langfuse-web)
 }
 
 module "langfuse_worker" {
   source             = "../ecs-service"
   name               = "langfuse-worker"
-  deployment         = local.service.deployment
-  cluster_arn        = local.service.cluster_arn
-  subnet_ids         = local.service.subnet_ids
-  security_group_ids = local.service.security_group_ids
-  namespace_id       = local.service.namespace_id
+  deployment         = local.task.deployment
+  cluster_arn        = local.task.cluster_arn
+  subnet_ids         = local.task.subnet_ids
+  security_group_ids = local.task.security_group_ids
+  namespace_id       = local.task.namespace_id
   size               = local.sizes["langfuse-worker"]
   log_retention_days = var.log_retention_days
   container = {
@@ -203,17 +214,17 @@ module "langfuse_worker" {
     secrets     = local.langfuse_secrets
   }
   task_role_policy_json = local.storage_policy.langfuse
-  after                 = { db-init = terraform_data.db_init.id }
+  after                 = merge({ db-init = terraform_data.db_init.id }, local.state, local.versions_of.langfuse-worker)
 }
 
 module "litellm" {
   source             = "../ecs-service"
   name               = "litellm"
-  deployment         = local.service.deployment
-  cluster_arn        = local.service.cluster_arn
-  subnet_ids         = local.service.subnet_ids
-  security_group_ids = local.service.security_group_ids
-  namespace_id       = local.service.namespace_id
+  deployment         = local.task.deployment
+  cluster_arn        = local.task.cluster_arn
+  subnet_ids         = local.task.subnet_ids
+  security_group_ids = local.task.security_group_ids
+  namespace_id       = local.task.namespace_id
   size               = local.sizes.litellm
   log_retention_days = var.log_retention_days
   container = {
@@ -222,7 +233,7 @@ module "litellm" {
     command = ["--config", "/etc/litellm/config.yaml", "--port", "4000"]
     environment = {
       LITELLM_OTEL_V2                         = "true"
-      OTEL_EXPORTER_OTLP_ENDPOINT             = local.otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT             = "http://${module.otel_collector.address.name}.${local.namespace}:4318"
       OTEL_EXPORTER_OTLP_PROTOCOL             = "http/protobuf"
       OTEL_SERVICE_NAME                       = "litellm"
       OTEL_RESOURCE_ATTRIBUTES                = "deployment.environment.name=${var.environment}"
@@ -240,20 +251,37 @@ module "litellm" {
       { for provider in var.gateway_providers : "${upper(provider)}_API_KEY" => local.secret["litellm-${provider}-api-key"] },
     )
   }
-  after = { db-init = terraform_data.db_init.id }
+  after = merge({ db-init = terraform_data.db_init.id }, local.versions_of.litellm)
 }
 
 # GoTrue, behind its proxy in its task (ADR-0032): the proxy takes its port and the edge's target
 # group, and GoTrue listens on the task's loopback, keying its rate limits on the one address the
-# proxy passes it.
+# proxy passes it. With SMTP, it also reaches the SMTP server, from a group of its own.
+resource "aws_security_group" "gotrue_smtp" {
+  count       = var.auth_smtp == null ? 0 : 1
+  name        = "${var.name}-gotrue-smtp"
+  description = "GoTrue: out to its SMTP server"
+  vpc_id      = module.network.vpc_id
+}
+
+resource "aws_vpc_security_group_egress_rule" "gotrue_smtp" {
+  count             = var.auth_smtp == null ? 0 : 1
+  security_group_id = aws_security_group.gotrue_smtp[0].id
+  description       = "SMTP out, through the NAT gateway"
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "tcp"
+  from_port         = var.auth_smtp.port
+  to_port           = var.auth_smtp.port
+}
+
 module "gotrue" {
   source             = "../ecs-service"
   name               = "gotrue"
-  deployment         = local.service.deployment
-  cluster_arn        = local.service.cluster_arn
-  subnet_ids         = local.service.subnet_ids
-  security_group_ids = local.service.security_group_ids
-  namespace_id       = local.service.namespace_id
+  deployment         = local.task.deployment
+  cluster_arn        = local.task.cluster_arn
+  subnet_ids         = local.task.subnet_ids
+  security_group_ids = concat(local.task.security_group_ids, aws_security_group.gotrue_smtp[*].id)
+  namespace_id       = local.task.namespace_id
   size               = local.sizes.gotrue
   log_retention_days = var.log_retention_days
   target_group_arn   = module.edge.target_groups.auth
@@ -293,7 +321,7 @@ module "gotrue" {
       var.auth_smtp == null ? {} : { GOTRUE_SMTP_PASS = local.secret["auth-smtp-password"] },
     )
   }
-  after = { db-init = terraform_data.db_init.id, auth-keys = terraform_data.auth_keys.id }
+  after = merge({ db-init = terraform_data.db_init.id, auth-keys = terraform_data.auth_keys.id }, local.versions_of.gotrue)
 }
 
 # The application, at app.<domain>: the settings the stack gives it, then its own.
@@ -303,31 +331,32 @@ locals {
       APP_HOST                    = "0.0.0.0"
       APP_PORT                    = "8000"
       APP_ENVIRONMENT             = var.environment
-      OTEL_EXPORTER_OTLP_ENDPOINT = local.otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT = "http://${module.otel_collector.address.name}.${local.namespace}:4318"
       OTEL_SERVICE_NAME           = var.application.name
-      LANGFUSE_BASE_URL           = "http://${local.address.langfuse-web}:3000"
-      LITELLM_BASE_URL            = "http://${local.address.litellm}:4000"
+      LANGFUSE_BASE_URL           = "http://${module.langfuse_web.address.name}.${local.namespace}:3000"
+      LITELLM_BASE_URL            = "http://${module.litellm.address.name}.${local.namespace}:4000"
       AUTH_ISSUER                 = "https://${local.hosts.auth}"
       AUTH_AUDIENCE               = "authenticated"
       # GoTrue's key set and admin API, at its private address: the edge refuses /admin.
-      AUTH_JWKS_URL = "http://${local.address.gotrue}:9999/.well-known/jwks.json"
+      AUTH_JWKS_URL = "http://${module.gotrue.address.name}.${local.namespace}:9999/.well-known/jwks.json"
     },
-    local.grantr ? { AUTH_ADMIN_URL = "http://${local.address.gotrue}:9999" } : {},
+    local.grantr ? { AUTH_ADMIN_URL = "http://${module.gotrue.address.name}.${local.namespace}:9999" } : {},
     var.application.environment,
   )
+  # With grantr, it works as a role that owns nothing, and migrates as the owner (ADR-0022).
+  app_databases = local.grantr ? {
+    DATABASE_URL       = "${local.database["database-app"]}:url::"
+    DATABASE_ADMIN_URL = "${local.database["database-app-owner"]}:url::"
+    } : {
+    DATABASE_URL = "${local.database["database-app-owner"]}:url::"
+  }
   app_secrets = merge(
+    local.app_databases,
     {
       LANGFUSE_PUBLIC_KEY = "${local.secret["langfuse-keys"]}:public::"
       LANGFUSE_SECRET_KEY = "${local.secret["langfuse-keys"]}:secret::"
     },
-    # With grantr, it works as a role that owns nothing, and migrates as the owner (ADR-0022).
-    local.grantr ? {
-      DATABASE_URL          = "${local.database["database-app"]}:url::"
-      DATABASE_ADMIN_URL    = "${local.database["database-app-owner"]}:url::"
-      AUTH_SERVICE_ROLE_KEY = "${local.secret["auth-keys"]}:service_role_key::"
-      } : {
-      DATABASE_URL = "${local.database["database-app-owner"]}:url::"
-    },
+    local.grantr ? { AUTH_SERVICE_ROLE_KEY = "${local.secret["auth-keys"]}:service_role_key::" } : {},
     var.application.secrets,
   )
 }
@@ -335,11 +364,11 @@ locals {
 module "app" {
   source             = "../ecs-service"
   name               = "app"
-  deployment         = local.service.deployment
-  cluster_arn        = local.service.cluster_arn
-  subnet_ids         = local.service.subnet_ids
-  security_group_ids = local.service.security_group_ids
-  namespace_id       = local.service.namespace_id
+  deployment         = local.task.deployment
+  cluster_arn        = local.task.cluster_arn
+  subnet_ids         = local.task.subnet_ids
+  security_group_ids = local.task.security_group_ids
+  namespace_id       = local.task.namespace_id
   size               = local.sizes.app
   log_retention_days = var.log_retention_days
   target_group_arn   = module.edge.target_groups.app
@@ -349,5 +378,10 @@ module "app" {
     environment = local.app_environment
     secrets     = local.app_secrets
   }
-  after = merge({ db-init = terraform_data.db_init.id }, { for run in terraform_data.db_roles : "db-roles" => run.id })
+  after = merge(
+    { db-init = terraform_data.db_init.id },
+    { for run in terraform_data.db_roles : "db-roles" => run.id },
+    local.grantr ? { auth-keys = terraform_data.auth_keys.id } : {},
+    local.versions_of.app,
+  )
 }

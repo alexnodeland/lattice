@@ -11,3 +11,6 @@ skip-check:
   # customer-managed key per deployment (RFC-0004).
   - CKV2_AWS_57
   - CKV_AWS_149
+  # GoTrue's SMTP group is attached to its service through ecs-service, which a scan of the stack's
+  # own files doesn't follow; tests/stack.tofutest.hcl checks it.
+  - CKV2_AWS_5

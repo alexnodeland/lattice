@@ -225,7 +225,7 @@ run "ecs_service_starts_again_after_the_runs_it_waits_for" {
   }
 
   assert {
-    condition     = aws_ecs_service.this[0].triggers["db-init"] == "run-1"
-    error_message = "A new run of a one-off it waits for deploys the service again."
+    condition     = aws_ecs_service.this[0].triggers["db-init"] == "run-1" && aws_ecs_service.this[0].force_new_deployment
+    error_message = "A new run of a one-off it waits for deploys the service again, with new tasks."
   }
 }

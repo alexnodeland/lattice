@@ -36,5 +36,5 @@ output "state_host_instance_id" {
 
 output "secrets_written_elsewhere" {
   description = "The secrets an operator writes, by key: the providers' API keys and GoTrue's SMTP password."
-  value       = { for key, arn in module.secrets.arns : key => arn if startswith(key, "litellm-") && endswith(key, "-api-key") || key == "auth-smtp-password" }
+  value       = { for key, arn in module.secrets.arns : key => arn if(startswith(key, "litellm-") && endswith(key, "-api-key")) || key == "auth-smtp-password" }
 }

@@ -1,35 +1,30 @@
 # The one-off tasks (RFC-0004): db-init, which creates each service's role and database; auth-keys,
 # which writes GoTrue's key set and the service role's key when their secret is empty; and, with
 # grantr, the application's db-roles, which creates the role it works as. Each runs by run-task,
-# from the machine that applies, when its definition or the secrets it reads change, and the
-# services that need it start after it (their `after`).
+# from the machine that applies: when its definition changes, and db-init and db-roles also when a
+# database's password is rotated. The services that need a run wait for it (their `after`).
 
 locals {
-  one_off = {
-    deployment         = var.name
-    cluster_arn        = aws_ecs_cluster.this.arn
-    subnet_ids         = module.network.private_subnet_ids
-    security_group_ids = [module.network.security_groups.services]
-    namespace_id       = aws_service_discovery_private_dns_namespace.this.id
-  }
-  # How run-task reaches the cluster, through the AWS CLI where OpenTofu runs.
-  run_task = {
+  # How run-task reaches the cluster, through the AWS CLI where OpenTofu runs, with the
+  # provider's credentials when they aren't in that environment already.
+  run_task = merge(var.run_task_environment, {
     CLUSTER        = aws_ecs_cluster.this.arn
     SUBNETS        = join(",", module.network.private_subnet_ids)
     SECURITY_GROUP = module.network.security_groups.services
     AWS_REGION     = local.region
-  }
+  })
+  # The databases' versions, which db-init sets their roles' passwords from.
+  database_versions = { for key, version in var.secret_versions : key => version if startswith(key, "database-") }
 }
 
 module "db_init" {
   source             = "../ecs-service"
   name               = "db-init"
   one_off            = true
-  deployment         = local.one_off.deployment
-  cluster_arn        = local.one_off.cluster_arn
-  subnet_ids         = local.one_off.subnet_ids
-  security_group_ids = local.one_off.security_group_ids
-  namespace_id       = local.one_off.namespace_id
+  deployment         = local.task.deployment
+  cluster_arn        = local.task.cluster_arn
+  subnet_ids         = local.task.subnet_ids
+  security_group_ids = local.task.security_group_ids
   size               = local.sizes["db-init"]
   log_retention_days = var.log_retention_days
   container = {
@@ -56,8 +51,7 @@ module "db_init" {
 }
 
 resource "terraform_data" "db_init" {
-  # Again when its definition changes, or a database's password is rotated.
-  triggers_replace = [module.db_init.task_definition_arn, jsonencode(var.secret_versions)]
+  triggers_replace = [module.db_init.task_definition_arn, jsonencode(local.database_versions)]
 
   provisioner "local-exec" {
     command     = "${path.module}/run-task"
@@ -71,11 +65,10 @@ module "auth_keys" {
   source             = "../ecs-service"
   name               = "auth-keys"
   one_off            = true
-  deployment         = local.one_off.deployment
-  cluster_arn        = local.one_off.cluster_arn
-  subnet_ids         = local.one_off.subnet_ids
-  security_group_ids = local.one_off.security_group_ids
-  namespace_id       = local.one_off.namespace_id
+  deployment         = local.task.deployment
+  cluster_arn        = local.task.cluster_arn
+  subnet_ids         = local.task.subnet_ids
+  security_group_ids = local.task.security_group_ids
   size               = local.sizes["auth-keys"]
   log_retention_days = var.log_retention_days
   container = {
@@ -103,31 +96,36 @@ resource "terraform_data" "auth_keys" {
   depends_on = [module.network]
 }
 
+# db-roles is the application's own admin command, with its two database URLs and the schema
+# setting, if it gives one, and nothing else.
 module "db_roles" {
   source             = "../ecs-service"
   count              = local.grantr ? 1 : 0
   name               = "db-roles"
   one_off            = true
-  deployment         = local.one_off.deployment
-  cluster_arn        = local.one_off.cluster_arn
-  subnet_ids         = local.one_off.subnet_ids
-  security_group_ids = local.one_off.security_group_ids
-  namespace_id       = local.one_off.namespace_id
+  deployment         = local.task.deployment
+  cluster_arn        = local.task.cluster_arn
+  subnet_ids         = local.task.subnet_ids
+  security_group_ids = local.task.security_group_ids
   size               = local.sizes["db-roles"]
   log_retention_days = var.log_retention_days
   container = {
     image       = var.application.image
     command     = ["${var.application.name}-admin", "db-roles"]
-    environment = local.app_environment
-    secrets     = local.app_secrets
+    environment = { for key, value in var.application.environment : key => value if key == "DATABASE_SCHEMA" }
+    secrets     = local.app_databases
   }
 }
 
 resource "terraform_data" "db_roles" {
   count = local.grantr ? 1 : 0
-  # Again when its definition changes, or its role's password is rotated; after db-init, which
-  # creates the database and its owner.
-  triggers_replace = [module.db_roles[0].task_definition_arn, lookup(var.secret_versions, "database-app", 1), terraform_data.db_init.id]
+  # Again when its definition changes, or a password it sets or connects with is rotated; after
+  # db-init, which creates the database and its owner.
+  triggers_replace = [
+    module.db_roles[0].task_definition_arn,
+    jsonencode({ for key, version in local.database_versions : key => version if startswith(key, "database-app") }),
+    terraform_data.db_init.id,
+  ]
 
   provisioner "local-exec" {
     command     = "${path.module}/run-task"

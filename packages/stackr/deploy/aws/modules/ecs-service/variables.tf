@@ -34,8 +34,14 @@ variable "security_group_ids" {
 }
 
 variable "namespace_id" {
-  description = "The private DNS namespace (Cloud Map) it is named in, as <name>.<namespace>."
+  description = "The private DNS namespace (Cloud Map) it is named in, as <name>.<namespace>; none for a one-off task."
   type        = string
+  default     = null
+
+  validation {
+    condition     = var.one_off || var.namespace_id != null
+    error_message = "A service is named in a namespace: give it one."
+  }
 }
 
 variable "container" {

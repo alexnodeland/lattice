@@ -109,7 +109,7 @@ run "stack_secrets_are_references_never_settings" {
         ] : [
         for container in service.containers : [
           for setting in container.environment :
-          !can(regex("PASSWORD|SECRET|TOKEN|_KEY$|^DATABASE_(ADMIN_)?URL$|^REDIS_|^GOTRUE_DB_DATABASE_URL$|^SALT$", setting.name))
+          !can(regex("PASSWORD|SECRET|TOKEN|_KEY$|PASS$|_AUTH$|^DATABASE_(ADMIN_)?URL$|^REDIS_|^GOTRUE_DB_DATABASE_URL$|^SALT$", setting.name))
         ]
       ]
     ]))
@@ -276,6 +276,13 @@ run "stack_the_state_host_on_fargate_for_floci" {
     condition     = aws_secretsmanager_secret.valkey.recovery_window_in_days == 0
     error_message = "A destroyable deployment deletes its secrets at once."
   }
+  assert {
+    condition = (
+      !contains(keys(module.secrets.arns), "clickhouse-admin-password")
+      && module.state_services["clickhouse"].containers[0].environment == [{ name = "CLICKHOUSE_USER", value = "langfuse" }]
+    )
+    error_message = "Floci's ClickHouse has Langfuse's user alone, and no admin, so no admin's password."
+  }
 }
 
 run "stack_refuses_to_rotate_what_encrypts_data" {
@@ -298,4 +305,171 @@ run "stack_refuses_the_state_host_without_its_ami" {
     ami_id = null
   }
   expect_failures = [var.ami_id]
+}
+
+run "stack_each_secret_reaches_the_services_that_read_it" {
+  command = plan
+  module {
+    source = "./modules/stack"
+  }
+  override_module {
+    target = module.secrets
+    outputs = {
+      arns = {
+        langfuse-salt             = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-salt-AAAAAA"
+        langfuse-encryption-key   = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-encryption-key-AAAAAA"
+        langfuse-nextauth-secret  = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-nextauth-secret-AAAAAA"
+        langfuse-admin-password   = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-admin-password-AAAAAA"
+        litellm-master-key        = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/litellm-master-key-AAAAAA"
+        litellm-salt-key          = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/litellm-salt-key-AAAAAA"
+        grafana-admin-password    = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/grafana-admin-password-AAAAAA"
+        gotrue-jwt-secret         = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/gotrue-jwt-secret-AAAAAA"
+        clickhouse-password       = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-password-AAAAAA"
+        clickhouse-admin-password = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-password-AAAAAA"
+        auth-keys                 = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-keys-AAAAAA"
+      }
+    }
+  }
+  override_module {
+    target = module.databases
+    outputs = {
+      arns = {
+        database-langfuse  = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-langfuse-AAAAAA"
+        database-litellm   = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-litellm-AAAAAA"
+        database-gotrue    = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-gotrue-AAAAAA"
+        database-grafana   = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-grafana-AAAAAA"
+        database-app-owner = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-app-owner-AAAAAA"
+        database-app       = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-app-AAAAAA"
+      }
+    }
+  }
+
+  assert {
+    condition = (
+      { for secret in module.litellm.containers[0].secrets : secret.name => secret.valueFrom }["LITELLM_MASTER_KEY"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/litellm-master-key-AAAAAA"
+      && { for secret in module.litellm.containers[0].secrets : secret.name => secret.valueFrom }["DATABASE_URL"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-litellm-AAAAAA:url::"
+      && { for secret in module.gotrue.containers[0].secrets : secret.name => secret.valueFrom }["GOTRUE_JWT_KEYS"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-keys-AAAAAA:jwt_keys::"
+      && { for secret in module.app.containers[0].secrets : secret.name => secret.valueFrom }["DATABASE_URL"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-app-AAAAAA:url::"
+      && { for secret in module.app.containers[0].secrets : secret.name => secret.valueFrom }["DATABASE_ADMIN_URL"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-app-owner-AAAAAA:url::"
+      && { for secret in module.db_init.containers[0].secrets : secret.name => secret.valueFrom }["GRAFANA_DB_PASSWORD"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-grafana-AAAAAA:password::"
+    )
+    error_message = "Each service reads its own secrets: LiteLLM its master key and database, GoTrue the key set, the application its two roles, db-init each role's password."
+  }
+  assert {
+    condition = module.state_host[0].secret_arns == {
+      clickhouse_password       = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-password-AAAAAA"
+      clickhouse_admin_password = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-password-AAAAAA"
+    }
+    error_message = "The state host reads ClickHouse's two passwords."
+  }
+  assert {
+    condition = (
+      toset([for secret in module.db_roles[0].containers[0].secrets : secret.name]) == toset(["DATABASE_URL", "DATABASE_ADMIN_URL"])
+      && { for secret in module.db_roles[0].containers[0].secrets : secret.name => secret.valueFrom }["DATABASE_URL"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-app-AAAAAA:url::"
+    )
+    error_message = "db-roles reads the application's two database URLs, and no other secret."
+  }
+}
+
+run "stack_wires_the_edge_and_scopes_storage" {
+  command = plan
+  module {
+    source = "./modules/stack"
+  }
+  override_module {
+    target = module.edge
+    outputs = {
+      target_groups = {
+        app  = "arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/stackr-app/a"
+        auth = "arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/stackr-auth/b"
+      }
+      hosts        = { app = "app.example.com", auth = "auth.example.com" }
+      alb_dns_name = "stackr.mocked.elb.amazonaws.com"
+      auth_proxy   = { image = "caddy:2", caddyfile = ":9999 {\n}\n", gotrue_port = 9998 }
+    }
+  }
+
+  assert {
+    condition = (
+      module.app.target_group_arn == "arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/stackr-app/a"
+      && module.gotrue.target_group_arn == "arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/stackr-auth/b"
+      && module.litellm.target_group_arn == null
+    )
+    error_message = "The edge reaches the application and GoTrue, each through its own target group, and nothing else."
+  }
+  assert {
+    condition = (
+      jsondecode(module.telemetry["tempo"].task_role_policy).Statement[1].Resource == "arn:aws:s3:::stackr-mocked/tempo/*"
+      && jsondecode(module.telemetry["tempo"].task_role_policy).Statement[0].Condition.StringLike["s3:prefix"] == ["tempo/*"]
+      && jsondecode(module.telemetry["loki"].task_role_policy).Statement[1].Resource == "arn:aws:s3:::stackr-mocked/loki/*"
+      && jsondecode(module.langfuse_web.task_role_policy).Statement[1].Resource == "arn:aws:s3:::stackr-mocked/*"
+      && module.litellm.task_role_policy == null
+    )
+    error_message = "Tempo and Loki reach only their prefix of the telemetry bucket, Langfuse its own bucket, and LiteLLM no bucket."
+  }
+}
+
+run "stack_waits_for_its_runs_and_redeploys_on_rotation" {
+  command = plan
+  module {
+    source = "./modules/stack"
+  }
+  variables {
+    secret_versions = { database-grafana = 2, valkey = 3 }
+  }
+
+  assert {
+    condition = (
+      module.grafana.after["version/database-grafana"] == "2"
+      && module.langfuse_worker.after["version/valkey"] == "3" && module.litellm.after["version/valkey"] == "3"
+      && !contains(keys(module.app.after), "version/valkey")
+    )
+    error_message = "A rotated secret deploys again the services that read it, and no other."
+  }
+  assert {
+    condition = (
+      contains(keys(module.app.after), "db-init") && contains(keys(module.app.after), "db-roles") && contains(keys(module.app.after), "auth-keys")
+      && contains(keys(module.gotrue.after), "auth-keys")
+      && contains(keys(module.langfuse_web.after), "state-host") && contains(keys(module.otel_collector.after), "state-host")
+    )
+    error_message = "The application waits for db-init, db-roles and auth-keys; GoTrue for auth-keys; Langfuse and the Collector for the state host."
+  }
+}
+
+run "stack_gotrue_reaches_its_smtp_server" {
+  command = plan
+  module {
+    source = "./modules/stack"
+  }
+  variables {
+    auth_smtp = { host = "smtp.example.com", user = "stackr", sender = "auth@example.com" }
+  }
+
+  assert {
+    condition     = length(aws_security_group.gotrue_smtp) == 1 && aws_vpc_security_group_egress_rule.gotrue_smtp[0].from_port == 587 && length(module.gotrue.security_group_ids) == 2
+    error_message = "With SMTP, GoTrue alone reaches out on its port."
+  }
+}
+
+run "stack_by_default_keeps_its_secrets_a_while" {
+  command = plan
+  module {
+    source = "./modules/stack"
+  }
+
+  assert {
+    condition     = aws_secretsmanager_secret.valkey.recovery_window_in_days == 30 && aws_secretsmanager_secret.langfuse_keys.recovery_window_in_days == 30
+    error_message = "A deleted secret can be restored for 30 days, unless the deployment is destroyable. The data, edge and state-host modules' tests check their own guards."
+  }
+}
+
+run "stack_refuses_the_state_host_on_fargate_outside_floci" {
+  command = plan
+  module {
+    source = "./modules/stack"
+  }
+  variables {
+    state_host = "fargate"
+  }
+  expect_failures = [var.state_host]
 }

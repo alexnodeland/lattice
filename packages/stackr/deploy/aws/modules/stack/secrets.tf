@@ -7,19 +7,22 @@
 module "secrets" {
   source                  = "../secrets"
   name                    = var.name
-  recovery_window_in_days = var.destroyable ? 0 : 30
-  generated = { for key, secret in {
-    langfuse-salt             = {}
-    langfuse-encryption-key   = { template = "{password_sha256}" }
-    langfuse-nextauth-secret  = {}
-    langfuse-admin-password   = {}
-    litellm-master-key        = { template = "sk-{password}" }
-    litellm-salt-key          = {}
-    grafana-admin-password    = {}
-    gotrue-jwt-secret         = {}
-    clickhouse-password       = {}
-    clickhouse-admin-password = {}
-  } : key => merge(secret, { version = lookup(var.secret_versions, key, 1) }) }
+  recovery_window_in_days = local.recovery_window
+  generated = { for key, secret in merge(
+    {
+      langfuse-salt            = {}
+      langfuse-encryption-key  = { template = "{password_sha256}" }
+      langfuse-nextauth-secret = {}
+      langfuse-admin-password  = {}
+      litellm-master-key       = { template = "sk-{password}" }
+      litellm-salt-key         = {}
+      grafana-admin-password   = {}
+      gotrue-jwt-secret        = {}
+      clickhouse-password      = {}
+    },
+    # ClickHouse's admin is the state host's users.xml's: Floci's ClickHouse has none.
+    { for key, secret in { clickhouse-admin-password = {} } : key => secret if var.state_host == "ec2" },
+  ) : key => merge(secret, { version = lookup(var.secret_versions, key, 1) }) }
   # GoTrue's key set and the service role's key, which the auth-keys task writes; and the
   # operator's.
   written_elsewhere = setunion(
@@ -30,7 +33,9 @@ module "secrets" {
 }
 
 locals {
-  postgres = "${module.data.postgres.address}:${module.data.postgres.port}"
+  # A deleted secret can be restored for 30 days, but where a destroy takes everything.
+  recovery_window = var.destroyable ? 0 : 30
+  postgres        = "${module.data.postgres.address}:${module.data.postgres.port}"
   # Each database's role's password, and its URL, as its client takes it.
   databases = merge(
     {
@@ -49,7 +54,7 @@ locals {
 module "databases" {
   source                  = "../secrets"
   name                    = var.name
-  recovery_window_in_days = var.destroyable ? 0 : 30
+  recovery_window_in_days = local.recovery_window
   generated = { for role, database in local.databases : "database-${role}" => {
     keys    = merge({ password = "{password}" }, database)
     version = lookup(var.secret_versions, "database-${role}", 1)
@@ -64,7 +69,7 @@ ephemeral "random_password" "valkey" {
 
 resource "aws_secretsmanager_secret" "valkey" {
   name                    = "${var.name}/valkey"
-  recovery_window_in_days = var.destroyable ? 0 : 30
+  recovery_window_in_days = local.recovery_window
 }
 
 resource "aws_secretsmanager_secret_version" "valkey" {
@@ -87,7 +92,7 @@ ephemeral "random_password" "langfuse_key" {
 
 resource "aws_secretsmanager_secret" "langfuse_keys" {
   name                    = "${var.name}/langfuse-keys"
-  recovery_window_in_days = var.destroyable ? 0 : 30
+  recovery_window_in_days = local.recovery_window
 }
 
 resource "aws_secretsmanager_secret_version" "langfuse_keys" {

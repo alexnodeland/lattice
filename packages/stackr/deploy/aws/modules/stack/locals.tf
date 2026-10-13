@@ -36,12 +36,28 @@ locals {
   namespace = "stackr.internal"
   grantr    = var.application.access == "grantr"
 
-  # Each service's name, as the others reach it; the thin images read their peers' from the
-  # environment, by these names (ADR-0034).
-  address = { for service in ["otel-collector", "tempo", "loki", "pyroscope", "prometheus", "langfuse-web", "litellm", "gotrue", "clickhouse"] :
-    service => "${service}.${local.namespace}"
+  # What every task shares: the cluster, the private subnets, and the services' group.
+  task = {
+    deployment         = var.name
+    cluster_arn        = aws_ecs_cluster.this.arn
+    subnet_ids         = module.network.private_subnet_ids
+    security_group_ids = [module.network.security_groups.services]
+    namespace_id       = aws_service_discovery_private_dns_namespace.this.id
   }
-  otlp = "http://${local.address.otel-collector}:4318"
+
+  # The secrets that rotate, by the services that read them: each service's `after` carries their
+  # versions, so a rotated one deploys it again.
+  reads = {
+    grafana         = ["database-grafana"]
+    langfuse-web    = ["database-langfuse", "valkey", "langfuse-nextauth-secret"]
+    langfuse-worker = ["database-langfuse", "valkey"]
+    litellm         = ["database-litellm", "valkey", "litellm-master-key"]
+    gotrue          = ["database-gotrue", "gotrue-jwt-secret"]
+    app             = ["database-app-owner", "database-app"]
+  }
+  versions_of = { for service, keys in local.reads : service => {
+    for key in keys : "version/${key}" => tostring(lookup(var.secret_versions, key, 1))
+  } }
 
   # The ports the services reach each other on: the network's, and the state host's three on
   # Fargate, where they are services too.

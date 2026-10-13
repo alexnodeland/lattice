@@ -112,6 +112,10 @@ variable "application" {
     error_message = "The application's database and role are named after it, so it can't share a name with the stack's own, or RDS's (rdsadmin, rds_*)."
   }
   validation {
+    condition     = can(regex("^[a-z_][a-z0-9_]{0,62}$", lookup(var.application.environment, "DATABASE_SCHEMA", "public")))
+    error_message = "The application's DATABASE_SCHEMA is a plain lowercase identifier, as the template's settings take it."
+  }
+  validation {
     condition     = contains(["grantr", "none"], var.application.access)
     error_message = "The application's access is grantr or none."
   }

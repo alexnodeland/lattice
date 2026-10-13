@@ -29,8 +29,8 @@ variable "endpoint" {
   default     = "http://127.0.0.1:4566"
 
   validation {
-    condition     = can(regex("^http://(127\\.0\\.0\\.1|localhost|floci)(:[0-9]+)?$", var.endpoint))
-    error_message = "Floci is on the loopback, or named floci on its network: never a remote address."
+    condition     = can(regex("^http://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?$", var.endpoint))
+    error_message = "Floci is on the loopback, where OpenTofu runs: never a remote address."
   }
 }
 

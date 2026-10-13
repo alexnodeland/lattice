@@ -20,10 +20,8 @@ cd "$(dirname "$0")"
 
 export TF_PLUGIN_CACHE_DIR=${TF_PLUGIN_CACHE_DIR:-$HOME/.terraform.d/plugin-cache}
 mkdir -p "$TF_PLUGIN_CACHE_DIR"
-# checkov, and everything it depends on as it was on this date, so a new release of a dependency
-# changes nothing until both move, by hand, together.
-CHECKOV_VERSION=3.3.27
-CHECKOV_RESOLVED_BEFORE=2026-10-12
+# checkov's version, and the date its dependencies are resolved at.
+source checkov.env
 status=0
 step() { printf '\n==> %s\n' "$*"; }
 fail() {

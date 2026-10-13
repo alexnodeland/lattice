@@ -8,13 +8,13 @@ nothing was given; a score is counted on the day it was given.
 """
 
 from collections import defaultdict
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Final, Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from portalr.readers.langfuse import Langfuse, Score, Scores
-from portalr.readers.query import Id, Span
+from portalr.readers.query import Id, Span, day_of, days_in
 from portalr.readers.reading import Ok, Unavailable
 from portalr.tenant import Tenant
 
@@ -106,17 +106,6 @@ class Feedback(BaseModel):
     """People's, the newest first."""
     complete: bool
     """False where a read stopped at one of its bounds: the sums are of the scores read."""
-
-
-def day_of(at: datetime) -> date:
-    """The day a moment is in, in UTC."""
-    return at.astimezone(UTC).date()
-
-
-def days_in(span: Span) -> list[date]:
-    """Each day the span touches, in UTC, the first first."""
-    first, last = day_of(span.start), day_of(span.end - timedelta(microseconds=1))
-    return [first + timedelta(days=n) for n in range((last - first).days + 1)]
 
 
 def peoples(score: Score) -> bool:

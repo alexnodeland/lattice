@@ -301,10 +301,26 @@ test("portalr's reads name their tenant and window", async () => {
   expect(seen.at(-1)?.url.searchParams.get("step")).toBeNull();
 });
 
-test("a feedback read is kept ten minutes and tried again once", () => {
-  const feedback = queries.portalr.feedback("acme", { start: DAY.start, end: DAY.end });
-  expect(feedback.staleTime).toBe(10 * 60_000);
-  expect(feedback.retry).toBe(1);
+test("a feedback or usage read is kept ten minutes and tried again once", () => {
+  const window = { start: DAY.start, end: DAY.end };
+  for (const read of [
+    queries.portalr.feedback("acme", window),
+    queries.portalr.usage("acme", window),
+  ]) {
+    expect(read.staleTime).toBe(10 * 60_000);
+    expect(read.retry).toBe(1);
+  }
+});
+
+test("a usage read asks after the workspaces it names", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  await client.fetchQuery(
+    queries.portalr.usage("acme", { start: DAY.start, end: DAY.end }, ["notes", "plans"]),
+  );
+  const usage = seen.at(-1);
+  expect(usage?.url.pathname).toBe("/portalr/v1/usage");
+  expect(usage?.url.searchParams.getAll("workspaces")).toEqual(["notes", "plans"]);
+  expect(usage?.headers.get("x-tenant")).toBe("acme");
 });
 
 test("the deployment's tenants are an operator's, and null for anyone else", async () => {

@@ -108,6 +108,8 @@ export const keys = {
       [...keys.portalr.tenant(tenant), "metrics", metric, window] as const,
     feedback: (tenant: string, window: TimeSpan, workspace: string | null) =>
       [...keys.portalr.tenant(tenant), "feedback", window, workspace] as const,
+    usage: (tenant: string, window: TimeSpan, workspaces: readonly string[]) =>
+      [...keys.portalr.tenant(tenant), "usage", window, workspaces] as const,
     /** The deployment's tenants, as the signed-in person, `user`, reads them: an operator's. */
     tenants: (user: string) => ["portalr", "deployment", "tenants", user] as const,
     /** Deep links into the tools for a trace, which only an operator, `user`, reads. */
@@ -484,6 +486,26 @@ export function createQueries(api: Api) {
               }),
             ),
           // Summing a window reads Langfuse at length: kept a while, and tried again once.
+          staleTime: 10 * 60_000,
+          retry: 1,
+        }),
+      /**
+       * The tenant's spend per day over a window, from its LiteLLM team, and each named
+       * workspace's, from its tag (portalr ADR-0028).
+       */
+      usage: (tenant: string, window: TimeSpan, workspaces: readonly string[] = []) =>
+        queryOptions({
+          queryKey: keys.portalr.usage(tenant, window, workspaces),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/usage", {
+                ...named(tenant),
+                params: {
+                  query: { start: window.start, end: window.end, workspaces: [...workspaces] },
+                },
+              }),
+            ),
+          // Summing a window reads LiteLLM at length: kept a while, and tried again once.
           staleTime: 10 * 60_000,
           retry: 1,
         }),

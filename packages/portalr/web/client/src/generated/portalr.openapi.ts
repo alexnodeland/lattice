@@ -228,6 +228,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portalr/v1/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Usage
+         * @description The tenant's spend per day from LiteLLM, and each named workspace's, with its budget.
+         *
+         *     The window is at most 91 days, and the read is bounded: ``complete`` is false where it
+         *     stopped at a bound. Only the named workspaces' tags are asked after.
+         */
+        get: operations["usage_portalr_v1_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -262,6 +285,23 @@ export interface components {
             };
             supabase: components["schemas"]["Supabase"];
             surfaces: components["schemas"]["Surfaces"];
+        };
+        /**
+         * DaySpend
+         * @description What was spent on one day, in UTC: dollars, tokens and requests.
+         */
+        DaySpend: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Requests */
+            requests: number;
+            /** Spend */
+            spend: number;
+            /** Tokens */
+            tokens: number;
         };
         /**
          * DeploymentTenants
@@ -404,6 +444,15 @@ export interface components {
         /** Ok[Union[Trace, NoneType]] */
         Ok_Union_Trace__NoneType__: {
             data: components["schemas"]["Trace"] | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+        };
+        /** Ok[Usage] */
+        Ok_Usage_: {
+            data: components["schemas"]["Usage"];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -676,6 +725,33 @@ export interface components {
              * @enum {string}
              */
             status: "unconfigured";
+        };
+        /**
+         * Usage
+         * @description The window's spend per day, each workspace's, the team's budget, and whether all was read.
+         */
+        Usage: {
+            budget: components["schemas"]["Spend"] | null;
+            /** Complete */
+            complete: boolean;
+            /** Days */
+            days: components["schemas"]["DaySpend"][];
+            /** Workspaces */
+            workspaces: components["schemas"]["WorkspaceSpend"][];
+        };
+        /**
+         * WorkspaceSpend
+         * @description One workspace's spend over the window, and per day.
+         */
+        WorkspaceSpend: {
+            /** Days */
+            days: components["schemas"]["DaySpend"][];
+            /** Spend */
+            spend: number;
+            /** Tokens */
+            tokens: number;
+            /** Workspace */
+            workspace: string;
         };
         /**
          * WorkspaceTotals
@@ -1301,6 +1377,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Ok_Union_Trace__NoneType__"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    usage_portalr_v1_usage_get: {
+        parameters: {
+            query: {
+                start: components["schemas"]["Moment"];
+                end: components["schemas"]["Moment"];
+                workspaces?: components["schemas"]["Id"][];
+            };
+            header?: {
+                "X-Tenant"?: components["schemas"]["TenantId"] | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok_Usage_"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
                 };
             };
             /** @description Refused */

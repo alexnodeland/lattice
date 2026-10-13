@@ -6,7 +6,7 @@ grantr has checked already, and is quoted.
 """
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Final, Self
 
 from pydantic import (
@@ -59,3 +59,14 @@ class Window(Span):
     """A span of time, and how many results to return from it."""
 
     limit: Annotated[int, Field(ge=1, le=1000)] = 100
+
+
+def day_of(at: datetime) -> date:
+    """The day a moment is in, in UTC."""
+    return at.astimezone(UTC).date()
+
+
+def days_in(span: Span) -> list[date]:
+    """Each day the span touches, in UTC, the first first."""
+    first, last = day_of(span.start), day_of(span.end - timedelta(microseconds=1))
+    return [first + timedelta(days=n) for n in range((last - first).days + 1)]

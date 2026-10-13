@@ -180,15 +180,12 @@ When("they open the audit log, filtered to members added", async ({ page }) => {
 });
 
 Then("the log says they added it", async ({ page, made }) => {
-  const change = page
-    .getByRole("table", { name: "Audit log" })
-    .getByRole("rowheader", { name: `added ${madeAs(made, "principal")} (service principal)` });
-  // The log reads from its start, a page at a time: the change is on the last page read.
-  const more = page.getByRole("button", { name: "Show more" });
-  while ((await change.count()) === 0 && (await more.count()) > 0) {
-    await more.click();
-  }
-  await expect(change).toBeVisible();
+  // The log opens on its newest changes: theirs is among them.
+  await expect(
+    page
+      .getByRole("table", { name: "Audit log" })
+      .getByRole("rowheader", { name: `added ${madeAs(made, "principal")} (service principal)` }),
+  ).toBeVisible();
 });
 
 When("they look on a phone, at Access's Members", async ({ page }) => {

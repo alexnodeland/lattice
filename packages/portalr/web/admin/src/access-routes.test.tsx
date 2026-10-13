@@ -128,10 +128,10 @@ function grantr(allowed: readonly string[]) {
     if (path === "/grantr/v1/tenants/acme/audit") {
       const query = new URL(request.url).searchParams;
       audits.push(query);
-      const after = Number(query.get("after_seq"));
-      const kept = LOG.filter(
+      const before = Number(query.get("before_seq") ?? Number.POSITIVE_INFINITY);
+      const kept = (query.get("newest_first") === "true" ? [...LOG].reverse() : LOG).filter(
         (entry) =>
-          entry.seq > after &&
+          entry.seq < before &&
           (!query.has("type") || query.getAll("type").includes(entry.event.type)),
       );
       return Response.json(kept.slice(0, Number(query.get("limit"))));
@@ -591,7 +591,7 @@ test("Audit is on the rail where grantr allows reading the log, and not found el
   expect(audits).toEqual([]);
 });
 
-test("the log reads a page at a time, and Show more adds the next", async () => {
+test("the log opens on the newest changes, and Show more adds the ones before", async () => {
   const { screen } = await open("/t/acme", ["grantr:read_audit"]);
   await screen
     .getByRole("navigation", { name: "Tenant" })
@@ -599,18 +599,19 @@ test("the log reads a page at a time, and Show more adds the next", async () => 
     .click();
   const log = screen.getByRole("table", { name: "Audit log" });
   await expect
-    .element(log.getByRole("rowheader", { name: "added sp_1 (service principal)" }))
-    .toBeVisible();
-  await expect
     .element(
-      log.getByRole("rowheader", { name: "granted viewer on workspace notes to u_2 (person)" }),
+      log.getByRole("rowheader", { name: "granted viewer on workspace notes to u_60 (person)" }),
     )
     .toBeVisible();
   expect(log.getByRole("rowheader").elements()).toHaveLength(50);
+  expect(log.getByRole("rowheader").elements()[0]?.textContent).toMatch(/u_60/);
   await screen.getByRole("button", { name: "Show more" }).click();
-  await expect.element(log.getByRole("rowheader", { name: /u_60/ })).toBeVisible();
+  await expect
+    .element(log.getByRole("rowheader", { name: "added sp_1 (service principal)" }))
+    .toBeVisible();
   expect(log.getByRole("rowheader").elements()).toHaveLength(60);
-  expect(audits.map((query) => query.get("after_seq"))).toEqual(["0", "50"]);
+  expect(audits.map((query) => query.get("before_seq"))).toEqual([null, "11"]);
+  expect(audits.every((query) => query.get("newest_first") === "true")).toBe(true);
   await expect.element(screen.getByRole("button", { name: "Show more" })).not.toBeInTheDocument();
 });
 

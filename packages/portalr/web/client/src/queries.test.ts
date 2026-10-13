@@ -62,11 +62,11 @@ beforeAll(() => {
         );
       }
       if (url.pathname.endsWith("/audit")) {
-        // Sixty entries: a full page, and then ten.
-        const after = Number(url.searchParams.get("after_seq"));
+        // Sixty entries, newest first: a full page, and then ten.
+        const before = Number(url.searchParams.get("before_seq") ?? 61);
         const limit = Number(url.searchParams.get("limit"));
-        const seqs = Array.from({ length: 60 }, (_, index) => index + 1).filter(
-          (seq) => seq > after,
+        const seqs = Array.from({ length: 60 }, (_, index) => 60 - index).filter(
+          (seq) => seq < before,
         );
         return Response.json(seqs.slice(0, limit).map((seq) => ({ seq })));
       }
@@ -322,7 +322,7 @@ test("the deployment's tenants are an operator's, and null for anyone else", asy
   ).rejects.toThrow(/refused the read \(404\)/);
 });
 
-test("the audit log is read a page at a time, with its filter, until a page isn't full", async () => {
+test("the audit log is read newest first, a page at a time, with its filter, until a page isn't full", async () => {
   const client = new QueryClient();
   const options = queries.grantr.audit("acme", {
     type: "member_added",
@@ -335,26 +335,28 @@ test("the audit log is read a page at a time, with its filter, until a page isn'
   const request = seen.at(-1);
   expect(request?.url.pathname).toBe("/grantr/v1/tenants/acme/audit");
   expect(Object.fromEntries(request?.url.searchParams ?? [])).toEqual({
-    after_seq: "0",
+    newest_first: "true",
     limit: String(AUDIT_PAGE),
     type: "member_added",
     actor_kind: "rule",
     actor: "triage",
     workspace: "ws_1",
   });
-  expect(options.getNextPageParam(first.pages[0] ?? [], first.pages, 0, first.pageParams)).toBe(
-    AUDIT_PAGE,
+  // The next page is read before this one's oldest entry: 60 down to 11, then 10 to 1.
+  expect(options.getNextPageParam(first.pages[0] ?? [], first.pages, null, first.pageParams)).toBe(
+    11,
   );
   const both = await client.fetchInfiniteQuery({ ...options, pages: 2 });
   expect(both.pages.map((page) => page.length)).toEqual([AUDIT_PAGE, 10]);
-  expect(options.getNextPageParam(both.pages[1] ?? [], both.pages, 0, both.pageParams)).toBe(
+  expect(seen.at(-1)?.url.searchParams.get("before_seq")).toBe("11");
+  expect(options.getNextPageParam(both.pages[1] ?? [], both.pages, 11, both.pageParams)).toBe(
     undefined,
   );
 });
 
 test("an audit read with no filter asks for every entry", async () => {
   await new QueryClient().fetchInfiniteQuery(queries.grantr.audit("acme", {}));
-  expect([...(seen.at(-1)?.url.searchParams.keys() ?? [])]).toEqual(["after_seq", "limit"]);
+  expect([...(seen.at(-1)?.url.searchParams.keys() ?? [])]).toEqual(["newest_first", "limit"]);
 });
 
 test("a workspace's grants and the tenant's are read apart", () => {

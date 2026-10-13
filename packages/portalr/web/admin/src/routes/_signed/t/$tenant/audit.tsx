@@ -18,9 +18,9 @@ import { actor, filterOf, MAKERS, said, TYPES } from "../../../../audit";
 const HEADER = <PageHeader title="Audit" meta="Every change to who may see and do what" />;
 
 /**
- * A tenant's audit log, for whoever may read it: each change, who made it, and when, a page at a
- * time from the first, filtered by one type of change and one maker, which the address keeps, so
- * a filtered log can be linked to. grantr filters it (grantr ADR-0030, portalr ADR-0026).
+ * A tenant's audit log, for whoever may read it: each change, who made it, and when, the newest
+ * first, a page at a time, filtered by one type of change and one maker, which the address keeps, so
+ * a filtered log can be linked to. grantr filters it (grantr ADR-0030, ADR-0032; portalr ADR-0026).
  */
 export const Route = createFileRoute("/_signed/t/$tenant/audit")({
   head: ({ params }) => ({ meta: [{ title: `Audit · ${params.tenant} · portalr admin` }] }),

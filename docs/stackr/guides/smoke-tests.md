@@ -83,7 +83,7 @@ make smoke-app
 
 It runs an application from the template beside the whole stack:
 
-1. It generates an application with both libraries and evals from this checkout, locks its dependencies, and creates a key on the `stackr-smoke` tenant for it.
+1. It generates an application with both libraries, evals, grantr and relayr's bridge from this checkout, locks its dependencies, and creates a key on the `stackr-smoke` tenant for it.
 2. It creates the role the application works as (`db-roles`), starts the application in its app profile, on port `SMOKE_APP_PORT` (8800 by default), with telemetry, Langfuse and mocked model replies, and waits for it to be healthy. On a single host, the application is generated with `hosting: host` and runs with its overlay, behind Caddy, at `https://app.<domain>`.
 3. A request without a token must be refused with 401.
 4. It creates a user with the identity adapter's admin API, local Supabase's or GoTrue's, and signs them in.
@@ -91,6 +91,10 @@ It runs an application from the template beside the whole stack:
 6. As that user, in `stackr-smoke`, it posts a message to the notes agent (artifactr) and opens a ticket for the triage agent (reflexr). Each agent's model request goes through the gateway on the tenant's key.
 7. For each agent, the turn or run must end successfully, and its trace must be in Tempo, with the gateway's spans in it, and in Langfuse.
 8. The completed turn and the succeeded run must be counted in Prometheus, as `artifactr_turns_total` and `reflexr_runs_total`, for the run's own workspace.
+9. PostgreSQL itself must keep each tenant's rows to that tenant, past the libraries' scoping: the application's role sees no rows outside a tenant, and can't write another tenant's.
+10. Through relayr's bridge, an `<app>:alert.fired` event must open an incident thread with its timeline, and the user's message in that thread must join the timeline. `<app>` is the application's package name.
+11. An `<app>:incident.resolved` event for the same service must post a closing notice in the incident's thread, and propose its postmortem there, drawn from the timeline.
+12. Rules from chat: a rule drafted in a thread, by a service principal's key, must go live in reflexr once the user accepts it, and tell the thread of the alert it watches. Before that, a forged `artifactr:proposal_resolved`, published into reflexr, must be refused, and install nothing.
 
 At the end it removes the application, its image and volumes, the key, the user and the application's schema. On the `postgres` adapter it needs the `auth` profile, whose GoTrue signs the user in. Building the application's image fetches the libraries from GitHub at `HEAD`, the commit the application was rendered from, so it needs the network, and `HEAD` must be pushed and the working tree clean: Copier renders uncommitted changes from a commit of its own, which GitHub doesn't have. In CI, `HEAD` is the pull request's merge commit, so the application runs the pull request's libraries.
 

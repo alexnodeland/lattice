@@ -40,6 +40,6 @@ RFCs are living documents while Accepted: the tracking checklist and "unresolved
 | RFC | Title | Status |
 |---|---|---|
 | [0001](0001-v0.1-implementation-plan.md) | v0.1 implementation plan | Implemented |
-| [0002](0002-the-combined-system.md) | The combined system | Accepted |
+| [0002](0002-the-combined-system.md) | The combined system | Implemented |
 | [0003](0003-one-repository-lattice.md) | One repository: lattice | Accepted |
 | [0004](0004-hosting-recipes.md) | Hosting recipes | Accepted |

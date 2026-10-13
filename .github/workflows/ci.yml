@@ -135,6 +135,97 @@ jobs:
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv run --no-project python scripts/affected.py images
 
+  # A stackr release's image path (stackr ADR-0035), short of GHCR, when the images change: each
+  # architecture's OCI archives, built by deploy/image-archive on a runner of that architecture,
+  # as release.yml builds them. They are kept a week.
+  release-images:
+    name: Release images (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    outputs:
+      built: ${{ steps.build.outputs.built }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      # When stackr:images' inputs change: the images' files, and these scripts.
+      - id: build
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          # moon's answer first, on its own: if moon fails, so does this, rather than skipping.
+          affected=$(moon query tasks --affected --id images)
+          if jq --exit-status '.tasks.stackr.images' <<<"$affected" >/dev/null; then
+            packages/stackr/deploy/image-archive "$ARCH" 0.0.0-ci archives
+            echo "built=true" >>"$GITHUB_OUTPUT"
+          fi
+      - if: steps.build.outputs.built == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: stackr-images-${{ matrix.arch }}
+          path: archives/
+          retention-days: 7
+          compression-level: 0
+          overwrite: true
+
+  # Then deploy/publish-image, as release.yml runs it, to a registry on this job's loopback in
+  # place of GHCR: each image's two architectures, joined under one version, with its annotations.
+  release-images-publish:
+    name: Release images (published to a registry of its own)
+    needs: release-images
+    if: needs.release-images.outputs.built == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    services:
+      registry:
+        image: registry:3.0.0@sha256:6c5666b861f3505b116bb9aa9b25175e71210414bd010d92035ff64018f9457e
+        ports:
+          - 127.0.0.1:5000:5000
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: stackr-images-*
+          path: archives
+          merge-multiple: true
+      - name: Publish each image, and inspect its index
+        shell: bash
+        env:
+          INSECURE: "1"
+        run: |
+          list=$(packages/stackr/deploy/image-archive --list)
+          mapfile -t images < <(jq --raw-output '.[]' <<<"$list")
+          verified=0
+          for image in "${images[@]}"; do
+            reference=$(packages/stackr/deploy/publish-image "$image" 0.0.0-ci "localhost:5000/stackr-$image" archives)
+            index=$(docker buildx imagetools inspect "$reference" --format '{{json .Manifest}}')
+            jq --exit-status '([.manifests[].platform | "\(.os)/\(.architecture)"] | sort) == ["linux/amd64", "linux/arm64"]
+              and .annotations["org.opencontainers.image.licenses"] == "MIT"' <<<"$index" >/dev/null ||
+              { echo "FAIL: $reference: $index" >&2; exit 1; }
+            echo "ok: $reference"
+            verified=$((verified + 1))
+          done
+          # Every image the release publishes, and none missed.
+          [[ ${#images[@]} -eq 8 && $verified -eq ${#images[@]} ]] ||
+            { echo "FAIL: $verified of ${#images[@]} images verified, of 8" >&2; exit 1; }
+
   # Each library's acceptance tests, against its reference application (stackr RFC-0003's phase 5,
   # lattice ADR-0015): its `api` task starts docplan or oncall from the package's compose.yaml,
   # runs the package's Bruno collection and Schemathesis over its committed OpenAPI document, and
@@ -331,6 +422,7 @@ jobs:
       - if: matrix.recipe == 'host' && hashFiles('packages/stackr/.env') != ''
         name: Back up, and run the restore drill
         working-directory: packages/stackr
+        shell: bash
         run: |
           minio=$(docker compose --profile langfuse config --format json | jq -r .services.minio.image)
           docker run -d --name backups --network stackr -v /tmp/stackr-backups:/certs:ro \
@@ -388,11 +480,13 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [check, tests, images, thin-images, acceptance, aws, template, smoke, dependency-review, osv]
+    needs: [check, tests, images, thin-images, release-images, release-images-publish, acceptance, aws, template, smoke, dependency-review, osv]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
     steps:
       - uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
+          # It runs only when the images changed.
+          allowed-skips: release-images-publish
           jobs: ${{ toJSON(needs) }}

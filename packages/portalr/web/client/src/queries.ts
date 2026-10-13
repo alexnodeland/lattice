@@ -12,11 +12,13 @@ import { queryOptions } from "@tanstack/react-query";
 import * as artifactr from "./artifactr";
 import type * as artifactrV1 from "./generated/artifactr.v1";
 import type { components as Grantr } from "./generated/grantr.openapi";
+import type { components as Portalr } from "./generated/portalr.openapi";
 import type * as reflexrV1 from "./generated/reflexr.v1";
 import * as reflexr from "./reflexr";
 import { type Api, named } from "./rest";
 
 type Check = Grantr["schemas"]["Check"];
+type Metric = Portalr["schemas"]["Metric"];
 
 /** Every query's key: each names its tenant, so two tenants' reads never share a cache entry. */
 export const keys = {
@@ -63,7 +65,24 @@ export const keys = {
     restrictions: (tenant: string, ws: string) =>
       [...keys.grantr.access(tenant), "restrictions", ws] as const,
   },
+  portalr: {
+    tenant: (tenant: string) => ["portalr", tenant] as const,
+    spend: (tenant: string) => [...keys.portalr.tenant(tenant), "spend"] as const,
+    scores: (tenant: string, window: TimeSpan) =>
+      [...keys.portalr.tenant(tenant), "scores", window] as const,
+    metrics: (tenant: string, metric: Metric, window: TimeSpan) =>
+      [...keys.portalr.tenant(tenant), "metrics", metric, window] as const,
+    /** The deployment's tenants, as the signed-in person, `user`, reads them: an operator's. */
+    tenants: (user: string) => ["portalr", "deployment", "tenants", user] as const,
+  },
 };
+
+/** A span of time to read, and for a series, the step between its points, in seconds. */
+export interface TimeSpan {
+  readonly start: string;
+  readonly end: string;
+  readonly step?: number;
+}
 
 /** What a read returns, or the error it throws when the server refuses it. */
 async function body<D>(
@@ -74,6 +93,23 @@ async function body<D>(
     throw new Refused(answered.status, error);
   }
   return data;
+}
+
+/** Whether a refusal is grantr's or portalr's `forbidden`: the reader may not, not that it failed. */
+function forbidden(error: unknown): boolean {
+  if (!(error instanceof Refused) || error.status !== 403) {
+    return false;
+  }
+  const { detail } = error;
+  return (
+    typeof detail === "object" &&
+    detail !== null &&
+    "detail" in detail &&
+    typeof detail.detail === "object" &&
+    detail.detail !== null &&
+    "type" in detail.detail &&
+    detail.detail.type === "forbidden"
+  );
 }
 
 /** The server refused a read: 401 when no one is signed in, 403 when they may not. */
@@ -275,6 +311,66 @@ export function createQueries(api: Api) {
                 params: { path: { tenant }, query: { workspace: ws } },
               }),
             ),
+        }),
+    },
+    portalr: {
+      /** The tenant's spend against its budget, from its LiteLLM team. */
+      spend: (tenant: string) =>
+        queryOptions({
+          queryKey: keys.portalr.spend(tenant),
+          queryFn: () => body(api.portalr.GET("/portalr/v1/spend", named(tenant))),
+        }),
+      /** The tenant's feedback and evaluation scores in a window, from Langfuse. */
+      scores: (tenant: string, window: TimeSpan) =>
+        queryOptions({
+          queryKey: keys.portalr.scores(tenant, window),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/scores", {
+                ...named(tenant),
+                params: { query: { start: window.start, end: window.end, limit: 1000 } },
+              }),
+            ),
+        }),
+      /** One of the tenant's series over a window, from Prometheus. */
+      metrics: (tenant: string, metric: Metric, window: TimeSpan) =>
+        queryOptions({
+          queryKey: keys.portalr.metrics(tenant, metric, window),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/metrics", {
+                ...named(tenant),
+                params: {
+                  query: {
+                    metric,
+                    start: window.start,
+                    end: window.end,
+                    ...(window.step !== undefined && { step: window.step }),
+                    limit: 1000,
+                  },
+                },
+              }),
+            ),
+        }),
+      /**
+       * Every tenant, with their spend, for an operator; null for anyone else, whom it's refused,
+       * so the one read also says whether the reader is an operator.
+       */
+      tenants: (user: string) =>
+        queryOptions({
+          queryKey: keys.portalr.tenants(user),
+          queryFn: async () => {
+            try {
+              return await body(api.portalr.GET("/portalr/v1/deployment/tenants"));
+            } catch (error) {
+              if (forbidden(error)) {
+                return null;
+              }
+              throw error;
+            }
+          },
+          // Who is an operator changes rarely: a minute, then it's read again.
+          staleTime: 60_000,
         }),
     },
   };

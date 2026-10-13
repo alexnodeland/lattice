@@ -46,7 +46,13 @@ lint = ["ruff>=0.16", "pyright>=1.1.414"]
 # The acceptance tests' application (tests/app/), which its image serves: it verifies Supabase
 # Auth's tokens, serves artifactr's and reflexr's streams, and names their actions to grantr, so
 # that it lists workspaces and checks every command.
-app = ["uvicorn>=0.54", "websockets>=15", "pyjwt>=2.15", "artifactr-ai", "reflexr"]
+app = [
+    "uvicorn>=0.54",
+    "websockets>=15",
+    "pyjwt>=2.15",
+    "artifactr-ai[otel]",
+    "reflexr[otel]",
+]
 dev = [
     { include-group = "test" },
     { include-group = "lint" },

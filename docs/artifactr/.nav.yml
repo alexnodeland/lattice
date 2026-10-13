@@ -102,7 +102,8 @@ nav:
     - adr/0064-asking-for-a-threads-next-turn.md
     - adr/0065-run-started-names-its-messages.md
     - adr/0066-row-level-security-under-the-scoping.md
-    - adr/0067-an-access-token-redacted-from-span-urls.md
+    - adr/0067-a-failed-turns-series-starts-at-zero.md
+    - adr/0068-an-access-token-redacted-from-span-urls.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

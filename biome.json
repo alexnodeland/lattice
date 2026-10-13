@@ -13,7 +13,8 @@
       "knip.json",
       "tsconfig.base.json",
       "!packages/portalr/web/client/src/generated",
-      "!packages/portalr/web/app/src/routeTree.gen.ts"
+      "!packages/portalr/web/app/src/routeTree.gen.ts",
+      "!packages/portalr/web/admin/src/routeTree.gen.ts"
     ]
   },
   "formatter": {

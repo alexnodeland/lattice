@@ -1,0 +1,43 @@
+# A deployment's settings: copy to <deployment>.tfvars, which the repository ignores, and fill in.
+# Secrets never go here: they are in Secrets Manager.
+#
+# Not yet usable end to end: stackr's thin images aren't published until its release (RFC-0004),
+# so `images` has nothing to name.
+
+account_id = "123456789012"
+# profile  = "stackr-prod"   # an AWS CLI profile; for a role, one with role_arn
+region     = "us-east-1"
+name       = "stackr"        # unique in the account: it names the resources and the state's key
+domain     = "example.com"   # a public Route 53 zone, already delegated
+zone_id    = "Z0123456789ABCDEFGHIJ"
+zones      = ["us-east-1a", "us-east-1b"]
+
+# Ubuntu 24.04 on arm64, in the region, which SSM names:
+#   aws ssm get-parameter --region us-east-1 --query Parameter.Value --output text \
+#     --name /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id
+ami_id = "ami-0123456789abcdef0"
+
+# The commit of the stackr release the images come from, by its full SHA:
+#   git rev-parse "stackr-v0.1.0^{commit}"
+lattice_commit = "0123456789abcdef0123456789abcdef01234567"
+
+# From the stackr release's notes, by digest.
+images = {
+  otel_collector = "ghcr.io/alexnodeland/stackr-otel-collector@sha256:..."
+  tempo          = "ghcr.io/alexnodeland/stackr-tempo@sha256:..."
+  loki           = "ghcr.io/alexnodeland/stackr-loki@sha256:..."
+  pyroscope      = "ghcr.io/alexnodeland/stackr-pyroscope@sha256:..."
+  grafana        = "ghcr.io/alexnodeland/stackr-grafana@sha256:..."
+  litellm        = "ghcr.io/alexnodeland/stackr-litellm@sha256:..."
+  db_init        = "ghcr.io/alexnodeland/stackr-db-init@sha256:..."
+  auth_keys      = "ghcr.io/alexnodeland/stackr-auth-keys@sha256:..."
+}
+
+# The application's image must be pullable without credentials: no private registry is wired.
+application = {
+  name  = "acme"
+  image = "ghcr.io/example/acme@sha256:..."
+}
+
+gateway_providers = ["anthropic"]
+# langfuse_admin_email = "ops@example.com"

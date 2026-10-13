@@ -185,6 +185,14 @@ async def test_a_turn_is_its_own_trace_linked_to_what_started_it(
     where = {TURN_TRIGGER: "message", TURN_OUTCOME: "completed", TENANT_ID: "t1"}
     assert recorder.total("artifactr.turns", where) == 1
     assert recorder.total("artifactr.turn.duration", where) == 1
+    failed = {TURN_TRIGGER: "message", TURN_OUTCOME: "failed", TENANT_ID: "t1"}
+    assert [
+        value
+        for found, value in recorder.points("artifactr.turns")
+        if failed.items() <= found.items()
+    ] == [0], (
+        "the failed series is there at zero, before a failure, so its first one is an increase"
+    )
 
 
 async def test_a_message_carried_out_as_a_run_ends_starts_a_turn_linked_to_it(

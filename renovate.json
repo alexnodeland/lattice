@@ -41,6 +41,11 @@
       "allowedVersions": "/^17(\\..*)?$/"
     },
     {
+      "description": "proto, which every CI job installs, waits three days too; its digests in .github/actions/toolchain/proto.sha256 move by hand (lattice ADR-0017).",
+      "matchDepNames": ["proto"],
+      "minimumReleaseAge": "3 days"
+    },
+    {
       "description": "Bun's version is in .prototools and in package.json's packageManager field: they move together, after the same three days.",
       "matchDepNames": ["bun"],
       "groupName": "Bun",

@@ -1,6 +1,6 @@
 # RFC-0002: portalr, the portal
 
-**Status:** Accepted, amended by [portalr ADR-0014](../portalr/adr/0014-the-apps-shell.md), and by [artifactr ADR-0067](../artifactr/adr/0067-an-access-token-redacted-from-span-urls.md) and [reflexr ADR-0065](../reflexr/adr/0065-an-access-token-redacted-from-span-urls.md)
+**Status:** Accepted, amended by [portalr ADR-0014](../portalr/adr/0014-the-apps-shell.md), and by [artifactr ADR-0068](../artifactr/adr/0068-an-access-token-redacted-from-span-urls.md) and [reflexr ADR-0065](../reflexr/adr/0065-an-access-token-redacted-from-span-urls.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-12
 **Discussion:** [#44](https://github.com/alexnodeland/lattice/pull/44); accepted on 2026-10-12, with the decisions in [Decisions](#decisions)

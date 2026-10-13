@@ -42,7 +42,8 @@ deploy/host/        the single host (RFC-0004): the overlay that puts Caddy in f
                     bootstrap, which prepares a VM, PostgreSQL's image with pgBackRest, the backups,
                     the restore drill and their systemd timers
 deploy/aws/         the AWS recipe (RFC-0004), in OpenTofu: its modules, with stack, which puts them
-                    together, their tests against a mocked AWS, check (tier 1), the plugins proto
+                    together; its roots, envs/prod, which an operator applies, and envs/floci, for
+                    tier 2; their tests against a mocked AWS, check (tier 1), the plugins proto
                     installs OpenTofu and TFLint with, and state-host/, the Compose its EC2 state
                     host runs
 deploy/postgres/    init.sql: each service's role and database, created by db-init

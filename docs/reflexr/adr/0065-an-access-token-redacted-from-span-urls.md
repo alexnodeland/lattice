@@ -17,7 +17,7 @@ Lattice RFC-0002 has the template redact it. A span processor can't: the ASGI in
 - **A parameter is `access_token` however its name is encoded,** as Starlette decodes it, so `access%5Ftoken` is redacted too, and every other parameter is kept byte for byte.
 - **`access_token` is OAuth's own name** for a bearer token in a URI ([RFC 6750, section 2.3](https://www.rfc-editor.org/rfc/rfc6750#section-2.3)), so hiding it is safe in any application, not only the template's. No option turns it off.
 - **`redact_access_token(text)` and `URL_ATTRIBUTES` are public,** so an application redacts its own logs the same way. The template redacts uvicorn's access log, and its log of WebSockets, with it, as RFC-0002 has it.
-- **The code is the same in reflexr and artifactr** ([artifactr ADR-0067](../../artifactr/adr/0067-an-access-token-redacted-from-span-urls.md)), copied as the rest of their telemetry setup is. One home for what the packages share is [lattice #73](https://github.com/alexnodeland/lattice/issues/73).
+- **The code is the same in reflexr and artifactr** ([artifactr ADR-0068](../../artifactr/adr/0068-an-access-token-redacted-from-span-urls.md)), copied as the rest of their telemetry setup is. One home for what the packages share is [lattice #73](https://github.com/alexnodeland/lattice/issues/73).
 
 ## Options considered
 

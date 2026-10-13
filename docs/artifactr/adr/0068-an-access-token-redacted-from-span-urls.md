@@ -1,4 +1,4 @@
-# ADR-0067: An access token redacted from the spans' URLs
+# ADR-0068: An access token redacted from the spans' URLs
 
 **Status:** Accepted
 **Date:** 2026-10-13

@@ -205,7 +205,7 @@
       "Metric": {
         "enum": [
           "turn_latency",
-          "failed_runs"
+          "failed_turns"
         ],
         "type": "string"
       },
@@ -475,6 +475,17 @@
             ],
             "title": "Data Type",
             "type": "string"
+          },
+          "evaluator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluator"
           },
           "id": {
             "title": "Id",

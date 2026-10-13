@@ -20,3 +20,8 @@ test("signed out, a plain page has no account", async () => {
   const screen = await render(<Plain home={<a href="#home" />} title="Not found" />);
   expect(screen.container.querySelectorAll("button")).toHaveLength(0);
 });
+
+test("admin's plain page links home as admin", async () => {
+  const screen = await render(<Plain ui="admin" home={<a href="#home" />} title="No access" />);
+  await expect.element(screen.getByRole("link", { name: "portalr admin" })).toBeVisible();
+});

@@ -5,8 +5,8 @@ artifactr's, with a scripted agent (``notes.py``), over grantr's ``Grants`` in m
 every artifactr command and read; it invites without Supabase. acme's owner is alice, and bob is its
 member with no tenant role, an editor of its workspaces ``notes`` and ``plans``; globex's owner is
 carol; erin is a member of both, and edits acme's ``notes``; vera views ``notes``, and dana is its
-admin, who may change who sees its threads but not list acme's members; ops is the deployment's
-operator.
+admin, who may change who sees its threads but not list acme's members; olga administers both
+tenants; ops is the deployment's operator.
 
 A caller is named by a Supabase Auth access token, verified as the template verifies one, or by
 the ``x-user`` header, which the API tests send. Signed in, a person's user id here is their
@@ -15,8 +15,10 @@ itself (GoTrue, alone) answers at ``/auth/v1`` on this origin, as it does behind
 gateway, so ``config.json`` names this origin for it (portalr ADR-0013).
 
 Each tool is read at the URL its environment variable names; Langfuse and LiteLLM aren't in its
-compose, so their reads are unavailable (portalr ADR-0011). Phase 7 moves the UIs' scenarios to an
-application the template generates, and this application's wiring of grantr goes then.
+compose, so their reads are unavailable (portalr ADR-0011), unless their variable is set
+empty, which leaves the tool unconfigured, as admin's scenarios run it (portalr ADR-0023).
+Phase 7 moves the UIs' scenarios to an application the template generates, and this
+application's wiring of grantr goes then.
 """
 
 import asyncio
@@ -34,9 +36,11 @@ from starlette.requests import HTTPConnection
 import artifactr
 import artifactr.core
 import artifactr.fastapi
+import artifactr.otel
 import reflexr
 import reflexr.core
 import reflexr.fastapi
+import reflexr.otel
 from artifactr.workspace import ACTIONS as ARTIFACTR_ACTIONS
 from grantr.core import Resource, User
 from grantr.fastapi import Caller, Unauthorized, grantr_router
@@ -48,8 +52,8 @@ from reflexr.workspace import ACTIONS as REFLEXR_ACTIONS
 from tests.app.notes import APPLICATION, collaboration
 from tests.app.tickets import automation
 
-OPS, ALICE, BOB, CAROL, DANA, ERIN, VERA = (
-    User(id=name) for name in ("ops", "alice", "bob", "carol", "dana", "erin", "vera")
+OPS, ALICE, BOB, CAROL, DANA, ERIN, OLGA, VERA = (
+    User(id=name) for name in ("ops", "alice", "bob", "carol", "dana", "erin", "olga", "vera")
 )
 
 PEOPLE = "portalr.test"
@@ -78,6 +82,10 @@ async def seed(grants: Grants) -> None:
     await grants.grant("acme", "editor", on=workspace("notes"), to=ERIN, by=ALICE)
     await grants.grant("acme", "viewer", on=workspace("notes"), to=VERA, by=ALICE)
     await grants.grant("acme", "admin", on=workspace("notes"), to=DANA, by=ALICE)
+    # olga administers both tenants, to switch between them in admin.
+    for tenant, owner in (("acme", ALICE), ("globex", CAROL)):
+        await grants.add_member(tenant, OLGA, by=owner)
+        await grants.grant(tenant, "admin", on=Resource(kind="tenant"), to=OLGA, by=owner)
 
 
 def signed_in(token: str) -> User:
@@ -158,14 +166,17 @@ async def invite(email: str) -> str:
 
 
 def readers() -> Readers:
-    """The tools, at the URLs the environment names."""
+    """The tools, at the URLs the environment names; Langfuse and LiteLLM not at all where their
+    URL is set empty."""
     env = os.environ.get
+    langfuse = env("PORTALR_LANGFUSE_URL", "http://langfuse:3000")
+    litellm = env("PORTALR_LITELLM_URL", "http://litellm:4000")
     return Readers(
         tempo=Tempo(env("PORTALR_TEMPO_URL", "http://tempo:3200")),
         loki=Loki(env("PORTALR_LOKI_URL", "http://loki:3100")),
         prometheus=Prometheus(env("PORTALR_PROXY_URL", "http://prom-label-proxy:8080")),
-        langfuse=Langfuse(env("PORTALR_LANGFUSE_URL", "http://langfuse:3000"), project="p1"),
-        litellm=LiteLLM(env("PORTALR_LITELLM_URL", "http://litellm:4000")),
+        langfuse=Langfuse(langfuse, project="p1") if langfuse else None,
+        litellm=LiteLLM(litellm) if litellm else None,
         grafana=Grafana("http://localhost:3000"),
     )
 
@@ -256,4 +267,22 @@ def create_app(ui: Path = UI) -> FastAPI:
     return app
 
 
-app = create_app()
+def instrumented(app: FastAPI) -> FastAPI:
+    """The application, sending its telemetry through stackr's Collector, as the template's does,
+    when compose names one in ``OTEL_EXPORTER_OTLP_ENDPOINT``: admin's scenarios read it back
+    from Tempo, Loki and Prometheus (portalr ADR-0023). The tests run without it.
+
+    FastAPI alone is instrumented: the application's own HTTP calls are portalr's reads of the
+    tools, which a trace of the tools' own traffic would only crowd."""
+    if os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
+        telemetry = artifactr.otel.configure_telemetry(
+            reflexr.otel.telemetry(),
+            service_name="portalr-test",
+            environment="test",
+            instrument=("fastapi",),
+        )
+        telemetry.instrument_app(app)
+    return app
+
+
+app = instrumented(create_app())

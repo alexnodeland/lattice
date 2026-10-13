@@ -11,3 +11,12 @@ export const test = base.extend<{ made: Map<string, string> }>({
 });
 
 export const { Given, When, Then } = createBdd(test);
+
+/** The name a scenario made afresh for `what`, such as a principal; it must have made one. */
+export const madeAs = (made: Map<string, string>, what: string) => {
+  const name = made.get(what);
+  if (name === undefined) {
+    throw new Error(`no ${what} was made: make one first`);
+  }
+  return name;
+};

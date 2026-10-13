@@ -1,5 +1,6 @@
 import { Menu } from "@base-ui/react/menu";
 import { Check, ChevronDown } from "lucide-react";
+import type { ReactElement } from "react";
 import { Icon } from "./icon";
 import { groupLabel, item, popup, separator } from "./menu";
 
@@ -48,6 +49,7 @@ export function Switcher({
   workspaces,
   onTenant,
   onWorkspace,
+  every,
 }: {
   tenant: string;
   workspace: string;
@@ -56,6 +58,8 @@ export function Switcher({
   workspaces: readonly Choice[];
   onTenant: (id: string) => void;
   onWorkspace: (id: string) => void;
+  /** A link to every workspace in the tenant, such as the router's, shown under them. */
+  every?: ReactElement;
 }) {
   return (
     <Menu.Root>
@@ -83,6 +87,12 @@ export function Switcher({
               chosen={workspace}
               onChoose={onWorkspace}
             />
+            {every && <Menu.Separator className={separator} />}
+            {every && (
+              <Menu.LinkItem render={every} className={item}>
+                Every workspace in {tenant}
+              </Menu.LinkItem>
+            )}
             <Menu.Separator className={separator} />
             <Choices label="Tenants" choices={tenants} chosen={tenant} onChoose={onTenant} />
           </Menu.Popup>

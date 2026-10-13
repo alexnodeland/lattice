@@ -1,4 +1,13 @@
-import { Button, TextField, TextLink } from "@portalr/ui";
+import {
+  Button,
+  EmptyState,
+  PageHeader,
+  Row,
+  RowLink,
+  Rows,
+  RunStatus,
+  TextField,
+} from "@portalr/ui";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useActionState } from "react";
 import { Connection, useStream, useWorkspace } from "../../../../../../workspace";
@@ -31,39 +40,56 @@ function Threads() {
     null,
   );
   const live = snapshot.status === "live";
+  // Each thread's run that is going, or waits on someone, said beside it.
+  const going = new Map(
+    Object.values(snapshot.state.runs)
+      .filter((run) => run.status === "running" || run.status === "paused")
+      .map((run) => [run.threadId, run.status] as const),
+  );
+  const starting =
+    snapshot.status !== "closed" ? (
+      <form className="flex items-end gap-2" action={start}>
+        <TextField label="New thread" name="title" error={refused} required />
+        <Button type="submit" disabled={pending || !live}>
+          Start
+        </Button>
+      </form>
+    ) : null;
   return (
-    <section aria-labelledby="threads" className="flex flex-col gap-4">
-      <h2 id="threads" className="font-semibold text-lg">
-        Threads
-      </h2>
+    <>
+      <PageHeader
+        title="Threads"
+        meta={`The threads in ${workspace}, the most recently active first`}
+        actions={starting}
+      />
       <Connection snapshot={snapshot} waiting="the workspace" />
-      {live && listed.length === 0 && <p>No threads yet.</p>}
+      {live && listed.length === 0 && (
+        <EmptyState title="No threads yet">
+          Name one in New thread, and talk with the agent in it.
+        </EmptyState>
+      )}
       {listed.length > 0 && (
-        <ul aria-label="Threads" className="flex flex-col gap-2">
-          {listed.map((thread) => (
-            <li key={thread.id}>
-              <TextLink
-                render={
-                  <Link
-                    to="/t/$tenant/w/$workspace/threads/$thread"
-                    params={{ tenant, workspace, thread: thread.id }}
-                  />
-                }
-              >
-                {thread.title || "Untitled"}
-              </TextLink>
-            </li>
-          ))}
-        </ul>
+        <Rows label="Threads">
+          {listed.map((thread) => {
+            const status = going.get(thread.id);
+            return (
+              <Row key={thread.id}>
+                <RowLink
+                  render={
+                    <Link
+                      to="/t/$tenant/w/$workspace/threads/$thread"
+                      params={{ tenant, workspace, thread: thread.id }}
+                    />
+                  }
+                >
+                  {thread.title || "Untitled"}
+                </RowLink>
+                {status && <RunStatus status={status} />}
+              </Row>
+            );
+          })}
+        </Rows>
       )}
-      {snapshot.status !== "closed" && (
-        <form className="flex max-w-sm flex-col gap-2" action={start}>
-          <TextField label="New thread" name="title" error={refused} required />
-          <Button type="submit" disabled={pending || !live}>
-            Start
-          </Button>
-        </form>
-      )}
-    </section>
+    </>
   );
 }

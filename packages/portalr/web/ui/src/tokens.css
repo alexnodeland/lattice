@@ -26,6 +26,10 @@
   --focus: light-dark(#6b2fa0, #38c6f4);
   /* A control's boundary: 3:1 or more on every surface, as WCAG asks of one. */
   --edge: light-dark(#857a97, #7d7091);
+  /* What a destructive action is in, and nothing else: deleting, removing, revoking, archiving. */
+  --danger: light-dark(#9b1c3c, #ff9fb2);
+  --on-danger: light-dark(#ffffff, #17111f);
+  --danger-hover: color-mix(in srgb, var(--danger) 88%, var(--on-danger));
   /* Behind a drawer or a dialog. */
   --scrim: light-dark(rgb(28 29 38 / 45%), rgb(0 0 0 / 60%));
 }

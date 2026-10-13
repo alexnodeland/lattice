@@ -1,6 +1,7 @@
-import { Page, TextLink } from "@portalr/ui";
+import { Plain, Row, RowLink, Rows } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { Account } from "../../account";
 import { landing } from "../../landing";
 
 /** Where a signed-in person lands: their one tenant, a choice of several, or no access. */
@@ -17,27 +18,28 @@ export const Route = createFileRoute("/_signed/")({
 });
 
 function Tenants() {
-  const { queries, user } = Route.useRouteContext();
+  const { queries, user, signed } = Route.useRouteContext();
+  const account = <Account signed={signed} />;
   const { data } = useSuspenseQuery(queries.grantr.memberships(user));
   const lands = landing(data);
   if (lands.kind !== "choose") {
     return (
-      <Page title="No access">
+      <Plain home={<Link to="/" />} title="No access" account={account}>
         <p>You aren't a member of any tenant yet. Ask an owner of one to invite you.</p>
-      </Page>
+      </Plain>
     );
   }
   return (
-    <Page title="Choose a tenant">
+    <Plain home={<Link to="/" />} title="Choose a tenant" account={account}>
       <nav aria-label="Tenants">
-        <ul className="flex flex-col gap-2">
+        <Rows label="Tenants">
           {lands.tenants.map((tenant) => (
-            <li key={tenant}>
-              <TextLink render={<Link to="/t/$tenant" params={{ tenant }} />}>{tenant}</TextLink>
-            </li>
+            <Row key={tenant}>
+              <RowLink render={<Link to="/t/$tenant" params={{ tenant }} />}>{tenant}</RowLink>
+            </Row>
           ))}
-        </ul>
+        </Rows>
       </nav>
-    </Page>
+    </Plain>
   );
 }

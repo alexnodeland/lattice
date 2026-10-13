@@ -1,4 +1,4 @@
-import { TextLink } from "@portalr/ui";
+import { EmptyState, PageHeader, Row, RowLink, Rows } from "@portalr/ui";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Connection, useWorkspace } from "../../../../../../../workspace";
 
@@ -15,17 +15,20 @@ function Artifacts() {
     .filter((artifact) => !artifact.archived)
     .sort((a, b) => a.id.localeCompare(b.id));
   return (
-    <section aria-labelledby="artifacts" className="flex flex-col gap-4">
-      <h2 id="artifacts" className="font-semibold text-lg">
-        Artifacts
-      </h2>
+    <>
+      <PageHeader title="Artifacts" meta={`What the agent and people make in ${workspace}`} />
       <Connection snapshot={snapshot} waiting="the workspace" />
-      {snapshot.status === "live" && listed.length === 0 && <p>No artifacts yet.</p>}
+      {snapshot.status === "live" && listed.length === 0 && (
+        <EmptyState title="No artifacts yet">
+          An artifact appears here when the agent makes one in a thread, or when someone accepts a
+          proposal that creates one.
+        </EmptyState>
+      )}
       {listed.length > 0 && (
-        <ul aria-label="Artifacts" className="flex flex-col gap-2">
+        <Rows label="Artifacts">
           {listed.map((artifact) => (
-            <li key={artifact.id} className="flex gap-2">
-              <TextLink
+            <Row key={artifact.id}>
+              <RowLink
                 render={
                   <Link
                     to="/t/$tenant/w/$workspace/artifacts/$artifact"
@@ -33,15 +36,15 @@ function Artifacts() {
                   />
                 }
               >
-                {artifact.id}
-              </TextLink>
+                <span className="font-mono">{artifact.id}</span>
+              </RowLink>
               <span className="text-muted">
                 {artifact.kind}, version {artifact.version}
               </span>
-            </li>
+            </Row>
           ))}
-        </ul>
+        </Rows>
       )}
-    </section>
+    </>
   );
 }

@@ -22,13 +22,13 @@ When("they keep the note the assistant proposed an edit to", async ({ page, scen
 When("they open the workspace's {word}", async ({ page }, area: string) => {
   const name = area.charAt(0).toUpperCase() + area.slice(1);
   await page.getByRole("navigation", { name: "Workspace" }).getByRole("link", { name }).click();
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText(name);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(name);
 });
 
 When("they open the note", async ({ page, scenario }) => {
   const note = kept(scenario.note);
   await page.getByRole("list", { name: "Artifacts" }).getByRole("link", { name: note }).click();
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText(note);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(note);
 });
 
 Then("the note reads {string}", async ({ page, scenario }, text: string) => {
@@ -63,7 +63,7 @@ When("they open an artifact that isn't there", async ({ page }) => {
 });
 
 Then("they are told it isn't found", async ({ page }) => {
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText("Artifact not found", {
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Artifact not found", {
     timeout: 2000,
   });
 });

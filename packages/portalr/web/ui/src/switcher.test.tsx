@@ -70,3 +70,21 @@ test("the item the keyboard is on is ringed and coloured, 3:1 or more from the s
   expect(style.color).toBe(token("accent"));
   expect(contrast(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5);
 });
+
+test("its menu can link to every workspace in the tenant", async () => {
+  const screen = await render(
+    <Switcher
+      tenant="acme"
+      workspace="notes"
+      tenants={[{ id: "acme" }]}
+      workspaces={[{ id: "notes" }]}
+      onTenant={vi.fn()}
+      onWorkspace={vi.fn()}
+      every={<a href="#every" />}
+    />,
+  );
+  await screen.getByRole("button", { name: /^Workspace/ }).click();
+  await expect
+    .element(screen.getByRole("menuitem", { name: "Every workspace in acme" }))
+    .toHaveAttribute("href", "#every");
+});

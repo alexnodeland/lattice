@@ -7,5 +7,7 @@ import { defineConfig } from "vite";
 export default defineConfig({
   base: "/portalr/admin/",
   plugins: [react(), tailwindcss()],
+  // ui's public files, such as the script that sets the scheme before the first paint.
+  publicDir: "../ui/public",
   build: { outDir: "../../src/portalr/static/admin", emptyOutDir: true },
 });

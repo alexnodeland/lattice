@@ -24,6 +24,8 @@ export default defineConfig({
   base: "/portalr/app/",
   // Each route is a chunk of its own, loaded when it is first visited.
   plugins: [tanstackRouter({ ...ROUTES, autoCodeSplitting: true }), react(), tailwindcss()],
+  // ui's public files, such as the script that sets the scheme before the first paint.
+  publicDir: "../ui/public",
   build: { outDir: "../../src/portalr/static/app", emptyOutDir: true },
   server: { proxy: { "^/(?!portalr/app/)": application } },
 });

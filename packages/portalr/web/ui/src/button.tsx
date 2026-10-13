@@ -6,6 +6,7 @@ const look = {
   primary: "border-transparent bg-accent text-on-accent hover:not-data-disabled:bg-accent-hover",
   secondary: "border-edge bg-surface text-fg hover:not-data-disabled:bg-wash",
   ghost: "border-transparent bg-transparent text-fg hover:not-data-disabled:bg-wash",
+  danger: "border-transparent bg-danger text-on-danger hover:not-data-disabled:bg-danger-hover",
 } as const;
 
 type Props = Omit<ComponentProps<typeof BaseButton>, "className"> & {

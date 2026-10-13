@@ -3,8 +3,9 @@
 The agent answers from a script, so the app's scenarios choose its path by the first word they
 post: ``ask`` makes it ask a question, ``publish`` makes it call a tool that waits for approval,
 ``propose`` makes it write a note of its own and propose an edit to it, which it names in its
-answer, so each scenario resolves a proposal of its own, and ``wait`` keeps its turn running until
-it is stopped. Anything else gets its words back. Each run streams, as every run does.
+answer, so each scenario resolves a proposal of its own, ``wait`` keeps its turn running until it
+is stopped, and ``fail`` fails its turn, for admin's count of failed turns. Anything else gets its
+words back. Each run streams, as every run does.
 """
 
 import asyncio
@@ -77,6 +78,8 @@ async def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelRespons
         case ["wait"]:
             await asyncio.Event().wait()  # until someone stops the turn, which cancels it
             return ModelResponse(parts=[TextPart("Done waiting.")])
+        case ["fail"]:
+            raise RuntimeError("the turn was asked to fail")
         case _:
             return ModelResponse(parts=[TextPart(f"You said: **{prompt}**")])
 

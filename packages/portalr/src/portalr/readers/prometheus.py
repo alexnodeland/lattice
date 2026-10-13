@@ -21,22 +21,27 @@ TENANT_LABEL: Final = "tenant_id"
 """The label that names a series' tenant: the collector's ``tenant.id``, as Prometheus spells it,
 and the parameter prom-label-proxy enforces it from."""
 
-type Metric = Literal["turn_latency", "failed_runs"]
-"""What portalr charts: artifactr's turn latency (p95), and runs that failed, per second."""
+type Metric = Literal["turn_latency", "failed_turns"]
+"""What portalr charts: artifactr's turn latency (p95), and how many turns failed in each step."""
 
 QUERIES: Final[dict[Metric, str]] = {
     "turn_latency": (
         "histogram_quantile(0.95, sum by (le) "
         "(rate(artifactr_turn_duration_seconds_bucket{{{tenant}}}[5m])))"
     ),
-    "failed_runs": 'sum(rate(artifactr_runs_total{{artifactr_run_status="failed",{tenant}}}[5m]))',
+    # artifactr records each failed series at zero as a turn starts, so a failure is an increase
+    # even when it is the series' first: each point counts the failures in the step before it.
+    "failed_turns": (
+        'sum(increase(artifactr_turns_total{{artifactr_turn_outcome="failed",{tenant}}}[{step}s]))'
+    ),
 }
-"""Each metric's PromQL, with ``{tenant}`` where its selector names the tenant."""
+"""Each metric's PromQL, with ``{tenant}`` where its selector names the tenant, and ``{step}``
+where it counts over each step."""
 
 
-def promql(tenant: Tenant, metric: Metric) -> str:
+def promql(tenant: Tenant, metric: Metric, step: int = 300) -> str:
     """A metric's PromQL, its selector naming the tenant, as the proxy will make sure it does."""
-    return QUERIES[metric].format(tenant=f"{TENANT_LABEL}={quoted(tenant.id)}")
+    return QUERIES[metric].format(tenant=f"{TENANT_LABEL}={quoted(tenant.id)}", step=step)
 
 
 class MetricQuery(Window):
@@ -75,7 +80,7 @@ _ANSWER: Final = TypeAdapter(_Answer)
 def parameters(tenant: Tenant, query: MetricQuery) -> dict[str, str | float]:
     """The proxy's parameters for a metric: its PromQL, its window, and the tenant."""
     return {
-        "query": promql(tenant, query.metric),
+        "query": promql(tenant, query.metric, query.step),
         "start": query.start.timestamp(),
         "end": query.end.timestamp(),
         "step": query.step,

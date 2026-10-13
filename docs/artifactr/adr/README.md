@@ -70,5 +70,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0064](0064-asking-for-a-threads-next-turn.md) | Asking for a thread's next turn | Accepted |
 | [0065](0065-run-started-names-its-messages.md) | `run_started` names its messages | Accepted |
 | [0066](0066-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted |
+| [0067](0067-a-failed-turns-series-starts-at-zero.md) | A turn's failed series starts at zero | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

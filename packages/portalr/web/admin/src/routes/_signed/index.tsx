@@ -1,7 +1,7 @@
-import { administered, adminLanding } from "@portalr/client";
+import { adminLanding } from "@portalr/client";
 import { Account, Plain, Row, RowLink, Rows } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate, redirect } from "@tanstack/react-router";
 import { lastChoice } from "../../last";
 
 /**
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_signed/")({
     const { queries, queryClient, user } = context;
     const [memberships, every] = await Promise.all([
       queryClient.ensureQueryData(queries.grantr.memberships(user)),
-      queryClient.ensureQueryData(queries.portalr.tenants()),
+      queryClient.ensureQueryData(queries.portalr.tenants(user)),
     ]);
     const lands = adminLanding(memberships, every !== null, lastChoice());
     if (lands.kind === "tenant") {
@@ -31,34 +31,42 @@ function Tenants() {
   const { queries, user, signed } = Route.useRouteContext();
   const account = <Account signed={signed} />;
   const { data: memberships } = useSuspenseQuery(queries.grantr.memberships(user));
-  const { data: every } = useSuspenseQuery(queries.portalr.tenants());
-  const tenants = administered(memberships);
-  if (tenants.length === 0 && every === null) {
-    return (
-      <Plain ui="admin" home={<Link to="/" />} title="No access" account={account}>
-        <p>
-          admin is for a tenant's owners and admins, and the deployment's operators. You're none of
-          these yet.
-        </p>
-      </Plain>
-    );
+  const { data: every } = useSuspenseQuery(queries.portalr.tenants(user));
+  const lands = adminLanding(memberships, every !== null, lastChoice());
+  switch (lands.kind) {
+    case "tenant":
+      return <Navigate to="/t/$tenant" params={{ tenant: lands.tenant }} />;
+    case "deployment":
+      return <Navigate to="/deployment" />;
+    case "no-access":
+      return (
+        <Plain ui="admin" home={<Link to="/" />} title="No access" account={account}>
+          <p>
+            admin is for a tenant's owners and admins, and the deployment's operators. You're none
+            of these yet.
+          </p>
+        </Plain>
+      );
+    case "choose":
+      return (
+        <Plain ui="admin" home={<Link to="/" />} title="Choose a tenant" account={account}>
+          <nav aria-label="Tenants">
+            <Rows label="Tenants">
+              {lands.tenants.map((tenant) => (
+                <Row key={tenant}>
+                  <RowLink render={<Link to="/t/$tenant" params={{ tenant }} />}>{tenant}</RowLink>
+                </Row>
+              ))}
+              {lands.operator && (
+                <Row>
+                  <RowLink render={<Link to="/deployment" />}>All tenants</RowLink>
+                </Row>
+              )}
+            </Rows>
+          </nav>
+        </Plain>
+      );
+    default:
+      return lands satisfies never;
   }
-  return (
-    <Plain ui="admin" home={<Link to="/" />} title="Choose a tenant" account={account}>
-      <nav aria-label="Tenants">
-        <Rows label="Tenants">
-          {tenants.map((tenant) => (
-            <Row key={tenant}>
-              <RowLink render={<Link to="/t/$tenant" params={{ tenant }} />}>{tenant}</RowLink>
-            </Row>
-          ))}
-          {every !== null && (
-            <Row>
-              <RowLink render={<Link to="/deployment" />}>All tenants</RowLink>
-            </Row>
-          )}
-        </Rows>
-      </nav>
-    </Plain>
-  );
 }

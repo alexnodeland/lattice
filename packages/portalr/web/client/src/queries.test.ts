@@ -44,7 +44,12 @@ beforeAll(() => {
         const operator = request.headers.get("authorization") === "Bearer t0k3n";
         return operator
           ? Response.json({ tenants: ["acme"], spend: { status: "unconfigured" } })
-          : Response.json({ detail: "not an operator" }, { status: 403 });
+          : request.headers.get("authorization") === "Bearer wrong"
+            ? Response.json(
+                { detail: { type: "forbidden", message: "not an operator" } },
+                { status: 403 },
+              )
+            : Response.json({ detail: "the proxy refused" }, { status: 403 });
       }
       if (url.pathname === "/portalr/config.json") {
         return Response.json(CONFIG);
@@ -264,11 +269,11 @@ const DAY = { start: "2026-10-11T00:00:00Z", end: "2026-10-12T00:00:00Z", step: 
 
 test("portalr's reads name their tenant and window", async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  await client.fetchQuery(queries.portalr.metrics("acme", "failed_runs", DAY));
+  await client.fetchQuery(queries.portalr.metrics("acme", "failed_turns", DAY));
   const metrics = seen.at(-1);
   expect(metrics?.url.pathname).toBe("/portalr/v1/metrics");
   expect(Object.fromEntries(metrics?.url.searchParams ?? [])).toEqual({
-    metric: "failed_runs",
+    metric: "failed_turns",
     start: DAY.start,
     end: DAY.end,
     step: "3600",
@@ -282,20 +287,29 @@ test("portalr's reads name their tenant and window", async () => {
 
 test("the deployment's tenants are an operator's, and null for anyone else", async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  expect(await client.fetchQuery(queries.portalr.tenants())).toEqual({
+  expect(await client.fetchQuery(queries.portalr.tenants("alice"))).toEqual({
     tenants: ["acme"],
     spend: { status: "unconfigured" },
   });
   const stranger = createQueries(
     createApi({ artifactr: "", reflexr: "", grantr: origin }, () => ({ token: "wrong" })),
   );
-  expect(await new QueryClient().fetchQuery(stranger.portalr.tenants())).toBeNull();
+  expect(await new QueryClient().fetchQuery(stranger.portalr.tenants("bob"))).toBeNull();
+  // A 403 that isn't grantr's or portalr's refusal, such as a proxy's, is no answer at all.
+  const proxied = createQueries(
+    createApi({ artifactr: "", reflexr: "", grantr: origin }, () => ({ token: "proxied" })),
+  );
+  await expect(
+    new QueryClient({ defaultOptions: { queries: { retry: false } } }).fetchQuery(
+      proxied.portalr.tenants("bob"),
+    ),
+  ).rejects.toThrow(/refused the read \(403\)/);
   const away = createQueries(
     createApi({ artifactr: "", reflexr: "", grantr: `${origin}/missing` }, () => ({ token: "x" })),
   );
   await expect(
     new QueryClient({ defaultOptions: { queries: { retry: false } } }).fetchQuery(
-      away.portalr.tenants(),
+      away.portalr.tenants("bob"),
     ),
   ).rejects.toThrow(/refused the read \(404\)/);
 });

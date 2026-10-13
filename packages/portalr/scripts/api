@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # portalr's acceptance tests (portalr ADR-0012, lattice ADR-0015). It starts the test
-# application (tests/app/) beside Tempo, Loki, Prometheus and prom-label-proxy, from compose.yaml,
-# as a compose project of its own on ports the system picks. Then:
+# application (tests/app/) beside Tempo, Loki, Prometheus, prom-label-proxy and stackr's
+# Collector, from compose.yaml, as a compose project of its own on ports the system picks, with
+# Langfuse and LiteLLM unavailable. Then:
 #   1. the two-tenant test (tests/acceptance/) seeds two tenants' telemetry and reads as each;
 #   2. the Bruno collection's up/ runs with every tool up;
 #   3. Tempo, Loki and the proxy stop, and its down/ runs;

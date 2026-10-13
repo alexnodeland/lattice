@@ -59,7 +59,7 @@ def trace_ids() -> dict[str, str]:
 
 
 def seed(tempo_otlp: str, loki: str, prometheus: str) -> dict[str, str]:
-    """Send each tenant's trace, logs and failed runs, and a trace both share; return the ids."""
+    """Send each tenant's trace, logs and failed turns, and a trace both share; return the ids."""
     now = time.time_ns()
     ids = trace_ids()
     spans = [
@@ -91,7 +91,7 @@ def seed(tempo_otlp: str, loki: str, prometheus: str) -> dict[str, str]:
             }
         ]
     }
-    # artifactr's failed runs: acme fails once a minute, globex a hundred times.
+    # artifactr's failed turns: acme fails once a minute, globex a hundred times.
     points = [
         {
             "timeUnixNano": str(now - minutes * 60_000_000_000),
@@ -99,7 +99,7 @@ def seed(tempo_otlp: str, loki: str, prometheus: str) -> dict[str, str]:
             "asInt": str((10 - minutes) * (1 if tenant == "acme" else 100)),
             "attributes": [
                 {"key": "tenant.id", "value": {"stringValue": tenant}},
-                {"key": "artifactr.run.status", "value": {"stringValue": "failed"}},
+                {"key": "artifactr.turn.outcome", "value": {"stringValue": "failed"}},
                 {"key": "smoke.run", "value": {"stringValue": RUN}},
             ],
         }
@@ -114,8 +114,8 @@ def seed(tempo_otlp: str, loki: str, prometheus: str) -> dict[str, str]:
                     {
                         "metrics": [
                             {
-                                "name": "artifactr.runs",
-                                "unit": "{run}",
+                                "name": "artifactr.turns",
+                                "unit": "{turn}",
                                 "sum": {
                                     "dataPoints": points,
                                     "aggregationTemporality": 2,

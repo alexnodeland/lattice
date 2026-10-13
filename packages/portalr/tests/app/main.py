@@ -5,8 +5,8 @@ artifactr's, with a scripted agent (``notes.py``), over grantr's ``Grants`` in m
 every artifactr command and read; it invites without Supabase. acme's owner is alice, and bob is its
 member with no tenant role, an editor of its workspaces ``notes`` and ``plans``; globex's owner is
 carol; erin is a member of both, and edits acme's ``notes``; vera views ``notes``, and dana is its
-admin, who may change who sees its threads but not list acme's members; ops is the deployment's
-operator.
+admin, who may change who sees its threads but not list acme's members; olga administers both
+tenants; ops is the deployment's operator.
 
 A caller is named by a Supabase Auth access token, verified as the template verifies one, or by
 the ``x-user`` header, which the API tests send. Signed in, a person's user id here is their
@@ -52,8 +52,8 @@ from reflexr.workspace import ACTIONS as REFLEXR_ACTIONS
 from tests.app.notes import APPLICATION, collaboration
 from tests.app.tickets import automation
 
-OPS, ALICE, BOB, CAROL, DANA, ERIN, VERA = (
-    User(id=name) for name in ("ops", "alice", "bob", "carol", "dana", "erin", "vera")
+OPS, ALICE, BOB, CAROL, DANA, ERIN, OLGA, VERA = (
+    User(id=name) for name in ("ops", "alice", "bob", "carol", "dana", "erin", "olga", "vera")
 )
 
 PEOPLE = "portalr.test"
@@ -82,6 +82,10 @@ async def seed(grants: Grants) -> None:
     await grants.grant("acme", "editor", on=workspace("notes"), to=ERIN, by=ALICE)
     await grants.grant("acme", "viewer", on=workspace("notes"), to=VERA, by=ALICE)
     await grants.grant("acme", "admin", on=workspace("notes"), to=DANA, by=ALICE)
+    # olga administers both tenants, to switch between them in admin.
+    for tenant, owner in (("acme", ALICE), ("globex", CAROL)):
+        await grants.add_member(tenant, OLGA, by=owner)
+        await grants.grant(tenant, "admin", on=Resource(kind="tenant"), to=OLGA, by=owner)
 
 
 def signed_in(token: str) -> User:
@@ -266,10 +270,16 @@ def create_app(ui: Path = UI) -> FastAPI:
 def instrumented(app: FastAPI) -> FastAPI:
     """The application, sending its telemetry through stackr's Collector, as the template's does,
     when compose names one in ``OTEL_EXPORTER_OTLP_ENDPOINT``: admin's scenarios read it back
-    from Tempo, Loki and Prometheus (portalr ADR-0023). The tests run without it."""
-    if "OTEL_EXPORTER_OTLP_ENDPOINT" in os.environ:
+    from Tempo, Loki and Prometheus (portalr ADR-0023). The tests run without it.
+
+    FastAPI alone is instrumented: the application's own HTTP calls are portalr's reads of the
+    tools, which a trace of the tools' own traffic would only crowd."""
+    if os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
         telemetry = artifactr.otel.configure_telemetry(
-            reflexr.otel.telemetry(), service_name="portalr-test", environment="test"
+            reflexr.otel.telemetry(),
+            service_name="portalr-test",
+            environment="test",
+            instrument=("fastapi",),
         )
         telemetry.instrument_app(app)
     return app

@@ -12,17 +12,17 @@ import { remember } from "../../last";
  */
 export const Route = createFileRoute("/_signed/deployment")({
   head: () => ({ meta: [{ title: "All tenants · portalr admin" }] }),
-  loader: async ({ context }) => {
+  beforeLoad: async ({ context }) => {
     const { queries, queryClient, user } = context;
     const [, every] = await Promise.all([
       queryClient.ensureQueryData(queries.grantr.memberships(user)),
-      queryClient.ensureQueryData(queries.portalr.tenants()),
+      queryClient.ensureQueryData(queries.portalr.tenants(user)),
     ]);
     if (every === null) {
       throw redirect({ to: "/" });
     }
-    remember("deployment");
   },
+  onEnter: () => remember("deployment"),
   component: Deployment,
 });
 

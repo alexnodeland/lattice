@@ -1,0 +1,12 @@
+# A single host's nightly backup (RFC-0004): deploy/host/backup.
+# deploy/host/bootstrap installs it, with the checkout's path in place of @STACKR_DIR@.
+[Unit]
+Description=Back up stackr's PostgreSQL and ClickHouse to the backups' bucket
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=3h
+WorkingDirectory=@STACKR_DIR@
+ExecStart=@STACKR_DIR@/deploy/host/backup

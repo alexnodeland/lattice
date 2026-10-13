@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Send one gauge to the Collector, as a single host's backup and restore drill report themselves.
+#
+# Usage: deploy/host/report-metric SERVICE METRIC VALUE   (from packages/stackr)
+#
+# It goes over OTLP/HTTP from the stack's probe container, to otel-collector:4318, so it needs
+# no published port; Prometheus keeps it as the metric's name with dots turned to underscores.
+
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+
+service=${1:?usage: report-metric SERVICE METRIC VALUE} metric=${2:?} value=${3:?}
+now=$(date +%s)
+docker compose -f compose.yaml -f deploy/host/compose.prod.yaml --profile smoke \
+  run --rm --no-deps -T probe -fsS --max-time 30 -o /dev/null -H 'Content-Type: application/json' \
+  --data @- http://otel-collector:4318/v1/metrics <<JSON
+{"resourceMetrics": [{
+  "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "$service"}}]},
+  "scopeMetrics": [{"scope": {"name": "$service"}, "metrics": [{
+    "name": "$metric",
+    "gauge": {"dataPoints": [{"asInt": "$value", "timeUnixNano": "${now}000000000"}]}
+  }]}]
+}]}
+JSON

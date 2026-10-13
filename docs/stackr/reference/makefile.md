@@ -16,6 +16,8 @@ Every command is a `make` target; `make` on its own lists them. The tools run th
 | `make ps` | Show the stack's containers |
 | `make logs` | Follow the logs of the running services |
 | `make tenant` | Create a tenant's team and key on the gateway: make tenant NAME=acme [TENANT_FLAGS="--max-budget 20"] |
+| `make backup` | On a single host: back up PostgreSQL and ClickHouse to the BACKUP_S3_* bucket now |
+| `make restore-drill` | On a single host: restore the latest backups beside the stack, check them, and report |
 | `make validate` | Validate every configuration without starting containers, as CI does |
 | `make smoke` | Send test telemetry through the running stack and find it (PROFILES as for up) |
 | `make smoke-app` | Run an application from the template beside the running stack, and trace its agents |

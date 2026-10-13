@@ -1,0 +1,12 @@
+# A single host's weekly restore drill (RFC-0004): deploy/host/restore-drill, after the backup.
+# deploy/host/bootstrap installs it, with the checkout's path in place of @STACKR_DIR@.
+[Unit]
+Description=Restore stackr's latest backups beside it, check them, and report
+Requires=docker.service
+After=docker.service stackr-backup.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=2h
+WorkingDirectory=@STACKR_DIR@
+ExecStart=@STACKR_DIR@/deploy/host/restore-drill

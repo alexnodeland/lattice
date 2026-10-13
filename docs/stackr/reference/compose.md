@@ -332,7 +332,7 @@ Langfuse's traces, observations and scores.
 | Image | `clickhouse/clickhouse-server`, pinned by tag and digest in `compose.yaml` |
 | Published ports | none |
 | Networks | `stackr` |
-| Volumes | `clickhouse-data` → `/var/lib/clickhouse`, `clickhouse-logs` → `/var/log/clickhouse-server` |
+| Volumes | `./deploy/clickhouse/users.xml` → `/etc/clickhouse-server/users.d/users.xml` (read-only), `clickhouse-data` → `/var/lib/clickhouse`, `clickhouse-logs` → `/var/log/clickhouse-server` |
 | Depends on | none |
 | Health check | `wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping`, every 3s |
 | Restart | `unless-stopped` |
@@ -341,9 +341,9 @@ Langfuse's traces, observations and scores.
 
     | Variable | Value |
     |---|---|
-    | `CLICKHOUSE_DB` | `default` |
-    | `CLICKHOUSE_USER` | `langfuse` |
-    | `CLICKHOUSE_PASSWORD` | `${CLICKHOUSE_PASSWORD:?run make env}` |
+    | `CLICKHOUSE_SKIP_USER_SETUP` | `1` |
+    | `CLICKHOUSE_ADMIN_PASSWORD` | `${CLICKHOUSE_ADMIN_PASSWORD:?run make env}` |
+    | `CLICKHOUSE_LANGFUSE_PASSWORD` | `${CLICKHOUSE_PASSWORD:?run make env}` |
 
 ### `langfuse-worker`
 

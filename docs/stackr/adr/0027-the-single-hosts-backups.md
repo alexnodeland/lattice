@@ -1,6 +1,6 @@
 # ADR-0027: The single host's backups
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0031](0031-clickhouse-s-admin-apart-from-langfuse.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

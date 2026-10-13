@@ -368,11 +368,14 @@ services:
     profiles: [langfuse]
     restart: unless-stopped
     user: "101:101"
+    # Its users are deploy/clickhouse/users.xml's, not the image's: an admin for operators, and
+    # Langfuse's, which may use only its own database (ADR-0031).
     environment:
-      CLICKHOUSE_DB: default
-      CLICKHOUSE_USER: langfuse
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?run make env}
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+      CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?run make env}
+      CLICKHOUSE_LANGFUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?run make env}
     volumes:
+      - ./deploy/clickhouse/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
       - clickhouse-data:/var/lib/clickhouse
       - clickhouse-logs:/var/log/clickhouse-server
     healthcheck:

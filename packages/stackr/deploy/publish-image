@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Publishes one of stackr's thin images (ADR-0035) from deploy/image-archive's two archives: each
+# architecture's as REPOSITORY:VERSION-ARCH, then both under REPOSITORY:VERSION, an index that
+# carries the image's description, source and licence. It prints REPOSITORY:VERSION@DIGEST.
+# release.yml runs it against GHCR, logged in as its job; CI's dry run against a registry on its
+# own loopback, in plain HTTP (INSECURE=1).
+#
+# Usage: deploy/publish-image IMAGE VERSION REPOSITORY ARCHIVES
+#   ARCHIVES holds stackr-<image>-amd64.tar and stackr-<image>-arm64.tar.
+
+set -euo pipefail
+if [[ $# -ne 4 ]]; then
+  echo "usage: deploy/publish-image IMAGE VERSION REPOSITORY ARCHIVES" >&2
+  exit 2
+fi
+image=$1 version=$2 repository=$3 archives=$4
+tls=()
+[[ ${INSECURE:-} == 1 ]] && tls=(--dest-tls-verify=false)
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+# skopeo reads Docker's login, as imagetools does.
+for arch in amd64 arm64; do
+  skopeo copy --quiet "${tls[@]}" --digestfile "$work/$arch" \
+    "oci-archive:$archives/stackr-$image-$arch.tar" "docker://$repository:$version-$arch" >&2
+done
+docker buildx imagetools create --tag "$repository:$version" \
+  --annotation "index:org.opencontainers.image.description=stackr's $image, for its AWS recipe" \
+  --annotation "index:org.opencontainers.image.source=https://github.com/alexnodeland/lattice" \
+  --annotation "index:org.opencontainers.image.licenses=MIT" \
+  --annotation "index:org.opencontainers.image.version=$version" \
+  "$repository@$(cat "$work/amd64")" "$repository@$(cat "$work/arm64")" >&2
+echo "$repository:$version@$(docker buildx imagetools inspect "$repository:$version" --format '{{.Manifest.Digest}}')"

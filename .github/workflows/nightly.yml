@@ -115,6 +115,29 @@ jobs:
           key: ${{ steps.toolchain.outputs.cache-key }}
       - run: moon run stackr:images
 
+  # A stackr release's images are reproducible (stackr ADR-0035): auth-keys, whose .pyc files
+  # are the likeliest to differ, built twice from the same commit without a cache, to one digest.
+  reproducible-image:
+    name: Reproducible image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - env:
+          NO_CACHE: "1"
+        run: |
+          for build in first second; do
+            packages/stackr/deploy/image-archive amd64 0.0.0-nightly "$build" auth-keys
+          done
+          first=$(tar --extract --to-stdout --file first/stackr-auth-keys-amd64.tar index.json | jq --raw-output '.manifests[0].digest')
+          second=$(tar --extract --to-stdout --file second/stackr-auth-keys-amd64.tar index.json | jq --raw-output '.manifests[0].digest')
+          echo "first: $first, second: $second"
+          [[ $first == "$second" ]]
+
   # Every lockfile git doesn't ignore: uv.lock and bun.lock.
   osv:
     name: OSV

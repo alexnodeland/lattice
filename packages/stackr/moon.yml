@@ -53,14 +53,19 @@ tasks:
   images:
     description: "Build the AWS recipe's thin images for this machine, and check each starts on its configuration"
     command: 'deploy/build-images'
+    # And the release's scripts, which CI's "Release images" jobs run when these change.
     inputs:
       - 'deploy/build-images'
+      - 'deploy/image-archive'
+      - 'deploy/publish-image'
       - 'deploy/otel-collector/**/*'
       - 'deploy/tempo/**/*'
       - 'deploy/loki/**/*'
       - 'deploy/pyroscope/**/*'
       - 'deploy/grafana/**/*'
       - 'deploy/litellm/**/*'
+      - 'deploy/db-init/**/*'
+      - 'deploy/auth-keys/**/*'
       - 'deploy/postgres/init.sql'
       - 'scripts/auth-keys'
       - 'scripts/_auth_keys.py'

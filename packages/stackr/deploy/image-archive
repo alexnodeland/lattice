@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Builds stackr's thin images (ADR-0035) as OCI archives, as a stackr release publishes them: for
+# one architecture, from lattice's checkout at its commit, reproducibly. release.yml runs it on
+# each architecture's runner, and CI's dry run does the same, then joins them as deploy/publish-image
+# does. Nothing here reaches a registry.
+#
+# Usage: deploy/image-archive ARCH VERSION OUT [IMAGE...]   (every image by default)
+#        deploy/image-archive --list                        (the images, as a JSON list)
+#   ARCH is amd64 or arm64, built where it runs, never emulated; each archive is
+#   OUT/stackr-<image>-<arch>.tar. NO_CACHE=1 builds without BuildKit's cache.
+#
+# Each image's times are the commit's (SOURCE_DATE_EPOCH, and BuildKit's rewrite-timestamp), and it
+# carries no provenance or SBOM of BuildKit's: the release attests the image itself. BuildKit is
+# pinned, in a builder of this run's own, which goes when it ends.
+
+set -euo pipefail
+images=(otel-collector tempo loki pyroscope grafana litellm db-init auth-keys)
+if [[ ${1:-} == --list ]]; then
+  printf '%s\n' "${images[@]}" | jq --raw-input --slurp --compact-output 'split("\n") | map(select(. != ""))'
+  exit 0
+fi
+if [[ $# -lt 3 ]]; then
+  echo "usage: deploy/image-archive ARCH VERSION OUT [IMAGE...], or --list" >&2
+  exit 2
+fi
+arch=$1 version=$2 out=$3
+shift 3
+[[ $# -gt 0 ]] && images=("$@")
+case $arch in
+  amd64) [[ $(uname -m) == x86_64 ]] ;;
+  arm64) [[ $(uname -m) == aarch64 || $(uname -m) == arm64 ]] ;;
+  *) false ;;
+esac || { echo "image-archive: builds $arch on $arch alone, not on $(uname -m)" >&2; exit 2; }
+
+buildkit=moby/buildkit:v0.33.1@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea
+mkdir -p "$out"
+out=$(cd "$out" && pwd)
+cd "$(dirname "$0")/../../.."
+SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+export SOURCE_DATE_EPOCH
+revision=$(git rev-parse HEAD)
+created=$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)
+
+builder=stackr-image-archive-$$
+docker buildx create --name "$builder" --driver docker-container --driver-opt "image=$buildkit" --bootstrap >/dev/null
+trap 'docker buildx rm "$builder" >/dev/null 2>&1 || true' EXIT
+cache=()
+[[ ${NO_CACHE:-} == 1 ]] && cache=(--no-cache)
+
+for image in "${images[@]}"; do
+  docker buildx build --builder "$builder" "${cache[@]}" --platform "linux/$arch" \
+    --file "packages/stackr/deploy/$image/Dockerfile" --provenance=false --sbom=false \
+    --build-arg "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+    --label "org.opencontainers.image.version=$version" \
+    --label "org.opencontainers.image.revision=$revision" \
+    --label "org.opencontainers.image.created=$created" \
+    --label "org.opencontainers.image.description=stackr's $image, for its AWS recipe" \
+    --output "type=oci,dest=$out/stackr-$image-$arch.tar,rewrite-timestamp=true" .
+  echo "image-archive: $out/stackr-$image-$arch.tar"
+done

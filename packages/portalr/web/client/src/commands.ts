@@ -206,6 +206,25 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
             ...inTenant(tenant, { group }),
           }),
         ),
+      /** Create a custom role, or replace its actions. */
+      defineRole: (
+        tenant: string,
+        name: string,
+        actions: readonly string[],
+      ): Promise<Answer<AuditEntry>> =>
+        answer(
+          api.grantr.PUT("/grantr/v1/tenants/{tenant}/roles/{name}", {
+            ...inTenant(tenant, { name }),
+            body: { actions: [...actions] },
+          }),
+        ),
+      /** Delete a custom role, with its grants. */
+      deleteRole: (tenant: string, name: string): Promise<Answer<AuditEntry>> =>
+        answer(
+          api.grantr.DELETE("/grantr/v1/tenants/{tenant}/roles/{name}", {
+            ...inTenant(tenant, { name }),
+          }),
+        ),
       /** Issue a key for a service principal: its secret is in the answer, and nowhere after. */
       issueKey: (tenant: string, principal: string): Promise<Answer<IssuedKey>> =>
         answer(

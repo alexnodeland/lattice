@@ -59,6 +59,20 @@ test("a store replays the log, then goes live", async () => {
   ]);
 });
 
+test("a live event is heard, and the replay before it isn't", async () => {
+  server.append(message(1));
+  open();
+  const heard: number[] = [];
+  const stop = stream.onLiveEvent((envelope) => heard.push(envelope.seq));
+  await until(stream, (s) => s.status === "live" && s.seq === 1);
+  server.append(message(2));
+  await until(stream, (s) => s.seq === 2);
+  stop();
+  server.append(message(3));
+  await until(stream, (s) => s.seq === 3);
+  expect(heard).toEqual([2]);
+});
+
 test("a store resumes across a dropped connection without losing or repeating an event", async () => {
   open();
   const seqs = applied(stream);

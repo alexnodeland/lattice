@@ -1,5 +1,12 @@
 import "@portalr/ui/styles.css";
-import { type Config, createApi, createQueries, Refused, readConfig } from "@portalr/client";
+import {
+  type Config,
+  createApi,
+  createCommands,
+  createQueries,
+  Refused,
+  readConfig,
+} from "@portalr/client";
 import { Page } from "@portalr/ui";
 import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
@@ -34,13 +41,16 @@ function start(root: Root, config: Config) {
       queries: { retry: (count, error) => !refusedOutright(error) && count < 3 },
     },
   });
+  const api = createApi(config.surfaces, () => signed.session());
   const router = createRouter({
     routeTree,
     basepath: import.meta.env.BASE_URL,
     context: {
       config,
       signed,
-      queries: createQueries(createApi(config.surfaces, () => signed.session())),
+      queries: createQueries(api),
+      // A command refused as unsigned ends the session, as a read does.
+      commands: createCommands(api, () => void signed.signOut()),
       queryClient,
     },
   });

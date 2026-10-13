@@ -59,7 +59,7 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 
 ## The app
 
-`web/app` is the people's UI, at `/portalr/app/`. It reads `config.json` first, signs in through Supabase Auth's client, `@supabase/auth-js`, and asks the server through `client`'s queries, each carrying the current token and the tenant its route names ([ADR-0014](adr/0014-the-apps-shell.md)).
+`web/app` is the people's UI, at `/portalr/app/`. It reads `config.json` first, signs in through Supabase Auth's client, `@supabase/auth-js`, and asks the server through `client`'s queries, each carrying the current token and the tenant its route names ([ADR-0014](adr/0014-the-apps-shell.md)). Commands go over each library's stream, except a stored rule's, which goes over reflexr's REST, for an answer to every one; and each live event on a workspace's streams makes stale the reads it changed ([ADR-0020](adr/0020-the-rules-area.md)).
 
 | Route | Shows |
 |---|---|
@@ -72,6 +72,8 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 | `/t/$tenant/w/$workspace/artifacts/$artifact` | An artifact through its kind's renderer, its revisions newest first with what each changed, and its open proposals |
 | `/t/$tenant/w/$workspace/proposals` | Every proposal in the workspace, the open ones first, to accept or reject |
 | `/t/$tenant/w/$workspace/runs` | The agent's turns and the rules' runs, newest first, with Stop, Retry, Skip and Cancel as each library and grantr allow, and thumbs on each |
+| `/t/$tenant/w/$workspace/rules` | The workspace's rules, each with its origin, version and how far it has read, the schedules that tick into it, and a stored rule installed from its JSON where grantr allows |
+| `/t/$tenant/w/$workspace/rules/$rule` | A rule: a code rule's JSON, or a stored rule's, edited and archived where grantr allows |
 
 TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test holds it to `src/routes/`. `moon run app:bdd` runs one feature per area through playwright-bdd, in Bun, against the test application with Supabase Auth (GoTrue, alone) in compose's `bdd` profile, served at `/auth/v1` on its origin ([ADR-0013](adr/0013-the-apps-scenarios-against-the-test-application.md)).
 

@@ -1,10 +1,10 @@
-import { keys, Refused } from "@portalr/client";
+import { keys, Refused, refusal } from "@portalr/client";
 import { Button, TextField } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { useActionState, useMemo, useState } from "react";
 import { allowedIn } from "../../../../../../../allowed";
-import { read, refusal } from "../../../../../../../rules";
+import { read } from "../../../../../../../rules";
 
 const ACTIONS = ["reflexr:update_rule", "reflexr:archive_rule"] as const;
 
@@ -24,7 +24,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/$rul
   loader: async ({ context, params }) => {
     const { tenant, workspace, rule } = params;
     await context.queryClient.ensureQueryData(
-      allowedIn(context.queries, tenant, workspace, ACTIONS, resource(workspace, rule)),
+      allowedIn(context.queries, tenant, resource(workspace, rule), ACTIONS),
     );
     try {
       await context.queryClient.ensureQueryData(
@@ -56,7 +56,7 @@ function RulePage() {
   const { queries, commands, queryClient } = Route.useRouteContext();
   const navigate = useNavigate();
   const checks = useMemo(
-    () => allowedIn(queries, tenant, workspace, ACTIONS, resource(workspace, name)),
+    () => allowedIn(queries, tenant, resource(workspace, name), ACTIONS),
     [queries, tenant, workspace, name],
   );
   const { data: allowed } = useSuspenseQuery(checks);

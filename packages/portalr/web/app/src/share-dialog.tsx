@@ -3,15 +3,19 @@
  * viewer or editor (portalr ADR-0022). grantr names people by id, so the dialog does too.
  */
 
-import type { Answer, GrantrApi } from "@portalr/client";
-import { Button, CommandButton, Dialog, TextField } from "@portalr/ui";
-import { useActionState } from "react";
+import { type Answer, type GrantrApi, refusal } from "@portalr/client";
+import { Button, CommandButton, Dialog, SelectField } from "@portalr/ui";
+import { type RefObject, useActionState, useRef } from "react";
 
 type Grant = GrantrApi.components["schemas"]["Grant"];
 type Grantee = Grant["to"];
+type AuditEntry = GrantrApi.components["schemas"]["AuditEntry"];
 
 /** The roles a thread is shared with. */
 const ROLES = ["viewer", "editor"] as const;
+export type Role = (typeof ROLES)[number];
+
+const isRole = (role: unknown): role is Role => ROLES.some((each) => each === role);
 
 /** A grantee as the dialog names it: a person or a client by id, a group or a rule as such. */
 function named(to: Grantee): string {
@@ -36,23 +40,29 @@ export function ShareDialog({
   canRevoke,
   onGrant,
   onRevoke,
+  finalFocus,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** The grants on the thread. */
-  grants: readonly Grant[];
-  /** Who it may be shared with: people the tenant has, by id, not holding a role on it yet. */
+  /** The grants on the thread, or null where the reader may not list them. */
+  grants: readonly Grant[] | null;
+  /** Who it may be shared with: people in the tenant, by id, not holding a role on it yet. */
   people: readonly string[];
   canRevoke: boolean;
-  onGrant: (person: string, role: (typeof ROLES)[number]) => Promise<Answer<unknown>>;
-  onRevoke: (grant: Grant) => Promise<Answer<unknown>>;
+  onGrant: (person: string, role: Role) => Promise<Answer<AuditEntry>>;
+  onRevoke: (grant: Grant) => Promise<Answer<AuditEntry>>;
+  /** Where focus goes when it closes: the menu it was opened from. */
+  finalFocus?: RefObject<HTMLElement | null>;
 }) {
+  const person = useRef<HTMLSelectElement>(null);
   const [refused, grant, granting] = useActionState(
     async (_last: string | null, form: FormData) => {
-      const person = String(form.get("person"));
-      const role = form.get("role") === "editor" ? "editor" : "viewer";
-      const answer = await onGrant(person, role);
-      return answer.outcome === "done" ? null : `Not shared: ${answer.reasons.join("; ")}`;
+      const role = form.get("role");
+      if (!isRole(role)) {
+        return `Not shared: ${String(role)} isn't a role a thread is shared with.`;
+      }
+      const answer = await onGrant(String(form.get("person")), role);
+      return answer.outcome === "done" ? null : refusal("Not shared", answer);
     },
     null,
   );
@@ -61,16 +71,19 @@ export function ShareDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Share the thread"
-      description="Who holds a role on it. While it's restricted, they and the workspace's admins are the only ones who see it."
+      description="Who holds a role on it. While it's restricted, they, the workspace's admins and the tenant's owners and admins are the only ones who see it."
+      {...(people.length > 0 && { initialFocus: person })}
+      {...(finalFocus && { finalFocus })}
     >
-      {grants.length === 0 ? (
+      {grants === null ? (
+        <p>You may share it, but not see who holds a role on it.</p>
+      ) : grants.length === 0 ? (
         <p>No one holds a role on it yet.</p>
       ) : (
         <ul aria-label="People with access" className="flex flex-col gap-2">
           {grants.map((each) => (
             <li
-              key={`${named(each.to)}:${each.role}`}
-              aria-label={`${named(each.to)}, ${each.role}`}
+              key={`${each.to.kind}:${named(each.to)}:${each.role}`}
               className="flex flex-wrap items-center justify-between gap-2"
             >
               <span>
@@ -81,35 +94,25 @@ export function ShareDialog({
           ))}
         </ul>
       )}
-      {people.length > 0 && (
+      {people.length === 0 ? (
+        <p>
+          There's no one else to share it with: everyone you can choose from holds a role on it
+          already.
+        </p>
+      ) : (
         <form aria-label="Share with someone" className="flex flex-col gap-2" action={grant}>
-          <TextField
+          <SelectField
+            ref={person}
             label="Person"
             name="person"
-            render={
-              <select>
-                {people.map((person) => (
-                  <option key={person} value={person}>
-                    {person}
-                  </option>
-                ))}
-              </select>
-            }
+            options={people.map((each) => ({ value: each, label: each }))}
           />
-          <TextField
+          <SelectField
             label="Role"
             name="role"
-            error={refused}
-            render={
-              <select>
-                {ROLES.map((role) => (
-                  <option key={role} value={role}>
-                    {role}
-                  </option>
-                ))}
-              </select>
-            }
+            options={ROLES.map((role) => ({ value: role, label: role }))}
           />
+          {refused && <p role="alert">{refused}</p>}
           <Button type="submit" disabled={granting} className="self-start">
             Share
           </Button>

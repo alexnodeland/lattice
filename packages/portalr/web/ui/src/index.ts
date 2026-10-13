@@ -34,15 +34,16 @@ export {
   Thumbs,
   ToolCall,
 } from "./chat";
-export { Dialog } from "./dialog-box";
+export { Dialog } from "./dialog";
 export { EmptyState } from "./empty-state";
 export { Icon } from "./icon";
 export { Markdown } from "./markdown";
 export { Lockup, Mark, type Ui } from "./marks";
-export * as menu from "./menu";
+export { Menu, type MenuItem } from "./menu";
 export { Page } from "./page";
 export { PageHeader } from "./page-header";
 export { type Segment, SegmentedFilter } from "./segmented-filter";
+export { SelectField } from "./select-field";
 export { NavLink, SideNav } from "./side-nav";
 export { StatusBadge, type Tone } from "./status-badge";
 export { Switch } from "./switch";

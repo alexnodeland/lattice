@@ -93,7 +93,6 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Diff` | What a revision changed, as `client`'s `changes` cut it | Nothing |
 | `Thumbs` | The reader's thumbs on a message, an artifact or a run, and why | Thumbs, then a comment ([ADR-0018](adr/0018-the-runs-area-and-feedback.md)) |
 | `CommandButton` | One action, waiting while its command is in flight | The command |
-| `Dialog` | A dialog over the page, opened by its caller, on `dialog.ts`'s classes | Closing it |
 | `Markdown` | Markdown through Streamdown: no raw HTML, links to the web, mail, the page and the application alone, images from this origin alone | Nothing |
 
 `ui` imports `client`'s types alone, which a root test holds it to.
@@ -112,6 +111,9 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Card`, `EmptyState`, `Table` | What asks something of the reader; nothing yet, and what to do; rows, named by a caption |
 | `StatusBadge` | How a thing is going, as a shape and a word; only waiting for you in the working colour |
 | `SegmentedFilter` | One filter of a few, side by side |
+| `Dialog` | A dialog over the page, opened by its caller, with where focus starts and where it returns ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
+| `Menu` | A button and the actions it opens, each of which may be disabled while it's being done |
+| `SelectField` | A labelled choice among a few, as the platform's own select, which submits with its form |
 | `Icon`, `Mark`, `Lockup` | A Lucide icon beside its word; portalr's marks |
 
 `gallery.screenshot.test.tsx` pins how they sit together, wide and narrow, in each scheme. It runs in CI alone, against Linux baselines.

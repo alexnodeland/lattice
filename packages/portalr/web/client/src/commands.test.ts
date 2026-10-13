@@ -1,6 +1,6 @@
 import type { Server } from "bun";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { createCommands } from "./commands";
+import { createCommands, refusal } from "./commands";
 import { createApi } from "./rest";
 
 /** What the server answers, by the command's id. */
@@ -60,6 +60,17 @@ const ANSWERS: Record<string, () => Response> = {
   odd: () => Response.json({ something: "else" }, { status: 400 }),
 };
 
+/** What grantr answers, by the last part of the path. */
+const GRANTR: Record<string, () => Response> = {
+  grants: () => Response.json({ seq: 1 }, { status: 201 }),
+  revocations: () => Response.json({ seq: 2 }),
+  restrictions: () =>
+    Response.json(
+      { detail: { type: "forbidden", message: "bob may not grantr:restrict" } },
+      { status: 403 },
+    ),
+};
+
 const sent: { url: URL; tenant: string | null; body: { command_id: string } }[] = [];
 let server: Server<unknown>;
 let commands: ReturnType<typeof createCommands>;
@@ -71,16 +82,16 @@ beforeAll(() => {
     port: 0,
     async fetch(request) {
       const body = (await request.json()) as { command_id: string };
-      if (new URL(request.url).pathname.startsWith("/grantr/")) {
-        sent.push({ url: new URL(request.url), tenant: null, body });
-        return new URL(request.url).pathname.endsWith("/grants")
-          ? Response.json({ seq: 1 }, { status: 201 })
-          : Response.json(
-              { detail: { type: "forbidden", message: "bob may not grantr:restrict" } },
-              { status: 403 },
-            );
+      const url = new URL(request.url);
+      sent.push({ url, tenant: request.headers.get("x-tenant"), body });
+      if (url.pathname.startsWith("/grantr/v1/tenants/unsigned/")) {
+        return Response.json({ detail: "no one is signed in" }, { status: 401 });
       }
-      sent.push({ url: new URL(request.url), tenant: request.headers.get("x-tenant"), body });
+      if (url.pathname.startsWith("/grantr/")) {
+        return (
+          GRANTR[url.pathname.split("/").at(-1) ?? ""]?.() ?? new Response(null, { status: 500 })
+        );
+      }
       return ANSWERS[body.command_id]?.() ?? new Response(null, { status: 500 });
     },
   });
@@ -194,14 +205,42 @@ test("grantr's grants, revocations and restrictions go to the tenant's own paths
     outcome: "done",
     result: { seq: 1 },
   });
+  expect(sent.at(-1)).toMatchObject({ tenant: "acme", body: grant });
   expect(sent.at(-1)?.url.pathname).toBe("/grantr/v1/tenants/acme/grants");
-  expect(sent.at(-1)?.body).toEqual(grant);
-  expect(await commands.grantr.revoke("acme", grant)).toMatchObject({ outcome: "refused" });
+  expect(await commands.grantr.revoke("acme", grant)).toEqual({
+    outcome: "done",
+    result: { seq: 2 },
+  });
   expect(sent.at(-1)?.url.pathname).toBe("/grantr/v1/tenants/acme/revocations");
+  expect(sent.at(-1)?.tenant).toBe("acme");
   expect(await commands.grantr.restrict("acme", { on, restricted: true })).toEqual({
     outcome: "refused",
     status: 403,
     reasons: ["bob may not grantr:restrict"],
   });
   expect(sent.at(-1)?.url.pathname).toBe("/grantr/v1/tenants/acme/restrictions");
+  expect(sent.at(-1)?.tenant).toBe("acme");
+});
+
+test("a grantr change refused for no one signed in ends the session", async () => {
+  const before = unsigned;
+  const on = { kind: "thread", workspace: "notes", id: "thr_1" } as const;
+  expect(
+    await commands.grantr.grant("unsigned", {
+      role: "viewer",
+      on,
+      to: { kind: "user", id: "bob" },
+    }),
+  ).toMatchObject({ outcome: "refused", status: 401 });
+  expect(unsigned).toBe(before + 1);
+});
+
+test("a refusal says what wasn't done, and each reason", () => {
+  expect(
+    refusal("The rule wasn't saved", {
+      outcome: "refused",
+      status: 422,
+      reasons: ["timeout is required", "when.throttle is required"],
+    }),
+  ).toBe("The rule wasn't saved: timeout is required; when.throttle is required");
 });

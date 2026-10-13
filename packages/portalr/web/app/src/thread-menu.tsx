@@ -1,58 +1,52 @@
 /**
- * A thread's menu: restricting it to the people it's shared with, or lifting that, and sharing
- * it, each where grantr allows (portalr ADR-0022).
+ * A thread's menu: sharing it, and restricting it to the people it's shared with or lifting
+ * that, each where grantr allows (portalr ADR-0022).
  */
 
-import { Menu } from "@base-ui/react/menu";
-import type { Answer } from "@portalr/client";
-import { Button, menu } from "@portalr/ui";
-import { useState } from "react";
+import { type Answer, type GrantrApi, refusal } from "@portalr/client";
+import { Menu, type MenuItem } from "@portalr/ui";
+import { type Ref, startTransition, useActionState } from "react";
+
+type AuditEntry = GrantrApi.components["schemas"]["AuditEntry"];
 
 export function ThreadMenu({
   restricted,
-  canRestrict,
-  canShare,
   onRestrict,
   onShare,
+  triggerRef,
 }: {
-  /** Whether only the people it's shared with, and the workspace's admins, see it. */
-  restricted: boolean;
-  canRestrict: boolean;
-  canShare: boolean;
+  /** Whether it's restricted, or null for no Restrict item: whoever may not read that. */
+  restricted: boolean | null;
   /** Restrict it, or lift its restriction: the opposite of `restricted`. */
-  onRestrict: () => Promise<Answer<unknown>>;
-  onShare: () => void;
+  onRestrict: () => Promise<Answer<AuditEntry>>;
+  /** Open its sharing, or null for no Share item. */
+  onShare: (() => void) | null;
+  /** The menu's button, which focus returns to from its sharing. */
+  triggerRef?: Ref<HTMLButtonElement>;
 }) {
-  const [refused, setRefused] = useState<string | null>(null);
-  if (!(canRestrict || canShare)) {
+  const [refused, restrict, restricting] = useActionState(async () => {
+    const answer = await onRestrict();
+    return answer.outcome === "done" ? null : refusal("That wasn't done", answer);
+  }, null);
+  const items: MenuItem[] = [
+    ...(onShare ? [{ label: "Share…", onSelect: onShare }] : []),
+    ...(restricted === null
+      ? []
+      : [
+          {
+            label: restricted ? "Lift restriction" : "Restrict",
+            onSelect: () => startTransition(restrict),
+            disabled: restricting,
+          },
+        ]),
+  ];
+  if (items.length === 0) {
     return null;
   }
-  async function restrict() {
-    const answer = await onRestrict();
-    setRefused(answer.outcome === "done" ? null : answer.reasons.join("; "));
-  }
   return (
-    <span className="inline-flex flex-col gap-1">
-      <Menu.Root>
-        <Menu.Trigger render={<Button variant="secondary" />}>Thread actions</Menu.Trigger>
-        <Menu.Portal>
-          <Menu.Positioner sideOffset={4} align="end" className="z-30">
-            <Menu.Popup className={menu.popup}>
-              {canShare && (
-                <Menu.Item className={menu.item} onClick={onShare}>
-                  Share…
-                </Menu.Item>
-              )}
-              {canRestrict && (
-                <Menu.Item className={menu.item} onClick={() => void restrict()}>
-                  {restricted ? "Lift restriction" : "Restrict"}
-                </Menu.Item>
-              )}
-            </Menu.Popup>
-          </Menu.Positioner>
-        </Menu.Portal>
-      </Menu.Root>
-      {refused && <p role="alert">That wasn't done: {refused}</p>}
-    </span>
+    <div className="flex flex-col items-end gap-1">
+      <Menu label="Thread actions" items={items} {...(triggerRef && { triggerRef })} />
+      {refused && <p role="alert">{refused}</p>}
+    </div>
   );
 }

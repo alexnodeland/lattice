@@ -11,13 +11,23 @@ export const test = base.extend<{
     thread: string | null;
     run: string | null;
     rule: string | null;
+    /** Where the thread a scenario started is, to open it by its address. */
+    threadUrl: string | null;
   };
 }>({
   // Playwright reads a fixture's dependencies from its first parameter, and Biome refuses an
   // empty pattern there: `page`, which every scenario has, stands in.
   scenario: async ({ page: _page }, use) => {
-    await use({ note: null, thread: null, run: null, rule: null });
+    await use({ note: null, thread: null, run: null, rule: null, threadUrl: null });
   },
 });
 
 export const { Given, When, Then } = createBdd(test);
+
+/** What a scenario started, or why a step that needs it can't run. */
+export function started<T>(what: T | null, step = "start a thread of their own"): T {
+  if (what === null) {
+    throw new Error(`nothing was started: ${step} first`);
+  }
+  return what;
+}

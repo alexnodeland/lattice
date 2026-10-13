@@ -36,8 +36,20 @@ interface Invalid {
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** Where in a command an invalid value is: its path after the command's own type. */
-const at = (loc: Invalid["loc"]) => loc.slice(loc.indexOf("command") + 2).join(".");
+/**
+ * Where in a body an invalid value is. FastAPI's path starts at `body`; in a command frame it runs
+ * on through `command` and the command's own type, `["body", "command", "install_rule", "rule"]`,
+ * which say nothing a person typed, so the path starts after them. Elsewhere it starts after
+ * `body`. The body itself, or the command, is an empty path.
+ */
+function at(loc: Invalid["loc"]): string {
+  const command = loc.indexOf("command");
+  return (command === -1 ? loc.slice(1) : loc.slice(command + 2)).join(".");
+}
+
+/** What a field or a form says of a command that wasn't done, after what it would have done. */
+export const refusal = (undone: string, refused: Refusal) =>
+  `${undone}: ${refused.reasons.join("; ")}`;
 
 /**
  * Each reason a refusal gives: a rejection's problems or its message, the body's errors, or a
@@ -47,9 +59,10 @@ function reasons(status: number, error: unknown): string[] {
   if (isRecord(error)) {
     const { detail, rejection } = error;
     if (Array.isArray(detail)) {
-      return (detail as Invalid[]).map(({ loc, msg }) =>
-        at(loc) === "" ? msg : `${at(loc)}: ${msg}`,
-      );
+      return (detail as Invalid[]).map(({ loc, msg }) => {
+        const path = at(loc);
+        return path === "" ? msg : `${path}: ${msg}`;
+      });
     }
     if (typeof detail === "string") {
       return [detail];
@@ -65,22 +78,18 @@ function reasons(status: number, error: unknown): string[] {
   return [`The server answered ${status}.`];
 }
 
-/** What openapi-fetch resolves with: the body, or the error's, and the response. */
-interface Fetched<D> {
-  readonly data?: D;
-  readonly error?: unknown;
-  readonly response: Response;
-}
-
 /**
  * The commands the UIs send over REST, over the given clients: reflexr's, and grantr's changes to
  * who may see and do what. `unsigned` is called when one is refused because no one is signed in,
  * as a read refused so ends the session.
  */
 export function createCommands(api: Api, unsigned: () => void = () => {}) {
-  /** A request's answer: `done` if the server says so of what it answered. */
+  /**
+   * A request's answer, from what openapi-fetch resolves with: `done` if the server says so of
+   * the body it answered.
+   */
   async function answer<D>(
-    sent: Promise<Fetched<D>>,
+    sent: Promise<{ data?: D; error?: unknown; response: Response }>,
     done: (data: D) => boolean = () => true,
   ): Promise<Answer<D>> {
     const answered = await sent.catch(() => null); // fetch throws when nothing answers
@@ -100,7 +109,8 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       reasons: reasons(response.status, data ?? error),
     };
   }
-  const tenantPath = (tenant: string) => ({ params: { path: { tenant } } });
+  /** A grantr request in a tenant: its path, and the header that names it, as every read sends. */
+  const inTenant = (tenant: string) => ({ ...named(tenant), params: { path: { tenant } } });
   return {
     reflexr: {
       /** Send one command to a workspace, once: the same `id` makes a retry the same command. */
@@ -124,7 +134,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       grant: (tenant: string, request: GrantRequest): Promise<Answer<AuditEntry>> =>
         answer(
           api.grantr.POST("/grantr/v1/tenants/{tenant}/grants", {
-            ...tenantPath(tenant),
+            ...inTenant(tenant),
             body: request,
           }),
         ),
@@ -132,7 +142,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       revoke: (tenant: string, request: GrantRequest): Promise<Answer<AuditEntry>> =>
         answer(
           api.grantr.POST("/grantr/v1/tenants/{tenant}/revocations", {
-            ...tenantPath(tenant),
+            ...inTenant(tenant),
             body: request,
           }),
         ),
@@ -140,7 +150,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       restrict: (tenant: string, restriction: Restriction): Promise<Answer<AuditEntry>> =>
         answer(
           api.grantr.POST("/grantr/v1/tenants/{tenant}/restrictions", {
-            ...tenantPath(tenant),
+            ...inTenant(tenant),
             body: restriction,
           }),
         ),

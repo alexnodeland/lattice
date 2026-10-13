@@ -109,7 +109,11 @@ test("every read has its own path", async () => {
     await client.fetchQuery(options as unknown as Parameters<QueryClient["fetchQuery"]>[0]);
     expect(seen.at(-1)?.url.pathname).toBe(path);
   }
+  const grantsRead = seen.find((each) => each.url.pathname === "/grantr/v1/tenants/acme/grants");
+  expect(grantsRead?.url.searchParams.get("workspace")).toBe("ws_1");
+  expect(grantsRead?.headers.get("x-tenant")).toBe("acme");
   expect(seen.at(-1)?.url.searchParams.get("workspace")).toBe("ws_1");
+  expect(seen.at(-1)?.headers.get("x-tenant")).toBe("acme");
 });
 
 test("grantr says who the caller is in the tenant a read names, or lists them all", async () => {

@@ -77,6 +77,17 @@ x-langfuse-env: &langfuse-env
   LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?run make env}
   LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
 
+# What Langfuse's web and worker wait for.
+x-langfuse-depends-on: &langfuse-depends-on
+  db-init:
+    condition: service_completed_successfully
+  redis:
+    condition: service_healthy
+  minio:
+    condition: service_healthy
+  clickhouse:
+    condition: service_healthy
+
 services:
   # The telemetry port: every application, and the LiteLLM proxy, sends OTLP
   # here. Swapping a backend changes the Collector's exporters only.
@@ -401,14 +412,12 @@ services:
       timeout: 3s
       retries: 30
       start_period: 60s
-    depends_on: &langfuse-depends-on
-      db-init:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      clickhouse:
+    # After the web server, which applies the database's migrations as it starts: the worker
+    # writes Langfuse's default models as it starts, and doing so during a migration can deadlock
+    # it, which leaves the migration failed and the web server unable to start again.
+    depends_on:
+      <<: *langfuse-depends-on
+      langfuse-web:
         condition: service_healthy
 
   # Langfuse's web server runs the database migrations on start, and creates

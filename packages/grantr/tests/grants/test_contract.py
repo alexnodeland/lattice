@@ -586,6 +586,50 @@ async def test_every_change_is_in_the_audit_log_in_order(grants: Grants) -> None
     assert page == entries[3:5]
 
 
+async def test_the_log_pages_back_with_last_and_catches_up_with_after_seq(
+    grants: Grants,
+) -> None:
+    await _members(grants, BOB)
+    await grants.define_group("acme", TEAM, frozenset((BOB,)), by=ALICE)
+    await grants.define_group("acme", TEAM, frozenset(), by=ALICE)
+    await grants.delete_group("acme", TEAM, by=ALICE)
+    everything = await grants.audit("acme", by=ALICE)
+    assert len(everything) == 5
+
+    tail = await grants.audit("acme", by=ALICE, last=2)
+    assert tail == everything[-2:], "the last, still oldest first"
+    back = await grants.audit("acme", by=ALICE, last=2, before_seq=tail[0].seq)
+    assert back == everything[1:3]
+    rest = await grants.audit("acme", by=ALICE, last=2, before_seq=back[0].seq)
+    assert rest == everything[:1], "a page short of what it asked for is the first"
+    assert await grants.audit("acme", by=ALICE, last=9) == everything
+
+    window = await grants.audit(
+        "acme", by=ALICE, last=2, after_seq=everything[0].seq, before_seq=everything[-1].seq
+    )
+    assert window == everything[2:4], "the last of the window between two entries"
+    assert (
+        await grants.audit(
+            "acme", by=ALICE, after_seq=everything[0].seq, before_seq=everything[-1].seq
+        )
+        == everything[1:4]
+    )
+
+    groups = AuditFilter(types=frozenset({"group_defined"}))
+    latest = await grants.audit("acme", by=ALICE, last=1, keep=groups)
+    assert [e.event for e in latest] == [GroupDefined(group="team", members=frozenset())]
+    alices = AuditFilter(by=ALICE)
+    before = await grants.audit("acme", by=ALICE, last=9, before_seq=latest[0].seq, keep=alices)
+    assert [e.event.type for e in before] == ["member_added", "group_defined"]
+
+    await grants.remove_member("acme", BOB, by=ALICE)
+    caught_up = await grants.audit("acme", by=ALICE, after_seq=everything[-1].seq)
+    assert [e.event.type for e in caught_up] == ["member_removed"]
+
+    with pytest.raises(Invalid, match="limit or last"):
+        await grants.audit("acme", by=ALICE, limit=1, last=1)
+
+
 async def test_the_deployments_log_holds_its_operators(grants: Grants) -> None:
     await grants.grant_operator(BOB.id, by=ROOT)
     entries = await grants.audit(None, by=ROOT)

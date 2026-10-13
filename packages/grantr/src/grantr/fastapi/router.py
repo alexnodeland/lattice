@@ -158,8 +158,14 @@ MAX_CHECKS: Final = 100
 AfterSeq = Annotated[int, Query(ge=0)]
 """Read the audit entries after this sequence number."""
 
-Limit = Annotated[int, Query(ge=1, le=1000)]
-"""Read at most this many audit entries."""
+BeforeSeq = Annotated[int | None, Query(ge=0)]
+"""Read the audit entries before this sequence number."""
+
+Limit = Annotated[int | None, Query(ge=1, le=1000)]
+"""Read the first this many audit entries: 100 with neither this nor ``last``."""
+
+Last = Annotated[int | None, Query(ge=1, le=1000)]
+"""Read the last this many audit entries, still oldest first."""
 
 ActorKind = Literal["user", "service_principal", "rule", "agent"]
 """The kinds of subject that make changes to access."""
@@ -344,16 +350,28 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
     async def deployment_audit(
         keep: Kept,
         after_seq: AfterSeq = 0,
-        limit: Limit = 100,
+        before_seq: BeforeSeq = None,
+        limit: Limit = None,
+        last: Last = None,
         who: Caller = current,
     ) -> list[AuditEntry]:
         """The deployment's audit log: its operators, granted and revoked.
 
         ``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``
-        one subject's changes.
+        one subject's changes. It reads the window ``after_seq < seq < before_seq``: the first
+        ``limit``, or the last ``last``, oldest first; a client pages back with ``last`` and its
+        oldest entry's ``seq`` as ``before_seq``.
         """
         return await _or_http(
-            grants.audit(None, by=who.subject, after_seq=after_seq, limit=limit, keep=keep)
+            grants.audit(
+                None,
+                by=who.subject,
+                after_seq=after_seq,
+                before_seq=before_seq,
+                limit=limit,
+                last=last,
+                keep=keep,
+            )
         )
 
     @router.get("/tenants/{tenant}/audit")
@@ -361,20 +379,26 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         tenant: TenantId,
         keep: Kept,
         after_seq: AfterSeq = 0,
-        limit: Limit = 100,
+        before_seq: BeforeSeq = None,
+        limit: Limit = None,
+        last: Last = None,
         who: Caller = current,
     ) -> list[AuditEntry]:
-        """A tenant's audit log after ``after_seq``, in order.
+        """A tenant's audit log in the window ``after_seq < seq < before_seq``, oldest first.
 
         ``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``
-        one subject's changes.
+        one subject's changes. It reads the window ``after_seq < seq < before_seq``: the first
+        ``limit``, or the last ``last``, oldest first; a client pages back with ``last`` and its
+        oldest entry's ``seq`` as ``before_seq``.
         """
         return await _or_http(
             grants.audit(
                 tenant,
                 by=by(tenant, who),
                 after_seq=after_seq,
+                before_seq=before_seq,
                 limit=limit,
+                last=last,
                 keep=keep,
             )
         )

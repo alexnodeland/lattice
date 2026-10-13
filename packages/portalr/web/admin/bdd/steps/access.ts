@@ -24,7 +24,7 @@ const item = (page: Page, part: string, text: string) =>
     .or(page.getByRole("list", { name: part }).getByRole("listitem"))
     .filter({ hasText: text });
 
-async function confirmed(page: Page, trigger: string, action: string) {
+async function confirmed(page: Page, trigger: string | RegExp, action: string) {
   await page.getByRole("button", { name: trigger }).click();
   const dialog = page.getByRole("alertdialog");
   await dialog.getByRole("button", { name: action }).click();
@@ -110,6 +110,63 @@ When("they delete the group", async ({ page, made }) => {
 
 Then("the group isn't listed", async ({ page, made }) => {
   await expect(item(page, "Groups", madeAs(made, "group"))).toHaveCount(0);
+});
+
+When("they create a role holding the first action the catalog lists", async ({ page, made }) => {
+  await page.getByRole("textbox", { name: "Role" }).fill(fresh(made, "role"));
+  await page.getByRole("region", { name: "Create a role" }).getByRole("checkbox").first().check();
+  await page.getByRole("button", { name: "Create the role" }).click();
+  await expect(page.getByRole("status")).toContainText("holds 1 action.");
+});
+
+Then("the role is listed", async ({ page, made }) => {
+  await expect(item(page, "Custom roles", madeAs(made, "role"))).toHaveCount(1);
+});
+
+When("they delete the role", async ({ page, made }) => {
+  await confirmed(page, `Delete ${madeAs(made, "role")}`, "Delete");
+});
+
+Then("the role isn't listed", async ({ page, made }) => {
+  await expect(item(page, "Custom roles", madeAs(made, "role"))).toHaveCount(0);
+});
+
+When(
+  "they grant it {string} on the workspace {string}",
+  async ({ page, made }, role: string, workspace: string) => {
+    const principal = madeAs(made, "principal");
+    await page.getByRole("combobox", { name: "Role" }).selectOption(role);
+    await page.getByRole("combobox", { name: "On" }).selectOption("workspace");
+    await page.getByRole("combobox", { name: "Workspace" }).fill(workspace);
+    await page
+      .getByRole("combobox", { name: "To" })
+      .selectOption(`${principal} (service principal)`);
+    await page.getByRole("button", { name: "Grant", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText(`holds ${role} on workspace ${workspace}`);
+  },
+);
+
+Then(
+  "it holds {string} on the workspace {string}",
+  async ({ page, made }, role: string, workspace: string) => {
+    const grant = item(page, `Grants in ${workspace}`, madeAs(made, "principal"));
+    await expect(grant).toHaveCount(1);
+    await expect(grant).toContainText(role);
+    await expect(grant).toContainText(`workspace ${workspace}`);
+  },
+);
+
+When("they revoke its {string}", async ({ page, made }, role: string) => {
+  const principal = madeAs(made, "principal");
+  await confirmed(
+    page,
+    new RegExp(`^Revoke ${principal} \\(service principal\\) as ${role} `),
+    "Revoke",
+  );
+});
+
+Then("it holds no role", async ({ page, made }) => {
+  await expect(item(page, "Grants in notes", madeAs(made, "principal"))).toHaveCount(0);
 });
 
 When("they look on a phone, at Access's Members", async ({ page }) => {

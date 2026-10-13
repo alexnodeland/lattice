@@ -1,10 +1,9 @@
-import type { ReactNode } from "react";
+import type { ComponentProps } from "react";
 
-/** A section's heading, under the page's one: the same size and weight wherever a page has one. */
-export function SectionTitle({ id, children }: { id?: string; children: ReactNode }) {
-  return (
-    <h2 id={id} className="font-bold text-fg text-lg tracking-tight">
-      {children}
-    </h2>
-  );
+/**
+ * A section's heading, under the page's one: the same size and weight wherever a page has one. A
+ * form that opens on it may focus it, with `tabIndex={-1}` and a `ref`, and no ring is drawn.
+ */
+export function SectionTitle(props: Omit<ComponentProps<"h2">, "className">) {
+  return <h2 className="font-bold text-fg text-lg tracking-tight outline-none" {...props} />;
 }

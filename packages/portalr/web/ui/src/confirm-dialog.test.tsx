@@ -104,3 +104,19 @@ test("an action that fails keeps the dialog open, and says why", async () => {
     .element(dialog.getByRole("alert"))
     .toHaveTextContent("The rule wasn't archived: it changed since you opened it.");
 });
+
+test("a trigger with a name shows its words and is named in full", async () => {
+  const screen = await render(
+    <ConfirmDialog
+      label="Revoke"
+      name="Revoke viewer from bob on workspace notes"
+      title="Revoke viewer from bob?"
+      confirm="Revoke"
+      onConfirm={async () => undefined}
+    >
+      bob loses what viewer holds there.
+    </ConfirmDialog>,
+  );
+  const trigger = screen.getByRole("button", { name: "Revoke viewer from bob on workspace notes" });
+  await expect.element(trigger).toHaveTextContent("Revoke");
+});

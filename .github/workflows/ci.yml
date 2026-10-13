@@ -48,7 +48,7 @@ jobs:
         with:
           fetch-depth: 0 # moon compares with main to find what a change affects
           persist-credentials: false
-      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       # The libraries' SQL tests run in parallel, so each gets its own database.
       - name: One database per library
         env:
@@ -87,7 +87,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv sync --locked --all-packages --all-groups --all-extras
       - run: bun install --frozen-lockfile
       # ui's tests run in Chromium, through Vitest's browser mode; ui holds Playwright.
@@ -107,7 +107,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv run --no-project python scripts/affected.py image
 
   # Each library's acceptance tests, against its reference application (stackr RFC-0003's phase 5,
@@ -125,7 +125,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       # scripts/api installs Schemathesis itself, with `uv run --group acceptance`, only when a
       # library is affected.
       - run: bun install --frozen-lockfile
@@ -164,7 +164,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       # OpenTofu's and TFLint's plugins are lattice's own, which proto loads from a trusted file.
       - run: proto trust .prototools && proto install tofu && proto install tflint
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -220,7 +220,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv sync --locked --all-packages --all-groups --all-extras
       - run: uv run --no-project python scripts/affected.py template
 
@@ -280,7 +280,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv sync --locked --all-packages --all-groups --all-extras
       - name: Read versions.env
         run: grep -E '^[A-Z_]+=' packages/stackr/versions.env >> "$GITHUB_ENV"

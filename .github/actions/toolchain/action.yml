@@ -1,15 +1,34 @@
 name: Toolchain
 description: >-
-  proto, at the version .prototools pins, and the tools .prototools lists, restored from a cache
-  when they can be, and otherwise downloaded with retries (lattice ADR-0017).
+  proto, at the version .prototools pins, and the tools .prototools lists: restored from main's
+  cache when they can be, and otherwise downloaded with retries (lattice ADR-0017).
+inputs:
+  cache:
+    description: Whether to restore ~/.proto from main's cache. A publishing job restores nothing.
+    default: "true"
+outputs:
+  cache-key:
+    description: The key of ~/.proto's cache, for the one job that saves it.
+    value: ${{ steps.key.outputs.key }}
+  cache-hit:
+    description: Whether the cache held this exact key.
+    value: ${{ steps.restore.outputs.cache-hit }}
 runs:
   using: composite
   steps:
+    - name: The cache's key
+      id: key
+      shell: bash
+      env:
+        HASH: ${{ hashFiles('.prototools') }}
+      run: echo "key=proto-$RUNNER_OS-$RUNNER_ARCH-$HASH" >>"$GITHUB_OUTPUT"
     - name: Restore proto and its tools
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      id: restore
+      if: inputs.cache == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.proto
-        key: proto-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.prototools', 'packages/stackr/deploy/aws/tools/*.toml') }}
+        key: ${{ steps.key.outputs.key }}
         restore-keys: proto-${{ runner.os }}-${{ runner.arch }}-
     - name: Install proto and its tools
       shell: bash

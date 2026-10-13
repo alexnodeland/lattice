@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       # mkdocstrings reads every package from the workspace's environment.
       - run: uv sync --locked --all-packages --all-groups --all-extras
       - run: moon run lattice:docs

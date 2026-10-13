@@ -71,7 +71,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+        with:
+          cache: false # a publishing job restores no cache
       # portalr's wheel carries its two UIs, which Vite builds into its source first.
       - name: Build portalr's UIs
         if: matrix.path == 'packages/portalr'

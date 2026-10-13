@@ -194,7 +194,7 @@ A change to evalr runs the checks of evalr and of every project above it; a chan
 - **Every workflow is hardened the same way:** each action pinned to a commit, with its version beside it; `permissions: {}` at the top, and each job granted what it needs; and no checkout keeps its credentials. actionlint and zizmor check the workflows, in the hooks and in the root's `workflows` task.
 - **Every test and every job has a timeout:** a test fails after a minute, printing every thread's stack, and each job has a limit of a few times its usual length ([ADR-0007](adr/0007-a-timeout-on-every-test-and-every-job.md)).
 - **Every project's tests run in a random order,** through pytest-randomly in the root's `dev` group, and each run prints the seed that reproduces it ([ADR-0010](adr/0010-every-projects-tests-run-in-a-random-order.md)).
-- **Every job that runs moon, uv or Bun installs them** through `.github/actions/toolchain`, at the versions in `.prototools`: from a cache of `~/.proto` when it can, and otherwise with each download retried ([ADR-0017](adr/0017-ci-installs-its-toolchain-from-a-cache-with-retries.md)). The jobs that run checks and tests install the web packages with `bun install --frozen-lockfile`.
+- **Every job that runs moon, uv or Bun installs them** through `.github/actions/toolchain`, at the versions in `.prototools`: from main's cache of `~/.proto` when it can, and otherwise with each download retried and proto checked against pinned digests ([ADR-0017](adr/0017-ci-installs-its-toolchain-from-a-cache-with-retries.md)). The jobs that run checks and tests install the web packages with `bun install --frozen-lockfile`.
 
 ## Hooks
 

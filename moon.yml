@@ -76,7 +76,6 @@ tasks:
     inputs:
       - '.github/workflows/**/*'
       - '.github/actions/**/*'
-      - '.github/zizmor.yml'
       - 'uv.lock'
 
   # One knip run over the Bun workspace: unused files, exports and dependencies in every web

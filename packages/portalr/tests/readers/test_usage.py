@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from portalr.readers import LiteLLM, Ok, Unavailable, UsageQuery, read_usage
 from portalr.readers.litellm import Spend
-from portalr.readers.usage import budget_days, daily_budget, workspace_tag
+from portalr.readers.usage import budget_days, daily_budget, tagged_workspace, workspace_tag
 from portalr.tenant import allowed
 from tests.tools import Tool, json
 
@@ -39,6 +39,23 @@ def day(at: str, **entities: tuple[float, int, int]) -> dict[str, Any]:
 
 def test_a_workspaces_tag_names_its_tenant() -> None:
     assert workspace_tag(ACME, "notes") == "tenant-workspace:acme/notes"
+
+
+def test_a_tags_ids_are_percent_encoded_and_read_back_for_their_tenant_alone() -> None:
+    odd = "a/b,c d"
+    tag = workspace_tag(ACME, odd)
+    # Neither the "/" between the ids nor the "," LiteLLM splits tags= on is in an id.
+    assert tag == "tenant-workspace:acme/a%2Fb%2Cc%20d"
+    assert "," not in tag
+    assert tag.count("/") == 1
+    assert tagged_workspace(ACME, tag) == odd
+    slashed = allowed("ac/me")
+    assert workspace_tag(slashed, "notes") == "tenant-workspace:ac%2Fme/notes"
+    assert tagged_workspace(slashed, workspace_tag(slashed, "notes")) == "notes"
+    # Another tenant's, a tag of another kind, or one with no workspace: none of acme's.
+    assert tagged_workspace(ACME, workspace_tag(allowed("globex"), odd)) is None
+    assert tagged_workspace(ACME, "workspace:notes") is None
+    assert tagged_workspace(ACME, "tenant-workspace:acme") is None
 
 
 def test_a_window_is_at_most_a_quarter_and_names_at_most_fifty_workspaces() -> None:

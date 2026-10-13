@@ -2,9 +2,10 @@
 
 The tenant's spend per day is its LiteLLM team's, from ``/team/daily/activity``. A workspace's is
 its tag's, from ``/tag/daily/activity``: the libraries' gateways tag each request
-``tenant-workspace:<tenant>/<workspace>``, so the read asks only for the tags of the tenant's own
-workspaces, never for every tag, and keeps only an answer whose tag is one it asked for. Spend
-recorded before the tag was sent has no workspace.
+``tenant-workspace:<tenant>/<workspace>``, each id percent-encoded, so the read asks only for the
+tags of the tenant's own workspaces, never for every tag, and keeps only an answer whose tag,
+decoded, names the tenant and a workspace it asked for. Spend recorded before the tag was sent
+has no workspace.
 
 A read is bounded, as Feedback's is: so many pages, so long in all; past any bound, it answers what
 it read, and says it is partial.
@@ -14,10 +15,11 @@ import asyncio
 import contextlib
 import re
 from collections import defaultdict
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Final, Self
+from urllib.parse import quote, unquote
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
@@ -43,7 +45,9 @@ DEADLINE: Final = 20.0
 """How long a read may take, in seconds: past it, the read answers what it has, partial."""
 
 WORKSPACE_TAG: Final = "tenant-workspace:"
-"""How a request's tag names its tenant and workspace: ``tenant-workspace:<tenant>/<workspace>``."""
+"""How a request's tag names its tenant and workspace: ``tenant-workspace:<tenant>/<workspace>``,
+each percent-encoded, so neither holds the ``/`` between them, nor the ``,`` LiteLLM splits
+``tags=`` on."""
 
 
 _DURATION: Final = re.compile(r"(\d+)(mo|[smhdw])")
@@ -73,8 +77,18 @@ def daily_budget(spend: Spend | None) -> float | None:
 
 
 def workspace_tag(tenant: Tenant, workspace: str) -> str:
-    """The tag the libraries' gateways send for a workspace's requests."""
-    return f"{WORKSPACE_TAG}{tenant.id}/{workspace}"
+    """The tag the libraries' gateways send for a workspace's requests, each id percent-encoded."""
+    return f"{WORKSPACE_TAG}{quote(tenant.id, safe='')}/{quote(workspace, safe='')}"
+
+
+def tagged_workspace(tenant: Tenant, tag: str) -> str | None:
+    """The workspace a tag names, decoded, if it is a workspace tag of the tenant's; else None."""
+    if not tag.startswith(WORKSPACE_TAG):
+        return None
+    owner, slash, workspace = tag.removeprefix(WORKSPACE_TAG).partition("/")
+    if not slash or unquote(owner) != tenant.id:
+        return None
+    return unquote(workspace)
 
 
 class UsageQuery(Span):
@@ -182,9 +196,16 @@ class _Stop(Exception):
 
 
 async def _activity(
-    litellm: LiteLLM, path: str, params: dict[str, str], keep: set[str], found: _Found
+    litellm: LiteLLM,
+    path: str,
+    params: dict[str, str],
+    keep: Callable[[str], str | None],
+    found: _Found,
 ) -> Unavailable | None:
-    """Each kept entity's metrics per day, from every page, so many at most, added to `found`."""
+    """Each kept entity's metrics per day, from every page, so many at most, added to `found`.
+
+    `keep` names what an entity is kept under, or None for one the read didn't ask for.
+    """
     for page in range(1, MOST_PAGES + 1):
         answer = await read(
             litellm.client,
@@ -198,9 +219,9 @@ async def _activity(
         for day in answer.results:
             # Only what was asked for: another team's, or another tenant's tag, is left out.
             for entity, metrics in day.breakdown.entities.items():
-                if entity in keep:
+                if (kept := keep(entity)) is not None:
                     # LiteLLM pages its rows, then groups them by day: a day may be on two pages.
-                    by_day = found.by_entity[entity]
+                    by_day = found.by_entity[kept]
                     by_day[day.date] = by_day.get(day.date, _Metrics()) + metrics.metrics
         found.pages = page
         if page >= answer.metadata.total_pages:
@@ -234,7 +255,8 @@ async def read_usage(
         "start_date": day_of(query.start).isoformat(),
         "end_date": day_of(query.end - timedelta(microseconds=1)).isoformat(),
     }
-    tags = {workspace_tag(tenant, workspace): workspace for workspace in query.workspaces}
+    asked = set(query.workspaces)
+    tags = [workspace_tag(tenant, workspace) for workspace in query.workspaces]
     teams, tagged = _Found(), _Found(complete=not tags)
     spent: list[Spend | None] = []
     refused: list[Unavailable] = []
@@ -262,7 +284,7 @@ async def read_usage(
                                 litellm,
                                 "/team/daily/activity",
                                 {"team_ids": team(tenant), **dates},
-                                {team(tenant)},
+                                lambda entity: entity if entity == team(tenant) else None,
                                 teams,
                             )
                         )
@@ -274,7 +296,11 @@ async def read_usage(
                                     litellm,
                                     "/tag/daily/activity",
                                     {"tags": ",".join(tags), **dates},
-                                    set(tags),
+                                    lambda tag: (
+                                        workspace
+                                        if (workspace := tagged_workspace(tenant, tag)) in asked
+                                        else None
+                                    ),
                                     tagged,
                                 )
                             )
@@ -287,12 +313,12 @@ async def read_usage(
     days = days_in(query)
     workspaces = [
         WorkspaceSpend(
-            workspace=tags[tag],
+            workspace=workspace,
             spend=sum(metrics.spend for metrics in by_day.values()),
             tokens=sum(metrics.total_tokens for metrics in by_day.values()),
             days=_days(by_day, days),
         )
-        for tag, by_day in tagged.by_entity.items()
+        for workspace, by_day in tagged.by_entity.items()
     ]
     budgeted = spent[0] if spent else None
     return Ok(

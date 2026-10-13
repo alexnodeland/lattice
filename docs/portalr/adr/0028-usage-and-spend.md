@@ -26,7 +26,9 @@ Spend recorded before the tag lands has no workspace, and the page says so, quie
 
 ## Decision
 
-- **A workspace's tag is `tenant-workspace:<tenant>/<workspace>`**, as `portalr.readers.usage.workspace_tag` builds it. It is agreed with the format relayr's PR gives for lattice-core's helper. Until that PR merges, portalr is built against fixtures in that format.
+- **A workspace's tag is `tenant-workspace:<tenant>/<workspace>`, each id percent-encoded** (`quote(id, safe="")`), as `portalr.readers.usage.workspace_tag` builds it and `tagged_workspace` reads it back.
+  - Encoding keeps the `/` between the ids unambiguous. It also keeps out the `,` that LiteLLM's `/tag/daily/activity` splits `tags=` on.
+  - This is the format relayr's lattice-core helper sends. Until that PR merges, portalr is built against fixtures in it.
 - **`GET /portalr/v1/usage`**, for whoever may read the tenant's spend (`portalr:read_spend`), takes a window, at most 91 days, and up to 50 `workspaces`. It answers:
   - `days`: the team's spend, tokens and requests on each day the window touches, in UTC, from `/team/daily/activity`, asked for the tenant's team alone;
   - `workspaces`: each named workspace's spend and tokens, over the window and per day, from `/tag/daily/activity`, the most spent first. A workspace with nothing under its tag isn't in it;
@@ -34,7 +36,7 @@ Spend recorded before the tag lands has no workspace, and the page says so, quie
   - `daily_budget`: a day's share of the budget;
   - `complete`: false where the read stopped at one of its bounds.
   - It is a reading, as every one is: `ok`, `unavailable` or `unconfigured`.
-- **Only the tenant's own tags are asked for**: those of the workspaces the request names, which admin takes from artifactr's list of the tenant's workspaces. The read never lists every tag. Each tag in an answer is kept only if it is one the read asked for, and each team only if it is the tenant's, so another tenant's workspace of the same name is never counted.
+- **Only the tenant's own tags are asked for**: those of the workspaces the request names, which admin takes from artifactr's list of the tenant's workspaces. The read never lists every tag. Each tag in an answer is decoded and kept only if it names the tenant and a workspace the read asked for, and each team only if it is the tenant's. So another tenant's workspace of the same name is never counted.
 - **A day's share of the budget** is the team's `max_budget` over its `budget_duration` in days, read as LiteLLM reads a duration: seconds, minutes, hours, days, weeks or months, or `hourly`, `daily`, `weekly` or `monthly`, with a month taken as 30 days. With no budget, a budget of 0, or a duration that can't be read, there is no share, and none is guessed.
 - **The read is bounded**, as Feedback's is:
   - The team's activity, the tags' and the budget are read at once, 1,000 records a page, up to 20 pages each. A day split across two pages, as LiteLLM pages its rows before grouping them by day, is summed.

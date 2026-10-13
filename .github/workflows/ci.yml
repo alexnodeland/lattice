@@ -314,8 +314,9 @@ jobs:
       # An application from the template, beside the whole stack (stackr ADR-0011).
       - if: matrix.app
         run: uv run --no-project python scripts/affected.py smoke-app
-      # A single host's backups, to the job's own MinIO, and the restore drill (RFC-0004).
-      - if: matrix.recipe == 'host'
+      # A single host's backups, to the job's own MinIO, and the restore drill (RFC-0004),
+      # when the steps above started the stack.
+      - if: matrix.recipe == 'host' && hashFiles('packages/stackr/.env') != ''
         name: Back up, and run the restore drill
         working-directory: packages/stackr
         run: |

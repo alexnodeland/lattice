@@ -1,5 +1,15 @@
 import { keys, refusal } from "@portalr/client";
-import { Button, StatusBadge, TextField, TextLink } from "@portalr/ui";
+import {
+  Button,
+  Card,
+  PageHeader,
+  Row,
+  RowLink,
+  Rows,
+  SectionTitle,
+  StatusBadge,
+  TextField,
+} from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useActionState, useMemo, useState } from "react";
@@ -69,15 +79,17 @@ function Rules() {
   }, null);
 
   return (
-    <section aria-labelledby="rules" className="flex flex-col gap-6">
-      <h2 id="rules" className="font-semibold text-lg">
-        Rules
-      </h2>
+    <>
+      <PageHeader
+        title="Rules"
+        meta={`What reacts to events in ${workspace}, and the schedules that tick into it`}
+      />
       <Connection snapshot={automation} waiting="the latest changes to the rules" />
-      <ul aria-label="Rules" className="flex flex-col gap-2">
+      <Rows label="Rules">
         {rules.map((rule) => (
-          <li key={rule.rule} aria-label={`Rule ${rule.rule}`} className="flex flex-wrap gap-2">
-            <TextLink
+          <Row key={rule.rule} aria-label={`Rule ${rule.rule}`}>
+            <RowLink
+              className="font-mono"
               render={
                 <Link
                   to="/t/$tenant/w/$workspace/rules/$rule"
@@ -86,7 +98,7 @@ function Rules() {
               }
             >
               {rule.rule}
-            </TextLink>
+            </RowLink>
             <span className="text-muted">
               {rule.origin === "code" ? "in code" : `stored, version ${rule.version}`}
             </span>
@@ -101,23 +113,17 @@ function Rules() {
                 {rule.dead_letters === 1 ? "1 dead letter" : `${rule.dead_letters} dead letters`}
               </span>
             )}
-          </li>
+          </Row>
         ))}
-      </ul>
-      <section aria-labelledby="schedules" className="flex flex-col gap-2">
-        <h3 id="schedules" className="font-semibold">
-          Schedules
-        </h3>
+      </Rows>
+      <section aria-labelledby="schedules" className="flex flex-col gap-3">
+        <SectionTitle id="schedules">Schedules</SectionTitle>
         {schedules.length === 0 ? (
           <p>No schedules tick into this workspace.</p>
         ) : (
-          <ul aria-label="Schedules" className="flex flex-col gap-2">
+          <Rows label="Schedules">
             {schedules.map((schedule) => (
-              <li
-                key={schedule.schedule}
-                aria-label={`Schedule ${schedule.schedule}`}
-                className="flex flex-wrap gap-2"
-              >
+              <Row key={schedule.schedule} aria-label={`Schedule ${schedule.schedule}`}>
                 <code className="font-mono">{schedule.schedule}</code>
                 <span className="text-muted">
                   next <When at={schedule.next_tick} />
@@ -125,16 +131,17 @@ function Rules() {
                 <span className="text-muted">
                   last <When at={schedule.last_tick} />
                 </span>
-              </li>
+              </Row>
             ))}
-          </ul>
+          </Rows>
         )}
       </section>
       {allowed.has("reflexr:install_rule") && (
-        <form aria-labelledby="install" className="flex flex-col gap-2" action={install}>
-          <h3 id="install" className="font-semibold">
-            Install a rule
-          </h3>
+        <Card
+          render={<form aria-labelledby="install" action={install} />}
+          className="flex flex-col gap-3"
+        >
+          <SectionTitle id="install">Install a rule</SectionTitle>
           <TextField
             label="Rule, as reflexr's JSON"
             value={text}
@@ -146,8 +153,8 @@ function Rules() {
           <Button type="submit" disabled={pending} className="self-start">
             Install
           </Button>
-        </form>
+        </Card>
       )}
-    </section>
+    </>
   );
 }

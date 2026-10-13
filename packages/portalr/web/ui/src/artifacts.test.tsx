@@ -57,8 +57,9 @@ test("a diff marks what was added and removed, for eyes and for screen readers",
   expect(added?.textContent).toBe("added: Tuesday");
   expect(removed?.textContent).toBe("removed: Monday");
   const style = (element: Element | null) => getComputedStyle(element as Element);
-  expect(style(added).color).toBe(token("accent"));
-  expect(contrast(style(added).color, style(added).backgroundColor)).toBeGreaterThanOrEqual(4.5);
+  expect(style(added).backgroundColor).toBe(token("wash"));
+  expect(style(added).textDecorationColor).toBe(token("accent"));
+  expect(contrast(style(added).color, style(added).backgroundColor)).toBeGreaterThanOrEqual(7);
   expect(style(removed).textDecorationLine).toBe("line-through");
   expect(contrast(style(removed).color, token("paper"))).toBeGreaterThanOrEqual(4.5);
   await expect.element(screen.getByText("Launch on")).toBeVisible();

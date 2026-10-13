@@ -1,4 +1,4 @@
-import { Button, Page, TextField } from "@portalr/ui";
+import { Button, Lockup, TextField } from "@portalr/ui";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useActionState } from "react";
 
@@ -38,28 +38,33 @@ function SignIn() {
   );
 
   return (
-    <Page title="Sign in">
-      <form className="flex max-w-sm flex-col gap-4" action={signIn}>
-        <TextField
-          label="Email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          defaultValue={attempt.email}
-          required
-        />
-        <TextField
-          label="Password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          error={attempt.refused}
-          required
-        />
-        <Button type="submit" disabled={pending}>
-          {pending ? "Signing in" : "Sign in"}
-        </Button>
-      </form>
-    </Page>
+    <main id="main" className="grid min-h-dvh place-items-center bg-paper px-4 py-10 text-fg">
+      <div className="flex w-full max-w-sm flex-col gap-2 rounded-xl border border-line bg-surface p-8">
+        <Lockup className="mb-6 h-9" />
+        <h1 className="font-bold text-2xl tracking-tight">Sign in</h1>
+        <p className="mb-4 text-muted text-sm">with your email and password</p>
+        <form className="flex flex-col gap-4" action={signIn}>
+          <TextField
+            label="Email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            defaultValue={attempt.email}
+            required
+          />
+          <TextField
+            label="Password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            error={attempt.refused}
+            required
+          />
+          <Button type="submit" disabled={pending} className="mt-1 py-2">
+            {pending ? "Signing in" : "Sign in"}
+          </Button>
+        </form>
+      </div>
+    </main>
   );
 }

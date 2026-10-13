@@ -3,10 +3,12 @@ import {
   Composer,
   Message,
   Messages,
+  PageHeader,
   ProposalCard,
   Request,
   RunStatus,
   Streaming,
+  TextLink,
   ToolCall,
 } from "@portalr/ui";
 import {
@@ -14,7 +16,7 @@ import {
   useSuspenseQueries,
   useSuspenseQuery,
 } from "@tanstack/react-query";
-import { CatchBoundary, createFileRoute } from "@tanstack/react-router";
+import { CatchBoundary, createFileRoute, Link } from "@tanstack/react-router";
 import { type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { allowedIn, workspaceOf } from "../../../../../../../allowed";
 import { useMe } from "../../../../../../../me";
@@ -57,11 +59,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/threads/$t
     const { tenant, workspace, thread } = params;
     const { queries, queryClient } = context;
     const checks = allowedIn(queries, tenant, threadOf(workspace, thread), ACTIONS);
-    const [, answers] = await Promise.all([
-      queryClient.ensureQueryData(queries.grantr.memberships(context.user)),
-      queryClient.ensureQueryData(checks),
-    ]);
-    const allowed = checks.select(answers);
+    const allowed = checks.select(await queryClient.ensureQueryData(checks));
     if (allowed.has("grantr:grant") || allowed.has("grantr:restrict")) {
       await prefetchAccess(context, tenant, workspace);
     }
@@ -124,6 +122,11 @@ function author(actor: ArtifactrV1.Actor, me: string): string {
 
 function Chat() {
   const { tenant, workspace, thread: id } = Route.useParams();
+  const crumb = (
+    <TextLink render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}>
+      Threads
+    </TextLink>
+  );
   const { queries, queryClient, user } = Route.useRouteContext();
   const me = useMe(queries, user, tenant);
   const checks = useMemo(
@@ -147,24 +150,20 @@ function Chat() {
   const thread = threads[id];
   if (thread === undefined) {
     return snapshot.status === "live" ? (
-      <section aria-labelledby="thread">
-        <h2 id="thread" className="font-semibold text-lg">
-          Thread not found
-        </h2>
+      <>
+        <PageHeader title="Thread not found" crumb={crumb} />
         <p>There's no thread here by that name, or it isn't one you can see.</p>
-      </section>
+      </>
     ) : (
       <Connection snapshot={snapshot} waiting="the thread" />
     );
   }
   if (!allowed.has("artifactr:read_threads")) {
     return (
-      <section aria-labelledby="thread">
-        <h2 id="thread" className="font-semibold text-lg">
-          {thread.title || "Untitled"}
-        </h2>
+      <>
+        <PageHeader title={thread.title || "Untitled"} crumb={crumb} />
         <p role="alert">This isn't available to you any more.</p>
-      </section>
+      </>
     );
   }
   const active = Object.values(runs).filter(
@@ -181,22 +180,24 @@ function Chat() {
     });
 
   return (
-    <section aria-labelledby="thread" className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <h2 id="thread" className="font-semibold text-lg">
-          {thread.title || "Untitled"}
-        </h2>
-        {(allowed.has("grantr:grant") || allowed.has("grantr:restrict")) && (
-          <CatchBoundary
-            getResetKey={() => id}
-            errorComponent={() => <p role="alert">Who has access to it couldn't be read.</p>}
-          >
-            <Suspense fallback={null}>
-              <Access tenant={tenant} workspace={workspace} thread={id} allowed={allowed} />
-            </Suspense>
-          </CatchBoundary>
-        )}
-      </div>
+    <section aria-labelledby="thread" className="flex max-w-190 flex-col gap-6">
+      <PageHeader
+        title={thread.title || "Untitled"}
+        crumb={crumb}
+        id="thread"
+        actions={
+          (allowed.has("grantr:grant") || allowed.has("grantr:restrict")) && (
+            <CatchBoundary
+              getResetKey={() => id}
+              errorComponent={() => <p role="alert">Who has access to it couldn't be read.</p>}
+            >
+              <Suspense fallback={null}>
+                <Access tenant={tenant} workspace={workspace} thread={id} allowed={allowed} />
+              </Suspense>
+            </CatchBoundary>
+          )
+        }
+      />
       <Connection snapshot={snapshot} waiting="the thread" />
       <Messages>
         {thread.messages.map((message) => (
@@ -250,17 +251,19 @@ function Chat() {
         />
       ))}
       {snapshot.status !== "closed" && allowed.has("artifactr:post_message") && (
-        <Composer
-          disabled={snapshot.status !== "live"}
-          onSend={async (content) => {
-            const sent = await stream.send({ type: "post_message", thread_id: id, content });
-            if (sent.outcome === "refused") {
-              // Refused, perhaps since they may no longer post or read it: ask grantr again.
-              void queryClient.invalidateQueries({ queryKey: checks.queryKey });
-            }
-            return sent;
-          }}
-        />
+        <div className="sticky bottom-0 z-10 bg-paper pt-2 pb-4">
+          <Composer
+            disabled={snapshot.status !== "live"}
+            onSend={async (content) => {
+              const sent = await stream.send({ type: "post_message", thread_id: id, content });
+              if (sent.outcome === "refused") {
+                // Refused, perhaps since they may no longer post or read it: ask grantr again.
+                void queryClient.invalidateQueries({ queryKey: checks.queryKey });
+              }
+              return sent;
+            }}
+          />
+        </div>
       )}
     </section>
   );

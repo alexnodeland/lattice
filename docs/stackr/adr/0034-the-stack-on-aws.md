@@ -47,9 +47,10 @@ RFC-0004's `stack` holds the cluster, the private namespace, every Fargate servi
   - Langfuse's salt and encryption key, and LiteLLM's salt key, encrypt data;
   - Langfuse's project keys and admin password, and Grafana's admin password, are read on their first start only;
   - ClickHouse's passwords reach the state host only when its unit restarts, which nothing here does.
+- **GoTrue's key set is rotated by hand,** since a new one ends every session. An operator deletes its secret, or writes a key set of their own to it, and replaces `terraform_data.auth_keys`: auth-keys writes a new key set where there is none, and the service role's key again, since it no longer verifies, and GoTrue and the application deploy again, after it. `envs/prod`'s README has the commands.
 - **A rotation reaches its readers.** db-init runs again for a database's version. Each service's `after` carries the versions of the secrets it reads, so a rotated one deploys it again, with new tasks, and only the services that read it.
 - **A secret is written when its version is raised, and only then.** Replacing what a secret's value names, such as RDS behind a database's URL, needs its version raised too.
-- **The secrets OpenTofu writes are written before a service reads them:** the ARNs the services are given come from the secret versions. Those it doesn't write are another matter. `auth-keys` is written by its task, which GoTrue and the application wait for. The providers' API keys and GoTrue's SMTP password are written by an operator: LiteLLM and GoTrue fail to start until they are, and after writing one, an operator deploys its reader again (`aws ecs update-service --force-new-deployment`), since OpenTofu can't see its version.
+- **The secrets OpenTofu writes are written before a service reads them:** the ARNs the services are given come from the secret versions. Those it doesn't write are another matter. GoTrue's key set and the service role's key are written by the auth-keys task, which GoTrue and the application wait for. The providers' API keys and GoTrue's SMTP password are written by an operator: LiteLLM and GoTrue fail to start until they are, and after writing one, an operator deploys its reader again (`aws ecs update-service --force-new-deployment`), since OpenTofu can't see its version.
 
 ### The thin images' environment
 
@@ -62,7 +63,7 @@ Each thin image reads what differs on AWS from its environment. It defaults to C
 | `stackr-grafana` | `TEMPO_ADDRESS`, `LOKI_ADDRESS`, `PYROSCOPE_ADDRESS`, `PROMETHEUS_ADDRESS`; `GF_DATABASE_*`, on RDS, with `GF_DATABASE_SSL_MODE`; its admin's and its database's passwords, secrets |
 | `stackr-litellm` | `compose.yaml`'s settings, with `DATABASE_URL`, `REDIS_URL` and its keys as secrets, and one `<PROVIDER>_API_KEY` secret for each of `gateway_providers`, which an operator writes |
 | `stackr-db-init` | `PG*`, as RDS's master, `postgres`, with `PGSSLMODE` and `PGPASSWORD` from RDS's own secret; the roles' passwords, as on one machine, with `GRAFANA_DB_PASSWORD`; and the application's database, `APP_DB_NAME` and `APP_DB_PASSWORD`, its owner's, which may create roles for `db-roles` |
-| `stackr-auth-keys` | `AUTH_KEYS_ARN`, the secret it writes, as JSON with `jwt_keys` and `service_role_key`, when it is empty; its task role may read and write that secret alone |
+| `stackr-auth-keys` | `AUTH_JWT_KEYS_ARN` and `AUTH_SERVICE_ROLE_KEY_ARN`, the two secrets it writes, each whole, as GoTrue and the application read them; its task role may read and write those two alone |
 
 The images' pull request implements these settings, with Compose's defaults.
 
@@ -72,7 +73,7 @@ The images' pull request implements these settings, with Compose's defaults.
   1. starts the task with the AWS CLI, in the private subnets, and fails when ECS can't place it;
   2. waits for it to stop, for up to 30 minutes;
   3. fails with its exit code and its stopped reason.
-- **It runs when its task definition changes.** db-init also runs when a database's version is raised, and db-roles when the application's are, and after each db-init. auth-keys writes its secret only when it is empty, so running it again changes nothing. Planning runs nothing, so tier 1 needs no AWS.
+- **It runs when its task definition changes.** db-init also runs when a database's version is raised, and db-roles when the application's are, and after each db-init. auth-keys writes the key set only when its secret has no value, and the service role's key only when it has none or no longer verifies with the key set, so running it again changes nothing. Planning runs nothing, so tier 1 needs no AWS.
 - **db-roles has only what it needs:** the application's two database URLs, and its schema setting, if it gives one.
 - **The services wait for what they need.** `ecs-service` gains `after`, what a service waits for, which becomes its `triggers`, with `force_new_deployment`: a trigger alone would update the service in place and keep its tasks. Only its ECS service waits, not its task definition. A module's `depends_on` would defer its data sources to the apply, and with them every policy the tests read.
   - GoTrue waits for db-init and auth-keys; the application for db-init and, with `grantr`, db-roles and auth-keys; Langfuse's, LiteLLM's and Grafana's for db-init.

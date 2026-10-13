@@ -92,6 +92,8 @@ The storage protocol, and the in-memory implementation. See [Storage](../guides/
 
 ::: reflexr.workspace.run_lease
 
+::: reflexr.workspace.version_of
+
 ::: reflexr.workspace.RUN_LEASE_PREFIX
 
 ::: reflexr.workspace.RunPolicy

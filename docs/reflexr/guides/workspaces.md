@@ -134,6 +134,7 @@ The incident's `causation` names the firing and run behind it, and its depth cou
 | `dead_letters(rule=None)` | The envelopes rules could not evaluate, oldest first |
 | `rule_progress()` | Each rule's `RuleProgress`: its cursor, generation and pending `absence` deadlines |
 | `get_rule(rule)` | One of the workspace's rules, a `WorkspaceRule`: the rule, its `origin`, and a stored rule's `version` and `provenance`, or raises `NotFound` |
+| `rule_history(rule)` | A stored rule's versions, oldest first: its `reflexr:rule_installed` and `reflexr:rule_archived` envelopes, each with the actor who made the change. An archived rule keeps its history, and a rule never stored has none ([ADR-0063](../adr/0063-a-stored-rules-history.md)) |
 | `rule_statuses()` | A `RuleStatus` for each of the workspace's rules, code rules first: its `origin`, `code` or `stored`, and a stored rule's `version`, whether it is `enabled`, its `cursor`, its `lag` behind the head, its `generation` and its number of `dead_letters`. A rule that has not evaluated the workspace yet is at cursor 0. |
 | `schedule_ticks()` | When each [schedule](schedules.md) last ticked in the workspace |
 | `schedule_statuses()` | A `ScheduleStatus` for each schedule that targets the workspace: its `last_tick` and `next_tick`, or neither before its first check |

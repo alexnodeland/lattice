@@ -21,6 +21,7 @@ from reflexr.workspace.storage import (
     WorkspaceRef,
     run_lease,
     utc_now,
+    version_of,
 )
 from reflexr.workspace.workspace import (
     ACTIONS,
@@ -74,5 +75,6 @@ __all__ = [
     "run_lease",
     "tick_id",
     "utc_now",
+    "version_of",
     "with_params",
 ]

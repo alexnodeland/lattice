@@ -525,3 +525,28 @@ async def test_a_rule_whose_artifact_is_archived_drifts_alone(ledger: Ledger, st
     await (await chat_.automation()).install_rule(draft(service="x").rule)
     await settled(chat_)
     assert await proposals(chat_) == []
+
+
+async def test_an_install_however_far_back_is_still_relayrs(ledger: Ledger, stack: Stack) -> None:
+    chat_ = await chat(stack, ledger)
+    artifact_id, proposal_id = await chat_.drafted()
+    await chat_.resolve(proposal_id)
+    operator = await chat_.automation()
+    other = draft("chat:other").rule
+    await operator.install_rule(other)
+    for version in range(2, 1_003):  # more installs since than any window of the log's tail
+        await operator.update_rule(other, expected_version=version - 1, provenance={"n": version})
+    # The drift rule passes over each, in order: one run a round, since they share a scope.
+    await chat_.app.reactor.settle(max_rounds=2_000)
+
+    await operator.replay_rule(RULES_FROM_CHAT.name, mode="refire")
+    await settled(chat_)
+    assert (await chat_.stored()).version == 1, "the replayed acceptance was installed already"
+    changed = draft(service="billing").rule
+    await operator.update_rule(changed, expected_version=1)
+    await settled(chat_)
+    [drift] = await proposals(chat_)
+    assert drift.artifact_id == artifact_id, "the change is proposed to the rule's artifact"
+    await chat_.archive(artifact_id)
+    with pytest.raises(reflexr.core.NotFound):
+        await chat_.stored()

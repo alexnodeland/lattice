@@ -75,7 +75,15 @@ from reflexr.sql.tables import (
     WorkspaceRow,
 )
 from reflexr.sql.tenancy import TENANT, TenantSession
-from reflexr.workspace import RUN_LEASE_PREFIX, Clock, Entry, RunPolicy, WorkspaceRef, utc_now
+from reflexr.workspace import (
+    RUN_LEASE_PREFIX,
+    Clock,
+    Entry,
+    RunPolicy,
+    WorkspaceRef,
+    utc_now,
+    version_of,
+)
 
 _PAGE = 500
 """How many envelopes a subscription reads at a time."""
@@ -157,6 +165,7 @@ class _Transaction:
                     seq=envelope.seq,
                     event_id=envelope.id,
                     event_type=envelope.event_type,
+                    rule=version_of(envelope),
                     envelope=envelope.model_dump(mode="json"),
                 )
             )
@@ -508,6 +517,11 @@ class SqlStorage:
         )
         envelopes = [_envelope(row) for row in await self._all(workspace, query)]
         return envelopes if last is None else envelopes[::-1]
+
+    async def rule_history(self, workspace: WorkspaceRef, name: RuleName) -> list[Envelope]:
+        """Return a stored rule's versions, oldest first, over ``ix_reflexr_events_rule``."""
+        query = _scoped(EventRow, workspace).where(EventRow.rule == name).order_by(EventRow.seq)
+        return [_envelope(row) for row in await self._all(workspace, query)]
 
     async def subscribe(
         self, workspace: WorkspaceRef, *, after_seq: int = 0

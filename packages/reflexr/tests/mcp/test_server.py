@@ -297,6 +297,17 @@ async def test_agents_install_update_and_archive_stored_rules(server: Server) ->
             True,
             "Error executing tool get_rule: rule chat:deploys does not exist",
         )
+        _, history = await call(client, "rule_history", workspace_id="prod", rule="chat:deploys")
+        versions = [json.loads(line)["event"] for line in history.splitlines()]
+        assert [(v["type"], v["version"]) for v in versions] == [
+            ("reflexr:rule_installed", 1),
+            ("reflexr:rule_installed", 2),
+            ("reflexr:rule_archived", 3),
+        ], "an archived rule keeps its history"
+        assert await call(client, "rule_history", workspace_id="prod", rule="app:deploys") == (
+            False,
+            "app:deploys has no versions.",
+        )
 
 
 @pytest.mark.parametrize(
@@ -460,6 +471,7 @@ async def test_authorize_decides_which_workspaces_a_client_may_use(
         "read_events": {},
         "rule_status": {},
         "get_rule": {"rule": "app:deploys"},
+        "rule_history": {"rule": "chat:deploys"},
         "schedule_status": {},
         "replay_rule": {"rule": "app:deploys"},
         "install_rule": {"rule": rule},

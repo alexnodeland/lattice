@@ -661,6 +661,7 @@ NUL_CALLS: dict[str, NulCall] = {
     "runs": lambda w, ws: ws.runs(scope_key=NUL),
     "dead_letters": lambda w, ws: ws.dead_letters(rule=NUL),
     "get_rule": lambda w, ws: ws.get_rule(NUL),
+    "rule_history": lambda w, ws: ws.rule_history(NUL),
 }
 """Each way a string reaches a workspace, with a NUL character in it (ADR-0060), named by the
 method it reaches, and what it is when a method takes more than one."""

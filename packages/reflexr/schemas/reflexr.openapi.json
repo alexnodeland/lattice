@@ -3395,6 +3395,111 @@
         "summary": "Get Rule"
       }
     },
+    "/workspaces/{workspace_id}/rules/{rule}/history": {
+      "get": {
+        "description": "Return a stored rule's versions, oldest first: its install and archive facts.\n\nAn archived rule keeps its history, and a rule never stored has none.",
+        "operationId": "get_rule_history_workspaces__workspace_id__rules__rule__history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Rule",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Envelope"
+                  },
+                  "title": "Response Get Rule History Workspaces  Workspace Id  Rules  Rule  History Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          }
+        },
+        "summary": "Get Rule History"
+      }
+    },
     "/workspaces/{workspace_id}/runs": {
       "get": {
         "description": "Return runs, newest first.",

@@ -25,7 +25,15 @@ from reflexr.core import (
     ScopeState,
     StoredRule,
 )
-from reflexr.workspace.storage import Clock, Entry, RunPolicy, WorkspaceRef, run_lease, utc_now
+from reflexr.workspace.storage import (
+    Clock,
+    Entry,
+    RunPolicy,
+    WorkspaceRef,
+    run_lease,
+    utc_now,
+    version_of,
+)
 
 
 @dataclass
@@ -244,6 +252,10 @@ class InMemoryStorage:
         if last is not None:
             return found[max(len(found) - last, 0) :]
         return found if limit is None else found[:limit]
+
+    async def rule_history(self, workspace: WorkspaceRef, name: RuleName) -> list[Envelope]:
+        """Return a stored rule's versions, oldest first."""
+        return [e for e in self._data(workspace).log if version_of(e) == name]
 
     async def subscribe(
         self, workspace: WorkspaceRef, *, after_seq: int = 0

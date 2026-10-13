@@ -28,6 +28,7 @@ from grantr.core import (
     AuditEvent,
     AuditFilter,
     Catalog,
+    CatalogView,
     Forbidden,
     Grant,
     Granted,
@@ -400,6 +401,13 @@ class Grants:
         else:
             await self._require(self._storage, tenant, by, "grantr:read_audit", TENANT)
         return await self._storage.audit(tenant, after_seq=after_seq, limit=limit, keep=keep)
+
+    def catalog(self) -> CatalogView:
+        """What a tenant's roles may be: the built-in roles, and what a custom one may hold.
+
+        It is the deployment's, and anyone may read it.
+        """
+        return self._catalog.view()
 
     # ─── commands ────────────────────────────────────────────────────────────
 
@@ -829,6 +837,8 @@ class Grants:
         actions = self._catalog.role(grant.role, grant.on.kind, await tx.roles(tenant))
         if actions is None:
             raise Invalid(f"{grant.role} can't be granted on a {grant.on.kind}")
+        if grant.role == RULE_ROLE and not isinstance(grant.to, RulePrincipal):
+            raise Invalid("rule is a stored rule's own role: no one else holds it")
         if isinstance(grant.to, RulePrincipal):
             if grant.on.workspace != grant.to.workspace:
                 raise Invalid(f"{grant.to} acts in its own workspace only")

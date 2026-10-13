@@ -218,3 +218,11 @@ packages/portalr/web/admin/playwright-report/
 # deploy/aws/.terraform.lock.hcl, which their tests use, is committed
 .terraform/
 packages/stackr/deploy/aws/modules/*/.terraform.lock.hcl
+# A deployment's variables, and envs/floci's local state: never in the repository
+*.tfvars
+*.tfvars.json
+*.tfbackend
+*.tfplan
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info

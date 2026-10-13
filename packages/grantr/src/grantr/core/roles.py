@@ -10,7 +10,7 @@ built-in role until the role is changed here.
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Final, Literal
+from typing import Final, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict
 
@@ -173,6 +173,10 @@ deployment role that holds in every tenant."""
 RULE_ROLE: Final = "rule"
 """The role a stored rule's principal holds in its own workspace, with no grant (ADR-0029)."""
 
+UNGRANTED: Final = frozenset({MEMBER, RULE_ROLE})
+"""Built-in roles granted within a tenant that a tenant's admins don't grant: membership comes
+with adding a member, and a stored rule holds `rule` without a grant."""
+
 
 LEVELS: Final[Mapping[ResourceKind, Level]] = {
     "deployment": "deployment",
@@ -183,6 +187,37 @@ LEVELS: Final[Mapping[ResourceKind, Level]] = {
     "rule": "item",
 }
 """The level a resource of each kind is at."""
+
+
+def _kinds(level: Level) -> list[ResourceKind]:
+    """The kinds of resource at a level, in ``LEVELS``' order."""
+    return [kind for kind, at in LEVELS.items() if at == level]
+
+
+class BuiltInRole(BaseModel):
+    """A built-in role a tenant's admins grant, and the kinds of resource it may be granted on."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    kinds: tuple[ResourceKind, ...]
+
+
+class CatalogView(BaseModel):
+    """What a tenant's roles may be: the built-in ones, and what a custom one may hold.
+
+    It has each built-in role and where it is granted, the actions a custom role may hold, and
+    where one may be granted. The deployment's roles, an operator's and the application's, are
+    granted apart from any tenant, and aren't in it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    roles: tuple[BuiltInRole, ...]
+    custom_actions: tuple[str, ...]
+    """A workspace's admin's actions: a custom role holds some of them."""
+
+    custom_kinds: tuple[ResourceKind, ...]
 
 
 class Role(BaseModel):
@@ -246,6 +281,29 @@ class Catalog:
                 ("item", "editor"): editor,
                 ("item", "viewer"): viewer,
             },
+        )
+
+    def view(self) -> CatalogView:
+        """The catalog as a tenant's admins read it.
+
+        Each built-in role granted within a tenant comes in the order of where it is granted,
+        with its kinds, then custom roles' actions and kinds.
+        """
+        order: list[Level] = list(get_args(Level.__value__))
+        named: dict[str, list[ResourceKind]] = {}
+        for at, name in sorted(self.built_in, key=lambda key: (order.index(key[0]), key[1])):
+            # The deployment's roles are no tenant's; `member` is given by adding a member, and
+            # `rule` is a stored rule's own, held with no grant (ADR-0029): none is granted here.
+            if at != "deployment" and name not in UNGRANTED:
+                named.setdefault(name, []).extend(_kinds(at))
+        return CatalogView(
+            roles=tuple(
+                BuiltInRole(name=name, kinds=tuple(kinds)) for name, kinds in named.items()
+            ),
+            custom_actions=tuple(sorted(self.built_in["workspace", "admin"])),
+            custom_kinds=tuple(
+                kind for at in sorted(CUSTOM_LEVELS, key=order.index) for kind in _kinds(at)
+            ),
         )
 
     def role(

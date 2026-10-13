@@ -1,5 +1,7 @@
-# The tools CI installs through moonrepo/setup-toolchain, and proto installs anywhere else
-# (`proto use`). Renovate's proto manager keeps them current.
+# The tools CI installs through .github/actions/toolchain, and proto installs anywhere else
+# (`proto use`). Renovate's proto manager keeps them current, proto itself among them; a bump of
+# proto also needs its digests in .github/actions/toolchain/proto.sha256.
+proto = "0.63.1"
 bun = "1.4.3"
 moon = "2.5.6"
 uv = "0.12.12"

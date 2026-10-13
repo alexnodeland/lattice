@@ -144,6 +144,61 @@
         ],
         "type": "string"
       },
+      "BuiltInRole": {
+        "description": "A built-in role a tenant's admins grant, and the kinds of resource it may be granted on.",
+        "properties": {
+          "kinds": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceKind"
+            },
+            "title": "Kinds",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kinds"
+        ],
+        "title": "BuiltInRole",
+        "type": "object"
+      },
+      "CatalogView": {
+        "description": "What a tenant's roles may be: the built-in ones, and what a custom one may hold.\n\nIt has each built-in role and where it is granted, the actions a custom role may hold, and\nwhere one may be granted. The deployment's roles, an operator's and the application's, are\ngranted apart from any tenant, and aren't in it.",
+        "properties": {
+          "custom_actions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Custom Actions",
+            "type": "array"
+          },
+          "custom_kinds": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceKind"
+            },
+            "title": "Custom Kinds",
+            "type": "array"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/BuiltInRole"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "roles",
+          "custom_actions",
+          "custom_kinds"
+        ],
+        "title": "CatalogView",
+        "type": "object"
+      },
       "Check": {
         "description": "One question for ``/checks``: may the caller take this action on this resource?",
         "properties": {
@@ -1132,6 +1187,25 @@
           }
         },
         "summary": "Deployment Audit"
+      }
+    },
+    "/grantr/v1/catalog": {
+      "get": {
+        "description": "The built-in roles a tenant's admins grant, and what a custom role may hold.\n\nEach built-in role comes with where it may be granted. It is the deployment's; any\ncaller may read it.",
+        "operationId": "catalog_grantr_v1_catalog_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Catalog"
       }
     },
     "/grantr/v1/checks": {

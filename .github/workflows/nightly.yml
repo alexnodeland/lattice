@@ -45,9 +45,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+        id: toolchain
+      # This job alone saves main's cache of ~/.proto, which every other job restores
+      # (ADR-0017), once proto has cleaned out what nothing uses.
+      - name: Clean ~/.proto for the cache
+        if: steps.toolchain.outputs.cache-hit != 'true'
+        run: proto clean --yes
+      - name: Save proto and its tools
+        if: steps.toolchain.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          auto-install: true
+          path: ~/.proto
+          key: ${{ steps.toolchain.outputs.cache-key }}
       - name: One database per library
         env:
           PGPASSWORD: lattice
@@ -68,9 +78,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
-        with:
-          auto-install: true
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: moon run :image
 
   # Every lockfile git doesn't ignore: uv.lock and bun.lock.

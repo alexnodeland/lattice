@@ -20,6 +20,7 @@ from portalr.readers import (
     Unavailable,
     Window,
 )
+from portalr.readers.langfuse import workspace_of
 from portalr.tenant import allowed
 from tests.tools import Tool, fails, json
 
@@ -95,7 +96,7 @@ async def test_langfuse_reads_the_tenants_scores_newest_first_and_links_for_oper
     observations = {
         "data": [
             {"traceId": "t1", "tags": ["tenant:acme"]},
-            {"traceId": "t2", "tags": ["tenant:acme", "thread:thr_1"]},
+            {"traceId": "t2", "tags": ["tenant:acme", "thread:thr_1", "workspace:notes"]},
             # Langfuse ignored the filter: another tenant's trace is left out.
             {"traceId": "t3", "tags": ["tenant:globex"]},
         ]
@@ -164,6 +165,8 @@ async def test_langfuse_reads_the_tenants_scores_newest_first_and_links_for_oper
     ]
     # evalr names its evaluator in the metadata; a person's feedback names none.
     assert [score.evaluator for score in read.data] == ["accuracy", None]
+    # A trace's workspace tag names its scores' workspace; a trace with none, none.
+    assert [score.workspace for score in read.data] == ["notes", None]
     assert tool.last.url.params["traceId"] == "t1,t2"
     assert langfuse.trace_link("t1") == "http://langfuse/project/p1/traces/t1"
     assert langfuse.session_link("thr_1") == "http://langfuse/project/p1/sessions/thr_1"
@@ -253,3 +256,10 @@ def test_grafana_links_into_explore() -> None:
     assert jsonlib.loads(logs)["queries"][0]["expr"] == (
         '{service_name=~".+"} | artifactr_run_id = "run_1" or reflexr_run_id = "run_1"'
     )
+
+
+def test_a_trace_names_one_workspace_or_none() -> None:
+    assert workspace_of(["tenant:acme", "workspace:notes"]) == "notes"
+    assert workspace_of(["tenant:acme"]) is None
+    assert workspace_of(["workspace:notes", "workspace:plans"]) is None
+    assert workspace_of(["workspace:notes", "workspace:notes"]) == "notes"

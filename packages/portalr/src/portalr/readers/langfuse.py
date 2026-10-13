@@ -4,7 +4,8 @@ Langfuse is read for scores only; traces come from Tempo. The libraries tag ever
 ``tenant:<id>``. Langfuse 4's score API neither filters by a trace's tags nor answers with them,
 so a read takes two steps, as lattice RFC-0002 allows: the tenant's traces in the window, from
 the observations API filtered on the tag, then those traces' scores. Each observation's tags are
-checked again, and each score must be on one of those traces.
+checked again, and each score must be on one of those traces. A trace's ``workspace:<id>`` tag,
+which artifactr's and reflexr's traces carry, names each score's workspace.
 """
 
 import json
@@ -29,6 +30,16 @@ def tenant_tag(tenant: Tenant) -> str:
     return f"tenant:{tenant.id}"
 
 
+WORKSPACE_TAG: Final = "workspace:"
+"""How a trace's tag names its workspace: ``workspace:<id>``."""
+
+
+def workspace_of(tags: list[str]) -> str | None:
+    """The workspace a trace's tags name, or None for a trace in none, or in more than one."""
+    named = {tag.removeprefix(WORKSPACE_TAG) for tag in tags if tag.startswith(WORKSPACE_TAG)}
+    return named.pop() if len(named) == 1 else None
+
+
 class Score(BaseModel):
     """A score: a person's feedback, or an evaluator's verdict, on a trace."""
 
@@ -44,6 +55,8 @@ class Score(BaseModel):
     comment: str | None = None
     evaluator: str | None = None
     """The evaluator that gave it, from evalr's metadata; None for a person's feedback."""
+    workspace: str | None = None
+    """The workspace its trace is tagged with; None for a trace tagged with none."""
 
 
 class _Observation(BaseModel):
@@ -166,7 +179,10 @@ class Langfuse:
         if any(observation.tags is None for observation in observed.data):
             return Unavailable(reason="langfuse answered observations without their traces' tags")
         tag = tenant_tag(tenant)
-        traces = sorted({o.trace_id for o in observed.data if o.tags and tag in o.tags})
+        workspaces = {
+            o.trace_id: workspace_of(o.tags) for o in observed.data if o.tags and tag in o.tags
+        }
+        traces = sorted(workspaces)
         mine: list[Score] = []
         for at in range(0, len(traces), TRACES_PER_READ):
             batch = traces[at : at + TRACES_PER_READ]
@@ -183,7 +199,14 @@ class Langfuse:
                 trace = score.subject.trace if score.subject else None
                 if trace is not None and trace in batch:
                     fields = score.model_dump(exclude={"subject", "metadata"})
-                    mine.append(Score(trace_id=trace, evaluator=score.evaluator, **fields))
+                    mine.append(
+                        Score(
+                            trace_id=trace,
+                            evaluator=score.evaluator,
+                            workspace=workspaces[trace],
+                            **fields,
+                        )
+                    )
         newest = sorted(mine, key=lambda score: score.timestamp, reverse=True)
         return Ok(data=newest[: window.limit])
 

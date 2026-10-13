@@ -424,6 +424,8 @@ export interface components {
             trace_id: string;
             /** Value */
             value: number | boolean | string;
+            /** Workspace */
+            workspace?: string | null;
         };
         /**
          * Span

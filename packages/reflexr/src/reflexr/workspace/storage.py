@@ -20,6 +20,8 @@ from reflexr.core import (
     Event,
     EventId,
     Rule,
+    RuleArchived,
+    RuleInstalled,
     RuleName,
     RuleProgress,
     Run,
@@ -62,6 +64,16 @@ RUN_LEASE_PREFIX = "run:"
 def run_lease(run_id: RunId) -> str:
     """Return the lease key an executor holds on a run while it runs it."""
     return RUN_LEASE_PREFIX + run_id
+
+
+def stored_rule_of(envelope: Envelope) -> RuleName | None:
+    """Return the stored rule an envelope is a version of, or None if it is no rule's version.
+
+    A stored rule's versions are its ``reflexr:rule_installed`` and ``reflexr:rule_archived``
+    facts, which :meth:`Storage.rule_history` reads.
+    """
+    event = envelope.event
+    return event.rule if isinstance(event, RuleInstalled | RuleArchived) else None
 
 
 @dataclass(frozen=True)
@@ -250,6 +262,14 @@ class Storage(Protocol):
 
         Callers give at most one of ``limit`` and ``last``, and no negative numbers;
         :meth:`~reflexr.workspace.Workspace.read` checks.
+        """
+        ...
+
+    async def rule_history(self, workspace: WorkspaceRef, name: RuleName) -> list[Envelope]:
+        """Return a stored rule's versions, oldest first: those :func:`stored_rule_of` names it in.
+
+        A storage for production reads them without reading the rest of the log, as
+        ``SqlStorage`` does through an index; ``InMemoryStorage``, for tests, scans its log.
         """
         ...
 

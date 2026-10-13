@@ -139,15 +139,17 @@ test("a disabled composer sends nothing, and looks it", async () => {
   const style = getComputedStyle(box.element());
   expect(style.opacity).toBe("1");
   expect(style.color).toBe(token("muted"));
-  expect(contrast(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(style.color, token("surface"))).toBeGreaterThanOrEqual(4.5);
 });
 
-test("the composer reached by the keyboard shows the focus ring", async () => {
+test("the composer reached by the keyboard rings the whole of it in the focus colour", async () => {
   const screen = await render(<Composer onSend={sent()} />);
   await userEvent.tab();
   const box = screen.getByRole("textbox", { name: "Message" }).element();
-  expect(box.matches(":focus-visible")).toBe(true);
-  expect(getComputedStyle(box).outlineColor).toBe(token("focus"));
+  expect(box).toBe(document.activeElement);
+  const composer = getComputedStyle(box.closest("form") as Element);
+  expect(composer.outlineStyle).toBe("solid");
+  expect(composer.outlineColor).toBe(token("focus"));
 });
 
 test("a tool call says it is running until it returns", async () => {

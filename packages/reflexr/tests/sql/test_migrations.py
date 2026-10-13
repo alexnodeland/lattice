@@ -13,7 +13,17 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import JSON, Connection, column, func, insert, inspect, select, table, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from reflexr.core import Envelope, Event, RunSkipped, SourceActor, Tick, UnknownEvent
+from reflexr.core import (
+    Envelope,
+    Event,
+    RuleArchived,
+    RuleInstalled,
+    RuleReset,
+    RunSkipped,
+    SourceActor,
+    Tick,
+    UnknownEvent,
+)
 from reflexr.sql import SqlStorage, create_schema, migrate
 from reflexr.sql.schema import _alembic_config
 from reflexr.sql.tables import VERSION_TABLE, EventRow, metadata
@@ -154,6 +164,8 @@ async def test_upgrading_qualifies_reflexrs_own_event_types(engine: AsyncEngine)
         await connection.run_sync(lambda c: command.upgrade(_alembic_config(c), "0004"))
         await connection.execute(insert(events), stored)
         await connection.run_sync(_qualify_facts, "upgrade")
+        await connection.run_sync(lambda c: command.stamp(_alembic_config(c), "0005"))
+    await migrate(engine)  # the later migrations, which the storage's models need
     storage = SqlStorage(engine)
     envelopes = await storage.read(WorkspaceRef("acme", "prod"))
     assert [e.event_type for e in envelopes] == [
@@ -183,6 +195,65 @@ async def test_upgrading_qualifies_reflexrs_own_event_types(engine: AsyncEngine)
         ("prod", "app:service.error", "app:service.error"),
         ("prod", "run_skipped", "run_skipped"),
     ]
+
+
+async def test_upgrading_fills_the_rule_column_from_each_rules_versions(
+    engine: AsyncEngine,
+) -> None:
+    events = table(
+        "reflexr_events",
+        column("tenant_id"),
+        column("workspace_id"),
+        column("seq"),
+        column("event_id"),
+        column("event_type"),
+        column("envelope", JSON()),
+    )
+
+    def stored_as_0007(seq: int, event: Event, workspace: str = "prod") -> Any:
+        row = _stored(seq, event)
+        return {**row, "workspace_id": workspace, "event_type": row["envelope"]["event"]["type"]}
+
+    installed = RuleInstalled(rule="chat:deploys", version=1, spec={}, provenance={})
+    stored = [
+        stored_as_0007(1, installed),
+        stored_as_0007(
+            2, RuleReset(rule="chat:deploys", generation=1, reason="changed", from_seq=1)
+        ),
+        stored_as_0007(3, ServiceError(service="auth")),
+        stored_as_0007(4, RuleArchived(rule="chat:deploys", version=2, cancelled=0)),
+        stored_as_0007(1, installed, workspace="dev"),
+    ]
+    async with engine.begin() as connection:
+        await connection.run_sync(lambda c: command.upgrade(_alembic_config(c), "0007"))
+        await connection.execute(insert(events), stored)
+    await migrate(engine)
+    async with engine.connect() as connection:
+        query = select(EventRow.workspace_id, EventRow.seq, EventRow.rule).order_by(
+            EventRow.workspace_id, EventRow.seq
+        )
+        assert (await connection.execute(query)).all() == [
+            ("dev", 1, "chat:deploys"),
+            ("prod", 1, "chat:deploys"),
+            ("prod", 2, None),
+            ("prod", 3, None),
+            ("prod", 4, "chat:deploys"),
+        ], "only a rule's versions name it: not its resets"
+        [index] = [
+            i
+            for i in await connection.run_sync(lambda c: inspect(c).get_indexes("reflexr_events"))
+            if i["name"] == "ix_reflexr_events_rule"
+        ]
+        options = index.get("dialect_options", {})
+        [where] = [value for key, value in options.items() if key.endswith("_where")]
+        assert "rule IS NOT NULL" in str(where), "the index holds only the rows that name a rule"
+    history = await SqlStorage(engine).rule_history(WorkspaceRef("acme", "prod"), "chat:deploys")
+    assert [e.seq for e in history] == [1, 4]
+    async with engine.begin() as connection:
+        await connection.run_sync(lambda c: command.downgrade(_alembic_config(c), "0007"))
+        assert await connection.scalar(select(func.count()).select_from(events)) == 5, (
+            "the rows outlive the column"
+        )
 
 
 ROW_SECURITY = text(

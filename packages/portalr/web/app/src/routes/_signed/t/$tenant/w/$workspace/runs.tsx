@@ -1,7 +1,18 @@
 import { type Reflexr, thumbs } from "@portalr/client";
-import { CommandButton, RunStatus, StatusBadge, TextLink, Thumbs, type Tone } from "@portalr/ui";
+import {
+  CommandButton,
+  PageHeader,
+  RunStatus,
+  SectionTitle,
+  StatusBadge,
+  Table,
+  TextLink,
+  Thumbs,
+  type Tone,
+} from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { allowedIn, workspaceOf } from "../../../../../../allowed";
 import { useMe } from "../../../../../../me";
@@ -32,12 +43,9 @@ const ACTIONS = [
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/runs")({
   head: ({ params }) => ({ meta: [{ title: `Runs · ${params.workspace} · portalr` }] }),
   loader: ({ context, params }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(
-        allowedIn(context.queries, params.tenant, workspaceOf(params.workspace), ACTIONS),
-      ),
-      context.queryClient.ensureQueryData(context.queries.grantr.memberships(context.user)),
-    ]),
+    context.queryClient.ensureQueryData(
+      allowedIn(context.queries, params.tenant, workspaceOf(params.workspace), ACTIONS),
+    ),
   component: Runs,
 });
 
@@ -56,6 +64,90 @@ const RULE_RUN: Record<Reflexr.Run["status"], readonly [Tone, string]> = {
   skipped: ["stopped", "Skipped"],
 };
 
+/** A run's parts, as the table's cells and a phone's card both show them. */
+interface Parts {
+  readonly key: string;
+  /** The row's or card's name. */
+  readonly name: string;
+  readonly status: ReactNode;
+  readonly title: ReactNode;
+  readonly attempts?: number;
+  readonly feedback: ReactNode;
+  readonly actions: ReactNode;
+}
+
+/**
+ * Runs as a table, named by its caption, from the small breakpoint; below it, a card for each, its
+ * status and title on top, then its attempts and feedback, and its actions in reach.
+ */
+function RunList({
+  caption,
+  title,
+  runs,
+  attempts,
+  feedback,
+}: {
+  caption: string;
+  title: string;
+  runs: readonly Parts[];
+  attempts: boolean;
+  feedback: boolean;
+}) {
+  return (
+    <>
+      <div className="max-sm:hidden">
+        <Table caption={caption}>
+          <thead>
+            <tr>
+              <th scope="col">Status</th>
+              <th scope="col">{title}</th>
+              {attempts && <th scope="col">Attempts</th>}
+              {feedback && <th scope="col">Feedback</th>}
+              <th scope="col">
+                <span className="sr-only">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {runs.map((run) => (
+              <tr key={run.key} aria-label={run.name}>
+                <td>{run.status}</td>
+                <td>{run.title}</td>
+                {attempts && <td className="text-muted tabular-nums">{run.attempts}</td>}
+                {feedback && <td>{run.feedback}</td>}
+                <td>
+                  <span className="flex flex-wrap justify-end gap-2">{run.actions}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
+      <ul aria-label={caption} className="flex flex-col gap-3 sm:hidden">
+        {runs.map((run) => (
+          <li
+            key={run.key}
+            aria-label={run.name}
+            className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4"
+          >
+            <span className="flex flex-wrap items-center gap-2">
+              {run.status}
+              {run.title}
+            </span>
+            {(attempts || feedback) && (
+              <span className="flex flex-wrap items-center gap-3 text-sm">
+                {attempts && <span className="text-muted">Attempt {run.attempts}</span>}
+                {feedback && run.feedback}
+              </span>
+            )}
+            {run.actions && <span className="flex flex-wrap gap-2">{run.actions}</span>}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 function Runs() {
   const { tenant, workspace } = Route.useParams();
   const { queries, user } = Route.useRouteContext();
@@ -71,117 +163,136 @@ function Runs() {
   const reflexr = useAutomationStream();
   const turnRuns = useMemo(() => newest(turns.state.runs), [turns.state.runs]);
   const ruleRuns = useMemo(() => newest(automation.state.runs), [automation.state.runs]);
+  const turnFeedback = allowed.has("artifactr:give_feedback");
+  const runFeedback = allowed.has("reflexr:give_feedback");
+
+  const turnParts: Parts[] = turnRuns.map((run) => ({
+    key: run.id,
+    name: `Turn ${run.id}`,
+    status: <RunStatus status={run.status} />,
+    title: (
+      <TextLink
+        render={
+          <Link
+            to="/t/$tenant/w/$workspace/threads/$thread"
+            params={{ tenant, workspace, thread: run.threadId }}
+          />
+        }
+      >
+        {turns.state.threads[run.threadId]?.title || "Untitled"}
+      </TextLink>
+    ),
+    feedback: turnFeedback && (
+      <Thumbs
+        given={thumbs(run.feedback, me)}
+        onThumbs={(up, comment) =>
+          artifactr.send({
+            type: "give_feedback",
+            feedback_type: "thumbs",
+            target: { kind: "turn", run_id: run.id },
+            value: comment === null ? { up } : { up, comment },
+          })
+        }
+      />
+    ),
+    actions: run.status === "running" && allowed.has("artifactr:stop_run") && (
+      <CommandButton onSend={() => artifactr.send({ type: "stop_run", run_id: run.id })}>
+        Stop
+      </CommandButton>
+    ),
+  }));
+
+  const ruleParts: Parts[] = ruleRuns.map((run) => {
+    const [tone, words] = RULE_RUN[run.status];
+    const retry = run.status === "dead_lettered" && allowed.has("reflexr:retry_run");
+    const skip =
+      (run.status === "dead_lettered" || run.status === "retrying") &&
+      allowed.has("reflexr:skip_run");
+    const cancel =
+      (run.status === "pending" || run.status === "running" || run.status === "retrying") &&
+      allowed.has("reflexr:cancel_run");
+    return {
+      key: run.id,
+      name: `Run ${run.id}`,
+      status: (
+        <StatusBadge tone={tone} live>
+          {words}
+        </StatusBadge>
+      ),
+      title: (
+        <span className="flex flex-col">
+          <code className="font-mono">{run.rule}</code>
+          {run.retries > 0 && (
+            <span className="text-muted text-xs">
+              retried {run.retries === 1 ? "once" : `${run.retries} times`}
+            </span>
+          )}
+        </span>
+      ),
+      attempts: run.attempt,
+      feedback: runFeedback && (
+        <Thumbs
+          given={thumbs(run.feedback, me)}
+          onThumbs={(up, comment) =>
+            reflexr.send({
+              type: "give_feedback",
+              feedback_type: "thumbs",
+              target: { kind: "run", run_id: run.id },
+              value: comment === null ? { up } : { up, comment },
+            })
+          }
+        />
+      ),
+      actions: (retry || skip || cancel) && (
+        <>
+          {retry && (
+            <CommandButton onSend={() => reflexr.send({ type: "retry_run", run_id: run.id })}>
+              Retry
+            </CommandButton>
+          )}
+          {skip && (
+            <CommandButton onSend={() => reflexr.send({ type: "skip_run", run_id: run.id })}>
+              Skip
+            </CommandButton>
+          )}
+          {cancel && (
+            <CommandButton onSend={() => reflexr.send({ type: "cancel_run", run_id: run.id })}>
+              Cancel
+            </CommandButton>
+          )}
+        </>
+      ),
+    };
+  });
 
   return (
-    <section aria-labelledby="runs" className="flex flex-col gap-6">
-      <h2 id="runs" className="font-semibold text-lg">
-        Runs
-      </h2>
-      <section aria-labelledby="turns" className="flex flex-col gap-2">
-        <h3 id="turns" className="font-semibold">
-          The agent's turns
-        </h3>
+    <>
+      <PageHeader
+        title="Runs"
+        meta={`The agent's turns and the rules' runs in ${workspace}, newest first`}
+      />
+      <div className="flex flex-col gap-3">
+        <SectionTitle>The agent's turns</SectionTitle>
         <Connection snapshot={turns} waiting="the workspace's turns" />
-        <ul aria-label="Turns" className="flex flex-col gap-3">
-          {turnRuns.map((run) => (
-            <li key={run.id} aria-label={`Turn ${run.id}`} className="flex flex-col gap-1">
-              <span className="flex flex-wrap gap-2 text-sm">
-                <TextLink
-                  render={
-                    <Link
-                      to="/t/$tenant/w/$workspace/threads/$thread"
-                      params={{ tenant, workspace, thread: run.threadId }}
-                    />
-                  }
-                >
-                  {turns.state.threads[run.threadId]?.title || "Untitled"}
-                </TextLink>
-                <RunStatus status={run.status} />
-              </span>
-              {run.status === "running" && allowed.has("artifactr:stop_run") && (
-                <CommandButton onSend={() => artifactr.send({ type: "stop_run", run_id: run.id })}>
-                  Stop
-                </CommandButton>
-              )}
-              {allowed.has("artifactr:give_feedback") && (
-                <Thumbs
-                  given={thumbs(run.feedback, me)}
-                  onThumbs={(up, comment) =>
-                    artifactr.send({
-                      type: "give_feedback",
-                      feedback_type: "thumbs",
-                      target: { kind: "turn", run_id: run.id },
-                      value: comment === null ? { up } : { up, comment },
-                    })
-                  }
-                />
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
-      <section aria-labelledby="rule-runs" className="flex flex-col gap-2">
-        <h3 id="rule-runs" className="font-semibold">
-          Rules' runs
-        </h3>
+        <RunList
+          caption="Turns"
+          title="Thread"
+          runs={turnParts}
+          attempts={false}
+          feedback={turnFeedback}
+        />
+      </div>
+      <div className="flex flex-col gap-3">
+        <SectionTitle>Rules' runs</SectionTitle>
         <Connection snapshot={automation} waiting="the workspace's rules" />
-        <ul aria-label="Rules' runs" className="flex flex-col gap-3">
-          {ruleRuns.map((run) => (
-            <li key={run.id} aria-label={`Run ${run.id}`} className="flex flex-col gap-1">
-              <span className="flex flex-wrap gap-2 text-sm">
-                <code className="font-mono">{run.rule}</code>
-                <StatusBadge tone={RULE_RUN[run.status][0]} live>
-                  {RULE_RUN[run.status][1]}
-                </StatusBadge>
-                <span className="text-muted">attempt {run.attempt}</span>
-                {run.retries > 0 && (
-                  <span className="text-muted">
-                    retried {run.retries === 1 ? "once" : `${run.retries} times`}
-                  </span>
-                )}
-              </span>
-              <span className="flex flex-wrap gap-2">
-                {run.status === "dead_lettered" && allowed.has("reflexr:retry_run") && (
-                  <CommandButton onSend={() => reflexr.send({ type: "retry_run", run_id: run.id })}>
-                    Retry
-                  </CommandButton>
-                )}
-                {(run.status === "dead_lettered" || run.status === "retrying") &&
-                  allowed.has("reflexr:skip_run") && (
-                    <CommandButton
-                      onSend={() => reflexr.send({ type: "skip_run", run_id: run.id })}
-                    >
-                      Skip
-                    </CommandButton>
-                  )}
-                {(run.status === "pending" ||
-                  run.status === "running" ||
-                  run.status === "retrying") &&
-                  allowed.has("reflexr:cancel_run") && (
-                    <CommandButton
-                      onSend={() => reflexr.send({ type: "cancel_run", run_id: run.id })}
-                    >
-                      Cancel
-                    </CommandButton>
-                  )}
-              </span>
-              {allowed.has("reflexr:give_feedback") && (
-                <Thumbs
-                  given={thumbs(run.feedback, me)}
-                  onThumbs={(up, comment) =>
-                    reflexr.send({
-                      type: "give_feedback",
-                      feedback_type: "thumbs",
-                      target: { kind: "run", run_id: run.id },
-                      value: comment === null ? { up } : { up, comment },
-                    })
-                  }
-                />
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
-    </section>
+        <RunList
+          caption="Rules' runs"
+          title="Rule"
+          runs={ruleParts}
+          attempts
+          feedback={runFeedback}
+        />
+      </div>
+    </>
   );
 }

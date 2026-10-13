@@ -68,6 +68,7 @@ test("revoking sends the grant as it is", async () => {
   const screen = await render(<Opened onRevoke={onRevoke} />);
   await screen.getByRole("button", { name: "Thread actions" }).click();
   await screen.getByRole("button", { name: "Revoke" }).click();
+  await screen.getByRole("alertdialog").getByRole("button", { name: "Revoke the role" }).click();
   expect(onRevoke).toHaveBeenCalledExactlyOnceWith(erin);
 });
 

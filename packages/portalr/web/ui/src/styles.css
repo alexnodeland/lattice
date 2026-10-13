@@ -13,6 +13,13 @@
 /* Streamdown renders with Tailwind classes of its own, which Tailwind finds here. */
 @source "../node_modules/streamdown/dist/*.js";
 
+@layer base {
+  html {
+    background-color: var(--paper);
+    color: var(--fg);
+  }
+}
+
 @theme inline {
   --color-*: initial;
   --color-paper: var(--paper);
@@ -25,6 +32,9 @@
   --color-focus: var(--focus);
   --color-edge: var(--edge);
   --color-scrim: var(--scrim);
+  --color-danger: var(--danger);
+  --color-on-danger: var(--on-danger);
+  --color-danger-hover: var(--danger-hover);
   --color-wash: var(--wash);
   --color-accent-hover: var(--accent-hover);
   /* The names Streamdown's own classes use, as portalr's roles. */

@@ -20,7 +20,7 @@ Feature: Runs
     When they retry its run
     Then its run shows "retried once"
     And its run is "Dead-lettered"
-    And its run shows "attempt 2"
+    And its run is on attempt 2
 
   Scenario: A running turn is stopped
     Given bob has signed in

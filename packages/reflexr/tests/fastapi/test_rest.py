@@ -400,6 +400,13 @@ async def test_stored_rules_are_installed_updated_and_archived_through_commands(
     archive = command("c4", type="archive_rule", rule="chat:releases", expected_version=2)
     archived = (await client.post(COMMANDS, json=archive)).json()["outcome"]
     assert (archived["version"], archived["duplicate"]) == (3, False)
+    history = (await client.get("/workspaces/prod/rules/chat:releases/history")).json()
+    assert [(h["event"]["type"], h["event"]["version"]) for h in history] == [
+        ("reflexr:rule_installed", 1),
+        ("reflexr:rule_installed", 2),
+        ("reflexr:rule_archived", 3),
+    ]
+    assert (await client.get("/workspaces/prod/rules/app:spike/history")).json() == []
     gone = await client.get("/workspaces/prod/rules/chat:releases")
     assert (gone.status_code, gone.json()["detail"]) == (
         404,

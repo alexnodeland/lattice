@@ -23,3 +23,12 @@ test("a page header without extras is its heading alone", async () => {
   const screen = await render(<PageHeader title="Runs" />);
   expect(screen.container.querySelectorAll("a, button, p")).toHaveLength(0);
 });
+
+test("a page header's heading can name the region around it", async () => {
+  const screen = await render(
+    <section aria-labelledby="note">
+      <PageHeader title="art_1" id="note" />
+    </section>,
+  );
+  await expect.element(screen.getByRole("region", { name: "art_1" })).toBeVisible();
+});

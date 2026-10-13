@@ -3,7 +3,9 @@
  * handed to the caller. The components know nothing of the transport (lattice RFC-0002).
  */
 
+import { Field } from "@base-ui/react/field";
 import type { Artifactr, ArtifactrV1, Thumb } from "@portalr/client";
+import { ThumbsDown, ThumbsUp } from "lucide-react";
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -15,11 +17,12 @@ import {
 } from "react";
 import { Button } from "./button";
 import { cn } from "./cn";
+import { Icon } from "./icon";
 import { Markdown } from "./markdown";
 import { StatusBadge, type Tone } from "./status-badge";
 import { TextField } from "./text-field";
 
-const card = "flex flex-col gap-2 rounded-md border border-line bg-surface p-3 text-sm";
+const card = "flex flex-col gap-2 rounded-lg border border-line bg-surface p-4 text-sm";
 
 /** How a command a part handed its caller ended, as `client`'s stream settles it. */
 export type Sent = Promise<{ readonly outcome: "done" | "refused" | "closed" }>;
@@ -98,19 +101,23 @@ export function Thumbs({ given, onThumbs }: { given: Thumb | null; onThumbs: Giv
     <fieldset aria-label="Feedback" className="m-0 flex min-w-0 flex-col gap-1 border-0 p-0">
       <span className="flex gap-1">
         <Button
-          variant="secondary"
+          variant="ghost"
+          className="border-line px-2 py-1 text-xs"
           aria-pressed={given?.up === true}
           disabled={pending}
           onClick={() => thumb(true)}
         >
+          <Icon icon={ThumbsUp} className="size-3.5" />
           Helpful
         </Button>
         <Button
-          variant="secondary"
+          variant="ghost"
+          className="border-line px-2 py-1 text-xs"
           aria-pressed={given?.up === false}
           disabled={pending}
           onClick={() => thumb(false)}
         >
+          <Icon icon={ThumbsDown} className="size-3.5" />
           Not helpful
         </Button>
       </span>
@@ -203,19 +210,29 @@ export function Composer({
     }
   }
   return (
-    <form className="flex flex-wrap items-end gap-2" onSubmit={submit}>
-      <TextField
-        label="Message"
-        className="flex-1"
-        render={<textarea className="min-h-16" />}
-        value={text}
-        disabled={disabled}
-        onValueChange={(value) => setText(String(value))}
-        onKeyDown={key}
-      />
-      <Button type="submit" disabled={disabled || pending || !text.trim()}>
-        Send
-      </Button>
+    <form
+      className="flex flex-col gap-1 rounded-lg border border-edge bg-surface p-1 outline-offset-2 has-[textarea:focus-visible]:outline-2 has-[textarea:focus-visible]:outline-focus"
+      onSubmit={submit}
+    >
+      <Field.Root className="flex flex-col" disabled={disabled}>
+        <Field.Label className="sr-only">Message</Field.Label>
+        <Field.Control
+          render={<textarea rows={2} />}
+          value={text}
+          placeholder="Write to the assistant"
+          onValueChange={(value) => setText(String(value))}
+          onKeyDown={key}
+          className="min-h-14 resize-none bg-transparent px-2.5 py-2 text-base text-fg outline-none placeholder:text-muted data-disabled:cursor-not-allowed data-disabled:text-muted"
+        />
+      </Field.Root>
+      <div className="flex items-center justify-between gap-2 px-2.5 pb-1">
+        <span className="text-muted text-xs max-sm:hidden">
+          Enter sends, Shift+Enter starts a new line
+        </span>
+        <Button type="submit" className="ml-auto" disabled={disabled || pending || !text.trim()}>
+          Send
+        </Button>
+      </div>
       <Unsent reason={unsent} />
     </form>
   );
@@ -257,12 +274,12 @@ export function Request({
   if (request.kind === "approval") {
     const args = Object.keys(request.args ?? {}).length > 0;
     return (
-      <section className={card} aria-label={`Approve ${request.tool_name}?`}>
+      <section className={cn(card, "border-accent")} aria-label={`Approve ${request.tool_name}?`}>
         <p>
           The agent wants to run <code className="font-mono">{request.tool_name}</code>.
         </p>
         {args && (
-          <pre className="overflow-x-auto font-mono text-xs">
+          <pre className="overflow-x-auto rounded-md border border-line bg-paper p-3 font-mono text-xs">
             {JSON.stringify(request.args, null, 2)}
           </pre>
         )}
@@ -353,7 +370,12 @@ export function ProposalCard({
           </span>
         )
       ) : (
-        <p>{proposal.status === "accept" ? "Accepted" : "Rejected"}</p>
+        <StatusBadge
+          tone={proposal.status === "accept" ? "done" : "stopped"}
+          className="self-start"
+        >
+          {proposal.status === "accept" ? "Accepted" : "Rejected"}
+        </StatusBadge>
       )}
       <Unsent reason={unsent} />
     </section>

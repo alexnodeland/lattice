@@ -239,6 +239,16 @@ def reflexr_router(
         """Return one of the workspace's rules, with a stored rule's version and provenance."""
         return await _or_http(workspace.get_rule(rule))
 
+    @router.get("/workspaces/{workspace_id}/rules/{rule}/history")
+    async def get_rule_history(
+        rule: PathId, workspace: Workspace = current_workspace
+    ) -> list[Envelope]:
+        """Return a stored rule's versions, oldest first: its install and archive facts.
+
+        An archived rule keeps its history, and a rule never stored has none.
+        """
+        return await _or_http(workspace.rule_history(rule))
+
     @router.get("/workspaces/{workspace_id}/runs")
     async def list_runs(
         rule: RuleName | None = None,

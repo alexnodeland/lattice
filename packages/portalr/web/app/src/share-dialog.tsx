@@ -1,10 +1,10 @@
 /**
- * Sharing a thread: who holds a role on it, each with Revoke, and a role granted to a person, as
- * viewer or editor (portalr ADR-0022). grantr names people by id, so the dialog does too.
+ * Sharing a thread: who holds a role on it, each with Revoke, asked first (portalr ADR-0021), and a
+ * role granted to a person, as viewer or editor (portalr ADR-0022). grantr names people by id, so the dialog does too.
  */
 
 import { type Answer, type GrantrApi, refusal } from "@portalr/client";
-import { Button, CommandButton, Dialog, SelectField } from "@portalr/ui";
+import { Button, ConfirmDialog, Dialog, SelectField } from "@portalr/ui";
 import { type RefObject, useActionState, useRef } from "react";
 
 type Grant = GrantrApi.components["schemas"]["Grant"];
@@ -89,7 +89,22 @@ export function ShareDialog({
               <span>
                 {named(each.to)} <span className="text-muted">{each.role}</span>
               </span>
-              {canRevoke && <CommandButton onSend={() => onRevoke(each)}>Revoke</CommandButton>}
+              {canRevoke && (
+                <ConfirmDialog
+                  label="Revoke"
+                  title={`Revoke ${named(each.to)}'s ${each.role} role?`}
+                  confirm="Revoke the role"
+                  onConfirm={async () => {
+                    const answer = await onRevoke(each);
+                    if (answer.outcome !== "done") {
+                      throw new Error(refusal("Not revoked", answer));
+                    }
+                  }}
+                >
+                  {named(each.to)} loses the {each.role} role on this thread. While it's restricted,
+                  they no longer see it.
+                </ConfirmDialog>
+              )}
             </li>
           ))}
         </ul>

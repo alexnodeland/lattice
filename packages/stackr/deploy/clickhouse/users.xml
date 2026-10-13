@@ -1,0 +1,45 @@
+<!-- ClickHouse's users (stackr ADR-0031), in place of the one the image would make. `admin` is
+     the operators', from inside the container only: every privilege, and the named collections,
+     such as a single host's `backups`. `langfuse` is Langfuse's: every privilege on its own
+     database, where it runs its migrations, and the system tables it reads, and nothing else.
+     Their passwords come from the environment, and are kept out of the preprocessed configuration
+     ClickHouse writes to its data volume. -->
+<clickhouse>
+  <users>
+    <default remove="remove"/>
+    <admin>
+      <password from_env="CLICKHOUSE_ADMIN_PASSWORD" hide_in_preprocessed="true"/>
+      <networks>
+        <ip>127.0.0.1</ip>
+        <ip>::1</ip>
+      </networks>
+      <profile>default</profile>
+      <quota>default</quota>
+      <access_management>1</access_management>
+      <named_collection_control>1</named_collection_control>
+    </admin>
+    <langfuse>
+      <password from_env="CLICKHOUSE_LANGFUSE_PASSWORD" hide_in_preprocessed="true"/>
+      <networks>
+        <ip>::/0</ip>
+      </networks>
+      <profile>default</profile>
+      <quota>default</quota>
+      <grants>
+        <query>GRANT ALL ON default.*</query>
+        <!-- The system tables Langfuse 4.46 reads, and no others: system.parts, system.tables,
+             system.columns and system.mutations, which its migrations, event propagation and
+             native codec read; and system.processes and system.query_log, where it follows a
+             query's progress and cost. system.query_log stays for that. system.replicas is read
+             only on a cluster, which stackr doesn't run, and system.asynchronous_metrics only by
+             Langfuse's seeding script. -->
+        <query>GRANT SELECT ON system.parts</query>
+        <query>GRANT SELECT ON system.tables</query>
+        <query>GRANT SELECT ON system.columns</query>
+        <query>GRANT SELECT ON system.mutations</query>
+        <query>GRANT SELECT ON system.processes</query>
+        <query>GRANT SELECT ON system.query_log</query>
+      </grants>
+    </langfuse>
+  </users>
+</clickhouse>

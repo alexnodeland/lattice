@@ -1,13 +1,15 @@
 <!-- ClickHouse's backups on a single host (RFC-0004): the bucket, as the `backups` named
      collection, from the BACKUP_S3_* settings in the environment, so no key is written in a
      BACKUP statement; and its certificate checked against /etc/stackr/backup-ca.crt as well as
-     the system's. Only the `backup` user may use it. -->
+     the system's. The `backup` user uses it for the backups and the drill, and `admin` to restore
+     a new host (ADR-0031). Its keys are kept out of the preprocessed configuration ClickHouse
+     writes to its data volume. -->
 <clickhouse>
   <named_collections>
     <backups>
       <url from_env="CLICKHOUSE_BACKUP_URL"/>
-      <access_key_id from_env="BACKUP_S3_ACCESS_KEY_ID"/>
-      <secret_access_key from_env="BACKUP_S3_SECRET_ACCESS_KEY"/>
+      <access_key_id from_env="BACKUP_S3_ACCESS_KEY_ID" hide_in_preprocessed="true"/>
+      <secret_access_key from_env="BACKUP_S3_SECRET_ACCESS_KEY" hide_in_preprocessed="true"/>
     </backups>
   </named_collections>
   <openSSL>

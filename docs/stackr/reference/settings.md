@@ -195,6 +195,12 @@ The SMTP server GoTrue sends invitations and password resets through. Optional: 
 | `LANGFUSE_DB_PASSWORD` | Generated: 64 hex characters |
 | `CLICKHOUSE_PASSWORD` | Generated: 64 hex characters |
 
+ClickHouse's admin, for operators, from inside its container only.
+
+| Setting | In `.env.example` |
+|---|---|
+| `CLICKHOUSE_ADMIN_PASSWORD` | Generated: 64 hex characters |
+
 SALT and ENCRYPTION_KEY must never change once Langfuse has data.
 
 | Setting | In `.env.example` |

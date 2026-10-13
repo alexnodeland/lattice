@@ -409,7 +409,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 - [x] Phase 3: template option, example and smoke test ([ADR-0021](../adr/0021-the-bridge-in-the-template.md))
 - [x] Phase 4: telemetry links and tags, in relayr ([relayr ADR-0023](../../relayr/adr/0023-traces-linked-across-the-bridge.md), [ADR-0024](../../relayr/adr/0024-langfuse-sessions-tagged-with-each-other.md)); LiteLLM's metadata waits on [lattice #86](https://github.com/alexnodeland/lattice/issues/86)
 - [x] Phase 5: rules from chat, in relayr ([relayr ADR-0028](../../relayr/adr/0028-rules-from-chat.md)) and the template ([ADR-0024](../adr/0024-rules-from-chat-in-the-template.md))
-- [ ] Phase 6: evaluation
+- [x] Phase 6: evaluation, in relayr ([relayr ADR-0031](../../relayr/adr/0031-proposal-outcomes-and-the-measures.md)) and the template ([ADR-0030](../adr/0030-the-incident-experiment-and-its-postmortem.md))
 - [ ] Phase 7: docs, ADRs and the product repository
 
 [a-adr-0032]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0032-libraries-and-the-stackr-template.md

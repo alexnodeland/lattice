@@ -19,6 +19,7 @@ from conftest import TENANT, Script, app, bearer, say, settings, wait_for
 ARTIFACTR = "/artifactr/v1/workspaces/main"
 REFLEXR = "/reflexr/v1/workspaces/main"
 FIRED = "{{ package_name }}:alert.fired"
+RESOLVED = "{{ package_name }}:incident.resolved"
 
 
 def command(client: TestClient, **body: Any) -> None:
@@ -116,3 +117,106 @@ async def _cursor(url: str) -> int:
         return await SqlLedger(engine).cursor(WorkspaceKey(TENANT, "main"))
     finally:
         await engine.dispose()
+
+
+def test_a_resolution_with_no_incident_closes_nothing(client: TestClient) -> None:
+    resolved = {"type": RESOLVED, "service": "none", "summary": "Nothing."}
+    assert client.post(f"{REFLEXR}/events", json={"event": resolved}).status_code == 200
+
+    def ran() -> list[str]:
+        params = {"rule": "{{ package_name }}:close-incident"}
+        return [r["status"] for r in client.get(f"{REFLEXR}/runs", params=params).json()]
+
+    wait_for(lambda: ran() == ["succeeded"])
+    assert client.get(f"{ARTIFACTR}/proposals").json() == []
+
+
+def alert(client: TestClient, service: str, summary: str = "Payments fail") -> str:
+    """Fire an alert, and wait for its incident: the incident's thread."""
+    before = {t["data"]["thread_id"] for t in timelines(client)}
+    fired = {"type": FIRED, "service": service, "summary": summary}
+    assert client.post(f"{REFLEXR}/events", json={"event": fired}).status_code == 200
+    wait_for(lambda: {t["data"]["thread_id"] for t in timelines(client)} - before)
+    [thread] = {t["data"]["thread_id"] for t in timelines(client)} - before
+    return thread
+
+
+def resolve(client: TestClient, service: str, summary: str = "Rolled back.") -> None:
+    """Resolve a service's incident, and wait for close-incident's run to end."""
+    before = len(closings(client))
+    resolved = {"type": RESOLVED, "service": service, "summary": summary}
+    assert client.post(f"{REFLEXR}/events", json={"event": resolved}).status_code == 200
+    wait_for(lambda: len(closings(client)) > before and "succeeded" in closings(client)[:1])
+
+
+def closings(client: TestClient) -> list[str]:
+    params = {"rule": "{{ package_name }}:close-incident"}
+    return [r["status"] for r in client.get(f"{REFLEXR}/runs", params=params).json()]
+
+
+def postmortems(client: TestClient) -> list[dict[str, Any]]:
+    found = client.get(f"{ARTIFACTR}/proposals").json()
+    return [p for p in found if p["change"].get("kind") == "postmortem"]
+
+
+def test_a_resolution_closes_its_incident_with_a_postmortem(client: TestClient) -> None:
+    thread = alert(client, "checkout")
+    resolve(client, "checkout")
+    [proposal] = postmortems(client)
+    assert proposal["thread_id"] == thread
+    entry = {"source": "monitoring", "text": "Payments fail"}
+    assert proposal["change"]["data"]["timeline"] == [entry]
+    assert proposal["rationale"] == (
+        "Drawn from the incident's timeline, 1 entry, and from its resolution: Rolled back."
+    )
+    closed = "Resolved: Rolled back. Its postmortem is proposed for review."
+    wait_for(lambda: notices(client, thread)[-1:] == [closed])
+    assert timelines(client)[0]["data"]["resolved_at"] is not None
+
+    resolve(client, "checkout", "Resolved again.")
+    assert len(postmortems(client)) == 1, "a resolved incident is closed once"
+
+
+def test_the_latest_open_incident_of_the_service_is_closed(client: TestClient) -> None:
+    first = alert(client, "checkout")
+    latest = alert(client, "checkout", "Payments fail again")
+    other = alert(client, "billing")
+    resolve(client, "checkout")
+    assert [p["thread_id"] for p in postmortems(client)] == [latest]
+    resolve(client, "checkout")
+    assert [p["thread_id"] for p in postmortems(client)] == [latest, first]
+    assert other not in [p["thread_id"] for p in postmortems(client)]
+
+
+def test_a_timeline_people_made_steers_no_resolution(client: TestClient) -> None:
+    command(client, type="create_thread", thread_id="secret")
+{%- if access == 'grantr' %}
+    restriction = {"on": {"kind": "thread", "workspace": "main", "id": "secret"}}
+    restricted = client.post(f"/grantr/v1/tenants/{TENANT}/restrictions", json=restriction)
+    assert restricted.status_code == 200, restricted.text
+{%- endif %}
+    thread = alert(client, "checkout")
+    forged = {"title": "checkout", "service": "checkout", "thread_id": "secret", "entries": {}}
+    command(client, type="create_artifact", kind="timeline", data=forged)
+    resolve(client, "checkout")
+    assert [p["thread_id"] for p in postmortems(client)] == [thread]
+    assert notices(client, "secret") == []
+
+
+def test_an_accepted_postmortem_scores_the_run_that_proposed_it(client: TestClient) -> None:
+    alert(client, "checkout")
+    resolve(client, "checkout")
+    [proposal] = postmortems(client)
+    command(client, type="respond_to_proposal", proposal_id=proposal["id"], decision="accept")
+
+    def scored() -> list[dict[str, Any]]:
+        found = client.get(f"{REFLEXR}/events", params={"type": "reflexr:feedback_given"})
+        return found.json()
+
+    wait_for(scored)
+    [feedback] = scored()
+    event = feedback["event"]
+    assert event["value"] == {"outcome": "accepted", "proposal_id": proposal["id"]}
+    params = {"rule": "{{ package_name }}:close-incident"}
+    [closing] = client.get(f"{REFLEXR}/runs", params=params).json()
+    assert event["target"] == {"kind": "run", "run_id": closing["id"]}

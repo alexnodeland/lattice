@@ -15,15 +15,32 @@ from its own traffic and feedback.
 {%- if use_reflexr %} reflexr's ``LogFeedbackSource`` turns a workspace's feedback into
 examples.
 {%- endif %}
+{%- if use_relayr %}
+
+The incident scenarios are different: they play the bridge's example through the application,
+with scripted decisions, to exercise relayr's measures end to end. They judge no model.
+{%- endif %}
 """
 
 import argparse
 import asyncio
+{%- if use_relayr %}
+import secrets
+import tempfile
+import time
+{%- endif %}
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any
+{%- if use_relayr %}
+from datetime import timedelta
+{%- endif %}
+from typing import Any{% if use_relayr %}, Literal{% endif %}
 
+{% if use_relayr -%}
+import jwt
+from fastapi.testclient import TestClient
+{% endif -%}
 from langfuse import Langfuse
-from pydantic import BaseModel
+from pydantic import BaseModel{% if use_relayr %}, Field{% endif %}
 from pydantic_ai import ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models import Model
 from pydantic_ai.models.function import AgentInfo
@@ -33,23 +50,47 @@ from artifactr import InMemoryStorage, Runner, UserActor, Workspaces
 from artifactr.agent import function_model
 from artifactr.core import CreateThread
 {% endif -%}
+{% if use_relayr -%}
+from artifactr.sql import SqlStorage as ArtifactrStorage
+{% endif -%}
 from evalr import Dataset, Example, ExperimentResult, ExperimentTracker, FunctionEvaluator
 from evalr.core import Task
 from evalr.langfuse import LangfuseExperimentTracker
+{%- if use_relayr %}
+from evalr.measures import Rewrites, measure_rewrites
+{%- endif %}
 from evalr.memory import InMemoryExperimentTracker
+{%- if access == 'grantr' and use_relayr %}
+from grantr import InMemoryStorage as GrantsMemory
+{%- endif %}
 {%- if use_reflexr %}
 {%- if not use_artifactr %}
 from reflexr.agent import function_model
 {%- endif %}
-from reflexr.core import Event
+from reflexr.core import {% if use_relayr %}Envelope, {% endif %}Event{% if use_relayr %}, SystemActor{% endif %}
 from reflexr.evals import Replay, replay_task
 {%- endif %}
+{%- if use_relayr %}
+from reflexr.sql import SqlStorage as ReflexrStorage
+from reflexr.workspace import Workspaces as ReflexrWorkspaces
+from relayr.evals import history, proposal_rates
+{%- endif %}
 
+{% if access == 'grantr' and use_relayr -%}
+from {{ package_name }}.access import build_grants
+{% endif -%}
+{% if use_relayr -%}
+from {{ package_name }}.app import create_app
+from {{ package_name }}.database import open_database
+{% endif -%}
 from {{ package_name }}.gateway import gateway_model
+{%- if use_relayr %}
+from {{ package_name }}.incidents import EVENTS as INCIDENT_EVENTS
+{%- endif %}
 {%- if use_artifactr %}
 from {{ package_name }}.notes import Note, Rating, build_note_agent
 {%- endif %}
-from {{ package_name }}.settings import Settings
+from {{ package_name }}.settings import {% if use_relayr %}AuthSettings, GatewaySettings, {% endif %}Settings
 {%- if use_reflexr %}
 from {{ package_name }}.tickets import (
     EVENTS,
@@ -193,6 +234,262 @@ async def ticket_triage(tracker: ExperimentTracker, model: Model) -> ExperimentR
         evaluators=[FunctionEvaluator(review_triage, verdict_type=TriageReview)],
     )
 {%- endif %}
+{%- if use_relayr %}
+
+
+# ─── relayr: the incident scenario, through the application ───────────────────
+#
+# This exercises the measures end to end, through the application as it is deployed: each
+# scenario's decisions are scripted and no model is on the path, so it checks the plumbing of
+# the outcomes, rewrites and times, not how well the rules do.
+
+FIRED = "{{ package_name }}:alert.fired"
+RESOLVED = "{{ package_name }}:incident.resolved"
+
+POLL = timedelta(milliseconds=10)
+"""How often the reactor looks for work in a scenario."""
+
+DEADLINE = timedelta(seconds=30)
+"""How long a scenario's step may take before it is reported as stuck."""
+
+PERSON = "evals"
+"""Who acts in the scenarios."""
+
+WORKSPACE = "incidents"
+
+
+class Scenario(BaseModel):
+    """An incident: what people write in its thread, and how they take its postmortem."""
+
+    messages: list[str]
+    decision: Literal["accept", "edit", "reject"]
+    """``edit`` accepts the postmortem with a follow-up the person adds."""
+
+    rewrite: bool = False
+    """Whether the person then rewrites the accepted postmortem in their own words."""
+
+
+class Incident(BaseModel):
+    """What the scenario measured."""
+
+    outcome: Literal["accepted", "edited", "rejected"]
+    """How the postmortem the rule proposed was taken."""
+
+    rewrites: Rewrites | None
+    """How much of the postmortem the rule wrote people rewrote; none without a postmortem."""
+
+    resolved_in: float
+    """Seconds between the alert and its resolution, as their events were logged."""
+
+
+class IncidentReview(BaseModel):
+    """How an incident went: its postmortem's outcome, its rewrites, and its length."""
+
+    outcome: Literal["accepted", "edited", "rejected"]
+    rewrite_rate: float | None = Field(ge=0, le=1)
+    resolved_in: float = Field(ge=0)
+
+
+SCENARIOS = Dataset(
+    "incident-scenarios",
+    [
+        Example(id="as-proposed", input=Scenario(messages=["Rolled back."], decision="accept")),
+        Example(
+            id="edited",
+            input=Scenario(messages=["Paged the team.", "Fixed."], decision="edit", rewrite=True),
+        ),
+        Example(id="rejected", input=Scenario(messages=["False alarm."], decision="reject")),
+    ],
+    input_type=Scenario,
+    verdict_type=IncidentReview,
+    description="Incidents, from an alert to the postmortem's review, with scripted decisions.",
+)
+
+
+def incident(model: Model) -> Task[Scenario, IncidentReview, Incident]:
+    """The task: an example's incident, run through the application, in memory and SQLite."""
+
+    async def play(example: Example[Scenario, IncidentReview]) -> Incident:
+        with tempfile.TemporaryDirectory() as directory:
+            settings = _settings(f"sqlite+aiosqlite:///{directory}/incident.db")
+            await _scenario(model, settings, example.id, example.input)
+            return await _measured(settings, example.id)
+
+    return play
+
+
+def _settings(url: str) -> Settings:
+    """A scenario's settings: its own database, and its own secret for its person's token."""
+    return Settings(
+        database_url=url,
+        auth=AuthSettings(jwt_secret=secrets.token_hex(32)),
+        gateway=GatewaySettings(tenant_keys={PERSON: "sk-evals"}),
+    )
+
+
+async def _scenario(model: Model, settings: Settings, service: str, scenario: Scenario) -> None:
+    """Play a scenario through the application's REST API, as people and monitoring would."""
+{%- if access == 'grantr' %}
+    grants = build_grants(GrantsMemory(), name=settings.service_name)
+    await grants.provision_tenant(PERSON, owner=PERSON)
+    application = create_app(settings, model=model, grants=grants, poll_interval=POLL)
+{%- else %}
+    application = create_app(settings, model=model, poll_interval=POLL)
+{%- endif %}
+    with TestClient(application, headers=_signed(settings)) as client:
+        artifactr = f"/artifactr/v1/workspaces/{WORKSPACE}"
+        reflexr = f"/reflexr/v1/workspaces/{WORKSPACE}"
+
+        def command(**body: Any) -> None:
+            frame = {"type": "command", "command_id": secrets.token_hex(8), "command": body}
+            answered = client.post(f"{artifactr}/commands", json=frame).json()
+            assert answered["ok"], answered
+
+        def artifacts(kind: str) -> list[dict[str, Any]]:
+            found = client.get(f"{artifactr}/artifacts").json()
+            return [a for a in found if a["kind"] == kind]
+
+        fired = {"type": FIRED, "service": service, "summary": f"{service} is failing"}
+        client.post(f"{reflexr}/events", json={"event": fired}).raise_for_status()
+        [timeline] = await _until(lambda: artifacts("timeline"))
+        thread = timeline["data"]["thread_id"]
+        # The alert is the timeline's first entry, so the nth message makes its (n + 1)th.
+        for entries, message in enumerate(scenario.messages, start=2):
+            command(type="post_message", thread_id=thread, content=message)
+            await _until(lambda n=entries: len(artifacts("timeline")[0]["data"]["entries"]) == n)
+        resolved = {"type": RESOLVED, "service": service, "summary": "Fixed by a rollback."}
+        client.post(f"{reflexr}/events", json={"event": resolved}).raise_for_status()
+
+        def postmortems() -> list[dict[str, Any]]:
+            found = client.get(f"{artifactr}/proposals").json()
+            return [p for p in found if p["change"].get("kind") == "postmortem"]
+
+        [proposal] = await _until(postmortems)
+        follow_up = [{"op": "add", "path": "/follow_ups/-", "value": {"text": "Add a canary."}}]
+        added = {"kind": "json_patch", "ops": follow_up}
+        command(
+            type="respond_to_proposal",
+            proposal_id=proposal["id"],
+            decision="reject" if scenario.decision == "reject" else "accept",
+            changes=added if scenario.decision == "edit" else None,
+        )
+        if scenario.rewrite:
+            [postmortem] = artifacts("postmortem")
+            summary = (
+                "Every checkout failed for twenty minutes after the 14:02 deploy, until the"
+                " rollback at 14:22; card payments, refunds and saved carts were all affected."
+            )
+            account = [{"source": PERSON, "text": "Checkout failed until we rolled back."}]
+            patch = [
+                {"op": "replace", "path": "/summary", "value": summary},
+                {"op": "replace", "path": "/timeline", "value": account},
+            ]
+            command(
+                type="edit_artifact",
+                artifact_id=postmortem["id"],
+                base_version=postmortem["version"],
+                patch={"kind": "json_patch", "ops": patch},
+            )
+
+        def scored() -> list[dict[str, Any]]:
+            given = client.get(f"{reflexr}/events", params={"type": ["reflexr:feedback_given"]})
+            return given.json()
+
+        await _until(scored)
+
+
+async def _measured(settings: Settings, service: str) -> Incident:
+    """Read what the scenario left, with relayr's measures.
+
+    It reads the scenario's SQLite file directly, offline, once the application has stopped.
+    """
+    assert settings.database_url is not None, "a scenario has its own database"
+    engine = open_database(settings.database_url, schema=settings.database_schema).engine
+    try:
+        source = await Workspaces(ArtifactrStorage(engine)).open(
+            PERSON, WORKSPACE, actor=UserActor(id=PERSON)
+        )
+        workspace = await ReflexrWorkspaces(ReflexrStorage(engine), events=INCIDENT_EVENTS).open(
+            PERSON, WORKSPACE, actor=SystemActor()
+        )
+        [rates] = (await proposal_rates(workspace)).values()
+        outcome = "accepted" if rates.accepted else "edited" if rates.edited else "rejected"
+        postmortems = await source.artifacts(kind="postmortem")
+        rewrites = None
+        if postmortems:
+            written = await history(source, postmortems[0].id)
+            rewrites = measure_rewrites(written, window=timedelta(hours=1))
+        return Incident(
+            outcome=outcome,
+            rewrites=rewrites,
+            resolved_in=_resolved_in(await workspace.read(types=[FIRED, RESOLVED]), service),
+        )
+    finally:
+        await engine.dispose()
+
+
+def _resolved_in(log: Sequence[Envelope], service: str) -> float:
+    """Seconds from the service's latest alert before its resolution to that resolution."""
+    alerts = [e for e in log if e.event_type == FIRED and e.data["service"] == service]
+    [resolution] = [e for e in log if e.event_type == RESOLVED and e.data["service"] == service]
+    [*_, alert] = [e for e in alerts if e.seq < resolution.seq]
+    return (resolution.ts - alert.ts).total_seconds()
+
+
+def review_incident(played: Incident) -> IncidentReview:
+    """The scenario's measures, as a verdict."""
+    return IncidentReview(
+        outcome=played.outcome,
+        rewrite_rate=played.rewrites.rate if played.rewrites else None,
+        resolved_in=played.resolved_in,
+    )
+
+
+async def incident_scenarios(
+    tracker: ExperimentTracker, model: Model
+) -> ExperimentResult[Incident]:
+    """The incident example, end to end: each postmortem's outcome, rewrites, and the time taken."""
+    return await tracker.run_experiment(
+        "incident-scenarios",
+        dataset=SCENARIOS,
+        task=incident(model),
+        evaluators=[FunctionEvaluator(review_incident, verdict_type=IncidentReview)],
+    )
+
+
+async def _until[T](found: Callable[[], T]) -> T:
+    """Wait, polling, until ``found()`` is truthy, and return it: the application is async."""
+    deadline = time.monotonic() + DEADLINE.total_seconds()
+    while not (value := found()):
+        if time.monotonic() >= deadline:
+            raise TimeoutError("the scenario never got there")
+        await asyncio.sleep(0.01)
+    return value
+
+
+def _signed(settings: Settings) -> dict[str, str]:
+    """The scenario's person, signed in with an HS256 token on the scenario's own secret.
+
+    It signs as Supabase does on its legacy secret, as the tests' ``token`` does: the evals are
+    run outside the tests, so they don't import them.
+    """
+    claims = {
+        "sub": PERSON,
+        "aud": "authenticated",
+        "exp": int(time.time()) + 3600,
+        "email": f"{PERSON}@example.com",
+{%- if access != 'grantr' %}
+        "app_metadata": {"tenant_id": PERSON},
+{%- endif %}
+    }
+    assert settings.auth.jwt_secret is not None, "a scenario signs with its own secret"
+    signed = jwt.encode(claims, settings.auth.jwt_secret, algorithm="HS256")
+{%- if access == 'grantr' %}
+    return {"Authorization": f"Bearer {signed}", "X-Tenant": PERSON}
+{%- else %}
+    return {"Authorization": f"Bearer {signed}"}
+{%- endif %}
+{%- endif %}
 
 
 # ─── running them ─────────────────────────────────────────────────────────────
@@ -203,6 +500,9 @@ EXPERIMENTS: list[Experiment] = [
 {%- endif %}
 {%- if use_reflexr %}
     ticket_triage,
+{%- endif %}
+{%- if use_relayr %}
+    incident_scenarios,
 {%- endif %}
 ]
 

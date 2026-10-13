@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# GoTrue's proxy, run (stackr ADR-0032): Caddy with the edge's Caddyfile, in front of a stand-in for
+# GoTrue that answers with the X-Forwarded-For it was given. Clients on an internal Docker network,
+# which publishes nothing, play the ALB, inside the trusted range, and a stranger outside it.
+#
+# Usage: deploy/aws/tests/auth-proxy CADDYFILE   (rendered with trusted_proxies 198.18.250.0/28)
+
+set -euo pipefail
+caddyfile=$(cat "$1")
+compose=$(dirname "$0")/../../host/compose.prod.yaml
+caddy=$(sed -n 's/^ *image: \(caddy:.*\)$/\1/p' "$compose")
+curl=curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+run=stackr-auth-proxy-$$
+cleanup() {
+  docker rm --force "$run-proxy" "$run-gotrue" >/dev/null 2>&1 || true
+  docker network rm "$run" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+docker network create --internal --subnet 198.18.250.0/24 "$run" >/dev/null
+docker run --detach --name "$run-gotrue" --network "$run" --ip 198.18.250.50 --entrypoint sh "$caddy" \
+  -c 'printf ":9998 {\n\trespond \"{header.X-Forwarded-For}\"\n}\n" >/tmp/Caddyfile && exec caddy run --config /tmp/Caddyfile --adapter caddyfile' >/dev/null
+docker run --detach --name "$run-proxy" --network "container:$run-gotrue" --env CADDYFILE="$caddyfile" \
+  --entrypoint sh "$caddy" -c 'printf "%s" "$CADDYFILE" >/tmp/Caddyfile && exec caddy run --config /tmp/Caddyfile --adapter caddyfile' >/dev/null
+
+# What GoTrue is given, for a request from an address with an X-Forwarded-For.
+given() {
+  docker run --rm --network "$run" --ip "$1" "$curl" --silent --retry 10 --retry-connrefused \
+    --header "X-Forwarded-For: $2" http://198.18.250.50:9999/
+}
+status=0
+expect() {
+  local got
+  got=$(given "$2" "$3")
+  if [[ $got == "$4" ]]; then
+    echo "ok: $1"
+  else
+    echo "FAIL: $1: GoTrue was given '$got', not '$4'" >&2
+    status=1
+  fi
+}
+expect "the ALB's right-most address, past a client's forgery" 198.18.250.5 "1.2.3.4, 9.9.9.9" 9.9.9.9
+expect "past another trusted hop too" 198.18.250.5 "1.2.3.4, 9.9.9.9, 198.18.250.6" 9.9.9.9
+expect "a caller outside the ALB's subnets is its own address" 198.18.250.100 "1.2.3.4" 198.18.250.100
+exit $status

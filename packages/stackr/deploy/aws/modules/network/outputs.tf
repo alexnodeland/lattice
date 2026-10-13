@@ -8,6 +8,11 @@ output "public_subnet_ids" {
   value       = [for zone in var.zones : aws_subnet.public[zone].id]
 }
 
+output "public_subnet_cidrs" {
+  description = "The public subnets' ranges: the ALB's nodes' addresses, which GoTrue's proxy trusts."
+  value       = [for zone in var.zones : local.public[zone]]
+}
+
 output "private_subnet_ids" {
   description = "The private subnets, one per zone: everything else."
   value       = [for zone in var.zones : aws_subnet.private[zone].id]

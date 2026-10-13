@@ -148,15 +148,15 @@ run "ecs_service_pulls_from_ecr_only_the_repositories_it_is_given" {
   }
 }
 
-run "ecs_service_counts_its_secrets_policy_before_their_arns_are_known" {
+run "ecs_service_counts_its_policies_before_their_arns_are_known" {
   command = plan
   module {
-    source = "./tests/fixtures/unknown-secrets"
+    source = "./tests/fixtures/unknown-arns"
   }
 
   assert {
     condition     = length(module.service.task_definition_arn) > 0
-    error_message = "A service whose secrets' ARNs are unknown at plan still plans."
+    error_message = "A service whose secrets' and bucket's ARNs are unknown at plan still plans."
   }
 }
 

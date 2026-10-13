@@ -171,7 +171,7 @@ moon runs every task, and only those a change affects; uv and Bun manage the dep
 
 1. It asks moon which projects the change touches, by their files and by their tasks' inputs, which include `uv.lock`, the root `pyproject.toml` and `.moon/`.
 2. It adds every project that depends on one of them, all the way down, from the project graph.
-3. It runs the task, `check`, `test`, `image`, `api`, or stackr's `template`, `smoke` or `smoke-app`, in each of those projects that has it.
+3. It runs the task, `check`, `test`, `image`, `api`, or stackr's `template`, `smoke` or `smoke-app`, in each of those projects that has it. `bdd` runs in one project after another, since each starts and stops a compose stack.
 
 A change to evalr runs the checks of evalr and of every project above it; a change to `uv.lock` runs every package's. A change to stackr or to a library runs the Template and Smoke jobs, whose applications install the pull request's libraries ([stackr ADR-0018](stackr/adr/0018-the-template-pins-the-libraries-at-its-own-commit.md)).
 

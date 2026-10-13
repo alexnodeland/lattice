@@ -2,6 +2,7 @@ import "@portalr/ui/styles.css";
 import {
   type Config,
   createApi,
+  createCommands,
   createQueries,
   createQueryClient,
   readConfig,
@@ -25,13 +26,16 @@ function start(root: Root, config: Config) {
   });
   // A read refused as unsigned ends the session, which goes back to signing in.
   const queryClient = createQueryClient(() => void signed.signOut());
+  const api = createApi(config.surfaces, () => signed.session());
   const router = createRouter({
     routeTree,
     basepath: import.meta.env.BASE_URL,
     context: {
       config,
       signed,
-      queries: createQueries(createApi(config.surfaces, () => signed.session())),
+      queries: createQueries(api),
+      // A command refused as unsigned ends the session, as a read does.
+      commands: createCommands(api, () => void signed.signOut()),
       queryClient,
     },
   });

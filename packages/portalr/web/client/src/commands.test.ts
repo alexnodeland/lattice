@@ -1,6 +1,6 @@
 import type { Server } from "bun";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { createCommands, refusal } from "./commands";
+import { createCommands, orThrow, refusal } from "./commands";
 import { createApi } from "./rest";
 
 /** What the server answers, by the command's id. */
@@ -71,7 +71,12 @@ const GRANTR: Record<string, () => Response> = {
     ),
 };
 
-const sent: { url: URL; tenant: string | null; body: { command_id: string } }[] = [];
+const sent: {
+  method: string;
+  url: URL;
+  tenant: string | null;
+  body: { command_id: string };
+}[] = [];
 let server: Server<unknown>;
 let commands: ReturnType<typeof createCommands>;
 let unsigned = 0;
@@ -81,16 +86,25 @@ beforeAll(() => {
     hostname: "127.0.0.1",
     port: 0,
     async fetch(request) {
-      const body = (await request.json()) as { command_id: string };
+      const text = await request.text();
+      const body = (text ? JSON.parse(text) : null) as { command_id: string };
       const url = new URL(request.url);
-      sent.push({ url, tenant: request.headers.get("x-tenant"), body });
+      sent.push({ method: request.method, url, tenant: request.headers.get("x-tenant"), body });
+      if (url.pathname === "/portalr/v1/invites") {
+        return Response.json({ tenant: "acme", user: "newcomer" }, { status: 201 });
+      }
       if (url.pathname.startsWith("/grantr/v1/tenants/unsigned/")) {
         return Response.json({ detail: "no one is signed in" }, { status: 401 });
       }
       if (url.pathname.startsWith("/grantr/")) {
-        return (
-          GRANTR[url.pathname.split("/").at(-1) ?? ""]?.() ?? new Response(null, { status: 500 })
-        );
+        const last = url.pathname.split("/").at(-1) ?? "";
+        const answered = GRANTR[last]?.();
+        if (answered) {
+          return answered;
+        }
+        return request.method === "POST" && last === "keys"
+          ? Response.json({ key: "sk_secret", entry: { seq: 4 } }, { status: 201 })
+          : Response.json({ seq: 3 });
       }
       return ANSWERS[body.command_id]?.() ?? new Response(null, { status: 500 });
     },
@@ -243,4 +257,56 @@ test("a refusal says what wasn't done, and each reason", () => {
       reasons: ["timeout is required", "when.throttle is required"],
     }),
   ).toBe("The rule wasn't saved: timeout is required; when.throttle is required");
+});
+
+test("grantr's access commands go to the tenant's own paths, with its header", async () => {
+  const bob = { kind: "user", id: "bob" } as const;
+  const ci = { kind: "service_principal", id: "ci" } as const;
+  const calls: [() => Promise<unknown>, string, string, unknown][] = [
+    [() => commands.grantr.addMember("acme", ci), "POST", "/members", { member: ci }],
+    [() => commands.grantr.removeMember("acme", bob), "DELETE", "/members/user/bob", null],
+    [
+      () => commands.grantr.removeMember("acme", ci),
+      "DELETE",
+      "/members/service_principal/ci",
+      null,
+    ],
+    [
+      () => commands.grantr.defineGroup("acme", "team", [bob]),
+      "PUT",
+      "/groups/team",
+      { members: [bob] },
+    ],
+    [() => commands.grantr.deleteGroup("acme", "team"), "DELETE", "/groups/team", null],
+    [() => commands.grantr.revokeKey("acme", "key_1"), "DELETE", "/keys/key_1", null],
+  ];
+  for (const [call, method, path, body] of calls) {
+    expect(await call()).toMatchObject({ outcome: "done" });
+    expect(sent.at(-1)).toMatchObject({ method, tenant: "acme", body });
+    expect(sent.at(-1)?.url.pathname).toBe(`/grantr/v1/tenants/acme${path}`);
+  }
+});
+
+test("a key's secret is in the answer to issuing it", async () => {
+  expect(await commands.grantr.issueKey("acme", "ci")).toEqual({
+    outcome: "done",
+    result: { key: "sk_secret", entry: { seq: 4 } },
+  });
+  expect(sent.at(-1)).toMatchObject({ method: "POST", body: { principal: "ci" } });
+});
+
+test("an invitation names its tenant, and answers whom it added", async () => {
+  expect(await commands.portalr.invite("acme", "new@acme.test")).toEqual({
+    outcome: "done",
+    result: { tenant: "acme", user: "newcomer" },
+  });
+  expect(sent.at(-1)).toMatchObject({ tenant: "acme", body: { email: "new@acme.test" } });
+  expect(sent.at(-1)?.url.pathname).toBe("/portalr/v1/invites");
+});
+
+test("orThrow gives a done command's answer, and throws a refusal's words", () => {
+  expect(orThrow("Not removed", { outcome: "done", result: 7 })).toBe(7);
+  expect(() =>
+    orThrow("Not removed", { outcome: "refused", status: 403, reasons: ["not yours"] }),
+  ).toThrow("Not removed: not yours");
 });

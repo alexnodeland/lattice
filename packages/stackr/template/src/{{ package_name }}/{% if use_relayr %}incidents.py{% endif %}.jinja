@@ -8,9 +8,14 @@ Replace it with the application's own. relayr bridges the libraries both ways:
 - A person's message in that thread reaches reflexr as ``artifactr:message_posted`` and fires
   ``timeline-entry``, whose run adds the message to the timeline, keyed by the message's event,
   so a retried run rewrites its entry rather than adding another.
+- An ``incident.resolved`` event fires ``close-incident``. Its run finds the service's latest open
+  incident, among the timelines ``open-incident`` made, marks it resolved, posts a closing notice
+  in its thread, and proposes a ``postmortem`` there, drawn from the timeline.
 
 The runs act in artifactr as their rules' own participants, within their allowlists: the
-timeline is written directly, everything else is a proposal or a notice.
+timeline is written directly, everything else is a proposal or a notice. ``close-incident`` may
+act in any thread, so it trusts only what ``open-incident`` recorded: the service and thread of
+the timeline's first version, which no one else can write.
 """
 
 from collections.abc import Mapping
@@ -18,6 +23,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel, Field
 
+import artifactr
 from artifactr import Artifact, Workspaces, WritePolicy
 from reflexr import Event, F, Rule, on, run
 from reflexr.workspace import Action, Reaction
@@ -47,8 +53,11 @@ class Timeline(Artifact, name="timeline"):
     """An incident's timeline, in its thread: entries keyed by the event each came from."""
 
     title: str
+    service: str
     thread_id: str
     entries: dict[str, Entry] = Field(default_factory=dict[str, Entry])
+    resolved_at: str | None = None
+    """When the incident was resolved, as its resolution was logged; open until then."""
 
 
 class IncidentResolved(AppEvent, name="incident.resolved"):
@@ -106,8 +115,8 @@ RULES = [open_incident, timeline_entry, close_incident]
 ALLOWLISTS: Mapping[str, Allowlist] = {
     open_incident.name: Allowlist(create_threads=True, direct=frozenset({"timeline"})),
     timeline_entry.name: Allowlist(direct=frozenset({"timeline"})),
-    # The resolution comes from monitoring, so its chain holds no thread: it names the incident's.
-    close_incident.name: Allowlist(threads="any"),
+    # The resolution comes from monitoring, so its chain holds no thread: the incident has one.
+    close_incident.name: Allowlist(threads="any", direct=frozenset({"timeline"})),
 }
 """What each rule may do in artifactr beyond proposals and notices in its chain's threads."""
 
@@ -117,7 +126,8 @@ def incident_actions(outbound: Outbound, workspaces: Workspaces) -> dict[str, Ac
 
     Args:
         outbound: What the runs do in artifactr.
-        workspaces: artifactr's workspaces, where ``timeline-entry`` finds a thread's timeline.
+        workspaces: artifactr's workspaces, where ``timeline-entry`` finds a thread's timeline,
+            and ``close-incident`` a service's open incident.
     """
 
     async def open_incident(reaction: Reaction[None]) -> None:
@@ -127,7 +137,9 @@ def incident_actions(outbound: Outbound, workspaces: Workspaces) -> dict[str, Ac
         acting = outbound.acting(reaction)
         thread = await acting.create_thread(f"Incident: {alert.service}")
         entry = Entry(source="monitoring", text=alert.summary)
-        timeline = Timeline(title=alert.service, thread_id=thread, entries={fired.id: entry})
+        timeline = Timeline(
+            title=alert.service, service=alert.service, thread_id=thread, entries={fired.id: entry}
+        )
         await acting.create(timeline, thread_id=thread)
         await acting.notice(f"Opened the timeline: {alert.summary}", thread_id=thread)
 
@@ -150,33 +162,49 @@ def incident_actions(outbound: Outbound, workspaces: Workspaces) -> dict[str, Ac
         [envelope] = reaction.events
         assert isinstance(envelope.event, IncidentResolved)
         resolved = envelope.event
+        actor = rule_actor(reaction.run.rule)
         workspace = await workspaces.open(
-            reaction.workspace.tenant_id,
-            reaction.workspace.workspace_id,
-            actor=rule_actor(reaction.run.rule),
+            reaction.workspace.tenant_id, reaction.workspace.workspace_id, actor=actor
         )
-        timelines = await workspace.artifacts(Timeline)
-        incidents = [t for t in timelines if t.data.title == resolved.service]
+        incidents = [
+            (opened, timeline)
+            for timeline in await workspace.artifacts(Timeline)
+            if timeline.data.resolved_at is None
+            and (opened := await _opened(workspace, timeline.id)) is not None
+            and opened.service == resolved.service
+        ]
         if not incidents:
             return
-        timeline = incidents[-1].data  # the service's latest incident
-        thread = timeline.thread_id
+        opened, timeline = incidents[-1]  # the service's latest open incident
+        acting = outbound.acting(reaction)
+        await acting.edit(timeline.id, "/resolved_at", envelope.ts.isoformat())
         postmortem = Postmortem(
             title=f"Postmortem: {resolved.service}",
-            thread_id=thread,
+            thread_id=opened.thread_id,
             summary=resolved.summary,
-            timeline=list(timeline.entries.values()),
+            timeline=list(timeline.data.entries.values()),
         )
-        count = len(timeline.entries)
+        count = len(timeline.data.entries)
         drawn = f"the incident's timeline, {count} {'entry' if count == 1 else 'entries'}"
         why = f"Drawn from {drawn}, and from its resolution: {resolved.summary}"
-        acting = outbound.acting(reaction)
-        await acting.create(postmortem, thread_id=thread, rationale=why)
+        await acting.create(postmortem, thread_id=opened.thread_id, rationale=why)
         closed = f"Resolved: {resolved.summary} Its postmortem is proposed for review."
-        await acting.notice(closed, thread_id=thread)
+        await acting.notice(closed, thread_id=opened.thread_id)
 
     return {
         "open-incident": open_incident,
         "timeline-entry": timeline_entry,
         "close-incident": close_incident,
     }
+
+
+async def _opened(workspace: artifactr.Workspace, timeline_id: str) -> Timeline | None:
+    """A timeline as ``open-incident`` made it, or None if anyone else made it.
+
+    Its first version is ``open-incident``'s own, so its service and thread can't be steered by
+    a later edit, nor by a timeline someone else created.
+    """
+    [first, *_] = await workspace.revisions(timeline_id)
+    if first.actor != rule_actor(open_incident.name):
+        return None
+    return Timeline.model_validate(first.data)

@@ -38,8 +38,15 @@ test = [
     "httpx>=0.28",
     "aiosqlite>=0.22",
 ]
+{%- if evals and use_relayr %}
+# The incident experiment drives the application in process, on SQLite.
+evals = ["httpx>=0.28", "aiosqlite>=0.22"]
+{%- endif %}
 lint = ["ruff>=0.16", "pyright>=1.1.414"]
 dev = [
+{%- if evals and use_relayr %}
+    { include-group = "evals" },
+{%- endif %}
     { include-group = "test" },
     { include-group = "lint" },
     "pre-commit>=4.6",

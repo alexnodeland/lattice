@@ -48,10 +48,10 @@ serve: ## Serve the application on this machine, with the settings in .env
 {%- if evals %}
 
 evals: ## Run the starter experiments offline, with a scripted model
-	$(UV) run python -m evals
+	$(UV) run{% if use_relayr %} --group evals{% endif %} python -m evals
 
 evals-langfuse: ## Run them in Langfuse, with the gateway's model, as .env configures them
-	$(UV) run $(ENV_FILE) python -m evals --langfuse
+	$(UV) run{% if use_relayr %} --group evals{% endif %} $(ENV_FILE) python -m evals --langfuse
 {%- endif %}
 
 {%- if access == 'grantr' %}

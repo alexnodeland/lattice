@@ -2,6 +2,9 @@
 
 import runpy
 import sys
+{%- if use_relayr %}
+from datetime import timedelta
+{%- endif %}
 from typing import Any
 
 import pytest
@@ -31,31 +34,36 @@ async def test_the_experiments_run_offline() -> None:
     ]
     for result in results:
         assert all(item.verdicts and not item.errors for item in result.items), result
+    named = {result.name: result for result in results}
 {%- if use_artifactr %}
-    replies = results[0].verdicts("rate_reply")
+    replies = named["notes-replies"].verdicts("rate_reply")
     assert {verdict.value.model_dump()["stars"] for verdict in replies.values()} == {5}
 {%- endif %}
 {%- if use_reflexr %}
-    reviews = results[{% if use_relayr %}-2{% else %}-1{% endif %}].verdicts("review_triage")
+    reviews = named["ticket-triage"].verdicts("review_triage")
     assert {verdict.value.model_dump()["correct"] for verdict in reviews.values()} == {True}
 {%- endif %}
 {%- if use_relayr %}
     incidents = {
         example: verdict.value.model_dump()
-        for example, verdict in results[-1].verdicts("review_incident").items()
+        for example, verdict in named["incident-scenarios"].verdicts("review_incident").items()
     }
     assert {example: v["outcome"] for example, v in incidents.items()} == {
         "as-proposed": "accepted",
         "edited": "edited",
         "rejected": "rejected",
     }
-    assert incidents["edited"]["rewrite_rate"] > 0, "a person rewrote the timeline"
-    assert incidents["as-proposed"]["rewrite_rate"] == 0
+    rates = {example: v["rewrite_rate"] for example, v in incidents.items()}
+    assert rates == {"as-proposed": 0.0, "edited": 1.0, "rejected": None}, (
+        "the person rewrote the accepted postmortem; a rejected one has none"
+    )
+    assert all(v["resolved_in"] >= 0 for v in incidents.values())
 
 
-async def test_a_scenario_that_never_gets_there_times_out() -> None:
+async def test_a_scenario_that_never_gets_there_times_out(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(evals.experiments, "DEADLINE", timedelta(0))
     with pytest.raises(TimeoutError, match="never got there"):
-        await evals.experiments._until(lambda: None, tries=1)
+        await evals.experiments._until(lambda: None)
 {%- endif %}
 
 

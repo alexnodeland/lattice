@@ -45,10 +45,8 @@ from reflexr import core as reflexr
 from reflexr.workspace import ACTIONS as REFLEXR_ACTIONS
 {%- endif %}
 {%- if use_relayr %}
-from relayr.evals import RULES as EVALUATION_RULES
 from relayr.outbound import RULES as RULE_ACTORS
 from relayr.outbound import is_rule_actor
-from relayr.rules import RULES as CHAT_RULES
 {%- endif %}
 
 from {{ package_name }}.auth import (
@@ -58,10 +56,10 @@ from {{ package_name }}.auth import (
     Unauthenticated,
     bearer_token,
 )
-from {{ package_name }}.database import Database
 {%- if use_relayr %}
-from {{ package_name }}.incidents import RULES as INCIDENT_RULES
+from {{ package_name }}.chat_rules import BRIDGE_RULES
 {%- endif %}
+from {{ package_name }}.database import Database
 from {{ package_name }}.telemetry import TelemetryHandle
 {%- if use_reflexr %}
 from {{ package_name }}.tickets import RULES
@@ -74,9 +72,7 @@ KEY_PREFIX: Final = "grantr_sk_"
 
 {% if use_reflexr -%}
 {% if use_relayr -%}
-CODE_RULES: Final = frozenset(
-    rule.name for rule in [*RULES, *INCIDENT_RULES, *CHAT_RULES, *EVALUATION_RULES]
-)
+CODE_RULES: Final = frozenset(rule.name for rule in [*RULES, *BRIDGE_RULES])
 {%- else -%}
 CODE_RULES: Final = frozenset(rule.name for rule in RULES)
 {%- endif %}

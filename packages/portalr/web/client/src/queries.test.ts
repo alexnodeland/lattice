@@ -62,13 +62,13 @@ beforeAll(() => {
         );
       }
       if (url.pathname.endsWith("/audit")) {
-        // Sixty entries, newest first: a full page, and then ten.
+        // Sixty entries, the last of them before before_seq: a full page, and then ten.
         const before = Number(url.searchParams.get("before_seq") ?? 61);
-        const limit = Number(url.searchParams.get("limit"));
-        const seqs = Array.from({ length: 60 }, (_, index) => 60 - index).filter(
+        const last = Number(url.searchParams.get("last"));
+        const seqs = Array.from({ length: 60 }, (_, index) => index + 1).filter(
           (seq) => seq < before,
         );
-        return Response.json(seqs.slice(0, limit).map((seq) => ({ seq })));
+        return Response.json(seqs.slice(Math.max(seqs.length - last, 0)).map((seq) => ({ seq })));
       }
       return Response.json(url.pathname.endsWith("/checks") ? [true, false] : []);
     },
@@ -322,7 +322,7 @@ test("the deployment's tenants are an operator's, and null for anyone else", asy
   ).rejects.toThrow(/refused the read \(404\)/);
 });
 
-test("the audit log is read newest first, a page at a time, with its filter, until a page isn't full", async () => {
+test("the audit log is read from its end back, a page at a time, with its filter, until a page isn't full", async () => {
   const client = new QueryClient();
   const options = queries.grantr.audit("acme", {
     type: "member_added",
@@ -335,14 +335,13 @@ test("the audit log is read newest first, a page at a time, with its filter, unt
   const request = seen.at(-1);
   expect(request?.url.pathname).toBe("/grantr/v1/tenants/acme/audit");
   expect(Object.fromEntries(request?.url.searchParams ?? [])).toEqual({
-    newest_first: "true",
-    limit: String(AUDIT_PAGE),
+    last: String(AUDIT_PAGE),
     type: "member_added",
     actor_kind: "rule",
     actor: "triage",
     workspace: "ws_1",
   });
-  // The next page is read before this one's oldest entry: 60 down to 11, then 10 to 1.
+  // The next page is read before this one's oldest entry: 11 to 60, then 1 to 10.
   expect(options.getNextPageParam(first.pages[0] ?? [], first.pages, null, first.pageParams)).toBe(
     11,
   );
@@ -356,7 +355,7 @@ test("the audit log is read newest first, a page at a time, with its filter, unt
 
 test("an audit read with no filter asks for every entry", async () => {
   await new QueryClient().fetchInfiniteQuery(queries.grantr.audit("acme", {}));
-  expect([...(seen.at(-1)?.url.searchParams.keys() ?? [])]).toEqual(["newest_first", "limit"]);
+  expect([...(seen.at(-1)?.url.searchParams.keys() ?? [])]).toEqual(["last"]);
 });
 
 test("a workspace's grants and the tenant's are read apart", () => {

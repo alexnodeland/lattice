@@ -378,9 +378,9 @@ export function createQueries(api: Api) {
             ),
         }),
       /**
-       * A tenant's audit log, as `filter` keeps it, newest first, a page at a time, each page
-       * read before the last one's oldest entry; a page short of a full one is the last
-       * (`grantr:read_audit`, grantr ADR-0032).
+       * A tenant's audit log, as `filter` keeps it, from its end back, a page at a time: each
+       * page is the last of the log before the previous page's oldest entry, oldest first, and a
+       * page short of a full one is the first (`grantr:read_audit`, grantr ADR-0032).
        */
       audit: (tenant: string, filter: AuditFilter) =>
         infiniteQueryOptions({
@@ -393,8 +393,7 @@ export function createQueries(api: Api) {
                 params: {
                   path: { tenant },
                   query: {
-                    newest_first: true,
-                    limit: AUDIT_PAGE,
+                    last: AUDIT_PAGE,
                     ...(pageParam !== null && { before_seq: pageParam }),
                     ...(filter.type && { type: [filter.type] }),
                     ...(filter.actor_kind && { actor_kind: filter.actor_kind }),
@@ -404,8 +403,7 @@ export function createQueries(api: Api) {
                 },
               }),
             ),
-          getNextPageParam: (page) =>
-            page.length < AUDIT_PAGE ? undefined : page[page.length - 1]?.seq,
+          getNextPageParam: (page) => (page.length < AUDIT_PAGE ? undefined : page[0]?.seq),
         }),
       /** The tenant's keys, by public id and principal, never their secrets (`grantr:issue_key`). */
       keyring: (tenant: string) =>

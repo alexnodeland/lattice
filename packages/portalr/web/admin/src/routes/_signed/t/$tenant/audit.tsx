@@ -48,7 +48,8 @@ function Audit() {
   const { data, hasNextPage, fetchNextPage, isFetchingNextPage } = useSuspenseInfiniteQuery(
     queries.grantr.audit(tenant, filter),
   );
-  const entries = data.pages.flat();
+  // Each page is oldest first, and each is older than the last: the newest are on top.
+  const entries = data.pages.flatMap((page) => [...page].reverse());
   const filtered = Object.keys(filter).length > 0;
   return (
     <div className="flex flex-col gap-6">

@@ -129,12 +129,12 @@ function grantr(allowed: readonly string[]) {
       const query = new URL(request.url).searchParams;
       audits.push(query);
       const before = Number(query.get("before_seq") ?? Number.POSITIVE_INFINITY);
-      const kept = (query.get("newest_first") === "true" ? [...LOG].reverse() : LOG).filter(
+      const kept = LOG.filter(
         (entry) =>
           entry.seq < before &&
           (!query.has("type") || query.getAll("type").includes(entry.event.type)),
       );
-      return Response.json(kept.slice(0, Number(query.get("limit"))));
+      return Response.json(kept.slice(Math.max(kept.length - Number(query.get("last")), 0)));
     }
     if (path === "/grantr/v1/me") {
       return Response.json({ memberships: [{ tenant: "acme", user: "alice", roles: ["owner"] }] });
@@ -611,7 +611,10 @@ test("the log opens on the newest changes, and Show more adds the ones before", 
     .toBeVisible();
   expect(log.getByRole("rowheader").elements()).toHaveLength(60);
   expect(audits.map((query) => query.get("before_seq"))).toEqual([null, "11"]);
-  expect(audits.every((query) => query.get("newest_first") === "true")).toBe(true);
+  expect(audits.every((query) => query.get("last") === "50")).toBe(true);
+  // The newest on top, down to the first.
+  const rows = log.getByRole("rowheader").elements();
+  expect(rows.at(-1)?.textContent).toBe("added sp_1 (service principal)");
   await expect.element(screen.getByRole("button", { name: "Show more" })).not.toBeInTheDocument();
 });
 

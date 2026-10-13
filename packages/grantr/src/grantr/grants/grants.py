@@ -92,6 +92,9 @@ class Access(Protocol):
         ...
 
 
+DEFAULT_PAGE: Final = 100
+"""How many audit entries a read returns when it asks for neither a first nor a last count."""
+
 RESTRICTABLE: Final = frozenset({"thread", "artifact"})
 """The kinds of item that can be restricted."""
 
@@ -385,20 +388,25 @@ class Grants:
         by: Subject,
         after_seq: int = 0,
         before_seq: int | None = None,
-        newest_first: bool = False,
-        limit: int = 100,
+        limit: int | None = None,
+        last: int | None = None,
         keep: AuditFilter | None = None,
     ) -> list[AuditEntry]:
-        """A tenant's audit log after ``after_seq``, or the deployment's with ``None``.
+        """A tenant's audit log in the window ``after_seq < seq < before_seq``, oldest first.
 
-        It returns the first ``limit`` entries ``keep`` keeps: of some types, by one actor, or
-        every one; before ``before_seq`` if it is given; oldest first, or newest first with
-        ``newest_first``, which pages back with each page's last ``seq`` as ``before_seq``.
+        The deployment's with ``None``. Of the entries ``keep`` keeps (of some types, by one
+        actor, or every one): the first ``limit``, 100 with neither, or the last ``last``. A
+        client pages back with ``last`` and its oldest entry's ``seq`` as ``before_seq``, as
+        artifactr's log does, and catches up with its newest as ``after_seq``: a page shorter
+        than it asked for holds all there is.
 
         Raises:
+            Invalid: If it gives both ``limit`` and ``last``.
             Forbidden: If ``by`` may not read it: ``grantr:read_audit`` on the tenant, or
                 ``grantr:grant_operator`` for the deployment's.
         """
+        if limit is not None and last is not None:
+            raise Invalid("give limit or last, not both")
         if tenant is None:
             await self._require(self._storage, None, by, "grantr:grant_operator", DEPLOYMENT)
         else:
@@ -407,8 +415,8 @@ class Grants:
             tenant,
             after_seq=after_seq,
             before_seq=before_seq,
-            newest_first=newest_first,
-            limit=limit,
+            limit=DEFAULT_PAGE if limit is None and last is None else limit,
+            last=last,
             keep=keep,
         )
 

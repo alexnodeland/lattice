@@ -10,21 +10,36 @@ variable "name" {
 
 variable "generated" {
   description = <<-EOT
-    Secrets made here, each from a password made for it alone: the password itself, or, with
-    `keys`, a JSON object whose values are templates, `{password}` where the password goes.
-    `version` writes it again when raised, with a new password: a changed template, such as a
-    database's new address, needs a raised version too, and so rotates the secret.
+    Secrets made here, each from a password made for it alone: its `template`, the password
+    itself by default; or, with `keys`, a JSON object whose values are templates. A template has
+    `{password}` where the password goes, and `{password_sha256}` where its SHA-256 goes, in
+    hexadecimal. `version` writes it again when raised, with a new password: a changed template,
+    such as a database's new address, needs a raised version too, and so rotates the secret.
   EOT
   type = map(object({
-    length  = optional(number, 48)
-    keys    = optional(map(string))
-    version = optional(number, 1)
+    length   = optional(number, 48)
+    template = optional(string, "{password}")
+    keys     = optional(map(string))
+    version  = optional(number, 1)
   }))
   default = {}
 
   validation {
     condition     = alltrue([for secret in var.generated : secret.length >= 16 && secret.length <= 128])
     error_message = "A generated password is 16 to 128 characters."
+  }
+  validation {
+    condition = alltrue(flatten([
+      for secret in var.generated : [
+        for template in secret.keys == null ? [secret.template] : values(secret.keys) :
+        strcontains(template, "{password}") || strcontains(template, "{password_sha256}")
+      ]
+    ]))
+    error_message = "Each template holds the password, or its SHA-256: one without would be written as it is."
+  }
+  validation {
+    condition     = alltrue([for secret in var.generated : secret.keys == null || secret.template == "{password}"])
+    error_message = "A secret is a template, or keys of templates, never both."
   }
 }
 

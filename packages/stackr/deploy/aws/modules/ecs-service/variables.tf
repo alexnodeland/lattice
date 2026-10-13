@@ -34,8 +34,14 @@ variable "security_group_ids" {
 }
 
 variable "namespace_id" {
-  description = "The private DNS namespace (Cloud Map) it is named in, as <name>.<namespace>."
+  description = "The private DNS namespace (Cloud Map) it is named in, as <name>.<namespace>; none for a one-off task."
   type        = string
+  default     = null
+
+  validation {
+    condition     = var.one_off || var.namespace_id != null
+    error_message = "A service is named in a namespace: give it one."
+  }
 }
 
 variable "container" {
@@ -105,6 +111,12 @@ variable "one_off" {
   description = "A task that runs once, by run-task, such as db-init: its definition, with no service and no name."
   type        = bool
   default     = false
+}
+
+variable "after" {
+  description = "The one-off runs, by name, the service waits for: it starts after them, and starts again after each new run."
+  type        = map(string)
+  default     = {}
 }
 
 variable "target_group_arn" {

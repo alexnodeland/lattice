@@ -104,9 +104,18 @@ Each service and one-off task has a group of its own, with a rule from each of i
 - **Each module is scanned on its own files** (`--file`), with its own skips: the stack's are its two hand-written secrets', with the `secrets` module's reasons.
 - **checkov over the plan's JSON waits for tier 2** (phase 4), where `envs/floci` plans against Floci, which answers the data sources.
 
+### The roots
+
+`envs/prod` and `envs/floci` came in the pull request after `stack`'s.
+
+- **`envs/prod`** keeps its state in S3 with `use_lockfile`, in one bucket per account, which its README makes by hand, and one key per deployment, given at `tofu init`. A deployment's settings are in its own `.tfvars`, which stays out of the repository, from `prod.tfvars.example`. Until stackr's release publishes the thin images, their digests are settings there too; then `envs/prod` pins them, and Renovate moves them.
+- **`envs/floci`** has local state, and its provider reaches Floci through `AWS_ENDPOINT_URL`, with Floci's credentials from the environment. It runs the state host's services on Fargate, without TLS to the data stores, destroyable, at Floci's sizes, with Valkey on a port in Floci's range, and with the domain's zone made in Floci. Its tests come with tier 2 (phase 4).
+- **Each root has its own lock file,** for Linux and macOS, and tier 1 validates both against it.
+
 ### Where this departs from RFC-0004
 
-- **`envs/prod` and `envs/floci` are their own pull request,** after this one, to keep each under review's size.
+- **`envs/prod` and `envs/floci` were their own pull request,** after `stack`'s, to keep each under review's size.
+- **The thin images' digests are a deployment's settings** until stackr's release publishes them.
 - **The one-off tasks run from where OpenTofu runs,** which needs the AWS CLI there. The RFC said only "by run-task".
 - **The application's settings come from the stack,** and not from a root of the template's. The template's `hosting: aws` root will call `stack` with its image and its own settings.
 - **Langfuse's bucket has no CORS configuration,** which browsers' media uploads to it need. Traces and events don't; the manual gate checks it.
@@ -148,4 +157,4 @@ Each service and one-off task has a group of its own, with a rule from each of i
   - both places the state host's services run.
 - Easier: one switch makes a deployment one a destroy takes whole.
 - Harder: applying needs the AWS CLI, and the thin images must read the settings above.
-- Next: `envs/prod` and `envs/floci`; VPC endpoints for AWS's own traffic; the thin images, with the settings above; then tier 2, with checkov over the plan's JSON.
+- Next: the thin images, with the settings above, and their digests pinned in `envs/prod`; VPC endpoints for AWS's own traffic; then tier 2, with `envs/floci`'s tests and checkov over the plan's JSON.

@@ -1,0 +1,28 @@
+# A deployment's settings: copy to <deployment>.tfvars, which stays out of the repository, and fill
+# in. Secrets never go here: they are in Secrets Manager.
+region         = "us-east-1"
+name           = "stackr"
+domain         = "example.com"
+zone_id        = "Z0123456789ABCDEFGHIJ"
+zones          = ["us-east-1a", "us-east-1b"]
+ami_id         = "ami-0123456789abcdef0"
+lattice_commit = "0123456789abcdef0123456789abcdef01234567"
+
+# From the stackr release's notes, by digest.
+images = {
+  otel_collector = "ghcr.io/alexnodeland/stackr-otel-collector@sha256:..."
+  tempo          = "ghcr.io/alexnodeland/stackr-tempo@sha256:..."
+  loki           = "ghcr.io/alexnodeland/stackr-loki@sha256:..."
+  pyroscope      = "ghcr.io/alexnodeland/stackr-pyroscope@sha256:..."
+  grafana        = "ghcr.io/alexnodeland/stackr-grafana@sha256:..."
+  litellm        = "ghcr.io/alexnodeland/stackr-litellm@sha256:..."
+  db_init        = "ghcr.io/alexnodeland/stackr-db-init@sha256:..."
+  auth_keys      = "ghcr.io/alexnodeland/stackr-auth-keys@sha256:..."
+}
+
+application = {
+  name  = "acme"
+  image = "ghcr.io/example/acme@sha256:..."
+}
+
+gateway_providers = ["anthropic"]

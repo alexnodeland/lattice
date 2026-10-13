@@ -5,11 +5,12 @@
 #   OpenTofu and TFLint come from lattice's .prototools, and checkov through uv. It needs Docker,
 #   and ShellCheck for the rendered user data.
 #
-# OpenTofu's format; TFLint with AWS's ruleset; checkov over each module, with the skips and their
-# reasons in that module's .checkov.yaml; and the modules' tests, against a mocked AWS (tests/),
-# which validate each module as they plan it, with the providers the committed lock file names; and
-# the modules' templates, rendered: shellcheck over the state host's user data, and GoTrue's proxy,
-# run in Docker (tests/auth-proxy).
+# OpenTofu's format; the two roots, envs/prod and envs/floci, validated against their own lock
+# files; TFLint with AWS's ruleset; checkov over each module, with the skips and their reasons in
+# that module's .checkov.yaml; the modules' tests, against a mocked AWS (tests/), which validate
+# each module as they plan it, with the providers the committed lock file names; and the modules'
+# templates, rendered: shellcheck over the state host's user data, and GoTrue's proxy, run in
+# Docker (tests/auth-proxy).
 # The providers download once, into TF_PLUGIN_CACHE_DIR. TFLint fetches its AWS ruleset from
 # GitHub, with GITHUB_TOKEN when it is set.
 
@@ -33,6 +34,16 @@ tofu fmt -check -recursive -diff . || fail "tofu fmt: run tofu fmt -recursive de
 
 step "The providers, as the lock file names them"
 tofu init -backend=false -input=false -lockfile=readonly >/dev/null || fail "tofu init: the lock file"
+
+step "The roots, envs/prod and envs/floci, valid with their own lock files"
+for root in envs/*/; do
+  if tofu -chdir="$root" init -backend=false -input=false -lockfile=readonly >/dev/null &&
+    tofu -chdir="$root" validate -no-color >/dev/null; then
+    echo "ok: $root"
+  else
+    fail "tofu validate: $root"
+  fi
+done
 
 step "TFLint"
 tflint --init --config "$PWD/.tflint.hcl" >/dev/null

@@ -668,17 +668,23 @@ class SqlStorage:
         tenant: TenantId | None,
         *,
         after_seq: int = 0,
+        before_seq: int | None = None,
+        newest_first: bool = False,
         limit: int = 100,
         keep: AuditFilter | None = None,
     ) -> list[AuditEntry]:
-        """A tenant's audit entries after ``after_seq``, in order, or the deployment's with None.
+        """A tenant's audit entries after ``after_seq``, or the deployment's with None.
 
-        It returns the first ``limit`` that ``keep`` keeps. A single type, or a single actor, is
-        one index's range; a type and an actor together are an index's range and a filter.
+        It returns the first ``limit`` that ``keep`` keeps, before ``before_seq`` if it is given,
+        oldest first, or newest first with ``newest_first``. A single type, or a single actor, is
+        one index's range, read forwards or backwards; a type and an actor together are an
+        index's range and a filter.
         """
         query = select(AuditRow).where(
             AuditRow.tenant_id == _scope(tenant), AuditRow.seq > after_seq
         )
+        if before_seq is not None:
+            query = query.where(AuditRow.seq < before_seq)
         if keep is not None and keep.types:
             query = query.where(AuditRow.event_type.in_(sorted(keep.types)))
         if keep is not None and keep.by is not None:
@@ -688,7 +694,8 @@ class SqlStorage:
                 AuditRow.actor_workspace == workspace,
                 AuditRow.actor_id == id,
             )
-        query = query.order_by(AuditRow.seq).limit(limit)
+        order = AuditRow.seq.desc() if newest_first else AuditRow.seq
+        query = query.order_by(order).limit(limit)
         async with self._session(tenant) as session:
             rows = await _to_the_end(session.scalars(query))
             return [

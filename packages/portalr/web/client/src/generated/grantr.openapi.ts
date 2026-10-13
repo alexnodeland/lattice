@@ -14,7 +14,8 @@ export interface paths {
          * @description The deployment's audit log: its operators, granted and revoked.
          *
          *     ``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``
-         *     one subject's changes.
+         *     one subject's changes. ``newest_first`` reads back from the newest, and ``before_seq``
+         *     from before an entry.
          */
         get: operations["deployment_audit_grantr_v1_audit_get"];
         put?: never;
@@ -169,10 +170,11 @@ export interface paths {
         };
         /**
          * Tenant Audit
-         * @description A tenant's audit log after ``after_seq``, in order.
+         * @description A tenant's audit log after ``after_seq``, oldest first, or newest first.
          *
          *     ``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``
-         *     one subject's changes.
+         *     one subject's changes. ``newest_first`` reads back from the newest, and ``before_seq``
+         *     from before an entry.
          */
         get: operations["tenant_audit_grantr_v1_tenants__tenant__audit_get"];
         put?: never;
@@ -921,6 +923,8 @@ export interface operations {
         parameters: {
             query?: {
                 after_seq?: number;
+                before_seq?: number | null;
+                newest_first?: boolean;
                 limit?: number;
                 /** @description Keep only entries of these event types; it may repeat. */
                 type?: components["schemas"]["AuditType"][] | null;
@@ -1193,6 +1197,8 @@ export interface operations {
         parameters: {
             query?: {
                 after_seq?: number;
+                before_seq?: number | null;
+                newest_first?: boolean;
                 limit?: number;
                 /** @description Keep only entries of these event types; it may repeat. */
                 type?: components["schemas"]["AuditType"][] | null;

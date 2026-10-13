@@ -276,16 +276,22 @@ class InMemoryStorage(_Reads):
         tenant: TenantId | None,
         *,
         after_seq: int = 0,
+        before_seq: int | None = None,
+        newest_first: bool = False,
         limit: int = 100,
         keep: AuditFilter | None = None,
     ) -> list[AuditEntry]:
-        """A tenant's audit entries after ``after_seq``, in order, or the deployment's with None.
+        """A tenant's audit entries after ``after_seq``, or the deployment's with None.
 
-        It returns the first ``limit`` that ``keep`` keeps.
+        It returns the first ``limit`` that ``keep`` keeps, before ``before_seq`` if it is given,
+        oldest first, or newest first with ``newest_first``.
         """
         entries = [
             e
             for e in self._data.log
-            if e.tenant == tenant and e.seq > after_seq and (keep is None or keep.keeps(e))
+            if e.tenant == tenant
+            and e.seq > after_seq
+            and (before_seq is None or e.seq < before_seq)
+            and (keep is None or keep.keeps(e))
         ]
-        return entries[:limit]
+        return (entries[::-1] if newest_first else entries)[:limit]

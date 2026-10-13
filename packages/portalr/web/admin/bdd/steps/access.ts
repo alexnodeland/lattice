@@ -1,18 +1,10 @@
 import { expect, type Page } from "@playwright/test";
-import { Then, When } from "./fixtures";
+import { madeAs, Then, When } from "./fixtures";
 
 /** A name made afresh for this run, so a scenario runs again against the same application. */
 const fresh = (made: Map<string, string>, what: string) => {
   const name = `${what}-${crypto.randomUUID().slice(0, 8)}`;
   made.set(what, name);
-  return name;
-};
-
-const madeAs = (made: Map<string, string>, what: string) => {
-  const name = made.get(what);
-  if (name === undefined) {
-    throw new Error(`no ${what} was made: make one first`);
-  }
   return name;
 };
 

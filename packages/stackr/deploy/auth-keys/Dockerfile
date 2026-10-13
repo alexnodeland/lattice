@@ -8,15 +8,18 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.24@sha256:3af4716e991d6956a41e573eab705d0e
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never UV_PYTHON=/usr/local/bin/python
 COPY . .
+# Read-only for everyone, directories and all, here: a COPY's --chmod of a tree leaves its
+# directories to the builder, and where nobody can't read pyvenv.cfg, Python ignores the venv.
 RUN --mount=type=cache,target=/root/.cache/uv \
-  uv sync --locked --no-install-workspace --package stackr --only-group auth-keys
+  uv sync --locked --no-install-workspace --package stackr --only-group auth-keys \
+  && chmod -R a=rX /app/.venv
 
 FROM python:3.13.16-slim-trixie@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
 LABEL org.opencontainers.image.source="https://github.com/alexnodeland/lattice"
 
 # Nothing here installs packages: pip goes.
 RUN rm -rf /usr/local/bin/pip* /usr/local/lib/python3.13/site-packages/pip*
-COPY --link --from=build --chmod=a=rX /app/.venv /app/.venv
+COPY --link --from=build /app/.venv /app/.venv
 COPY --link --chmod=a=rX packages/stackr/scripts/auth-keys packages/stackr/scripts/_auth_keys.py /app/
 ENV PATH="/app/.venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1
 USER 65534:65534

@@ -107,7 +107,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `/` | Where admin opens: its last choice while still the person's, their one tenant, every tenant for an operator, a choice, or no access |
 | `/t/$tenant` | A tenant someone owns or administers, in admin's frame, with the areas grantr allows |
 | `/t/$tenant/` | Home: members, workspaces, feedback, failed turns and spend, each a card from one read, with its own state |
-| `/t/$tenant/access/members`, `/groups`, `/keys` | Access: members, invited or made as service principals, and removed; groups; and keys, a secret shown once, and revoked. Each part where grantr allows its read, as a table or, on a phone, cards ([ADR-0024](adr/0024-access-members-groups-and-keys.md)) |
+| `/t/$tenant/access/members`, `/groups`, `/keys`, `/roles`, `/grants` | Access: members, invited or made as service principals, and removed; groups; keys, a secret shown once, and revoked; roles, built in and custom; and grants, given and revoked. Each part where grantr allows its read, as a table or, on a phone, cards ([ADR-0024](adr/0024-access-members-groups-and-keys.md), [ADR-0025](adr/0025-access-roles-and-grants.md)) |
 | `/deployment` | Every tenant, for operators, with the deployment's areas alone |
 | `/deployment/` | Home: the tenants, and their spend |
 
@@ -128,11 +128,11 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Rows`, `Row`, `RowLink`, `SectionTitle` | A lined list, each row's link stretched over it; a section's heading |
 | `Plain` | A page outside the frame: the lockup as a link home, the account if signed in, and one column |
 | `StatusBadge` | How a thing is going, as a shape and a word; only waiting for you in the working colour; a budget near or over as a word and a shape of its own, with no warning colour |
-| `ConfirmDialog` | A destructive action, asked first: what will be lost, the focus on Cancel, and a name to type where asked |
+| `ConfirmDialog` | A destructive action, asked first: what will be lost, the focus on Cancel, and a name to type where asked; its trigger named in full where its words are short |
 | `SegmentedFilter` | One filter of a few, side by side |
 | `TenantSwitcher` | admin's tenant, or every tenant, and a menu of the others |
 | `StatCard` | One figure, read on its own, or why there's none |
-| `ItemTable` | Items as a table from 640 pixels, each row named by its first cell, and as headed cards below, one in the accessibility tree; an `EmptyState` with none |
+| `ItemTable` | Items as a table from 640 pixels, each row named by its first cell or a name of its own, and as headed cards below, one in the accessibility tree; an `EmptyState` with none |
 | `TabNav`, `TabLink` | An area's parts as tabs of links, the current one marked with `aria-current` |
 | `CheckboxGroup` | Several choices, any of them checked, named by a legend |
 | `SignIn`, `Account` | Signing in, and the account menu over a session, for both UIs |

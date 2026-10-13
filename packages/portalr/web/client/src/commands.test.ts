@@ -279,6 +279,13 @@ test("grantr's access commands go to the tenant's own paths, with its header", a
     ],
     [() => commands.grantr.deleteGroup("acme", "team"), "DELETE", "/groups/team", null],
     [() => commands.grantr.revokeKey("acme", "key_1"), "DELETE", "/keys/key_1", null],
+    [
+      () => commands.grantr.defineRole("acme", "triager", ["reflexr:retry_run"]),
+      "PUT",
+      "/roles/triager",
+      { actions: ["reflexr:retry_run"] },
+    ],
+    [() => commands.grantr.deleteRole("acme", "triager"), "DELETE", "/roles/triager", null],
   ];
   for (const [call, method, path, body] of calls) {
     expect(await call()).toMatchObject({ outcome: "done" });

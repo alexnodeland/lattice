@@ -22,7 +22,7 @@ The decisions ADR-0021 records hold here:
 - whatever a person may not use is hidden;
 - on a phone, Access is a list of cards rather than a table scrolled sideways.
 
-Roles and grants need lists grantr's API doesn't read: the actions a custom role may hold, and the roles each kind of resource may be granted. They wait on that decision, and land as 6b-ii.
+Roles and grants need lists grantr's API doesn't read: the actions a custom role may hold, and the roles each kind of resource may be granted. They wait on that decision, and land as 6b-ii. [ADR-0025](0025-access-roles-and-grants.md) records them, on grantr's catalog read.
 
 ## Decision
 
@@ -66,7 +66,7 @@ Roles and grants need lists grantr's API doesn't read: the actions a custom role
 
 ## Consequences
 
-- Easier: Roles and Grants join as parts beside these, once their lists are decided.
+- Easier: Roles and Grants join as parts beside these, once their lists are decided ([ADR-0025](0025-access-roles-and-grants.md)).
 - Harder: a key not copied when issued is lost; issuing another is the remedy.
 - Harder: a group's members are last-writer-wins until grantr can refuse a change made against an older version.
 - Harder: people are listed by their UUID until portalr reads who an id is.

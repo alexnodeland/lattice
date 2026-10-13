@@ -57,3 +57,22 @@ test("no items says so, as an empty state", async () => {
   );
   await expect.element(screen.getByRole("heading", { name: "No keys yet" })).toBeVisible();
 });
+
+test("an item named apart from its first cell is named so, as a row and as a card", async () => {
+  const table = (
+    <ItemTable
+      caption="Grants"
+      columns={[{ key: "role", label: "Role", cell: (grant) => grant.role }]}
+      items={[{ role: "viewer", to: "bob" }]}
+      keyOf={(grant) => grant.to}
+      named={(grant) => `${grant.to} as ${grant.role}`}
+      empty={{ title: "No grants", body: "None yet." }}
+    />
+  );
+  await page.viewport(1024, 768);
+  onTestFinished(() => page.viewport(414, 896));
+  const wide = await render(table);
+  await expect.element(wide.getByRole("row", { name: "bob as viewer" })).toBeVisible();
+  await page.viewport(414, 896);
+  await expect.element(wide.getByRole("listitem", { name: "bob as viewer" })).toBeVisible();
+});

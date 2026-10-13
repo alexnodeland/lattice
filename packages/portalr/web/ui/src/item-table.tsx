@@ -22,6 +22,7 @@ export function ItemTable<T>({
   columns,
   items,
   keyOf,
+  named,
   actions,
   empty,
 }: {
@@ -29,17 +30,22 @@ export function ItemTable<T>({
   columns: readonly [Column<T>, ...Column<T>[]];
   items: readonly T[];
   keyOf: (item: T) => string;
+  /** Each item's name, where its first cell alone doesn't say which it is. */
+  named?: ((item: T) => string) | undefined;
   /** What can be done with an item, such as removing it, in its last cell or at its card's end. */
   actions?: ((item: T) => ReactNode) | undefined;
   /** What shows when there are no items: a title, and what will appear. */
   empty: { readonly title: string; readonly body: ReactNode };
 }) {
-  const named = useId();
+  const prefix = useId();
   if (items.length === 0) {
     return <EmptyState title={empty.title}>{empty.body}</EmptyState>;
   }
   const [first, ...rest] = columns;
-  const id = (index: number, where: string) => `${named}-${where}-${index}`;
+  /** A row's or card's name: `named`'s, or its first cell's. */
+  const name = (item: T, index: number, where: string) =>
+    named ? { "aria-label": named(item) } : { "aria-labelledby": id(index, where) };
+  const id = (index: number, where: string) => `${prefix}-${where}-${index}`;
   return (
     <>
       <div className="max-sm:hidden">
@@ -60,7 +66,7 @@ export function ItemTable<T>({
           </thead>
           <tbody>
             {items.map((item, index) => (
-              <tr key={keyOf(item)} aria-labelledby={id(index, "row")}>
+              <tr key={keyOf(item)} {...name(item, index, "row")}>
                 <th id={id(index, "row")} scope="row" className="font-semibold text-fg">
                   {first.cell(item)}
                 </th>
@@ -75,7 +81,7 @@ export function ItemTable<T>({
       </div>
       <ul aria-label={caption} className="flex flex-col gap-2 sm:hidden">
         {items.map((item, index) => (
-          <li key={keyOf(item)} aria-labelledby={id(index, "card")}>
+          <li key={keyOf(item)} {...name(item, index, "card")}>
             <Card className="flex flex-col gap-2">
               <h3 id={id(index, "card")} className="font-semibold">
                 {first.cell(item)}

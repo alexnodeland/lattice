@@ -77,6 +77,7 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `src/<package>/database.py` | always | rendered |
 | `src/<package>/gateway.py` | always | rendered |
 | `src/<package>/py.typed` | always | copied |
+| `src/<package>/redaction.py` | always | rendered |
 | `src/<package>/scores.py` | always | rendered |
 | `src/<package>/settings.py` | always | rendered |
 | `src/<package>/telemetry.py` | always | rendered |
@@ -93,6 +94,7 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `tests/conftest.py` | always | rendered |
 | `tests/test_app.py` | always | rendered |
 | `tests/test_auth.py` | always | rendered |
+| `tests/test_redaction.py` | always | rendered |
 | `tests/test_scores.py` | always | rendered |
 | `tests/test_settings.py` | always | rendered |
 | `tests/test_access.py` | `access == 'grantr'` | rendered |

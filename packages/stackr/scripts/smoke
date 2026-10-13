@@ -396,6 +396,16 @@ smoke_database() {
   fi
 }
 
+# A query in ClickHouse as one of its users (admin or langfuse), whose password is in the
+# container's environment, never on a command line. It prints what ClickHouse answers, refusals
+# included.
+clickhouse_as() {
+  local user=$1 query=$2
+  stack_compose exec -T clickhouse sh -c \
+    "CLICKHOUSE_USER=$user CLICKHOUSE_PASSWORD=\"\$CLICKHOUSE_$(tr '[:lower:]' '[:upper:]' <<<"$user")_PASSWORD\" clickhouse-client --query \"\$0\" 2>&1" \
+    "$query" </dev/null
+}
+
 smoke_langfuse() {
   trace_id=$(random_hex 16)
   log "langfuse: sending trace $trace_id through the Collector"
@@ -403,6 +413,40 @@ smoke_langfuse() {
   send_trace
   eventually "the trace is in Langfuse" langfuse_has_trace
   eventually "the same trace is in Tempo" tempo_has_trace_id
+  # ClickHouse's users (ADR-0031): Langfuse's reaches its own database and the system tables it
+  # reads, and nothing more.
+  # Each answer is kept before it is searched: grep -q stops reading at a match, which pipefail
+  # would count as a failure.
+  local logs refused
+  logs=$(stack_compose logs langfuse-worker 2>&1)
+  if grep -q "Not enough privileges" <<<"$logs"; then
+    log "FAIL: Langfuse's worker lacked a privilege in ClickHouse"
+    status=1
+  else
+    log "ok: Langfuse's worker has every privilege it needs in ClickHouse"
+  fi
+  refused=$(clickhouse_as langfuse "CREATE DATABASE stackr_smoke_refused" || true)
+  if grep -q "Code: 497" <<<"$refused"; then
+    log "ok: Langfuse's ClickHouse user is refused another database"
+  else
+    log "FAIL: Langfuse's ClickHouse user may make another database"
+    status=1
+  fi
+}
+
+# The guide's rebuild of a host's ClickHouse, as admin, from the latest backup: into a scratch
+# database here, which is dropped after.
+admin_restores_the_latest_backup() {
+  local latest
+  latest=$(clickhouse_as admin "SELECT max(extract(_path, '([^/]+)/\\\\.backup\$'))
+    FROM s3(backups, filename = '*/.backup', format = 'RawBLOB')") || return 1
+  [[ -n $latest ]] || return 1
+  clickhouse_as admin "DROP DATABASE IF EXISTS restore_rebuild SYNC" >/dev/null || return 1
+  clickhouse_as admin "RESTORE DATABASE default AS restore_rebuild FROM S3(backups, '$latest') FORMAT Null" >/dev/null &&
+    [[ $(clickhouse_as admin "SELECT count() FROM system.tables WHERE database = 'restore_rebuild'") -gt 0 ]]
+  local restored=$?
+  clickhouse_as admin "DROP DATABASE IF EXISTS restore_rebuild SYNC" >/dev/null
+  return $restored
 }
 
 # GoTrue's admin API with the service role's key, passed to curl on stdin.
@@ -893,6 +937,12 @@ for profile in "${profiles[@]}"; do
     drill)
       eventually "the restore drill's success is in Prometheus" \
         prometheus_has 'stackr_restore_drill_success{job="stackr-restore-drill"} == 1' || status=1
+      if admin_restores_the_latest_backup; then
+        log "ok: ClickHouse's admin restores the latest backup, as the guide rebuilds a host"
+      else
+        log "FAIL: ClickHouse's admin restoring the latest backup, as the guide rebuilds a host"
+        status=1
+      fi
       ;;
     app) smoke_app || status=1 ;;
     *)

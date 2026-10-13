@@ -1,0 +1,3 @@
+# What stackr-pyroscope's image is built from, out of lattice's root: its own files alone.
+*
+!packages/stackr/deploy/pyroscope/config.yaml

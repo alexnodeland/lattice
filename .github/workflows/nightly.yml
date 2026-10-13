@@ -81,6 +81,40 @@ jobs:
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: moon run :image
 
+  # stackr's thin images, on both architectures, as CI builds them when they change.
+  thin-images:
+    name: Thin images (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+        id: toolchain
+      # The arm64 runner's own cache of ~/.proto, which the toolchain's key names by architecture:
+      # the main job saves amd64's.
+      - name: Clean ~/.proto for the cache
+        if: matrix.arch == 'arm64' && steps.toolchain.outputs.cache-hit != 'true'
+        run: proto clean --yes
+      - name: Save proto and its tools
+        if: matrix.arch == 'arm64' && steps.toolchain.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.proto
+          key: ${{ steps.toolchain.outputs.cache-key }}
+      - run: moon run stackr:images
+
   # Every lockfile git doesn't ignore: uv.lock and bun.lock.
   osv:
     name: OSV

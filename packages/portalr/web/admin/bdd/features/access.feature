@@ -1,8 +1,7 @@
 Feature: Access
   A tenant's owners and admins see and change who may do what in it: its members, invited by
   email or made as service principals; its groups; its service principals' keys; its roles; and
-  who holds them where. Each
-  destructive change is confirmed first.
+  who holds them where. Each destructive change is confirmed first.
 
   Scenario: An owner invites someone, and removes them
     Given alice has signed in to admin

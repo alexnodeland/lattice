@@ -114,7 +114,7 @@ Then("the group isn't listed", async ({ page, made }) => {
 
 When("they create a role holding the first action the catalog lists", async ({ page, made }) => {
   await page.getByRole("textbox", { name: "Role" }).fill(fresh(made, "role"));
-  await page.getByRole("group", { name: "Actions" }).getByRole("checkbox").first().check();
+  await page.getByRole("region", { name: "Create a role" }).getByRole("checkbox").first().check();
   await page.getByRole("button", { name: "Create the role" }).click();
   await expect(page.getByRole("status")).toContainText("holds 1 action.");
 });
@@ -137,7 +137,7 @@ When(
     const principal = madeAs(made, "principal");
     await page.getByRole("combobox", { name: "Role" }).selectOption(role);
     await page.getByRole("combobox", { name: "On" }).selectOption("workspace");
-    await page.getByRole("textbox", { name: "Workspace" }).fill(workspace);
+    await page.getByRole("combobox", { name: "Workspace" }).fill(workspace);
     await page
       .getByRole("combobox", { name: "To" })
       .selectOption(`${principal} (service principal)`);
@@ -149,7 +149,7 @@ When(
 Then(
   "it holds {string} on the workspace {string}",
   async ({ page, made }, role: string, workspace: string) => {
-    const grant = item(page, "Grants", madeAs(made, "principal"));
+    const grant = item(page, `Grants in ${workspace}`, madeAs(made, "principal"));
     await expect(grant).toHaveCount(1);
     await expect(grant).toContainText(role);
     await expect(grant).toContainText(`workspace ${workspace}`);
@@ -158,11 +158,15 @@ Then(
 
 When("they revoke its {string}", async ({ page, made }, role: string) => {
   const principal = madeAs(made, "principal");
-  await confirmed(page, new RegExp(`^Revoke ${role} from ${principal} `), "Revoke");
+  await confirmed(
+    page,
+    new RegExp(`^Revoke ${principal} \\(service principal\\) as ${role} `),
+    "Revoke",
+  );
 });
 
 Then("it holds no role", async ({ page, made }) => {
-  await expect(item(page, "Grants", madeAs(made, "principal"))).toHaveCount(0);
+  await expect(item(page, "Grants in notes", madeAs(made, "principal"))).toHaveCount(0);
 });
 
 When("they open the audit log, filtered to members added", async ({ page }) => {

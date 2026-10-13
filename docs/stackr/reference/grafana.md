@@ -10,10 +10,10 @@ Every data source has a fixed uid, which dashboards and links refer to, and none
 
 | Data source | uid | Type | URL | Default | Settings |
 |---|---|---|---|---|---|
-| Prometheus | `prometheus` | `prometheus` | `http://prometheus:9090` | yes | `httpMethod: POST`, `prometheusType: Prometheus`, `timeInterval: 60s` |
-| Tempo | `tempo` | `tempo` | `http://tempo:3200` | no | none |
-| Loki | `loki` | `loki` | `http://loki:3100` | no | none |
-| Pyroscope | `pyroscope` | `grafana-pyroscope-datasource` | `http://pyroscope:4040` | no | none |
+| Prometheus | `prometheus` | `prometheus` | `http://${PROMETHEUS_ADDRESS}:9090` | yes | `httpMethod: POST`, `prometheusType: Prometheus`, `timeInterval: 60s` |
+| Tempo | `tempo` | `tempo` | `http://${TEMPO_ADDRESS}:3200` | no | none |
+| Loki | `loki` | `loki` | `http://${LOKI_ADDRESS}:3100` | no | none |
+| Pyroscope | `pyroscope` | `grafana-pyroscope-datasource` | `http://${PYROSCOPE_ADDRESS}:4040` | no | none |
 
 <!-- end generated -->
 

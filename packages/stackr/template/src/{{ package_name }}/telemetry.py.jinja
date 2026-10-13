@@ -12,6 +12,9 @@ so ``create_app`` instruments the application and its database engine itself.
 stackr's Collector sends Langfuse every trace (its ADR-0007), so the application sends Langfuse
 only scores: the Langfuse client sets each turn's and run's session, user and tags on the spans,
 and records feedback as scores, but exports no spans of its own.
+
+The libraries redact an ``access_token`` from the URLs on the spans, as a WebSocket carries a
+browser's token; ``redaction.py`` redacts it from uvicorn's logs.
 """
 
 from importlib.metadata import version

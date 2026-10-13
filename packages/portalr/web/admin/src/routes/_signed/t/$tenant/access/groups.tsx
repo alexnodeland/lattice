@@ -2,9 +2,20 @@ import { orThrow } from "@portalr/client";
 import { Button, ConfirmDialog, ItemTable } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { type ComponentProps, useState } from "react";
-import { allowedNow, byKind, fromKey, keyOf, opening, useAccess, who } from "../../../../../access";
-import { type Changing, counted, DefineSet, refused } from "../../../../../define-set";
+import { useState } from "react";
+import {
+  allowedNow,
+  byKind,
+  counted,
+  fromKey,
+  keyOf,
+  opening,
+  refused,
+  type Said,
+  useAccess,
+  who,
+} from "../../../../../access";
+import { type Changing, DefineSet, type DefineSetProps } from "../../../../../define-set";
 
 /** The kinds of member a group's form takes. */
 const MEMBER_KINDS = ["user", "service_principal"] as const;
@@ -44,7 +55,7 @@ function Groups() {
   const { allowed, changed } = useAccess(tenant);
   const { data: groups } = useSuspenseQuery(queries.grantr.groups(tenant));
   const [changing, setChanging] = useState<Changing | null>(null);
-  const [said, setSaid] = useState<{ said: string; refused: boolean } | null>(null);
+  const [said, setSaid] = useState<Said>(null);
   const listed = Object.entries(groups)
     .map(([name, members]) => ({ name, members: [...members].sort(byKind) }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -58,11 +69,16 @@ function Groups() {
     setChanging(current ? { name, chosen: current.map(keyOf) } : null);
   }
 
-  const define: Omit<ComponentProps<typeof DefineSet>, "choices"> = {
-    noun: "group",
-    of: "members",
+  const define: Omit<DefineSetProps, "picking"> = {
+    words: {
+      name: "Group",
+      of: "Members",
+      create: "Create a group",
+      change: (name) => `Change ${name}'s members`,
+      created: "Create the group",
+      saved: "Save the group",
+    },
     changing,
-    typed: "Members, as user:id or service_principal:id, separated by commas",
     taken: async (name) =>
       name in (await fresh())
         ? `${name} is a group already. Change its members from its row.`
@@ -111,7 +127,11 @@ function Groups() {
         keyOf={(group) => group.name}
         actions={(group) => (
           <>
-            <Button variant="secondary" onClick={() => void change(group.name)}>
+            <Button
+              variant="secondary"
+              aria-label={`Change ${group.name}'s members`}
+              onClick={() => void change(group.name)}
+            >
               Change members
             </Button>
             <ConfirmDialog
@@ -138,7 +158,11 @@ function Groups() {
       {allowed.has("grantr:add_member") ? (
         <FromMembers key={changing?.name ?? "new"} tenant={tenant} define={define} />
       ) : (
-        <DefineSet key={changing?.name ?? "new"} {...define} choices={null} />
+        <DefineSet
+          key={changing?.name ?? "new"}
+          {...define}
+          picking={{ typed: "Members, as user:id or service_principal:id, separated by commas" }}
+        />
       )}
     </div>
   );
@@ -150,17 +174,19 @@ function FromMembers({
   define,
 }: {
   tenant: string;
-  define: Omit<ComponentProps<typeof DefineSet>, "choices">;
+  define: Omit<DefineSetProps, "picking">;
 }) {
   const { queries } = Route.useRouteContext();
   const { data: members } = useSuspenseQuery(queries.grantr.members(tenant));
   return (
     <DefineSet
       {...define}
-      choices={[...members].sort(byKind).map((member) => ({
-        value: keyOf(member),
-        label: who(member),
-      }))}
+      picking={{
+        choices: [...members].sort(byKind).map((member) => ({
+          value: keyOf(member),
+          label: who(member),
+        })),
+      }}
     />
   );
 }

@@ -193,7 +193,7 @@ test("Create refuses a group's name that is taken, rather than replace its membe
 test("Change members starts from the group's members, and confirms whom it takes out", async () => {
   const { screen } = await open("/t/acme/access/groups", TENANT_ACTIONS);
   await expect.element(screen.getByRole("cell", { name: "bob (person)" })).toBeVisible();
-  await screen.getByRole("button", { name: "Change ops's members" }).click();
+  await screen.getByRole("button", { name: "Change ops' members" }).click();
   const bob = screen.getByRole("checkbox", { name: "bob (person)" });
   await expect.element(bob).toBeChecked();
   await screen.getByRole("checkbox", { name: "ci (service principal)" }).click();
@@ -316,11 +316,14 @@ test("deleting a custom role says its grants go with it", async () => {
 
 test("Grants groups the tenant's grants and each workspace's, each named by whom and what", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
-  const tenant = screen.getByRole("table", { name: "Grants on the tenant" });
+  // Each place is headed, visibly, and its table named by its heading.
+  await expect.element(screen.getByRole("heading", { name: "The tenant" })).toBeVisible();
+  await expect.element(screen.getByRole("heading", { name: "Workspace ws_1" })).toBeVisible();
+  const tenant = screen.getByRole("table", { name: "The tenant" });
   await expect
     .element(tenant.getByRole("row", { name: "alice (person) as owner on the tenant" }))
     .toBeVisible();
-  const workspace = screen.getByRole("table", { name: "Grants in ws_1" });
+  const workspace = screen.getByRole("table", { name: "Workspace ws_1" });
   const rows = workspace
     .getByRole("rowheader")
     .elements()
@@ -328,6 +331,34 @@ test("Grants groups the tenant's grants and each workspace's, each named by whom
   // The workspace's own grants before its items'.
   expect(rows).toEqual(["bob (person)", "ops (group)"]);
   await expect.element(screen.getByRole("cell", { name: "member" })).not.toBeInTheDocument();
+  // The tenant's table doesn't say "the tenant" again; a workspace's names only its items.
+  await expect.element(tenant.getByRole("columnheader", { name: "On" })).not.toBeInTheDocument();
+  await expect.element(workspace.getByRole("cell", { name: "thread t_1" })).toBeVisible();
+  await expect.element(workspace.getByRole("cell", { name: "the workspace" })).toBeVisible();
+  // The tenant's one owner is kept: grantr refuses taking the last.
+  await expect
+    .element(screen.getByRole("button", { name: /^Revoke alice \(person\) as owner/ }))
+    .not.toBeInTheDocument();
+});
+
+test("on a phone, each place's grants are a list named by its heading", async () => {
+  await page.viewport(390, 844);
+  const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
+  await expect.element(screen.getByRole("list", { name: "Workspace ws_1" })).toBeVisible();
+  await expect
+    .element(screen.getByRole("table", { name: "Workspace ws_1" }))
+    .not.toBeInTheDocument();
+});
+
+test("a group made the tenant's admin is named so in the question", async () => {
+  const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
+  await screen.getByRole("combobox", { name: "Role" }).selectOptions("owner");
+  await screen.getByRole("combobox", { name: "On" }).selectOptions("tenant");
+  await screen.getByRole("combobox", { name: "To" }).selectOptions("ops (group)");
+  await screen.getByRole("button", { name: "Grant", exact: true }).click();
+  await expect
+    .element(screen.getByRole("alertdialog", { name: "Make ops (group) owner of acme?" }))
+    .toBeVisible();
 });
 
 test("the form starts on no role and no one, and a role chooses where again", async () => {
@@ -381,8 +412,15 @@ test("granting a role that runs the tenant is confirmed first", async () => {
   await screen.getByRole("combobox", { name: "Role" }).selectOptions("owner");
   await screen.getByRole("combobox", { name: "On" }).selectOptions("tenant");
   await screen.getByRole("combobox", { name: "To" }).selectOptions("bob (person)");
-  await screen.getByRole("button", { name: "Grant", exact: true }).click();
-  const dialog = screen.getByRole("alertdialog", { name: "Make them owner of acme?" });
+  // The trigger sits at the form's start, as Grant does; the question names whom it makes owner.
+  const trigger = screen.getByRole("button", { name: "Grant", exact: true });
+  await expect.element(trigger).toBeVisible();
+  const form = trigger.element().closest("form")?.getBoundingClientRect();
+  const placed = trigger.element().getBoundingClientRect();
+  expect(placed.width).toBeLessThan((form?.width ?? 0) / 2);
+  expect(placed.left).toBeCloseTo(form?.left ?? Number.NaN, 0);
+  await trigger.click();
+  const dialog = screen.getByRole("alertdialog", { name: "Make bob (person) owner of acme?" });
   expect(sent).toEqual([]);
   await dialog.getByRole("button", { name: "Grant owner" }).click();
   await expect
@@ -452,7 +490,7 @@ test("without deleting the tenant, owner isn't offered, nor its grants' Revoke",
 
 test("without revoking, Grants has no Revoke", async () => {
   const { screen } = await open("/t/acme/access/grants", ["grantr:grant"]);
-  await expect.element(screen.getByRole("table", { name: "Grants in ws_1" })).toBeVisible();
+  await expect.element(screen.getByRole("table", { name: "Workspace ws_1" })).toBeVisible();
   await expect.element(screen.getByRole("button", { name: /^Revoke/ })).not.toBeInTheDocument();
 });
 

@@ -380,3 +380,31 @@ test("a workspace's grants and the tenant's are read apart", () => {
   expect(keys.grantr.grants("acme")).not.toEqual(keys.grantr.grants("acme", "ws_1"));
   expect(queries.grantr.grants("acme").queryKey).toEqual(keys.grantr.grants("acme"));
 });
+
+test("a refusal says why, and never shows its body as it came", () => {
+  const said = (status: number, detail: unknown) => new Refused(status, detail).message;
+  expect(said(422, { detail: "no such subject" })).toBe(
+    "the server refused the read (422): no such subject",
+  );
+  expect(said(403, { detail: { type: "forbidden", message: "not an operator" } })).toBe(
+    "the server refused the read (403): not an operator",
+  );
+  expect(
+    said(422, {
+      detail: [
+        { loc: ["query", "start"], msg: "Input should be a valid datetime", input: "x", ctx: {} },
+        { loc: ["query", "end"], msg: "Field required", url: "https://errors.pydantic.dev" },
+      ],
+    }),
+  ).toBe(
+    "the server refused the read (422): start: Input should be a valid datetime; end: Field required",
+  );
+  expect(said(502, "<html>Bad gateway</html>")).toBe(
+    "the server refused the read (502): The server answered 502.",
+  );
+  expect(said(403, { detail: { type: "forbidden", message: { nested: true } } })).toBe(
+    "the server refused the read (403): The server answered 403.",
+  );
+  expect(said(500, null)).toBe("the server refused the read (500): The server answered 500.");
+  expect(said(500, undefined)).toBe("the server refused the read (500): The server answered 500.");
+});

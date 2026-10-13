@@ -2,6 +2,7 @@ import { type Answer, type GrantrApi, orThrow, refusal } from "@portalr/client";
 import {
   Button,
   Card,
+  type Column,
   ConfirmDialog,
   EmptyState,
   ItemTable,
@@ -111,6 +112,10 @@ function Grants() {
   );
   // Owner holds every action, deleting the tenant among them: only one who may gives or takes it.
   const owns = allowed.has("grantr:delete_tenant");
+  // grantr refuses taking the tenant's last owner: so does the page.
+  const owners = granted.filter((grant) => grant.role === "owner" && grant.on.kind === "tenant");
+  const revocable = (grant: Grant) =>
+    (grant.role !== "owner" || owns) && !(owners.length === 1 && owners[0] === grant);
   const roles = [
     ...catalog.roles.filter((role) => owns || role.name !== "owner"),
     ...(custom ?? []).map((role) => ({ name: role.name, kinds: catalog.custom_kinds })),
@@ -130,10 +135,9 @@ function Grants() {
         <Granted
           key={place ?? "~tenant"}
           tenant={tenant}
-          caption={place === null ? "Grants on the tenant" : `Grants in ${place}`}
+          heading={place === null ? "The tenant" : `Workspace ${place}`}
           grants={granted.filter((grant) => (grant.on.workspace ?? null) === place)}
-          revokes={allowed.has("grantr:revoke")}
-          owns={owns}
+          revocable={allowed.has("grantr:revoke") ? revocable : null}
         />
       ))}
       <Granting
@@ -150,16 +154,16 @@ function Grants() {
 /** One place's grants, the workspace's before its items', each revoked once confirmed. */
 function Granted({
   tenant,
-  caption,
+  heading,
   grants,
-  revokes,
-  owns,
+  revocable,
 }: {
   tenant: string;
-  caption: string;
+  /** The place, as its heading names it, and the table under it: "The tenant", "Workspace notes". */
+  heading: string;
   grants: readonly Grant[];
-  revokes: boolean;
-  owns: boolean;
+  /** Whether grantr would let a grant be revoked; null where revoking isn't allowed at all. */
+  revocable: ((grant: Grant) => boolean) | null;
 }) {
   const { commands } = Route.useRouteContext();
   const { changed } = useAccess(tenant);
@@ -170,49 +174,66 @@ function Granted({
       whom(a.to).localeCompare(whom(b.to)) ||
       a.role.localeCompare(b.role),
   );
+  const headingId = useId();
+  // The place is the heading's: an item in it is named, and the place itself isn't again.
+  const items = grants.some((grant) => AN_ITEM.has(grant.on.kind));
+  const columns: [Column<Grant>, ...Column<Grant>[]] = [
+    { key: "to", label: "To", cell: (grant) => whom(grant.to), width: "40%" },
+    { key: "role", label: "Role", cell: (grant) => grant.role, width: "20%" },
+    ...(items
+      ? [
+          {
+            key: "on",
+            label: "On",
+            cell: (grant: Grant) =>
+              AN_ITEM.has(grant.on.kind) ? `${grant.on.kind} ${grant.on.id}` : "the workspace",
+            width: "25%",
+          },
+        ]
+      : []),
+  ];
   return (
-    <ItemTable
-      caption={caption}
-      columns={[
-        { key: "to", label: "To", cell: (grant) => whom(grant.to) },
-        { key: "role", label: "Role", cell: (grant) => grant.role },
-        { key: "on", label: "On", cell: (grant) => where(grant.on) },
-      ]}
-      items={sorted}
-      keyOf={said}
-      named={said}
-      actions={
-        revokes
-          ? (grant) =>
-              grant.role === "owner" && !owns ? null : (
-                <ConfirmDialog
-                  label="Revoke"
-                  name={`Revoke ${said(grant)}`}
-                  title={`Revoke ${grant.role} from ${whom(grant.to)}?`}
-                  confirm="Revoke"
-                  onConfirm={async () =>
-                    orThrow(
-                      "Not revoked",
-                      await changed(
-                        commands.grantr.revoke(tenant, {
-                          role: grant.role,
-                          on: grant.on,
-                          to: grant.to,
-                        }),
-                      ),
-                    )
-                  }
-                >
-                  <p>
-                    They lose what {grant.role} holds on {where(grant.on)}, unless it's granted them
-                    another way.
-                  </p>
-                </ConfirmDialog>
-              )
-          : undefined
-      }
-      empty={{ title: "No grants here", body: "Grant a role below." }}
-    />
+    <div className="flex flex-col gap-2">
+      <SectionTitle id={headingId}>{heading}</SectionTitle>
+      <ItemTable
+        labelledBy={headingId}
+        columns={columns}
+        items={sorted}
+        keyOf={said}
+        named={said}
+        actions={
+          revocable
+            ? (grant) =>
+                !revocable(grant) ? null : (
+                  <ConfirmDialog
+                    label="Revoke"
+                    name={`Revoke ${said(grant)}`}
+                    title={`Revoke ${grant.role} from ${whom(grant.to)}?`}
+                    confirm="Revoke"
+                    onConfirm={async () =>
+                      orThrow(
+                        "Not revoked",
+                        await changed(
+                          commands.grantr.revoke(tenant, {
+                            role: grant.role,
+                            on: grant.on,
+                            to: grant.to,
+                          }),
+                        ),
+                      )
+                    }
+                  >
+                    <p>
+                      They lose what {grant.role} holds on {where(grant.on)}, unless it's granted
+                      them another way.
+                    </p>
+                  </ConfirmDialog>
+                )
+            : undefined
+        }
+        empty={{ title: "No grants here", body: "Grant a role below." }}
+      />
+    </div>
   );
 }
 
@@ -259,7 +280,9 @@ function Granting({
     );
   const kinds = roles.find((role) => role.name === fields.role)?.kinds ?? [];
   const kind = kinds.find((one) => one === fields.kind);
-  const confirmed = kind === "tenant" && RUNS_THE_TENANT.has(fields.role);
+  // Whom the fields name, read once: the grant, its question and what it says done all use it.
+  const to = fromKey(fields.to.trim(), GRANTEE_KINDS);
+  const confirmed = kind === "tenant" && RUNS_THE_TENANT.has(fields.role) && to !== null;
 
   /** Where the fields say, once they name a kind of resource. */
   const on = (from: ResourceKind): Resource => {
@@ -274,7 +297,6 @@ function Granting({
 
   /** The grant the fields name, sent; or why it can't be. */
   async function grant(): Promise<Answer<AuditEntry>> {
-    const to = fromKey(fields.to.trim(), GRANTEE_KINDS);
     if (kind === undefined || to === null) {
       return refused(
         "name the role, where, and whom, as user:id, service_principal:id or group:id",
@@ -285,7 +307,6 @@ function Granting({
 
   /** What a grant done says; the form starts again. */
   function done(): Said {
-    const to = fromKey(fields.to.trim(), GRANTEE_KINDS);
     const place = kind ? ` on ${where(on(kind))}` : "";
     setFields(EMPTY);
     return { said: `${to ? whom(to) : fields.to} holds ${fields.role}${place}.`, refused: false };
@@ -395,7 +416,8 @@ function Granting({
         {confirmed ? (
           <ConfirmDialog
             label="Grant"
-            title={`Make them ${fields.role} of ${tenant}?`}
+            className="self-start"
+            title={`Make ${whom(to)} ${fields.role} of ${tenant}?`}
             confirm={`Grant ${fields.role}`}
             onConfirm={async () => {
               orThrow("Not granted", await grant());

@@ -42,3 +42,67 @@ test("the keyboard reaches the table's scroll, a region of the caption's name", 
   await userEvent.tab();
   await expect.element(screen.getByRole("region", { name: "Runs" })).toHaveFocus();
 });
+
+test("a row's header reads as its row does, between the row's borders", async () => {
+  const screen = await render(
+    <Table caption="Members">
+      <thead>
+        <tr>
+          <th scope="col">Member</th>
+          <th scope="col">Kind</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">alice</th>
+          <td>person</td>
+        </tr>
+      </tbody>
+    </Table>,
+  );
+  const header = getComputedStyle(screen.getByRole("rowheader", { name: "alice" }).element());
+  const cell = getComputedStyle(screen.getByRole("cell", { name: "person" }).element());
+  expect(header.fontSize).toBe(cell.fontSize);
+  expect(header.color).toBe(cell.color);
+  expect(header.borderTopWidth).toBe(cell.borderTopWidth);
+  expect(header.borderTopStyle).toBe("solid");
+});
+
+test("a table may be named by a heading beside it", async () => {
+  const screen = await render(
+    <section>
+      <h2 id="tenant-grants">The tenant</h2>
+      <Table labelledBy="tenant-grants">
+        <tbody>
+          <tr>
+            <td>owner</td>
+          </tr>
+        </tbody>
+      </Table>
+    </section>,
+  );
+  await expect.element(screen.getByRole("table", { name: "The tenant" })).toBeVisible();
+  await expect.element(screen.getByRole("region", { name: "The tenant" })).toBeVisible();
+  expect(screen.getByRole("table").element().querySelector("caption")).toBeNull();
+});
+
+test("a column's header stays small and muted", async () => {
+  const screen = await render(
+    <Table caption="Members">
+      <thead>
+        <tr>
+          <th scope="col">Member</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>alice</td>
+        </tr>
+      </tbody>
+    </Table>,
+  );
+  const header = getComputedStyle(screen.getByRole("columnheader", { name: "Member" }).element());
+  const cell = getComputedStyle(screen.getByRole("cell", { name: "alice" }).element());
+  expect(Number.parseFloat(header.fontSize)).toBeLessThan(Number.parseFloat(cell.fontSize));
+  expect(header.color).not.toBe(cell.color);
+});

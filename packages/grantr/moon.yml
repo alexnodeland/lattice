@@ -1,8 +1,10 @@
-# grantr: identity and access for artifactr and reflexr. It imports neither, nor any sibling.
+# grantr: identity and access for artifactr and reflexr. It imports neither, nor any sibling but
+# lattice-core.
 language: 'python'
 layer: 'library'
 tags: ['distribution']
-dependsOn: []
+dependsOn:
+  - 'lattice-core'
 
 tasks:
   schema:

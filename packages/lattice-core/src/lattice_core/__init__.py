@@ -8,6 +8,8 @@ package (lattice ADR-0018).
   :func:`~lattice_core.schema.tag_required`.
 - :mod:`lattice_core.text`: checks on text before it is stored, such as
   :func:`~lattice_core.text.holds_nul`.
+- :mod:`lattice_core.sql`: SQL helpers for storage on SQLAlchemy's asyncio API, behind the
+  ``sql`` extra.
 """
 
 from importlib.metadata import version

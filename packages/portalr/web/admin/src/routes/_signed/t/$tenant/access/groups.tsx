@@ -10,6 +10,7 @@ import {
   fromKey,
   keyOf,
   opening,
+  possessive,
   refused,
   type Said,
   useAccess,
@@ -74,7 +75,7 @@ function Groups() {
       name: "Group",
       of: "Members",
       create: "Create a group",
-      change: (name) => `Change ${name}'s members`,
+      change: (name) => `Change ${possessive(name)} members`,
       created: "Create the group",
       saved: "Save the group",
     },
@@ -129,7 +130,7 @@ function Groups() {
           <>
             <Button
               variant="secondary"
-              aria-label={`Change ${group.name}'s members`}
+              aria-label={define.words.change(group.name)}
               onClick={() => void change(group.name)}
             >
               Change members

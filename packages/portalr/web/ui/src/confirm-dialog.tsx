@@ -14,6 +14,7 @@ import { TextField } from "./text-field";
 export function ConfirmDialog({
   label,
   name,
+  className,
   title,
   children,
   confirm,
@@ -24,6 +25,8 @@ export function ConfirmDialog({
   label: string;
   /** The trigger's accessible name, where its words alone don't say what it acts on. */
   name?: string;
+  /** The trigger's classes, beside its own, such as where it sits in a form. */
+  className?: string | undefined;
   /** The question, such as "Archive portalr:triage?". */
   title: string;
   /** What will be lost. */
@@ -65,7 +68,9 @@ export function ConfirmDialog({
         setFailed(null);
       }}
     >
-      <AlertDialog.Trigger render={<Button variant="secondary" aria-label={name} />}>
+      <AlertDialog.Trigger
+        render={<Button variant="secondary" aria-label={name} className={className ?? ""} />}
+      >
         {label}
       </AlertDialog.Trigger>
       <AlertDialog.Portal>

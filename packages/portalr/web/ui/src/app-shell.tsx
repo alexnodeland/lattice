@@ -2,6 +2,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { useRender } from "@base-ui/react/use-render";
 import { Menu as MenuGlyph, X } from "lucide-react";
 import { type MouseEvent, type ReactElement, type ReactNode, useEffect, useState } from "react";
+import { backdrop } from "./dialog";
 import { Icon } from "./icon";
 import { Lockup, Mark, type Ui } from "./marks";
 
@@ -84,7 +85,7 @@ export function AppShell({
             Menu
           </Dialog.Trigger>
           <Dialog.Portal>
-            <Dialog.Backdrop className="fixed inset-0 z-40 bg-scrim transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none" />
+            <Dialog.Backdrop className={backdrop} />
             <Dialog.Popup
               aria-modal="true"
               onClick={followed}

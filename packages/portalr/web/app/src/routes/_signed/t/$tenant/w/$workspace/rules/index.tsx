@@ -1,10 +1,10 @@
-import { keys } from "@portalr/client";
+import { keys, refusal } from "@portalr/client";
 import { Button, StatusBadge, TextField, TextLink } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useActionState, useMemo, useState } from "react";
-import { allowedIn } from "../../../../../../../allowed";
-import { read, refusal, SKELETON } from "../../../../../../../rules";
+import { allowedIn, workspaceOf } from "../../../../../../../allowed";
+import { read, SKELETON } from "../../../../../../../rules";
 import { Connection, useAutomation } from "../../../../../../../workspace";
 
 const ACTIONS = ["reflexr:install_rule"] as const;
@@ -24,7 +24,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/")({
         context.queries.reflexr.schedules(params.tenant, params.workspace),
       ),
       context.queryClient.ensureQueryData(
-        allowedIn(context.queries, params.tenant, params.workspace, ACTIONS),
+        allowedIn(context.queries, params.tenant, workspaceOf(params.workspace), ACTIONS),
       ),
     ]),
   component: Rules,
@@ -39,7 +39,7 @@ function Rules() {
   const { tenant, workspace } = Route.useParams();
   const { queries, commands, queryClient } = Route.useRouteContext();
   const checks = useMemo(
-    () => allowedIn(queries, tenant, workspace, ACTIONS),
+    () => allowedIn(queries, tenant, workspaceOf(workspace), ACTIONS),
     [queries, tenant, workspace],
   );
   const { data: allowed } = useSuspenseQuery(checks);

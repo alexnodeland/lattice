@@ -8,12 +8,19 @@ one else's. So this asks moon which projects the change touches, both by their f
 their tasks' inputs, which cover the root's files (uv.lock, pyproject.toml, .moon/), then adds
 every project that depends on one, all the way down, from moon's project graph, and runs the
 task in each that has it.
+
+A task in ONE_AT_A_TIME runs in one project after another, rather than all at once.
 """
 
 import json
 import subprocess
 import sys
 from typing import Any
+
+# Tasks whose projects run one after another, each its own `moon run`. app's and admin's
+# scenarios each start and stop a compose stack: in CI, one stack's network coming down while
+# the other's Chromium navigates fails it with ERR_NETWORK_CHANGED (ADR-0002).
+ONE_AT_A_TIME = frozenset({"bdd"})
 
 
 def query(*arguments: str) -> dict[str, Any]:
@@ -51,7 +58,9 @@ def main() -> int:
         return 0
     sys.stdout.write(f"affected: {' '.join(targets)}\n")
     sys.stdout.flush()
-    return subprocess.run(["moon", "run", *targets], check=False).returncode
+    batches = [[target] for target in targets] if task in ONE_AT_A_TIME else [targets]
+    codes = [subprocess.run(["moon", "run", *batch], check=False).returncode for batch in batches]
+    return max(codes)
 
 
 if __name__ == "__main__":

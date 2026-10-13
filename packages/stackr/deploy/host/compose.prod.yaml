@@ -80,8 +80,8 @@ services:
     volumes:
       - &ca ${BACKUP_S3_CA_FILE:-/etc/ssl/certs/ca-certificates.crt}:/etc/stackr/backup-ca.crt:ro
     ports: !reset []
-  # ClickHouse's BACKUP and RESTORE, to the same bucket, as the `backup` user, through the
-  # `backups` named collection.
+  # ClickHouse's BACKUP and RESTORE, to the same bucket, through the `backups` named collection:
+  # the `backup` user's backups and drill, and `admin`'s restore of a new host (ADR-0031).
   clickhouse:
     environment:
       <<: *bucket

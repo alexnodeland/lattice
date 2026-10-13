@@ -369,7 +369,9 @@ services:
     restart: unless-stopped
     user: "101:101"
     # Its users are deploy/clickhouse/users.xml's, not the image's: an admin for operators, and
-    # Langfuse's, which may use only its own database (ADR-0031).
+    # Langfuse's, which may use only its own database and the system tables it reads (ADR-0031).
+    # Langfuse's password is CLICKHOUSE_LANGFUSE_PASSWORD here, since both the image's entrypoint
+    # and clickhouse-client read CLICKHOUSE_PASSWORD as their own.
     environment:
       CLICKHOUSE_SKIP_USER_SETUP: "1"
       CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?run make env}

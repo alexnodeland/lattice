@@ -30,9 +30,9 @@ Each record captures one decision: the context that forced it, the options consi
 | [0024](0024-rules-from-chat-in-the-template.md) | Rules from chat in the template | Accepted |
 | [0025](0025-what-the-floci-spike-found.md) | What the Floci spike found | Accepted |
 | [0026](0026-the-single-host.md) | The single host | Accepted |
-| [0027](0027-the-single-hosts-backups.md) | The single host's backups | Accepted, amended by [0031](0031-clickhouse-s-admin-apart-from-langfuse.md) |
+| [0027](0027-the-single-hosts-backups.md) | The single host's backups | Accepted, amended by [0031](0031-clickhouses-admin-apart-from-langfuse.md) |
 | [0028](0028-local-supabase-on-the-loopback.md) | Local Supabase on the loopback | Accepted |
-| [0031](0031-clickhouse-s-admin-apart-from-langfuse.md) | ClickHouse's admin, apart from Langfuse | Accepted |
 | [0029](0029-the-aws-modules-and-tier-1.md) | The AWS modules, and tier 1 | Accepted |
+| [0031](0031-clickhouses-admin-apart-from-langfuse.md) | ClickHouse's admin, apart from Langfuse | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

@@ -41,6 +41,9 @@ A network made before this, or for another address, is refused: `make down`, the
 | `GRAFANA_ADMIN_PASSWORD` | Everything in Grafana; the data sources and dashboards are read-only in the UI | You |
 | `LANGFUSE_ADMIN_PASSWORD` | Langfuse's UI, as the admin of the `stackr` organisation. Sign-up is disabled | You |
 | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | The `stackr` project's API: scores, datasets, traces | The Collector, applications and evaluators |
+| `CLICKHOUSE_ADMIN_PASSWORD` | Everything in ClickHouse, the named collections included, from inside its container only ([ADR-0031](../adr/0031-clickhouses-admin-apart-from-langfuse.md)) | You |
+| `CLICKHOUSE_PASSWORD` | Langfuse's data in ClickHouse, and the system tables Langfuse reads; nothing else | Langfuse |
+| `CLICKHOUSE_BACKUP_PASSWORD` | On a single host, reading and backing up Langfuse's data, the backups' bucket, and the drill's own databases, from inside ClickHouse's container only | `make backup` and the restore drill |
 | Supabase's secret key | Supabase's admin API, including setting a user's tenant | You, and server-side code |
 | Supabase's publishable key | Signing users in, and the Data API as the anonymous role | Anyone: it is public |
 

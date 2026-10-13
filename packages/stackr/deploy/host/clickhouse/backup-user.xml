@@ -1,11 +1,12 @@
 <!-- The user deploy/host/backup and restore-drill run as, from inside the container only: it may
-     back up Langfuse's database, use the bucket, read the system tables, and own the drill's
-     three databases. Langfuse's own
-     user can't reach the bucket. -->
+     read and back up Langfuse's database, use the bucket, read the system tables the drill needs,
+     and own the drill's three databases. It can't write Langfuse's tables: ClickHouse's `admin`
+     restores a new host (ADR-0031). Langfuse's own user can't reach the bucket. Its password is
+     kept out of the preprocessed configuration ClickHouse writes to its data volume. -->
 <clickhouse>
   <users>
     <backup>
-      <password from_env="CLICKHOUSE_BACKUP_PASSWORD"/>
+      <password from_env="CLICKHOUSE_BACKUP_PASSWORD" hide_in_preprocessed="true"/>
       <networks>
         <ip>127.0.0.1</ip>
         <ip>::1</ip>
@@ -17,7 +18,10 @@
         <query>GRANT ALL ON stackr_drill.*</query>
         <query>GRANT ALL ON restore_drill.*</query>
         <query>GRANT ALL ON restore_sentinel.*</query>
-        <query>GRANT SELECT ON system.*</query>
+        <!-- The system tables the drill reads: what it restored, and the room to restore it. -->
+        <query>GRANT SELECT ON system.tables</query>
+        <query>GRANT SELECT ON system.parts</query>
+        <query>GRANT SELECT ON system.disks</query>
         <query>GRANT READ, WRITE ON S3</query>
         <query>GRANT NAMED COLLECTION ON backups</query>
       </grants>

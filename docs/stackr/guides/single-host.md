@@ -103,7 +103,7 @@ On a new host, with the same `.env` and the stack stopped:
      -c 'pgbackrest-conf && gosu postgres pgbackrest --stanza=stackr restore'
    ```
 
-2. **ClickHouse:** start only ClickHouse, before Langfuse, so its database is still empty, and restore the backup you choose as ClickHouse's `admin`, through the `backups` named collection. Neither Langfuse's user nor the `backup` user can write Langfuse's tables from the bucket, by design ([ADR-0031](../adr/0031-clickhouse-s-admin-apart-from-langfuse.md)).
+2. **ClickHouse:** start only ClickHouse, before Langfuse, so its database is still empty, and restore the backup you choose as ClickHouse's `admin`, through the `backups` named collection. Neither Langfuse's user nor the `backup` user can write Langfuse's tables from the bucket, by design ([ADR-0031](../adr/0031-clickhouses-admin-apart-from-langfuse.md)).
 
    ```bash
    docker compose -f compose.yaml -f deploy/host/compose.prod.yaml up --detach --wait clickhouse
@@ -116,4 +116,6 @@ On a new host, with the same `.env` and the stack stopped:
 
 ## Update it
 
-Check out the new stackr tag, then `make up` again: Compose pulls the new images and recreates what changed. Langfuse, LiteLLM, GoTrue and the application migrate their databases when they start.
+Check out the new stackr tag, then `make env` and `make up` again: `make env` adds any new setting, and Compose pulls the new images and recreates what changed. Langfuse, LiteLLM, GoTrue and the application migrate their databases when they start.
+
+To use ClickHouse by hand, sign in as its `admin`, inside its container: `docker compose exec clickhouse sh -c 'CLICKHOUSE_USER=admin CLICKHOUSE_PASSWORD="$CLICKHOUSE_ADMIN_PASSWORD" clickhouse-client'`. Langfuse's user reaches only Langfuse's data ([ADR-0031](../adr/0031-clickhouses-admin-apart-from-langfuse.md)).

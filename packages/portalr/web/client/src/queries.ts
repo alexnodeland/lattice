@@ -13,7 +13,7 @@ import { isKnown } from "./artifactr";
 import type * as artifactrV1 from "./generated/artifactr.v1";
 import type { components as Grantr } from "./generated/grantr.openapi";
 import type * as reflexrV1 from "./generated/reflexr.v1";
-import type { Api } from "./rest";
+import { type Api, named } from "./rest";
 
 type Check = Grantr["schemas"]["Check"];
 
@@ -79,9 +79,6 @@ export class Refused extends Error {
     this.detail = detail;
   }
 }
-
-/** The headers that name a read's tenant. */
-const named = (tenant: string) => ({ headers: { "X-Tenant": tenant } });
 
 /** The query options of every read, over the given clients. */
 export function createQueries(api: Api) {

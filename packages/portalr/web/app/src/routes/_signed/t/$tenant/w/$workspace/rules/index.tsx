@@ -1,8 +1,8 @@
 import { keys } from "@portalr/client";
 import { Button, StatusBadge, TextField, TextLink } from "@portalr/ui";
-import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { allowedIn } from "../../../../../../../allowed";
 import { read, refusal, SKELETON } from "../../../../../../../rules";
 import { Connection, useAutomation } from "../../../../../../../workspace";
@@ -30,13 +30,14 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/")({
   component: Rules,
 });
 
-/** A time the server gave, in the reader's own zone. */
-const when = (at: string | null) => (at === null ? "never" : new Date(at).toLocaleString());
+/** A time the server gave, in the reader's own zone, or never. */
+function When({ at }: { at: string | null }) {
+  return at === null ? "never" : <time dateTime={at}>{new Date(at).toLocaleString()}</time>;
+}
 
 function Rules() {
   const { tenant, workspace } = Route.useParams();
-  const { queries, commands } = Route.useRouteContext();
-  const queryClient = useQueryClient();
+  const { queries, commands, queryClient } = Route.useRouteContext();
   const checks = useMemo(
     () => allowedIn(queries, tenant, workspace, ACTIONS),
     [queries, tenant, workspace],
@@ -44,16 +45,8 @@ function Rules() {
   const { data: allowed } = useSuspenseQuery(checks);
   const { data: rules } = useSuspenseQuery(queries.reflexr.rules(tenant, workspace));
   const { data: schedules } = useSuspenseQuery(queries.reflexr.schedules(tenant, workspace));
+  // The list is read again as the log says a rule changed (`WorkspaceStreams`).
   const automation = useAutomation();
-  // Each stored rule's version as the log has it: when one changes, the list is read again.
-  const versions = Object.values(automation.state.rules)
-    .map((rule) => `${rule.name}@${rule.version}${rule.archived ? "-" : ""}`)
-    .join(" ");
-  useEffect(() => {
-    if (versions !== "") {
-      void queryClient.invalidateQueries({ queryKey: keys.reflexr.rules(tenant, workspace) });
-    }
-  }, [versions, queryClient, tenant, workspace]);
 
   // The field is held here, not by the form, which a sent action resets.
   const [text, setText] = useState(SKELETON);
@@ -62,12 +55,11 @@ function Rules() {
     if ("refused" in parsed) {
       return parsed.refused;
     }
-    const answer = await commands.reflexr.send(
-      tenant,
-      workspace,
-      { type: "install_rule", rule: parsed.rule, provenance: {} },
-      `install-${crypto.randomUUID()}`,
-    );
+    const answer = await commands.reflexr.send(tenant, workspace, {
+      type: "install_rule",
+      rule: parsed.rule,
+      provenance: {},
+    });
     if (answer.outcome === "refused") {
       return refusal("The rule wasn't installed", answer);
     }
@@ -81,7 +73,7 @@ function Rules() {
       <h2 id="rules" className="font-semibold text-lg">
         Rules
       </h2>
-      <Connection snapshot={automation} waiting="the workspace's rules" />
+      <Connection snapshot={automation} waiting="the latest changes to the rules" />
       <ul aria-label="Rules" className="flex flex-col gap-2">
         {rules.map((rule) => (
           <li key={rule.rule} aria-label={`Rule ${rule.rule}`} className="flex flex-wrap gap-2">
@@ -127,8 +119,12 @@ function Rules() {
                 className="flex flex-wrap gap-2"
               >
                 <code className="font-mono">{schedule.schedule}</code>
-                <span className="text-muted">next {when(schedule.next_tick)}</span>
-                <span className="text-muted">last {when(schedule.last_tick)}</span>
+                <span className="text-muted">
+                  next <When at={schedule.next_tick} />
+                </span>
+                <span className="text-muted">
+                  last <When at={schedule.last_tick} />
+                </span>
               </li>
             ))}
           </ul>
@@ -141,7 +137,6 @@ function Rules() {
           </h3>
           <TextField
             label="Rule, as reflexr's JSON"
-            name="rule"
             value={text}
             onValueChange={setText}
             error={refused}

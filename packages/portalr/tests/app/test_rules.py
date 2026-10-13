@@ -11,7 +11,11 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from grantr.core import RulePrincipal
+from reflexr import AgentActor
 from tests.app.main import create_app
+from tests.app.notes import APPLICATION
+from tests.app.tickets import subject
 
 REFLEXR = "/reflexr/v1/workspaces/notes"
 
@@ -62,6 +66,16 @@ def test_a_stored_rules_run_succeeds_as_the_rule(client: TestClient) -> None:
             return
         time.sleep(0.1)
     raise AssertionError("the stored rule's run never succeeded")
+
+
+def test_a_stored_rules_run_is_checked_as_the_rule_and_a_code_rules_as_the_application() -> None:
+    def run_of(rule: str) -> AgentActor:
+        return AgentActor(rule=rule, run_id="run_1", name=rule)
+
+    assert subject(APPLICATION, "notes", run_of(RULE["name"])) == RulePrincipal(
+        workspace="notes", rule="tickets:echo"
+    )
+    assert subject(APPLICATION, "notes", run_of("portalr:triage")) == APPLICATION
 
 
 def test_an_editor_may_not_install_one(client: TestClient) -> None:

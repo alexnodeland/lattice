@@ -59,7 +59,7 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 
 ## The app
 
-`web/app` is the people's UI, at `/portalr/app/`. It reads `config.json` first, signs in through Supabase Auth's client, `@supabase/auth-js`, and asks the server through `client`'s queries, each carrying the current token and the tenant its route names ([ADR-0014](adr/0014-the-apps-shell.md)). Commands go over each library's stream, except a stored rule's, which goes over reflexr's REST, for an answer to every one ([ADR-0020](adr/0020-the-rules-area.md)).
+`web/app` is the people's UI, at `/portalr/app/`. It reads `config.json` first, signs in through Supabase Auth's client, `@supabase/auth-js`, and asks the server through `client`'s queries, each carrying the current token and the tenant its route names ([ADR-0014](adr/0014-the-apps-shell.md)). Commands go over each library's stream, except a stored rule's, which goes over reflexr's REST, for an answer to every one; and each live event on a workspace's streams makes stale the reads it changed ([ADR-0020](adr/0020-the-rules-area.md)).
 
 | Route | Shows |
 |---|---|

@@ -49,7 +49,8 @@ function start(root: Root, config: Config) {
       config,
       signed,
       queries: createQueries(api),
-      commands: createCommands(api),
+      // A command refused as unsigned ends the session, as a read does.
+      commands: createCommands(api, () => void signed.signOut()),
       queryClient,
     },
   });

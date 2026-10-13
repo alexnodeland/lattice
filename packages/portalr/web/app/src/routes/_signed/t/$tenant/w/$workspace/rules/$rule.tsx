@@ -1,13 +1,16 @@
-import { keys } from "@portalr/client";
+import { keys, Refused } from "@portalr/client";
 import { Button, TextField } from "@portalr/ui";
-import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
+import { useActionState, useMemo, useState } from "react";
 import { allowedIn } from "../../../../../../../allowed";
 import { read, refusal } from "../../../../../../../rules";
-import { useAutomation } from "../../../../../../../workspace";
 
 const ACTIONS = ["reflexr:update_rule", "reflexr:archive_rule"] as const;
+
+/** The rule a page is about, as grantr names it: the server checks its commands on it. */
+const resource = (workspace: string, rule: string) =>
+  ({ kind: "rule", workspace, id: rule }) as const;
 
 /**
  * One of the workspace's rules: a code rule, read only, or a stored rule's current version,
@@ -16,15 +19,32 @@ const ACTIONS = ["reflexr:update_rule", "reflexr:archive_rule"] as const;
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/rules/$rule")({
   head: ({ params }) => ({ meta: [{ title: `${params.rule} · ${params.workspace} · portalr` }] }),
-  loader: ({ context, params }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(
-        context.queries.reflexr.rule(params.tenant, params.workspace, params.rule),
-      ),
-      context.queryClient.ensureQueryData(
-        allowedIn(context.queries, params.tenant, params.workspace, ACTIONS),
-      ),
-    ]),
+  // Another rule's page starts its editor afresh.
+  remountDeps: ({ params }) => params.rule,
+  loader: async ({ context, params }) => {
+    const { tenant, workspace, rule } = params;
+    await context.queryClient.ensureQueryData(
+      allowedIn(context.queries, tenant, workspace, ACTIONS, resource(workspace, rule)),
+    );
+    try {
+      await context.queryClient.ensureQueryData(
+        context.queries.reflexr.rule(tenant, workspace, rule),
+      );
+    } catch (error) {
+      if (error instanceof Refused && error.status === 404) {
+        throw notFound();
+      }
+      throw error;
+    }
+  },
+  notFoundComponent: () => (
+    <section aria-labelledby="rule">
+      <h2 id="rule" className="font-semibold text-lg">
+        Rule not found
+      </h2>
+      <p>There's no rule here by that name: it may have been archived.</p>
+    </section>
+  ),
   component: RulePage,
 });
 
@@ -33,39 +53,35 @@ const shown = (rule: unknown) => `${JSON.stringify(rule, null, 2)}\n`;
 
 function RulePage() {
   const { tenant, workspace, rule: name } = Route.useParams();
-  const { queries, commands } = Route.useRouteContext();
-  const queryClient = useQueryClient();
+  const { queries, commands, queryClient } = Route.useRouteContext();
   const navigate = useNavigate();
   const checks = useMemo(
-    () => allowedIn(queries, tenant, workspace, ACTIONS),
-    [queries, tenant, workspace],
+    () => allowedIn(queries, tenant, workspace, ACTIONS, resource(workspace, name)),
+    [queries, tenant, workspace, name],
   );
   const { data: allowed } = useSuspenseQuery(checks);
+  // Read again as the log says the rule changed (`WorkspaceStreams`).
   const { data: held } = useSuspenseQuery(queries.reflexr.rule(tenant, workspace, name));
-  // The log's version of the rule: when an active one passes what was read, it's read again.
-  const logged = useAutomation().state.rules[name];
-  const newer = logged !== undefined && !logged.archived && logged.version > (held.version ?? 0);
-  useEffect(() => {
-    if (newer) {
-      void queryClient.invalidateQueries({ queryKey: keys.reflexr.rule(tenant, workspace, name) });
-    }
-  }, [newer, queryClient, tenant, workspace, name]);
+  const current = held.version ?? 0;
 
   // The field is held here, not by the form, which a sent action resets; and the version its
-  // text was opened at, or last saved as, which a change says it replaces.
+  // text was opened at, or last saved or loaded as, which a change says it replaces.
   const [text, setText] = useState(() => shown(held.rule));
-  const [base, setBase] = useState(held.version ?? 0);
+  const [base, setBase] = useState(current);
   const [refused, save, saving] = useActionState(async () => {
     const parsed = read(text);
     if ("refused" in parsed) {
       return parsed.refused;
     }
-    const answer = await commands.reflexr.send(
-      tenant,
-      workspace,
-      { type: "update_rule", rule: parsed.rule, expected_version: base, provenance: {} },
-      `update-${crypto.randomUUID()}`,
-    );
+    if (parsed.rule.name !== name) {
+      return `The rule's name is ${name}; install a new rule to rename it.`;
+    }
+    const answer = await commands.reflexr.send(tenant, workspace, {
+      type: "update_rule",
+      rule: parsed.rule,
+      expected_version: base,
+      provenance: {},
+    });
     if (answer.outcome === "refused") {
       return refusal("The rule wasn't saved", answer);
     }
@@ -76,17 +92,15 @@ function RulePage() {
     await queryClient.invalidateQueries({ queryKey: keys.reflexr.rule(tenant, workspace, name) });
     return null;
   }, null);
-  const [archived, archive, archiving] = useActionState(async () => {
-    const answer = await commands.reflexr.send(
-      tenant,
-      workspace,
-      { type: "archive_rule", rule: name, expected_version: base },
-      `archive-${crypto.randomUUID()}`,
-    );
+  const [unarchived, archive, archiving] = useActionState(async () => {
+    const answer = await commands.reflexr.send(tenant, workspace, {
+      type: "archive_rule",
+      rule: name,
+      expected_version: base,
+    });
     if (answer.outcome === "refused") {
       return refusal("The rule wasn't archived", answer);
     }
-    queryClient.removeQueries({ queryKey: keys.reflexr.rule(tenant, workspace, name) });
     await navigate({ to: "/t/$tenant/w/$workspace/rules", params: { tenant, workspace } });
     return null;
   }, null);
@@ -105,9 +119,23 @@ function RulePage() {
       </p>
       {stored && allowed.has("reflexr:update_rule") ? (
         <form aria-label="Edit the rule" className="flex flex-col gap-2" action={save}>
+          {current > base && (
+            <p role="status" className="flex flex-wrap items-center gap-2">
+              Version {current} was saved since you opened this.
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setText(shown(held.rule));
+                  setBase(current);
+                }}
+              >
+                Load version {current}
+              </Button>
+            </p>
+          )}
           <TextField
             label="Rule, as reflexr's JSON"
-            name="rule"
             value={text}
             onValueChange={setText}
             error={refused}
@@ -119,14 +147,16 @@ function RulePage() {
           </Button>
         </form>
       ) : (
-        <pre className="overflow-x-auto font-mono text-sm">{shown(held.rule)}</pre>
+        <section aria-label="The rule, as reflexr's JSON">
+          <pre className="overflow-x-auto font-mono text-sm">{shown(held.rule)}</pre>
+        </section>
       )}
       {stored && allowed.has("reflexr:archive_rule") && (
-        <form className="flex flex-col gap-1" action={archive}>
+        <form aria-label="Archive the rule" className="flex flex-col gap-1" action={archive}>
           <Button type="submit" variant="secondary" disabled={archiving} className="self-start">
             Archive
           </Button>
-          {archived && <p role="alert">{archived}</p>}
+          {unarchived && <p role="alert">{unarchived}</p>}
         </form>
       )}
     </section>

@@ -50,6 +50,12 @@ When("they install a rule with no throttle", async ({ page }) => {
   await send(page, ruleOf(name, "Unbounded", { filter: THROTTLED.filter }), "Install");
 });
 
+When("they install a rule whose throttle allows {string}", async ({ page }, times: string) => {
+  const name = `tickets:r${crypto.randomUUID().slice(0, 8)}`;
+  const when = { ...THROTTLED, throttle: { ...THROTTLED.throttle, at_most: times } };
+  await send(page, ruleOf(name, "Mistyped", when), "Install");
+});
+
 When("they install {string}", async ({ page }, text: string) => {
   await send(page, text, "Install");
 });
@@ -95,7 +101,9 @@ When("they open their rule", async ({ page, scenario }) => {
 });
 
 Then("they can't edit or archive it", async ({ page }) => {
-  await expect(page.getByText('"description"')).toBeVisible();
+  await expect(page.getByRole("region", { name: "The rule, as reflexr's JSON" })).toContainText(
+    '"description"',
+  );
   await expect(field(page)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Archive" })).toHaveCount(0);
 });
@@ -104,8 +112,25 @@ When("they describe their rule as {string}", async ({ page, scenario }, text: st
   await send(page, ruleOf(own(scenario.rule), text), "Save");
 });
 
+When(
+  "they change only its description, in the JSON shown, to {string}",
+  async ({ page }, text: string) => {
+    const rule = JSON.parse(await field(page).inputValue());
+    await send(page, JSON.stringify({ ...rule, description: text }, null, 2), "Save");
+  },
+);
+
+When("they load version {int}", async ({ page }, version: number) => {
+  await page.getByRole("button", { name: `Load version ${version}` }).click();
+});
+
+When("they open their rule's page again", async ({ page, scenario }) => {
+  const rule = own(scenario.rule);
+  await page.goto(`${page.url().replace(/\/rules$/, "")}/rules/${encodeURIComponent(rule)}`);
+});
+
 Given(
-  "someone else has described their rule as {string}",
+  "the rule is changed elsewhere to {string}",
   async ({ page, request, scenario }, text: string) => {
     const updated = await request.post(`${origin()}/reflexr/v1/workspaces/notes/commands`, {
       headers: { Authorization: `Bearer ${await session(page)}`, "X-Tenant": "acme" },

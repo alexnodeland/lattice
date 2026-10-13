@@ -1,7 +1,8 @@
 /**
  * A workspace's streams, open while the workspace's routes are: artifactr's, whose store holds
  * its threads, messages, artifacts, proposals and turns, and reflexr's, whose store holds its
- * rules and runs. The routes under it read either store, and where its connection is.
+ * rules and runs. The routes under it read either store, and where its connection is; and what
+ * either log says changed, once live, makes stale the reads it changed (`client`'s `stale`).
  */
 
 import {
@@ -14,8 +15,10 @@ import {
   type Snapshot,
   Stream,
   type Surfaces,
+  stale,
   streamUrl,
 } from "@portalr/client";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
   type ReactNode,
@@ -59,6 +62,27 @@ export function WorkspaceStreams({
       reflexr: new Stream(reflexr, { url: url(surfaces.reflexr) }),
     };
   });
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    const invalidate = (keys: readonly (readonly unknown[])[]) => {
+      for (const queryKey of keys) {
+        void queryClient.invalidateQueries({ queryKey });
+      }
+    };
+    const unhear = [
+      streams.artifactr.onLiveEvent((envelope) =>
+        invalidate(stale.artifactr(tenant, workspace, envelope)),
+      ),
+      streams.reflexr.onLiveEvent((envelope) =>
+        invalidate(stale.reflexr(tenant, workspace, envelope)),
+      ),
+    ];
+    return () => {
+      for (const stop of unhear) {
+        stop();
+      }
+    };
+  }, [streams, queryClient, tenant, workspace]);
   useEffect(() => {
     const each = [streams.artifactr, streams.reflexr];
     for (const stream of each) {

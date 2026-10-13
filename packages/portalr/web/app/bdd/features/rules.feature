@@ -22,8 +22,12 @@ Feature: Rules
     When they open their rule
     And they describe their rule as "Triage it twice"
     Then they see "Stored in this workspace, version 2."
+    When they change only its description, in the JSON shown, to "Triage it thrice"
+    Then they see "Stored in this workspace, version 3."
     When they archive their rule
     Then their rule isn't listed
+    When they open their rule's page again
+    Then they see "Rule not found"
 
   Scenario: A rule reflexr refuses says why on its field
     Given alice has signed in
@@ -33,6 +37,8 @@ Feature: Rules
     Then the field says "That isn't JSON"
     When they install a rule with no throttle
     Then the field says "when.throttle is required"
+    When they install a rule whose throttle allows "ten"
+    Then the field says "rule.when.throttle.at_most"
 
   Scenario: An edit over someone else's is refused
     Given alice has signed in
@@ -40,6 +46,11 @@ Feature: Rules
     When they open the workspace's rules
     And they install a rule of their own
     And they open their rule
-    And someone else has described their rule as "Triage it elsewhere"
+    And the rule is changed elsewhere to "Triage it elsewhere"
     And they describe their rule as "Triage it here"
     Then the field says "is at version 2, not 1"
+    And they see "Stored in this workspace, version 2."
+    And they see "Version 2 was saved since you opened this."
+    When they load version 2
+    And they describe their rule as "Triage it here"
+    Then they see "Stored in this workspace, version 3."

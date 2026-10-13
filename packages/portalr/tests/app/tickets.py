@@ -72,31 +72,35 @@ async def triage(reaction: Reaction[None]) -> dict[str, str]:
     return {"triaged": subject}
 
 
+def subject(application: ServicePrincipal, workspace: str | None, actor: Actor) -> Subject:
+    """Who grantr checks for a reflexr actor, as the template's ``reflexr_subject`` maps them: a
+    person, and a client acting for one, as them; a client with a key as its principal; the code
+    rule's runs, and the application's own system, as the application; a stored rule's runs as
+    the rule; any other agent as no one."""
+    match actor:
+        case UserActor():
+            return User(id=actor.id)
+        case ExternalAgentActor(on_behalf_of=None):
+            return ServicePrincipal(id=actor.client_id)
+        case ExternalAgentActor(on_behalf_of=UserActor(id=person)):
+            return User(id=person)
+        case AgentActor(rule=rule) if rule == TRIAGE.name:
+            return application
+        case AgentActor(rule=rule) if workspace is not None:
+            return RulePrincipal(workspace=workspace, rule=rule)
+        case SystemActor() | EvaluatorActor() | SourceActor():
+            return application
+        case _:  # an agent of no rule this application has holds nothing
+            return AgentSubject()
+
+
 def automation(grants: Grants, application: ServicePrincipal) -> tuple[Workspaces, Reactor[None]]:
     """reflexr's workspaces, checked by grantr, and the reactor that runs their rules."""
 
-    def subject(_tenant: str, workspace: str | None, actor: Actor) -> Subject:
-        """Who grantr checks for a reflexr actor, as the template's ``reflexr_subject`` maps them:
-        a person, and a client acting for one, as them; a client with a key as its principal;
-        the code rule's runs, and the application's own system, as the application; a stored
-        rule's runs as the rule; any other agent as no one."""
-        match actor:
-            case UserActor():
-                return User(id=actor.id)
-            case ExternalAgentActor(on_behalf_of=None):
-                return ServicePrincipal(id=actor.client_id)
-            case ExternalAgentActor(on_behalf_of=UserActor(id=person)):
-                return User(id=person)
-            case AgentActor(rule=rule) if rule == TRIAGE.name:
-                return application
-            case AgentActor(rule=rule) if workspace is not None:
-                return RulePrincipal(workspace=workspace, rule=rule)
-            case SystemActor() | EvaluatorActor() | SourceActor():
-                return application
-            case _:  # an agent of no rule this application has holds nothing
-                return AgentSubject()
+    def checked_as(_tenant: str, workspace: str | None, actor: Actor) -> Subject:
+        return subject(application, workspace, actor)
 
-    hooks = grants.hooks(subject)
+    hooks = grants.hooks(checked_as)
     workspaces = Workspaces(
         InMemoryStorage(),
         events=[TicketOpened],

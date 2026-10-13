@@ -1,5 +1,5 @@
-"""lattice-core's shipped code imports only the standard library and pydantic, never a lattice
-package (lattice ADR-0018)."""
+"""lattice-core's shipped code imports only the standard library, pydantic and what its extras
+declare, each only where the extra is needed, and never a lattice package (lattice ADR-0018)."""
 
 import ast
 import sys
@@ -9,7 +9,9 @@ import pytest
 
 SOURCE = Path(__file__).parent.parent / "src" / "lattice_core"
 ALLOWED = {"lattice_core", "pydantic"}
-"""The modules beyond the standard library that lattice-core may import: its own and pydantic."""
+"""The modules beyond the standard library that every part of lattice-core may import."""
+EXTRAS = {"sql": {"sqlalchemy"}}
+"""What each extra's subpackage may import as well."""
 
 
 def _imports(path: Path) -> set[str]:
@@ -24,6 +26,7 @@ def _imports(path: Path) -> set[str]:
 
 
 @pytest.mark.parametrize("path", sorted(SOURCE.rglob("*.py")), ids=lambda p: p.name)
-def test_shipped_code_imports_only_the_standard_library_and_pydantic(path: Path) -> None:
-    outside = _imports(path) - sys.stdlib_module_names - ALLOWED
+def test_shipped_code_imports_only_the_standard_library_pydantic_and_its_extra(path: Path) -> None:
+    extra = path.relative_to(SOURCE).parts[0]
+    outside = _imports(path) - sys.stdlib_module_names - ALLOWED - EXTRAS.get(extra, set())
     assert not outside, f"{path.name} imports {sorted(outside)}"

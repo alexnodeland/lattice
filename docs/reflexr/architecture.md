@@ -74,7 +74,7 @@ Dependencies point one way. Each layer is usable without the ones above it, and 
 | `reflexr.evals` (extra) | workspace, evalr | evalr's `FeedbackSource` over a workspace's log, `EvaluatorAction`, which runs an evalr evaluator as a rule's action and records its verdicts as feedback, replay experiments and the end-to-end measures. |
 | `reflexr.workspace` | core, telemetry, cronsim, lattice-core's `text` | `Workspaces`, `Workspace` and the rule and schedule statuses it reports, `Workspaces.execute`, which carries out commands once per id, and its `CommandResults` port, the storage protocol, in-memory storage, the `Reactor` (evaluation, execution and schedules), the action port and `Reaction`, and function actions. |
 | `reflexr.agent` | workspace, pydantic-ai, pydantic-graph | Agent actions with the `EventContext` capability, graph actions with checkpoints (adapters of the action port), and `function_model` for tests. |
-| `reflexr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | `SqlStorage` on PostgreSQL and SQLite, and its packaged migrations. |
+| `reflexr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic, lattice-core's `sql` | `SqlStorage` on PostgreSQL and SQLite, and its packaged migrations. |
 | `reflexr.fastapi` (extra) | workspace, FastAPI | HTTP ingest, REST reads and administration, and the WebSocket stream protocol, over one command handler. |
 | `reflexr.mcp` (extra) | workspace, mcp | Publishing, reading and administration as MCP tools, and runs as resources. |
 | `reflexr.otel` (extra) | telemetry, the OpenTelemetry SDK and instrumentations | `configure_telemetry`: the SDK behind the API, with the metric views, composed with other libraries' contributions. |
@@ -502,13 +502,11 @@ erDiagram
 | MCP | Tenant in resource URIs | The same |
 | Commands | `Runner.execute(workspace, command, command_id=)` returns the `command_result`, remembered in a `CommandResults` port by tenant, workspace, participant and id; every MCP tool that changes something takes `command_id` | The same, as `Workspaces.execute` |
 
-What reflexr and artifactr shared verbatim moves into [lattice-core](../lattice-core/index.md), which both depend on ([lattice ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md)): `tag_required` and the NUL search are there already. Until the rest moves, it is copied at the same path under `src/artifactr/`, each copy says so, and a change to one is made to both:
+What reflexr and artifactr shared verbatim moves into [lattice-core](../lattice-core/index.md), which both depend on ([lattice ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md)): `tag_required`, the NUL search, the SQLite engine, the tenant session, and the session helpers that await a database call to its end and lock a row are there already. Until the rest moves, it is copied at the same path under `src/artifactr/`, each copy says so, and a change to one is made to both:
 
 - `_logging_left_alone`, in `src/reflexr/mcp/server.py`
 - `litellm_model`, in `src/reflexr/litellm/gateway.py`
-- `create_sqlite_engine`, in `src/reflexr/sql/sqlite.py`
 - `langfuse_client`, in `src/reflexr/langfuse/client.py`
-- `_to_the_end` and `_awaited_to_the_end`, in `src/reflexr/sql/storage.py` ([ADR-0042](adr/0042-cancel-safe-storage.md))
 
 ## Dependencies
 

@@ -8,15 +8,13 @@ import importlib.util
 from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
-from typing import Any, cast
+from typing import cast
 
 import pytest
 from sqlalchemy import Connection
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.orm import Session
 
 from reflexr.sql.schema import _row_level_security
-from reflexr.sql.tenancy import TENANT, _set_tenant, grant
 
 MIGRATION = (
     Path(__file__).parents[2] / "src/reflexr/sql/migrations/versions/0007_row_level_security.py"
@@ -61,18 +59,6 @@ def _migration(recorder: Recorder, monkeypatch: pytest.MonkeyPatch) -> ModuleTyp
     return module
 
 
-def test_a_role_is_granted_the_schema_the_tables_and_their_sequences() -> None:
-    recorder = Recorder()
-    grant(cast("Connection", recorder), "app role", ["reflexr_runs", "reflexr_events"])
-    granted = [s for s in recorder.statements if s.startswith("GRANT")]
-    assert granted == [
-        'GRANT USAGE ON SCHEMA "app schema" TO "app role"',
-        'GRANT SELECT, INSERT, UPDATE, DELETE ON reflexr_events TO "app role"',
-        'GRANT SELECT, INSERT, UPDATE, DELETE ON reflexr_runs TO "app role"',
-        'GRANT USAGE ON SEQUENCE numbered_id_seq TO "app role"',
-    ]
-
-
 def test_create_schema_creates_the_policies_the_migration_does(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -81,18 +67,6 @@ def test_create_schema_creates_the_policies_the_migration_does(
     created = Recorder()
     _row_level_security(cast("Connection", created))
     assert sorted(created.statements) == sorted(migrated.statements)
-
-
-def test_a_transaction_names_its_tenant() -> None:
-    recorder = Recorder()
-    session = cast("Session", SimpleNamespace(info={TENANT: "acme"}))
-    _set_tenant(session, cast("Any", None), cast("Connection", recorder))
-    assert recorder.calls == [
-        (
-            "SELECT set_config(:setting, :tenant, true)",
-            {"setting": "lattice.tenant_id", "tenant": "acme"},
-        )
-    ]
 
 
 def test_the_migration_creates_and_drops_the_policies(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -8,54 +8,19 @@ cancellation is raised after it. SQLAlchemy takes a statement cancelled part-way
 connection, which on SQLite can keep the database's write lock, or the pool's one connection.
 """
 
-import asyncio
 import contextlib
-import functools
-from collections.abc import Awaitable, Callable
 from datetime import UTC, timedelta
-from types import CoroutineType
-from typing import Any, Final
+from typing import Final
 
 from sqlalchemy import ColumnElement, delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
 
+from lattice_core.sql import awaited_to_the_end
 from relayr.ledger import Cause, CauseKind, Clock, DeadLetter, WorkspaceKey, utc_now
 from relayr.sql.tables import CauseRow, DeadLetterRow, FollowerRow
 from relayr.sql.tenancy import TENANT, TenantSession
-
-
-# Shared verbatim with artifactr's src/artifactr/sql/storage.py, reflexr's
-# src/reflexr/sql/storage.py and grantr's src/grantr/sql/storage.py; change all four.
-async def _to_the_end[T](call: Awaitable[T]) -> T:
-    """Await a database call to its end; a cancellation that came meanwhile is raised after."""
-    task = asyncio.ensure_future(call)
-    cancelled: asyncio.CancelledError | None = None
-    while not task.done():
-        try:
-            await asyncio.wait([task])
-        except asyncio.CancelledError as error:
-            cancelled = error
-    if cancelled is not None:
-        if not task.cancelled():
-            task.exception()
-        raise cancelled
-    return task.result()
-
-
-# Shared verbatim with artifactr's src/artifactr/sql/storage.py, reflexr's
-# src/reflexr/sql/storage.py and grantr's src/grantr/sql/storage.py; change all four.
-def _awaited_to_the_end[**P, T](
-    method: Callable[P, Awaitable[T]],
-) -> Callable[P, "CoroutineType[Any, Any, T]"]:  # subscriptable at run time from Python 3.13
-    """Await every call of a method to its end, with :func:`_to_the_end`."""
-
-    @functools.wraps(method)
-    async def call(*args: P.args, **kwargs: P.kwargs) -> T:
-        return await _to_the_end(method(*args, **kwargs))
-
-    return call
 
 
 def _follower(workspace: WorkspaceKey) -> ColumnElement[bool]:
@@ -136,7 +101,7 @@ class SqlLedger:
             except IntegrityError:
                 await session.rollback()
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def acquire_lease(self, workspace: WorkspaceKey, holder: str, ttl: timedelta) -> bool:
         """Take or renew the workspace's lease for `ttl`. Return False if another holder has it."""
         # Normalized to UTC, because SQLite compares timestamps as text.
@@ -159,7 +124,7 @@ class SqlLedger:
             )
             return taken is not None
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def release_lease(self, workspace: WorkspaceKey, holder: str) -> None:
         """Release the workspace's lease, if `holder` has it."""
         async with self._session(workspace.tenant_id) as session, session.begin():
@@ -169,14 +134,14 @@ class SqlLedger:
                 .values(holder=None, expires_at=None)
             )
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def cursor(self, workspace: WorkspaceKey) -> int:
         """Return the `seq` of the last envelope the workspace's follower is done with, or 0."""
         async with self._session(workspace.tenant_id) as session:
             row = await session.get(FollowerRow, workspace)
         return 0 if row is None else row.seq
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def save_cursor(self, workspace: WorkspaceKey, seq: int) -> None:
         """Save that the follower is done with `seq`. A cursor only moves forward.
 
@@ -187,12 +152,12 @@ class SqlLedger:
             row = await _locked(session, workspace)
             row.seq = max(row.seq, seq)
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def dead_letter(self, workspace: WorkspaceKey, letter: DeadLetter) -> None:
         """Record an envelope the follower could not bridge; once per `seq`, the first kept."""
         await self._insert_once(DeadLetterRow(**workspace._asdict(), **letter.model_dump()))
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def dead_letters(self, workspace: WorkspaceKey) -> list[DeadLetter]:
         """Return the workspace's dead letters, in `seq` order."""
         query = (
@@ -215,7 +180,7 @@ class SqlLedger:
                 for row in rows
             ]
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def record_cause(
         self, workspace: WorkspaceKey, kind: CauseKind, key: str, cause: Cause
     ) -> None:
@@ -228,7 +193,7 @@ class SqlLedger:
             )
         )
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def cause(self, workspace: WorkspaceKey, kind: CauseKind, key: str) -> Cause | None:
         """Return the run behind a write, or None if no run of a rule made it."""
         async with self._session(workspace.tenant_id) as session:
@@ -242,7 +207,7 @@ class SqlLedger:
             depth=row.depth,
         )
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def forget_causes(self, workspace: WorkspaceKey, *, older_than: timedelta) -> None:
         """Forget the causes recorded longer ago than `older_than`, by the ledger's clock."""
         before = self._clock().astimezone(UTC) - older_than
@@ -255,7 +220,7 @@ class SqlLedger:
                 )
             )
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def followed(self) -> list[WorkspaceKey]:
         """Return every workspace a follower has held a lease on or saved a cursor for, in order."""
         query = select(FollowerRow.tenant_id, FollowerRow.workspace_id).order_by(

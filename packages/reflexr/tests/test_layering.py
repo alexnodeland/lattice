@@ -57,7 +57,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     ),
     "sql": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.sql"},
-        {"pydantic", "sqlalchemy", "alembic"},
+        {"pydantic", "sqlalchemy", "alembic", "lattice_core.sql"},
     ),
 }
 

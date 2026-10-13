@@ -2,8 +2,8 @@ import {
   type Artifactr,
   type ArtifactrV1,
   allowedIn,
+  changedAccess,
   type GrantrApi,
-  keys,
   thumbs,
   useMe,
   workspaceOf,
@@ -400,11 +400,7 @@ function Sharing({
     .filter((person) => !holding.has(person))
     .sort();
   /** A change to access, done or not, after which grantr's answers in the tenant are read again. */
-  async function changed<A>(answer: Promise<A>): Promise<A> {
-    const answered = await answer;
-    await queryClient.invalidateQueries({ queryKey: keys.grantr.tenant(tenant) });
-    return answered;
-  }
+  const changed = <A,>(answer: Promise<A>) => changedAccess(queryClient, tenant, answer);
   const canShare = allowed.has("grantr:grant");
   return (
     <div className="flex flex-col items-end gap-1">

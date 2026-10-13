@@ -8,7 +8,7 @@
  */
 
 import type { components as Grantr } from "./generated/grantr.openapi";
-import type { components as components_portalr } from "./generated/portalr.openapi";
+import type { components as Portalr } from "./generated/portalr.openapi";
 import type { components } from "./generated/reflexr.openapi";
 import { type Api, named } from "./rest";
 
@@ -19,7 +19,7 @@ type Restriction = Grantr["schemas"]["Restriction"];
 type AuditEntry = Grantr["schemas"]["AuditEntry"];
 type Member = Grantr["schemas"]["Member"];
 type IssuedKey = Grantr["schemas"]["IssuedKey"];
-type Invited = components_portalr["schemas"]["Invited"];
+type Invited = Portalr["schemas"]["Invited"];
 
 /** A command's answer: carried out, with what the server answered, or refused, with each reason. */
 export type Answer<R = Result> = { readonly outcome: "done"; readonly result: R } | Refusal;
@@ -124,8 +124,11 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       reasons: reasons(response.status, data ?? error),
     };
   }
-  /** A grantr request in a tenant: its path, and the header that names it, as every read sends. */
-  const inTenant = (tenant: string) => ({ ...named(tenant), params: { path: { tenant } } });
+  /** A grantr request in a tenant, with any more of its path: the header names it, as every read sends. */
+  const inTenant = <P extends Record<string, string>>(tenant: string, path: P) => ({
+    ...named(tenant),
+    params: { path: { tenant, ...path } },
+  });
   return {
     reflexr: {
       /** Send one command to a workspace, once: the same `id` makes a retry the same command. */
@@ -149,7 +152,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       grant: (tenant: string, request: GrantRequest): Promise<Answer<AuditEntry>> =>
         answer(
           api.grantr.POST("/grantr/v1/tenants/{tenant}/grants", {
-            ...inTenant(tenant),
+            ...inTenant(tenant, {}),
             body: request,
           }),
         ),
@@ -157,7 +160,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       revoke: (tenant: string, request: GrantRequest): Promise<Answer<AuditEntry>> =>
         answer(
           api.grantr.POST("/grantr/v1/tenants/{tenant}/revocations", {
-            ...inTenant(tenant),
+            ...inTenant(tenant, {}),
             body: request,
           }),
         ),
@@ -165,7 +168,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       restrict: (tenant: string, restriction: Restriction): Promise<Answer<AuditEntry>> =>
         answer(
           api.grantr.POST("/grantr/v1/tenants/{tenant}/restrictions", {
-            ...inTenant(tenant),
+            ...inTenant(tenant, {}),
             body: restriction,
           }),
         ),
@@ -173,25 +176,17 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       addMember: (tenant: string, member: Member): Promise<Answer<AuditEntry>> =>
         answer(
           api.grantr.POST("/grantr/v1/tenants/{tenant}/members", {
-            ...inTenant(tenant),
+            ...inTenant(tenant, {}),
             body: { member },
           }),
         ),
       /** Remove a member, with their grants, their places in groups, and their keys. */
       removeMember: (tenant: string, member: Member): Promise<Answer<AuditEntry>> =>
-        member.kind === "user"
-          ? answer(
-              api.grantr.DELETE("/grantr/v1/tenants/{tenant}/members/user/{member_id}", {
-                ...named(tenant),
-                params: { path: { tenant, member_id: member.id } },
-              }),
-            )
-          : answer(
-              api.grantr.DELETE(
-                "/grantr/v1/tenants/{tenant}/members/service_principal/{member_id}",
-                { ...named(tenant), params: { path: { tenant, member_id: member.id } } },
-              ),
-            ),
+        answer(
+          api.grantr.DELETE(`/grantr/v1/tenants/{tenant}/members/${member.kind}/{member_id}`, {
+            ...inTenant(tenant, { member_id: member.id }),
+          }),
+        ),
       /** Create a group, or replace its members. */
       defineGroup: (
         tenant: string,
@@ -200,8 +195,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       ): Promise<Answer<AuditEntry>> =>
         answer(
           api.grantr.PUT("/grantr/v1/tenants/{tenant}/groups/{group}", {
-            ...named(tenant),
-            params: { path: { tenant, group } },
+            ...inTenant(tenant, { group }),
             body: { members: [...members] },
           }),
         ),
@@ -209,15 +203,14 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       deleteGroup: (tenant: string, group: string): Promise<Answer<AuditEntry>> =>
         answer(
           api.grantr.DELETE("/grantr/v1/tenants/{tenant}/groups/{group}", {
-            ...named(tenant),
-            params: { path: { tenant, group } },
+            ...inTenant(tenant, { group }),
           }),
         ),
       /** Issue a key for a service principal: its secret is in the answer, and nowhere after. */
       issueKey: (tenant: string, principal: string): Promise<Answer<IssuedKey>> =>
         answer(
           api.grantr.POST("/grantr/v1/tenants/{tenant}/keys", {
-            ...inTenant(tenant),
+            ...inTenant(tenant, {}),
             body: { principal },
           }),
         ),
@@ -225,8 +218,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       revokeKey: (tenant: string, key: string): Promise<Answer<AuditEntry>> =>
         answer(
           api.grantr.DELETE("/grantr/v1/tenants/{tenant}/keys/{key_id}", {
-            ...named(tenant),
-            params: { path: { tenant, key_id: key } },
+            ...inTenant(tenant, { key_id: key }),
           }),
         ),
     },

@@ -48,7 +48,7 @@ When("they invite someone new", async ({ page, made }) => {
 });
 
 Then("the one they invited is a member", async ({ page, made }) => {
-  await expect(item(page, "Members", madeAs(made, "invitee"))).toContainText("Person");
+  await expect(item(page, "Members", madeAs(made, "invitee"))).toContainText("person");
 });
 
 When("they remove the one they invited", async ({ page, made }) => {
@@ -94,9 +94,10 @@ Then("it has no key", async ({ page, made }) => {
 
 When("they make a group of {string}", async ({ page, made }, member: string) => {
   await page.getByRole("textbox", { name: "Group" }).fill(fresh(made, "group"));
-  await page.getByRole("checkbox", { name: member, exact: true }).check();
-  await page.getByRole("button", { name: "Save the group" }).click();
-  await expect(page.getByRole("status")).toContainText("has 1 members");
+  // Each member is named with their kind beside them, such as "bob (person)".
+  await page.getByRole("checkbox", { name: new RegExp(`^${member} \\(`) }).check();
+  await page.getByRole("button", { name: "Create the group" }).click();
+  await expect(page.getByRole("status")).toContainText("has 1 member.");
 });
 
 Then("the group is listed with {string}", async ({ page, made }, member: string) => {

@@ -3,8 +3,7 @@ import { Account, NavLink, Plain, SideNav, TextLink } from "@portalr/ui";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, Outlet } from "@tanstack/react-router";
 import { House, KeyRound } from "lucide-react";
-import { useMemo } from "react";
-import { accessIn, anyPart } from "../../../access";
+import { allowedNow, anyPart, useAccess } from "../../../access";
 import { Frame } from "../../../frame";
 import { remember } from "../../../last";
 
@@ -22,7 +21,7 @@ export const Route = createFileRoute("/_signed/t/$tenant")({
       throw notFound();
     }
     // What its rail shows: Access, where grantr allows one of its parts.
-    await queryClient.ensureQueryData(accessIn(queries, params.tenant));
+    await allowedNow(context, params.tenant);
   },
   // Entering it, or switching to another tenant on it, makes it the choice.
   onEnter: ({ params }) => remember(params.tenant),
@@ -52,8 +51,7 @@ function Tenant() {
   const { data: memberships } = useSuspenseQuery(queries.grantr.memberships(user));
   // Whether they may see every tenant, for the switch alone: a tenant's admin needn't wait on it.
   const { data: every } = useQuery(queries.portalr.tenants(user));
-  const checks = useMemo(() => accessIn(queries, tenant), [queries, tenant]);
-  const { data: allowed } = useSuspenseQuery(checks);
+  const { allowed } = useAccess(tenant);
   return (
     <Frame
       tenant={tenant}

@@ -132,7 +132,9 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `SegmentedFilter` | One filter of a few, side by side |
 | `TenantSwitcher` | admin's tenant, or every tenant, and a menu of the others |
 | `StatCard` | One figure, read on its own, or why there's none |
-| `ItemTable` | Items as a table on a wide screen, and as cards on a phone, one in the accessibility tree |
+| `ItemTable` | Items as a table from 640 pixels, each row named by its first cell, and as headed cards below, one in the accessibility tree; an `EmptyState` with none |
+| `TabNav`, `TabLink` | An area's parts as tabs of links, the current one marked with `aria-current` |
+| `CheckboxGroup` | Several choices, any of them checked, named by a legend |
 | `SignIn`, `Account` | Signing in, and the account menu over a session, for both UIs |
 | `Dialog` | A dialog over the page, opened by its caller, with where focus starts and where it returns ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
 | `Menu` | A button and the actions it opens, each of which may be disabled while it's being done |

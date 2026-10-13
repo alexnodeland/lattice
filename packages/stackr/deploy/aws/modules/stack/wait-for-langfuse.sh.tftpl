@@ -1,0 +1,22 @@
+# Langfuse's worker's wait (services.tf): until the web server answers as ${version}, which it does
+# only once its migrations are applied, for 30 minutes at most. Each try gives up after 5 seconds,
+# so an address that no longer answers can't hold it longer.
+deadline=$(($(date +%s) + 1800))
+seen=none
+echo "waiting for langfuse-web to answer as ${version}"
+next_log=$(($(date +%s) + 60))
+while [ "$(date +%s)" -lt "$deadline" ]; do
+  answer=$(curl -fs --connect-timeout 3 --max-time 5 '${health}' || true)
+  if printf '%s' "$answer" | grep -qF '"version":"${version}"'; then
+    echo "langfuse-web answers ${version}"
+    exit 0
+  fi
+  seen=$(printf '%s' "$answer" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+  if [ "$(date +%s)" -ge "$next_log" ]; then
+    echo "still waiting: langfuse-web answers $${seen:-nothing}"
+    next_log=$(($(date +%s) + 60))
+  fi
+  sleep 5
+done
+echo "langfuse-web never answered as ${version} in 30 minutes; it last answered $${seen:-nothing}" >&2
+exit 1

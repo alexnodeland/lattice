@@ -108,7 +108,7 @@ run "stack_secrets_are_references_never_settings" {
         module.db_init, module.auth_keys, module.db_roles[0],
         ] : [
         for container in service.containers : [
-          for setting in container.environment :
+          for setting in try(container.environment, []) :
           !can(regex("PASSWORD|SECRET|TOKEN|_KEY$|PASS$|_AUTH$|^DATABASE_(ADMIN_)?URL$|^REDIS_|^GOTRUE_DB_DATABASE_URL$|^SALT$", setting.name))
         ]
       ]
@@ -524,7 +524,7 @@ run "stack_each_service_takes_only_its_callers" {
       "app/8000/alb",
       "gotrue/9999/alb", "gotrue/9999/app",
       "litellm/4000/app", "litellm/4000/state-host",
-      "langfuse-web/3000/app", "langfuse-web/3000/otel-collector", "langfuse-web/3000/state-host",
+      "langfuse-web/3000/app", "langfuse-web/3000/otel-collector", "langfuse-web/3000/langfuse-worker", "langfuse-web/3000/state-host",
       "otel-collector/4318/app", "otel-collector/4318/litellm", "otel-collector/8888/state-host",
       "tempo/4317/otel-collector", "tempo/3200/grafana", "tempo/3200/app", "tempo/3200/state-host",
       "loki/3100/otel-collector", "loki/3100/grafana", "loki/3100/app", "loki/3100/state-host",
@@ -606,7 +606,7 @@ run "stack_the_state_services_on_fargate_take_their_callers" {
       "app/8000/alb",
       "gotrue/9999/alb", "gotrue/9999/app",
       "litellm/4000/app",
-      "langfuse-web/3000/app", "langfuse-web/3000/otel-collector",
+      "langfuse-web/3000/app", "langfuse-web/3000/otel-collector", "langfuse-web/3000/langfuse-worker",
       "otel-collector/4318/app", "otel-collector/4318/litellm",
       "tempo/4317/otel-collector", "tempo/3200/grafana", "tempo/3200/app",
       "loki/3100/otel-collector", "loki/3100/grafana", "loki/3100/app",
@@ -619,5 +619,37 @@ run "stack_the_state_services_on_fargate_take_their_callers" {
       "prom-label-proxy/9091/app",
     ])
     error_message = "On Fargate, ClickHouse, Prometheus and prom-label-proxy each take their callers; Prometheus scrapes nothing, and nothing names a state host."
+  }
+}
+
+run "stack_langfuses_worker_starts_after_the_web_servers_migrations" {
+  command = plan
+  module {
+    source = "./modules/stack"
+  }
+
+  assert {
+    condition = (
+      { for container in module.langfuse_worker.containers : container.name => container.dependsOn if container.name == "langfuse-worker" }["langfuse-worker"] == [{ containerName = "wait", condition = "SUCCESS" }]
+      && one([for container in module.langfuse_worker.containers : container.essential if container.name == "wait"]) == false
+      && one([for container in module.langfuse_worker.containers : container.readonlyRootFilesystem if container.name == "wait"])
+    )
+    error_message = "The worker starts only once its wait, which writes nothing, has ended well."
+  }
+  assert {
+    condition = (
+      strcontains(one([for container in module.langfuse_worker.containers : container.command[2] if container.name == "wait"]), "http://langfuse-web.stackr.internal:3000/api/public/health")
+      && strcontains(one([for container in module.langfuse_worker.containers : container.command[2] if container.name == "wait"]), "\"version\":\"4.46.0\"")
+      && strcontains(one([for container in module.langfuse_worker.containers : container.command[2] if container.name == "wait"]), "--connect-timeout 3 --max-time 5")
+    )
+    error_message = "It waits, each try bounded, for the web server to answer as the worker's own version, which it does only once migrated."
+  }
+  assert {
+    condition     = local.langfuse_web_version == local.langfuse_version
+    error_message = "Langfuse's web server and worker are the same version, which the worker waits for."
+  }
+  assert {
+    condition     = alltrue([for container in module.langfuse_web.containers : !contains(keys(container), "dependsOn")])
+    error_message = "A service without a wait has no dependsOn, so its definition doesn't change."
   }
 }

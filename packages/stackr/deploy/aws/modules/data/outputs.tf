@@ -16,7 +16,7 @@ output "valkey" {
 }
 
 output "security_group_id" {
-  description = "The data stores' security group."
+  description = "The data stores' security group, which the stack gives each store's clients rules to."
   value       = aws_security_group.this.id
 }
 

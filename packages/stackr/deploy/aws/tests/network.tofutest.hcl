@@ -54,28 +54,21 @@ run "network_only_the_alb_takes_traffic_from_anywhere_and_only_on_80_and_443" {
     condition     = toset([for rule in aws_vpc_security_group_ingress_rule.alb : rule.from_port]) == toset([80, 443]) && alltrue([for rule in aws_vpc_security_group_ingress_rule.alb : rule.from_port == rule.to_port])
     error_message = "The ALB takes 80 and 443 from anywhere, and nothing else."
   }
-  assert {
-    condition     = toset([for rule in aws_vpc_security_group_egress_rule.alb : rule.from_port]) == toset([8000, 9999])
-    error_message = "The ALB reaches only the ports it forwards to."
-  }
 }
 
-run "network_services_take_traffic_only_from_groups_on_their_own_ports" {
+run "network_tasks_reach_out_over_https_only" {
   command = plan
   module {
     source = "./modules/network"
   }
 
   assert {
-    condition = alltrue([
-      for rule in concat(values(aws_vpc_security_group_ingress_rule.from_alb), values(aws_vpc_security_group_ingress_rule.between_services)) :
-      rule.cidr_ipv4 == null && rule.from_port == rule.to_port && !contains([22, 3389], rule.from_port)
-    ])
-    error_message = "The services take traffic from groups only, one port at a time, never SSH's or RDP's."
+    condition     = aws_vpc_security_group_egress_rule.tasks_https.from_port == 443 && aws_vpc_security_group_egress_rule.tasks_https.to_port == 443
+    error_message = "Every task reaches out over HTTPS only; who reaches whom inside is the stack's."
   }
   assert {
-    condition     = aws_vpc_security_group_egress_rule.services_https.from_port == 443 && aws_vpc_security_group_egress_rule.services_https.to_port == 443
-    error_message = "The services reach out over HTTPS only."
+    condition     = length(aws_security_group.tasks.ingress) == 0
+    error_message = "The group every task shares lets nothing in."
   }
 }
 
@@ -104,17 +97,6 @@ run "network_refuses_one_zone" {
     zones = ["us-east-1a"]
   }
   expect_failures = [var.zones]
-}
-
-run "network_refuses_ssh_among_the_services_ports" {
-  command = plan
-  module {
-    source = "./modules/network"
-  }
-  variables {
-    service_ports = [8000, 22]
-  }
-  expect_failures = [var.service_ports]
 }
 
 run "network_refuses_a_range_that_isnt_a_16" {

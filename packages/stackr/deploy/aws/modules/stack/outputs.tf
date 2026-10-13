@@ -22,10 +22,10 @@ output "one_off_task_definitions" {
 }
 
 output "run_task_network" {
-  description = "The subnets and security group a one-off task runs in."
+  description = "The subnets the one-off tasks run in, and each one's security groups."
   value = {
-    subnet_ids        = module.network.private_subnet_ids
-    security_group_id = module.network.security_groups.services
+    subnet_ids         = module.network.private_subnet_ids
+    security_group_ids = { for task, groups in local.groups_of : task => groups if contains(["db-init", "auth-keys", "db-roles"], task) }
   }
 }
 

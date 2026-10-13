@@ -36,13 +36,12 @@ locals {
   namespace = "stackr.internal"
   grantr    = var.application.access == "grantr"
 
-  # What every task shares: the cluster, the private subnets, and the services' group.
+  # What every task shares: the cluster and the private subnets.
   task = {
-    deployment         = var.name
-    cluster_arn        = aws_ecs_cluster.this.arn
-    subnet_ids         = module.network.private_subnet_ids
-    security_group_ids = [module.network.security_groups.services]
-    namespace_id       = aws_service_discovery_private_dns_namespace.this.id
+    deployment   = var.name
+    cluster_arn  = aws_ecs_cluster.this.arn
+    subnet_ids   = module.network.private_subnet_ids
+    namespace_id = aws_service_discovery_private_dns_namespace.this.id
   }
 
   # The secrets that rotate, by the services that read them: each service's `after` carries their
@@ -58,11 +57,6 @@ locals {
   versions_of = { for service, keys in local.reads : service => {
     for key in keys : "version/${key}" => tostring(lookup(var.secret_versions, key, 1))
   } }
-
-  # The ports the services reach each other on: the network's, and the state host's three on
-  # Fargate, where they are services too.
-  state_ports   = [8123, 9000, 9090, 9091]
-  service_ports = setunion([8000, 9999, 4000, 3000, 4317, 4318, 8888, 3200, 3100, 4040], var.state_host == "fargate" ? local.state_ports : [])
 
   # The application's database: its owner, which migrates, and with grantr the role it works as.
   app_database = replace(var.application.name, "-", "_")

@@ -29,26 +29,6 @@ variable "zones" {
   }
 }
 
-variable "alb_target_ports" {
-  description = "The ports the ALB forwards to: the application's and GoTrue's."
-  type        = set(number)
-  default     = [8000, 9999]
-}
-
-variable "service_ports" {
-  description = <<-EOT
-    The ports the services listen on for each other: the application, GoTrue, LiteLLM, Langfuse
-    and Grafana, the Collector, its metrics, Tempo, Loki and Pyroscope.
-  EOT
-  type        = set(number)
-  default     = [8000, 9999, 4000, 3000, 4317, 4318, 8888, 3200, 3100, 4040]
-
-  validation {
-    condition     = alltrue([for port in var.service_ports : port > 0 && port < 65536 && !contains([22, 3389], port)])
-    error_message = "Service ports are 1 to 65535, and never SSH's or RDP's."
-  }
-}
-
 variable "flow_log_retention_days" {
   description = "How long the VPC's flow logs are kept, in days: a value CloudWatch Logs accepts."
   type        = number

@@ -4,19 +4,17 @@
 # services.tf, and the one-off tasks in one-offs.tf.
 
 module "network" {
-  source        = "../network"
-  name          = var.name
-  cidr          = var.cidr
-  zones         = var.zones
-  service_ports = local.service_ports
+  source = "../network"
+  name   = var.name
+  cidr   = var.cidr
+  zones  = var.zones
 }
 
 module "data" {
-  source                     = "../data"
-  name                       = var.name
-  vpc_id                     = module.network.vpc_id
-  subnet_ids                 = module.network.private_subnet_ids
-  services_security_group_id = module.network.security_groups.services
+  source     = "../data"
+  name       = var.name
+  vpc_id     = module.network.vpc_id
+  subnet_ids = module.network.private_subnet_ids
   postgres = merge(var.postgres, {
     deletion_protection = !var.destroyable
     skip_final_snapshot = var.destroyable
@@ -67,7 +65,6 @@ module "state_host" {
   subnet_id                            = module.network.private_subnet_ids[0]
   private_ip                           = cidrhost(module.network.private_subnet_cidrs[0], 10)
   vpc_id                               = module.network.vpc_id
-  services_security_group_id           = module.network.security_groups.services
   namespace_id                         = aws_service_discovery_private_dns_namespace.this.id
   clickhouse_password_secret_arn       = module.secrets.arns["clickhouse-password"]
   clickhouse_admin_password_secret_arn = module.secrets.arns["clickhouse-admin-password"]

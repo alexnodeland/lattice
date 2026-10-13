@@ -166,6 +166,10 @@ METHODS: dict[str, tuple[Call, Access]] = {
         lambda ws: ws.get_rule("app:deploys"),
         Access(action="reflexr:read_rules", rule="app:deploys"),
     ),
+    "rule_history": (
+        lambda ws: ws.rule_history("chat:deploys"),
+        Access(action="reflexr:read_rules", rule="chat:deploys"),
+    ),
 }
 """Each public ``Workspace`` method, a call of it, and the one ``Access`` it asks for."""
 
@@ -275,6 +279,10 @@ ROUTES: dict[tuple[str, str], tuple[str, list[str]]] = {
     ("GET", "/rules"): ("", ["reflexr:read_rules"]),
     ("GET", "/workspaces/{workspace_id}/rules"): ("", ["reflexr:read_rules"]),
     ("GET", "/workspaces/{workspace_id}/rules/{rule}"): ("app:deploys", ["reflexr:read_rules"]),
+    ("GET", "/workspaces/{workspace_id}/rules/{rule}/history"): (
+        "chat:deploys/history",
+        ["reflexr:read_rules"],
+    ),
     ("GET", "/workspaces/{workspace_id}/runs"): ("", ["reflexr:read_runs"]),
     ("GET", "/workspaces/{workspace_id}/runs/{run_id}"): (RUN, ["reflexr:read_runs"]),
     ("GET", "/workspaces/{workspace_id}/dead-letters"): ("", ["reflexr:read_dead_letters"]),
@@ -384,6 +392,7 @@ TOOLS: dict[str, tuple[dict[str, Any], list[str]]] = {
     "read_events": ({}, ["reflexr:read_events"]),
     "rule_status": ({}, ["reflexr:read_rules"]),
     "get_rule": ({"rule": "app:deploys"}, ["reflexr:read_rules"]),
+    "rule_history": ({"rule": "chat:deploys"}, ["reflexr:read_rules"]),
     "schedule_status": ({}, ["reflexr:read_schedules"]),
     "replay_rule": ({"rule": "app:deploys"}, ["reflexr:replay_rule"]),
     "install_rule": ({"rule": STORED.model_dump(mode="json")}, ["reflexr:install_rule"]),

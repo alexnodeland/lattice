@@ -21,6 +21,7 @@ from sqlalchemy import (
     String,
     TypeDecorator,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -92,12 +93,25 @@ class EventRow(ScopedRow):
         UniqueConstraint("tenant_id", "workspace_id", "event_id", name="uq_reflexr_events_id"),
         # Reads of some types, from the start or the tail, are one range per type.
         Index("ix_reflexr_events_type", "tenant_id", "workspace_id", "event_type", "seq"),
+        # A stored rule's history is one range, of the few rows that are a rule's versions.
+        Index(
+            "ix_reflexr_events_rule",
+            "tenant_id",
+            "workspace_id",
+            "rule",
+            "seq",
+            postgresql_where=text("rule IS NOT NULL"),
+            sqlite_where=text("rule IS NOT NULL"),
+        ),
     )
 
     seq: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     event_id: Mapped[str]
     event_type: Mapped[str]
     """The event's type name, which reads filter on."""
+
+    rule: Mapped[str | None]
+    """The stored rule the envelope is a version of, which its history reads; None for others."""
 
     envelope: Mapped[dict[str, Any]] = mapped_column(JSON)
 

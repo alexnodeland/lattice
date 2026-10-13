@@ -16,14 +16,14 @@ export default defineConfig({
           name: "components",
           include: ["src/**/*.test.tsx"],
           setupFiles: ["./src/test/setup.ts"],
+          // On 127.0.0.1, not localhost: ui's, app's and admin's servers, started at once, took one
+          // port, on ::1 and on 127.0.0.1, and a Chromium reached the other's (portalr ADR-0009).
+          api: { host: "127.0.0.1" },
           browser: {
             enabled: true,
             headless: true,
             provider: playwright({ contextOptions: { reducedMotion: "reduce" } }),
             instances: [{ browser: "chromium" }],
-            // ui's, app's and admin's tests start their Chromiums at once in CI, where one took longer
-            // than Vitest's minute to connect: three minutes covers them (portalr ADR-0009).
-            connectTimeout: 180_000,
           },
         },
       },

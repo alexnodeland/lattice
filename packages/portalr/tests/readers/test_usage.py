@@ -9,7 +9,8 @@ import pytest
 from pydantic import ValidationError
 
 from portalr.readers import LiteLLM, Ok, Unavailable, UsageQuery, read_usage
-from portalr.readers.usage import Usage, workspace_tag
+from portalr.readers.litellm import Spend
+from portalr.readers.usage import budget_days, daily_budget, workspace_tag
 from portalr.tenant import allowed
 from tests.tools import Tool, json
 
@@ -95,6 +96,7 @@ async def test_spend_per_day_and_per_workspace_from_the_teams_and_the_tenants_ta
     assert [d.spend for d in usage.workspaces[0].days] == [0, 2.0]
     assert usage.budget is not None
     assert usage.budget.max_budget == 100
+    assert usage.daily_budget == pytest.approx(100 / 30)
     assert usage.complete
     asked = {r.url.path: r.url.params for r in tool.requests}
     assert asked["/team/daily/activity"]["team_ids"] == "tenant-acme"
@@ -136,7 +138,28 @@ async def test_every_page_is_read_up_to_the_most(monkeypatch: Any) -> None:
     assert [d.spend for d in read.data.days] == [1.0, 1.0]
 
 
-async def test_a_read_past_its_deadline_is_partial(monkeypatch: Any) -> None:
+async def test_a_day_split_across_pages_is_summed() -> None:
+    def pages(request: httpx.Request) -> httpx.Response:
+        page = int(request.url.params["page"])
+        return httpx.Response(
+            200,
+            json={
+                "results": [day("2026-10-11", **{"tenant-acme": (1.0, 10, 1)})],
+                "metadata": {"page": page, "total_pages": 2},
+            },
+        )
+
+    tool = Tool({"/team/info": json(INFO), "/team/daily/activity": pages})
+    query = UsageQuery(start=START, end=START + timedelta(days=1))
+    read = await read_usage(LiteLLM("http://litellm", tool.client()), ACME, query)
+    assert isinstance(read, Ok)
+    assert read.data.complete
+    assert [(d.spend, d.tokens, d.requests) for d in read.data.days] == [(2.0, 20, 2)]
+
+
+async def test_a_read_past_its_deadline_before_the_teams_activity_is_unavailable(
+    monkeypatch: Any,
+) -> None:
     monkeypatch.setattr("portalr.readers.usage.DEADLINE", 0.05)
 
     async def slow(request: httpx.Request) -> httpx.Response:
@@ -145,9 +168,46 @@ async def test_a_read_past_its_deadline_is_partial(monkeypatch: Any) -> None:
 
     litellm = LiteLLM("http://litellm", httpx.AsyncClient(transport=httpx.MockTransport(slow)))
     read = await read_usage(litellm, ACME, WINDOW)
+    assert read == Unavailable(reason="litellm didn't answer in time")
+
+
+async def test_a_read_past_its_deadline_answers_what_it_read(monkeypatch: Any) -> None:
+    monkeypatch.setattr("portalr.readers.usage.DEADLINE", 0.2)
+    team = {"results": [day("2026-10-11", **{"tenant-acme": (1.5, 100, 3)})]}
+
+    async def answer(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/team/daily/activity":
+            return httpx.Response(200, json=team)
+        # The budget and the workspaces' tags take too long.
+        await asyncio.sleep(5)
+        return httpx.Response(200, json={})
+
+    litellm = LiteLLM("http://litellm", httpx.AsyncClient(transport=httpx.MockTransport(answer)))
+    read = await read_usage(litellm, ACME, WINDOW)
     assert isinstance(read, Ok)
-    assert read.data == Usage(days=read.data.days, workspaces=[], budget=None, complete=False)
-    assert [d.spend for d in read.data.days] == [0, 0]
+    assert [d.spend for d in read.data.days] == [1.5, 0]
+    assert read.data.workspaces == []
+    assert read.data.budget is None
+    assert not read.data.complete
+    assert asyncio.all_tasks() == {asyncio.current_task()}
+
+
+async def test_a_read_refused_stops_the_others() -> None:
+    finished: list[str] = []
+
+    async def answer(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/team/info":
+            return httpx.Response(503)
+        await asyncio.sleep(5)
+        finished.append(request.url.path)
+        return httpx.Response(200, json={"results": []})
+
+    litellm = LiteLLM("http://litellm", httpx.AsyncClient(transport=httpx.MockTransport(answer)))
+    async with asyncio.timeout(1):
+        read = await read_usage(litellm, ACME, WINDOW)
+    assert read == Unavailable(reason="litellm answered 503")
+    assert finished == []
+    assert asyncio.all_tasks() == {asyncio.current_task()}
 
 
 async def test_a_litellm_without_its_activity_is_unavailable() -> None:
@@ -162,3 +222,33 @@ async def test_a_litellm_without_its_activity_is_unavailable() -> None:
     down = Tool({"/team/info": json({}, status=503)})
     read = await read_usage(LiteLLM("http://litellm", down.client()), ACME, WINDOW)
     assert read == Unavailable(reason="litellm answered 503")
+
+
+@pytest.mark.parametrize(
+    ("duration", "days"),
+    [
+        ("30d", 30),
+        ("1mo", 30),
+        ("2w", 14),
+        ("24h", 1),
+        ("1440m", 1),
+        ("86400s", 1),
+        ("monthly", 30),
+        (" Daily ", 1),
+        ("0d", None),
+        ("30", None),
+        ("thirty days", None),
+        ("30d extra", None),
+    ],
+)
+def test_a_budget_duration_is_read_as_litellm_reads_it(duration: str, days: float | None) -> None:
+    assert budget_days(duration) == (pytest.approx(days) if days is not None else None)
+
+
+def test_a_days_share_of_the_budget_needs_a_budget_and_a_duration() -> None:
+    assert daily_budget(Spend(spend=1, max_budget=70, budget_duration="7d")) == 10
+    assert daily_budget(None) is None
+    assert daily_budget(Spend(spend=1)) is None
+    assert daily_budget(Spend(spend=1, max_budget=0, budget_duration="7d")) is None
+    assert daily_budget(Spend(spend=1, max_budget=70)) is None
+    assert daily_budget(Spend(spend=1, max_budget=70, budget_duration="soon")) is None

@@ -1160,6 +1160,17 @@
             "title": "Complete",
             "type": "boolean"
           },
+          "daily_budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Budget"
+          },
           "days": {
             "items": {
               "$ref": "#/components/schemas/DaySpend"
@@ -1179,6 +1190,7 @@
           "days",
           "workspaces",
           "budget",
+          "daily_budget",
           "complete"
         ],
         "title": "Usage",

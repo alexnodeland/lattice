@@ -747,6 +747,8 @@ export interface components {
             budget: components["schemas"]["Spend"] | null;
             /** Complete */
             complete: boolean;
+            /** Daily Budget */
+            daily_budget: number | null;
             /** Days */
             days: components["schemas"]["DaySpend"][];
             /** Workspaces */

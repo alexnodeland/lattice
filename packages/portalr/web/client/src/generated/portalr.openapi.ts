@@ -62,6 +62,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portalr/v1/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Feedback By Day
+         * @description The tenant's feedback and evaluations from Langfuse, or one workspace's, by day.
+         *
+         *     Every score in the window is read and summed: ``complete`` is false where there were more
+         *     than one read takes.
+         */
+        get: operations["feedback_by_day_portalr_v1_feedback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portalr/v1/invites": {
         parameters: {
             query?: never;
@@ -232,6 +255,36 @@ export interface components {
             tenants: string[];
         };
         /**
+         * Evaluation
+         * @description One evaluator's score of one name, over the window, and per day.
+         */
+        Evaluation: {
+            /** Count */
+            count: number;
+            /** Days */
+            days: components["schemas"]["Mean"][];
+            /** Evaluator */
+            evaluator: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * Feedback
+         * @description The window's feedback and evaluations, and whether every score was read.
+         */
+        Feedback: {
+            /** Comments */
+            comments: components["schemas"]["Score"][];
+            /** Complete */
+            complete: boolean;
+            /** Days */
+            days: components["schemas"]["Thumbs"][];
+            /** Evaluations */
+            evaluations: components["schemas"]["Evaluation"][];
+            /** Workspaces */
+            workspaces: components["schemas"]["Place"][];
+        };
+        /**
          * FieldError
          * @description One problem FastAPI found with a request's parameters or body.
          */
@@ -284,6 +337,21 @@ export interface components {
             /** Time Ns */
             time_ns: number;
         };
+        /**
+         * Mean
+         * @description An evaluation's scores on one day: how many, and their mean; None for a day with none.
+         */
+        Mean: {
+            /** Count */
+            count: number;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Mean */
+            mean: number | null;
+        };
         /** @enum {string} */
         Metric: "turn_latency" | "failed_turns";
         /**
@@ -293,6 +361,15 @@ export interface components {
         NewInvite: {
             /** Email */
             email: string;
+        };
+        /** Ok[Feedback] */
+        Ok_Feedback_: {
+            data: components["schemas"]["Feedback"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
         };
         /** Ok[Union[Spend, NoneType]] */
         Ok_Union_Spend__NoneType__: {
@@ -361,6 +438,20 @@ export interface components {
              * @enum {string}
              */
             status: "ok";
+        };
+        /**
+         * Place
+         * @description One workspace's thumbs and evaluations; None for traces tagged with no workspace.
+         */
+        Place: {
+            /** Down */
+            down: number;
+            /** Evaluated */
+            evaluated: number;
+            /** Up */
+            up: number;
+            /** Workspace */
+            workspace: string | null;
         };
         /**
          * Point
@@ -511,6 +602,21 @@ export interface components {
             spend: number;
             /** Tenant */
             tenant: string;
+        };
+        /**
+         * Thumbs
+         * @description People's thumbs on one day.
+         */
+        Thumbs: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Down */
+            down: number;
+            /** Up */
+            up: number;
         };
         /**
          * Trace
@@ -669,6 +775,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeploymentTenants"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    feedback_by_day_portalr_v1_feedback_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+                limit?: number;
+                workspace?: components["schemas"]["Id"] | null;
+            };
+            header?: {
+                "X-Tenant"?: components["schemas"]["TenantId"] | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok_Feedback_"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
                 };
             };
             /** @description Refused */

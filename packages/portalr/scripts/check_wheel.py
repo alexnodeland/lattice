@@ -1,4 +1,4 @@
-"""Fail unless portalr's wheel carries both UIs, their typefaces, and the licences of what they hold.
+"""Fail unless portalr's wheel carries both UIs, their typefaces, and what they hold's licences.
 
 The app's styles must hold ui's own classes too.
 
@@ -14,7 +14,7 @@ from pathlib import Path
 
 UIS = ("app", "admin")
 LICENCES = ("OFL-schibsted-grotesk.txt", "OFL-fragment-mono.txt", "tremor.txt", "NOTICE")
-"""The typefaces' licences, and Tremor's, whose charts ``ui`` adapts, with the notice that says so."""
+"""The typefaces' licences, and Tremor's, whose charts ``ui`` adapts, and the notice saying so."""
 
 STYLED = ".bg-accent"
 """A class of ui's own components: an app's styles without it lack the kit's (portalr ADR-0018)."""

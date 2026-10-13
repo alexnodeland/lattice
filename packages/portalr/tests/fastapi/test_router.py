@@ -47,7 +47,7 @@ async def test_a_tenant_admin_reads_their_tenants_traces(
 async def test_every_read_is_refused_without_the_tenants_grant(
     client: httpx.AsyncClient, stack: Stack
 ) -> None:
-    reads = ["/v1/traces", "/v1/traces/t1", "/v1/logs", "/v1/scores", "/v1/spend"]
+    reads = ["/v1/traces", "/v1/traces/t1", "/v1/logs", "/v1/scores", "/v1/feedback", "/v1/spend"]
     for path in reads:
         for who, tenant in (("bob", "acme"), ("carol", "acme"), ("alice", "globex")):
             response = await client.get(
@@ -101,6 +101,12 @@ async def test_each_tools_read(client: httpx.AsyncClient, stack: Stack) -> None:
         "status": "ok",
         "data": [],
     }
+    summary = await client.get(
+        "/v1/feedback", params={**WINDOW, "workspace": "notes"}, headers=alice
+    )
+    assert summary.json()["status"] == "ok"
+    assert summary.json()["data"]["complete"] is True
+    assert '"workspace:notes"' in stack.langfuse.last.url.params["filter"]
     assert (await client.get("/v1/spend", headers=alice)).json() == {
         "status": "ok",
         "data": {"spend": 2.0, "max_budget": None, "budget_duration": None},
@@ -124,7 +130,14 @@ async def test_a_tool_the_application_doesnt_run_is_unconfigured(grants: Grants,
     transport = httpx.ASGITransport(app=app_for(grants, Readers(), None, ui))
     async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
         alice, ops = headers("alice"), headers("ops", tenant=None)
-        for path in ("/v1/traces", "/v1/traces/t1", "/v1/logs", "/v1/scores", "/v1/spend"):
+        for path in (
+            "/v1/traces",
+            "/v1/traces/t1",
+            "/v1/logs",
+            "/v1/scores",
+            "/v1/feedback",
+            "/v1/spend",
+        ):
             response = await client.get(
                 path, params={**WINDOW, "metric": "failed_turns"}, headers=alice
             )

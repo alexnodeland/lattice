@@ -66,6 +66,84 @@
         "title": "DeploymentTenants",
         "type": "object"
       },
+      "Evaluation": {
+        "description": "One evaluator's score of one name, over the window, and per day.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/Mean"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "evaluator": {
+            "title": "Evaluator",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evaluator",
+          "name",
+          "count",
+          "days"
+        ],
+        "title": "Evaluation",
+        "type": "object"
+      },
+      "Feedback": {
+        "description": "The window's feedback and evaluations, and whether every score was read.",
+        "properties": {
+          "comments": {
+            "items": {
+              "$ref": "#/components/schemas/Score"
+            },
+            "title": "Comments",
+            "type": "array"
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/Thumbs"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "evaluations": {
+            "items": {
+              "$ref": "#/components/schemas/Evaluation"
+            },
+            "title": "Evaluations",
+            "type": "array"
+          },
+          "workspaces": {
+            "items": {
+              "$ref": "#/components/schemas/Place"
+            },
+            "title": "Workspaces",
+            "type": "array"
+          }
+        },
+        "required": [
+          "days",
+          "evaluations",
+          "workspaces",
+          "comments",
+          "complete"
+        ],
+        "title": "Feedback",
+        "type": "object"
+      },
       "FieldError": {
         "additionalProperties": true,
         "description": "One problem FastAPI found with a request's parameters or body.",
@@ -202,6 +280,38 @@
         "title": "LogLine",
         "type": "object"
       },
+      "Mean": {
+        "description": "An evaluation's scores on one day: how many, and their mean; None for a day with none.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean"
+          }
+        },
+        "required": [
+          "day",
+          "count",
+          "mean"
+        ],
+        "title": "Mean",
+        "type": "object"
+      },
       "Metric": {
         "enum": [
           "turn_latency",
@@ -223,6 +333,24 @@
           "email"
         ],
         "title": "NewInvite",
+        "type": "object"
+      },
+      "Ok_Feedback_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Feedback"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[Feedback]",
         "type": "object"
       },
       "Ok_Union_Spend__NoneType__": {
@@ -383,6 +511,42 @@
           "data"
         ],
         "title": "Ok[list[TraceSummary]]",
+        "type": "object"
+      },
+      "Place": {
+        "description": "One workspace's thumbs and evaluations; None for traces tagged with no workspace.",
+        "properties": {
+          "down": {
+            "title": "Down",
+            "type": "integer"
+          },
+          "evaluated": {
+            "title": "Evaluated",
+            "type": "integer"
+          },
+          "up": {
+            "title": "Up",
+            "type": "integer"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "workspace",
+          "up",
+          "down",
+          "evaluated"
+        ],
+        "title": "Place",
         "type": "object"
       },
       "Point": {
@@ -740,6 +904,31 @@
         "title": "TenantSpend",
         "type": "object"
       },
+      "Thumbs": {
+        "description": "People's thumbs on one day.",
+        "properties": {
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "down": {
+            "title": "Down",
+            "type": "integer"
+          },
+          "up": {
+            "title": "Up",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day",
+          "up",
+          "down"
+        ],
+        "title": "Thumbs",
+        "type": "object"
+      },
       "Trace": {
         "description": "A trace and its spans.",
         "properties": {
@@ -1040,6 +1229,150 @@
           }
         },
         "summary": "Deployment Tenants"
+      }
+    },
+    "/portalr/v1/feedback": {
+      "get": {
+        "description": "The tenant's feedback and evaluations from Langfuse, or one workspace's, by day.\n\nEvery score in the window is read and summed: ``complete`` is false where there were more\nthan one read takes.",
+        "operationId": "feedback_by_day_portalr_v1_feedback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "ok": "#/components/schemas/Ok_Feedback_",
+                      "unavailable": "#/components/schemas/Unavailable",
+                      "unconfigured": "#/components/schemas/Unconfigured"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Ok_Feedback_"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unavailable"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unconfigured"
+                    }
+                  ],
+                  "title": "Response Feedback By Day Portalr V1 Feedback Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          }
+        },
+        "summary": "Feedback By Day"
       }
     },
     "/portalr/v1/invites": {

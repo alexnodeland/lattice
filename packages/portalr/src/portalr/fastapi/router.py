@@ -30,6 +30,8 @@ from portalr.fastapi.site import Site, Surfaces
 from portalr.fastapi.ui import ui_router
 from portalr.invites import Invite, InviteFailed
 from portalr.readers import (
+    Feedback,
+    FeedbackQuery,
     LogLine,
     LogQuery,
     MetricQuery,
@@ -45,6 +47,7 @@ from portalr.readers import (
     Unavailable,
     Unconfigured,
     Window,
+    feedback,
     reading,
 )
 from portalr.readers.query import Id
@@ -261,6 +264,19 @@ def portalr_router(
     ) -> Ok[list[Score]] | Unavailable | Unconfigured:
         """The tenant's feedback and evaluation scores, from Langfuse."""
         return await readers.langfuse.scores(tenant, window) if readers.langfuse else Unconfigured()
+
+    @api.get("/v1/feedback", response_model=reading(Feedback))
+    async def feedback_by_day(
+        query: Annotated[FeedbackQuery, Query()], tenant: Tenant = telemetry
+    ) -> Ok[Feedback] | Unavailable | Unconfigured:
+        """The tenant's feedback and evaluations from Langfuse, or one workspace's, by day.
+
+        Every score in the window is read and summed: ``complete`` is false where there were more
+        than one read takes.
+        """
+        if not readers.langfuse:
+            return Unconfigured()
+        return await feedback(readers.langfuse, tenant, query)
 
     @api.get("/v1/spend", response_model=reading(Spend | None))
     async def spend(tenant: Tenant = spending) -> Ok[Spend | None] | Unavailable | Unconfigured:

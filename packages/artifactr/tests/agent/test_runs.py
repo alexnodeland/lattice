@@ -267,8 +267,10 @@ async def test_a_run_that_ended_meanwhile_is_left_as_it_ended(gate: Gate) -> Non
     assert (await ws.run("run_done")).status == "completed"
 
 
-TTL = timedelta(milliseconds=300)
-"""A claim ttl short enough for a test to outlast, renewed every 100 ms."""
+TTL = timedelta(seconds=2)
+"""A claim ttl a test outlasts, renewed every two thirds of a second. A claim lapses a whole ttl
+after its last renewal began, so a process starved for longer loses it, rightly: under CI's load,
+a 300 ms ttl lapsed before the run reached its tool."""
 
 
 async def test_a_run_whose_claim_lapses_is_stopped_at_its_deadline(
@@ -279,9 +281,11 @@ async def test_a_run_whose_claim_lapses_is_stopped_at_its_deadline(
     thread = await ws.create_thread()
     runner = Runner(make_agent(Script(call("hold")), tools=[app_tools]), app=gate, claim_ttl=TTL)
     handle = started(await runner.send(ws, thread.id, "Hold on"))
-    storage.cut_off.add(storage.holders[f"thread:{thread.id}"])  # its next renewal hangs
-    async with asyncio.timeout(5):
+    async with asyncio.timeout(5 * TTL.total_seconds()):
+        # Cut off once the run holds its tool open, so it is the cut-off, not a slow start, that
+        # makes the claim lapse.
         await gate.entered.wait()
+        storage.cut_off.add(storage.holders[f"thread:{thread.id}"])  # its next renewal hangs
         await asyncio.gather(handle.task, return_exceptions=True)
     assert handle.task.cancelled()
     assert types(await ws.read()) == [

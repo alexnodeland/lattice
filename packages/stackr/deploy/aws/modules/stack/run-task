@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Runs one of the stack's one-off tasks to its end, for OpenTofu's local-exec (one-offs.tf), with
+# the AWS CLI where OpenTofu runs: AWS's, or Floci's through AWS_ENDPOINT_URL. Fails when the task
+# does, with its exit code and where its logs are.
+#
+# Environment: CLUSTER, TASK_DEFINITION, SUBNETS (comma-separated), SECURITY_GROUP, AWS_REGION.
+
+set -euo pipefail
+task=$(aws ecs run-task --cluster "$CLUSTER" --task-definition "$TASK_DEFINITION" --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SECURITY_GROUP],assignPublicIp=DISABLED}" \
+  --query 'tasks[0].taskArn' --output text)
+echo "run-task: $TASK_DEFINITION as $task"
+aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$task"
+code=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$task" \
+  --query 'tasks[0].containers[0].exitCode' --output text)
+if [[ $code != 0 ]]; then
+  reason=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$task" --query 'tasks[0].stoppedReason' --output text)
+  echo "run-task: $task ended with $code ($reason); its logs are in CloudWatch Logs" >&2
+  exit 1
+fi
+echo "run-task: $task ended with 0"

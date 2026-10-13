@@ -37,5 +37,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0031](0031-clickhouses-admin-apart-from-langfuse.md) | ClickHouse's admin, apart from Langfuse | Accepted |
 | [0032](0032-the-edge-the-services-and-the-state-host.md) | The edge, the services, and the state host | Accepted |
 | [0033](0033-the-combined-system-proved-in-ci.md) | The combined system, proved in CI | Accepted |
+| [0034](0034-the-stack-on-aws.md) | The stack on AWS | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

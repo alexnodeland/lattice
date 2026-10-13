@@ -214,3 +214,18 @@ run "ecs_service_a_proxy_needs_a_port" {
   }
   expect_failures = [var.proxy]
 }
+
+run "ecs_service_starts_again_after_the_runs_it_waits_for" {
+  command = plan
+  module {
+    source = "./modules/ecs-service"
+  }
+  variables {
+    after = { db-init = "run-1" }
+  }
+
+  assert {
+    condition     = aws_ecs_service.this[0].triggers == { db-init = "run-1" }
+    error_message = "A new run of a one-off it waits for deploys the service again."
+  }
+}

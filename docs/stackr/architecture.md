@@ -41,9 +41,10 @@ deploy/<service>/   each service's configuration, mounted read-only
 deploy/host/        the single host (RFC-0004): the overlay that puts Caddy in front, its Caddyfile,
                     bootstrap, which prepares a VM, PostgreSQL's image with pgBackRest, the backups,
                     the restore drill and their systemd timers
-deploy/aws/         the AWS recipe (RFC-0004), in OpenTofu: its modules, their tests against a mocked
-                    AWS, check (tier 1), the plugins proto installs OpenTofu and TFLint with, and
-                    state-host/, the Compose its EC2 state host runs
+deploy/aws/         the AWS recipe (RFC-0004), in OpenTofu: its modules, with stack, which puts them
+                    together, their tests against a mocked AWS, check (tier 1), the plugins proto
+                    installs OpenTofu and TFLint with, and state-host/, the Compose its EC2 state
+                    host runs
 deploy/postgres/    init.sql: each service's role and database, created by db-init
 supabase/           the Supabase CLI project: config.toml (project id stackr-supabase) and seed.sql
 scripts/            setup-env, validate, smoke, create-tenant, check-config, check-template, check-app

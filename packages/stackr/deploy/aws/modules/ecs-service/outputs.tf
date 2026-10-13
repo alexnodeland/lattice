@@ -12,3 +12,8 @@ output "address" {
   description = "The service's private name, and its port; none for a one-off task."
   value       = var.one_off ? null : { name = aws_service_discovery_service.this[0].name, port = var.container.port }
 }
+
+output "containers" {
+  description = "Its containers, as its task definition gives them to ECS: settings, and secrets by reference only."
+  value       = jsondecode(aws_ecs_task_definition.this.container_definitions)
+}

@@ -18,6 +18,11 @@ output "private_subnet_ids" {
   value       = [for zone in var.zones : aws_subnet.private[zone].id]
 }
 
+output "private_subnet_cidrs" {
+  description = "The private subnets' ranges, known at plan: the state host's fixed address is in the first."
+  value       = [for zone in var.zones : local.private[zone]]
+}
+
 output "security_groups" {
   description = "The ALB's and the services' security groups."
   value = {

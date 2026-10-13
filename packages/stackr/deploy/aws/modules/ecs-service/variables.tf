@@ -107,6 +107,12 @@ variable "one_off" {
   default     = false
 }
 
+variable "after" {
+  description = "The one-off runs, by name, the service waits for: it starts after them, and starts again after each new run."
+  type        = map(string)
+  default     = {}
+}
+
 variable "target_group_arn" {
   description = "The ALB target group its tasks register with, when the edge reaches it."
   type        = string

@@ -166,6 +166,8 @@ resource "aws_ecs_service" "this" {
   launch_type            = "FARGATE"
   enable_execute_command = false
   propagate_tags         = "SERVICE"
+  # Created after, and redeployed after, each one-off run it waits for.
+  triggers = var.after
 
   network_configuration {
     subnets          = var.subnet_ids

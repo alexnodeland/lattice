@@ -1,0 +1,116 @@
+# ADR-0034: The stack on AWS
+
+**Status:** Accepted
+**Date:** 2026-10-12
+**Deciders:** Alex Nodeland
+
+Builds the third part of phase 3 of [RFC-0004](../rfcs/0004-hosting-recipes.md): the `stack` module, which puts [ADR-0029](0029-the-aws-modules-and-tier-1.md)'s and [ADR-0032](0032-the-edge-the-services-and-the-state-host.md)'s modules together. `envs/prod` and `envs/floci`, its two roots, follow in their own pull request, then the thin images. Records what the RFC left to the build, and where it departs from it.
+
+## Context
+
+RFC-0004's `stack` holds the cluster, the private namespace, every Fargate service, the state host and the one-off tasks. Putting them together found six things the RFC didn't settle:
+
+- **Some secrets combine passwords.** Langfuse's encryption key must be 64 hexadecimal characters. LiteLLM's master key starts with `sk-`. Valkey's token goes to ElastiCache and into the connection strings that carry it. The Collector's credential for Langfuse is both of Langfuse's project keys, in Base64. The `secrets` module makes one password per secret, and writes it as it is or into templates.
+- **The thin images' configuration names Compose's services,** such as `tempo:4317` and `langfuse-web:3000`. On Fargate they are `tempo.stackr.internal` and `langfuse-web.stackr.internal`.
+- **Nothing runs a one-off task.** The RFC runs `db-init`, `auth-keys` and `db-roles` before the services that need them, by run-task, but OpenTofu has no resource that runs a task to its end.
+- **Floci serves no TLS to RDS or ElastiCache,** and can't run the state host ([ADR-0025](0025-what-the-floci-spike-found.md)).
+- **checkov follows `stack`'s module calls.** Scanning the directory reports each module's findings again, without the skips and reasons in that module's own configuration.
+- **checkov over the plan's JSON** needs a plan that answers its data sources. A mocked test plans without producing one.
+
+## Decision
+
+### Its inputs
+
+- **`images`, stackr's eight thin images, by digest, with no defaults.** Their defaults come with the images, which their own pull request builds. `envs/prod` pins them, and Renovate moves them.
+- **The upstream images the stack runs as they are:** GoTrue, Langfuse's web and worker, and, on Fargate, ClickHouse, Prometheus and prom-label-proxy. Each is pinned in `locals.tf` as `compose.yaml` pins it, and `scripts/check-config aws` holds them to it.
+- **`application`,** the application generated from the template: its name (`project_slug`), its image, its access (`grantr` or `none`), and its own settings and secrets. The stack gives it the rest:
+  - the Collector, Langfuse and LiteLLM, at their private names;
+  - GoTrue's issuer at `auth.<domain>`, and its key set and admin API at its private address;
+  - Langfuse's project keys;
+  - its database URLs, with `ssl=require`, as asyncpg takes them.
+- **With `grantr`, the application gets two database URLs,** the role it works as and the tables' owner, with the service role's key and `db-roles` ([ADR-0022](0022-row-level-security-in-the-template.md)). With `none`, it gets one URL, the owner's.
+- **`state_host`,** `ec2` on AWS, or `fargate` for Floci.
+- **Floci's switches:**
+  - `tls_to_data`, off on Floci, which serves no TLS to RDS or ElastiCache: `sslmode=prefer` in place of `require`, `redis://` in place of `rediss://`, and Grafana's `disable`;
+  - `aws_endpoint_url`, Floci's address for the services that call S3 and Secrets Manager;
+  - `destroyable`. One switch, not one per resource: on, a destroy takes RDS without a final snapshot, empties the buckets, deletes the secrets at once, skips the state host's volume's snapshot, and lets the ALB go.
+
+### Secrets
+
+- **The `secrets` module makes most of them,** and gains a `template` for a secret that isn't JSON, such as `sk-{password}`, and a `{password_sha256}` placeholder, 64 hexadecimal characters, for Langfuse's encryption key. It refuses a template without either placeholder, which would be written as it is.
+- **The databases' secrets are a second instance of it,** since their URLs carry RDS's address. Each is JSON, with the role's `password`, which `db-init` reads, and its `url`, which its service reads. Their keys start with `database-`, so the two instances never collide.
+- **Two are written in `stack`,** from ephemeral passwords of their own, with `secret_string_wo`:
+  - **Valkey's,** with its token and the connection strings for Langfuse (database 0) and LiteLLM (database 1). ElastiCache is given the same ephemeral token, so nothing reads a secret back, which a mocked test couldn't do.
+  - **Langfuse's project keys,** `public` and `secret`, with `otlp_auth`, the Collector's Basic credential, made of both.
+- **`secret_versions` rotates a secret by its key.** It refuses Langfuse's salt and encryption key, and LiteLLM's salt key, which encrypt data and never change.
+- **The services read a secret only once it is written.** The ARNs they are given come from the secret versions.
+
+### The thin images' environment
+
+Each thin image reads what differs on AWS from its environment. It defaults to Compose's names on one machine, as RFC-0004 asks ("one file per service"). The stack sets:
+
+| Image | Settings |
+|---|---|
+| `stackr-otel-collector` | `TEMPO_ADDRESS`, `PROMETHEUS_ADDRESS`, `LOKI_ADDRESS`, `LANGFUSE_ADDRESS`; `STACKR_ENVIRONMENT`, `STACKR_TRACES_EXPORTERS`; `LANGFUSE_OTLP_AUTH`, a secret |
+| `stackr-tempo`, `stackr-loki`, `stackr-pyroscope` | Their peers' addresses; `S3_BUCKET`, `S3_REGION`, and `S3_PREFIX`, its own under the telemetry bucket (`tempo/`, `loki/`, `pyroscope/`); `AWS_ENDPOINT_URL` on Floci. Their task roles reach only their prefix |
+| `stackr-grafana` | Its peers' addresses; `GF_DATABASE_*`, on RDS, with `GF_DATABASE_SSL_MODE`; its admin's and its database's passwords, secrets |
+| `stackr-litellm` | `compose.yaml`'s settings, with `DATABASE_URL`, `REDIS_URL` and its keys as secrets, and one `<PROVIDER>_API_KEY` secret for each of `gateway_providers`, which an operator writes |
+| `stackr-db-init` | `PG*`, as RDS's master, `postgres`, with `PGSSLMODE` and `PGPASSWORD` from RDS's own secret; the roles' passwords, as on one machine, with `GRAFANA_DB_PASSWORD`; and the application's database, `APP_DB_NAME` and `APP_DB_PASSWORD`, its owner's, which may create roles for `db-roles` |
+| `stackr-auth-keys` | `AUTH_KEYS_ARN`, the secret it writes, as JSON with `jwt_keys` and `service_role_key`, when it is empty; its task role may read and write that secret alone |
+
+The images' pull request implements these settings, with Compose's defaults.
+
+### The one-off tasks
+
+- **Each is run by `run-task` from the machine that applies,** through a `terraform_data` with a `local-exec` that calls `modules/stack/run-task`. The script:
+  1. starts the task with the AWS CLI, in the private subnets;
+  2. waits for it to stop;
+  3. fails with its exit code and its stopped reason.
+- **It runs when its task definition changes,** or a secret it reads is rotated: `db-roles` also after each `db-init`. Planning runs nothing, so tier 1 needs no AWS.
+- **The services wait for the runs they need.** `ecs-service` gains `after`, the runs a service waits for, which become its `triggers`. Only its ECS service waits, not its task definition, and a new run deploys it again, so GoTrue restarts with a new key set. A module's `depends_on` would defer its data sources to the apply, and with them every policy the tests read.
+- **The edge's target groups wait for their listener rules,** since ECS refuses a service whose target group no listener forwards to.
+- **Applying needs AWS CLI v2** where OpenTofu runs. On Floci, `AWS_ENDPOINT_URL` points it there.
+
+### ClickHouse, Prometheus and prom-label-proxy on Fargate, for Floci
+
+- **ClickHouse has no `users.xml`:** without the state host, there is no checkout to mount it from, and no thin image carries it. Its image's own setup makes Langfuse's user, `langfuse`, from `CLICKHOUSE_USER` and `CLICKHOUSE_PASSWORD`, with no admin. Langfuse's settings are the same in both places.
+- **Prometheus** takes its metrics by OTLP and remote write, with `compose.yaml`'s flags, and scrapes only itself.
+- **prom-label-proxy** listens on 9091, the state host's port.
+- **The network lets the services reach the three ports** only on Fargate.
+
+### checkov
+
+- **Each module is scanned on its own files** (`--file`), with its own skips: the stack's are its two hand-written secrets', with the `secrets` module's reasons.
+- **checkov over the plan's JSON waits for tier 2** (phase 4), where `envs/floci` plans against Floci, which answers the data sources.
+
+### Where this departs from RFC-0004
+
+- **`envs/prod` and `envs/floci` are their own pull request,** after this one, to keep each under review's size.
+- **The one-off tasks run from where OpenTofu runs,** which needs the AWS CLI there. The RFC said only "by run-task".
+- **The application's settings come from the stack,** and not from a root of the template's. The template's `hosting: aws` root will call `stack` with its image and its own settings.
+- **The services still share one security group** ([ADR-0032](0032-the-edge-the-services-and-the-state-host.md)'s design debt): a group per service, from its callers, comes after the roots.
+
+## Options considered
+
+| Option | For | Against |
+|---|---|---|
+| **A run per one-off, from the machine that applies (chosen)** | Runs once, before the services that need it, and fails the apply when it fails | Needs the AWS CLI where OpenTofu runs |
+| Each one-off as a container in its services' tasks | Nothing beyond ECS | Runs once per task, in parallel: two `auth-keys` would race to write the first key set |
+| An operator runs them by hand | Nothing in OpenTofu | A first apply's services fail until someone does |
+| **`after`, as the ECS service's `triggers` (chosen)** | Only the service waits; a new run deploys it again | One more input to `ecs-service` |
+| A module's `depends_on` | Plain OpenTofu | Defers every data source in the module to the apply, so plans and tests can't read the policies |
+| **Valkey's token from an ephemeral password in `stack` (chosen)** | Nothing reads a secret back; tests mock everything | Valkey's secret is written outside the `secrets` module |
+| An ephemeral read of the token's secret | One place that makes secrets | OpenTofu can't mock an ephemeral resource, so the stack couldn't be tested |
+| **Peers' addresses as settings (chosen)** | One configuration file per service, for Compose and AWS | Settings the images must read |
+| A DNS search domain of `stackr.internal` | No settings | Rests on Fargate following the VPC's DHCP options, which nothing here has confirmed |
+
+## Consequences
+
+- Easier: the stack plans whole against a mocked AWS. Its tests check:
+  - that no secret is a setting;
+  - GoTrue behind its proxy;
+  - the application with and without `grantr`;
+  - both places the state host's services run.
+- Easier: one switch makes a deployment one a destroy takes whole.
+- Harder: applying needs the AWS CLI, and the thin images must read the settings above.
+- Next: `envs/prod` and `envs/floci`; the thin images, with the settings above; then tier 2, with checkov over the plan's JSON.

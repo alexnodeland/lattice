@@ -64,13 +64,13 @@ dev = [
     { include-group = "lint" },
 ]
 
-# In lattice, the libraries are the checkout's. A built wheel keeps the ranges in [project]
-# alone.
+# In lattice, the libraries and lattice-core are the checkout's. A built wheel keeps the ranges
+# in [project] alone.
 [tool.uv.sources]
 artifactr-ai = { workspace = true }
-reflexr = { workspace = true }
 evalr = { workspace = true }
 lattice-core-ai = { workspace = true }
+reflexr = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]
@@ -82,10 +82,11 @@ module-name = "relayr"
 
 # ─── dependencies ─────────────────────────────────────────────────────────────
 
-# deptry can't tell from the workspace's editable install which module artifactr-ai provides.
+# deptry can't tell from the workspace's editable install which module a distribution named
+# apart from its module provides.
 [tool.deptry.package_module_name_map]
-lattice-core-ai = "lattice_core"
 artifactr-ai = "artifactr"
+lattice-core-ai = "lattice_core"
 
 # ─── types ────────────────────────────────────────────────────────────────────
 

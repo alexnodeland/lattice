@@ -6,7 +6,7 @@ from pathlib import Path
 from sqlalchemy import text
 from sqlalchemy.pool import NullPool
 
-from lattice_core.sql import create_sqlite_engine
+from lattice_core.sql.sqlite import create_sqlite_engine
 
 
 async def test_transactions_take_turns_in_the_order_they_begin(tmp_path: Path) -> None:

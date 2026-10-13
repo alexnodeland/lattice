@@ -46,8 +46,12 @@ def awaited_to_the_end[**P, T](
     return call
 
 
-async def lock_row[R](session: AsyncSession, model: type[R], key: tuple[str, ...], new: R) -> R:
-    """Lock a row (``SELECT ... FOR UPDATE``), inserting ``new`` first if it does not exist."""
+async def lock_row[R](session: AsyncSession, model: type[R], key: object, new: R) -> R:
+    """Lock a row (``SELECT ... FOR UPDATE``), inserting ``new`` first if it does not exist.
+
+    ``key`` is the row's primary key, as SQLAlchemy's ``AsyncSession.get`` takes it: a value, a
+    tuple or a mapping.
+    """
     while (row := await session.get(model, key, with_for_update=True)) is None:
         # A concurrent transaction may insert the row first. Then this insert fails, and the
         # next lookup waits for that transaction to end and locks its row instead.

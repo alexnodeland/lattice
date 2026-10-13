@@ -5,7 +5,6 @@ that records what it is asked, so every run checks it.
 """
 
 import importlib.util
-from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import cast
@@ -38,14 +37,6 @@ class Recorder:
 
     def execute(self, statement: object, parameters: object = None) -> None:
         self.calls.append((str(statement), parameters))
-
-    def scalar(self, statement: object) -> str:
-        self.calls.append((str(statement), None))
-        return "app schema"
-
-    def scalars(self, statement: object, parameters: object = None) -> Iterator[str]:
-        self.calls.append((str(statement), parameters))
-        return iter(["numbered_id_seq"])
 
 
 def _migration(recorder: Recorder, monkeypatch: pytest.MonkeyPatch) -> ModuleType:

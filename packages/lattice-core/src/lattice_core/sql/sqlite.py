@@ -29,7 +29,7 @@ def create_sqlite_engine(url: str | URL, **kwargs: Any) -> AsyncEngine:
 
     Args:
         url: A SQLite URL for an async driver, such as ``sqlite+aiosqlite:///app.db``.
-        **kwargs: Passed to `sqlalchemy.ext.asyncio.create_async_engine`. Give ``poolclass``
+        **kwargs: Passed to SQLAlchemy's ``create_async_engine``. Give ``poolclass``
             (with its own arguments) to pool connections differently.
 
     Returns:

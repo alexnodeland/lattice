@@ -42,7 +42,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import InstrumentedAttribute, Session, aliased
 
-from lattice_core.sql import awaited_to_the_end, lock_row, to_the_end
+from lattice_core.sql.sessions import awaited_to_the_end, lock_row, to_the_end
+from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 from reflexr.core import (
     HOLDING,
     WAITING,
@@ -71,7 +72,6 @@ from reflexr.sql.tables import (
     StateRow,
     WorkspaceRow,
 )
-from reflexr.sql.tenancy import TENANT, TenantSession
 from reflexr.workspace import (
     RUN_LEASE_PREFIX,
     Clock,
@@ -415,7 +415,7 @@ class SqlStorage:
 
     def _session(self, workspace: WorkspaceRef) -> AsyncSession:
         """A session in a workspace's tenant."""
-        return self._sessions(info={TENANT: workspace.tenant_id})
+        return self._sessions(info={TENANT_KEY: workspace.tenant_id})
 
     @asynccontextmanager
     async def transaction(self, workspace: WorkspaceRef) -> AsyncGenerator[_Transaction]:

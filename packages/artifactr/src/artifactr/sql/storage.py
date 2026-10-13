@@ -61,9 +61,9 @@ from artifactr.sql.tables import (
     ThreadRow,
     WorkspaceRow,
 )
-from artifactr.sql.tenancy import TENANT, TenantSession
 from artifactr.workspace import HistoryChunk, Scope, seal
-from lattice_core.sql import awaited_to_the_end, lock_row, to_the_end
+from lattice_core.sql.sessions import awaited_to_the_end, lock_row, to_the_end
+from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 
 Clock = Callable[[], datetime]
 """Returns the current time; injectable so tests control expiry."""
@@ -301,7 +301,7 @@ class SqlStorage:
 
     def _session(self, tenant_id: TenantId) -> AsyncSession:
         """A session in a tenant."""
-        return self._sessions(info={TENANT: tenant_id})
+        return self._sessions(info={TENANT_KEY: tenant_id})
 
     @asynccontextmanager
     async def transaction(self, scope: Scope) -> AsyncGenerator[_Transaction]:

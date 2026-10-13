@@ -6,10 +6,11 @@ from typing import Any, override
 
 import pytest
 from sqlalchemy import insert
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from lattice_core.sql import awaited_to_the_end, create_sqlite_engine, lock_row, to_the_end
+from lattice_core.sql.sessions import awaited_to_the_end, lock_row, to_the_end
+from lattice_core.sql.sqlite import create_sqlite_engine
 
 
 @pytest.mark.parametrize("ending", ["returns", "raises", "is cancelled"])
@@ -59,7 +60,7 @@ class Counter(Base):
     count: Mapped[int]
 
 
-async def _sessions(tmp_path: Path) -> Any:
+async def _sessions(tmp_path: Path) -> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]:
     engine = create_sqlite_engine(f"sqlite+aiosqlite:///{tmp_path / 'core.db'}")
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
@@ -82,12 +83,14 @@ async def test_a_missing_row_is_inserted_and_an_existing_one_locked(tmp_path: Pa
 class MissesOnce(AsyncSession):
     """A session whose first lookup misses the row, as if another transaction inserted it since."""
 
-    looked = 0
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.looked = 0
 
     @override
     async def get(self, *args: Any, **kwargs: Any) -> Any:
-        MissesOnce.looked += 1
-        return None if MissesOnce.looked == 1 else await super().get(*args, **kwargs)
+        self.looked += 1
+        return None if self.looked == 1 else await super().get(*args, **kwargs)
 
 
 async def test_a_row_another_transaction_inserted_first_is_locked(tmp_path: Path) -> None:
@@ -99,6 +102,7 @@ async def test_a_row_another_transaction_inserted_first_is_locked(tmp_path: Path
         sessions = async_sessionmaker(engine, class_=MissesOnce, expire_on_commit=False)
         async with sessions.begin() as session:
             row = await lock_row(session, Counter, ("a",), Counter(name="a", count=0))
-        assert (row.count, MissesOnce.looked) == (7, 2), "the insert failed, then it was locked"
+            looked = session.looked
+        assert (row.count, looked) == (7, 2), "the insert failed, then it was locked"
     finally:
         await engine.dispose()

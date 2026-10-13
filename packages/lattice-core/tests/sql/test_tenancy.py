@@ -11,8 +11,8 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import Session
 
-from lattice_core.sql import TENANT, TenantSession, create_sqlite_engine, grant, tenant_policy
-from lattice_core.sql.tenancy import _set_tenant
+from lattice_core.sql.sqlite import create_sqlite_engine
+from lattice_core.sql.tenancy import TENANT_KEY, TenantSession, _set_tenant, grant, tenant_policy
 
 
 class Recorder:
@@ -41,7 +41,7 @@ class Recorder:
 
 def test_a_transaction_names_its_tenant_to_postgresql() -> None:
     recorder = Recorder()
-    session = cast("Session", SimpleNamespace(info={TENANT: "acme"}))
+    session = cast("Session", SimpleNamespace(info={TENANT_KEY: "acme"}))
     _set_tenant(session, cast("Any", None), cast("Connection", recorder))
     assert recorder.calls == [
         (
@@ -51,7 +51,7 @@ def test_a_transaction_names_its_tenant_to_postgresql() -> None:
     ]
 
 
-@pytest.mark.parametrize("info", [{}, {TENANT: ""}, {TENANT: 7}])
+@pytest.mark.parametrize("info", [{}, {TENANT_KEY: ""}, {TENANT_KEY: 7}])
 async def test_a_session_must_name_its_tenant(tmp_path: Path, info: dict[str, object]) -> None:
     engine = create_sqlite_engine(f"sqlite+aiosqlite:///{tmp_path / 'core.db'}")
     try:
@@ -66,7 +66,9 @@ async def test_a_session_must_name_its_tenant(tmp_path: Path, info: dict[str, ob
 async def test_sqlite_has_nothing_to_set(tmp_path: Path) -> None:
     engine = create_sqlite_engine(f"sqlite+aiosqlite:///{tmp_path / 'core.db'}")
     try:
-        sessions = async_sessionmaker(engine, sync_session_class=TenantSession, info={TENANT: "a"})
+        sessions = async_sessionmaker(
+            engine, sync_session_class=TenantSession, info={TENANT_KEY: "a"}
+        )
         async with sessions.begin() as session:
             assert await session.scalar(text("SELECT 1")) == 1
     finally:

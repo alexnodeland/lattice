@@ -17,10 +17,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
 
-from lattice_core.sql import awaited_to_the_end
+from lattice_core.sql.sessions import awaited_to_the_end
+from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 from relayr.ledger import Cause, CauseKind, Clock, DeadLetter, WorkspaceKey, utc_now
 from relayr.sql.tables import CauseRow, DeadLetterRow, FollowerRow
-from relayr.sql.tenancy import TENANT, TenantSession
 
 
 def _follower(workspace: WorkspaceKey) -> ColumnElement[bool]:
@@ -90,7 +90,7 @@ class SqlLedger:
 
     def _session(self, tenant_id: str) -> AsyncSession:
         """A session in a tenant."""
-        return self._sessions(info={TENANT: tenant_id})
+        return self._sessions(info={TENANT_KEY: tenant_id})
 
     async def _insert_once(self, row: CauseRow | DeadLetterRow) -> None:
         """Insert a row, unless one with its key is there: the first is kept."""

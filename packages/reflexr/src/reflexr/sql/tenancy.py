@@ -10,6 +10,9 @@ lattice-core holds the tenant session, the policy and the grants, which every li
 storage shares (lattice ADR-0018); this module re-exports them.
 """
 
-from lattice_core.sql import CURRENT, SETTING, TENANT, TenantSession, grant, tenant_policy
+from lattice_core.sql.tenancy import CURRENT_TENANT as CURRENT
+from lattice_core.sql.tenancy import TENANT_KEY as TENANT
+from lattice_core.sql.tenancy import TENANT_SETTING as SETTING
+from lattice_core.sql.tenancy import TenantSession, grant, tenant_policy
 
 __all__ = ["CURRENT", "SETTING", "TENANT", "TenantSession", "grant", "tenant_policy"]

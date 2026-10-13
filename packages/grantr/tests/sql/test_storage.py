@@ -7,7 +7,6 @@ import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import AsyncEngine
-from sqlalchemy.pool import NullPool
 
 from grantr.core import (
     DEPLOYMENT,
@@ -24,7 +23,7 @@ from grantr.core import (
     User,
 )
 from grantr.grants import Grants
-from grantr.sql import SqlStorage, create_schema, create_sqlite_engine
+from grantr.sql import SqlStorage, create_schema
 from grantr.sql.storage import (
     Columns,
     _scope,
@@ -79,21 +78,6 @@ async def test_a_refused_command_leaves_no_row(engine: AsyncEngine) -> None:
         await grants.create_tenant("acme", owner="alice", by=Agent())
     async with engine.connect() as connection:
         assert await connection.scalar(select(func.count()).select_from(TenantRow)) == 0
-
-
-async def test_an_engine_can_pool_connections_its_own_way(tmp_path: Path) -> None:
-    engine = create_sqlite_engine(
-        f"sqlite+aiosqlite:///{tmp_path / 'grantr.db'}", poolclass=NullPool
-    )
-    try:
-        assert isinstance(engine.pool, NullPool)
-        await create_schema(engine)
-        grants = Grants(SqlStorage(engine))
-        await grants.first_operator("root")
-        await grants.create_tenant("acme", owner="alice", by=User(id="root"))
-        assert await grants.member("acme", "alice") is not None
-    finally:
-        await engine.dispose()
 
 
 VIEWER = Grant(tenant="acme", role="viewer", on=TENANT, to=User(id="bob"))

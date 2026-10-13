@@ -9,9 +9,10 @@ transactions queue for it and take turns in the order they begin, as they do on 
 storage, instead of polling for the write lock; only other processes contend for the lock.
 
 lattice-core holds the engine, which every library's SQL storage shares (lattice
-ADR-0018); this module re-exports it.
+ADR-0018); this module re-exports it. Install ``artifactr-ai[sqlite]`` for its async driver,
+aiosqlite.
 """
 
-from lattice_core.sql import create_sqlite_engine
+from lattice_core.sql.sqlite import create_sqlite_engine
 
 __all__ = ["create_sqlite_engine"]

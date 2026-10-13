@@ -55,9 +55,8 @@ from grantr.sql.tables import (
     RoleRow,
     TenantRow,
 )
-from grantr.sql.tenancy import TENANT as TENANT_KEY
-from grantr.sql.tenancy import TenantSession
-from lattice_core.sql import awaited_to_the_end, to_the_end
+from lattice_core.sql.sessions import awaited_to_the_end, to_the_end
+from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 
 Clock = Callable[[], datetime]
 """Returns the current time; injectable so tests control it."""

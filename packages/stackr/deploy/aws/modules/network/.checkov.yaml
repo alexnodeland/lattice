@@ -1,0 +1,16 @@
+# checkov over the network module (RFC-0004), run by deploy/aws/check. Each check it skips here is
+# skipped for this module only, with its reason; nothing is skipped inline.
+framework:
+  - terraform
+compact: true
+quiet: true
+skip-check:
+  # The ALB takes 80 from anywhere, only to redirect it to 443; the tests check that only the ALB
+  # takes traffic from an address range, and only on 80 and 443.
+  - CKV_AWS_260
+  # A customer-managed key per deployment comes later (RFC-0004): AWS's encrypts the flow logs.
+  - CKV_AWS_158
+  # Flow logs keep their days by a variable, 30 by default, not a year.
+  - CKV_AWS_338
+  # The groups are attached in the modules that make the services; the tests check their rules.
+  - CKV2_AWS_5

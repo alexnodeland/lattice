@@ -56,6 +56,7 @@ nav:
     - adr/0026-the-single-host.md
     - adr/0027-the-single-hosts-backups.md
     - adr/0028-local-supabase-on-the-loopback.md
+    - adr/0029-the-aws-modules-and-tier-1.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

@@ -1,0 +1,32 @@
+# checkov over the data module (RFC-0004), run by deploy/aws/check. Each check it skips here is
+# skipped for this module only, with its reason; nothing is skipped inline.
+framework:
+  - terraform
+compact: true
+quiet: true
+skip-check:
+  # One zone and one copy, with Multi-AZ, replicas and cross-region copies in RFC-0004's
+  # "What comes later".
+  - CKV_AWS_157 # RDS Multi-AZ
+  - CKV2_AWS_50 # ElastiCache automatic failover
+  - CKV_AWS_144 # S3 cross-region replication
+  # A customer-managed key per deployment comes later (RFC-0004): AWS's encrypt these at rest.
+  - CKV_AWS_145 # S3
+  - CKV_AWS_191 # ElastiCache
+  - CKV_AWS_354 # Performance Insights
+  # Nothing consumes bucket events or access logs yet; RDS has Performance Insights and its logs.
+  - CKV2_AWS_62 # S3 event notifications
+  - CKV_AWS_18 # S3 access logging
+  - CKV_AWS_118 # RDS enhanced monitoring
+  # The scan of the HCL doesn't follow these, which tests/data.tofutest.hcl checks: each bucket's
+  # versioning, public access block and lifecycle are resources of their own, made for each role;
+  # RDS's backup retention and deletion protection come from a variable that refuses 0 days; and
+  # Valkey's auth token is a write-only argument.
+  - CKV_AWS_21
+  - CKV2_AWS_6
+  - CKV2_AWS_61
+  - CKV_AWS_133
+  - CKV_AWS_293
+  - CKV_AWS_31
+  # The data stores' group is attached to RDS and ElastiCache in this module; checkov doesn't see it.
+  - CKV2_AWS_5

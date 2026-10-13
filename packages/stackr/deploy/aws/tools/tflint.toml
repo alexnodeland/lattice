@@ -1,0 +1,24 @@
+# TFLint, for stackr's AWS recipe (RFC-0004): proto installs it from TFLint's own releases, checked
+# against their checksums.txt. A plugin of lattice's own, so nothing outside lattice decides what runs.
+
+name = "TFLint"
+type = "cli"
+
+[platform.linux]
+checksum-file = "checksums.txt"
+download-file = "tflint_linux_{arch}.zip"
+
+[platform.macos]
+checksum-file = "checksums.txt"
+download-file = "tflint_darwin_{arch}.zip"
+
+[install]
+checksum-url = "https://github.com/terraform-linters/tflint/releases/download/v{version}/{checksum_file}"
+download-url = "https://github.com/terraform-linters/tflint/releases/download/v{version}/{download_file}"
+
+[install.arch]
+x86_64 = "amd64"
+aarch64 = "arm64"
+
+[resolve]
+git-url = "https://github.com/terraform-linters/tflint"

@@ -1,0 +1,10 @@
+# Langfuse's worker's wait (services.tf): until the web server answers as ${version}, which it does
+# only once its migrations are applied, for up to 30 minutes.
+for _ in $(seq 360); do
+  if curl -fsS '${health}' | grep -qE '"version":"v?${version_pattern}"'; then
+    exit 0
+  fi
+  sleep 5
+done
+echo "langfuse-web never answered as ${version}" >&2
+exit 1

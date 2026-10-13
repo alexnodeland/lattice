@@ -3,6 +3,7 @@
 # target group, when the edge reaches it. A one-off task, such as db-init, is its definition alone,
 # which the recipe runs by run-task. A service may have a proxy in front of it, in its task, such as
 # GoTrue's: the proxy then takes the service's port, and the service listens on the task's loopback.
+# A service may also wait, in its task, for a container that must end well first.
 
 data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
@@ -52,7 +53,20 @@ locals {
     secrets                = [for key, value in var.container.secrets : { name = key, valueFrom = value }]
     readonlyRootFilesystem = var.container.readonly_root_filesystem
     logConfiguration       = local.logs
+    dependsOn              = var.wait == null ? [] : [{ containerName = "wait", condition = "SUCCESS" }]
   }
+  # A container that must end well before the service's starts, such as one that waits for
+  # another service to be ready.
+  wait = var.wait == null ? [] : [{
+    name        = "wait"
+    image       = var.wait.image
+    essential   = false
+    command     = var.wait.command
+    environment = []
+    logConfiguration = merge(local.logs, {
+      options = merge(local.logs.options, { awslogs-stream-prefix = "${var.name}-wait" })
+    })
+  }]
   # Caddy, with its configuration from the environment: it needs no image of its own.
   proxy = var.proxy == null ? [] : [{
     name         = "proxy"
@@ -141,7 +155,7 @@ resource "aws_ecs_task_definition" "this" {
     cpu_architecture        = "ARM64"
   }
 
-  container_definitions = jsonencode(concat([local.service], local.proxy))
+  container_definitions = jsonencode(concat([local.service], local.proxy, local.wait))
 }
 
 resource "aws_service_discovery_service" "this" {

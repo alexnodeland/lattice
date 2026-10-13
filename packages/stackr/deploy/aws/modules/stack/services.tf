@@ -65,6 +65,8 @@ locals {
       var.aws_endpoint_url == null ? {} : { "LANGFUSE_S3_${upload}_UPLOAD_ENDPOINT" = var.aws_endpoint_url },
     )]...),
   )
+  # The version Langfuse's web and worker share, from the worker's tag.
+  langfuse_version = regex(":([^@]+)@", local.upstream.langfuse_worker)[0]
   langfuse_secrets = {
     DATABASE_URL            = "${local.database["database-langfuse"]}:url::"
     SALT                    = local.secret["langfuse-salt"]
@@ -212,6 +214,19 @@ module "langfuse_worker" {
     port        = 3030
     environment = local.langfuse_environment
     secrets     = local.langfuse_secrets
+  }
+  # The worker writes Langfuse's default models as it starts, which can deadlock a migration of the
+  # web server's (#155). So it starts once the web server answers as its own version, which it does
+  # only after its migrations: on a first deployment, and on an upgrade, when the old web tasks still
+  # answer as the old version. It waits up to 30 minutes.
+  wait = {
+    image = local.upstream.curl
+    command = ["sh", "-c", templatefile("${path.module}/wait-for-langfuse.sh.tftpl", {
+      health  = "http://${module.langfuse_web.address.name}.${local.namespace}:3000/api/public/health"
+      version = local.langfuse_version
+      # The version as a pattern: its dots, literal.
+      version_pattern = replace(local.langfuse_version, ".", "\\.")
+    })]
   }
   task_role_policy_json = local.storage_policy.langfuse
   after                 = merge({ db-init = terraform_data.db_init.id }, local.state, local.versions_of.langfuse-worker)

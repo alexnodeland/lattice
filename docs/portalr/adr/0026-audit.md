@@ -18,7 +18,7 @@ Reading it takes `grantr:read_audit` on the tenant, which owners and admins hold
 - **Audit is `/t/$tenant/audit`,** on the rail where grantr allows `grantr:read_audit`.
   - The rail's one read of grantr's checks asks it beside Access's actions.
   - The route is gated in `beforeLoad` and reads in `loader`, as Access's parts are (ADR-0024).
-  - Opened by its address where it isn't allowed, it says so in the tenant's frame. A failed read says so there, through admin's `ReadFailed`, which Access shares, with a way to read it again, and, where the address has a filter, a way to clear it, so a filter grantr refuses isn't a dead end.
+  - Opened by its address where it isn't allowed, it says so in the tenant's frame. A failed read says so there, through admin's `ReadFailed`, which Access shares, with a way to read it again, and, where the address has a filter, a way to clear it, so a filter grantr refuses isn't a dead end. A refusal says why, as the server gave it, not its body as it came.
 - **It opens on the newest changes.**
   - `client`'s `audit(tenant, filter)` is an infinite query. Each page is the last 50 before the previous page's oldest entry, and a page short of 50 is the first.
   - Each page comes oldest first, so the table turns each around, and the newest is on top. "Show more" reads the page before.
@@ -28,6 +28,7 @@ Reading it takes `grantr:read_audit` on the tenant, which owners and admins hold
   - A change to access on any screen reads the log again, as `changedAccess` stales everything grantr answers in the tenant.
 - **Each entry reads as a sentence,** with who made it and when, and each row, or card, is named by its sentence and its time:
   - "added ci (service principal)";
+  - "set reviewers' members to alice (person)", a name's possessive as English writes it;
   - "granted viewer on workspace notes to ops (group)".
   - `said(event)` covers each of grantr's 14 event types in an exhaustive switch, so a new type fails the typecheck.
   - The maker is a member, a rule, "the agent", or "no one" for the first operator's grant. People and principals are named with their kind, the tenant's first owner too.

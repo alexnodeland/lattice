@@ -21,6 +21,13 @@
       "managerFilePatterns": ["/^packages/stackr/deploy/aws/modules/.+\\.tf$/"],
       "matchStrings": ["\"(?<depName>[a-z0-9./-]+):(?<currentValue>[^@\"]+)@(?<currentDigest>sha256:[a-f0-9]{64})\""],
       "datasourceTemplate": "docker"
+    },
+    {
+      "description": "The BuildKit that deploy/image-archive builds a stackr release's images with, by tag and digest (stackr ADR-0035).",
+      "customType": "regex",
+      "managerFilePatterns": ["/^packages/stackr/deploy/image-archive$/"],
+      "matchStrings": ["(?<depName>moby/buildkit):(?<currentValue>v[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"],
+      "datasourceTemplate": "docker"
     }
   ],
   "packageRules": [

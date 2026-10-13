@@ -21,16 +21,16 @@ ami_id = "ami-0123456789abcdef0"
 #   git rev-parse "stackr-v0.1.0^{commit}"
 lattice_commit = "0123456789abcdef0123456789abcdef01234567"
 
-# From the stackr release's notes, by digest.
+# From the stackr release's notes, by version and digest, as Renovate moves them.
 images = {
-  otel_collector = "ghcr.io/alexnodeland/stackr-otel-collector@sha256:..."
-  tempo          = "ghcr.io/alexnodeland/stackr-tempo@sha256:..."
-  loki           = "ghcr.io/alexnodeland/stackr-loki@sha256:..."
-  pyroscope      = "ghcr.io/alexnodeland/stackr-pyroscope@sha256:..."
-  grafana        = "ghcr.io/alexnodeland/stackr-grafana@sha256:..."
-  litellm        = "ghcr.io/alexnodeland/stackr-litellm@sha256:..."
-  db_init        = "ghcr.io/alexnodeland/stackr-db-init@sha256:..."
-  auth_keys      = "ghcr.io/alexnodeland/stackr-auth-keys@sha256:..."
+  otel_collector = "ghcr.io/alexnodeland/stackr-otel-collector:<version>@sha256:..."
+  tempo          = "ghcr.io/alexnodeland/stackr-tempo:<version>@sha256:..."
+  loki           = "ghcr.io/alexnodeland/stackr-loki:<version>@sha256:..."
+  pyroscope      = "ghcr.io/alexnodeland/stackr-pyroscope:<version>@sha256:..."
+  grafana        = "ghcr.io/alexnodeland/stackr-grafana:<version>@sha256:..."
+  litellm        = "ghcr.io/alexnodeland/stackr-litellm:<version>@sha256:..."
+  db_init        = "ghcr.io/alexnodeland/stackr-db-init:<version>@sha256:..."
+  auth_keys      = "ghcr.io/alexnodeland/stackr-auth-keys:<version>@sha256:..."
 }
 
 # The application's image must be pullable without credentials: no private registry is wired.

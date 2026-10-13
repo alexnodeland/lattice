@@ -74,16 +74,20 @@ module "auth_keys" {
   size               = local.sizes["auth-keys"]
   log_retention_days = var.log_retention_days
   container = {
-    image       = var.images.auth_keys
-    environment = merge(local.endpoint, { AUTH_KEYS_ARN = local.secret["auth-keys"], AWS_REGION = local.region })
+    image = var.images.auth_keys
+    environment = merge(local.endpoint, {
+      AUTH_JWT_KEYS_ARN         = local.secret["auth-jwt-keys"]
+      AUTH_SERVICE_ROLE_KEY_ARN = local.secret["auth-service-role-key"]
+      AWS_REGION                = local.region
+    })
   }
-  # It reads its secret, and writes it when it is empty.
+  # It reads its two secrets, and writes each that is empty.
   task_role_policy_json = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
       Action   = ["secretsmanager:DescribeSecret", "secretsmanager:GetSecretValue", "secretsmanager:PutSecretValue"]
-      Resource = local.secret["auth-keys"]
+      Resource = [local.secret["auth-jwt-keys"], local.secret["auth-service-role-key"]]
     }]
   })
 }

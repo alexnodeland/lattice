@@ -350,7 +350,8 @@ run "stack_each_secret_reaches_the_services_that_read_it" {
         gotrue-jwt-secret         = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/gotrue-jwt-secret-AAAAAA"
         clickhouse-password       = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-password-AAAAAA"
         clickhouse-admin-password = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-password-AAAAAA"
-        auth-keys                 = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-keys-AAAAAA"
+        auth-jwt-keys             = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-jwt-keys-AAAAAA"
+        auth-service-role-key     = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-service-role-key-AAAAAA"
       }
     }
   }
@@ -372,7 +373,8 @@ run "stack_each_secret_reaches_the_services_that_read_it" {
     condition = (
       { for secret in module.litellm.containers[0].secrets : secret.name => secret.valueFrom }["LITELLM_MASTER_KEY"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/litellm-master-key-AAAAAA"
       && { for secret in module.litellm.containers[0].secrets : secret.name => secret.valueFrom }["DATABASE_URL"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-litellm-AAAAAA:url::"
-      && { for secret in module.gotrue.containers[0].secrets : secret.name => secret.valueFrom }["GOTRUE_JWT_KEYS"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-keys-AAAAAA:jwt_keys::"
+      && { for secret in module.gotrue.containers[0].secrets : secret.name => secret.valueFrom }["GOTRUE_JWT_KEYS"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-jwt-keys-AAAAAA"
+      && { for secret in module.app.containers[0].secrets : secret.name => secret.valueFrom }["AUTH_SERVICE_ROLE_KEY"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-service-role-key-AAAAAA"
       && { for secret in module.app.containers[0].secrets : secret.name => secret.valueFrom }["DATABASE_URL"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-app-AAAAAA:url::"
       && { for secret in module.app.containers[0].secrets : secret.name => secret.valueFrom }["DATABASE_ADMIN_URL"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-app-owner-AAAAAA:url::"
       && { for secret in module.db_init.containers[0].secrets : secret.name => secret.valueFrom }["GRAFANA_DB_PASSWORD"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/database-grafana-AAAAAA:password::"

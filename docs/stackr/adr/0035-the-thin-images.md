@@ -19,7 +19,7 @@ Building the images settled the rest: where they're built from, how each tool ta
   - a `postgres` role where there is none, for GoTrue's migrations on Floci (ADR-0025);
   - Grafana's role and database;
   - the application's database and its owner, which may create roles, for `db-roles`. On PostgreSQL 16 and later, it administers only the roles it creates.
-- **`stackr-auth-keys` runs `scripts/auth-keys`,** a command around `_auth_keys.py`, as RFC-0004 first named it. It writes the key set and the service role's key to `AUTH_KEYS_ARN` only when the secret has no value, through boto3. Its dependencies are stackr's `auth-keys` group, as lattice's `uv.lock` pins them; its image is Python's, pinned by digest, and runs as `nobody`.
+- **`stackr-auth-keys` runs `scripts/auth-keys`,** a command around `_auth_keys.py`, as RFC-0004 first named it. It writes the key set to `AUTH_JWT_KEYS_ARN` only when that secret has no value, and the service role's key to `AUTH_SERVICE_ROLE_KEY_ARN` when it has none or is signed with a key the set no longer has, through boto3. ADR-0034's one JSON secret becomes these two, each read whole: Floci's ECS refused the key set as a JSON key of it ("secret value is not a string"), and a whole secret asks nothing of ECS's JSON keys. Its dependencies are stackr's `auth-keys` group, as lattice's `uv.lock` pins them; its image is Python's, pinned by digest, and runs as `nobody`.
 - **Each Dockerfile is beside its configuration,** as `deploy/<service>/Dockerfile`, labelled with lattice's repository, built from lattice's root, since Grafana's carries artifactr's and reflexr's dashboards. Each has its own `Dockerfile.dockerignore`, which lets in its files alone, as lattice's other images do.
 - **Each base is its service's image, as `compose.yaml` pins it.** `scripts/check-config aws` fails when `deploy/<service>/Dockerfile`'s `FROM` isn't `<service>`'s image in `compose.yaml`, so Renovate's moves of the two stay together. LiteLLM's is now its non-root image, in both. auth-keys, which `compose.yaml` doesn't run, has its own pins, Python's and uv's.
 - **Their files are read-only:** each `COPY` gives them `a=rX`, and `--link` where the destination's directories are the image's own to make.
@@ -34,7 +34,7 @@ Building the images settled the rest: where they're built from, how each tool ta
   - that each image starts and answers its health check, on a Docker network of its own, which publishes no port and has no route out; LiteLLM's beside a Valkey, which it needs to start;
   - that Grafana's four data sources are at their addresses, Compose's and then the AWS recipe's, and that it has the three folders of dashboards;
   - that db-init creates one machine's roles and databases, then the AWS recipe's, twice, against a PostgreSQL of its own;
-  - that auth-keys' dependencies load and make a key set, and that it refuses to start without a secret to write.
+  - that auth-keys' dependencies load and make a key set, and that it refuses to start without its secrets to write.
 - **The checks' helpers, curl, Valkey and PostgreSQL, are `compose.yaml`'s pins too.**
 - **CI builds them natively on both architectures,** on `ubuntu-24.04` and `ubuntu-24.04-arm`, in a "Thin images" job, whenever stackr, or a project it depends on, changes (`scripts/affected.py`), and nightly. It publishes nothing.
 

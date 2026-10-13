@@ -154,7 +154,7 @@ for image in "${images[@]}"; do
       once --entrypoint python "$tag" -c \
         'import sys; sys.path.insert(0, "/app"); from _auth_keys import key_set, service_role_key; service_role_key(key_set())' ||
         fail "auth-keys can't make its keys"
-      if once "$tag" 2>/dev/null; then fail "auth-keys starts without AUTH_KEYS_ARN"; else echo "ok: auth-keys makes its keys"; fi
+      if once "$tag" 2>/dev/null; then fail "auth-keys starts without its secrets"; else echo "ok: auth-keys makes its keys"; fi
       ;;
     *)
       fail "no check for $image"

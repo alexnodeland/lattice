@@ -67,7 +67,7 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 | `/` | The person's tenants, from grantr's `/me`: none is no access, and one goes straight to it |
 | `/t/$tenant` | The workspaces grantr says they can open there |
 | `/t/$tenant/w/$workspace` | A workspace's threads, and a new one; its artifactr stream is open while any of its routes is |
-| `/t/$tenant/w/$workspace/threads/$thread` | A thread's chat: its messages, its runs as they stream, what a paused run waits on, its proposals, and a message to post |
+| `/t/$tenant/w/$workspace/threads/$thread` | A thread's chat: its messages, its runs as they stream, what a paused run waits on, its proposals, and a message to post where grantr allows; and its menu, to restrict and share it ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
 | `/t/$tenant/w/$workspace/artifacts` | The workspace's artifacts that aren't archived, each by kind and latest version |
 | `/t/$tenant/w/$workspace/artifacts/$artifact` | An artifact through its kind's renderer, its revisions newest first with what each changed, and its open proposals |
 | `/t/$tenant/w/$workspace/proposals` | Every proposal in the workspace, the open ones first, to accept or reject |
@@ -93,6 +93,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Diff` | What a revision changed, as `client`'s `changes` cut it | Nothing |
 | `Thumbs` | The reader's thumbs on a message, an artifact or a run, and why | Thumbs, then a comment ([ADR-0018](adr/0018-the-runs-area-and-feedback.md)) |
 | `CommandButton` | One action, waiting while its command is in flight | The command |
+| `Dialog` | A dialog over the page, opened by its caller, on `dialog.ts`'s classes | Closing it |
 | `Markdown` | Markdown through Streamdown: no raw HTML, links to the web, mail, the page and the application alone, images from this origin alone | Nothing |
 
 `ui` imports `client`'s types alone, which a root test holds it to.

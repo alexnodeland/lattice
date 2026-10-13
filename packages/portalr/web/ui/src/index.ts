@@ -34,7 +34,6 @@ export {
   Thumbs,
   ToolCall,
 } from "./chat";
-export * as dialog from "./dialog";
 export { Dialog } from "./dialog-box";
 export { EmptyState } from "./empty-state";
 export { Icon } from "./icon";

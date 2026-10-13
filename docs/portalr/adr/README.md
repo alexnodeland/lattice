@@ -33,5 +33,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0025](0025-access-roles-and-grants.md) | Access: roles and grants, on grantr's catalog | Accepted |
 | [0026](0026-audit.md) | Audit: grantr's log, newest on top, filtered by type and maker | Accepted |
 | [0027](0027-feedback-and-evaluations.md) | Feedback and evaluations, summed by day, and the first charts | Accepted |
+| [0028](0028-usage-and-spend.md) | Usage and spend, per day and per workspace, against the budget's share | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

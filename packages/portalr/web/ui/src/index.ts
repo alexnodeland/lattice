@@ -71,3 +71,4 @@ export { TabLink, TabNav } from "./tab-nav";
 export { Table } from "./table";
 export { TextField } from "./text-field";
 export { TextLink } from "./text-link";
+export { type Block, type Level, MAX_LEVELS, Tracker } from "./tracker";

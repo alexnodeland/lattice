@@ -4,7 +4,7 @@
 **Date:** 2026-10-13
 **Deciders:** Alex Nodeland
 
-Builds the thin images of [RFC-0004](../rfcs/0004-hosting-recipes.md)'s phase 3, for the settings [ADR-0034](0034-the-stack-on-aws.md) gives them: the six that carry a service's configuration, then the two one-off tasks', `stackr-db-init` and `stackr-auth-keys`, in the pull request after. It amends ADR-0034's table of those settings, for the telemetry stores' S3. The release that publishes them follows.
+Builds the thin images of [RFC-0004](../rfcs/0004-hosting-recipes.md)'s phase 3, for the settings [ADR-0034](0034-the-stack-on-aws.md) gives them: the six that carry a service's configuration, then the two one-off tasks', `stackr-db-init` and `stackr-auth-keys`, in the pull request after. It amends ADR-0034's table of those settings, for the telemetry stores' S3, and settles the release that publishes them.
 
 ## Context
 
@@ -36,7 +36,16 @@ Building the images settled the rest: where they're built from, how each tool ta
   - that db-init, as a `postgres` that may create roles and databases and is no superuser, as RDS's master, creates one machine's roles and databases and none of the AWS recipe's; then the AWS recipe's, twice; and that the application's owner may create and drop a role with grantr, and may not without;
   - that auth-keys refuses to start without its secrets, and says which, and that the script does what it should against a stubbed Secrets Manager: with nothing written yet, with both written, with a service role's key that no longer verifies, losing a race to write the key set, and when it is refused.
 - **The checks' helpers, curl, Valkey and PostgreSQL, are `compose.yaml`'s pins too.**
+- **A stackr release publishes them,** and nothing else does: no pull request, no push to main without a release, and no one by hand. Two scripts do it, which CI runs too. After release-please creates stackr's release, `release.yml`:
+  1. on a runner of each architecture, checks out the release's commit (release-please's `packages/stackr--sha`), and builds every image as an OCI archive with `deploy/image-archive`, in jobs that can't write to the registry. It builds with a pinned BuildKit, in a builder of its own, and without BuildKit's provenance or SBOM, since the release attests the image itself. The archives are kept for seven days;
+  2. in one job per image, the only one with `packages: write`, runs `deploy/publish-image`. It pushes each architecture's image as `<version>-amd64` and `<version>-arm64`, and joins them as `ghcr.io/alexnodeland/stackr-<image>:<version>`, an index carrying the image's description, source and licence. The job then attests that index's build provenance, stored in the registry beside it, as the wheels' is attached to their release;
+  3. in a job that may write the release and nothing in the registry, adds each image's reference, `ghcr.io/alexnodeland/stackr-<image>:<version>@sha256:…`, to the release's notes, for `envs/prod`.
+- **Each image's tags are its version, bare, and that version for each architecture.** There is no `latest`, and no major or minor tag: a deployment names a version and its digest.
+- **A failed publish is run again** by re-running the release workflow's failed jobs only, within the archives' seven days, never all its jobs. Re-running all of them re-runs release-please too, which finds nothing new to release and skips the rest, green and silent. The same archives push the same images, under the same tags. After seven days, a new stackr release publishes them. While a publish job has failed for good, the release's notes get no images: their job runs only after every image is published.
+- **The builds are reproducible.** Each layer's and file's time is the release commit's: `SOURCE_DATE_EPOCH`, given to each build as an argument too, with BuildKit's `rewrite-timestamp`. With it, auth-keys' `.pyc` files are checked against their sources' hashes, not their times. The labels carry the commit as `revision` and its time as `created`, and the files' modes are fixed in the Dockerfiles, by their `COPY` or, for auth-keys' virtual environment, by its build stage. Nightly builds auth-keys, whose `.pyc` files are the likeliest to differ, twice without a cache on amd64, and checks that the digests match. All eight, built twice without a cache on arm64, matched when this was written; nothing checks the other seven since.
+- **A package GHCR makes is private** until its owner makes it public, once, in its settings: RFC-0004's images are public. Each image's label links its package to lattice's repository.
 - **CI builds them natively on both architectures,** on `ubuntu-24.04` and `ubuntu-24.04-arm`, in a "Thin images" job, whenever stackr, or a project it depends on, changes (`scripts/affected.py`), and nightly. It publishes nothing.
+- **CI runs the release's path too, short of GHCR,** whenever the images' files, the two scripts or `release.yml` change: "Release images" builds each architecture's archives on its own runner, and publishes them with `deploy/publish-image` to a registry on its own loopback, then checks that each of the eight images' indexes has its two platforms and its annotations. It needs no write permission.
 
 ## Options considered
 
@@ -53,4 +62,4 @@ Building the images settled the rest: where they're built from, how each tool ta
 
 - Easier: an image's configuration is the file Compose mounts, checked on both architectures, and on AWS's settings.
 - Harder: the telemetry stores' files carry S3's settings, unused on one machine.
-- Next: the release step that publishes the images, multi-arch, to GHCR; and tier 2, which runs them against Floci, auth-keys' write included.
+- Next: pinning the published digests in `envs/prod`, with a Renovate manager for `envs/`; and tier 2, which runs the images against Floci, auth-keys' write included.

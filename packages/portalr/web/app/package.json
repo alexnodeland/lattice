@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@base-ui/react": "1.8.0",
     "@portalr/client": "workspace:*",
     "@portalr/ui": "workspace:*",
     "@supabase/auth-js": "2.117.3",

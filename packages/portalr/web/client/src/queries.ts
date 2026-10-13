@@ -54,6 +54,11 @@ export const keys = {
     me: (tenant: string) => ["grantr", tenant, "me"] as const,
     checks: (tenant: string, checks: readonly Check[]) =>
       ["grantr", tenant, "checks", checks] as const,
+    access: (tenant: string) => ["grantr", tenant, "access"] as const,
+    members: (tenant: string) => [...keys.grantr.access(tenant), "members"] as const,
+    grants: (tenant: string, ws: string) => [...keys.grantr.access(tenant), "grants", ws] as const,
+    restrictions: (tenant: string, ws: string) =>
+      [...keys.grantr.access(tenant), "restrictions", ws] as const,
   },
 };
 
@@ -219,6 +224,39 @@ export function createQueries(api: Api) {
             }
             return me;
           },
+        }),
+      /** The tenant's members, for those who may add one (`grantr:add_member`). */
+      members: (tenant: string) =>
+        queryOptions({
+          queryKey: keys.grantr.members(tenant),
+          queryFn: () =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/members", {
+                params: { path: { tenant } },
+              }),
+            ),
+        }),
+      /** The grants on a workspace and on the threads and artifacts in it. */
+      grants: (tenant: string, ws: string) =>
+        queryOptions({
+          queryKey: keys.grantr.grants(tenant, ws),
+          queryFn: () =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/grants", {
+                params: { path: { tenant }, query: { workspace: ws } },
+              }),
+            ),
+        }),
+      /** The threads and artifacts restricted in a workspace. */
+      restrictions: (tenant: string, ws: string) =>
+        queryOptions({
+          queryKey: keys.grantr.restrictions(tenant, ws),
+          queryFn: () =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/restrictions", {
+                params: { path: { tenant }, query: { workspace: ws } },
+              }),
+            ),
         }),
       /** Whether the caller may take each action, in the order asked (lattice RFC-0002). */
       checks: (tenant: string, checks: readonly Check[]) =>

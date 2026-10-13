@@ -1,4 +1,4 @@
-import { type Artifactr, type ArtifactrV1, thumbs } from "@portalr/client";
+import { type Artifactr, type ArtifactrV1, keys, thumbs } from "@portalr/client";
 import {
   Composer,
   Message,
@@ -9,15 +9,54 @@ import {
   Streaming,
   ToolCall,
 } from "@portalr/ui";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { allowedIn } from "../../../../../../../allowed";
 import { useMe } from "../../../../../../../me";
+import { ShareDialog } from "../../../../../../../share-dialog";
+import { ThreadMenu } from "../../../../../../../thread-menu";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
 
-/** A thread's chat: its messages, its runs as they go, its proposals, and a message to post. */
+/** What a person may do with a thread, asked of grantr on the thread itself. */
+const ACTIONS = [
+  "artifactr:post_message",
+  "grantr:grant",
+  "grantr:revoke",
+  "grantr:restrict",
+] as const;
+
+/** Who may list the tenant's members, to share with any of them. */
+const LISTS_MEMBERS = ["grantr:add_member"] as const;
+
+const threadOf = (workspace: string, thread: string) =>
+  ({ kind: "thread", workspace, id: thread }) as const;
+
+/**
+ * A thread's chat: its messages, its runs as they go, its proposals, and a message to post where
+ * grantr allows; and its menu, to restrict and share it, for those who may (portalr ADR-0022).
+ */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/threads/$thread")({
   head: ({ params }) => ({ meta: [{ title: `Thread · ${params.workspace} · portalr` }] }),
-  loader: ({ context }) =>
-    context.queryClient.ensureQueryData(context.queries.grantr.memberships(context.user)),
+  loader: async ({ context, params }) => {
+    const { tenant, workspace, thread } = params;
+    const { queries, queryClient } = context;
+    const [, answers] = await Promise.all([
+      queryClient.ensureQueryData(queries.grantr.memberships(context.user)),
+      queryClient.ensureQueryData(
+        allowedIn(queries, tenant, workspace, ACTIONS, threadOf(workspace, thread)),
+      ),
+      queryClient.ensureQueryData(
+        allowedIn(queries, tenant, workspace, LISTS_MEMBERS, { kind: "tenant" }),
+      ),
+    ]);
+    const may = (action: (typeof ACTIONS)[number]) => answers[ACTIONS.indexOf(action)] === true;
+    await Promise.all([
+      may("grantr:grant") && queryClient.ensureQueryData(queries.grantr.grants(tenant, workspace)),
+      may("grantr:restrict") &&
+        queryClient.ensureQueryData(queries.grantr.restrictions(tenant, workspace)),
+    ]);
+  },
   component: Chat,
 });
 
@@ -43,9 +82,14 @@ function author(actor: ArtifactrV1.Actor, me: string): string {
 }
 
 function Chat() {
-  const { tenant, thread: id } = Route.useParams();
+  const { tenant, workspace, thread: id } = Route.useParams();
   const { queries, user } = Route.useRouteContext();
   const me = useMe(queries, user, tenant);
+  const checks = useMemo(
+    () => allowedIn(queries, tenant, workspace, ACTIONS, threadOf(workspace, id)),
+    [queries, tenant, workspace, id],
+  );
+  const { data: allowed } = useSuspenseQuery(checks);
   const stream = useStream();
   const snapshot = useWorkspace();
   const { threads, runs, proposals } = snapshot.state;
@@ -77,9 +121,12 @@ function Chat() {
 
   return (
     <section aria-labelledby="thread" className="flex flex-col gap-4">
-      <h2 id="thread" className="font-semibold text-lg">
-        {thread.title || "Untitled"}
-      </h2>
+      <span className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="thread" className="font-semibold text-lg">
+          {thread.title || "Untitled"}
+        </h2>
+        <Access tenant={tenant} workspace={workspace} thread={id} allowed={allowed} />
+      </span>
       <Connection snapshot={snapshot} waiting="the thread" />
       <Messages>
         {thread.messages.map((message) => (
@@ -132,12 +179,106 @@ function Chat() {
           }
         />
       ))}
-      {snapshot.status !== "closed" && (
+      {snapshot.status !== "closed" && allowed.has("artifactr:post_message") && (
         <Composer
           disabled={snapshot.status !== "live"}
           onSend={(content) => stream.send({ type: "post_message", thread_id: id, content })}
         />
       )}
     </section>
+  );
+}
+
+/**
+ * The thread's menu and its sharing, for whoever grantr lets grant, revoke or restrict on it: the
+ * grants on it, and whether it's restricted, as grantr holds them.
+ */
+function Access({
+  tenant,
+  workspace,
+  thread,
+  allowed,
+}: {
+  tenant: string;
+  workspace: string;
+  thread: string;
+  allowed: ReadonlySet<string>;
+}) {
+  const { queries, commands, queryClient } = Route.useRouteContext();
+  const [sharing, setSharing] = useState(false);
+  const canShare = allowed.has("grantr:grant");
+  const canRestrict = allowed.has("grantr:restrict");
+  const lister = useMemo(
+    () => allowedIn(queries, tenant, workspace, LISTS_MEMBERS, { kind: "tenant" }),
+    [queries, tenant, workspace],
+  );
+  const { data: lists } = useSuspenseQuery(lister);
+  const grants = useQuery({ ...queries.grantr.grants(tenant, workspace), enabled: canShare });
+  const restrictions = useQuery({
+    ...queries.grantr.restrictions(tenant, workspace),
+    enabled: canRestrict,
+  });
+  const members = useQuery({
+    ...queries.grantr.members(tenant),
+    enabled: canShare && lists.has("grantr:add_member"),
+  });
+  const on = threadOf(workspace, thread);
+  const held = (grants.data ?? []).filter(
+    (grant) => grant.on.kind === "thread" && grant.on.id === thread,
+  );
+  const restricted = (restrictions.data ?? []).some(
+    (item) => item.kind === "thread" && item.id === thread,
+  );
+  // The people it may be shared with: those with a role in the workspace, and, for whoever may
+  // list them, the tenant's members; less those who hold a role on it already.
+  const holding = new Set(held.flatMap((grant) => (grant.to.kind === "user" ? [grant.to.id] : [])));
+  const people = [
+    ...new Set([
+      ...(grants.data ?? []).flatMap((grant) =>
+        grant.on.kind === "workspace" && grant.to.kind === "user" ? [grant.to.id] : [],
+      ),
+      ...(members.data ?? []).flatMap((member) => (member.kind === "user" ? [member.id] : [])),
+    ]),
+  ]
+    .filter((person) => !holding.has(person))
+    .sort();
+  /** A change to access, after which grantr's answers are read again. */
+  async function changed<A extends { outcome: string }>(answer: Promise<A>): Promise<A> {
+    const answered = await answer;
+    if (answered.outcome === "done") {
+      await queryClient.invalidateQueries({ queryKey: keys.grantr.access(tenant) });
+    }
+    return answered;
+  }
+  return (
+    <>
+      {restricted && (
+        <p className="text-muted text-sm">Restricted to the people it's shared with</p>
+      )}
+      <ThreadMenu
+        restricted={restricted}
+        canRestrict={canRestrict}
+        canShare={canShare}
+        onRestrict={() =>
+          changed(commands.grantr.restrict(tenant, { on, restricted: !restricted }))
+        }
+        onShare={() => setSharing(true)}
+      />
+      {canShare && (
+        <ShareDialog
+          open={sharing}
+          onOpenChange={setSharing}
+          grants={held}
+          people={people}
+          canRevoke={allowed.has("grantr:revoke")}
+          onGrant={(person, role) =>
+            changed(commands.grantr.grant(tenant, { role, on, to: { kind: "user", id: person } }))
+          }
+          onRevoke={(grant) =>
+            changed(commands.grantr.revoke(tenant, { role: grant.role, on, to: grant.to }))
+          }
+        />
+      )}
+    </>
   );
 }

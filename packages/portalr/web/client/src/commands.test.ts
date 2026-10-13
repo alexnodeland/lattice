@@ -71,6 +71,15 @@ beforeAll(() => {
     port: 0,
     async fetch(request) {
       const body = (await request.json()) as { command_id: string };
+      if (new URL(request.url).pathname.startsWith("/grantr/")) {
+        sent.push({ url: new URL(request.url), tenant: null, body });
+        return new URL(request.url).pathname.endsWith("/grants")
+          ? Response.json({ seq: 1 }, { status: 201 })
+          : Response.json(
+              { detail: { type: "forbidden", message: "bob may not grantr:restrict" } },
+              { status: 403 },
+            );
+      }
       sent.push({ url: new URL(request.url), tenant: request.headers.get("x-tenant"), body });
       return ANSWERS[body.command_id]?.() ?? new Response(null, { status: 500 });
     },
@@ -176,4 +185,23 @@ test("an answer that isn't the library's says its status", async () => {
       reasons: [`The server answered ${status}.`],
     });
   }
+});
+
+test("grantr's grants, revocations and restrictions go to the tenant's own paths", async () => {
+  const on = { kind: "thread", workspace: "notes", id: "thr_1" } as const;
+  const grant = { role: "viewer", on, to: { kind: "user", id: "bob" } } as const;
+  expect(await commands.grantr.grant("acme", grant)).toEqual({
+    outcome: "done",
+    result: { seq: 1 },
+  });
+  expect(sent.at(-1)?.url.pathname).toBe("/grantr/v1/tenants/acme/grants");
+  expect(sent.at(-1)?.body).toEqual(grant);
+  expect(await commands.grantr.revoke("acme", grant)).toMatchObject({ outcome: "refused" });
+  expect(sent.at(-1)?.url.pathname).toBe("/grantr/v1/tenants/acme/revocations");
+  expect(await commands.grantr.restrict("acme", { on, restricted: true })).toEqual({
+    outcome: "refused",
+    status: 403,
+    reasons: ["bob may not grantr:restrict"],
+  });
+  expect(sent.at(-1)?.url.pathname).toBe("/grantr/v1/tenants/acme/restrictions");
 });

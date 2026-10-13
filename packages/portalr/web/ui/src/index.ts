@@ -34,10 +34,13 @@ export {
   Thumbs,
   ToolCall,
 } from "./chat";
+export * as dialog from "./dialog";
+export { Dialog } from "./dialog-box";
 export { EmptyState } from "./empty-state";
 export { Icon } from "./icon";
 export { Markdown } from "./markdown";
 export { Lockup, Mark, type Ui } from "./marks";
+export * as menu from "./menu";
 export { Page } from "./page";
 export { PageHeader } from "./page-header";
 export { type Segment, SegmentedFilter } from "./segmented-filter";

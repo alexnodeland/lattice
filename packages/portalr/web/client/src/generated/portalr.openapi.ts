@@ -157,7 +157,7 @@ export interface paths {
         };
         /**
          * Scores
-         * @description The tenant's feedback and evaluation scores, from Langfuse.
+         * @description The tenant's feedback and evaluation scores, from Langfuse, and whether that's all.
          */
         get: operations["scores_portalr_v1_scores_get"];
         put?: never;
@@ -300,6 +300,8 @@ export interface components {
             days: components["schemas"]["Thumbs"][];
             /** Evaluations */
             evaluations: components["schemas"]["Evaluation"][];
+            /** Known From */
+            known_from?: string | null;
             /** Workspaces */
             workspaces: components["schemas"]["WorkspaceTotals"][];
         };
@@ -373,8 +375,6 @@ export interface components {
         };
         /** @enum {string} */
         Metric: "turn_latency" | "failed_turns";
-        /** Format: date-time */
-        Moment: string;
         /**
          * NewInvite
          * @description Whom to invite to the tenant ``X-Tenant`` names.
@@ -386,6 +386,15 @@ export interface components {
         /** Ok[Feedback] */
         Ok_Feedback_: {
             data: components["schemas"]["Feedback"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+        };
+        /** Ok[Scores] */
+        Ok_Scores_: {
+            data: components["schemas"]["Scores"];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -424,16 +433,6 @@ export interface components {
         Ok_list_Point__: {
             /** Data */
             data: components["schemas"]["Point"][];
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            status: "ok";
-        };
-        /** Ok[list[Score]] */
-        Ok_list_Score__: {
-            /** Data */
-            data: components["schemas"]["Score"][];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -507,6 +506,8 @@ export interface components {
             data_type: "NUMERIC" | "BOOLEAN" | "CATEGORICAL" | "TEXT" | "CORRECTION";
             /** Evaluator */
             evaluator?: string | null;
+            /** Feedback Type */
+            feedback_type?: string | null;
             /** Id */
             id: string;
             /** Name */
@@ -524,6 +525,18 @@ export interface components {
             value: number | boolean | string;
             /** Workspace */
             workspace?: string | null;
+        };
+        /**
+         * Scores
+         * @description The scores a read took, whether they are all there were, and since when they are known.
+         */
+        Scores: {
+            /** Complete */
+            complete: boolean;
+            /** Known From */
+            known_from?: string | null;
+            /** Scores */
+            scores: components["schemas"]["Score"][];
         };
         /**
          * Span
@@ -839,8 +852,8 @@ export interface operations {
     feedback_portalr_v1_feedback_get: {
         parameters: {
             query: {
-                start: components["schemas"]["Moment"];
-                end: components["schemas"]["Moment"];
+                start: string;
+                end: string;
                 workspace?: components["schemas"]["Id"] | null;
             };
             header?: {
@@ -972,8 +985,8 @@ export interface operations {
     logs_portalr_v1_logs_get: {
         parameters: {
             query: {
-                start: components["schemas"]["Moment"];
-                end: components["schemas"]["Moment"];
+                start: string;
+                end: string;
                 limit?: number;
                 thread?: components["schemas"]["Id"] | null;
                 run?: components["schemas"]["Id"] | null;
@@ -1036,8 +1049,8 @@ export interface operations {
     metrics_portalr_v1_metrics_get: {
         parameters: {
             query: {
-                start: components["schemas"]["Moment"];
-                end: components["schemas"]["Moment"];
+                start: string;
+                end: string;
                 limit?: number;
                 metric: components["schemas"]["Metric"];
                 step?: number;
@@ -1100,8 +1113,8 @@ export interface operations {
     scores_portalr_v1_scores_get: {
         parameters: {
             query: {
-                start: components["schemas"]["Moment"];
-                end: components["schemas"]["Moment"];
+                start: string;
+                end: string;
                 limit?: number;
             };
             header?: {
@@ -1118,7 +1131,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Ok_list_Score__"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
+                    "application/json": components["schemas"]["Ok_Scores_"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
                 };
             };
             /** @description Refused */
@@ -1220,8 +1233,8 @@ export interface operations {
     traces_portalr_v1_traces_get: {
         parameters: {
             query: {
-                start: components["schemas"]["Moment"];
-                end: components["schemas"]["Moment"];
+                start: string;
+                end: string;
                 limit?: number;
                 session?: components["schemas"]["Id"] | null;
                 run?: components["schemas"]["Id"] | null;

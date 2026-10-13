@@ -39,3 +39,19 @@ export function windowOf(days: Days, now: Date): TimeSpan {
     end: new Date(today + DAY).toISOString(),
   };
 }
+
+/**
+ * How many of a summary's first days its read didn't reach: those before `known_from`, which
+ * are unknown, not empty; every day, where it is after them all.
+ */
+export function unknownDays(summary: {
+  readonly days: readonly { readonly day: string }[];
+  readonly known_from?: string | null;
+}): number {
+  const from = summary.known_from;
+  if (!from) {
+    return 0;
+  }
+  const at = summary.days.findIndex((one) => one.day >= from);
+  return at === -1 ? summary.days.length : at;
+}

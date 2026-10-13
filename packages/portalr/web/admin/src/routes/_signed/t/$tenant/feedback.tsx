@@ -19,7 +19,7 @@ import {
   type SearchSchemaInput,
 } from "@tanstack/react-router";
 import { opening } from "../../../../access";
-import { type Shown, shownOf, WINDOWS, windowOf } from "../../../../feedback";
+import { type Shown, shownOf, unknownDays, WINDOWS, windowOf } from "../../../../feedback";
 import { figure } from "../../../../format";
 import { ReadFailed } from "../../../../read-failed";
 
@@ -123,6 +123,8 @@ function Feedback() {
           <StatusBadge tone="stopped">Partial</StatusBadge>
           The read stopped at one of its bounds: some days, scores and comments may be missing. A
           shorter window, or one workspace, may read them all.
+          {unknownDays(summary) > 0 &&
+            " The shaded days weren't reached: they're unknown, not empty."}
         </p>
       )}
       <Charts summary={summary} everywhere={workspace === undefined} />
@@ -134,6 +136,9 @@ function Feedback() {
 /** The thumbs per day, each evaluation's mean per day, and, for every workspace, each one's share. */
 function Charts({ summary, everywhere }: { summary: Summary; everywhere: boolean }) {
   const drawn = summary.evaluations.slice(0, MAX_SERIES);
+  const unknown = unknownDays(summary);
+  /** A day's value, or none on a day the read didn't reach. */
+  const known = (at: number, value: number | null) => (at < unknown ? null : value);
   const thumbed = summary.workspaces.filter((place) => place.up + place.down > 0);
   const thumbs = summary.days.some((day) => day.up + day.down > 0);
   return (
@@ -146,8 +151,13 @@ function Charts({ summary, everywhere }: { summary: Summary; everywhere: boolean
             { key: "up", name: "Thumbs up" },
             { key: "down", name: "Thumbs down" },
           ]}
-          data={summary.days.map((day) => ({ day: short(day.day), up: day.up, down: day.down }))}
+          data={summary.days.map((day, at) => ({
+            day: short(day.day),
+            up: known(at, day.up),
+            down: known(at, day.down),
+          }))}
           format={figure}
+          unknown={unknown}
           diverging
         />
       ) : (
@@ -164,10 +174,14 @@ function Charts({ summary, everywhere }: { summary: Summary; everywhere: boolean
           data={summary.days.map((day, at) =>
             Object.fromEntries([
               ["day", short(day.day)],
-              ...drawn.map((evaluation) => [named(evaluation), evaluation.days[at]?.mean ?? null]),
+              ...drawn.map((evaluation) => [
+                named(evaluation),
+                known(at, evaluation.days[at]?.mean ?? null),
+              ]),
             ]),
           )}
           format={mean}
+          unknown={unknown}
         />
       ) : (
         <EmptyState title="No evaluations in this window">

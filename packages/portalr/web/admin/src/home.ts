@@ -15,7 +15,7 @@ type Schemas = PortalrApi.components["schemas"];
 type Unread = Schemas["Unavailable"] | Schemas["Unconfigured"];
 
 export type SpendReading = Schemas["Ok_Union_Spend__NoneType__"] | Unread;
-export type ScoresReading = Schemas["Ok_list_Score__"] | Unread;
+export type ScoresReading = Schemas["Ok_Scores_"] | Unread;
 export type PointsReading = Schemas["Ok_list_Point__"] | Unread;
 export type TenantSpendReading = Schemas["Ok_list_TenantSpend__"] | Unread;
 
@@ -31,9 +31,6 @@ export interface Said {
   readonly line: string;
   readonly badge?: Badge;
 }
-
-/** The most a read returns: a figure at it may be more, so it shows as at least that. */
-export const LIMIT = 1000;
 
 /** A count of something, with its noun as one or many. */
 export const counted = (count: number, one: string, many = `${one}s`) =>
@@ -86,22 +83,27 @@ export function workspacesSaid(workspaces: readonly string[]): Said {
 }
 
 /**
- * People's feedback over the window: the scores no evaluator gave, and, of those that are yes or
- * no, how many said yes.
+ * People's feedback over the window: the scores no evaluator gave, and, of the thumbs among them,
+ * how many were up. Langfuse sends a yes-or-no as 1 or 0. A read that stopped at one of its bounds
+ * shows its figure as at least that, and says it is partial.
  */
 export function feedbackSaid(reading: ScoresReading): Said {
   if (reading.status !== "ok") {
     return unread("Langfuse", reading);
   }
-  const given = reading.data.filter((score) => !score.evaluator);
-  const thumbs = given.filter((score) => typeof score.value === "boolean");
-  const up = thumbs.filter((score) => score.value === true).length;
+  const { scores, complete } = reading.data;
+  const given = scores.filter((score) => !score.evaluator);
+  const thumbs = given.filter(
+    (score) => score.feedback_type === "thumbs" && score.data_type === "BOOLEAN",
+  );
+  const up = thumbs.filter((score) => score.value === true || score.value === 1).length;
   const scored = "pieces of feedback in the last week";
   return {
-    figure: figure(given.length, LIMIT),
+    figure: figure(given.length, !complete),
     line: thumbs.length
       ? `${scored}; ${numbers.format(up)} of ${numbers.format(thumbs.length)} thumbs up`
       : scored,
+    ...(!complete && { badge: { tone: "stopped", word: "Partial" } }),
   };
 }
 

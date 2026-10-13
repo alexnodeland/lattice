@@ -38,7 +38,7 @@ from portalr.readers import (
     Ok,
     Point,
     Readers,
-    Score,
+    Scores,
     Spend,
     TenantSpend,
     Trace,
@@ -258,11 +258,11 @@ def portalr_router(
             return Unconfigured()
         return await readers.prometheus.series(tenant, query)
 
-    @api.get("/v1/scores", response_model=reading(list[Score]))
+    @api.get("/v1/scores", response_model=reading(Scores))
     async def scores(
         window: Annotated[Window, Query()], tenant: Tenant = telemetry
-    ) -> Ok[list[Score]] | Unavailable | Unconfigured:
-        """The tenant's feedback and evaluation scores, from Langfuse."""
+    ) -> Ok[Scores] | Unavailable | Unconfigured:
+        """The tenant's feedback and evaluation scores, from Langfuse, and whether that's all."""
         return await readers.langfuse.scores(tenant, window) if readers.langfuse else Unconfigured()
 
     @api.get("/v1/feedback", response_model=reading(Feedback))

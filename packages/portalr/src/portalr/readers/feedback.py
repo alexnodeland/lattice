@@ -1,10 +1,11 @@
 """A tenant's feedback and evaluations, summed by day from Langfuse's scores (portalr ADR-0027).
 
 People's feedback is the scores no evaluator gave, from the libraries' feedback mirrors, which
-Langfuse marks `API`: a thumb is a yes-or-no one, and what they wrote is a text one, or a score's
-comment. An evaluation is an evaluator's numeric or yes-or-no score, averaged per day, a yes as 1
-and a no as 0. Each day the window touches, in UTC, is in the summary, with nothing in it where
-nothing was given; a score is counted on the day it was given.
+Langfuse marks `API`: a thumb is a yes-or-no one from the ``thumbs`` feedback type, as the
+mirrors name it in a score's metadata, and what they wrote is a text one, or a score's comment.
+An evaluation is an evaluator's numeric or yes-or-no score, averaged per day, a yes as 1 and a no
+as 0. Each day the window touches, in UTC, is in the summary, with nothing in it where nothing was
+given; a score is counted on the day it was given.
 """
 
 from collections import defaultdict
@@ -20,6 +21,9 @@ from portalr.tenant import Tenant
 
 COMMENTS: Final = 20
 """How many of people's comments the summary carries: the newest."""
+
+THUMBS: Final = "thumbs"
+"""The feedback type whose yes-or-no scores are thumbs."""
 
 MOST_DAYS: Final = 91
 """The longest window a summary sums, in days: a quarter, and a day's slack for its edges."""
@@ -106,6 +110,9 @@ class Feedback(BaseModel):
     """People's, the newest first."""
     complete: bool
     """False where a read stopped at one of its bounds: the sums are of the scores read."""
+    known_from: date | None = None
+    """Where a read stopped short of the oldest traces, the first day all of whose traces were
+    read: the days before it are unknown, not empty. None when no day is."""
 
 
 def day_of(at: datetime) -> date:
@@ -160,7 +167,7 @@ def summarize(read: Scores, span: Span) -> Feedback:
                 evaluations[score.evaluator, score.name][day].append(value)
             places.setdefault(score.workspace, [0, 0, 0])[2] += 1
         elif peoples(score):
-            if score.data_type == "BOOLEAN" and day in thumbs:
+            if score.feedback_type == THUMBS and score.data_type == "BOOLEAN" and day in thumbs:
                 side = 0 if score.value else 1
                 thumbs[day][side] += 1
                 places.setdefault(score.workspace, [0, 0, 0])[side] += 1
@@ -202,7 +209,16 @@ def summarize(read: Scores, span: Span) -> Feedback:
         ),
         comments=sorted(comments, key=lambda comment: comment.timestamp, reverse=True)[:COMMENTS],
         complete=read.complete,
+        known_from=_known_from(read, days),
     )
+
+
+def _known_from(read: Scores, days: list[date]) -> date | None:
+    """The first of the days all of whose traces were read, if the read stopped short of some."""
+    if read.known_from is None:
+        return None
+    first = day_of(read.known_from) + timedelta(days=1)
+    return first if first > days[0] else None
 
 
 async def read_feedback(

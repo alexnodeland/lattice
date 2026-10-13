@@ -73,7 +73,8 @@ function summary() {
         comments: [],
       };
     case "partial":
-      return { ...base, complete: false };
+      // The read stopped short of the traces before the 6th day: the 5 before it are unknown.
+      return { ...base, complete: false, known_from: week[5] };
     case "busy":
       return { ...base, evaluations: ["a", "b", "c", "d", "e"].map(evaluation) };
     default:
@@ -220,6 +221,17 @@ test("a partial summary says so, with a badge", async () => {
   shape = "partial";
   const { screen } = await open("/t/acme/feedback");
   await expect.element(screen.getByRole("status").filter({ hasText: "Partial" })).toBeVisible();
+  await expect
+    .element(screen.getByText(/The shaded days weren't reached: they're unknown, not empty\./))
+    .toBeVisible();
+  const thumbs = screen.getByRole("figure", { name: "People's thumbs per day" });
+  await expect
+    .poll(() => [...thumbs.element().querySelectorAll("svg text")].map((t) => t.textContent))
+    .toContain("Not read");
+  await thumbs.getByText("Show the figures").click();
+  // The first day's figures are unknown: none, not 0.
+  const first = days(7)[0]?.slice(5) ?? "";
+  await expect.element(thumbs.getByRole("row", { name: first })).toHaveTextContent(`${first}––`);
 });
 
 test("a window with no feedback says so, not with an empty chart", async () => {

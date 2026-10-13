@@ -75,8 +75,13 @@ test("a page asks for a scheme with data-theme", () => {
   expect(token("accent")).toBe(dark ? "rgb(107, 47, 160)" : "rgb(226, 204, 245)");
 });
 
-test("a chart's series stand out from the surface", () => {
+test("a chart's series stand out from the surface, and from the paper, where pages draw them", () => {
   for (const series of ["chart-1", "chart-2", "chart-3"]) {
-    expect(contrast(token(series), token("surface"))).toBeGreaterThanOrEqual(3);
+    for (const ground of ["surface", "paper"]) {
+      expect(
+        contrast(token(series), token(ground)),
+        `${series} on ${ground}`,
+      ).toBeGreaterThanOrEqual(3);
+    }
   }
 });

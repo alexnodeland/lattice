@@ -4,11 +4,7 @@
  */
 
 import { QueryCache, QueryClient } from "@tanstack/react-query";
-import { Refused } from "./queries";
-
-/** Whether the server refused a read for what was asked: asking again would get the same. */
-const refusedOutright = (error: unknown) =>
-  error instanceof Refused && error.status >= 400 && error.status < 500;
+import { Refused, refusedOutright } from "./queries";
 
 /** A query cache whose reads call `unsigned` when one is refused for no one signed in. */
 export function createQueryClient(unsigned: () => void): QueryClient {

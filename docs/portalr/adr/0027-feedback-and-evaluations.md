@@ -23,15 +23,16 @@ The user decided four things:
 ## Decision
 
 - **A score names its workspace,** from its trace's `workspace:<id>` tag, which artifactr's and reflexr's traces carry. A trace tagged with no workspace, or with two, names none.
-- **`GET /portalr/v1/feedback`** sums a window's scores, or one workspace's, for whoever may read the tenant's telemetry. A window ends after it starts and is at most 91 days, or the read is a 422. It answers:
+- **`GET /portalr/v1/feedback`** sums a window's scores, or one workspace's, for whoever may read the tenant's telemetry. A window ends after it starts and is at most 91 days, and each of its moments names its zone, or the read is a 422. Every read's span, Feedback's, Traces', Logs', Metrics' and Scores', starts in 2000 or later, so a look back from it stays in range; an earlier start is a 422, too. It answers:
   - `days`: people's thumbs up and down, on each day the window touches, in UTC;
   - `evaluations`: each evaluator's score of each name, with its count, and its count and mean on each day, the most scored first;
   - `workspaces`: each workspace's thumbs and evaluations, the busiest first;
   - `comments`: the 20 newest of what people wrote, each with its trace;
-  - `complete`: whether every score was read, false where the read stopped at one of its bounds.
+  - `complete`: whether every score was read, false where the read stopped at one of its bounds;
+  - `known_from`: where the read stopped short of the oldest traces, the first day all of whose traces were read. The days before it are unknown, not empty, and the charts shade them "Not read", their figures none. It is none when every trace was read.
   - It is a reading, as every one is: `ok`, `unavailable` or `unconfigured`.
 - **People's feedback is the scores no evaluator gave, that the libraries' feedback mirrors sent,** which Langfuse marks `API`; an annotation made in Langfuse's own UI isn't.
-  - A thumb is a yes-or-no one: an application's `thumbs` feedback is mirrored as `thumbs.up`. Langfuse sends a yes-or-no value as 1 or 0, so a thumb is read by its type, its value as true or false.
+  - A thumb is a yes-or-no score of the `thumbs` feedback type, which the mirrors name in each score's metadata: an application's `thumbs` feedback is mirrored as `thumbs.up`. Another type's yes-or-no, such as a `helpful`, isn't a thumb. Langfuse sends a yes-or-no value as 1 or 0, so a thumb is read by its type, its value as true or false.
   - What they wrote is a text one, such as `thumbs.comment`, or a score's comment.
 - **An evaluation is an evaluator's score:**
   - a numeric score, as it is;
@@ -40,13 +41,18 @@ The user decided four things:
   - Categorical and text scores are counted toward a workspace's evaluations, not averaged.
 - **The summary reads every score, within bounds:**
   - The tenant's traces come from Langfuse's observations API, filtered on their tags, and the workspace's if one is named, each checked again, a thousand a page. They are those started up to a week before the window, so a late thumb, or an evaluator's verdict on yesterday's turn, is counted on the day it was given.
-  - Their scores in the window come from the score API, newest traces first, fifty traces a request, a hundred scores a page, four requests at once.
+  - A score given more than a week after its trace started is missed: its trace is older than the read looks.
+  - Feedback on a thread, rather than on one of its turns, is mirrored onto the thread's session, not a trace, and isn't counted: the read finds scores by their traces.
+  - The observations API pages its rows newest first, though it takes no order, nor promises one. The read relies on it, so that a read that stops at its page bound has the newest traces, and checks it as it reads: where a page holds a trace newer than one already read, no day is known, and `known_from` is past the window.
+  - Their scores in the window come from the score API, newest traces first, fifty traces a request, a hundred scores a page, four requests at once. A score is kept by its id, so one sent twice counts once.
   - It stops, and says it is partial, at any of its bounds: 20 pages of traces, 50,000 scores, a cursor that comes round again, or 20 seconds in all. The UI says so, with a badge, and suggests a shorter window or one workspace.
-  - Home's card reads the same way, its newest traces first, and stops at its window's limit.
+  - At the deadline, it answers the scores it has read, partial; if no trace was read by then, it is unavailable, "langfuse didn't answer in time", rather than a window of zeros.
+  - A request for scores that fails cancels the others, and the read is unavailable.
+  - Home's card reads the same way, its newest traces first, and stops at its window's limit. `GET /portalr/v1/scores` answers its scores with `complete` and `known_from`, and the card shows a partial read's figure as at least that, with a badge. It is kept a minute.
 - **Not Langfuse's metrics API.** It sums by day, and filters scores by their traces' tags. But it has no dimension for evalr's evaluator, which is in a score's metadata. So people's feedback and an evaluator's verdict couldn't be told apart.
 - **Feedback is `/t/$tenant/feedback`,** on the rail where `portalr:read_telemetry` is allowed. It is gated in `beforeLoad`, as Audit is, and reads in `loader`.
   - Its window, the last 7, 30 or 90 days, and a workspace, are in the address.
-  - Its window is whole days in UTC, ending with today's, so a read of it is one query all day, kept ten minutes and tried again once. A score is counted on its day in UTC, and the charts and the windows say "in UTC".
+  - Its window is whole days in UTC, ending with today's, so a read of it is one query all day, kept ten minutes and tried again once, unless it was refused outright, as no read is. A score is counted on its day in UTC, and the charts and the windows say "in UTC".
 - **The charts:**
   - The thumbs per day are a diverging bar chart: up above the baseline, down below it, each a count. A window with no thumbs says so, rather than draw an empty chart.
   - Each evaluation's mean per day is a line chart, with a gap for a day with none. The three most scored are drawn, and every one is in a table when there are more.
@@ -58,11 +64,11 @@ The user decided four things:
   - Tracker is used in 6c-iii, where a day's spend against its share of the budget is a block.
 - **The chart rule (ADR-0021) holds:**
   - The series take the inks in order, `--chart-1` to `--chart-3`, as marks and never as text, three at most.
-  - Each pair passes the dataviz palette check in its scheme: lightness, chroma, colour-blind separation, and 3:1 or more on the surface, which a token test holds.
-  - Every series is also named in a legend and directly at its last mark, the labels placed from the data and nudged apart before they are drawn, and every chart's figures are a table beneath it.
+  - Each pair passes the dataviz palette check in its scheme: lightness, chroma, colour-blind separation, and 3:1 or more on the surface and on the paper, where Feedback draws them, which a token test holds.
+  - Every series is also named in a legend and directly at its last mark, the labels placed from the data, kept inside the plot and nudged apart before they are drawn, a name longer than 14 characters cut, and given whole as a title. Every chart's figures are a table beneath it.
   - Each series has a pattern: solid, hatched one way, then the other; or a line solid, dashed, then dotted. What is folded into "Other" is dotted in the muted ink.
 - **Each comment shows its trace's id.** For an operator, the id is a link to the trace's page in Langfuse, from portalr's deep links, which only operators may read: read once, for a stand-in id, and the trace's own put in its place.
-- **The page's weight:** Recharts is in Feedback's own chunk, about 114 kB gzipped, loaded when Feedback is first opened; admin's first load and app's bundle are as they were.
+- **The page's weight:** Recharts is in Feedback's own chunk, about 114 kB gzipped, loaded when Feedback is first opened; admin's first load and app's bundle are as they were. admin's build fails if its entry, or a chunk the entry loads, holds Recharts or d3.
 - **The scenario:** the test application runs without Langfuse, so it shows Feedback saying Langfuse isn't configured. The route-level tests cover the rest over a stubbed portalr.
 
 ## Options considered

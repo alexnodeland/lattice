@@ -3,8 +3,18 @@ import { Button, ConfirmDialog, ItemTable } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { counted, opening, refused, type Said, useAccess } from "../../../../../access";
+import { counted, opening, possessive, refused, type Said, useAccess } from "../../../../../access";
 import { type Changing, DefineSet } from "../../../../../define-set";
+
+/** The role form's words, and its rows' Change, which names the role it changes. */
+const WORDS = {
+  name: "Role",
+  of: "Actions",
+  create: "Create a role",
+  change: (name: string) => `Change ${possessive(name)} actions`,
+  created: "Create the role",
+  saved: "Save the role",
+};
 
 /**
  * A tenant's roles, for whoever may define them: the built-in ones from grantr's catalog, each
@@ -70,7 +80,7 @@ function Roles() {
           <>
             <Button
               variant="secondary"
-              aria-label={`Change ${role.name}'s actions`}
+              aria-label={WORDS.change(role.name)}
               onClick={() => void change(role.name)}
             >
               Change actions
@@ -95,14 +105,7 @@ function Roles() {
       {said && <p role={said.refused ? "alert" : "status"}>{said.said}</p>}
       <DefineSet
         key={changing?.name ?? "new"}
-        words={{
-          name: "Role",
-          of: "Actions",
-          create: "Create a role",
-          change: (name) => `Change ${name}'s actions`,
-          created: "Create the role",
-          saved: "Save the role",
-        }}
+        words={WORDS}
         changing={changing}
         // Each action under its library, such as reflexr's.
         picking={{

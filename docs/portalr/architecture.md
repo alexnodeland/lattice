@@ -125,7 +125,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Switcher` | The tenant and the workspace, and a menu of the others |
 | `AccountMenu` | Who is signed in, their scheme, and signing out |
 | `PageHeader` | A page's way back, its one heading, a line about it, and its actions |
-| `Card`, `EmptyState`, `Table` | What asks something of the reader; nothing yet, and what to do; rows, named by a caption |
+| `Card`, `EmptyState`, `Table` | What asks something of the reader; nothing yet, and what to do; rows, named by a caption or by a heading beside them, a row's header in the row's own type |
 | `Rows`, `Row`, `RowLink`, `SectionTitle` | A lined list, each row's link stretched over it; a section's heading |
 | `Plain` | A page outside the frame: the lockup as a link home, the account if signed in, and one column |
 | `StatusBadge` | How a thing is going, as a shape and a word; only waiting for you in the working colour; a budget near or over as a word and a shape of its own, with no warning colour |

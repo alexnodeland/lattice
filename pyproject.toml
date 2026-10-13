@@ -81,6 +81,8 @@ convention = "google"
 "examples/docplan/src/docplan/agent.py" = ["D417"]
 # Stubs for untyped libraries mirror the libraries' own names (DSPy's InputField, toDict).
 "packages/evalr/typings/**" = ["N802"]
+# A skill's helper scripts are CLIs: printing is their output.
+".claude/skills/**/scripts/*.py" = ["T201"]
 
 # ─── types ────────────────────────────────────────────────────────────────────
 # pyright stays per package until ty replaces it with one root configuration. This one covers

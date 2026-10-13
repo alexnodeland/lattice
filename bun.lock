@@ -16,6 +16,7 @@
       "name": "@portalr/admin",
       "dependencies": {
         "@portalr/ui": "workspace:*",
+        "lucide-react": "1.55.0",
         "react": "19.3.0",
         "react-dom": "19.3.0",
       },
@@ -35,6 +36,7 @@
         "@supabase/auth-js": "2.117.3",
         "@tanstack/react-query": "5.104.1",
         "@tanstack/react-router": "1.170.41",
+        "lucide-react": "1.55.0",
         "react": "19.3.0",
         "react-dom": "19.3.0",
       },
@@ -46,8 +48,11 @@
         "@types/react": "19.3.0",
         "@types/react-dom": "19.3.0",
         "@vitejs/plugin-react": "6.1.2",
+        "@vitest/browser-playwright": "5.0.3",
+        "playwright": "1.64.0",
         "playwright-bdd": "9.2.1",
         "vite": "8.3.4",
+        "vitest-browser-react": "2.3.0",
       },
     },
     "packages/portalr/web/client": {

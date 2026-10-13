@@ -67,7 +67,7 @@ Langfuse and LiteLLM aren't in that stack, so their reads answer `unavailable` t
 | `/` | The person's tenants, from grantr's `/me`: none is no access, and one goes straight to it |
 | `/t/$tenant` | The workspaces grantr says they can open there |
 | `/t/$tenant/w/$workspace` | A workspace's threads, and a new one; its artifactr stream is open while any of its routes is |
-| `/t/$tenant/w/$workspace/threads/$thread` | A thread's chat: its messages, its runs as they stream, what a paused run waits on, its proposals, and a message to post |
+| `/t/$tenant/w/$workspace/threads/$thread` | A thread's chat: its messages, its runs as they stream, what a paused run waits on, its proposals, and a message to post where grantr allows; and its menu, to restrict and share it ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
 | `/t/$tenant/w/$workspace/artifacts` | The workspace's artifacts that aren't archived, each by kind and latest version |
 | `/t/$tenant/w/$workspace/artifacts/$artifact` | An artifact through its kind's renderer, its revisions newest first with what each changed, and its open proposals |
 | `/t/$tenant/w/$workspace/proposals` | Every proposal in the workspace, the open ones first, to accept or reject |
@@ -99,7 +99,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 
 ## The kit's look
 
-`ui`'s tokens are lattice ADR-0014's, with `--edge`, `--wash`, `--accent-hover` and `--scrim` beside them, each pair's contrast asserted in both schemes ([ADR-0019](adr/0019-the-kits-look.md)). Its typefaces, Schibsted Grotesk and Fragment Mono, are served from the UIs' own origin. The frame and its parts:
+`ui`'s tokens are lattice ADR-0014's, with `--edge`, `--wash`, `--accent-hover` and `--scrim` beside them ([ADR-0019](adr/0019-the-kits-look.md)), and `--danger`, for destructive actions alone ([ADR-0021](adr/0021-the-areas-on-the-frame-and-what-admin-needs.md)), each pair's contrast asserted in both schemes. Its typefaces, Schibsted Grotesk and Fragment Mono, are served from the UIs' own origin. The frame and its parts:
 
 | Component | What it is |
 |---|---|
@@ -109,11 +109,19 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `AccountMenu` | Who is signed in, their scheme, and signing out |
 | `PageHeader` | A page's way back, its one heading, a line about it, and its actions |
 | `Card`, `EmptyState`, `Table` | What asks something of the reader; nothing yet, and what to do; rows, named by a caption |
-| `StatusBadge` | How a thing is going, as a shape and a word; only waiting for you in the working colour |
+| `Rows`, `Row`, `RowLink`, `SectionTitle` | A lined list, each row's link stretched over it; a section's heading |
+| `Plain` | A page outside the frame: the lockup as a link home, the account if signed in, and one column |
+| `StatusBadge` | How a thing is going, as a shape and a word; only waiting for you in the working colour; a budget near or over as a word and a shape of its own, with no warning colour |
+| `ConfirmDialog` | A destructive action, asked first: what will be lost, the focus on Cancel, and a name to type where asked |
 | `SegmentedFilter` | One filter of a few, side by side |
+| `Dialog` | A dialog over the page, opened by its caller, with where focus starts and where it returns ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
+| `Menu` | A button and the actions it opens, each of which may be disabled while it's being done |
+| `SelectField` | A labelled choice among a few, as the platform's own select, which submits with its form |
 | `Icon`, `Mark`, `Lockup` | A Lucide icon beside its word; portalr's marks |
 
 `gallery.screenshot.test.tsx` pins how they sit together, wide and narrow, in each scheme. It runs in CI alone, against Linux baselines.
+
+Every area of a workspace renders in `AppShell`. The screens outside one are ui's `Plain` page: choosing a tenant or a workspace, with the account, and what went wrong, without it. Signing in is a card of its own. `admin` renders its frame, with its own mark.
 
 ## The wheel
 

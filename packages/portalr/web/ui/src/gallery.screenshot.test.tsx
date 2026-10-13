@@ -1,7 +1,7 @@
 /**
  * The kit's look, pinned by screenshots (portalr ADR-0019): the frame with every component in it,
  * wide and narrow, in each scheme. Computed styles pin each component's colours and states; these
- * pin how they sit together, and the menu and the drawer open. Baselines are Linux's, made in CI, with motion reduced and the
+ * pin how they sit together, and the menu, the drawer and a dialog open. Baselines are Linux's, made in CI, with motion reduced and the
  * self-hosted faces loaded, so they don't move between runs.
  */
 
@@ -13,6 +13,8 @@ import { AccountMenu } from "./account-menu";
 import { AppShell } from "./app-shell";
 import { Button } from "./button";
 import { Card } from "./card";
+import { ConfirmDialog } from "./confirm-dialog";
+import { Dialog } from "./dialog";
 import { EmptyState } from "./empty-state";
 import { Icon } from "./icon";
 import { PageHeader } from "./page-header";
@@ -134,6 +136,19 @@ function Gallery() {
             <Button disabled>Send</Button>
           </span>
         </Card>
+        <Card className="flex flex-wrap items-center gap-3">
+          <StatusBadge tone="near">Near budget</StatusBadge>
+          <StatusBadge tone="over">Over budget</StatusBadge>
+          <ConfirmDialog
+            label="Delete acme"
+            title="Delete acme?"
+            confirm="Delete the tenant"
+            typed="acme"
+            onConfirm={async () => undefined}
+          >
+            Its 6 workspaces, their threads, artifacts and rules, and its 14 members' access go.
+          </ConfirmDialog>
+        </Card>
         <EmptyState title="No artifacts yet" action={<Button>Start a thread</Button>}>
           An artifact appears here when the agent makes one.
         </EmptyState>
@@ -142,11 +157,30 @@ function Gallery() {
   );
 }
 
+/** A dialog over the frame, as a thread's sharing opens one. */
+function Sharing() {
+  return (
+    <Dialog
+      open
+      onOpenChange={() => undefined}
+      title="Share the thread"
+      description="Who holds a role on it."
+    >
+      <TextField label="Person" defaultValue="bob" />
+    </Dialog>
+  );
+}
+
 /** Lay the gallery out at a width, with the faces loaded before the shot (motion is reduced). */
-async function shown(width: number, height: number) {
+async function shown(width: number, height: number, dialog = false) {
   await page.viewport(width, height);
   onTestFinished(() => page.viewport(414, 896));
-  const screen = await render(<Gallery />);
+  const screen = await render(
+    <>
+      <Gallery />
+      {dialog && <Sharing />}
+    </>,
+  );
   await Promise.all([
     document.fonts.load('1em "Schibsted Grotesk"'),
     document.fonts.load('italic 1em "Schibsted Grotesk"'),
@@ -169,7 +203,7 @@ test("the frame and its components, wide", async () => {
 });
 
 test("the frame and its components, narrow", async () => {
-  await shown(390, 844);
+  await shown(390, 1400);
   await matches("gallery-narrow");
 });
 
@@ -181,8 +215,21 @@ test("the switcher's menu, open, with the keyboard on an item", async () => {
 });
 
 test("the drawer, open", async () => {
-  const screen = await shown(390, 844);
+  const screen = await shown(390, 1400);
   await screen.getByRole("button", { name: "Menu" }).click();
   await expect.element(screen.getByRole("dialog", { name: "Navigation" })).toBeVisible();
   await matches("gallery-drawer");
+});
+
+test("a dialog, open, over the frame", async () => {
+  const screen = await shown(1280, 900, true);
+  await expect.element(screen.getByRole("dialog", { name: "Share the thread" })).toBeVisible();
+  await matches("gallery-dialog");
+});
+
+test("a destructive action, asked first", async () => {
+  const screen = await shown(1280, 900);
+  await screen.getByRole("button", { name: "Delete acme" }).click();
+  await screen.getByRole("textbox", { name: "Type acme to confirm" }).fill("acme");
+  await matches("gallery-confirm");
 });

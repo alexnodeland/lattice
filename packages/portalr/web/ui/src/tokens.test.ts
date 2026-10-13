@@ -37,6 +37,15 @@ test("text and the focus ring read on the wash", () => {
   expect(contrast(token("focus"), token("wash"))).toBeGreaterThanOrEqual(3);
 });
 
+test("the danger colour reads on every surface, and its words read on it, hovered or not", () => {
+  for (const surface of ["paper", "surface", "wash"]) {
+    expect(contrast(token("danger"), token(surface))).toBeGreaterThanOrEqual(4.5);
+  }
+  expect(contrast(token("on-danger"), token("danger"))).toBeGreaterThanOrEqual(4.5);
+  expect(token("danger-hover")).not.toBe(token("danger"));
+  expect(contrast(token("on-danger"), token("danger-hover"))).toBeGreaterThanOrEqual(4.5);
+});
+
 test("the hovered working colour keeps its text readable", () => {
   expect(token("accent-hover")).not.toBe(token("accent"));
   expect(contrast(token("on-accent"), token("accent-hover"))).toBeGreaterThanOrEqual(4.5);

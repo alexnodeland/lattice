@@ -1,7 +1,9 @@
-import { Button } from "@portalr/ui";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
-/** Every route but signing in: each needs someone signed in, whom its context names. */
+/**
+ * Every route but signing in: each needs someone signed in, whom its context names. Each frames
+ * itself, with the account in it: a plain page, or a workspace's shell.
+ */
 export const Route = createFileRoute("/_signed")({
   beforeLoad: async ({ context }) => {
     const user = await context.signed.signedIn();
@@ -10,20 +12,5 @@ export const Route = createFileRoute("/_signed")({
     }
     return { user };
   },
-  component: Signed,
+  component: Outlet,
 });
-
-/** Signing out ends the session here; `Signed` then clears what was read and goes to sign in. */
-function Signed() {
-  const { signed } = Route.useRouteContext();
-  return (
-    <>
-      <header className="mb-6 flex justify-end">
-        <Button variant="secondary" onClick={() => signed.signOut()}>
-          Sign out
-        </Button>
-      </header>
-      <Outlet />
-    </>
-  );
-}

@@ -34,13 +34,19 @@ export {
   Thumbs,
   ToolCall,
 } from "./chat";
+export { ConfirmDialog } from "./confirm-dialog";
+export { Dialog } from "./dialog";
 export { EmptyState } from "./empty-state";
 export { Icon } from "./icon";
 export { Markdown } from "./markdown";
 export { Lockup, Mark, type Ui } from "./marks";
-export { Page } from "./page";
+export { Menu, type MenuItem } from "./menu";
 export { PageHeader } from "./page-header";
+export { Plain } from "./plain";
+export { Row, RowLink, Rows } from "./rows";
+export { SectionTitle } from "./section-title";
 export { type Segment, SegmentedFilter } from "./segmented-filter";
+export { SelectField } from "./select-field";
 export { NavLink, SideNav } from "./side-nav";
 export { StatusBadge, type Tone } from "./status-badge";
 export { Switch } from "./switch";

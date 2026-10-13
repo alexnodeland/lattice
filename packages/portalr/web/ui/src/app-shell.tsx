@@ -2,6 +2,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { useRender } from "@base-ui/react/use-render";
 import { Menu as MenuGlyph, X } from "lucide-react";
 import { type MouseEvent, type ReactElement, type ReactNode, useEffect, useState } from "react";
+import { backdrop } from "./dialog";
 import { Icon } from "./icon";
 import { Lockup, Mark, type Ui } from "./marks";
 
@@ -70,7 +71,7 @@ export function AppShell({
     }
   }
   return (
-    <div className="min-h-dvh bg-paper text-fg lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]">
       <a
         href="#main"
         className="fixed top-2 left-2 z-50 -translate-y-16 rounded-md bg-surface px-3 py-2 font-semibold text-sm focus:translate-y-0 focus-visible:outline-2 focus-visible:outline-focus"
@@ -84,7 +85,7 @@ export function AppShell({
             Menu
           </Dialog.Trigger>
           <Dialog.Portal>
-            <Dialog.Backdrop className="fixed inset-0 z-40 bg-scrim transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none" />
+            <Dialog.Backdrop className={backdrop} />
             <Dialog.Popup
               aria-modal="true"
               onClick={followed}
@@ -119,7 +120,7 @@ export function AppShell({
         tabIndex={-1}
         className="min-w-0 px-4 py-6 outline-none sm:px-6 lg:px-12 lg:py-9"
       >
-        <div className="max-w-260">{children}</div>
+        <div className="flex max-w-260 flex-col gap-6">{children}</div>
       </main>
     </div>
   );

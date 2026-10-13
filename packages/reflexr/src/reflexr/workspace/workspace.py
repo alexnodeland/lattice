@@ -1200,6 +1200,17 @@ class Workspace:
             raise NotFound("rule", rule)
         return found
 
+    async def rule_history(self, rule: RuleName) -> list[Envelope]:
+        """Return a stored rule's versions, oldest first, however long the log.
+
+        Each is its ``reflexr:rule_installed`` or ``reflexr:rule_archived`` fact, with who made
+        the change and, for an install, its provenance. An archived rule keeps its history, and
+        a rule never stored, such as a code rule, has none.
+        """
+        _check_text(rule)
+        await self.check(Access(action="reflexr:read_rules", rule=rule))
+        return await self._context.storage.rule_history(self._ref, rule)
+
     async def rule_statuses(self) -> list[RuleStatus]:
         """Return the status of each of the workspace's rules, code rules first.
 

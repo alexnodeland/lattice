@@ -55,6 +55,13 @@ test("a secondary button's edge stands out from the surface it sits on", async (
   expect(contrast(style.borderTopColor, token("paper"))).toBeGreaterThanOrEqual(3);
 });
 
+test("a danger button is in the danger colour, readably", async () => {
+  const screen = await render(<Button variant="danger">Delete acme</Button>);
+  const style = getComputedStyle(screen.getByRole("button", { name: "Delete acme" }).element());
+  expect(style.backgroundColor).toBe(token("danger"));
+  expect(contrast(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5);
+});
+
 test("a ghost button is bare until hovered", async () => {
   const screen = await render(<Button variant="ghost">More</Button>);
   const style = getComputedStyle(screen.getByRole("button", { name: "More" }).element());

@@ -4,7 +4,16 @@ import { render } from "vitest-browser-react";
 import { StatusBadge, type Tone } from "./status-badge";
 import { contrast, token } from "./test/colours";
 
-const TONES: readonly Tone[] = ["working", "waiting", "done", "failed", "queued", "stopped"];
+const TONES: readonly Tone[] = [
+  "working",
+  "waiting",
+  "done",
+  "failed",
+  "queued",
+  "stopped",
+  "near",
+  "over",
+];
 
 test("a status says its word, with a shape hidden beside it", async () => {
   const screen = await render(<StatusBadge tone="failed">Dead-lettered</StatusBadge>);
@@ -61,4 +70,23 @@ test("still, working keeps a shape of its own, apart from queued's", async () =>
     return [style.borderTopStyle, style.borderRightColor === style.borderTopColor].join();
   };
   expect(shape("Working")).not.toBe(shape("Queued"));
+});
+
+test("a budget nearly spent and one overspent have shapes of their own, with no warning colour", async () => {
+  const screen = await render(
+    <div>
+      <StatusBadge tone="near">Near budget</StatusBadge>
+      <StatusBadge tone="over">Over budget</StatusBadge>
+    </div>,
+  );
+  const near = getComputedStyle(
+    screen.getByText("Near budget").element().firstElementChild as Element,
+  );
+  const over = getComputedStyle(
+    screen.getByText("Over budget").element().firstElementChild as Element,
+  );
+  expect(near.backgroundImage).toContain("linear-gradient");
+  expect(over.clipPath).toContain("polygon");
+  const overBadge = getComputedStyle(screen.getByText("Over budget").element());
+  expect(overBadge.backgroundColor).toBe(token("fg"));
 });

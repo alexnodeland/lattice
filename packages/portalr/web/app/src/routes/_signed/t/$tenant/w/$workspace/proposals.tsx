@@ -1,4 +1,4 @@
-import { ProposalCard, proposedOn, TextLink } from "@portalr/ui";
+import { EmptyState, PageHeader, ProposalCard, proposedOn, TextLink } from "@portalr/ui";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Connection, useStream, useWorkspace } from "../../../../../../workspace";
 
@@ -16,37 +16,41 @@ function Proposals() {
     (a, b) => Number(b.status === "open") - Number(a.status === "open"),
   );
   return (
-    <section aria-labelledby="proposals" className="flex flex-col gap-4">
-      <h2 id="proposals" className="font-semibold text-lg">
-        Proposals
-      </h2>
+    <>
+      <PageHeader title="Proposals" meta={`Every proposal in ${workspace}, the open ones first`} />
       <Connection snapshot={snapshot} waiting="the workspace" />
-      {snapshot.status === "live" && listed.length === 0 && <p>No proposals yet.</p>}
-      {listed.map((proposal) => {
-        const artifact = proposedOn(proposal);
-        return (
-          <ProposalCard
-            key={proposal.id}
-            proposal={proposal}
-            onRespond={(decision) =>
-              stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision })
-            }
-          >
-            {artifact && (
-              <TextLink
-                render={
-                  <Link
-                    to="/t/$tenant/w/$workspace/artifacts/$artifact"
-                    params={{ tenant, workspace, artifact }}
-                  />
-                }
-              >
-                {artifact}
-              </TextLink>
-            )}
-          </ProposalCard>
-        );
-      })}
-    </section>
+      {snapshot.status === "live" && listed.length === 0 && (
+        <EmptyState title="No proposals yet">
+          The agent proposes a change to an artifact here when it may not make the change itself.
+        </EmptyState>
+      )}
+      <div className="flex max-w-190 flex-col gap-3">
+        {listed.map((proposal) => {
+          const artifact = proposedOn(proposal);
+          return (
+            <ProposalCard
+              key={proposal.id}
+              proposal={proposal}
+              onRespond={(decision) =>
+                stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision })
+              }
+            >
+              {artifact && (
+                <TextLink
+                  render={
+                    <Link
+                      to="/t/$tenant/w/$workspace/artifacts/$artifact"
+                      params={{ tenant, workspace, artifact }}
+                    />
+                  }
+                >
+                  {artifact}
+                </TextLink>
+              )}
+            </ProposalCard>
+          );
+        })}
+      </div>
+    </>
   );
 }

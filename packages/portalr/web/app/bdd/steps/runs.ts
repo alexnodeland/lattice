@@ -60,9 +60,7 @@ const runOf = (page: Page, run: string | null) => {
   if (run === null) {
     throw new Error("no run was set off: publish a ticket first");
   }
-  return page
-    .getByRole("list", { name: "Rules' runs" })
-    .getByRole("listitem", { name: `Run ${run}` });
+  return page.getByRole("table", { name: "Rules' runs" }).getByRole("row", { name: `Run ${run}` });
 };
 
 const turnOf = (page: Page, thread: string | null) => {
@@ -70,8 +68,8 @@ const turnOf = (page: Page, thread: string | null) => {
     throw new Error("no thread was started: start one of their own first");
   }
   return page
-    .getByRole("list", { name: "Turns" })
-    .getByRole("listitem")
+    .getByRole("table", { name: "Turns" })
+    .getByRole("row")
     .filter({ has: page.getByRole("link", { name: thread, exact: true }) })
     .first();
 };
@@ -89,7 +87,8 @@ When("they start a thread of their own", async ({ page, scenario }) => {
   scenario.thread = `Thread ${crypto.randomUUID().slice(0, 8)}`;
   await page.getByLabel("New thread").fill(scenario.thread);
   await page.getByRole("button", { name: "Start" }).click();
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText(scenario.thread);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(scenario.thread);
+  scenario.threadUrl = page.url();
 });
 
 Then("its run is {string}", async ({ page, scenario }, status: string) => {
@@ -110,6 +109,12 @@ When(
     await run.getByRole("button", { name: "Add" }).click();
   },
 );
+
+Then("its run is on attempt {int}", async ({ page, scenario }, attempt: number) => {
+  await expect(
+    runOf(page, scenario.run).getByRole("cell", { name: String(attempt), exact: true }),
+  ).toBeVisible();
+});
 
 Then("its run shows {string}", async ({ page, scenario }, text: string) => {
   await expect(runOf(page, scenario.run).getByText(text)).toBeVisible();

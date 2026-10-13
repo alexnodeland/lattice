@@ -31,6 +31,9 @@ const screenshots = "src/**/*.screenshot.test.tsx";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Every test's imports are found before the first runs, so a dependency met mid-run doesn't
+  // reload the page under the tests.
+  optimizeDeps: { entries: ["src/**/*.test.{ts,tsx}"] },
   test: {
     setupFiles: ["./src/test/setup.ts"],
     exclude: [...configDefaults.exclude, ...(process.env.CI ? [] : [screenshots])],

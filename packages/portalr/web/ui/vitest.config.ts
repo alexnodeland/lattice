@@ -41,6 +41,9 @@ export default defineConfig({
       enabled: true,
       headless: true,
       provider: playwright(),
+      // ui's, app's and admin's tests start their Chromiums at once in CI, where one took longer
+      // than Vitest's minute to connect: three minutes covers them (portalr ADR-0009).
+      connectTimeout: 180_000,
       instances: [scheme("light"), scheme("dark")],
       commands: { pointerAway, reduceMotion },
     },

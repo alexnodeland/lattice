@@ -1,5 +1,5 @@
 # The one-off tasks (RFC-0004): db-init, which creates each service's role and database; auth-keys,
-# which writes GoTrue's key set and the service role's key when their secret is empty; and, with
+# which writes GoTrue's key set and the service role's key when each secret has none; and, with
 # grantr, the application's db-roles, which creates the role it works as. Each runs by run-task,
 # from the machine that applies: when its definition changes, and db-init and db-roles also when a
 # database's password is rotated. The services that need a run wait for it (their `after`).
@@ -31,7 +31,7 @@ module "db_init" {
   container = {
     image = var.images.db_init
     # RDS's master, named postgres, whose password RDS keeps.
-    environment = {
+    environment = merge({
       PGHOST            = module.data.postgres.address
       PGPORT            = tostring(module.data.postgres.port)
       PGDATABASE        = "postgres"
@@ -39,7 +39,7 @@ module "db_init" {
       PGSSLMODE         = local.postgres_tls
       PGCONNECT_TIMEOUT = "10"
       APP_DB_NAME       = local.app_database
-    }
+    }, local.grantr ? { APP_DB_CREATES_ROLES = "true" } : {})
     secrets = {
       PGPASSWORD           = "${module.data.postgres.master_secret_arn}:password::"
       LANGFUSE_DB_PASSWORD = "${local.database["database-langfuse"]}:password::"
@@ -81,12 +81,12 @@ module "auth_keys" {
       AWS_REGION                = local.region
     })
   }
-  # It reads its two secrets, and writes each that is empty.
+  # It reads its two secrets, and writes each that has no value.
   task_role_policy_json = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action   = ["secretsmanager:DescribeSecret", "secretsmanager:GetSecretValue", "secretsmanager:PutSecretValue"]
+      Action   = ["secretsmanager:GetSecretValue", "secretsmanager:PutSecretValue"]
       Resource = [local.secret["auth-jwt-keys"], local.secret["auth-service-role-key"]]
     }]
   })

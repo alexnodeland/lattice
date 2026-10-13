@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write GoTrue's key set and the service role's key to their secrets, each when it is empty.
+"""Write GoTrue's key set and the service role's key to their secrets, each when it needs it.
 
 Usage: scripts/auth-keys   (AUTH_JWT_KEYS_ARN and AUTH_SERVICE_ROLE_KEY_ARN name the secrets;
 AWS's credentials and region come from the environment, and AWS_ENDPOINT_URL points at an
@@ -8,15 +8,20 @@ emulator such as Floci)
 The AWS recipe's one-off task (stackr RFC-0004, ADR-0034), in stackr-auth-keys' image: what
 `make env` does on one machine, with `_auth_keys.py`. The first secret holds the ES256 key set
 GoTrue signs with, the second the service role's key, a JWT signed with it, each whole, as GoTrue
-and the application read them. A key set that is already written is kept, since replacing it
-ends every token signed with the old one; the service role's key is written again only when it is
-missing or signed with a key the set no longer has.
+and the application read them. A key set already written is kept, since replacing it ends every
+token signed with the old one; the service role's key is written again only when it is missing or
+no longer verifies with the key set.
+
+Two runs at once write the same: each write's request token is derived from what it writes for,
+so Secrets Manager takes the first and refuses the second, which then reads what the first wrote.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import sys
+import uuid
 from typing import Any
 
 import boto3
@@ -31,10 +36,28 @@ def current(secrets: Any, arn: str) -> str | None:
         # Secrets Manager refuses to read a secret with no value; Floci answers without one.
         return secrets.get_secret_value(SecretId=arn).get("SecretString") or None
     except ClientError as error:
-        # An empty secret has no current version: Secrets Manager says it can't find one.
         if error.response.get("Error", {}).get("Code") == "ResourceNotFoundException":
             return None
         raise
+
+
+def put_once(secrets: Any, arn: str, value: str, token: str) -> str:
+    """Write a value under a request token, and return the secret's value: the one written here,
+    or, when another run wrote first under the same token, its."""
+    try:
+        secrets.put_secret_value(SecretId=arn, SecretString=value, ClientRequestToken=token)
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") != "ResourceExistsException":
+            raise
+    stored = current(secrets, arn)
+    if stored is None:
+        raise RuntimeError(f"{arn} has no value after it was written")
+    return stored
+
+
+def token_for(name: str) -> str:
+    """A write's request token, the same for every run that writes for the same name."""
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, name))
 
 
 def main() -> int:
@@ -44,17 +67,22 @@ def main() -> int:
         print("auth-keys: set AUTH_JWT_KEYS_ARN and AUTH_SERVICE_ROLE_KEY_ARN", file=sys.stderr)
         return 2
     secrets = boto3.client("secretsmanager")
-    keys = current(secrets, keys_arn)
-    if keys is None:
-        keys = key_set()
-        secrets.put_secret_value(SecretId=keys_arn, SecretString=keys)
-        print("auth-keys: wrote a new key set")
-    role = current(secrets, role_arn)
-    if role is None or not signed_by(role, keys):
-        secrets.put_secret_value(SecretId=role_arn, SecretString=service_role_key(keys))
+    try:
+        keys = current(secrets, keys_arn)
+        if keys is None:
+            keys = put_once(secrets, keys_arn, key_set(), token_for(keys_arn))
+            print("auth-keys: wrote the key set")
+        role = current(secrets, role_arn)
+        if role is not None and signed_by(role, keys):
+            print("auth-keys: the service role's key verifies with the key set; nothing written")
+            return 0
+        kid = json.loads(keys)[0]["kid"]
+        put_once(secrets, role_arn, service_role_key(keys), token_for(kid))
         print("auth-keys: wrote the service role's key, signed with the key set")
-    else:
-        print("auth-keys: both secrets have their keys already; nothing written")
+    except ClientError as error:
+        code = error.response.get("Error", {}).get("Code", "unknown")
+        print(f"auth-keys: Secrets Manager refused: {code}", file=sys.stderr)
+        return 1
     return 0
 
 

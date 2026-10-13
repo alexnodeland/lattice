@@ -5,4 +5,5 @@ FROM postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49
 LABEL org.opencontainers.image.source="https://github.com/alexnodeland/lattice"
 
 COPY --link --chmod=a=rX packages/stackr/deploy/postgres/init.sql /init.sql
+USER postgres
 CMD ["psql", "--no-psqlrc", "--quiet", "--file=/init.sql"]

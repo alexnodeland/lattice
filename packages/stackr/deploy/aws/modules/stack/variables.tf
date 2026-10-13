@@ -108,6 +108,10 @@ variable "application" {
     error_message = "The application's name is its project_slug: lowercase letters, digits and hyphens."
   }
   validation {
+    condition     = !contains(["postgres", "grafana", "langfuse", "litellm", "gotrue", "auth", "rdsadmin"], replace(var.application.name, "-", "_")) && !startswith(replace(var.application.name, "-", "_"), "rds_")
+    error_message = "The application's database and role are named after it, so it can't share a name with the stack's own, or RDS's (rdsadmin, rds_*)."
+  }
+  validation {
     condition     = contains(["grantr", "none"], var.application.access)
     error_message = "The application's access is grantr or none."
   }

@@ -2,7 +2,7 @@
 # Builds stackr's thin images (RFC-0004, ADR-0034) for this machine's architecture, from lattice's
 # root, and checks each: its configuration as the tool reads it, on one machine's settings and on
 # the AWS recipe's, and that it starts and answers; db-init against a PostgreSQL of its own, and
-# auth-keys' keys. Nothing is published, and nothing is reachable
+# auth-keys against a stubbed Secrets Manager. Nothing is published, and nothing is reachable
 # from outside: the checks run on a Docker network of their own, which publishes no port and has
 # no route out.
 #
@@ -128,33 +128,68 @@ for image in "${images[@]}"; do
         --env REDIS_URL=redis://valkey:6379/1 "$tag"
       ;;
     db-init)
-      # Against a PostgreSQL of its own: one machine's roles, then the AWS recipe's, twice.
+      # Against a PostgreSQL of its own, whose superuser is admin, as RDS's is rdsadmin. db-init
+      # works as postgres, which may create roles and databases and is no superuser, as RDS's
+      # master. One machine's settings first, then the AWS recipe's, twice, then without grantr.
       docker run --detach --name "$network-postgres" --network "$network" --network-alias postgres \
-        --label "stackr-images=$network" --env POSTGRES_PASSWORD=check "$postgres_image" >/dev/null
+        --label "stackr-images=$network" --env POSTGRES_USER=admin --env POSTGRES_PASSWORD=check \
+        "$postgres_image" >/dev/null
+      # Over TCP, which the server listens on only once its own setup is done.
+      for _ in $(seq 30); do
+        docker exec "$network-postgres" pg_isready --quiet --host localhost --username admin && break
+        sleep 1
+      done
+      # A query's answer, as the given role, in the given database.
+      sql() {
+        docker exec --env PGPASSWORD=check "$network-postgres" psql --host localhost --username "$1" \
+          --dbname "$2" --no-psqlrc --quiet --tuples-only --no-align --set ON_ERROR_STOP=on --command "$3"
+      }
+      sql admin postgres "CREATE ROLE postgres LOGIN CREATEROLE CREATEDB PASSWORD 'check'"
       db=(--env PGHOST=postgres --env PGUSER=postgres --env PGPASSWORD=check --env PGDATABASE=postgres
         --env PGCONNECT_TIMEOUT=5 --env LANGFUSE_DB_PASSWORD=check --env LITELLM_DB_PASSWORD=check
         --env AUTH_DB_PASSWORD=check --env "PGOPTIONS=-c client_min_messages=warning")
       aws=(--env GRAFANA_DB_PASSWORD=check --env APP_DB_NAME=acme --env APP_DB_PASSWORD=check)
-      for _ in $(seq 30); do
-        docker exec "$network-postgres" pg_isready --quiet --username postgres && break
-        sleep 1
-      done
-      for run in "one machine's settings" "the AWS recipe's settings" "the AWS recipe's settings, again"; do
+      for run in "one machine's settings" "the AWS recipe's settings" "the AWS recipe's settings, again" \
+        "the AWS recipe's settings, without grantr"; do
         settings=("${db[@]}")
-        [[ $run == "one machine's settings" ]] || settings+=("${aws[@]}")
-        if docker run --rm --network "$network" --label "stackr-images=$network" "${settings[@]}" "$tag" >/dev/null; then
-          echo "ok: db-init on $run"
-        else
+        case $run in
+          "one machine's settings") ;;
+          *grantr) settings+=("${aws[@]}") ;;
+          *) settings+=("${aws[@]}" --env APP_DB_CREATES_ROLES=true) ;;
+        esac
+        if ! docker run --rm --network "$network" --label "stackr-images=$network" "${settings[@]}" "$tag" >/dev/null; then
           fail "db-init on $run"
+          continue
         fi
+        echo "ok: db-init on $run"
+        case $run in
+          "one machine's settings")
+            [[ $(sql admin postgres "SELECT count(*) FROM pg_roles WHERE rolname IN ('grafana', 'acme')") == 0 &&
+              $(sql admin postgres "SELECT count(*) FROM pg_database WHERE datname IN ('grafana', 'acme')") == 0 ]] ||
+              fail "db-init on one machine's settings makes the AWS recipe's roles or databases"
+            ;;
+          *again)
+            [[ $(sql admin postgres "SELECT rolcreaterole FROM pg_roles WHERE rolname = 'acme'") == t ]] ||
+              fail "with grantr, the application's owner may not create roles"
+            # What the application's db-roles does: create the role it works as.
+            sql acme acme "CREATE ROLE acme_app LOGIN; DROP ROLE acme_app" ||
+              fail "the application's owner can't create and drop its role"
+            ;;
+          *grantr)
+            [[ $(sql admin postgres "SELECT rolcreaterole FROM pg_roles WHERE rolname = 'acme'") == f ]] ||
+              fail "without grantr, the application's owner may still create roles"
+            ;;
+        esac
       done
       ;;
     auth-keys)
-      # Its dependencies, and the keys it makes; without a secret to write, it refuses to start.
-      once --entrypoint python "$tag" -c \
-        'import sys; sys.path.insert(0, "/app"); from _auth_keys import key_set, service_role_key; service_role_key(key_set())' ||
-        fail "auth-keys can't make its keys"
-      if once "$tag" 2>/dev/null; then fail "auth-keys starts without its secrets"; else echo "ok: auth-keys makes its keys"; fi
+      # Its usage without its secrets, then the script against a stubbed Secrets Manager.
+      code=0
+      usage=$(once "$tag" 2>&1) || code=$?
+      [[ $code == 2 && $usage == *AUTH_JWT_KEYS_ARN* ]] ||
+        fail "auth-keys, without its secrets, exits $code and says: $usage"
+      once --volume "$PWD/packages/stackr/deploy/auth-keys/check.py:/check.py:ro" --entrypoint /app/.venv/bin/python \
+        "$tag" /check.py || fail "auth-keys against a stubbed Secrets Manager"
       ;;
     *)
       fail "no check for $image"

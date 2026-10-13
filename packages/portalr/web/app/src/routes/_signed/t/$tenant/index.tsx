@@ -1,7 +1,6 @@
-import { Plain, Row, RowLink, Rows } from "@portalr/ui";
+import { Account, Plain, Row, RowLink, Rows } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Account } from "../../../../account";
 
 /** The workspaces the caller can open in the tenant, as grantr lists them, in order. */
 export const Route = createFileRoute("/_signed/t/$tenant/")({ component: Workspaces });

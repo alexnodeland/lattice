@@ -1,4 +1,4 @@
-import { keys, refusal } from "@portalr/client";
+import { allowedIn, keys, refusal, workspaceOf } from "@portalr/client";
 import {
   Button,
   Card,
@@ -13,7 +13,6 @@ import {
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useActionState, useMemo, useState } from "react";
-import { allowedIn, workspaceOf } from "../../../../../../../allowed";
 import { read, SKELETON } from "../../../../../../../rules";
 import { Connection, useAutomation } from "../../../../../../../workspace";
 

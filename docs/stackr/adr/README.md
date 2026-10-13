@@ -32,10 +32,10 @@ Each record captures one decision: the context that forced it, the options consi
 | [0026](0026-the-single-host.md) | The single host | Accepted |
 | [0027](0027-the-single-hosts-backups.md) | The single host's backups | Accepted, amended by [0031](0031-clickhouses-admin-apart-from-langfuse.md) |
 | [0028](0028-local-supabase-on-the-loopback.md) | Local Supabase on the loopback | Accepted |
-| [0029](0029-the-aws-modules-and-tier-1.md) | The AWS modules, and tier 1 | Accepted |
+| [0029](0029-the-aws-modules-and-tier-1.md) | The AWS modules, and tier 1 | Accepted, amended by [0034](0034-the-stack-on-aws.md) |
 | [0030](0030-the-incident-experiment-and-its-postmortem.md) | The incident experiment, and its postmortem | Accepted |
 | [0031](0031-clickhouses-admin-apart-from-langfuse.md) | ClickHouse's admin, apart from Langfuse | Accepted |
-| [0032](0032-the-edge-the-services-and-the-state-host.md) | The edge, the services, and the state host | Accepted |
+| [0032](0032-the-edge-the-services-and-the-state-host.md) | The edge, the services, and the state host | Accepted, amended by [0034](0034-the-stack-on-aws.md) |
 | [0033](0033-the-combined-system-proved-in-ci.md) | The combined system, proved in CI | Accepted |
 | [0034](0034-the-stack-on-aws.md) | The stack on AWS | Accepted |
 

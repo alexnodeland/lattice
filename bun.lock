@@ -15,17 +15,27 @@
     "packages/portalr/web/admin": {
       "name": "@portalr/admin",
       "dependencies": {
+        "@portalr/client": "workspace:*",
         "@portalr/ui": "workspace:*",
+        "@tanstack/react-query": "5.104.1",
+        "@tanstack/react-router": "1.170.41",
         "lucide-react": "1.55.0",
         "react": "19.3.0",
         "react-dom": "19.3.0",
       },
       "devDependencies": {
+        "@playwright/test": "1.64.0",
         "@tailwindcss/vite": "4.3.3",
+        "@tanstack/router-generator": "1.167.40",
+        "@tanstack/router-plugin": "1.168.42",
         "@types/react": "19.3.0",
         "@types/react-dom": "19.3.0",
         "@vitejs/plugin-react": "6.1.2",
+        "@vitest/browser-playwright": "5.0.3",
+        "playwright": "1.64.0",
+        "playwright-bdd": "9.2.1",
         "vite": "8.3.4",
+        "vitest-browser-react": "2.3.0",
       },
     },
     "packages/portalr/web/app": {
@@ -33,7 +43,6 @@
       "dependencies": {
         "@portalr/client": "workspace:*",
         "@portalr/ui": "workspace:*",
-        "@supabase/auth-js": "2.117.3",
         "@tanstack/react-query": "5.104.1",
         "@tanstack/react-router": "1.170.41",
         "lucide-react": "1.55.0",
@@ -58,6 +67,7 @@
     "packages/portalr/web/client": {
       "name": "@portalr/client",
       "dependencies": {
+        "@supabase/auth-js": "2.117.3",
         "diff": "9.0.0",
         "openapi-fetch": "0.17.0",
       },

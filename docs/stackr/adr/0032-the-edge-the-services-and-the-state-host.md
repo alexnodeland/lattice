@@ -1,6 +1,6 @@
 # ADR-0032: The edge, the services, and the state host
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0034](0034-the-stack-on-aws.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

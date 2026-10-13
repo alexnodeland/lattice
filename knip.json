@@ -6,6 +6,9 @@
   "workspaces": {
     "packages/portalr/web/app": {
       "entry": ["bdd/steps/*.ts"]
+    },
+    "packages/portalr/web/admin": {
+      "entry": ["bdd/steps/*.ts"]
     }
   }
 }

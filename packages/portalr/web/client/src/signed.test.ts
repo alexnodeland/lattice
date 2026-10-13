@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { authUrl } from "./deployment";
+import { authUrl } from "./signed";
 
 test("Supabase Auth is the project's, or at a path on this origin", () => {
   const origin = "https://app.example";

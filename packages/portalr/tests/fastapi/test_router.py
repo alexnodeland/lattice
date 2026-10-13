@@ -51,7 +51,7 @@ async def test_every_read_is_refused_without_the_tenants_grant(
     for path in reads:
         for who, tenant in (("bob", "acme"), ("carol", "acme"), ("alice", "globex")):
             response = await client.get(
-                path, params={**WINDOW, "metric": "failed_runs"}, headers=headers(who, tenant)
+                path, params={**WINDOW, "metric": "failed_turns"}, headers=headers(who, tenant)
             )
             assert response.status_code == 403, (path, who, tenant)
             assert response.json()["detail"]["type"] == "forbidden"
@@ -126,11 +126,11 @@ async def test_a_tool_the_application_doesnt_run_is_unconfigured(grants: Grants,
         alice, ops = headers("alice"), headers("ops", tenant=None)
         for path in ("/v1/traces", "/v1/traces/t1", "/v1/logs", "/v1/scores", "/v1/spend"):
             response = await client.get(
-                path, params={**WINDOW, "metric": "failed_runs"}, headers=alice
+                path, params={**WINDOW, "metric": "failed_turns"}, headers=alice
             )
             assert response.json() == {"status": "unconfigured"}, path
         metrics = await client.get(
-            "/v1/metrics", params={**WINDOW, "metric": "failed_runs"}, headers=alice
+            "/v1/metrics", params={**WINDOW, "metric": "failed_turns"}, headers=alice
         )
         assert metrics.json() == {"status": "unconfigured"}
         tenants = (await client.get("/v1/deployment/tenants", headers=ops)).json()

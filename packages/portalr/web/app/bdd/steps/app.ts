@@ -1,13 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Given, Then, When } from "./fixtures";
-import { email, password } from "./people";
-
-export async function signIn(page: Page, person: string, secret: string) {
-  await page.goto("sign-in");
-  await page.getByLabel("Email").fill(email(person));
-  await page.getByLabel("Password").fill(secret);
-  await page.getByRole("button", { name: "Sign in" }).click();
-}
+import { password, signIn } from "./people";
 
 When("{word} signs in", async ({ page }, person: string) => {
   await signIn(page, person, password(person));

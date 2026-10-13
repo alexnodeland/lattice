@@ -8,11 +8,12 @@ locals {
   # How run-task reaches the cluster, through the AWS CLI where OpenTofu runs, with the
   # provider's credentials when they aren't in that environment already.
   run_task = merge(var.run_task_environment, {
-    CLUSTER        = aws_ecs_cluster.this.arn
-    SUBNETS        = join(",", module.network.private_subnet_ids)
-    SECURITY_GROUP = module.network.security_groups.services
-    AWS_REGION     = local.region
+    CLUSTER    = aws_ecs_cluster.this.arn
+    SUBNETS    = join(",", module.network.private_subnet_ids)
+    AWS_REGION = local.region
   })
+  # Each one-off task's security groups, as run-task takes them.
+  one_off_groups = { for task, groups in local.groups_of : task => join(",", groups) if contains(["db-init", "auth-keys", "db-roles"], task) }
   # The databases' versions, which db-init sets their roles' passwords from.
   database_versions = { for key, version in var.secret_versions : key => version if startswith(key, "database-") }
 }
@@ -24,7 +25,7 @@ module "db_init" {
   deployment         = local.task.deployment
   cluster_arn        = local.task.cluster_arn
   subnet_ids         = local.task.subnet_ids
-  security_group_ids = local.task.security_group_ids
+  security_group_ids = local.groups_of["db-init"]
   size               = local.sizes["db-init"]
   log_retention_days = var.log_retention_days
   container = {
@@ -55,10 +56,11 @@ resource "terraform_data" "db_init" {
 
   provisioner "local-exec" {
     command     = "${path.module}/run-task"
-    environment = merge(local.run_task, { TASK_DEFINITION = module.db_init.task_definition_arn })
+    environment = merge(local.run_task, { TASK_DEFINITION = module.db_init.task_definition_arn, SECURITY_GROUPS = local.one_off_groups["db-init"] })
   }
-  # Each run needs the private subnets' route out, to pull its image and read its secrets.
-  depends_on = [module.network]
+  # Each run needs the private subnets' route out, to pull its image and read its secrets, and its
+  # group's rule to PostgreSQL: with no rule, its group reaches nothing there.
+  depends_on = [module.network, aws_vpc_security_group_ingress_rule.call, aws_vpc_security_group_egress_rule.call]
 }
 
 module "auth_keys" {
@@ -68,7 +70,7 @@ module "auth_keys" {
   deployment         = local.task.deployment
   cluster_arn        = local.task.cluster_arn
   subnet_ids         = local.task.subnet_ids
-  security_group_ids = local.task.security_group_ids
+  security_group_ids = local.groups_of["auth-keys"]
   size               = local.sizes["auth-keys"]
   log_retention_days = var.log_retention_days
   container = {
@@ -91,7 +93,7 @@ resource "terraform_data" "auth_keys" {
 
   provisioner "local-exec" {
     command     = "${path.module}/run-task"
-    environment = merge(local.run_task, { TASK_DEFINITION = module.auth_keys.task_definition_arn })
+    environment = merge(local.run_task, { TASK_DEFINITION = module.auth_keys.task_definition_arn, SECURITY_GROUPS = local.one_off_groups["auth-keys"] })
   }
   depends_on = [module.network]
 }
@@ -106,7 +108,7 @@ module "db_roles" {
   deployment         = local.task.deployment
   cluster_arn        = local.task.cluster_arn
   subnet_ids         = local.task.subnet_ids
-  security_group_ids = local.task.security_group_ids
+  security_group_ids = local.groups_of["db-roles"]
   size               = local.sizes["db-roles"]
   log_retention_days = var.log_retention_days
   container = {
@@ -129,7 +131,7 @@ resource "terraform_data" "db_roles" {
 
   provisioner "local-exec" {
     command     = "${path.module}/run-task"
-    environment = merge(local.run_task, { TASK_DEFINITION = module.db_roles[0].task_definition_arn })
+    environment = merge(local.run_task, { TASK_DEFINITION = module.db_roles[0].task_definition_arn, SECURITY_GROUPS = local.one_off_groups["db-roles"] })
   }
-  depends_on = [module.network]
+  depends_on = [module.network, aws_vpc_security_group_ingress_rule.call, aws_vpc_security_group_egress_rule.call]
 }

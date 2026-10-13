@@ -14,7 +14,9 @@ export interface paths {
          * @description The deployment's audit log: its operators, granted and revoked.
          *
          *     ``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``
-         *     one subject's changes.
+         *     one subject's changes. It reads the window ``after_seq < seq < before_seq``: the first
+         *     ``limit``, or the last ``last``, oldest first; a client pages back with ``last`` and its
+         *     oldest entry's ``seq`` as ``before_seq``.
          */
         get: operations["deployment_audit_grantr_v1_audit_get"];
         put?: never;
@@ -169,10 +171,12 @@ export interface paths {
         };
         /**
          * Tenant Audit
-         * @description A tenant's audit log after ``after_seq``, in order.
+         * @description A tenant's audit log in the window ``after_seq < seq < before_seq``, oldest first.
          *
          *     ``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``
-         *     one subject's changes.
+         *     one subject's changes. It reads the window ``after_seq < seq < before_seq``: the first
+         *     ``limit``, or the last ``last``, oldest first; a client pages back with ``last`` and its
+         *     oldest entry's ``seq`` as ``before_seq``.
          */
         get: operations["tenant_audit_grantr_v1_tenants__tenant__audit_get"];
         put?: never;
@@ -921,7 +925,9 @@ export interface operations {
         parameters: {
             query?: {
                 after_seq?: number;
-                limit?: number;
+                before_seq?: number | null;
+                limit?: number | null;
+                last?: number | null;
                 /** @description Keep only entries of these event types; it may repeat. */
                 type?: components["schemas"]["AuditType"][] | null;
                 /** @description Keep only the changes of one subject, of this kind. */
@@ -1193,7 +1199,9 @@ export interface operations {
         parameters: {
             query?: {
                 after_seq?: number;
-                limit?: number;
+                before_seq?: number | null;
+                limit?: number | null;
+                last?: number | null;
                 /** @description Keep only entries of these event types; it may repeat. */
                 type?: components["schemas"]["AuditType"][] | null;
                 /** @description Keep only the changes of one subject, of this kind. */

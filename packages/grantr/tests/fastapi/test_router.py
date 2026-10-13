@@ -243,6 +243,32 @@ async def test_the_audit_log_is_read_of_some_types_or_by_one_subject(
     assert [e["event"]["grant"]["to"]["id"] for e in by_root.json()] == ["carol"]
 
 
+async def test_the_audit_log_reads_its_last_and_pages_back_from_an_entry(
+    client: httpx.AsyncClient,
+) -> None:
+    await client.post("/tenants/acme/members", json={"member": BOB}, headers=AS_ALICE)
+    await client.put("/tenants/acme/groups/team", json={"members": [BOB]}, headers=AS_ALICE)
+    tail = await client.get("/tenants/acme/audit", params={"last": 2}, headers=AS_ALICE)
+    assert [e["event"]["type"] for e in tail.json()] == ["member_added", "group_defined"]
+    back = await client.get(
+        "/tenants/acme/audit",
+        params={"last": 2, "before_seq": tail.json()[0]["seq"]},
+        headers=AS_ALICE,
+    )
+    assert [e["event"]["type"] for e in back.json()] == ["tenant_created"]
+    window = await client.get(
+        "/tenants/acme/audit",
+        params={"last": 1, "after_seq": back.json()[0]["seq"], "before_seq": tail.json()[1]["seq"]},
+        headers=AS_ALICE,
+    )
+    assert [e["event"]["type"] for e in window.json()] == ["member_added"]
+    assert (await client.put("/operators/carol", headers=AS_ROOT)).status_code == 200
+    deployment = await client.get("/audit", params={"last": 1}, headers=AS_ROOT)
+    assert [e["event"]["grant"]["to"]["id"] for e in deployment.json()] == ["carol"]
+    both = await client.get("/tenants/acme/audit", params={"limit": 1, "last": 1}, headers=AS_ALICE)
+    assert both.status_code == 422
+
+
 @pytest.mark.parametrize(
     "params",
     [

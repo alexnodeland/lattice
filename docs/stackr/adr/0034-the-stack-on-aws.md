@@ -4,7 +4,7 @@
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 
-Builds the third part of phase 3 of [RFC-0004](../rfcs/0004-hosting-recipes.md): the `stack` module, which puts [ADR-0029](0029-the-aws-modules-and-tier-1.md)'s and [ADR-0032](0032-the-edge-the-services-and-the-state-host.md)'s modules together. `envs/prod` and `envs/floci`, its two roots, follow in their own pull request, then the thin images. Records what the RFC left to the build, and where it departs from it.
+Builds the third part of phase 3 of [RFC-0004](../rfcs/0004-hosting-recipes.md): the `stack` module, which puts [ADR-0029](0029-the-aws-modules-and-tier-1.md)'s and [ADR-0032](0032-the-edge-the-services-and-the-state-host.md)'s modules together. `envs/prod` and `envs/floci`, its two roots, came in their own pull request; the thin images follow. Records what the RFC left to the build, and where it departs from it.
 
 ## Context
 
@@ -34,7 +34,7 @@ RFC-0004's `stack` holds the cluster, the private namespace, every Fargate servi
   - `tls_to_data`, off on Floci, which serves no TLS to RDS or ElastiCache: `sslmode=prefer` in place of `require`, `redis://` in place of `rediss://`, and Grafana's `disable`;
   - `aws_endpoint_url`, Floci's address for the services that call S3 and Secrets Manager;
   - `destroyable`. One switch, not one per resource: on, a destroy takes RDS without a final snapshot, empties the buckets, deletes the secrets at once, skips the state host's volume's snapshot, and lets the ALB go. The stack's tests check its own secrets' recovery window both ways; the `data`, `edge` and `state-host` modules' tests check their guards.
-- **`run_task_environment`,** what the AWS CLI that runs the one-off tasks needs beside OpenTofu's own environment: the provider's credentials, such as `AWS_PROFILE`, when the provider is given them otherwise.
+- **`run_task_environment`,** what the AWS CLI that runs the one-off tasks needs beside OpenTofu's own environment: the provider's credentials, when the provider is given them otherwise. `envs/prod` passes its `profile` as `AWS_PROFILE`, and `envs/floci` Floci's keys and address.
 
 ### Secrets
 
@@ -104,12 +104,23 @@ Each service and one-off task has a group of its own, with a rule from each of i
 - **Each module is scanned on its own files** (`--file`), with its own skips: the stack's are its two hand-written secrets', with the `secrets` module's reasons.
 - **checkov over the plan's JSON waits for tier 2** (phase 4), where `envs/floci` plans against Floci, which answers the data sources.
 
+### The roots
+
+`envs/prod` and `envs/floci` came in the pull request after `stack`'s.
+
+- **`envs/prod`** keeps its state in S3 with `use_lockfile`, in one bucket per account, which its README makes by hand (versioned, encrypted, private, TLS only, its old versions expired), and one key per deployment, `<name>/terraform.tfstate`, from a `<deployment>.s3.tfbackend` given at `tofu init`. A deployment's settings are in its own `.tfvars`, from `prod.tfvars.example`; the repository ignores both. Its provider applies only to `account_id`, with the credentials of `profile`, a role's through a profile with `role_arn`, or the shell's. Until stackr's release publishes the thin images, their digests are settings too. Tier 1 plans `prod.tfvars.example` against a mocked AWS.
+- **`envs/prod` exposes what an operator chooses, and fixes the rest** at the stack's defaults, every guard included; its README lists them, and how to retire a deployment past them.
+- **`envs/floci` fails closed.** Its provider reaches Floci through `AWS_ENDPOINT_URL`, with Floci's keys, which AWS refuses, and applies only to Floci's account, `000000000000`, which no AWS account is; the one-off tasks' AWS CLI gets the same keys and Floci's address, which must be on the loopback or Floci's own network. It has local state, and runs the state host's services on Fargate, without TLS to the data stores, destroyable, with Valkey on a port in Floci's range, and with the domain's zone made in Floci.
+- **Each root has its own lock file,** the tests' own, for `linux_amd64`, `darwin_arm64` and `darwin_amd64`. Tier 1 validates each root against it, and fails when it differs from the tests'.
+
 ### Where this departs from RFC-0004
 
-- **`envs/prod` and `envs/floci` are their own pull request,** after this one, to keep each under review's size.
+- **`envs/prod` and `envs/floci` were their own pull request,** after `stack`'s, to keep each under review's size.
+- **The thin images' digests are a deployment's settings** until stackr's release publishes them.
 - **The one-off tasks run from where OpenTofu runs,** which needs the AWS CLI there. The RFC said only "by run-task".
 - **The application's settings come from the stack,** and not from a root of the template's. The template's `hosting: aws` root will call `stack` with its image and its own settings.
 - **Langfuse's bucket has no CORS configuration,** which browsers' media uploads to it need. Traces and events don't; the manual gate checks it.
+- **`envs/floci`'s tests wait for tier 2,** where they apply against Floci; the RFC puts them beside the root.
 - **checkov over the plan's JSON waits for tier 2,** which RFC-0004 puts in tier 1: a mocked test makes no plan to scan.
 
 ## Options considered
@@ -148,4 +159,4 @@ Each service and one-off task has a group of its own, with a rule from each of i
   - both places the state host's services run.
 - Easier: one switch makes a deployment one a destroy takes whole.
 - Harder: applying needs the AWS CLI, and the thin images must read the settings above.
-- Next: `envs/prod` and `envs/floci`; VPC endpoints for AWS's own traffic; the thin images, with the settings above; then tier 2, with checkov over the plan's JSON.
+- Next: the thin images, with the settings above; their digests pinned in `envs/prod`, with a Renovate manager for `envs/` (today's matches only `modules/`); VPC endpoints for AWS's own traffic; then tier 2, with `envs/floci`'s tests and checkov over the plan's JSON.

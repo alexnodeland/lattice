@@ -1,0 +1,6 @@
+# What stackr-grafana's image is built from, out of lattice's root: its own files alone.
+*
+!packages/stackr/deploy/grafana/provisioning/
+!packages/stackr/deploy/grafana/dashboards/stackr/
+!packages/artifactr/deploy/grafana/dashboards/
+!packages/reflexr/deploy/grafana/dashboards/

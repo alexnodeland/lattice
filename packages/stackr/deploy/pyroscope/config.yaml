@@ -1,5 +1,8 @@
-# Pyroscope 2, as a single process with its data on a local volume.
-# Applications push profiles to it on 4040.
+# Pyroscope 2, as a single process. Applications push profiles to it on 4040.
+# Its data is on a local volume on one machine, and in S3 on AWS (stackr
+# ADR-0034), as the environment says: Pyroscope reads it with
+# -config.expand-env=true, and each setting has one machine's value by default.
+# Expanded, a literal $ is written $$.
 target: all
 architecture_storage: v2
 
@@ -7,9 +10,16 @@ server:
   http_listen_port: 4040
 
 storage:
-  backend: filesystem
+  backend: ${PYROSCOPE_BACKEND:-filesystem}
+  prefix: ${S3_PREFIX:-}
   filesystem:
     dir: /data/v2/shared
+  s3:
+    bucket_name: ${S3_BUCKET:-}
+    region: ${S3_REGION:-}
+    endpoint: ${S3_ENDPOINT:-}
+    insecure: ${S3_INSECURE:-false}
+    bucket_lookup_type: ${S3_BUCKET_LOOKUP_TYPE:-auto}
 
 metastore:
   data_dir: /data/v2/metastore/data

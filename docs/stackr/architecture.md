@@ -37,7 +37,8 @@ copier.yml          the application template's questions; its files are in templ
 template/           the application template (Copier): an application on artifactr, reflexr or both
 .env.example        settings and placeholders; `make env` turns it into .env
 versions.env        versions pinned outside compose.yaml: the Supabase CLI
-deploy/<service>/   each service's configuration, mounted read-only
+deploy/<service>/   each service's configuration, mounted read-only, and, for the AWS recipe, the
+                    Dockerfile of its thin image (deploy/build-images builds and checks them)
 deploy/host/        the single host (RFC-0004): the overlay that puts Caddy in front, its Caddyfile,
                     bootstrap, which prepares a VM, PostgreSQL's image with pgBackRest, the backups,
                     the restore drill and their systemd timers

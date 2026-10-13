@@ -9,6 +9,7 @@ nav:
   - Observability: guides/observability.md
   - Langfuse: guides/langfuse.md
   - The application template: guides/template.md
+  - The combined system: guides/combined-system.md
   - The smoke tests: guides/smoke-tests.md
   - Validation and CI: guides/validation.md
   - Security: guides/security.md
@@ -59,6 +60,7 @@ nav:
     - adr/0029-the-aws-modules-and-tier-1.md
     - adr/0030-the-incident-experiment-and-its-postmortem.md
     - adr/0031-clickhouses-admin-apart-from-langfuse.md
+    - adr/0033-the-combined-system-proved-in-ci.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

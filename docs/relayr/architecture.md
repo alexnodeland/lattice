@@ -1,6 +1,6 @@
 # Architecture
 
-Decisions are recorded in [`adr/`](adr/README.md), and the plan that builds relayr in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). The design is [stackr RFC-0002](../stackr/rfcs/0002-the-combined-system.md). This page describes what exists: the inbound adapter, the outbound adapter with its loop control, and their telemetry, phases 1, 2 and 4 of the plan.
+Decisions are recorded in [`adr/`](adr/README.md), and the plan that builds relayr in [RFC-0001](rfcs/0001-v0.1-implementation-plan.md). The design is [stackr RFC-0002](../stackr/rfcs/0002-the-combined-system.md). This page describes what exists: the inbound adapter, the outbound adapter with its loop control, their telemetry, rules from chat and evaluation, phases 1 to 6 of the plan. stackr's template wires relayr in with its `bridge` question, phase 3 ([stackr ADR-0021](../stackr/adr/0021-the-bridge-in-the-template.md)).
 
 ## What relayr is
 
@@ -108,4 +108,4 @@ One contract test, `tests/ledger/test_contract.py`, runs against memory, SQLite 
 
 ## What isn't built yet
 
-Docs, ADRs and the product repository (phase 7). stackr's template wires relayr in with its `bridge` question ([stackr ADR-0021](../stackr/adr/0021-the-bridge-in-the-template.md)). LiteLLM's metadata doesn't carry relayr's tags yet ([lattice #86](https://github.com/alexnodeland/lattice/issues/86)).
+LiteLLM's metadata doesn't carry relayr's tags yet ([lattice #86](https://github.com/alexnodeland/lattice/issues/86)).

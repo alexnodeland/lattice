@@ -35,5 +35,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0029](0029-the-aws-modules-and-tier-1.md) | The AWS modules, and tier 1 | Accepted |
 | [0030](0030-the-incident-experiment-and-its-postmortem.md) | The incident experiment, and its postmortem | Accepted |
 | [0031](0031-clickhouses-admin-apart-from-langfuse.md) | ClickHouse's admin, apart from Langfuse | Accepted |
+| [0033](0033-the-combined-system-proved-in-ci.md) | The combined system, proved in CI | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

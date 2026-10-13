@@ -6,9 +6,10 @@
 #   and ShellCheck for the rendered user data.
 #
 # OpenTofu's format; the two roots, envs/prod and envs/floci, validated against their own lock
-# files; TFLint with AWS's ruleset; checkov over each module, with the skips and their reasons in
-# that module's .checkov.yaml; the modules' tests, against a mocked AWS (tests/), which validate
-# each module as they plan it, with the providers the committed lock file names; and the modules'
+# files, which are the tests' own, and envs/prod planned with its example against a mocked AWS;
+# TFLint with AWS's ruleset; checkov over each module, with the skips and their reasons in that
+# module's .checkov.yaml; the modules' tests, against a mocked AWS (tests/), which validate each
+# module as they plan it, with the providers the committed lock file names; and the modules'
 # templates, rendered: shellcheck over the state host's user data, and GoTrue's proxy, run in
 # Docker (tests/auth-proxy).
 # The providers download once, into TF_PLUGIN_CACHE_DIR. TFLint fetches its AWS ruleset from
@@ -43,6 +44,15 @@ for root in envs/*/; do
   else
     fail "tofu validate: $root"
   fi
+done
+
+step "envs/prod, planned with its example against a mocked AWS"
+tofu -chdir=envs/prod test -no-color -var-file=prod.tfvars.example || fail "tofu test: envs/prod"
+
+step "The roots' lock files, the same as the tests'"
+for root in envs/*/; do
+  cmp -s .terraform.lock.hcl "$root.terraform.lock.hcl" ||
+    fail "$root.terraform.lock.hcl differs from .terraform.lock.hcl"
 done
 
 step "TFLint"

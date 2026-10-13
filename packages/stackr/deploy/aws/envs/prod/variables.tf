@@ -1,3 +1,22 @@
+variable "account_id" {
+  description = "The AWS account the deployment is in: the provider refuses any other, so a profile for the wrong account can't apply."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]{12}$", var.account_id))
+    error_message = "An account id is 12 digits."
+  }
+}
+
+variable "profile" {
+  description = <<-EOT
+    The AWS CLI profile to apply with, which the one-off tasks run with too; the shell's
+    credentials when null. To act as a role, name a profile with its role_arn.
+  EOT
+  type        = string
+  default     = null
+}
+
 variable "region" {
   description = "The AWS region the deployment is in."
   type        = string
@@ -82,8 +101,8 @@ variable "secret_versions" {
   default     = {}
 }
 
-variable "run_task_environment" {
-  description = "What the AWS CLI that runs the one-off tasks needs beside your shell's environment, such as AWS_PROFILE when the provider's credentials come from a profile you don't export."
-  type        = map(string)
-  default     = {}
+variable "langfuse_admin_email" {
+  description = "The email of Langfuse's first user, its admin; admin@<domain> when null."
+  type        = string
+  default     = null
 }

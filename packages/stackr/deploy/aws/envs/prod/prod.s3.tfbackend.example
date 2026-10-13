@@ -1,0 +1,6 @@
+# Where a deployment's state is: copy to <deployment>.s3.tfbackend, which the repository ignores,
+# and init with it (README.md). One bucket per account; one key per deployment, under its name.
+bucket = "123456789012-stackr-state"
+key    = "stackr/terraform.tfstate"
+region = "us-east-1"
+# profile = "stackr-prod"   # the same profile as the deployment's, if it has one

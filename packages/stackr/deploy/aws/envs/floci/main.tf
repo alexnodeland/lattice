@@ -1,17 +1,30 @@
-# Floci answers every service at AWS_ENDPOINT_URL, with its own credentials, which the caller sets
-# (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY), and serves S3 by path.
+locals {
+  # Floci's account, and the keys it takes (any), which AWS doesn't.
+  floci = {
+    account    = "000000000000"
+    access_key = "test"
+    secret_key = "test"
+  }
+}
+
+# Floci answers every service at AWS_ENDPOINT_URL, which the caller sets, and serves S3 by path.
 provider "aws" {
-  region                      = "us-east-1"
-  skip_credentials_validation = true
-  skip_metadata_api_check     = true
-  s3_use_path_style           = true
+  region              = "us-east-1"
+  access_key          = local.floci.access_key
+  secret_key          = local.floci.secret_key
+  allowed_account_ids = [local.floci.account]
+  s3_use_path_style   = true
+
+  default_tags {
+    tags = { Deployment = "stackr", ManagedBy = "stackr", Environment = "floci" }
+  }
 }
 
 module "stack" {
   source             = "../../modules/stack"
   name               = "stackr"
   environment        = "floci"
-  domain             = "stackr.test"
+  domain             = aws_route53_zone.this.name
   zone_id            = aws_route53_zone.this.zone_id
   zones              = ["us-east-1a", "us-east-1b"]
   images             = var.images
@@ -21,12 +34,13 @@ module "stack" {
   destroyable        = true
   aws_endpoint_url   = var.endpoint_for_tasks
   log_retention_days = 1
-
-  # Floci's catalog has nothing above medium (ADR-0025).
-  postgres = { instance_class = "db.t4g.micro", allocated_storage = 20, max_allocated_storage = 20, backup_retention_days = 1 }
-  valkey   = { node_type = "cache.t4g.micro", port = 6390 }
-  sizes = { for service in ["app", "litellm", "langfuse-web", "langfuse-worker", "clickhouse"] :
-    service => { cpu = 512, memory = 1024 }
+  # Valkey's port in Floci's proxy range (ADR-0025).
+  valkey = { port = 6390 }
+  # The one-off tasks' AWS CLI, with the same keys, at the same Floci.
+  run_task_environment = {
+    AWS_ACCESS_KEY_ID     = local.floci.access_key
+    AWS_SECRET_ACCESS_KEY = local.floci.secret_key
+    AWS_ENDPOINT_URL      = var.endpoint
   }
 }
 

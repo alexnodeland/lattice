@@ -23,6 +23,17 @@ variable "application" {
   })
 }
 
+variable "endpoint" {
+  description = "Floci's address from where OpenTofu runs, as AWS_ENDPOINT_URL gives it to the provider."
+  type        = string
+  default     = "http://127.0.0.1:4566"
+
+  validation {
+    condition     = can(regex("^http://(127\\.0\\.0\\.1|localhost|floci)(:[0-9]+)?$", var.endpoint))
+    error_message = "Floci is on the loopback, or named floci on its network: never a remote address."
+  }
+}
+
 variable "endpoint_for_tasks" {
   description = "Floci's address as the tasks reach it, on the Docker network Floci runs them on."
   type        = string

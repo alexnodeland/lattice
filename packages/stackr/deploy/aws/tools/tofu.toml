@@ -1,0 +1,24 @@
+# OpenTofu, for stackr's AWS recipe (RFC-0004): proto installs it from OpenTofu's own releases, checked
+# against their SHA256SUMS. A plugin of lattice's own, so nothing outside lattice decides what runs.
+
+name = "OpenTofu"
+type = "cli"
+
+[platform.linux]
+checksum-file = "tofu_{version}_SHA256SUMS"
+download-file = "tofu_{version}_linux_{arch}.tar.gz"
+
+[platform.macos]
+checksum-file = "tofu_{version}_SHA256SUMS"
+download-file = "tofu_{version}_darwin_{arch}.tar.gz"
+
+[install]
+checksum-url = "https://github.com/opentofu/opentofu/releases/download/v{version}/{checksum_file}"
+download-url = "https://github.com/opentofu/opentofu/releases/download/v{version}/{download_file}"
+
+[install.arch]
+x86_64 = "amd64"
+aarch64 = "arm64"
+
+[resolve]
+git-url = "https://github.com/opentofu/opentofu"

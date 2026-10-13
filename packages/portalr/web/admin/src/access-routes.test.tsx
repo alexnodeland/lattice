@@ -44,6 +44,47 @@ function grantr(allowed: readonly string[]) {
       sent.push({ to: `${request.method} ${path}`, body: await request.text() });
       return Response.json({ at: "2026-10-13T00:00:00Z", by: null, seq: 2, tenant: "acme" });
     }
+    if (request.method === "POST" && path.endsWith("/grants")) {
+      sent.push({ to: `POST ${path}`, body: await request.text() });
+      return Response.json({ at: "2026-10-13T00:00:00Z", by: null, seq: 3, tenant: "acme" });
+    }
+    if (path === "/grantr/v1/tenants/acme/revocations") {
+      sent.push({ to: `POST ${path}`, body: await request.text() });
+      return Response.json({ at: "2026-10-13T00:00:00Z", by: null, seq: 4, tenant: "acme" });
+    }
+    if (path === "/grantr/v1/catalog") {
+      return Response.json({
+        roles: [
+          { name: "owner", kinds: ["tenant"] },
+          { name: "editor", kinds: ["workspace"] },
+          { name: "viewer", kinds: ["workspace", "thread", "artifact", "rule"] },
+        ],
+        custom_actions: ["reflexr:retry_run", "reflexr:skip_run"],
+        custom_kinds: ["workspace"],
+      });
+    }
+    if (path === "/grantr/v1/tenants/acme/roles") {
+      return Response.json([
+        { name: "triager", actions: ["reflexr:retry_run", "reflexr:skip_run"] },
+      ]);
+    }
+    if (path === "/grantr/v1/tenants/acme/grants") {
+      return Response.json([
+        {
+          role: "owner",
+          on: { kind: "tenant" },
+          to: { kind: "user", id: "alice" },
+          tenant: "acme",
+        },
+        { role: "member", on: { kind: "tenant" }, to: { kind: "user", id: "bob" }, tenant: "acme" },
+        {
+          role: "viewer",
+          on: { kind: "thread", workspace: "ws_1", id: "t_1" },
+          to: { kind: "group", id: "ops" },
+          tenant: "acme",
+        },
+      ]);
+    }
     if (path === "/grantr/v1/me") {
       return Response.json({ memberships: [{ tenant: "acme", user: "alice", roles: ["owner"] }] });
     }
@@ -238,4 +279,101 @@ test("revoking the key just issued clears its secret", async () => {
   await screen.getByRole("button", { name: "Revoke k_2" }).click();
   await screen.getByRole("alertdialog").getByRole("button", { name: "Revoke" }).click();
   await expect.element(screen.getByRole("textbox", { name: "The key" })).not.toBeInTheDocument();
+});
+
+test("Roles and Grants are parts where grantr allows defining roles and granting", async () => {
+  const { screen } = await open("/t/acme/access/members", ["grantr:add_member"]);
+  const parts = screen.getByRole("navigation", { name: "Access" });
+  await expect.element(parts.getByRole("link", { name: "Members" })).toBeVisible();
+  await expect.element(parts.getByRole("link", { name: "Roles" })).not.toBeInTheDocument();
+  await expect.element(parts.getByRole("link", { name: "Grants" })).not.toBeInTheDocument();
+});
+
+test("Roles lists the catalog's roles and the custom ones, and refuses a built-in's name", async () => {
+  const { screen } = await open("/t/acme/access/roles", ACCESS);
+  const builtIn = screen.getByRole("table", { name: "Built-in roles" });
+  await expect.element(builtIn.getByRole("rowheader", { name: "viewer" })).toBeVisible();
+  await expect
+    .element(screen.getByRole("cell", { name: "workspace, thread, artifact, rule" }))
+    .toBeVisible();
+  const custom = screen.getByRole("table", { name: "Custom roles" });
+  await expect.element(custom.getByRole("rowheader", { name: "triager" })).toBeVisible();
+  await screen.getByRole("textbox", { name: "Role" }).fill("viewer");
+  await screen.getByRole("checkbox", { name: "reflexr:retry_run" }).click();
+  await screen.getByRole("button", { name: "Create the role" }).click();
+  await expect
+    .element(screen.getByRole("alert"))
+    .toHaveTextContent("Not saved: viewer is a built-in role. Choose another name.");
+  expect(sent).toEqual([]);
+});
+
+test("Change actions starts from the role's, and confirms the actions it takes away", async () => {
+  const { screen } = await open("/t/acme/access/roles", ACCESS);
+  await screen.getByRole("button", { name: "Change actions" }).click();
+  const skip = screen.getByRole("checkbox", { name: "reflexr:skip_run" });
+  await expect.element(skip).toBeChecked();
+  await skip.click();
+  await screen.getByRole("button", { name: "Save the role" }).click();
+  const dialog = screen.getByRole("alertdialog", { name: "Take this action from triager?" });
+  await expect
+    .element(
+      dialog.getByText("Whoever holds triager loses reflexr:skip_run, wherever it is granted."),
+    )
+    .toBeVisible();
+  await dialog.getByRole("button", { name: "Save the role" }).click();
+  await expect.element(screen.getByRole("status")).toHaveTextContent("triager holds 1 action.");
+  expect(sent).toEqual([
+    {
+      to: "PUT /grantr/v1/tenants/acme/roles/triager",
+      body: JSON.stringify({ actions: ["reflexr:retry_run"] }),
+    },
+  ]);
+});
+
+test("Grants lists each grant by where, and grants a role where the role may be granted", async () => {
+  const { screen } = await open("/t/acme/access/grants", ACCESS);
+  const table = screen.getByRole("table", { name: "Grants" });
+  await expect.element(table.getByRole("cell", { name: "thread t_1 in ws_1" })).toBeVisible();
+  // The broadest first: the tenant's owner, then the thread's viewer.
+  const roles = table
+    .getByRole("rowheader")
+    .elements()
+    .map((row) => row.textContent);
+  expect(roles).toEqual(["owner", "viewer"]);
+  await screen.getByRole("combobox", { name: "Role" }).selectOptions("triager");
+  const on = screen.getByRole("combobox", { name: "On" });
+  await expect.element(on).toHaveValue("workspace");
+  expect(on.element().querySelectorAll("option")).toHaveLength(1);
+  await screen.getByRole("textbox", { name: "Workspace" }).fill("ws_1");
+  await screen.getByRole("combobox", { name: "To" }).selectOptions("ops (group)");
+  await screen.getByRole("button", { name: "Grant", exact: true }).click();
+  await expect
+    .element(screen.getByRole("status"))
+    .toHaveTextContent("ops (group) holds triager on workspace ws_1.");
+  expect(sent).toEqual([
+    {
+      to: "POST /grantr/v1/tenants/acme/grants",
+      body: JSON.stringify({
+        role: "triager",
+        on: { kind: "workspace", workspace: "ws_1" },
+        to: { kind: "group", id: "ops" },
+      }),
+    },
+  ]);
+});
+
+test("without revoking, Grants has no Revoke; with it, revoking is confirmed", async () => {
+  const without = await open("/t/acme/access/grants", ["grantr:grant"]);
+  await expect.element(without.screen.getByRole("rowheader", { name: "owner" })).toBeVisible();
+  await expect
+    .element(without.screen.getByRole("button", { name: /^Revoke/ }))
+    .not.toBeInTheDocument();
+  without.screen.unmount();
+  const { screen } = await open("/t/acme/access/grants", ACCESS);
+  await screen
+    .getByRole("button", { name: "Revoke viewer from ops (group) on thread t_1 in ws_1" })
+    .click();
+  await screen.getByRole("alertdialog").getByRole("button", { name: "Revoke" }).click();
+  await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();
+  expect(sent.at(-1)?.to).toBe("POST /grantr/v1/tenants/acme/revocations");
 });

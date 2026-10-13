@@ -64,8 +64,12 @@ export const keys = {
     grants: (tenant: string, ws: string) => [...keys.grantr.access(tenant), "grants", ws] as const,
     restrictions: (tenant: string, ws: string) =>
       [...keys.grantr.access(tenant), "restrictions", ws] as const,
-    /** Every grant in the tenant, on it and on everything in it. */
+    /** Every grant in the tenant, on it and on everything in it, apart from a workspace's. */
+    tenantGrants: (tenant: string) => [...keys.grantr.access(tenant), "tenant-grants"] as const,
     groups: (tenant: string) => [...keys.grantr.access(tenant), "groups"] as const,
+    roles: (tenant: string) => [...keys.grantr.access(tenant), "roles"] as const,
+    /** The deployment's catalog of roles, the same in every tenant: no change to access stales it. */
+    catalog: () => ["grantr", "deployment", "catalog"] as const,
     keyring: (tenant: string) => [...keys.grantr.access(tenant), "keys"] as const,
   },
   portalr: {
@@ -314,6 +318,40 @@ export function createQueries(api: Api) {
                 params: { path: { tenant }, query: { workspace: ws } },
               }),
             ),
+        }),
+      /** Every grant in the tenant, for those who may grant there (`grantr:grant`). */
+      tenantGrants: (tenant: string) =>
+        queryOptions({
+          queryKey: keys.grantr.tenantGrants(tenant),
+          queryFn: () =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/grants", {
+                ...named(tenant),
+                params: { path: { tenant } },
+              }),
+            ),
+        }),
+      /** The tenant's custom roles (`grantr:define_role`). */
+      roles: (tenant: string) =>
+        queryOptions({
+          queryKey: keys.grantr.roles(tenant),
+          queryFn: () =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/roles", {
+                ...named(tenant),
+                params: { path: { tenant } },
+              }),
+            ),
+        }),
+      /**
+       * The built-in roles a tenant's admins grant, each with where, and what a custom role may
+       * hold and where: the deployment's, which any signed-in caller may read (grantr ADR-0031).
+       */
+      catalog: () =>
+        queryOptions({
+          queryKey: keys.grantr.catalog(),
+          queryFn: () => body(api.grantr.GET("/grantr/v1/catalog")),
+          staleTime: Number.POSITIVE_INFINITY,
         }),
       /** The tenant's groups, by name, with their members (`grantr:manage_groups`). */
       groups: (tenant: string) =>

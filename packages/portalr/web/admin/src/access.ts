@@ -10,6 +10,8 @@ import { useCallback, useMemo } from "react";
 import type { Context } from "./context";
 
 type Member = GrantrApi.components["schemas"]["Member"];
+type Grantee = GrantrApi.components["schemas"]["Grantee"];
+type Resource = GrantrApi.components["schemas"]["Resource"];
 
 /** Every action Access's screens ask about, once per screen. */
 export const ACCESS = [
@@ -18,6 +20,9 @@ export const ACCESS = [
   "grantr:manage_groups",
   "grantr:issue_key",
   "grantr:revoke_key",
+  "grantr:define_role",
+  "grantr:grant",
+  "grantr:revoke",
 ] as const;
 
 /** Each part of Access, and the action its read takes. */
@@ -25,6 +30,8 @@ export const PARTS = [
   { part: "members", label: "Members", reads: "grantr:add_member" },
   { part: "groups", label: "Groups", reads: "grantr:manage_groups" },
   { part: "keys", label: "Keys", reads: "grantr:issue_key" },
+  { part: "roles", label: "Roles", reads: "grantr:define_role" },
+  { part: "grants", label: "Grants", reads: "grantr:grant" },
 ] as const;
 
 /** The one read of grantr's checks a screen of Access makes. */
@@ -67,6 +74,48 @@ export const who = (member: Member) => `${member.id} (${KIND[member.kind]})`;
 /** Members in the order Access lists them: people first, then service principals, each by id. */
 export const byKind = (a: Member, b: Member) =>
   Number(a.kind !== "user") - Number(b.kind !== "user") || a.id.localeCompare(b.id);
+
+/** Whom a grant is to, as people read it: a member as `who` names them, a group, or a rule. */
+export function whom(grantee: Grantee): string {
+  switch (grantee.kind) {
+    case "group":
+      return `${grantee.id} (group)`;
+    case "rule":
+      return `${grantee.rule} (rule in ${grantee.workspace})`;
+    default:
+      return who(grantee);
+  }
+}
+
+/** Where a grant is, as people read it: "the tenant", "workspace ws_1", "thread t_1 in ws_1". */
+export function where(on: Resource): string {
+  if (on.kind === "tenant" || on.kind === "deployment") {
+    return `the ${on.kind}`;
+  }
+  return on.kind === "workspace"
+    ? `workspace ${on.workspace}`
+    : `${on.kind} ${on.id} in ${on.workspace}`;
+}
+
+/** A member or a group as a form names it, `kind:id`, since grantr keeps the kinds apart. */
+export const keyOf = (grantee: { readonly kind: string; readonly id: string }) =>
+  `${grantee.kind}:${grantee.id}`;
+
+/** A grantee from its `kind:id`, or null where it names none of `kinds`, or no id. */
+export function fromKey<K extends "user" | "service_principal" | "group">(
+  key: string,
+  kinds: readonly K[],
+): Keyed<K> | null {
+  const at = key.indexOf(":");
+  const kind = kinds.find((one) => one === key.slice(0, at));
+  const id = key.slice(at + 1);
+  return at < 0 || kind === undefined || id === "" ? null : keyed(kind, id);
+}
+
+/** A kind and an id, one kind at a time, so a union of kinds narrows as grantr's types do. */
+type Keyed<K extends string> = K extends unknown ? { kind: K; id: string } : never;
+
+const keyed = <K extends string>(kind: K, id: string) => ({ kind, id }) as Keyed<K>;
 
 const tenantRoute = getRouteApi("/_signed/t/$tenant");
 

@@ -12,9 +12,11 @@ import { Route as SignedTTenantRouteImport } from './routes/_signed/t/$tenant'
 import { Route as SignedTTenantIndexRouteImport } from './routes/_signed/t/$tenant/index'
 import { Route as SignedTTenantAccessRouteImport } from './routes/_signed/t/$tenant/access'
 import { Route as SignedTTenantAccessIndexRouteImport } from './routes/_signed/t/$tenant/access/index'
+import { Route as SignedTTenantAccessGrantsRouteImport } from './routes/_signed/t/$tenant/access/grants'
 import { Route as SignedTTenantAccessGroupsRouteImport } from './routes/_signed/t/$tenant/access/groups'
 import { Route as SignedTTenantAccessKeysRouteImport } from './routes/_signed/t/$tenant/access/keys'
 import { Route as SignedTTenantAccessMembersRouteImport } from './routes/_signed/t/$tenant/access/members'
+import { Route as SignedTTenantAccessRolesRouteImport } from './routes/_signed/t/$tenant/access/roles'
 
 const SignedRoute = SignedRouteImport.update({
   id: '/_signed',
@@ -61,6 +63,12 @@ const SignedTTenantAccessIndexRoute =
     path: '/',
     getParentRoute: () => SignedTTenantAccessRoute,
   } as any)
+const SignedTTenantAccessGrantsRoute =
+  SignedTTenantAccessGrantsRouteImport.update({
+    id: '/grants',
+    path: '/grants',
+    getParentRoute: () => SignedTTenantAccessRoute,
+  } as any)
 const SignedTTenantAccessGroupsRoute =
   SignedTTenantAccessGroupsRouteImport.update({
     id: '/groups',
@@ -78,6 +86,12 @@ const SignedTTenantAccessMembersRoute =
     path: '/members',
     getParentRoute: () => SignedTTenantAccessRoute,
   } as any)
+const SignedTTenantAccessRolesRoute =
+  SignedTTenantAccessRolesRouteImport.update({
+    id: '/roles',
+    path: '/roles',
+    getParentRoute: () => SignedTTenantAccessRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof SignedIndexRoute
@@ -87,9 +101,11 @@ export interface FileRoutesByFullPath {
   '/deployment/': typeof SignedDeploymentIndexRoute
   '/t/$tenant/access': typeof SignedTTenantAccessRouteWithChildren
   '/t/$tenant/': typeof SignedTTenantIndexRoute
+  '/t/$tenant/access/grants': typeof SignedTTenantAccessGrantsRoute
   '/t/$tenant/access/groups': typeof SignedTTenantAccessGroupsRoute
   '/t/$tenant/access/keys': typeof SignedTTenantAccessKeysRoute
   '/t/$tenant/access/members': typeof SignedTTenantAccessMembersRoute
+  '/t/$tenant/access/roles': typeof SignedTTenantAccessRolesRoute
   '/t/$tenant/access/': typeof SignedTTenantAccessIndexRoute
 }
 export interface FileRoutesByTo {
@@ -97,9 +113,11 @@ export interface FileRoutesByTo {
   '/': typeof SignedIndexRoute
   '/deployment': typeof SignedDeploymentIndexRoute
   '/t/$tenant': typeof SignedTTenantIndexRoute
+  '/t/$tenant/access/grants': typeof SignedTTenantAccessGrantsRoute
   '/t/$tenant/access/groups': typeof SignedTTenantAccessGroupsRoute
   '/t/$tenant/access/keys': typeof SignedTTenantAccessKeysRoute
   '/t/$tenant/access/members': typeof SignedTTenantAccessMembersRoute
+  '/t/$tenant/access/roles': typeof SignedTTenantAccessRolesRoute
   '/t/$tenant/access': typeof SignedTTenantAccessIndexRoute
 }
 export interface FileRoutesById {
@@ -112,9 +130,11 @@ export interface FileRoutesById {
   '/_signed/deployment/': typeof SignedDeploymentIndexRoute
   '/_signed/t/$tenant/access': typeof SignedTTenantAccessRouteWithChildren
   '/_signed/t/$tenant/': typeof SignedTTenantIndexRoute
+  '/_signed/t/$tenant/access/grants': typeof SignedTTenantAccessGrantsRoute
   '/_signed/t/$tenant/access/groups': typeof SignedTTenantAccessGroupsRoute
   '/_signed/t/$tenant/access/keys': typeof SignedTTenantAccessKeysRoute
   '/_signed/t/$tenant/access/members': typeof SignedTTenantAccessMembersRoute
+  '/_signed/t/$tenant/access/roles': typeof SignedTTenantAccessRolesRoute
   '/_signed/t/$tenant/access/': typeof SignedTTenantAccessIndexRoute
 }
 export interface FileRouteTypes {
@@ -127,9 +147,11 @@ export interface FileRouteTypes {
     | '/deployment/'
     | '/t/$tenant/access'
     | '/t/$tenant/'
+    | '/t/$tenant/access/grants'
     | '/t/$tenant/access/groups'
     | '/t/$tenant/access/keys'
     | '/t/$tenant/access/members'
+    | '/t/$tenant/access/roles'
     | '/t/$tenant/access/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -137,9 +159,11 @@ export interface FileRouteTypes {
     | '/'
     | '/deployment'
     | '/t/$tenant'
+    | '/t/$tenant/access/grants'
     | '/t/$tenant/access/groups'
     | '/t/$tenant/access/keys'
     | '/t/$tenant/access/members'
+    | '/t/$tenant/access/roles'
     | '/t/$tenant/access'
   id:
     | '__root__'
@@ -151,9 +175,11 @@ export interface FileRouteTypes {
     | '/_signed/deployment/'
     | '/_signed/t/$tenant/access'
     | '/_signed/t/$tenant/'
+    | '/_signed/t/$tenant/access/grants'
     | '/_signed/t/$tenant/access/groups'
     | '/_signed/t/$tenant/access/keys'
     | '/_signed/t/$tenant/access/members'
+    | '/_signed/t/$tenant/access/roles'
     | '/_signed/t/$tenant/access/'
   fileRoutesById: FileRoutesById
 }
@@ -227,6 +253,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedTTenantAccessIndexRouteImport
       parentRoute: typeof SignedTTenantAccessRoute
     }
+    '/_signed/t/$tenant/access/grants': {
+      id: '/_signed/t/$tenant/access/grants'
+      path: '/grants'
+      fullPath: '/t/$tenant/access/grants'
+      preLoaderRoute: typeof SignedTTenantAccessGrantsRouteImport
+      parentRoute: typeof SignedTTenantAccessRoute
+    }
     '/_signed/t/$tenant/access/groups': {
       id: '/_signed/t/$tenant/access/groups'
       path: '/groups'
@@ -248,6 +281,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedTTenantAccessMembersRouteImport
       parentRoute: typeof SignedTTenantAccessRoute
     }
+    '/_signed/t/$tenant/access/roles': {
+      id: '/_signed/t/$tenant/access/roles'
+      path: '/roles'
+      fullPath: '/t/$tenant/access/roles'
+      preLoaderRoute: typeof SignedTTenantAccessRolesRouteImport
+      parentRoute: typeof SignedTTenantAccessRoute
+    }
   }
 }
 
@@ -263,16 +303,20 @@ const SignedDeploymentRouteWithChildren =
   SignedDeploymentRoute._addFileChildren(SignedDeploymentRouteChildren)
 
 interface SignedTTenantAccessRouteChildren {
+  SignedTTenantAccessGrantsRoute: typeof SignedTTenantAccessGrantsRoute
   SignedTTenantAccessGroupsRoute: typeof SignedTTenantAccessGroupsRoute
   SignedTTenantAccessKeysRoute: typeof SignedTTenantAccessKeysRoute
   SignedTTenantAccessMembersRoute: typeof SignedTTenantAccessMembersRoute
+  SignedTTenantAccessRolesRoute: typeof SignedTTenantAccessRolesRoute
   SignedTTenantAccessIndexRoute: typeof SignedTTenantAccessIndexRoute
 }
 
 const SignedTTenantAccessRouteChildren: SignedTTenantAccessRouteChildren = {
+  SignedTTenantAccessGrantsRoute: SignedTTenantAccessGrantsRoute,
   SignedTTenantAccessGroupsRoute: SignedTTenantAccessGroupsRoute,
   SignedTTenantAccessKeysRoute: SignedTTenantAccessKeysRoute,
   SignedTTenantAccessMembersRoute: SignedTTenantAccessMembersRoute,
+  SignedTTenantAccessRolesRoute: SignedTTenantAccessRolesRoute,
   SignedTTenantAccessIndexRoute: SignedTTenantAccessIndexRoute,
 }
 

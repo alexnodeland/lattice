@@ -13,8 +13,8 @@ variable "domain" {
   type        = string
 
   validation {
-    condition     = can(regex("^[a-z0-9.-]+$", var.domain))
-    error_message = "A domain is lowercase letters, digits, dots and hyphens."
+    condition     = can(regex("^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$", var.domain))
+    error_message = "A domain is labels of lowercase letters, digits and inner hyphens, joined by dots."
   }
 }
 
@@ -31,6 +31,30 @@ variable "vpc_id" {
 variable "subnet_ids" {
   description = "The public subnets, in two zones, the ALB lives in."
   type        = list(string)
+}
+
+variable "public_subnet_cidrs" {
+  description = "The public subnets' ranges: the only addresses GoTrue's proxy takes X-Forwarded-For from."
+  type        = list(string)
+
+  validation {
+    condition     = length(var.public_subnet_cidrs) > 0 && alltrue([for cidr in var.public_subnet_cidrs : can(cidrhost(cidr, 0))])
+    error_message = "Name each public subnet's range, in CIDR notation."
+  }
+}
+
+variable "access_logs" {
+  description = "The bucket, from data, and the prefix ELB may write the ALB's access logs under."
+  type = object({
+    bucket = string
+    prefix = string
+  })
+}
+
+variable "caddy_image" {
+  description = "Caddy's image for GoTrue's proxy, pinned as the single host's edge is."
+  type        = string
+  default     = "caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f"
 }
 
 variable "security_group_id" {

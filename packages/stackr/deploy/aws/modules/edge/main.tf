@@ -1,22 +1,23 @@
 # The edge (RFC-0004): an ALB with an ACM certificate for app.<domain> and auth.<domain>, validated
 # through Route 53. HTTP redirects to HTTPS; the application's host goes to its target group, and
 # GoTrue's to its own, at its root, with its admin API refused at the edge, as on the single host.
+# The ALB appends to the X-Forwarded-For a client sends, so GoTrue's rate limits can't trust it:
+# GoTrue's task runs a Caddy in front of it, whose configuration is here (auth-proxy.Caddyfile).
 
 locals {
+  # Each host's name, its target group's port and health check, and its rule's priority: the
+  # template's app, and GoTrue, behind its proxy.
   hosts = {
-    app  = "app.${var.domain}"
-    auth = "auth.${var.domain}"
+    app  = { name = "app.${var.domain}", port = 8000, health = "/healthz", priority = 20 }
+    auth = { name = "auth.${var.domain}", port = 9999, health = "/health", priority = 30 }
   }
-  # Each target group's port and health check: the template's app, and GoTrue.
-  targets = {
-    app  = { port = 8000, health = "/healthz" }
-    auth = { port = 9999, health = "/health" }
-  }
+  # GoTrue listens on its task's loopback, at this port, behind its proxy at its own.
+  gotrue_port = 9998
 }
 
 resource "aws_acm_certificate" "this" {
-  domain_name               = local.hosts.app
-  subject_alternative_names = [local.hosts.auth]
+  domain_name               = local.hosts.app.name
+  subject_alternative_names = [local.hosts.auth.name]
   validation_method         = "DNS"
 
   lifecycle {
@@ -28,11 +29,12 @@ resource "aws_route53_record" "validation" {
   for_each = {
     for option in aws_acm_certificate.this.domain_validation_options : option.domain_name => option
   }
-  zone_id = var.zone_id
-  name    = each.value.resource_record_name
-  type    = each.value.resource_record_type
-  records = [each.value.resource_record_value]
-  ttl     = 300
+  zone_id         = var.zone_id
+  name            = each.value.resource_record_name
+  type            = each.value.resource_record_type
+  records         = [each.value.resource_record_value]
+  ttl             = 300
+  allow_overwrite = true
 }
 
 resource "aws_acm_certificate_validation" "this" {
@@ -48,10 +50,16 @@ resource "aws_lb" "this" {
   security_groups            = [var.security_group_id]
   drop_invalid_header_fields = true
   enable_deletion_protection = var.deletion_protection
+
+  access_logs {
+    bucket  = var.access_logs.bucket
+    prefix  = var.access_logs.prefix
+    enabled = true
+  }
 }
 
 resource "aws_lb_target_group" "this" {
-  for_each    = local.targets
+  for_each    = local.hosts
   name        = "${var.name}-${each.key}"
   port        = each.value.port
   protocol    = "HTTP"
@@ -86,6 +94,12 @@ resource "aws_lb_listener" "https" {
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
   certificate_arn   = aws_acm_certificate_validation.this.certificate_arn
 
+  # The single host's headers, which Caddy sets there. The ALB can't set Referrer-Policy: GoTrue's
+  # proxy does, and the application sets its own.
+  routing_http_response_strict_transport_security_header_value = "max-age=31536000; includeSubDomains"
+  routing_http_response_x_content_type_options_header_value    = "nosniff"
+  routing_http_response_server_enabled                         = false
+
   default_action {
     type = "fixed-response"
     fixed_response {
@@ -111,7 +125,7 @@ resource "aws_lb_listener_rule" "auth_admin" {
   }
   condition {
     host_header {
-      values = [local.hosts.auth]
+      values = [local.hosts.auth.name]
     }
   }
   condition {
@@ -124,7 +138,7 @@ resource "aws_lb_listener_rule" "auth_admin" {
 resource "aws_lb_listener_rule" "host" {
   for_each     = local.hosts
   listener_arn = aws_lb_listener.https.arn
-  priority     = each.key == "app" ? 20 : 30
+  priority     = each.value.priority
 
   action {
     type             = "forward"
@@ -132,7 +146,7 @@ resource "aws_lb_listener_rule" "host" {
   }
   condition {
     host_header {
-      values = [each.value]
+      values = [each.value.name]
     }
   }
 }
@@ -140,7 +154,7 @@ resource "aws_lb_listener_rule" "host" {
 resource "aws_route53_record" "host" {
   for_each = local.hosts
   zone_id  = var.zone_id
-  name     = each.value
+  name     = each.value.name
   type     = "A"
 
   alias {

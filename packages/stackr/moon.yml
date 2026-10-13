@@ -42,10 +42,12 @@ tasks:
       - '/uv.lock'
 
   aws:
-    description: "The AWS recipe's tier 1: format, validation, TFLint, checkov, and tests against a mocked AWS"
+    description: "The AWS recipe's tier 1: format, TFLint, checkov, tests against a mocked AWS, and the templates"
     command: 'deploy/aws/check'
     inputs:
       - 'deploy/aws/**/*'
+      # GoTrue's proxy runs the single host's Caddy.
+      - 'deploy/host/compose.prod.yaml'
       - '/.prototools'
 
   check:

@@ -1,0 +1,25 @@
+# GoTrue's proxy, in GoTrue's task (stackr ADR-0032). The ALB appends to the X-Forwarded-For a
+# client sends, so its left-most address is the client's to choose. This trusts only the ALB's
+# subnets, takes the right-most address it doesn't trust, which the ALB added, and passes GoTrue
+# that one address, which its rate limits read (GOTRUE_RATE_LIMIT_HEADER), as Caddy does on the
+# single host. A caller inside the VPC, such as the application's admin commands, is its own
+# address.
+{
+	admin off
+	auto_https off
+	servers {
+		trusted_proxies static ${trusted_proxies}
+		trusted_proxies_strict
+		client_ip_headers X-Forwarded-For
+	}
+}
+
+:${port} {
+	header {
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	reverse_proxy 127.0.0.1:${gotrue_port} {
+		header_up X-Forwarded-For {client_ip}
+	}
+}

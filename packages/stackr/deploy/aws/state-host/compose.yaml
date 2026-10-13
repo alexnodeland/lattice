@@ -1,10 +1,11 @@
 # The AWS recipe's state host (RFC-0004): ClickHouse, Prometheus and prom-label-proxy, the services
 # that need a disk that outlives a task, under Compose and systemd on one EC2 instance, with their
-# data on its EBS volume at /data. Their images are compose.yaml's, which scripts/check-config holds
-# them to. Each port binds the instance's private address, STATE_HOST_ADDRESS, which only the
-# services' security group reaches. ClickHouse's users are deploy/clickhouse/users.xml's, as on one
-# machine (ADR-0031): an admin, and Langfuse's, on its own database. .env beside this file holds the
-# address and both passwords, which the instance's user data writes from Secrets Manager.
+# data on its EBS volume at /data. They are compose.yaml's but for their ports and their data's
+# paths on the host, which scripts/check-config holds them to. Each port binds the instance's
+# private address, STATE_HOST_ADDRESS, which only the services' security group reaches.
+# ClickHouse's users are deploy/clickhouse/users.xml's, as on one machine (ADR-0031): an admin, and
+# Langfuse's, on its own database. The address and both passwords are in /run/stackr/.env, which
+# the stackr-state unit writes from Secrets Manager each time it starts.
 
 name: stackr-state
 
@@ -15,15 +16,15 @@ services:
     user: "101:101"
     environment:
       CLICKHOUSE_SKIP_USER_SETUP: "1"
-      CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?the user data writes it}
-      CLICKHOUSE_LANGFUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?the user data writes it}
+      CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?stackr-state.service writes it}
+      CLICKHOUSE_LANGFUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?stackr-state.service writes it}
     volumes:
       - ../../clickhouse/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
       - /data/clickhouse:/var/lib/clickhouse
       - /data/clickhouse-logs:/var/log/clickhouse-server
     ports:
-      - ${STATE_HOST_ADDRESS:?the user data writes it}:8123:8123
-      - ${STATE_HOST_ADDRESS:?the user data writes it}:9000:9000
+      - ${STATE_HOST_ADDRESS:?stackr-state.service writes it}:8123:8123
+      - ${STATE_HOST_ADDRESS:?stackr-state.service writes it}:9000:9000
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8123/ping"]
       interval: 3s
@@ -45,7 +46,7 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - /data/prometheus:/prometheus
     ports:
-      - ${STATE_HOST_ADDRESS:?the user data writes it}:9090:9090
+      - ${STATE_HOST_ADDRESS:?stackr-state.service writes it}:9090:9090
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
       interval: 5s
@@ -61,6 +62,11 @@ services:
       - -insecure-listen-address=0.0.0.0:8080
       - -internal-listen-address=127.0.0.1:8081
     ports:
-      - ${STATE_HOST_ADDRESS:?the user data writes it}:9091:8080
+      - ${STATE_HOST_ADDRESS:?stackr-state.service writes it}:9091:8080
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/metrics"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
     depends_on:
       - prometheus

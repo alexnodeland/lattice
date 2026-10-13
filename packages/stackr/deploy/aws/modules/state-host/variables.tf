@@ -34,18 +34,33 @@ variable "namespace_id" {
 }
 
 variable "clickhouse_password_secret_arn" {
-  description = "The secret holding ClickHouse's password for Langfuse, which the instance reads at boot."
+  description = "The secret holding ClickHouse's password for Langfuse, which the instance reads each time it starts its services."
   type        = string
+
+  validation {
+    condition     = can(regex("^arn:[^:]+:secretsmanager:[^:]+:[0-9]{12}:secret:[^:]+$", var.clickhouse_password_secret_arn))
+    error_message = "A whole secret's ARN: the instance reads it whole, without a JSON key."
+  }
 }
 
 variable "clickhouse_admin_password_secret_arn" {
-  description = "The secret holding ClickHouse's admin password, for operators, which the instance reads at boot."
+  description = "The secret holding ClickHouse's admin password, for operators, which the instance reads each time it starts its services."
   type        = string
+
+  validation {
+    condition     = can(regex("^arn:[^:]+:secretsmanager:[^:]+:[0-9]{12}:secret:[^:]+$", var.clickhouse_admin_password_secret_arn))
+    error_message = "A whole secret's ARN: the instance reads it whole, without a JSON key."
+  }
 }
 
-variable "lattice_ref" {
-  description = "The tag of lattice the instance checks out: deploy/aws/state-host is its Compose."
+variable "lattice_commit" {
+  description = "The commit of lattice the instance checks out, by its full SHA, which can't move as a tag can: deploy/aws/state-host is its Compose."
   type        = string
+
+  validation {
+    condition     = can(regex("^[0-9a-f]{40}$", var.lattice_commit))
+    error_message = "A commit's full SHA: 40 lowercase hexadecimal digits."
+  }
 }
 
 variable "instance_type" {
@@ -71,10 +86,39 @@ variable "snapshot_retention" {
   }
 }
 
-variable "ami_parameter" {
-  description = "The SSM parameter that names the AMI: Ubuntu 24.04, arm64, which comes with the SSM agent."
+variable "ami_id" {
+  description = <<-EOT
+    The AMI: Ubuntu 24.04, arm64, which comes with the SSM agent, in the deployment's region. It is
+    pinned, since a new AMI replaces the instance: bump it on purpose, to the ID that SSM's
+    /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id names.
+  EOT
   type        = string
-  default     = "/aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id"
+
+  validation {
+    condition     = can(regex("^ami-[0-9a-f]{8}([0-9a-f]{9})?$", var.ami_id))
+    error_message = "An AMI's ID: ami- and 8 or 17 hexadecimal digits."
+  }
+}
+
+variable "final_snapshot" {
+  description = "Whether destroying the data volume snapshots it first: off only where nothing is kept."
+  type        = bool
+  default     = true
+}
+
+variable "service_ports" {
+  description = <<-EOT
+    The services' ports the state host reaches: Prometheus's scrapes (the Collector's metrics,
+    Tempo, Loki, Pyroscope and Grafana), and the admin UIs operators forward to through it
+    (Grafana and Langfuse on 3000, LiteLLM on 4000).
+  EOT
+  type        = set(number)
+  default     = [8888, 3200, 3100, 4040, 3000, 4000]
+
+  validation {
+    condition     = alltrue([for port in var.service_ports : port > 0 && port < 65536 && !contains([22, 3389], port)])
+    error_message = "Service ports are 1 to 65535, and never SSH's or RDP's."
+  }
 }
 
 variable "aws_cli_image" {

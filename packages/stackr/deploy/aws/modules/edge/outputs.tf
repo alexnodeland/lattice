@@ -5,7 +5,24 @@ output "target_groups" {
 
 output "hosts" {
   description = "The names users reach: app.<domain> and auth.<domain>."
-  value       = local.hosts
+  value       = { for key, host in local.hosts : key => host.name }
+}
+
+output "auth_proxy" {
+  description = <<-EOT
+    GoTrue's proxy, for its task: Caddy's image, and its configuration, which trusts only the ALB's
+    subnets for X-Forwarded-For and passes GoTrue the one address it found. GoTrue listens on the
+    task's loopback at `gotrue_port`.
+  EOT
+  value = {
+    image = var.caddy_image
+    caddyfile = templatefile("${path.module}/auth-proxy.Caddyfile.tftpl", {
+      port            = local.hosts.auth.port
+      gotrue_port     = local.gotrue_port
+      trusted_proxies = join(" ", var.public_subnet_cidrs)
+    })
+    gotrue_port = local.gotrue_port
+  }
 }
 
 output "alb_dns_name" {

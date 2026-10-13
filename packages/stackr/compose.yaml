@@ -118,6 +118,8 @@ services:
     image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
     profiles: [observability]
     restart: unless-stopped
+    # The image's own user, nobody, named so the state host's data directory can be given to it.
+    user: "65534:65534"
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus

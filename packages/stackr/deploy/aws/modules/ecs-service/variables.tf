@@ -39,13 +39,17 @@ variable "namespace_id" {
 }
 
 variable "container" {
-  description = "Its one container: image (by digest), port, command, environment, and secrets, each a Secrets Manager ARN, or <arn>:<json key>::."
+  description = <<-EOT
+    Its container: image (by digest), port, command, environment, and secrets, each a Secrets
+    Manager ARN, or <arn>:<json key>::; and whether its root filesystem is read-only.
+  EOT
   type = object({
-    image       = string
-    port        = optional(number)
-    command     = optional(list(string))
-    environment = optional(map(string), {})
-    secrets     = optional(map(string), {})
+    image                    = string
+    port                     = optional(number)
+    command                  = optional(list(string))
+    environment              = optional(map(string), {})
+    secrets                  = optional(map(string), {})
+    readonly_root_filesystem = optional(bool, false)
   })
 
   validation {
@@ -56,6 +60,30 @@ variable "container" {
     condition     = alltrue([for value in values(var.container.secrets) : can(regex("^arn:[^:]+:secretsmanager:[^:]+:[0-9]{12}:secret:[^:]+(:[^:]*:[^:]*:[^:]*)?$", value))])
     error_message = "A secret is a Secrets Manager ARN, or <arn>:<json key>:<version stage>:<version id>."
   }
+}
+
+variable "proxy" {
+  description = <<-EOT
+    A Caddy in front of the container, in its task, such as GoTrue's (the edge's auth_proxy): its
+    image, and its Caddyfile. It takes the container's port, which the edge and the other services
+    reach, and the container listens on the task's loopback, at a port of its own.
+  EOT
+  type = object({
+    image     = string
+    caddyfile = string
+  })
+  default = null
+
+  validation {
+    condition     = var.proxy == null || var.container.port != null
+    error_message = "A proxy takes the container's port: give the container one."
+  }
+}
+
+variable "ecr_repository_arns" {
+  description = "The ECR repositories its image comes from, which the execution role may pull from; none for a public registry."
+  type        = list(string)
+  default     = []
 }
 
 variable "size" {
@@ -83,6 +111,11 @@ variable "target_group_arn" {
   description = "The ALB target group its tasks register with, when the edge reaches it."
   type        = string
   default     = null
+
+  validation {
+    condition     = var.target_group_arn == null || (var.container.port != null && !var.one_off)
+    error_message = "A target group needs a service with a port: never a one-off task."
+  }
 }
 
 variable "task_role_policy_json" {

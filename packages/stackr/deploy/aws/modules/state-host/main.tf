@@ -4,14 +4,12 @@
 # named in the private namespace. Operators reach the admin UIs through it with SSM port
 # forwarding: it opens no port for that, and has no SSH key.
 
-data "aws_ssm_parameter" "ami" {
-  name = var.ami_parameter
-}
-
 data "aws_subnet" "this" {
   id = var.subnet_id
 }
 
+data "aws_caller_identity" "current" {}
+data "aws_partition" "current" {}
 data "aws_region" "current" {}
 
 resource "aws_iam_role" "this" {
@@ -22,10 +20,37 @@ resource "aws_iam_role" "this" {
   })
 }
 
-# SSM: Session Manager and port forwarding, without SSH.
-resource "aws_iam_role_policy_attachment" "ssm" {
-  role       = aws_iam_role.this.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+# SSM's agent: Session Manager and port forwarding, without SSH, and nothing else of SSM's, such as
+# its parameters. It registers as an instance of this account's; its channels' and messages'
+# actions can't be narrowed to a resource.
+resource "aws_iam_role_policy" "session_manager" {
+  role = aws_iam_role.this.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "ssm:UpdateInstanceInformation"
+        Resource = "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:instance/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel",
+          "ec2messages:AcknowledgeMessage",
+          "ec2messages:DeleteMessage",
+          "ec2messages:FailMessage",
+          "ec2messages:GetEndpoint",
+          "ec2messages:GetMessages",
+          "ec2messages:SendReply",
+        ]
+        Resource = "*"
+      },
+    ]
+  })
 }
 
 # Its two secrets: ClickHouse's passwords, Langfuse's and the admin's.
@@ -58,11 +83,13 @@ resource "aws_ebs_volume" "data" {
   size              = var.volume_size
   type              = "gp3"
   encrypted         = true
-  tags              = { Name = "${var.name}-state", Snapshot = "${var.name}-state" }
+  # A destroy, or a move to another zone, snapshots it first.
+  final_snapshot = var.final_snapshot
+  tags           = { Name = "${var.name}-state", Snapshot = "${var.name}-state" }
 }
 
 resource "aws_instance" "this" {
-  ami                  = data.aws_ssm_parameter.ami.value
+  ami                  = var.ami_id
   instance_type        = var.instance_type
   iam_instance_profile = aws_iam_instance_profile.this.name
   ebs_optimized        = true
@@ -72,11 +99,12 @@ resource "aws_instance" "this" {
     network_interface_id = aws_network_interface.this.id
   }
 
-  # IMDSv2 only, with a hop for the AWS CLI's container.
+  # IMDSv2 only, one hop: the AWS CLI reads the secrets on the host's network, and the services'
+  # containers, on Compose's, can't reach it.
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
-    http_put_response_hop_limit = 2
+    http_put_response_hop_limit = 1
   }
 
   root_block_device {
@@ -87,22 +115,24 @@ resource "aws_instance" "this" {
 
   user_data_replace_on_change = true
   user_data = templatefile("${path.module}/user-data.sh.tftpl", {
-    volume_id     = aws_ebs_volume.data.id
-    address       = var.private_ip
-    lattice_ref   = var.lattice_ref
-    secret_arn    = var.clickhouse_password_secret_arn
-    admin_arn     = var.clickhouse_admin_password_secret_arn
-    region        = data.aws_region.current.region
-    aws_cli_image = var.aws_cli_image
+    volume_id      = aws_ebs_volume.data.id
+    address        = var.private_ip
+    lattice_commit = var.lattice_commit
+    secret_arn     = var.clickhouse_password_secret_arn
+    admin_arn      = var.clickhouse_admin_password_secret_arn
+    region         = data.aws_region.current.region
+    aws_cli_image  = var.aws_cli_image
   })
 
   tags = { Name = "${var.name}-state-host" }
 }
 
+# Replacing the instance stops it first, so the volume is unmounted cleanly before it detaches.
 resource "aws_volume_attachment" "data" {
-  device_name = "/dev/sdf"
-  volume_id   = aws_ebs_volume.data.id
-  instance_id = aws_instance.this.id
+  device_name                    = "/dev/sdf"
+  volume_id                      = aws_ebs_volume.data.id
+  instance_id                    = aws_instance.this.id
+  stop_instance_before_detaching = true
 }
 
 # The data volume's daily snapshots.
@@ -116,7 +146,7 @@ resource "aws_iam_role" "dlm" {
 
 resource "aws_iam_role_policy_attachment" "dlm" {
   role       = aws_iam_role.dlm.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole"
+  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole"
 }
 
 resource "aws_dlm_lifecycle_policy" "this" {

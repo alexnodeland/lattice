@@ -7,6 +7,5 @@ quiet: true
 skip-check:
   # TLS ends at the ALB; it reaches the services over HTTP, inside the VPC's private subnets.
   - CKV_AWS_378
-  # WAF and the ALB's access logs come later (RFC-0004).
+  # WAF comes later (RFC-0004).
   - CKV2_AWS_28
-  - CKV_AWS_91

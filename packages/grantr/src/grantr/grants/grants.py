@@ -837,6 +837,8 @@ class Grants:
         actions = self._catalog.role(grant.role, grant.on.kind, await tx.roles(tenant))
         if actions is None:
             raise Invalid(f"{grant.role} can't be granted on a {grant.on.kind}")
+        if grant.role == RULE_ROLE and not isinstance(grant.to, RulePrincipal):
+            raise Invalid("rule is a stored rule's own role: no one else holds it")
         if isinstance(grant.to, RulePrincipal):
             if grant.on.workspace != grant.to.workspace:
                 raise Invalid(f"{grant.to} acts in its own workspace only")

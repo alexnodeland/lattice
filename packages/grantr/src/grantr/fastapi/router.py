@@ -274,8 +274,8 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
             return tenant, subject
         raise _refused(Forbidden(f"the caller isn't a member of {tenant}"))
 
-    @router.get("/catalog")
-    async def catalog(_who: Caller = current) -> CatalogView:
+    @router.get("/catalog", dependencies=[current])
+    async def catalog() -> CatalogView:
         """The built-in roles a tenant's admins grant, and what a custom role may hold.
 
         Each built-in role comes with where it may be granted. It is the deployment's; any

@@ -10,7 +10,7 @@ built-in role until the role is changed here.
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Final, Literal
+from typing import Final, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict
 
@@ -173,6 +173,10 @@ deployment role that holds in every tenant."""
 RULE_ROLE: Final = "rule"
 """The role a stored rule's principal holds in its own workspace, with no grant (ADR-0029)."""
 
+UNGRANTED: Final = frozenset({MEMBER, RULE_ROLE})
+"""Built-in roles granted within a tenant that a tenant's admins don't grant: membership comes
+with adding a member, and a stored rule holds `rule` without a grant."""
+
 
 LEVELS: Final[Mapping[ResourceKind, Level]] = {
     "deployment": "deployment",
@@ -285,11 +289,12 @@ class Catalog:
         Each built-in role granted within a tenant comes in the order of where it is granted,
         with its kinds, then custom roles' actions and kinds.
         """
-        order = list(LEVELS.values())
+        order: list[Level] = list(get_args(Level.__value__))
         named: dict[str, list[ResourceKind]] = {}
         for at, name in sorted(self.built_in, key=lambda key: (order.index(key[0]), key[1])):
-            # A role that holds nothing, such as `rule` without reflexr's catalog, isn't offered.
-            if at != "deployment" and self.built_in[at, name]:
+            # The deployment's roles are no tenant's; `member` is given by adding a member, and
+            # `rule` is a stored rule's own, held with no grant (ADR-0029): none is granted here.
+            if at != "deployment" and name not in UNGRANTED:
                 named.setdefault(name, []).extend(_kinds(at))
         return CatalogView(
             roles=tuple(

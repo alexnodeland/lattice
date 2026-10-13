@@ -29,6 +29,7 @@ from grantr.core import (
     MemberRemoved,
     Membership,
     Resource,
+    ResourceKind,
     Restricted,
     Revoked,
     Role,
@@ -869,7 +870,26 @@ async def test_the_deployments_own_tools_list_every_tenant(storage: Storage) -> 
     assert await grants.served_tenants() == ["acme", "globex"]
 
 
-async def test_grants_reads_its_catalog_as_a_tenants_roles(grants: Grants) -> None:
-    catalog = grants.catalog()
-    assert {role.name for role in catalog.roles} >= {"owner", "admin", "editor", "viewer"}
-    assert "grantr:create_tenant" not in catalog.custom_actions, "an operator's, no tenant's"
+async def test_every_role_the_catalog_offers_is_one_grant_accepts(grants: Grants) -> None:
+    """The catalog is what a tenant's admins may grant: each role, on each kind it lists."""
+    await _members(grants, BOB)
+    on: dict[ResourceKind, Resource] = {
+        "tenant": TENANT,
+        "workspace": WS,
+        "thread": THREAD,
+        "artifact": ARTIFACT,
+        "rule": Resource(kind="rule", workspace="w1", id="chat:triage"),
+    }
+    offered: list[tuple[str, ResourceKind]] = [
+        (built_in.name, kind) for built_in in grants.catalog().roles for kind in built_in.kinds
+    ]
+    assert offered
+    for name, kind in offered:
+        entry = await grants.grant("acme", name, on=on[kind], to=BOB, by=ALICE)
+        assert entry.event == Granted(grant=Grant(tenant="acme", role=name, on=on[kind], to=BOB))
+
+
+async def test_rule_is_a_stored_rules_own_role(grants: Grants) -> None:
+    await _members(grants, BOB)
+    with pytest.raises(Invalid, match="a stored rule's own role"):
+        await grants.grant("acme", "rule", on=WS, to=BOB, by=ALICE)

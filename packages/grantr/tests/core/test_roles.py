@@ -166,24 +166,14 @@ def test_portalrs_admin_reads_are_its_tenants_owners_and_admins_and_operators() 
     assert holders == {"operator"}
 
 
-def test_the_catalog_reads_as_a_tenants_roles_and_what_a_custom_one_may_hold() -> None:
+def test_the_catalog_reads_as_the_roles_a_tenants_admins_grant() -> None:
     view = CATALOG.view()
-    assert {role.name: role.kinds for role in view.roles} == {
-        "admin": ("tenant", "workspace"),
-        "member": ("tenant",),
-        "owner": ("tenant",),
-        "editor": ("workspace", "thread", "artifact", "rule"),
-        "rule": ("workspace",),
-        "viewer": ("workspace", "thread", "artifact", "rule"),
-    }, "the deployment's roles are no tenant's"
+    assert [(role.name, role.kinds) for role in view.roles] == [
+        ("admin", ("tenant", "workspace")),
+        ("owner", ("tenant",)),
+        ("editor", ("workspace", "thread", "artifact", "rule")),
+        ("viewer", ("workspace", "thread", "artifact", "rule")),
+    ], "in the order of where each is granted; no deployment role, member or rule"
     assert set(view.custom_actions) == CATALOG.built_in["workspace", "admin"]
     assert list(view.custom_actions) == sorted(view.custom_actions)
     assert view.custom_kinds == ("workspace", "thread", "artifact", "rule")
-    for role in view.roles:
-        for kind in role.kinds:
-            assert CATALOG.role(role.name, kind, {}) is not None, (role.name, kind)
-
-
-def test_a_role_that_holds_nothing_isnt_in_the_catalog_read() -> None:
-    without_reflexr = Catalog.of(ARTIFACTR).view()
-    assert "rule" not in {role.name for role in without_reflexr.roles}

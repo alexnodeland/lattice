@@ -143,8 +143,8 @@ Then(
   async ({ page, made }, role: string, workspace: string) => {
     const grant = item(page, `Workspace ${workspace}`, madeAs(made, "principal"));
     await expect(grant).toHaveCount(1);
+    // The workspace's own table holds it: the row needn't name the workspace again.
     await expect(grant).toContainText(role);
-    await expect(grant).toContainText(`workspace ${workspace}`);
   },
 );
 

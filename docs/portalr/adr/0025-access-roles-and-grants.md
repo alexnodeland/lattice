@@ -32,15 +32,17 @@ Each read takes the same action as its changes:
   - grantr replaces a role's actions whole: the last to save wins, as with a group's members.
 - **Groups and Roles share one form,** admin's `DefineSet`: create under a free name, or change from a row, with a confirmation naming what a change takes out.
 - **Grants** lists every grant in the tenant, a table per place, each under a visible heading that names it, "The tenant" or "Workspace notes": the tenant's, then each workspace's, its own before its threads', artifacts' and rules'.
+  - Under its heading, a place isn't named again: the tenant's table has no "On", and a workspace's names only its items, "thread t_1", or "the workspace". The tables' columns are laid out to the same widths, so they line up.
   - Each row, or card, is named by whom, the role and where, such as "ops (group) as viewer on thread t_1 in notes".
   - Membership is left out. grantr gives `member` by adding a member and takes it by removing one, so Members shows it.
   - Revoke shows where `grantr:revoke` is allowed, and is confirmed. Its words are "Revoke", and its accessible name the whole grant, through `ConfirmDialog`'s `name`. grantr refuses revoking a tenant's last owner, and the dialog shows that refusal.
+  - Revoke is hidden where grantr would refuse it: on owner, for whoever may not delete the tenant, and on the tenant's last owner, as grantr keeps one.
 - **A role is granted** from the catalog's built-in roles and, where they may be read, the tenant's custom roles.
   - The form starts on no role and no one, each a required choice, so nothing is granted by a click. Choosing a role chooses where again.
   - Each role is offered only on the kinds it may be granted on: a custom role on the catalog's `custom_kinds`.
   - A grant on a workspace names it, from artifactr's workspaces as suggestions or typed; a grant on an item also names the item. Each is trimmed.
   - It goes to a member or a group, chosen from the tenant's where both may be read, or typed as `kind:id`, with what may be read suggested. A rule's role isn't offered here.
-  - Granting owner or admin on the tenant is confirmed first, in a dialog naming whom it makes so: "Make olga admin of acme?".
+  - Granting owner or admin on the tenant is confirmed first, in a dialog naming whom it makes so as the form says them done: "Make olga (person) admin of acme?". It opens only once whom is chosen.
   - What was entered stays after a refusal, which the form shows.
 - **What grantr allows is asked on the tenant,** and that is exact for granting and revoking: a grant on the tenant holds on everything in it. grantr also refuses granting or revoking a role whose actions the granter doesn't hold where it is. Of the roles offered, only owner holds more than an admin, deleting the tenant among them. So owner is offered, and Revoke shown on its grants, only where `grantr:delete_tenant` is allowed.
 - **The scenarios** add, against the same application:

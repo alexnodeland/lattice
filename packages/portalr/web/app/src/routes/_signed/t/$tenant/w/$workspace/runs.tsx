@@ -94,7 +94,7 @@ function RunList({
   return (
     <>
       <div className="max-sm:hidden">
-        <Table name={{ caption }}>
+        <Table caption={caption}>
           <thead>
             <tr>
               <th scope="col">Status</th>

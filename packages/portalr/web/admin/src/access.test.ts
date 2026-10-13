@@ -57,4 +57,6 @@ test("a possessive is written as English writes it", () => {
   expect(possessive("triager")).toBe("triager's");
   expect(possessive("ops")).toBe("ops'");
   expect(possessive("reviewers")).toBe("reviewers'");
+  expect(possessive("OPS")).toBe("OPS'");
+  expect(possessive("team-1")).toBe("team-1's");
 });

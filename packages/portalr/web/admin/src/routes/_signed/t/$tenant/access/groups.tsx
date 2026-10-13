@@ -130,7 +130,7 @@ function Groups() {
           <>
             <Button
               variant="secondary"
-              aria-label={`Change ${possessive(group.name)} members`}
+              aria-label={define.words.change(group.name)}
               onClick={() => void change(group.name)}
             >
               Change members

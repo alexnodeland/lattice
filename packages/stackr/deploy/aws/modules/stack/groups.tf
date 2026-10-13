@@ -36,7 +36,7 @@ locals {
       { to = "app", port = 8000, from = ["alb"] },
       { to = "gotrue", port = 9999, from = ["alb", "app"] },
       { to = "litellm", port = 4000, from = ["app"] },
-      { to = "langfuse-web", port = 3000, from = ["app", "otel-collector"] },
+      { to = "langfuse-web", port = 3000, from = ["app", "otel-collector", "langfuse-worker"] },
       # OTLP over HTTP, from the application and LiteLLM.
       { to = "otel-collector", port = 4318, from = ["app", "litellm"] },
       # portalr, in the application, reads Tempo and Loki, and Prometheus through prom-label-proxy.

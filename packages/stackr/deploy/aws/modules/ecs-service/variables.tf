@@ -68,6 +68,18 @@ variable "container" {
   }
 }
 
+variable "wait" {
+  description = <<-EOT
+    A container in the task that must exit 0 before the service's container starts, such as one
+    that waits for another service: its image, and its command. The task stops if it fails.
+  EOT
+  type = object({
+    image   = string
+    command = list(string)
+  })
+  default = null
+}
+
 variable "proxy" {
   description = <<-EOT
     A Caddy in front of the container, in its task, such as GoTrue's (the edge's auth_proxy): its

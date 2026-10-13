@@ -13,6 +13,10 @@ that answer each other stop at reflexr's depth limit.
 Rules from chat: the notes agent drafts a rule with ``draft_rule``, and relayr's
 ``relayr:rules-from-chat`` puts it live in reflexr once a person who may accepts it
 (``chat_rules.py``).
+
+Evaluation: relayr's ``relayr:proposal-outcome`` scores each resolved proposal a rule made,
+accepted, edited or rejected, as feedback on the run that made it, which the feedback mirror
+carries to Langfuse.
 """
 
 import contextlib
@@ -30,22 +34,26 @@ from artifactr.agent import TurnContext
 from grantr import Grants, Resource, User
 {%- endif %}
 from reflexr.workspace import Action, Reaction, RunContext, with_params
+from relayr.evals import Outcomes
 from relayr.inbound import {% if access == 'grantr' %}FOLLOWER, {% endif %}Followers
 from relayr.langfuse import bridged_run, bridged_turns
 from relayr.ledger import InMemoryLedger, Ledger
 from relayr.outbound import Outbound
 from relayr.rules import ALLOWLISTS as RELAYR_ALLOWLISTS
-from relayr.rules import RULES as CHAT_RULES
 from relayr.rules import Installer, {% if access == 'grantr' %}RuleChange, RuleDrafting{% else %}RuleDrafting, anyone{% endif %}
 from relayr.sql import SqlLedger, migrate
 
 from {{ package_name }}.automation import Automation
 from {{ package_name }}.chat_rules import ALLOWLISTS as CHAT_ALLOWLISTS
-from {{ package_name }}.chat_rules import STORED_RULES, StoredAction, chat_rule_actions
+from {{ package_name }}.chat_rules import (
+    BRIDGE_RULES,
+    STORED_RULES,
+    StoredAction,
+    chat_rule_actions,
+)
 from {{ package_name }}.collaboration import Collaboration
 from {{ package_name }}.database import Database
 from {{ package_name }}.incidents import ALLOWLISTS as INCIDENT_ALLOWLISTS
-from {{ package_name }}.incidents import RULES as INCIDENT_RULES
 from {{ package_name }}.incidents import incident_actions
 from {{ package_name }}.telemetry import TelemetryHandle
 
@@ -119,9 +127,8 @@ class Bridge:
 
             return with_params(delegate, params)
 
-        rules = [*INCIDENT_RULES, *CHAT_RULES]
         return {
-            **{rule.then.action: act for rule in rules},
+            **{rule.then.action: act for rule in BRIDGE_RULES},
             # Every action rules from chat run declares its params.
             **{
                 name: stored(name, params)
@@ -156,6 +163,7 @@ class Bridge:
         self._actions = {
             **incident_actions(outbound, collaboration.workspaces),
             **installer.actions,
+            **Outcomes(collaboration.workspaces, self.ledger).actions,
         }
         self._followers = Followers(
             collaboration.workspaces,

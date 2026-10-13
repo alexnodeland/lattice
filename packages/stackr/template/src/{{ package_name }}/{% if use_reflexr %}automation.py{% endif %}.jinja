@@ -44,7 +44,6 @@ from reflexr.workspace import (
 {%- if use_relayr %}
 from relayr.events import BRIDGED
 from relayr.inbound import SOURCE
-from relayr.rules import RULES as CHAT_RULES
 {%- endif %}
 
 {% if access == 'grantr' -%}
@@ -52,13 +51,12 @@ from {{ package_name }}.access import Refused
 {% endif -%}
 from {{ package_name }}.auth import Authenticate, RequireToken, Unauthenticated
 {%- if use_relayr %}
-from {{ package_name }}.chat_rules import STORED_RULES
+from {{ package_name }}.chat_rules import BRIDGE_RULES, STORED_RULES
 {%- endif %}
 from {{ package_name }}.database import Database
 from {{ package_name }}.gateway import Guardrails, TenantKeys
 {%- if use_relayr %}
 from {{ package_name }}.incidents import EVENTS as INCIDENT_EVENTS
-from {{ package_name }}.incidents import RULES as INCIDENT_RULES
 {%- endif %}
 from {{ package_name }}.scores import Mirrors, {% if use_relayr %}OnOpen, {% endif %}opened, sync_configs
 from {{ package_name }}.settings import GatewaySettings
@@ -148,7 +146,7 @@ class Automation:
             if database
             else InMemoryStorage(),
             events={% if use_relayr %}events{% else %}EVENTS{% endif %},
-            rules={% if use_relayr %}[*RULES, *([*INCIDENT_RULES, *CHAT_RULES] if actions else [])]{% else %}RULES{% endif %},
+            rules={% if use_relayr %}[*RULES, *(BRIDGE_RULES if actions else [])]{% else %}RULES{% endif %},
             authorize=authorize,
 {%- if use_relayr %}
             publishers={"artifactr": [SOURCE]},

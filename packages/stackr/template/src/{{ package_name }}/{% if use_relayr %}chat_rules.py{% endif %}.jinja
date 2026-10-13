@@ -14,9 +14,14 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from reflexr import Rule
 from reflexr.core import StoredRules
 from reflexr.workspace import Reaction
+from relayr.evals import RULES as EVALUATION_RULES
 from relayr.outbound import Allowlist, Outbound
+from relayr.rules import RULES as CHAT_RULES
+
+from {{ package_name }}.incidents import RULES as INCIDENT_RULES
 
 
 class NotifyParams(BaseModel):
@@ -24,6 +29,9 @@ class NotifyParams(BaseModel):
 
     thread_id: str
 
+
+BRIDGE_RULES: list[Rule] = [*INCIDENT_RULES, *CHAT_RULES, *EVALUATION_RULES]
+"""The code rules the bridge brings: the example's, and relayr's rules from chat and evaluation."""
 
 STORED_RULES = StoredRules(actions={"notify": NotifyParams}, namespaces={"chat"})
 """What rules from chat may run, and the namespace they are named in."""

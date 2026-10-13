@@ -42,7 +42,7 @@ from {{ package_name }}.auth import Authenticate, RequireToken, Unauthenticated
 from {{ package_name }}.database import Database
 from {{ package_name }}.gateway import Guardrails, TenantKeys
 {%- if use_relayr %}
-from {{ package_name }}.incidents import Timeline
+from {{ package_name }}.incidents import Postmortem, Timeline
 {%- endif %}
 from {{ package_name }}.notes import Note, Rating, build_note_agent
 from {{ package_name }}.scores import Mirrors, {% if use_relayr %}OnOpen, {% endif %}opened, sync_configs
@@ -109,7 +109,7 @@ class Collaboration:
             SqlStorage(database.engine, row_level_security=database.row_level_security)
             if database
             else InMemoryStorage(),
-            types=[Note{% if use_relayr %}, Timeline, RuleDraft{% endif %}],
+            types=[Note{% if use_relayr %}, Timeline, Postmortem, RuleDraft{% endif %}],
             authorize=authorize,
             hidden=hidden,
             on_open=opened(self._mirrors.watch if self._mirrors else None{% if use_relayr %}, on_open{% endif %}),

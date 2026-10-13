@@ -41,6 +41,13 @@ tasks:
       - '/packages/grantr/src/**/*'
       - '/uv.lock'
 
+  aws:
+    description: "The AWS recipe's tier 1: format, validation, TFLint, checkov, and tests against a mocked AWS"
+    command: 'deploy/aws/check'
+    inputs:
+      - 'deploy/aws/**/*'
+      - '/.prototools'
+
   check:
     description: "Run the project's checks, as CI does"
     command: 'noop'

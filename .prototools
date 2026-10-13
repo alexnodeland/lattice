@@ -3,6 +3,14 @@
 bun = "1.4.3"
 moon = "2.5.6"
 uv = "0.12.12"
+# stackr's AWS recipe (RFC-0004), from plugins of lattice's own, which proto loads once you trust
+# this file: `proto trust .prototools`. Renovate moves these two by its custom managers.
+tofu = "1.13.1"
+tflint = "0.64.0"
+
+[plugins.tools]
+tofu = "file://./packages/stackr/deploy/aws/tools/tofu.toml"
+tflint = "file://./packages/stackr/deploy/aws/tools/tflint.toml"
 
 # Only this file chooses proto's tools: uv owns Python, from .python-version.
 [settings]

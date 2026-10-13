@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Tier 1 of the AWS recipe's checks (RFC-0004): everything that needs neither AWS nor Floci.
+#
+# Usage: deploy/aws/check   (OpenTofu and TFLint from lattice's .prototools; uv for checkov)
+#
+# OpenTofu's format; TFLint with AWS's ruleset; checkov over each module, with the skips and their
+# reasons in that module's .checkov.yaml; and the modules' tests, against a mocked AWS (tests/),
+# which validate each module as they plan it, with the providers the committed lock file names.
+# The providers download once, into TF_PLUGIN_CACHE_DIR. TFLint fetches its AWS ruleset from
+# GitHub, with GITHUB_TOKEN when it is set.
+
+set -euo pipefail
+cd "$(dirname "$0")"
+
+export TF_PLUGIN_CACHE_DIR=${TF_PLUGIN_CACHE_DIR:-$HOME/.terraform.d/plugin-cache}
+mkdir -p "$TF_PLUGIN_CACHE_DIR"
+# checkov, and everything it depends on as it was on this date, so a new release of a dependency
+# changes nothing until both move, by hand, together.
+CHECKOV_VERSION=3.3.27
+CHECKOV_RESOLVED_BEFORE=2026-10-12
+status=0
+step() { printf '\n==> %s\n' "$*"; }
+fail() {
+  echo "FAIL: $*" >&2
+  status=1
+}
+step "Format"
+tofu fmt -check -recursive -diff . || fail "tofu fmt: run tofu fmt -recursive deploy/aws"
+
+step "The providers, as the lock file names them"
+tofu init -backend=false -input=false -lockfile=readonly >/dev/null || fail "tofu init: the lock file"
+
+step "TFLint"
+tflint --init --config "$PWD/.tflint.hcl" >/dev/null
+tflint --recursive --config "$PWD/.tflint.hcl" || fail "tflint"
+
+step "checkov, each module with its own skips"
+for module in modules/*/; do
+  if uvx --quiet --exclude-newer "$CHECKOV_RESOLVED_BEFORE" "checkov==$CHECKOV_VERSION" \
+    -d "$module" --config-file "$module.checkov.yaml"; then
+    echo "ok: $module"
+  else
+    fail "checkov: $module"
+  fi
+done
+
+step "Tests, against a mocked AWS"
+tofu test -no-color || fail "tofu test"
+
+exit $status

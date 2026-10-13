@@ -234,9 +234,7 @@ test("an artifactr event makes stale the reads it changes", () => {
 });
 
 test("reflexr's rule events make its rules stale, its run events its runs, and ticks its schedules", () => {
-  expect(stale.reflexr("acme", "ws_1", reflexrFrame("reflexr:rule_installed"))).toEqual([
-    keys.reflexr.rules("acme", "ws_1"),
-  ]);
+  expect(stale.reflexr("acme", "ws_1", reflexrFrame("reflexr:feedback_given"))).toEqual([]);
   expect(
     stale.reflexr("acme", "ws_1", reflexrFrame("reflexr:rule_archived", { rule: "tickets:echo" })),
   ).toEqual([

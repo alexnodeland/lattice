@@ -6,6 +6,12 @@ variables {
   name = "stackr"
   generated = {
     redis-auth-token = {}
+    litellm-master-key = {
+      template = "sk-{password}"
+    }
+    langfuse-encryption-key = {
+      template = "{password_sha256}"
+    }
     litellm-database = {
       keys = {
         password = "{password}"
@@ -69,6 +75,28 @@ run "secrets_refuse_a_short_password" {
   }
   variables {
     generated = { short = { length = 8 } }
+  }
+  expect_failures = [var.generated]
+}
+
+run "secrets_refuse_a_template_without_the_password" {
+  command = plan
+  module {
+    source = "./modules/secrets"
+  }
+  variables {
+    generated = { constant = { keys = { url = "postgresql://db:5432/x" } } }
+  }
+  expect_failures = [var.generated]
+}
+
+run "secrets_refuse_a_template_with_keys" {
+  command = plan
+  module {
+    source = "./modules/secrets"
+  }
+  variables {
+    generated = { both = { template = "sk-{password}", keys = { key = "{password}" } } }
   }
   expect_failures = [var.generated]
 }

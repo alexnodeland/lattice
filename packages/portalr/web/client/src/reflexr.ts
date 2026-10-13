@@ -2,15 +2,23 @@
  * reflexr's workspace protocol: a workspace's stored rules and runs, as reflexr's own events
  * build them, and the feedback on its runs.
  *
- * reflexr's schema types an event as open, `{type, ...}`, since the application's events share
- * the log with reflexr's own. The reducer has one handler for each of reflexr's run and rule
- * events, by name, and reads their fields as JSON; every other event changes nothing here. Once
- * reflexr's schema names its own events (lattice#83), this reducer is typed like artifactr's.
+ * The reducer has one handler for every event of reflexr's own that the protocol's schema names,
+ * which the compiler checks; the application's events, and any this version doesn't know, are
+ * kept by the log and change nothing here.
  */
 
 import type { Feedback } from "./feedback";
 import type * as v1 from "./generated/reflexr.v1";
 import type { Classified, Protocol, Stream } from "./stream";
+
+/** reflexr's own events, which this version of the protocol names: those whose `type` is a literal. */
+export type Known = v1.LoggedEvent extends infer E
+  ? E extends { type: infer T }
+    ? string extends T
+      ? never
+      : E
+    : never
+  : never;
 
 export interface Run {
   readonly id: string;
@@ -45,22 +53,13 @@ export interface Workspace {
   readonly runs: Readonly<Record<string, Run>>;
 }
 
-type Event = v1.EventFrame["event"];
-type Handler = (state: Workspace, event: Event, envelope: v1.EventFrame) => Workspace;
-
-function text(event: Event, field: string): string {
-  const value = event[field];
-  return typeof value === "string" ? value : "";
-}
-
-function count(event: Event, field: string): number {
-  const value = event[field];
-  return typeof value === "number" ? value : 0;
-}
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+type Handlers = {
+  readonly [T in Known["type"]]: (
+    state: Workspace,
+    event: Extract<Known, { type: T }>,
+    envelope: v1.EventFrame,
+  ) => Workspace;
+};
 
 function withRun(state: Workspace, id: string, change: Partial<Run>): Workspace {
   const run: Run = state.runs[id] ?? {
@@ -80,71 +79,76 @@ function withRule(state: Workspace, name: string, change: Partial<Rule>): Worksp
   return { ...state, rules: { ...state.rules, [name]: { ...rule, ...change } } };
 }
 
-function ended(status: Run["status"]): Handler {
-  return (state, event) => withRun(state, text(event, "run_id"), { status });
+function ended(status: Run["status"]) {
+  return (state: Workspace, event: { readonly run_id: string }): Workspace =>
+    withRun(state, event.run_id, { status });
 }
 
 function ignore(state: Workspace): Workspace {
   return state;
 }
 
-const handlers: Readonly<Record<string, Handler>> = {
+const handlers: Handlers = {
   "reflexr:rule_installed": (state, event) =>
-    withRule(state, text(event, "rule"), { version: count(event, "version"), archived: false }),
+    withRule(state, event.rule, { version: event.version, archived: false }),
   "reflexr:rule_archived": (state, event) =>
-    withRule(state, text(event, "rule"), { version: count(event, "version"), archived: true }),
-  "reflexr:rule_fired": (state, event) => {
-    const name = text(event, "rule");
-    return withRule(state, name, { firings: (state.rules[name]?.firings ?? 0) + 1 });
-  },
-  "reflexr:run_started": (state, event, envelope) => {
-    const id = text(event, "run_id");
-    return withRun(state, id, {
-      rule: text(event, "rule"),
+    withRule(state, event.rule, { version: event.version, archived: true }),
+  "reflexr:rule_fired": (state, event) =>
+    withRule(state, event.rule, { firings: (state.rules[event.rule]?.firings ?? 0) + 1 }),
+  "reflexr:run_started": (state, event, envelope) =>
+    withRun(state, event.run_id, {
+      rule: event.rule,
       status: "running",
-      attempt: count(event, "attempt"),
+      attempt: event.attempt,
       // Its first attempt's `seq`: a later attempt doesn't make the run newer.
-      started: state.runs[id]?.started || envelope.seq,
-    });
-  },
-  "reflexr:run_retrying": (state, event) =>
-    withRun(state, text(event, "run_id"), {
-      status: "retrying",
-      attempt: count(event, "attempt"),
+      started: state.runs[event.run_id]?.started || envelope.seq,
     }),
-  "reflexr:run_requeued": (state, event) => {
-    const id = text(event, "run_id");
-    return withRun(state, id, { status: "pending", retries: (state.runs[id]?.retries ?? 0) + 1 });
-  },
+  "reflexr:run_retrying": (state, event) =>
+    withRun(state, event.run_id, { status: "retrying", attempt: event.attempt }),
+  "reflexr:run_requeued": (state, event) =>
+    withRun(state, event.run_id, {
+      status: "pending",
+      retries: (state.runs[event.run_id]?.retries ?? 0) + 1,
+    }),
   "reflexr:run_succeeded": ended("succeeded"),
   "reflexr:run_dead_lettered": ended("dead_lettered"),
   "reflexr:run_cancelled": ended("cancelled"),
   "reflexr:run_skipped": ended("skipped"),
-  // Facts the store doesn't show: a rule's errors, resets and progress, ticks and feedback.
+  // Facts the store doesn't show: a rule's errors, resets and progress, and ticks.
   "reflexr:rule_errored": ignore,
   "reflexr:rule_reset": ignore,
   "reflexr:run_progressed": ignore,
   "reflexr:tick": ignore,
   "reflexr:feedback_given": (state, event, envelope) => {
-    const { target, value } = event;
-    const run =
-      isRecord(target) && target.kind === "run" ? state.runs[String(target.run_id)] : null;
+    const { target } = event;
+    const run = target.kind === "run" ? state.runs[target.run_id] : null;
     if (!run) {
       return state; // a firing's or a chain's, or a run before what the store read
     }
-    const feedback = {
-      actor: envelope.actor,
-      type: text(event, "feedback_type"),
-      value: isRecord(value) ? value : {},
-    };
+    const feedback = { actor: envelope.actor, type: event.feedback_type, value: event.value };
     return withRun(state, run.id, { feedback: [...run.feedback, feedback] });
   },
 };
 
+/** Whether the event is one of reflexr's own that this version knows. */
+export function isKnown(event: v1.LoggedEvent): event is Known {
+  return Object.hasOwn(handlers, event.type);
+}
+
 /** The state after one event. */
 export function apply(state: Workspace, envelope: v1.EventFrame): Workspace {
-  const handler = handlers[envelope.event.type];
-  return handler ? handler(state, envelope.event, envelope) : state;
+  const { event } = envelope;
+  if (!isKnown(event)) {
+    return state;
+  }
+  // A correlated union: `handlers[event.type]` takes this very event, which the compiler can't
+  // follow through the lookup.
+  const handler = handlers[event.type] as (
+    state: Workspace,
+    event: Known,
+    envelope: v1.EventFrame,
+  ) => Workspace;
+  return handler(state, event, envelope);
 }
 
 function classify(frame: v1.ServerFrame): Classified<v1.ServerFrame, v1.CommandResult> {

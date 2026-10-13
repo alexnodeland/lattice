@@ -28,7 +28,8 @@ but for their ports and their data's paths on the host: the same images, users,
 commands, health checks, settings and mount points. Its Prometheus
 configuration is deploy/prometheus's, with the services' names in the private
 namespace in place of Compose's. GoTrue's proxy, the edge's caddy_image, is the
-single host's Caddy.
+single host's Caddy, and the images the stack module runs as they are, such as
+GoTrue's and Langfuse's, are compose.yaml's.
 """
 
 from __future__ import annotations
@@ -242,6 +243,7 @@ NAMESPACE = "stackr.internal"
 # paths on the host differ.
 STATE_HOST_KEYS = ("image", "user", "command", "entrypoint", "healthcheck")
 EDGE = ROOT / "deploy" / "aws" / "modules" / "edge" / "variables.tf"
+STACK = ROOT / "deploy" / "aws" / "modules" / "stack" / "locals.tf"
 HOST_OVERLAY = ROOT / "deploy" / "host" / "compose.prod.yaml"
 
 
@@ -286,9 +288,14 @@ def check_aws() -> list[str]:
     caddy = found[1] if found else "(none in deploy/host/compose.prod.yaml)"
     if f'"{caddy}"' not in EDGE.read_text():
         problems.append(f"the edge's caddy_image isn't the single host's Caddy, {caddy}")
+    images = {service["image"] for service in stack.values() if "image" in service}
+    for image in re.findall(r'"([^"\s]+@sha256:[0-9a-f]{64})"', STACK.read_text()):
+        if image not in images:
+            problems.append(f"deploy/aws/modules/stack runs {image}, which compose.yaml doesn't")
     if not problems:
         print(f"ok: the state host runs {', '.join(state)} as compose.yaml does")
         print("ok: GoTrue's proxy runs the single host's Caddy")
+        print("ok: the stack runs the upstream images compose.yaml pins")
     return problems
 
 

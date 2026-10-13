@@ -155,6 +155,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{workspace_id}/rules/{rule}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Rule History
+         * @description Return a stored rule's versions, oldest first: its install and archive facts.
+         *
+         *     An archived rule keeps its history, and a rule never stored has none.
+         */
+        get: operations["get_rule_history_workspaces__workspace_id__rules__rule__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{workspace_id}/runs": {
         parameters: {
             query?: never;
@@ -492,11 +514,7 @@ export interface components {
             /** Correlation Id */
             correlation_id: string;
             /** Event */
-            event: {
-                type: string;
-            } & {
-                [key: string]: unknown;
-            };
+            event: components["schemas"]["_LoggedEvent"];
             id: components["schemas"]["EventId"];
             /** Seq */
             seq: number;
@@ -564,6 +582,21 @@ export interface components {
             /** Name */
             name?: string | null;
             on_behalf_of?: components["schemas"]["UserActor"] | null;
+        };
+        /**
+         * FeedbackGiven
+         * @description A person or an evaluator judged a run, a firing or a causal chain.
+         */
+        FeedbackGiven: {
+            /** Feedback Type */
+            feedback_type: string;
+            target: components["schemas"]["FeedbackTarget"];
+            /** @constant */
+            type: "reflexr:feedback_given";
+            /** Value */
+            value: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
         };
         FeedbackTarget: components["schemas"]["RunTarget"] | components["schemas"]["FiringTarget"] | components["schemas"]["ChainTarget"];
         /**
@@ -696,11 +729,7 @@ export interface components {
             /** Correlation Id */
             correlation_id?: string | null;
             /** Event */
-            event: {
-                type: string;
-            } & {
-                [key: string]: unknown;
-            };
+            event: components["schemas"]["_LoggedEvent"];
             id?: components["schemas"]["EventId"] | null;
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -724,11 +753,7 @@ export interface components {
          */
         PublishItem: {
             /** Event */
-            event: {
-                type: string;
-            } & {
-                [key: string]: unknown;
-            };
+            event: components["schemas"]["_LoggedEvent"];
             id?: components["schemas"]["EventId"] | null;
         };
         /**
@@ -958,6 +983,73 @@ export interface components {
             timeout?: string | null;
             when: components["schemas"]["Condition-Output"];
         };
+        /**
+         * RuleArchived
+         * @description A stored rule was archived, and its unfinished runs cancelled.
+         */
+        RuleArchived: {
+            /** Cancelled */
+            cancelled: number;
+            /** Reason */
+            reason?: string | null;
+            rule: components["schemas"]["RuleName"];
+            /** @constant */
+            type: "reflexr:rule_archived";
+            /** Version */
+            version: number;
+        };
+        /**
+         * RuleErrored
+         * @description A rule could not evaluate one envelope; it is dead-lettered for that rule alone.
+         */
+        RuleErrored: {
+            /** Error */
+            error: string;
+            rule: components["schemas"]["RuleName"];
+            /** Seq */
+            seq: number;
+            /** @constant */
+            type: "reflexr:rule_errored";
+        };
+        /**
+         * RuleFired
+         * @description A rule's condition held for one scope; a run of its action was created.
+         */
+        RuleFired: {
+            firing_id: components["schemas"]["FiringId"];
+            /** Matched */
+            matched: number[];
+            rule: components["schemas"]["RuleName"];
+            /** Scope */
+            scope: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            scope_key: components["schemas"]["ScopeKey"];
+            /** @constant */
+            type: "reflexr:rule_fired";
+        };
+        /**
+         * RuleInstalled
+         * @description A stored rule was installed or updated: its new version, whole, and where it came from.
+         *
+         *     The facts are a stored rule's history: the version that fired a run is the latest one
+         *     before its firing.
+         */
+        RuleInstalled: {
+            /** Provenance */
+            provenance: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            rule: components["schemas"]["RuleName"];
+            /** Spec */
+            spec: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            /** @constant */
+            type: "reflexr:rule_installed";
+            /** Version */
+            version: number;
+        };
         RuleName: string;
         "RuleName_a-z__a-z0-9____a-z0-9___-_____": string;
         /**
@@ -1005,6 +1097,29 @@ export interface components {
              * @default 0
              */
             silent_through: number;
+        };
+        /**
+         * RuleReset
+         * @description A rule's state was reset, because its definition changed or it was replayed.
+         */
+        RuleReset: {
+            /** From Seq */
+            from_seq: number;
+            /** Generation */
+            generation: number;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "changed" | "replayed";
+            rule: components["schemas"]["RuleName"];
+            /**
+             * Silent Through
+             * @default 0
+             */
+            silent_through: number;
+            /** @constant */
+            type: "reflexr:rule_reset";
         };
         /**
          * RuleStatus
@@ -1119,6 +1234,34 @@ export interface components {
              */
             updated_at: string;
         };
+        /**
+         * RunCancelled
+         * @description A run was cancelled.
+         */
+        RunCancelled: {
+            /** Reason */
+            reason?: string | null;
+            rule: components["schemas"]["RuleName"];
+            run_id: components["schemas"]["RunId"];
+            /** @constant */
+            type: "reflexr:run_cancelled";
+        };
+        /**
+         * RunDeadLettered
+         * @description A run exhausted its retries, or failed in a way retrying cannot fix.
+         */
+        RunDeadLettered: {
+            /** Attempts */
+            attempts: number;
+            /** Error */
+            error: string;
+            /** Reason */
+            reason?: string | null;
+            rule: components["schemas"]["RuleName"];
+            run_id: components["schemas"]["RunId"];
+            /** @constant */
+            type: "reflexr:run_dead_lettered";
+        };
         RunId: string;
         /**
          * RunOutcome
@@ -1131,6 +1274,92 @@ export interface components {
              * @enum {string}
              */
             type: "run";
+        };
+        /**
+         * RunProgressed
+         * @description A graph run completed a step and saved a checkpoint.
+         */
+        RunProgressed: {
+            rule: components["schemas"]["RuleName"];
+            run_id: components["schemas"]["RunId"];
+            /** Step */
+            step: string;
+            /** @constant */
+            type: "reflexr:run_progressed";
+        };
+        /**
+         * RunRequeued
+         * @description Someone made a run runnable again. The envelope's actor records who.
+         */
+        RunRequeued: {
+            rule: components["schemas"]["RuleName"];
+            run_id: components["schemas"]["RunId"];
+            /** @constant */
+            type: "reflexr:run_requeued";
+        };
+        /**
+         * RunRetrying
+         * @description An attempt failed, and the run will be tried again.
+         */
+        RunRetrying: {
+            /** Attempt */
+            attempt: number;
+            /** Error */
+            error: string;
+            /**
+             * Next Attempt At
+             * Format: date-time
+             */
+            next_attempt_at: string;
+            /** Reason */
+            reason?: string | null;
+            rule: components["schemas"]["RuleName"];
+            run_id: components["schemas"]["RunId"];
+            /** @constant */
+            type: "reflexr:run_retrying";
+        };
+        /**
+         * RunSkipped
+         * @description A run was skipped without completing, unblocking its scope.
+         */
+        RunSkipped: {
+            /** Reason */
+            reason?: string | null;
+            rule: components["schemas"]["RuleName"];
+            run_id: components["schemas"]["RunId"];
+            /** @constant */
+            type: "reflexr:run_skipped";
+        };
+        /**
+         * RunStarted
+         * @description An attempt of a run began.
+         */
+        RunStarted: {
+            /** Attempt */
+            attempt: number;
+            rule: components["schemas"]["RuleName"];
+            run_id: components["schemas"]["RunId"];
+            /**
+             * Scope
+             * @default {}
+             */
+            scope: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            scope_key: components["schemas"]["ScopeKey"];
+            /** @constant */
+            type: "reflexr:run_started";
+        };
+        /**
+         * RunSucceeded
+         * @description A run finished.
+         */
+        RunSucceeded: {
+            output?: components["schemas"]["JsonValue"];
+            rule: components["schemas"]["RuleName"];
+            run_id: components["schemas"]["RunId"];
+            /** @constant */
+            type: "reflexr:run_succeeded";
         };
         /**
          * RunTarget
@@ -1308,6 +1537,21 @@ export interface components {
              */
             per: string;
         };
+        /**
+         * Tick
+         * @description A schedule's tick. Ticks also move rules' clocks forward in quiet workspaces.
+         */
+        Tick: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Schedule */
+            schedule: string;
+            /** @constant */
+            type: "reflexr:tick";
+        };
         TraceId: string;
         /**
          * UpdateRule
@@ -1384,6 +1628,20 @@ export interface components {
             rule: components["schemas"]["Rule-Output"];
             /** Version */
             version?: number | null;
+        };
+        /** LoggedEvent */
+        _LoggedEvent: components["schemas"]["RuleFired"] | components["schemas"]["RuleErrored"] | components["schemas"]["RuleReset"] | components["schemas"]["RuleInstalled"] | components["schemas"]["RuleArchived"] | components["schemas"]["RunStarted"] | components["schemas"]["RunProgressed"] | components["schemas"]["RunRetrying"] | components["schemas"]["RunSucceeded"] | components["schemas"]["RunDeadLettered"] | components["schemas"]["RunCancelled"] | components["schemas"]["RunRequeued"] | components["schemas"]["RunSkipped"] | components["schemas"]["FeedbackGiven"] | components["schemas"]["Tick"] | components["schemas"]["_OtherEvent"];
+        /**
+         * OtherEvent
+         * @description An event of the application's, or one this version doesn't know, in JSON Schema only.
+         *
+         *     Events are validated through the registry, by their ``type``; this only describes the wire.
+         */
+        _OtherEvent: {
+            /** Type */
+            type: string;
+        } & {
+            [key: string]: unknown;
         };
     };
     responses: never;
@@ -1957,6 +2215,83 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspaceRule"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    get_rule_history_workspaces__workspace_id__rules__rule__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope"][];
                 };
             };
             /** @description Refused */

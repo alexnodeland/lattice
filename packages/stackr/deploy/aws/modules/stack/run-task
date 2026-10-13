@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Runs one of the stack's one-off tasks to its end, for OpenTofu's local-exec (one-offs.tf), with
+# the AWS CLI where OpenTofu runs: AWS's, or Floci's through AWS_ENDPOINT_URL. Fails when ECS
+# can't place the task, or the task fails, with its exit code and where its logs are. A task that
+# can't start for want of its secrets or image (ResourceInitializationError), as when IAM hasn't
+# yet propagated a new role's policy, is run again, a few times.
+#
+# Environment: CLUSTER, TASK_DEFINITION, SUBNETS and SECURITY_GROUPS (comma-separated), AWS_REGION,
+# and the credentials the provider uses.
+
+set -euo pipefail
+attempts=4
+# How long to wait for a task to stop: 30 minutes, the CLI's waiter's 10 at a time.
+waits=3
+
+describe() {
+  aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$1" --query "tasks[0].$2" --output text
+}
+
+for attempt in $(seq 1 "$attempts"); do
+  # The task's ARN, or ECS's reasons for not placing it.
+  placed=$(aws ecs run-task --cluster "$CLUSTER" --task-definition "$TASK_DEFINITION" \
+    --launch-type FARGATE \
+    --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SECURITY_GROUPS],assignPublicIp=DISABLED}" \
+    --query "[tasks[0].taskArn || 'none', join(', ', failures[].reason) || '']" --output text)
+  read -r task failures <<<"$placed"
+  if [[ $task == none || -n $failures ]]; then
+    echo "run-task: ECS couldn't place $TASK_DEFINITION: ${failures:-no task}" >&2
+    exit 1
+  fi
+  echo "run-task: $TASK_DEFINITION as $task (attempt $attempt of $attempts)"
+
+  for wait in $(seq 1 "$waits"); do
+    if aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$task"; then
+      break
+    fi
+    if [[ $wait == "$waits" ]]; then
+      echo "run-task: $task hasn't stopped in 30 minutes" >&2
+      exit 1
+    fi
+  done
+
+  code=$(describe "$task" 'containers[0].exitCode')
+  reason=$(describe "$task" stoppedReason)
+  if [[ $code == 0 ]]; then
+    echo "run-task: $task ended with 0"
+    exit 0
+  fi
+  if [[ $reason == ResourceInitializationError* && $attempt != "$attempts" ]]; then
+    echo "run-task: $task couldn't start ($reason); trying again" >&2
+    sleep $((attempt * 15))
+    continue
+  fi
+  echo "run-task: $task ended with $code ($reason); its logs are in CloudWatch Logs" >&2
+  exit 1
+done

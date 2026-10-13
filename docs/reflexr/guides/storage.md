@@ -110,7 +110,7 @@ The storage does not own the engine: dispose of it when the application stops, w
     ```
 
 - **Records are JSON.** Envelopes, runs, rule progress, scope states and dead letters are stored as the JSON of their Pydantic models, and a stored rule as the JSON of its rule and its provenance, beside the columns that queries filter and order by. An event whose type the process does not know comes back as an `UnknownEvent`. Adding a field with a default to an event type needs no migration.
-- **Reads of the log filter in the database.** An event's type has a column of its own, indexed with its workspace and `seq`, so reading some types reads only their envelopes, and a read of the last so many reads the log backwards from the end.
+- **Reads of the log filter in the database.** An event's type has a column of its own, indexed with its workspace and `seq`, so reading some types reads only their envelopes, and a read of the last so many reads the log backwards from the end. A stored rule's install and archive facts also name the rule in a column, indexed for those rows alone, so its history is one range ([ADR-0063](../adr/0063-a-stored-rules-history.md)).
 - **Timestamps in columns are UTC.** They are stored and read back in UTC, because SQLite compares timestamps as text. Timestamps inside the JSON round-trip exactly as given.
 - **Leases are rows,** taken with a conditional `UPDATE` or else an `INSERT`, and they expire by the storage's clock. `SqlStorage(engine, clock=...)` takes a clock, as `InMemoryStorage` does.
 - **Cursors are rows,** each locked while a save compares it, so the furthest save wins.

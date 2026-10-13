@@ -39,9 +39,11 @@ tflint --init --config "$PWD/.tflint.hcl" >/dev/null
 tflint --recursive --config "$PWD/.tflint.hcl" || fail "tflint"
 
 step "checkov, each module with its own skips"
+# Each module's own files: with the directory, checkov would follow stack's calls into the other
+# modules, and report their findings again without their skips.
 for module in modules/*/; do
   if uvx --quiet --exclude-newer "$CHECKOV_RESOLVED_BEFORE" "checkov==$CHECKOV_VERSION" \
-    -d "$module" --config-file "$module.checkov.yaml"; then
+    --file "$module"*.tf --config-file "$module.checkov.yaml"; then
     echo "ok: $module"
   else
     fail "checkov: $module"

@@ -71,11 +71,21 @@ resource "aws_iam_instance_profile" "this" {
   role = aws_iam_role.this.name
 }
 
+# Its address, kept from the subnet's own assignments, so no task takes it while the instance is
+# being replaced.
+resource "aws_ec2_subnet_cidr_reservation" "this" {
+  subnet_id        = var.subnet_id
+  cidr_block       = "${var.private_ip}/32"
+  reservation_type = "explicit"
+  description      = "${var.name} state host"
+}
+
 resource "aws_network_interface" "this" {
   subnet_id       = var.subnet_id
   private_ips     = [var.private_ip]
   security_groups = [aws_security_group.this.id]
   tags            = { Name = "${var.name}-state-host" }
+  depends_on      = [aws_ec2_subnet_cidr_reservation.this]
 }
 
 resource "aws_ebs_volume" "data" {

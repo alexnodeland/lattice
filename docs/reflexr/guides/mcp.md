@@ -80,6 +80,7 @@ The server's instructions tell the client what it is talking to: event logs, one
 | `list_rules()` | The rules registered in code, which every workspace evaluates, as JSON. They are the application's, the same for every tenant, so every client sees them all ([Multi-tenancy and security](security.md#tenants-and-workspaces)). A workspace's stored rules are not among them. |
 | `rule_status(workspace_id)` | Each of the workspace's rules, code rules first, as `GET /v1/workspaces/{workspace_id}/rules` lists them: whether it is a code or a stored rule, a stored rule's version, whether it is enabled, its cursor, how far it is behind the log, its generation and its number of dead letters. A rule that has not evaluated the workspace yet is at cursor 0. |
 | `get_rule(workspace_id, rule)` | One of the workspace's rules, as JSON, as `GET /v1/workspaces/{workspace_id}/rules/{rule}` returns it: its definition, its origin, and a stored rule's version and provenance |
+| `rule_history(workspace_id, rule)` | A stored rule's versions, oldest first, as JSON lines: its install and archive facts, as `GET /v1/workspaces/{workspace_id}/rules/{rule}/history` returns them. An archived rule keeps its history |
 | `schedule_status(workspace_id)` | Each [schedule](schedules.md) that targets the workspace, as `GET /v1/workspaces/{workspace_id}/schedules` lists them: when it last ticked and when it ticks next, or that it has not started there yet |
 | `replay_rule(workspace_id, rule, from_seq=0, mode="rebuild")` | Evaluates a rule again from `from_seq`: rebuilds its state quietly, or refires ([The reactor](reactor.md#replaying-a-rule)) |
 | `install_rule(workspace_id, rule, provenance=None)` | Installs a [stored rule](#stored-rules): version 1, or the next version of an archived rule |
@@ -132,7 +133,7 @@ When the application turns [stored rules](rules.md#stored-rules) on, a client ca
 
 `authorize` hears each change with the rule's name, as it hears every command, and each change is checked as over REST: a rule the fixed limits refuse answers every problem at once, `rule chat:prod-deploy-failures cannot be stored: ["when.throttle is required", "timeout is required"]`, and a rule someone else changed since the `expected_version` a client gives answers `rule chat:prod-deploy-failures is at version 2, not 1`. A change retried with its `command_id` answers with its first result ([Retries](#retries)); one retried under a new `command_id`, or none, after it succeeded, changes nothing and answers `"duplicate": true`, whatever its `expected_version`. Give `expected_version` so a retry after someone else's change is refused rather than applied.
 
-A stored rule belongs to the workspace it is installed in. `rule_status` lists it after the code rules, with its version, and `get_rule` returns it; another workspace, or another tenant's workspace of the same id, has no rule of that name. `list_rules` lists the code rules only.
+A stored rule belongs to the workspace it is installed in. `rule_status` lists it after the code rules, with its version, `get_rule` returns it, and `rule_history` its versions, archived or not; another workspace, or another tenant's workspace of the same id, has no rule of that name. `list_rules` lists the code rules only.
 
 ```text
 - ops:error-spike: code, enabled, cursor 812, 0 behind, generation 0, 0 dead letters

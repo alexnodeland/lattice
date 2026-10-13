@@ -6,6 +6,8 @@
 from grantr.core.audit import (
     AuditEntry,
     AuditEvent,
+    AuditFilter,
+    AuditType,
     Granted,
     GroupDefined,
     GroupDeleted,
@@ -68,6 +70,8 @@ __all__ = [
     "Agent",
     "AuditEntry",
     "AuditEvent",
+    "AuditFilter",
+    "AuditType",
     "Catalog",
     "Forbidden",
     "Grant",

@@ -15,7 +15,7 @@ from pydantic_ai.messages import ModelResponse
 from pydantic_ai.models import ModelRequestContext
 from pydantic_ai.settings import ModelSettings
 
-from lattice_core.litellm import litellm_model
+from lattice_core.litellm import litellm_model, request_tags
 from reflexr.core import RuleName, TenantId, UserActor, WorkspaceId
 from reflexr.telemetry import current_trace_id
 from reflexr.workspace import Reaction, RunFailure
@@ -137,8 +137,7 @@ class LiteLLMGateway(AbstractCapability[Reaction[Any]]):
             "session_id": run.correlation_id,
             "tags": [
                 "reflexr",
-                f"tenant:{tenant_id}",
-                f"workspace:{workspace_id}",
+                *request_tags(tenant_id, workspace_id),
                 f"rule:{run.rule}",
                 *self.tags,
             ],

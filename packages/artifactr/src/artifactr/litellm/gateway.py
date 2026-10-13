@@ -18,7 +18,7 @@ from pydantic_ai.settings import ModelSettings
 from artifactr.agent import RunFailure, Session
 from artifactr.core import TenantId, UserActor, WorkspaceId
 from artifactr.telemetry import current_trace_id
-from lattice_core.litellm import litellm_model
+from lattice_core.litellm import litellm_model, request_tags
 
 __all__ = [
     "GUARDRAIL_BLOCKED",
@@ -127,7 +127,7 @@ class LiteLLMGateway(AbstractCapability[Session[Any]]):
             "thread_id": session.thread_id,
             "run_id": session.run_id,
             "session_id": session.thread_id,
-            "tags": ["artifactr", f"tenant:{tenant_id}", f"workspace:{workspace_id}", *self.tags],
+            "tags": ["artifactr", *request_tags(tenant_id, workspace_id), *self.tags],
         }
         if isinstance(person := session.on_behalf_of, UserActor):
             metadata["trace_user_id"] = person.id

@@ -125,7 +125,14 @@ async def test_each_request_carries_the_tenant_chain_trace_key_and_guardrails() 
         "scope": "[]",
         "run_id": done.id,
         "session_id": done.correlation_id,
-        "tags": ["reflexr", "tenant:acme", "workspace:prod", "rule:app:review", "oncall"],
+        "tags": [
+            "reflexr",
+            "tenant:acme",
+            "workspace:prod",
+            "tenant-workspace:acme/prod",
+            "rule:app:review",
+            "oncall",
+        ],
         "trace_user_id": "ada",
         "existing_trace_id": done.trace_ids[-1],
     }

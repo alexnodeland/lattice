@@ -1,2 +1,3 @@
+# What stackr-db-init's image is built from, out of lattice's root: init.sql alone.
 *
 !packages/stackr/deploy/postgres/init.sql

@@ -10,9 +10,10 @@ COPY . .
 RUN uv sync --locked --no-install-workspace --package stackr --only-group auth-keys
 
 FROM python:3.13.16-slim-trixie@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
+LABEL org.opencontainers.image.source="https://github.com/alexnodeland/lattice"
 
-COPY --from=build /app/.venv /app/.venv
-COPY packages/stackr/scripts/auth-keys packages/stackr/scripts/_auth_keys.py /app/
+COPY --link --from=build /app/.venv /app/.venv
+COPY --link --chmod=a=rX packages/stackr/scripts/auth-keys packages/stackr/scripts/_auth_keys.py /app/
 ENV PATH="/app/.venv/bin:$PATH"
 USER nobody
 ENTRYPOINT ["python", "/app/auth-keys"]

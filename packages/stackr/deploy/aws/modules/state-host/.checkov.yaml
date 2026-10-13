@@ -1,0 +1,11 @@
+# checkov over the state-host module (RFC-0004), run by deploy/aws/check. Each check it skips here
+# is skipped for this module only, with its reason; nothing is skipped inline.
+framework:
+  - terraform
+compact: true
+quiet: true
+skip-check:
+  # A customer-managed key per deployment comes later (RFC-0004): AWS's encrypts the volumes.
+  - CKV_AWS_189
+  # The ENI's group is this module's own, which checkov doesn't follow; the tests check its rules.
+  - CKV2_AWS_5

@@ -62,6 +62,9 @@ uv run scripts/check-config supabase || fail "supabase"
 step "The gateway's configuration"
 uv run scripts/check-config litellm || fail "litellm"
 
+step "The AWS recipe, against the stack"
+uv run scripts/check-config aws || fail "aws"
+
 step "The application template, rendered in every variant"
 uv run scripts/check-template || fail "template"
 
@@ -104,9 +107,11 @@ check_service "Loki" \
   "$(image_of loki)" -config.file=/etc/loki/loki.yaml -verify-config=true
 
 step "Shell scripts"
+# OpenTofu's templates (*.tftpl) are scripts only once rendered, with their values in place:
+# deploy/aws/check renders the state host's user data and checks it.
 shell_scripts=()
 while IFS= read -r file; do shell_scripts+=("$file"); done \
-  < <(grep -rlE '^#!/usr/bin/env (bash|sh)' scripts deploy .devcontainer template | sort)
+  < <(grep -rlE --exclude='*.tftpl' '^#!/usr/bin/env (bash|sh)' scripts deploy .devcontainer template | sort)
 if uv run shellcheck "${shell_scripts[@]}"; then
   echo "ok: ${shell_scripts[*]}"
 else

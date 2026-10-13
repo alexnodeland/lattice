@@ -60,6 +60,7 @@ make up         # the application in its app profile, at http://localhost:8800
 - **One route for telemetry.** The OpenTelemetry Collector sends traces to Tempo and Langfuse, metrics to Prometheus and logs to Loki, and Grafana links them to each other and to Pyroscope's profiles. [Observability](guides/observability.md)
 - **Self-hosted Langfuse.** Traces arrive through the Collector; applications use Langfuse's API only for scores and datasets. [Langfuse](guides/langfuse.md)
 - **An application template.** FastAPI with each library's REST, WebSocket and MCP surfaces, examples, evals, a dev container and lattice's quality gates. [The application template](guides/template.md)
+- **The combined system.** With both libraries, relayr joins them: chats and artifacts become events for rules, rules act back as proposals and notices, people draft rules in chat, and an experiment measures how people take what rules propose. [The combined system](guides/combined-system.md)
 - **Checked every way it can be.** `make validate` checks every configuration with each service's own validator, and the smoke tests start the stack and follow telemetry, a gateway request and an application's agents to where they land. [Validation and CI](guides/validation.md)
 - **Local by default.** Secrets are generated into a gitignored `.env`, and every published port binds to `127.0.0.1`. [Security](guides/security.md)
 
@@ -69,6 +70,7 @@ make up         # the application in its app profile, at http://localhost:8800
 |---|---|
 | Run the stack now | [Getting started](getting-started.md) |
 | Understand one part in depth | The [guides](guides/stack.md) |
+| See artifactr and reflexr working together | [The combined system](guides/combined-system.md) |
 | Look up a service, setting, port or command | The [reference](reference/index.md) |
 | Understand why it is built this way | The [architecture](architecture.md) and the [decision records](adr/README.md) |
 | Fix something that doesn't start | [Troubleshooting](guides/troubleshooting.md) |

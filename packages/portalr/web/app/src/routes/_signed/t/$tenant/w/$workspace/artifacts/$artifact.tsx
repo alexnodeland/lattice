@@ -3,7 +3,7 @@ import { ArtifactContent, Diff, ProposalCard, proposedOn, rendererFor, Thumbs } 
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
-import { allowedIn } from "../../../../../../../allowed";
+import { allowedIn, workspaceOf } from "../../../../../../../allowed";
 import { useMe } from "../../../../../../../me";
 import { RENDERERS } from "../../../../../../../renderers";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
@@ -23,7 +23,9 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/
   loader: async ({ context, params }) => {
     const { tenant, workspace, artifact } = params;
     await Promise.all([
-      context.queryClient.ensureQueryData(allowedIn(context.queries, tenant, workspace, ACTIONS)),
+      context.queryClient.ensureQueryData(
+        allowedIn(context.queries, tenant, workspaceOf(workspace), ACTIONS),
+      ),
       context.queryClient.ensureQueryData(context.queries.grantr.memberships(context.user)),
     ]);
     try {
@@ -56,7 +58,7 @@ function Artifact() {
   const { queries, queryClient, user } = Route.useRouteContext();
   const me = useMe(queries, user, tenant);
   const checks = useMemo(
-    () => allowedIn(queries, tenant, workspace, ACTIONS),
+    () => allowedIn(queries, tenant, workspaceOf(workspace), ACTIONS),
     [queries, tenant, workspace],
   );
   const { data: allowed } = useSuspenseQuery(checks);

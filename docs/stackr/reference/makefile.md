@@ -20,7 +20,7 @@ Every command is a `make` target; `make` on its own lists them. The tools run th
 | `make restore-drill` | On a single host: restore the latest backups beside the stack, check them, and report |
 | `make validate` | Validate every configuration without starting containers, as CI does |
 | `make smoke` | Send test telemetry through the running stack and find it (PROFILES as for up) |
-| `make smoke-app` | Run an application from the template beside the running stack, and trace its agents |
+| `make smoke-app` | Run an application from the template beside the running stack, trace its agents, and bridge an incident |
 | `make docs-reference` | Regenerate the reference pages from the files they describe |
 | `make clean` | Remove tool caches |
 

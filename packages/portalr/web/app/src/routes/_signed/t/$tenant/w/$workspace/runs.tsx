@@ -3,7 +3,7 @@ import { CommandButton, RunStatus, StatusBadge, TextLink, Thumbs, type Tone } fr
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { allowedIn } from "../../../../../../allowed";
+import { allowedIn, workspaceOf } from "../../../../../../allowed";
 import { useMe } from "../../../../../../me";
 import {
   Connection,
@@ -34,7 +34,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/runs")({
   loader: ({ context, params }) =>
     Promise.all([
       context.queryClient.ensureQueryData(
-        allowedIn(context.queries, params.tenant, params.workspace, ACTIONS),
+        allowedIn(context.queries, params.tenant, workspaceOf(params.workspace), ACTIONS),
       ),
       context.queryClient.ensureQueryData(context.queries.grantr.memberships(context.user)),
     ]),
@@ -61,7 +61,7 @@ function Runs() {
   const { queries, user } = Route.useRouteContext();
   const me = useMe(queries, user, tenant);
   const checks = useMemo(
-    () => allowedIn(queries, tenant, workspace, ACTIONS),
+    () => allowedIn(queries, tenant, workspaceOf(workspace), ACTIONS),
     [queries, tenant, workspace],
   );
   const { data: allowed } = useSuspenseQuery(checks);

@@ -4,7 +4,9 @@ It mounts ``portalr_router``, grantr's own router for the UIs' ``/me`` and ``/ch
 artifactr's, with a scripted agent (``notes.py``), over grantr's ``Grants`` in memory, which checks
 every artifactr command and read; it invites without Supabase. acme's owner is alice, and bob is its
 member with no tenant role, an editor of its workspaces ``notes`` and ``plans``; globex's owner is
-carol; erin is a member of both, and edits acme's ``notes``; ops is the deployment's operator.
+carol; erin is a member of both, and edits acme's ``notes``; vera views ``notes``, and dana is its
+admin, who may change who sees its threads but not list acme's members; ops is the deployment's
+operator.
 
 A caller is named by a Supabase Auth access token, verified as the template verifies one, or by
 the ``x-user`` header, which the API tests send. Signed in, a person's user id here is their
@@ -46,8 +48,8 @@ from reflexr.workspace import ACTIONS as REFLEXR_ACTIONS
 from tests.app.notes import APPLICATION, collaboration
 from tests.app.tickets import automation
 
-OPS, ALICE, BOB, CAROL, ERIN, VERA = (
-    User(id=name) for name in ("ops", "alice", "bob", "carol", "erin", "vera")
+OPS, ALICE, BOB, CAROL, DANA, ERIN, VERA = (
+    User(id=name) for name in ("ops", "alice", "bob", "carol", "dana", "erin", "vera")
 )
 
 PEOPLE = "portalr.test"
@@ -68,13 +70,14 @@ async def seed(grants: Grants) -> None:
     await grants.first_operator(OPS.id)
     await grants.create_tenant("acme", owner=ALICE.id, by=OPS)
     await grants.create_tenant("globex", owner=CAROL.id, by=OPS)
-    for member in (BOB, ERIN, VERA):
+    for member in (BOB, DANA, ERIN, VERA):
         await grants.add_member("acme", member, by=ALICE)
     await grants.add_member("globex", ERIN, by=CAROL)
     for name in ("notes", "plans"):
         await grants.grant("acme", "editor", on=workspace(name), to=BOB, by=ALICE)
     await grants.grant("acme", "editor", on=workspace("notes"), to=ERIN, by=ALICE)
     await grants.grant("acme", "viewer", on=workspace("notes"), to=VERA, by=ALICE)
+    await grants.grant("acme", "admin", on=workspace("notes"), to=DANA, by=ALICE)
 
 
 def signed_in(token: str) -> User:

@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # Tier 1 of the AWS recipe's checks (RFC-0004): everything that needs neither AWS nor Floci.
 #
-# Usage: deploy/aws/check   (OpenTofu and TFLint from lattice's .prototools; uv for checkov)
+# Usage: deploy/aws/check
+#   OpenTofu and TFLint come from lattice's .prototools, and checkov through uv. It needs Docker,
+#   and ShellCheck for the rendered user data.
 #
 # OpenTofu's format; TFLint with AWS's ruleset; checkov over each module, with the skips and their
 # reasons in that module's .checkov.yaml; and the modules' tests, against a mocked AWS (tests/),
-# which validate each module as they plan it, with the providers the committed lock file names.
+# which validate each module as they plan it, with the providers the committed lock file names; and
+# the modules' templates, rendered: shellcheck over the state host's user data, and GoTrue's proxy,
+# run in Docker (tests/auth-proxy).
 # The providers download once, into TF_PLUGIN_CACHE_DIR. TFLint fetches its AWS ruleset from
 # GitHub, with GITHUB_TOKEN when it is set.
 
@@ -46,5 +50,20 @@ done
 
 step "Tests, against a mocked AWS"
 tofu test -no-color || fail "tofu test"
+
+step "The templates, rendered"
+rendered=$(mktemp -d)
+trap 'rm -rf "$rendered"' EXIT
+fixture=tests/fixtures/rendered
+if tofu -chdir="$fixture" init -backend=false -input=false >/dev/null &&
+  tofu -chdir="$fixture" apply -auto-approve -input=false -state="$rendered/state" \
+    -var trusted_proxies=198.18.250.0/28 >/dev/null; then
+  tofu -chdir="$fixture" output -state="$rendered/state" -raw user_data >"$rendered/user-data.sh"
+  tofu -chdir="$fixture" output -state="$rendered/state" -raw caddyfile >"$rendered/Caddyfile"
+  shellcheck --shell=bash "$rendered/user-data.sh" || fail "shellcheck: the state host's user data"
+  tests/auth-proxy "$rendered/Caddyfile" || fail "GoTrue's proxy"
+else
+  fail "rendering the templates"
+fi
 
 exit $status

@@ -16,27 +16,27 @@ The bridge between artifactr and reflexr: events from chats and artifacts become
 
 </div>
 
-!!! note "Both adapters built"
+!!! note "Built: the v0.1 plan"
 
-    relayr's inbound and outbound adapters are built: artifactr's events reach reflexr exactly once, and rules' runs act back in artifactr once however often they are retried, in chains that stop at reflexr's depth limit. The rest below is what the [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)'s later phases build. It is distributed as `relayr-ai`, since the name `relayr` on PyPI is an unrelated project, and imported as `relayr`.
+    Everything below is built: both adapters, telemetry across the bridge, rules from chat, and evaluation, with stackr's template wiring it all into an application ([v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)), except LiteLLM's metadata, which waits on [lattice #86](https://github.com/alexnodeland/lattice/issues/86). It is distributed as `relayr-ai`, since the name `relayr` on PyPI is an unrelated project, and imported as `relayr`.
 
 ## Why: one bridge, built once
 
 An application can mount [artifactr](../artifactr/index.md) and [reflexr](../reflexr/index.md) side by side, on one database and one telemetry setup, over one shared context: the same tenant and workspace ids name the same context in both. But the two halves don't talk to each other. A rule can't see what people say in a thread, and a run can't put its result in front of the people it concerns. Each application that wants this would write its own glue, and meet the same hard parts: duplicate and lost deliveries, rules that trigger themselves, two kinds of session that don't line up, and events that anyone could forge.
 
-[stackr's RFC-0002](../stackr/rfcs/0002-the-combined-system.md) designs the bridge once, and relayr is where it is built. It will use only the two libraries' public APIs, and neither library will import it or the other.
+[stackr's RFC-0002](../stackr/rfcs/0002-the-combined-system.md) designs the bridge once, and relayr is where it is built. It uses only the two libraries' public APIs, and neither library imports it or the other.
 
-## What it does, and will do
+## What it does
 
 - **Inbound: chats and artifacts become events (built).** One follower per workspace, with a lease, a cursor and dead letters, publishes selected artifactr events into reflexr under the `artifactr` namespace, such as `artifactr:message_posted`, `artifactr:artifact_changed` and `artifactr:proposal_resolved`, so that a message fires a rule exactly once, across a restart and a redelivery ([ADR-0006](adr/0006-bridged-types-in-the-artifactr-namespace.md), [the guide](guides/inbound.md)).
 - **Outbound: runs act as participants (built).** A pydantic-ai capability and helpers let a run act in artifactr as its rule's own external agent, `reflexr:<rule>`, so artifactr's rules apply to it: under a `propose` write policy its edits are proposals, and relayr never resolves one ([ADR-0002](adr/0002-the-outbound-actor-an-external-agent-per-rule.md)).
 - **Notices by default (built).** A rule's messages start no turn in the thread, unless the rule's allowlist grants it ([ADR-0007](adr/0007-notices-by-default.md)).
 - **Chains and sessions kept apart, and linked (built).** A thread is never a causal chain, and a chain never joins a thread's session or model history; traces are linked, and Langfuse sessions tagged, across the two ([ADR-0003](adr/0003-a-thread-is-never-a-chain.md), [ADR-0004](adr/0004-sessions-linked-not-continued.md)).
-- **Rules from chat.** A rule drafted in a thread is a `rule` artifact, reviewed as a proposal, and goes live in reflexr's stored rules only when a person accepts it, with provenance recorded both ways ([ADR-0005](adr/0005-where-a-rules-source-of-truth-lives.md)).
-- **Evaluation.** Proposal outcomes become feedback on the runs that proposed them, with measures of acceptance, rewrites and time to resolution.
+- **Rules from chat (built).** A rule drafted in a thread is a `rule` artifact, reviewed as a proposal, and goes live in reflexr's stored rules only when a person who may install rules accepts it, with provenance recorded both ways. A rule changed in reflexr directly is proposed back to its artifact ([ADR-0005](adr/0005-where-a-rules-source-of-truth-lives.md), [the guide](guides/rules.md)).
+- **Evaluation (built).** Proposal outcomes become feedback on the runs that proposed them, with measures of acceptance, rewrites and rules from chat that stay live ([the guide](guides/evaluation.md)).
 - **A ledger of its own (built)**, in memory or in SQL, behind the `sql`, `sqlite` and `postgres` extras.
 
-[RFC-0001](rfcs/0001-v0.1-implementation-plan.md#phases) builds these in seven phases after the foundation, and says what each waits on in the libraries. Its guides, reference and architecture grow with the phases that build what they describe.
+[RFC-0001](rfcs/0001-v0.1-implementation-plan.md#phases) built these in phases after the foundation, and records what each waited on in the libraries.
 
 ## Where to go next
 
@@ -45,8 +45,11 @@ An application can mount [artifactr](../artifactr/index.md) and [reflexr](../ref
 | Bridge artifactr's events into reflexr | [Bridging artifactr into reflexr](guides/inbound.md) |
 | Let rules act in artifactr | [Acting in artifactr from rules](guides/outbound.md) |
 | Follow a story across the bridge in Tempo and Langfuse | [Tracing across the bridge](guides/telemetry.md) |
+| Turn rules drafted in chat into stored rules | [Rules from chat](guides/rules.md) |
+| Measure how people receive what rules propose | [Evaluating the bridge's rules](guides/evaluation.md) |
+| Run all of it in an application | [stackr's template](../stackr/guides/template.md), with its `bridge` question |
 | See how it works | The [architecture](architecture.md), and the [API reference](reference.md) |
-| Understand why each part will be the way it is | The [decision records](adr/README.md) |
+| Understand why each part is the way it is | The [decision records](adr/README.md) |
 | See the plan, its phases and what each waits on | [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and the [RFCs](rfcs/README.md) |
 | Read the design relayr builds | [stackr's RFC-0002](../stackr/rfcs/0002-the-combined-system.md) |
 | Use the mark and its colours | The [brand page](assets/brand/README.md) |

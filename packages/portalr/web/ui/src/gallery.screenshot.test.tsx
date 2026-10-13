@@ -1,7 +1,7 @@
 /**
  * The kit's look, pinned by screenshots (portalr ADR-0019): the frame with every component in it,
  * wide and narrow, in each scheme. Computed styles pin each component's colours and states; these
- * pin how they sit together, and the menu and the drawer open. Baselines are Linux's, made in CI, with motion reduced and the
+ * pin how they sit together, and the menu, the drawer and a dialog open. Baselines are Linux's, made in CI, with motion reduced and the
  * self-hosted faces loaded, so they don't move between runs.
  */
 
@@ -13,6 +13,7 @@ import { AccountMenu } from "./account-menu";
 import { AppShell } from "./app-shell";
 import { Button } from "./button";
 import { Card } from "./card";
+import { Dialog } from "./dialog";
 import { EmptyState } from "./empty-state";
 import { Icon } from "./icon";
 import { PageHeader } from "./page-header";
@@ -142,11 +143,30 @@ function Gallery() {
   );
 }
 
+/** A dialog over the frame, as a thread's sharing opens one. */
+function Sharing() {
+  return (
+    <Dialog
+      open
+      onOpenChange={() => undefined}
+      title="Share the thread"
+      description="Who holds a role on it."
+    >
+      <TextField label="Person" defaultValue="bob" />
+    </Dialog>
+  );
+}
+
 /** Lay the gallery out at a width, with the faces loaded before the shot (motion is reduced). */
-async function shown(width: number, height: number) {
+async function shown(width: number, height: number, dialog = false) {
   await page.viewport(width, height);
   onTestFinished(() => page.viewport(414, 896));
-  const screen = await render(<Gallery />);
+  const screen = await render(
+    <>
+      <Gallery />
+      {dialog && <Sharing />}
+    </>,
+  );
   await Promise.all([
     document.fonts.load('1em "Schibsted Grotesk"'),
     document.fonts.load('italic 1em "Schibsted Grotesk"'),
@@ -185,4 +205,10 @@ test("the drawer, open", async () => {
   await screen.getByRole("button", { name: "Menu" }).click();
   await expect.element(screen.getByRole("dialog", { name: "Navigation" })).toBeVisible();
   await matches("gallery-drawer");
+});
+
+test("a dialog, open, over the frame", async () => {
+  const screen = await shown(1280, 900, true);
+  await expect.element(screen.getByRole("dialog", { name: "Share the thread" })).toBeVisible();
+  await matches("gallery-dialog");
 });

@@ -48,7 +48,9 @@
 # Each agent's trace, with the gateway's spans in it, is in Tempo and
 # Langfuse, and the application's metrics are in Prometheus. An alert crosses
 # into artifactr through relayr, as an incident thread with its timeline, and
-# the user's message in that thread crosses back, onto the timeline. A rule
+# the user's message in that thread crosses back, onto the timeline; the
+# incident's resolution posts a closing notice there and proposes its
+# postmortem, drawn from the timeline. A rule
 # drafted in a thread, by a service principal's key, goes live once the user
 # accepts it, and tells the thread of the alert it watches; a forged
 # acceptance, published into reflexr, is refused.
@@ -721,6 +723,20 @@ incident_timeline() {
     jq -er 'first(.[] | select(.kind == "timeline") | .data.thread_id)')
 }
 
+# A notice in the incident's thread that says this.
+incident_has_notice() {
+  app_call "/artifactr/v1/workspaces/$run_id/events" |
+    jq -e --arg thread "$incident_thread" --arg said "$1" \
+      'any(.[]; .thread_id == $thread and .event.kind? == "notice" and .event.content == $said)' >/dev/null
+}
+
+# A postmortem proposed in the incident's thread, drawn from its timeline's two entries.
+postmortem_proposed() {
+  app_call "/artifactr/v1/workspaces/$run_id/proposals" |
+    jq -e --arg thread "$incident_thread" 'any(.[]; .change.kind == "postmortem" and
+      .change.thread_id == $thread and (.change.data.timeline | length) == 2)' >/dev/null
+}
+
 # The stored rule a rule artifact installed, as reflexr reads it.
 rule_is_live() { app_call "/reflexr/v1/workspaces/$run_id/rules/chat:smoke-alerts" -o /dev/null; }
 
@@ -888,6 +904,11 @@ ENV
     "{\"type\": \"command\", \"command_id\": \"c3\", \"command\": {\"type\": \"post_message\", \"thread_id\": \"$incident_thread\", \"content\": \"Rolled back.\"}}"
   eventually "the person's message reached reflexr, and its rule added it to the timeline" \
     timeline_has 2
+  app_json "/reflexr/v1/workspaces/$run_id/events" \
+    "{\"event\": {\"type\": \"$app_package:incident.resolved\", \"service\": \"checkout\", \"summary\": \"Rolled back.\"}}"
+  eventually "the resolution closed the incident, in its thread" \
+    incident_has_notice "Resolved: Rolled back. Its postmortem is proposed for review."
+  eventually "its postmortem, drawn from the timeline, is proposed for review" postmortem_proposed
 
   log "app: a rule drafted in a thread goes live once the user accepts it"
   local tenant=/grantr/v1/tenants/stackr-smoke drafter_key

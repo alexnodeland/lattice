@@ -1,10 +1,10 @@
 # RFC-0002: The combined system
 
-**Status:** Accepted
+**Status:** Implemented
 **Author:** Alex Nodeland
 **Created:** 2026-09-29
 **Discussion:** [#30](https://github.com/alexnodeland/stackr/pull/30), from [issue #8](https://github.com/alexnodeland/stackr/issues/8); accepted on 2026-09-29, with the decisions in [Decision points](#decision-points)
-**Amended by:** [relayr ADR-0016](../../relayr/adr/0016-followers-start-on-open.md): followers start through the libraries' `on_open` hook, not `authorize`; [relayr ADR-0019](../../relayr/adr/0019-runs-act-once-through-derived-ids-and-keyed-edits.md): no read-back, since artifactr refuses a used message id; [relayr ADR-0021](../../relayr/adr/0021-chains-continue-across-the-bridge.md): the run behind each write is recorded before it, by ids on its envelope, and a rule's turn is traced from its start
+**Amended by:** [relayr ADR-0016](../../relayr/adr/0016-followers-start-on-open.md): followers start through the libraries' `on_open` hook, not `authorize`; [relayr ADR-0019](../../relayr/adr/0019-runs-act-once-through-derived-ids-and-keyed-edits.md): no read-back, since artifactr refuses a used message id; [relayr ADR-0021](../../relayr/adr/0021-chains-continue-across-the-bridge.md): the run behind each write is recorded before it, by ids on its envelope, and a rule's turn is traced from its start; [ADR-0033](../adr/0033-the-combined-system-proved-in-ci.md): no separate product repository until a product needs one; phase 7 ends when the generated application passes its CI, in the Template job, and runs end to end on the stack, in the Smoke job's rows with an application
 **Siblings:**
 
 - [reflexr ADR-0003][r-adr-0003] keeps the libraries independent and leaves the adapters between them to this system. [artifactr ADR-0032][a-adr-0032] makes it an application built from stackr's template.
@@ -370,7 +370,7 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 | 4. Telemetry links and tags | Span links, `thread:` and `chain:` tags, and the Langfuse user (after reflexr #62 and artifactr #50) | In Tempo, a turn started by a run links to the run's span. In Langfuse, each session carries the other's tag |
 | 5. Rules from chat | The `rule` artifact type, validation, preview, the install rule, and provenance (after reflexr #21) | A rule drafted in a thread goes live only after a person accepts it, and a forged `artifactr:proposal_resolved` installs nothing |
 | 6. Evaluation | Proposal-outcome feedback, the measures, and a combined experiment in the template's `evals/` | The example's experiment reports acceptance, rewrite rate and time to resolution |
-| 7. Docs, ADRs and the product repository | An ADR for each decision, stackr's docs, and the product repository generated from the template | The product repository passes its CI on the stack |
+| 7. Docs, ADRs and the product repository | An ADR for each decision, stackr's docs, and the product repository generated from the template | The product repository passes its CI on the stack (amended by [ADR-0033](../adr/0033-the-combined-system-proved-in-ci.md): the generated application passes its CI and runs end to end on the stack) |
 
 ## Drawbacks
 
@@ -410,7 +410,9 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 - [x] Phase 4: telemetry links and tags, in relayr ([relayr ADR-0023](../../relayr/adr/0023-traces-linked-across-the-bridge.md), [ADR-0024](../../relayr/adr/0024-langfuse-sessions-tagged-with-each-other.md)); LiteLLM's metadata waits on [lattice #86](https://github.com/alexnodeland/lattice/issues/86)
 - [x] Phase 5: rules from chat, in relayr ([relayr ADR-0028](../../relayr/adr/0028-rules-from-chat.md)) and the template ([ADR-0024](../adr/0024-rules-from-chat-in-the-template.md))
 - [x] Phase 6: evaluation, in relayr ([relayr ADR-0031](../../relayr/adr/0031-proposal-outcomes-and-the-measures.md)) and the template ([ADR-0030](../adr/0030-the-incident-experiment-and-its-postmortem.md))
-- [ ] Phase 7: docs, ADRs and the product repository
+- [x] Phase 7: docs, ADRs, and the combined system proved in CI: its CI in the Template job, and end to end on the stack in the Smoke job's rows with an application ([ADR-0033](../adr/0033-the-combined-system-proved-in-ci.md))
+
+Carried past v0.1: LiteLLM's metadata, which waits on [lattice #86](https://github.com/alexnodeland/lattice/issues/86), and the [unresolved questions](#unresolved-questions).
 
 [a-adr-0032]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0032-libraries-and-the-stackr-template.md
 [a-adr-0033]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0033-trace-links-on-runs-and-revisions.md

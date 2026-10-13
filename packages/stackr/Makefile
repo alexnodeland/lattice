@@ -148,7 +148,7 @@ validate: .env ## Validate every configuration without starting containers, as C
 smoke: ## Send test telemetry through the running stack and find it (PROFILES as for up)
 	$(SMOKE) $(PROFILES) $(if $(NEEDS_DATABASE),database) $(if $(COMPOSE_FILES),edge)
 
-smoke-app: ## Run an application from the template beside the running stack, and trace its agents
+smoke-app: ## Run an application from the template beside the running stack, trace its agents, and bridge an incident
 	$(SMOKE) app
 
 docs-reference: ## Regenerate the reference pages from the files they describe

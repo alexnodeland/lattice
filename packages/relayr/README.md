@@ -14,20 +14,20 @@
 
 **relayr** is the bridge between [artifactr](https://lattice.alexnodeland.com/artifactr/) and [reflexr](https://lattice.alexnodeland.com/reflexr/): events from chats and artifacts become events for rules, and runs act back in the chat as proposals and notices. It uses only the two libraries' public APIs, and neither library imports it or the other.
 
-> **Status:** both adapters are built: artifactr's events reach reflexr exactly once ([guide](https://lattice.alexnodeland.com/relayr/guides/inbound/)), and rules' runs act back in artifactr once however often they are retried ([guide](https://lattice.alexnodeland.com/relayr/guides/outbound/)). The rest below is what the [v0.1 plan](https://lattice.alexnodeland.com/relayr/rfcs/0001-v0.1-implementation-plan/)'s later phases build. Its distribution is `relayr-ai`, since the name `relayr` on PyPI is an unrelated project, and it is imported as `relayr`.
+> **Status:** built: the [v0.1 plan](https://lattice.alexnodeland.com/relayr/rfcs/0001-v0.1-implementation-plan/). Both adapters, telemetry across the bridge, rules from chat and evaluation, and stackr's template wires it all into an application, except LiteLLM's metadata, which waits on [lattice #86](https://github.com/alexnodeland/lattice/issues/86). Its distribution is `relayr-ai`, since the name `relayr` on PyPI is an unrelated project, and it is imported as `relayr`.
 
 ## Why
 
 An application can mount artifactr and reflexr side by side, on one database and one telemetry setup, over one shared context: the same tenant and workspace ids name the same context in both. But the two halves don't talk to each other. A rule can't see what people say in a thread, and a run can't put its result in front of the people it concerns. Each application that wants this would write its own glue, and meet the same hard parts: duplicate and lost deliveries, rules that trigger themselves, two kinds of session that don't line up, and events that anyone could forge. [stackr's RFC-0002](https://lattice.alexnodeland.com/stackr/rfcs/0002-the-combined-system/) designs the bridge once, and relayr is where it is built.
 
-## What it does, and will do
+## What it does
 
 - **Inbound: chats and artifacts become events (built).** One follower per workspace, with a lease, a cursor and dead letters, publishes selected artifactr events into reflexr under the `artifactr` namespace, such as `artifactr:message_posted`, `artifactr:artifact_changed` and `artifactr:proposal_resolved`, so that a message fires a rule exactly once, across a restart and a redelivery ([ADR-0006](https://lattice.alexnodeland.com/relayr/adr/0006-bridged-types-in-the-artifactr-namespace/)).
 - **Outbound: runs act as participants (built).** A pydantic-ai capability and helpers let a run act in artifactr as its rule's own external agent, `reflexr:<rule>`, so artifactr's rules apply to it: under a `propose` write policy its edits are proposals, and relayr never resolves one ([ADR-0002](https://lattice.alexnodeland.com/relayr/adr/0002-the-outbound-actor-an-external-agent-per-rule/)).
 - **Notices by default (built).** A rule's messages start no turn in the thread, unless the rule's allowlist grants it ([ADR-0007](https://lattice.alexnodeland.com/relayr/adr/0007-notices-by-default/)).
 - **Chains and sessions kept apart, and linked (built).** A thread is never a causal chain, and a chain never joins a thread's session or model history; traces are linked, and Langfuse sessions tagged, across the two ([ADR-0003](https://lattice.alexnodeland.com/relayr/adr/0003-a-thread-is-never-a-chain/), [ADR-0004](https://lattice.alexnodeland.com/relayr/adr/0004-sessions-linked-not-continued/)).
-- **Rules from chat.** A rule drafted in a thread is a `rule` artifact, reviewed as a proposal, and goes live in reflexr's stored rules only when a person accepts it, with provenance recorded both ways ([ADR-0005](https://lattice.alexnodeland.com/relayr/adr/0005-where-a-rules-source-of-truth-lives/)).
-- **Evaluation.** Proposal outcomes become feedback on the runs that proposed them, with measures of acceptance, rewrites and time to resolution.
+- **Rules from chat (built).** A rule drafted in a thread is a `rule` artifact, reviewed as a proposal, and goes live in reflexr's stored rules only when a person who may install rules accepts it, with provenance recorded both ways. A rule changed in reflexr directly is proposed back to its artifact ([ADR-0005](https://lattice.alexnodeland.com/relayr/adr/0005-where-a-rules-source-of-truth-lives/)).
+- **Evaluation (built).** Proposal outcomes become feedback on the runs that proposed them, with measures of acceptance, rewrites and rules from chat that stay live, in the `evals` extra.
 - **A ledger of its own (built)**, in memory or in SQL, behind the `sql`, `sqlite` and `postgres` extras.
 
 ## Documentation
@@ -37,8 +37,10 @@ relayr's documentation is its section of lattice's site, at **<https://lattice.a
 - [Bridging artifactr into reflexr](https://lattice.alexnodeland.com/relayr/guides/inbound/): wiring the followers into an application.
 - [Acting in artifactr from rules](https://lattice.alexnodeland.com/relayr/guides/outbound/): the outbound adapter, allowlists and loops.
 - [Tracing across the bridge](https://lattice.alexnodeland.com/relayr/guides/telemetry/): links, Langfuse tags and counters.
+- [Rules from chat](https://lattice.alexnodeland.com/relayr/guides/rules/): drafting, previewing and installing rules, and drift.
+- [Evaluating the bridge's rules](https://lattice.alexnodeland.com/relayr/guides/evaluation/): proposal outcomes and the measures.
 - [Architecture](https://lattice.alexnodeland.com/relayr/architecture/): what exists, and how it works.
-- [Architecture decision records](https://lattice.alexnodeland.com/relayr/adr/): why each part will be the way it is.
+- [Architecture decision records](https://lattice.alexnodeland.com/relayr/adr/): why each part is the way it is.
 - [RFCs](https://lattice.alexnodeland.com/relayr/rfcs/): the v0.1 plan, its phases and what each waits on.
 - [The combined system](https://lattice.alexnodeland.com/stackr/rfcs/0002-the-combined-system/), stackr's RFC-0002: the design relayr builds.
 - [Brand](https://lattice.alexnodeland.com/relayr/assets/brand/): the mark and its colours.

@@ -126,7 +126,9 @@ jobs:
           ref: ${{ fromJSON(needs.release-please.outputs.releases)['packages/stackr--sha'] }}
           persist-credentials: false
       - id: images
-        run: echo "images=$(packages/stackr/deploy/image-archive --list)" >>"$GITHUB_OUTPUT"
+        run: |
+          images=$(packages/stackr/deploy/image-archive --list)
+          echo "images=$images" >>"$GITHUB_OUTPUT"
       - name: Build each image as an OCI archive
         env:
           ARCH: ${{ matrix.arch }}
@@ -137,6 +139,7 @@ jobs:
           path: archives/
           retention-days: 7
           compression-level: 0
+          overwrite: true
 
   # The one job that writes packages: it pushes each architecture's image, joins them under the
   # release's version, and attests the result, with its provenance in the registry. Re-running it
@@ -170,6 +173,7 @@ jobs:
           merge-multiple: true
       - name: Push each architecture, then the release's version
         id: push
+        shell: bash
         env:
           IMAGE: ${{ matrix.image }}
           GH_TOKEN: ${{ github.token }}
@@ -189,6 +193,7 @@ jobs:
           name: stackr-reference-${{ matrix.image }}
           path: ${{ matrix.image }}.md
           retention-days: 7
+          overwrite: true
 
   # The published references, by version and digest, added to the release's notes, for envs/prod:
   # a job of its own, which may write the release and nothing in the registry.
@@ -206,15 +211,23 @@ jobs:
           pattern: stackr-reference-*
           path: references
           merge-multiple: true
-      - env:
+      - shell: bash
+        env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ fromJSON(needs.release-please.outputs.releases)['packages/stackr--tag_name'] }}
         run: |
+          # The notes as release-please wrote them, without a section this job added before: run
+          # again, it replaces its own. Never edited from an empty read.
+          marker='<!-- stackr: images -->'
+          body=$(gh release view "$TAG" --json body --jq .body)
+          body=$(printf '%s\n' "$body" | tr -d '\r' | sed "/^$marker\$/,\$d")
+          if [[ -z ${body//[[:space:]]/} ]]; then
+            echo "release-notes: $TAG's notes read as empty; nothing edited" >&2
+            exit 1
+          fi
           {
-            # The notes as release-please wrote them: run again, this replaces its own section.
-            gh release view "$TAG" --json body --jq .body | sed '/^### Images$/,$d'
-            printf '\n### Images\n\nFor envs/prod, by version and digest:\n\n'
+            printf '%s\n\n%s\n### Images\n\nFor envs/prod, by version and digest:\n\n' "$body" "$marker"
             sort references/*.md
           } >notes.md
           gh release edit "$TAG" --notes-file notes.md

@@ -58,6 +58,7 @@ tasks:
       - 'deploy/build-images'
       - 'deploy/image-archive'
       - 'deploy/publish-image'
+      - '/.github/workflows/release.yml'
       - 'deploy/otel-collector/**/*'
       - 'deploy/tempo/**/*'
       - 'deploy/loki/**/*'

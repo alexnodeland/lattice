@@ -21,4 +21,7 @@
 !packages/grantr/README.md
 !packages/grantr/LICENSE
 !packages/grantr/src/
+!packages/lattice-core/README.md
+!packages/lattice-core/LICENSE
+!packages/lattice-core/src/
 **/__pycache__

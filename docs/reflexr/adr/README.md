@@ -6,7 +6,7 @@ Each record captures one decision: the context that forced it, the options consi
 |---|---|---|
 | [0001](0001-library-with-a-sans-io-core.md) | A library with a sans-IO core, replacing the template | Accepted |
 | [0002](0002-the-name-reflexr.md) | The name reflexr | Accepted |
-| [0003](0003-independent-sibling-of-artifactr.md) | An independent sibling of artifactr, with aligned conventions | Accepted |
+| [0003](0003-independent-sibling-of-artifactr.md) | An independent sibling of artifactr, with aligned conventions | Accepted, amended by lattice 0018 |
 | [0004](0004-tenant-scoped-streams.md) | Tenant-scoped streams with one log each | Superseded by 0016 |
 | [0005](0005-per-rule-cursors.md) | Per-rule cursors: decide exactly, act at least once | Accepted |
 | [0006](0006-rules-as-typed-serializable-data.md) | Rules as typed, serializable data | Accepted, amended by 0041, 0051 and 0053 |
@@ -61,8 +61,8 @@ Each record captures one decision: the context that forced it, the options consi
 | [0057](0057-reserved-publishers.md) | Reserved publishers | Accepted |
 | [0058](0058-an-mcp-client-acts-for-its-person.md) | An MCP client acts for its person | Accepted |
 | [0059](0059-the-tenant-on-log-records.md) | The tenant on log records | Accepted |
-| [0060](0060-a-nul-character-is-refused-at-the-boundary.md) | A NUL character is refused at the boundary | Accepted |
-| [0061](0061-the-openapi-documents-describe-refusals.md) | The OpenAPI documents describe refusals | Accepted |
+| [0060](0060-a-nul-character-is-refused-at-the-boundary.md) | A NUL character is refused at the boundary | Accepted, amended by lattice 0018 |
+| [0061](0061-the-openapi-documents-describe-refusals.md) | The OpenAPI documents describe refusals | Accepted, amended by lattice 0018 |
 | [0062](0062-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted |
 | [0063](0063-a-stored-rules-history.md) | A stored rule's history, read by its name | Accepted |
 | [0064](0064-the-protocol-schema-names-reflexrs-own-events.md) | The protocol schema names reflexr's own events | Accepted |

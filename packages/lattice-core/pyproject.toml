@@ -1,0 +1,88 @@
+[project]
+name = "lattice-core-ai"
+version = "0.1.0.dev0"
+description = "What lattice's libraries share and must keep identical: their JSON Schema and text helpers, and in time their SQL and OpenTelemetry setup."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Alex Nodeland", email = "alex@ournature.studio" }]
+requires-python = ">=3.12"
+keywords = ["agents", "pydantic", "lattice"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Framework :: Pydantic :: 2",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pydantic>=2.13",
+]
+
+[project.urls]
+Homepage = "https://lattice.alexnodeland.com/lattice-core/"
+Documentation = "https://lattice.alexnodeland.com/lattice-core/"
+Repository = "https://github.com/alexnodeland/lattice"
+Issues = "https://github.com/alexnodeland/lattice/issues"
+Changelog = "https://github.com/alexnodeland/lattice/blob/main/packages/lattice-core/CHANGELOG.md"
+
+[dependency-groups]
+test = [
+    "pytest>=9.1",
+    "pytest-cov>=7.1",
+    "pytest-timeout>=2.4",
+]
+lint = ["ruff>=0.16", "pyright>=1.1.414"]
+dev = [
+    { include-group = "test" },
+    { include-group = "lint" },
+]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "lattice_core"
+
+# ─── types ────────────────────────────────────────────────────────────────────
+
+[tool.pyright]
+include = ["src", "tests"]
+strict = ["src"]
+typeCheckingMode = "standard"
+pythonVersion = "3.12"
+venvPath = "../.."
+venv = ".venv"
+
+# ─── tests and coverage ───────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config", "-ra"]
+# A test that runs for a minute is stuck: fail it, with every thread's stack.
+timeout = 60
+timeout_method = "thread"
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = ["src/lattice_core"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "@overload",
+    "assert_never\\(",
+    "raise NotImplementedError",
+    "^\\s*\\.\\.\\.$",
+    "class .*\\(Protocol.*\\):",
+]

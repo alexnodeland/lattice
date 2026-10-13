@@ -22,6 +22,7 @@ classifiers = [
 ]
 dependencies = [
     "cronsim>=2.7",
+    "lattice-core-ai>=0.1.0.dev0",
     "opentelemetry-api>=1.45",
     "pydantic>=2.13",
     "pydantic-ai-slim>=2.51",
@@ -86,6 +87,11 @@ dev = [
 # In lattice, evalr is the checkout's. A built wheel keeps the range in [project] alone.
 [tool.uv.sources]
 evalr = { workspace = true }
+lattice-core-ai = { workspace = true }
+
+# deptry can't tell from the distribution's name which module it installs.
+[tool.deptry.package_module_name_map]
+lattice-core-ai = "lattice_core"
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]

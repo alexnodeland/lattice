@@ -32,11 +32,12 @@ INNER = {"artifactr.core", "artifactr.telemetry", "artifactr.workspace", "artifa
 
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (artifactr packages it may import, third-party modules it may import)
-    "core": ({"artifactr.core"}, {"pydantic", "jsonpatch", "jsonpointer"}),
+    # lattice-core's helpers, which every library shares (lattice ADR-0018).
+    "core": ({"artifactr.core"}, {"pydantic", "jsonpatch", "jsonpointer", "lattice_core.schema"}),
     "telemetry": ({"artifactr.core", "artifactr.telemetry"}, OTEL_API),
     "workspace": (
         {"artifactr.core", "artifactr.telemetry", "artifactr.workspace"},
-        {"pydantic", *OTEL_API},
+        {"pydantic", "lattice_core.text", *OTEL_API},
     ),
     "agent": (INNER, {"pydantic", "pydantic_ai", *OTEL_API}),
     "sql": ({"artifactr.core", "artifactr.workspace", "artifactr.sql"}, {"sqlalchemy", "alembic"}),

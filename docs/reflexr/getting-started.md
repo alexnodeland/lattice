@@ -34,6 +34,10 @@ The core install covers event types, rules, workspaces with in-memory storage, t
 
 Combine extras with commas, as in `"reflexr[fastapi,postgres] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"`. You also need the pydantic-ai extra for your model provider, such as `pydantic-ai-slim[anthropic]`, and its API key in the environment.
 
+!!! note "lattice-core comes from lattice too"
+
+    reflexr depends on [lattice-core](../lattice-core/index.md), distributed as `lattice-core-ai`, which holds what lattice's libraries share. It isn't on PyPI yet either, and uv installs it from the same commit of lattice as reflexr. With pip, install it from lattice as well: `pip install "lattice-core-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/lattice-core" "reflexr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"`.
+
 !!! note "evalr comes from lattice too"
 
     The `evals` and `langfuse` extras depend on [evalr](../evalr/index.md), which is not on PyPI yet either. uv installs it from the same commit of lattice as reflexr. pip reads only the version ranges, so with pip, install evalr from lattice as well: `pip install "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" "reflexr[evals] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/reflexr"`.

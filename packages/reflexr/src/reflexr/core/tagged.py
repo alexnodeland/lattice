@@ -4,19 +4,10 @@ A member of a discriminated union, such as a command, gives its tag (``type`` or
 default, so Python code can leave it out. A client can't: the discriminator needs the tag to
 tell the members apart. Pydantic's schema calls a field with a default optional, so each
 member's config names :func:`tag_required`, which says what the discriminator does (artifactr
-ADR-0063, reflexr ADR-0061).
+ADR-0063, reflexr ADR-0061). lattice-core holds it for artifactr and reflexr alike, and this
+module re-exports it (lattice ADR-0018).
 """
 
-from typing import cast
+from lattice_core.schema import tag_required
 
-from pydantic import JsonValue
-
-
-# Shared verbatim with artifactr's src/artifactr/core/tagged.py; change both.
-def tag_required(schema: dict[str, JsonValue]) -> None:
-    """Mark a model's fields fixed to one value, its tags, required in its JSON Schema."""
-    properties = cast("dict[str, dict[str, JsonValue]]", schema.get("properties", {}))
-    required = cast("list[JsonValue]", schema.setdefault("required", []))
-    required += [
-        name for name, field in properties.items() if "const" in field and name not in required
-    ]
+__all__ = ["tag_required"]

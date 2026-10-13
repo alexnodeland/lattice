@@ -1,6 +1,6 @@
 # ADR-0063: The OpenAPI documents describe refusals
 
-**Status:** Accepted
+**Status:** Accepted, amended by [lattice ADR-0018](../../adr/0018-lattice-core-what-the-libraries-share.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

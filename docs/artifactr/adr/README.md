@@ -64,9 +64,9 @@ Each record captures one decision: the context that forced it, the options consi
 | [0058](0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md) | A tenant's workspaces, listed by what each actor may open | Accepted |
 | [0059](0059-a-turn-starts-from-an-empty-context.md) | A turn starts from an empty context | Accepted |
 | [0060](0060-the-tenant-on-log-records.md) | The tenant on log records | Accepted |
-| [0061](0061-a-nul-character-is-refused-at-the-boundary.md) | A NUL character is refused at the boundary | Accepted |
+| [0061](0061-a-nul-character-is-refused-at-the-boundary.md) | A NUL character is refused at the boundary | Accepted, amended by lattice 0018 |
 | [0062](0062-restricted-items-left-out-of-every-read.md) | Restricted items left out of every read | Accepted |
-| [0063](0063-the-openapi-documents-describe-refusals.md) | The OpenAPI documents describe refusals | Accepted |
+| [0063](0063-the-openapi-documents-describe-refusals.md) | The OpenAPI documents describe refusals | Accepted, amended by lattice 0018 |
 | [0064](0064-asking-for-a-threads-next-turn.md) | Asking for a thread's next turn | Accepted |
 | [0065](0065-run-started-names-its-messages.md) | `run_started` names its messages | Accepted |
 | [0066](0066-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted |

@@ -102,6 +102,7 @@ sequenceDiagram
 | **[relayr](packages/relayr)** | The bridge between artifactr and reflexr: chat events become events for rules, and runs act back in the chat. Rules can be drafted in chat. | 🚧 [v0.1 in progress](docs/relayr/rfcs/0001-v0.1-implementation-plan.md) |
 | **[grantr](packages/grantr)** | Identity and access: tenants, members, groups, roles, service principals and restricted items, checked before every command and read, with row-level security | ✅ v0.1 |
 | **[portalr](packages/portalr)** | The portal: an app UI to chat with agents and see their artifacts, proposals and runs, and an admin UI for access, feedback, traces and spend | 🚧 [v0.1 in progress](docs/portalr/rfcs/0001-v0.1-implementation-plan.md) |
+| **[lattice-core](packages/lattice-core)** | What the libraries share and must keep identical, which each depends on and re-exports; distributed as `lattice-core-ai` | 🚧 [moving in](docs/adr/0018-lattice-core-what-the-libraries-share.md) |
 | **[stackr](packages/stackr)** | The stack the libraries run on (Supabase or PostgreSQL, LiteLLM, OpenTelemetry, Grafana, Langfuse), an application template, and hosting recipes | ✅ template · 🚧 [hosting recipes](docs/stackr/rfcs/0004-hosting-recipes.md) |
 
 > [!NOTE]
@@ -147,7 +148,7 @@ uv add "relayr-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=pac
 uv add "grantr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/grantr"
 ```
 
-uv takes relayr's own dependencies, artifactr and reflexr, from the same commit. Each package's getting-started page lists its extras, such as artifactr's `fastapi`, `mcp` and `postgres`: [artifactr](https://lattice.alexnodeland.com/artifactr/getting-started/), [reflexr](https://lattice.alexnodeland.com/reflexr/getting-started/), [evalr](https://lattice.alexnodeland.com/evalr/getting-started/), [grantr](https://lattice.alexnodeland.com/grantr/getting-started/).
+uv takes each package's own dependencies from lattice, from the same commit: relayr's, artifactr and reflexr, and lattice-core, which artifactr and reflexr share. Each package's getting-started page lists its extras, such as artifactr's `fastapi`, `mcp` and `postgres`: [artifactr](https://lattice.alexnodeland.com/artifactr/getting-started/), [reflexr](https://lattice.alexnodeland.com/reflexr/getting-started/), [evalr](https://lattice.alexnodeland.com/evalr/getting-started/), [grantr](https://lattice.alexnodeland.com/grantr/getting-started/).
 
 </details>
 

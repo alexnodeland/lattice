@@ -38,6 +38,10 @@ The core install covers artifact types, workspaces with in-memory storage, and t
 
 Combine extras with commas, as in `artifactr-ai[fastapi,postgres]`. You also need the pydantic-ai extra for your model provider, such as `pydantic-ai-slim[anthropic]` or `pydantic-ai-slim[openai]`, and its API key in the environment.
 
+!!! note "lattice-core comes from lattice too"
+
+    artifactr depends on [lattice-core](../lattice-core/index.md), distributed as `lattice-core-ai`, which holds what lattice's libraries share. It isn't on PyPI yet either, and uv installs it from the same commit of lattice as artifactr. With pip, install it from lattice as well: `pip install "lattice-core-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/lattice-core" "artifactr-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"`.
+
 !!! note "evalr comes from lattice too"
 
     The `evals` and `langfuse` extras depend on [evalr](../evalr/index.md), which is not on PyPI yet either. uv installs it from the same commit of lattice as artifactr. pip reads only the version ranges, so with pip, install evalr from lattice as well: `pip install "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr" "artifactr-ai[langfuse] @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/artifactr"`.

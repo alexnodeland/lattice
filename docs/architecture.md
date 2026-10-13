@@ -60,13 +60,14 @@ lattice/
 
 ## The projects
 
-moon knows fourteen projects: the thirteen below, and `lattice`, the root, which holds the site and lattice's own tests and scripts.
+moon knows fifteen projects: the fourteen below, and `lattice`, the root, which holds the site and lattice's own tests and scripts.
 
 | Project | Path | What it is | Kind | Depends on |
 |---|---|---|---|---|
+| lattice-core | `packages/lattice-core` | What the libraries share and must keep identical; distributed as `lattice-core-ai` ([ADR-0018](adr/0018-lattice-core-what-the-libraries-share.md)) | Library | |
 | evalr | `packages/evalr` | Typed evaluation of agent systems | Library | |
-| artifactr | `packages/artifactr` | Chat applications where people and agents share versioned artifacts; distributed as `artifactr-ai` | Library | evalr |
-| reflexr | `packages/reflexr` | Rules over event streams that run LLM workflows | Library | evalr |
+| artifactr | `packages/artifactr` | Chat applications where people and agents share versioned artifacts; distributed as `artifactr-ai` | Library | evalr, lattice-core |
+| reflexr | `packages/reflexr` | Rules over event streams that run LLM workflows | Library | evalr, lattice-core |
 | relayr | `packages/relayr` | The bridge between artifactr and reflexr; distributed as `relayr-ai` | Library | artifactr, reflexr |
 | grantr | `packages/grantr` | Identity and access for artifactr and reflexr, in stackr's template ([its plan](grantr/rfcs/0001-v0.1-implementation-plan.md)) | Library | |
 | stackr | `packages/stackr` | The stack the libraries run on, and the application template | Tool (shell), ships no wheel | artifactr, reflexr, evalr, grantr |
@@ -151,7 +152,7 @@ moon runs every task, and only those a change affects; uv and Bun manage the dep
 
 | File | Holds |
 |---|---|
-| `.moon/workspace.yml` | The fourteen projects, by path; `main` as the default branch; moon's version constraint |
+| `.moon/workspace.yml` | The fifteen projects, by path; `main` as the default branch; moon's version constraint |
 | `.moon/tasks/python.yml` | For every Python project: `lint`, `typecheck`, `test`, `format` and `check`. The root's `pyproject.toml` and `uv.lock` are inputs of every task |
 | `.moon/tasks/distribution.yml` | For every project tagged `distribution`: `build`, `standalone` and `deptry` |
 | `.moon/toolchains.yml` | JavaScript, with Bun as its package manager, Bun, and TypeScript. Every setting that would install dependencies or rewrite a `package.json` or `tsconfig.json` is off, and moon installs no Bun of its own: proto does, from `.prototools` |

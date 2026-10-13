@@ -4,7 +4,8 @@
 #   metrics -> Prometheus, through its OTLP receiver; portalr reads them
 #              through prom-label-proxy
 #   logs    -> Loki, through its OTLP endpoint
-# See docs/architecture.md and ADR-0007.
+# See docs/architecture.md and ADR-0007. Each backend's address is Compose's
+# name by default, and its name in the AWS recipe's namespace there (ADR-0034).
 
 extensions:
   health_check:
@@ -64,21 +65,21 @@ processors:
 
 exporters:
   otlp_grpc/tempo:
-    endpoint: tempo:4317
+    endpoint: ${env:TEMPO_ADDRESS:-tempo}:4317
     tls:
       insecure: true
   otlp_http/prometheus:
-    endpoint: http://prometheus:9090/api/v1/otlp
+    endpoint: http://${env:PROMETHEUS_ADDRESS:-prometheus}:9090/api/v1/otlp
     tls:
       insecure: true
   otlp_http/loki:
-    endpoint: http://loki:3100/otlp
+    endpoint: http://${env:LOKI_ADDRESS:-loki}:3100/otlp
     tls:
       insecure: true
   # Langfuse takes traces only, over OTLP HTTP. The ingestion version header
   # makes them visible as soon as they are written.
   otlp_http/langfuse:
-    endpoint: http://langfuse-web:3000/api/public/otel
+    endpoint: http://${env:LANGFUSE_ADDRESS:-langfuse-web}:3000/api/public/otel
     headers:
       Authorization: Basic ${env:LANGFUSE_OTLP_AUTH}
       x-langfuse-ingestion-version: "4"

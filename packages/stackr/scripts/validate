@@ -101,10 +101,10 @@ check_service "Prometheus" \
   "$(image_of prometheus)" check config --syntax-only /etc/prometheus/prometheus.yml
 check_service "Tempo" \
   -v "$PWD/deploy/tempo:/etc/tempo:ro" \
-  "$(image_of tempo)" -config.file=/etc/tempo/tempo.yaml -config.verify=true
+  "$(image_of tempo)" -config.file=/etc/tempo/tempo.yaml -config.expand-env=true -config.verify=true
 check_service "Loki" \
   -v "$PWD/deploy/loki:/etc/loki:ro" \
-  "$(image_of loki)" -config.file=/etc/loki/loki.yaml -verify-config=true
+  "$(image_of loki)" -config.file=/etc/loki/loki.yaml -config.expand-env=true -verify-config=true
 
 step "Shell scripts"
 # OpenTofu's templates (*.tftpl) are scripts only once rendered, with their values in place:

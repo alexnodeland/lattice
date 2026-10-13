@@ -1,5 +1,8 @@
-# Loki, as a single process with its data on a local volume. It receives OTLP
-# logs from the Collector at /otlp/v1/logs.
+# Loki, as a single process. It receives OTLP logs from the Collector at
+# /otlp/v1/logs. Its chunks and index are on a local volume on one machine, and
+# in S3 on AWS (stackr ADR-0034), as the environment says: Loki reads it with
+# -config.expand-env=true, and each setting has one machine's value by default.
+# Expanded, a literal $ is written $$.
 auth_enabled: false
 
 server:
@@ -23,11 +26,21 @@ schema_config:
   configs:
     - from: "2024-01-01"
       store: tsdb
-      object_store: filesystem
+      object_store: ${LOKI_OBJECT_STORE:-filesystem}
       schema: v13
       index:
         prefix: index_
         period: 24h
+
+storage_config:
+  aws:
+    bucketnames: ${S3_BUCKET:-}
+    region: ${S3_REGION:-}
+    endpoint: ${S3_ENDPOINT:-}
+    insecure: ${S3_INSECURE:-false}
+    s3forcepathstyle: ${S3_PATH_STYLE:-false}
+  # Under the telemetry bucket's loki/ prefix, beside Tempo's and Pyroscope's.
+  object_prefix: ${S3_PREFIX:-}
 
 limits_config:
   # OTLP attributes that aren't index labels are kept as structured metadata,
@@ -39,7 +52,7 @@ limits_config:
 compactor:
   working_directory: /loki/compactor
   retention_enabled: true
-  delete_request_store: filesystem
+  delete_request_store: ${LOKI_OBJECT_STORE:-filesystem}
 
 pattern_ingester:
   enabled: true

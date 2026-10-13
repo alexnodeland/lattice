@@ -113,6 +113,8 @@ test("every read has its own path", async () => {
     ],
     [queries.reflexr.schedules("acme", "ws_1"), "/reflexr/v1/workspaces/ws_1/schedules"],
     [queries.grantr.members("acme"), "/grantr/v1/tenants/acme/members"],
+    [queries.grantr.groups("acme"), "/grantr/v1/tenants/acme/groups"],
+    [queries.grantr.keyring("acme"), "/grantr/v1/tenants/acme/keys"],
     [queries.portalr.spend("acme"), "/portalr/v1/spend"],
     [queries.grantr.grants("acme", "ws_1"), "/grantr/v1/tenants/acme/grants"],
     [queries.grantr.restrictions("acme", "ws_1"), "/grantr/v1/tenants/acme/restrictions"],
@@ -121,7 +123,11 @@ test("every read has its own path", async () => {
     await client.fetchQuery(options as unknown as Parameters<QueryClient["fetchQuery"]>[0]);
     expect(seen.at(-1)?.url.pathname).toBe(path);
   }
-  const grantsRead = seen.find((each) => each.url.pathname === "/grantr/v1/tenants/acme/grants");
+  const grantsRead = seen.find(
+    (each) =>
+      each.url.pathname === "/grantr/v1/tenants/acme/grants" &&
+      each.url.searchParams.has("workspace"),
+  );
   expect(grantsRead?.url.searchParams.get("workspace")).toBe("ws_1");
   expect(grantsRead?.headers.get("x-tenant")).toBe("acme");
   expect(seen.at(-1)?.url.searchParams.get("workspace")).toBe("ws_1");

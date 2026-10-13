@@ -107,6 +107,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `/` | Where admin opens: its last choice while still the person's, their one tenant, every tenant for an operator, a choice, or no access |
 | `/t/$tenant` | A tenant someone owns or administers, in admin's frame, with the areas grantr allows |
 | `/t/$tenant/` | Home: members, workspaces, feedback, failed turns and spend, each a card from one read, with its own state |
+| `/t/$tenant/access/members`, `/groups`, `/keys` | Access: members, invited or made as service principals, and removed; groups; and keys, a secret shown once, and revoked. Each part where grantr allows its read, as a table or, on a phone, cards ([ADR-0024](adr/0024-access-members-groups-and-keys.md)) |
 | `/deployment` | Every tenant, for operators, with the deployment's areas alone |
 | `/deployment/` | Home: the tenants, and their spend |
 
@@ -131,6 +132,9 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `SegmentedFilter` | One filter of a few, side by side |
 | `TenantSwitcher` | admin's tenant, or every tenant, and a menu of the others |
 | `StatCard` | One figure, read on its own, or why there's none |
+| `ItemTable` | Items as a table from 640 pixels, each row named by its first cell, and as headed cards below, one in the accessibility tree; an `EmptyState` with none |
+| `TabNav`, `TabLink` | An area's parts as tabs of links, the current one marked with `aria-current` |
+| `CheckboxGroup` | Several choices, any of them checked, named by a legend |
 | `SignIn`, `Account` | Signing in, and the account menu over a session, for both UIs |
 | `Dialog` | A dialog over the page, opened by its caller, with where focus starts and where it returns ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
 | `Menu` | A button and the actions it opens, each of which may be disabled while it's being done |

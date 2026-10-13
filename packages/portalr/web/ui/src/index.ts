@@ -36,10 +36,12 @@ export {
   Thumbs,
   ToolCall,
 } from "./chat";
+export { type CheckboxChoice, CheckboxGroup } from "./checkbox";
 export { ConfirmDialog } from "./confirm-dialog";
 export { Dialog } from "./dialog";
 export { EmptyState } from "./empty-state";
 export { Icon } from "./icon";
+export { type Column, ItemTable } from "./item-table";
 export { Markdown } from "./markdown";
 export { Lockup, Mark, type Ui } from "./marks";
 export { Menu, type MenuItem } from "./menu";
@@ -55,6 +57,7 @@ export { StatCard } from "./stat-card";
 export { StatusBadge, type Tone } from "./status-badge";
 export { Switch } from "./switch";
 export { type Choice, Switcher, TenantSwitcher } from "./switcher";
+export { TabLink, TabNav } from "./tab-nav";
 export { Table } from "./table";
 export { TextField } from "./text-field";
 export { TextLink } from "./text-link";

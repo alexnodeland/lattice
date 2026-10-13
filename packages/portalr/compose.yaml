@@ -1,8 +1,10 @@
-# portalr's acceptance stack (lattice ADR-0015): its test application, and the tools its readers
-# read, as stackr runs them, with stackr's own configurations. Langfuse and LiteLLM aren't here:
-# their reads are unavailable (portalr ADR-0011). `moon run portalr:api` runs it. With the `bdd`
-# profile, Supabase Auth (GoTrue, alone) and its database come too, for the UIs' scenarios
-# (`moon run app:bdd`, portalr ADR-0013).
+# portalr's acceptance stack (lattice ADR-0015): its test application, the tools its readers read,
+# and stackr's Collector, which the application sends its own telemetry through, each as stackr
+# runs it, with stackr's own configurations (portalr ADR-0023). Langfuse and LiteLLM aren't here:
+# their reads are unavailable (portalr ADR-0011), or unconfigured where their URL is set empty.
+# `moon run portalr:api` runs it. With the `bdd` profile, Supabase Auth (GoTrue, alone) and its
+# database come too, for the UIs' scenarios (`moon run app:bdd` and `admin:bdd`, portalr
+# ADR-0013 and ADR-0023).
 #
 # Ports are the system's to pick, which the scripts read back.
 
@@ -20,6 +22,15 @@ services:
     environment:
       PORTALR_JWT_SECRET: &secret portalr-test-only-jwt-secret-not-for-use
       PORTALR_GOTRUE_URL: http://gotrue:9999
+      # Empty leaves the tool unconfigured, as admin's scenarios run it; unset, it's unavailable.
+      PORTALR_LANGFUSE_URL: ${PORTALR_LANGFUSE_URL-http://langfuse:3000}
+      PORTALR_LITELLM_URL: ${PORTALR_LITELLM_URL-http://litellm:4000}
+      # Its own telemetry, through stackr's Collector, as an application's goes (portalr ADR-0023),
+      # but not of compose's health check, which asks for config.json every two seconds.
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_PYTHON_FASTAPI_EXCLUDED_URLS: portalr/config.json
+      # Each second, so a scenario reads a turn's metrics back while it runs.
+      OTEL_METRIC_EXPORT_INTERVAL: "1000"
     # Loki's image has no shell or probe of its own, so the application's check waits for it too.
     healthcheck:
       test:
@@ -34,12 +45,32 @@ services:
       timeout: 5s
       retries: 60
     depends_on:
+      otel-collector:
+        condition: service_started
       tempo:
         condition: service_healthy
       loki:
         condition: service_started
       prom-label-proxy:
         condition: service_healthy
+
+  # stackr's Collector, with its own configuration: it copies the libraries' tenant attributes to
+  # `tenant.id`, and sends traces to Tempo alone, metrics to Prometheus, and logs to Loki. It
+  # publishes nothing; the application reaches it on compose's network.
+  otel-collector:
+    profiles: [app]
+    image: otel/opentelemetry-collector-contrib:0.161.0@sha256:fd328de2552466ad78385e1b1289c3f2402b1c45f265b252aab1955b42845ac1
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      STACKR_ENVIRONMENT: test
+      STACKR_TRACES_EXPORTERS: "[otlp_grpc/tempo]"
+      LANGFUSE_OTLP_AUTH: unused
+    volumes:
+      - ../stackr/deploy/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    depends_on:
+      - tempo
+      - loki
+      - prometheus
 
   tempo:
     image: grafana/tempo:3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5

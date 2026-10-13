@@ -16,7 +16,10 @@ export interface Surfaces {
   readonly artifactr: string;
   /** reflexr's router, such as `/reflexr/v1`. */
   readonly reflexr: string;
-  /** The origin grantr's router is mounted at; its paths carry `/grantr/v1` themselves. */
+  /**
+   * The origin grantr's router is mounted at; its paths carry `/grantr/v1` themselves, as
+   * portalr's carry `/portalr/v1`, so portalr's client is on it too.
+   */
   readonly grantr: string;
 }
 
@@ -24,9 +27,10 @@ export interface Api {
   readonly artifactr: Client<ArtifactrPaths>;
   readonly reflexr: Client<ReflexrPaths>;
   readonly grantr: Client<GrantrPaths>;
+  readonly portalr: Client<PortalrPaths>;
 }
 
-/** The three clients, each sending the session that `session()` returns at the time. */
+/** The four clients, each sending the session that `session()` returns at the time. */
 export function createApi(surfaces: Surfaces, session: () => Session): Api {
   const signed: Middleware = {
     onRequest({ request }) {
@@ -39,10 +43,11 @@ export function createApi(surfaces: Surfaces, session: () => Session): Api {
   const artifactr = createClient<ArtifactrPaths>({ baseUrl: surfaces.artifactr });
   const reflexr = createClient<ReflexrPaths>({ baseUrl: surfaces.reflexr });
   const grantr = createClient<GrantrPaths>({ baseUrl: surfaces.grantr });
-  for (const client of [artifactr, reflexr, grantr] as const) {
+  const portalr = createClient<PortalrPaths>({ baseUrl: surfaces.grantr });
+  for (const client of [artifactr, reflexr, grantr, portalr] as const) {
     client.use(signed);
   }
-  return { artifactr, reflexr, grantr };
+  return { artifactr, reflexr, grantr, portalr };
 }
 
 /** The headers that name a request's tenant. */

@@ -1,8 +1,7 @@
-import { AppShell, NavLink, SideNav, Switcher } from "@portalr/ui";
+import { Account, AppShell, NavLink, SideNav, Switcher } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useMatchRoute, useNavigate } from "@tanstack/react-router";
 import { FileText, MessageSquare, Play, Workflow, Zap } from "lucide-react";
-import { Account } from "../../../../../account";
 import { useWorkspace, WorkspaceStreams } from "../../../../../workspace";
 
 /**

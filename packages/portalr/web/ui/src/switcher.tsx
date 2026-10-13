@@ -101,3 +101,56 @@ export function Switcher({
     </Menu.Root>
   );
 }
+
+/**
+ * Where an admin is: a tenant, or every tenant, and a menu of the others. Choosing a tenant hands
+ * its id to the caller; `everyTenant`, the link for operators, is offered only where given.
+ */
+export function TenantSwitcher({
+  tenant,
+  tenants,
+  onTenant,
+  everyTenant,
+}: {
+  /** The tenant chosen, or null for every tenant. */
+  tenant: string | null;
+  tenants: readonly Choice[];
+  onTenant: (id: string) => void;
+  /** A link to every tenant, such as the router's, for whoever may see them all. */
+  everyTenant?: ReactElement;
+}) {
+  const named = tenant ?? "All tenants";
+  return (
+    <Menu.Root>
+      <Menu.Trigger
+        aria-label={`Tenant: ${named}`}
+        className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-edge bg-paper px-3 py-1.5 font-semibold text-fg text-sm outline-offset-2 hover:bg-wash focus-visible:outline-2 focus-visible:outline-focus"
+      >
+        <span aria-hidden="true" className="truncate">
+          {named}
+        </span>
+        <Icon icon={ChevronDown} className="ml-auto text-muted" />
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner sideOffset={6} align="start" className="z-30">
+          <Menu.Popup className={popup}>
+            {tenants.length > 0 && (
+              <Choices
+                label="Tenants"
+                choices={tenants}
+                chosen={tenant ?? ""}
+                onChoose={onTenant}
+              />
+            )}
+            {everyTenant && tenants.length > 0 && <Menu.Separator className={separator} />}
+            {everyTenant && (
+              <Menu.LinkItem render={everyTenant} className={item}>
+                All tenants
+              </Menu.LinkItem>
+            )}
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+}

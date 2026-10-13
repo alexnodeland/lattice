@@ -1,4 +1,13 @@
-import { type Artifactr, type ArtifactrV1, type GrantrApi, keys, thumbs } from "@portalr/client";
+import {
+  type Artifactr,
+  type ArtifactrV1,
+  allowedIn,
+  type GrantrApi,
+  keys,
+  thumbs,
+  useMe,
+  workspaceOf,
+} from "@portalr/client";
 import {
   Composer,
   Message,
@@ -18,8 +27,6 @@ import {
 } from "@tanstack/react-query";
 import { CatchBoundary, createFileRoute, Link } from "@tanstack/react-router";
 import { type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { allowedIn, workspaceOf } from "../../../../../../../allowed";
-import { useMe } from "../../../../../../../me";
 import { ShareDialog } from "../../../../../../../share-dialog";
 import { ThreadMenu } from "../../../../../../../thread-menu";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";

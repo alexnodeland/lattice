@@ -1,8 +1,7 @@
-import { Plain, Row, RowLink, Rows } from "@portalr/ui";
+import { landing } from "@portalr/client";
+import { Account, Plain, Row, RowLink, Rows } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { Account } from "../../account";
-import { landing } from "../../landing";
 
 /** Where a signed-in person lands: their one tenant, a choice of several, or no access. */
 export const Route = createFileRoute("/_signed/")({

@@ -5,8 +5,10 @@
  * both.
  */
 
+export { Account } from "./account";
 export { AccountMenu, type Appearance } from "./account-menu";
 export { AppShell } from "./app-shell";
+export { useAppearance } from "./appearance";
 export {
   ArtifactContent,
   type Data,
@@ -48,9 +50,11 @@ export { SectionTitle } from "./section-title";
 export { type Segment, SegmentedFilter } from "./segmented-filter";
 export { SelectField } from "./select-field";
 export { NavLink, SideNav } from "./side-nav";
+export { SignIn } from "./sign-in";
+export { StatCard } from "./stat-card";
 export { StatusBadge, type Tone } from "./status-badge";
 export { Switch } from "./switch";
-export { type Choice, Switcher } from "./switcher";
+export { type Choice, Switcher, TenantSwitcher } from "./switcher";
 export { Table } from "./table";
 export { TextField } from "./text-field";
 export { TextLink } from "./text-link";

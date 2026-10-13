@@ -1,8 +1,7 @@
-"""Checks on the text the libraries store.
+"""Checks on text before it is stored.
 
-PostgreSQL's text can't hold a NUL character, so every storage of every library refuses one
-alike, before its ``authorize`` hook hears the request (artifactr ADR-0061, reflexr ADR-0060).
-Each library raises its own error when :func:`holds_nul` finds one.
+PostgreSQL's text can't hold a NUL character, so a storage that may be PostgreSQL refuses one
+before anything is stored. :func:`holds_nul` finds one, and the caller raises its own error.
 """
 
 from collections.abc import Collection, Mapping

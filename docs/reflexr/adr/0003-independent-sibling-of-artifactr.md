@@ -1,6 +1,6 @@
 # ADR-0003: An independent sibling of artifactr, with aligned conventions
 
-**Status:** Accepted, amended by [lattice ADR-0018](../../adr/0018-lattice-core-what-the-libraries-share.md)
+**Status:** Accepted, amended by [lattice ADR-0018](../../adr/0018-lattice-core-what-the-libraries-share.md): artifactr and reflexr still import neither each other nor grantr, and share lattice-core
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 

@@ -61,8 +61,8 @@ Each record captures one decision: the context that forced it, the options consi
 | [0057](0057-reserved-publishers.md) | Reserved publishers | Accepted |
 | [0058](0058-an-mcp-client-acts-for-its-person.md) | An MCP client acts for its person | Accepted |
 | [0059](0059-the-tenant-on-log-records.md) | The tenant on log records | Accepted |
-| [0060](0060-a-nul-character-is-refused-at-the-boundary.md) | A NUL character is refused at the boundary | Accepted, amended by lattice 0018 |
-| [0061](0061-the-openapi-documents-describe-refusals.md) | The OpenAPI documents describe refusals | Accepted, amended by lattice 0018 |
+| [0060](0060-a-nul-character-is-refused-at-the-boundary.md) | A NUL character is refused at the boundary | Accepted |
+| [0061](0061-the-openapi-documents-describe-refusals.md) | The OpenAPI documents describe refusals | Accepted |
 | [0062](0062-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted |
 | [0063](0063-a-stored-rules-history.md) | A stored rule's history, read by its name | Accepted |
 | [0064](0064-the-protocol-schema-names-reflexrs-own-events.md) | The protocol schema names reflexr's own events | Accepted |

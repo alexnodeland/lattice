@@ -14,7 +14,7 @@ SRC = Path(__file__).parent.parent / "src" / "reflexr"
 
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (reflexr packages it may import, third-party packages it may import)
-    # lattice-core's helpers, which every library shares (lattice ADR-0018).
+    # lattice-core's helpers, shared with artifactr (lattice ADR-0018).
     "core": ({"reflexr.core"}, {"pydantic", "pydantic_core", "lattice_core.schema"}),
     "telemetry": ({"reflexr.core", "reflexr.telemetry"}, {"opentelemetry"}),
     "workspace": (

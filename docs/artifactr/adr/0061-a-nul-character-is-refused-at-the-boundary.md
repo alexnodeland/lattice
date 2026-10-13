@@ -1,6 +1,6 @@
 # ADR-0061: A NUL character is refused at the boundary
 
-**Status:** Accepted, amended by [lattice ADR-0018](../../adr/0018-lattice-core-what-the-libraries-share.md)
+**Status:** Accepted
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

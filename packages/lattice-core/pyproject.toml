@@ -1,7 +1,7 @@
 [project]
 name = "lattice-core-ai"
 version = "0.1.0.dev0"
-description = "What lattice's libraries share and must keep identical: their JSON Schema and text helpers, and in time their SQL and OpenTelemetry setup."
+description = "What lattice's packages share and must keep identical."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -47,6 +47,8 @@ dev = [
 requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
 
+# Distributed as lattice-core-ai, since lattice-core on PyPI is an unrelated project (lattice
+# ADR-0018); imported as lattice_core.
 [tool.uv.build-backend]
 module-name = "lattice_core"
 

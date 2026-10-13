@@ -55,7 +55,7 @@ Each package keeps its own name, version, changelog and releases. They share one
   <img alt="People use portalr, which talks to artifactr and reflexr. relayr carries events from artifactr to reflexr, and reflexr's runs act back in artifactr. grantr checks every command and read, evalr judges the agents, and everything runs on stackr's stack." src="docs/assets/readme/flow-light.svg" width="100%">
 </picture>
 
-A person chats with an agent in **artifactr**, through **portalr** or any client of artifactr's REST, WebSocket and MCP surfaces. **relayr** turns what happens in the chat into events for **reflexr**'s rules, and the rules' runs act back in the chat as proposals and notices. **grantr** decides who may do what, **evalr** measures how well the agents do it, and **stackr** runs it all.
+A person chats with an agent in **artifactr**, through **portalr** or any client of artifactr's REST, WebSocket and MCP surfaces. **relayr** turns what happens in the chat into events for **reflexr**'s rules, and the rules' runs act back in the chat as proposals and notices. **grantr** decides who may do what, **evalr** measures how well the agents do it, and **stackr** runs it all. Underneath, the packages share **lattice-core**, the infrastructure they must keep identical.
 
 <details>
 <summary><b>🔁 Follow one rule from chat to live</b></summary>
@@ -102,7 +102,7 @@ sequenceDiagram
 | **[relayr](packages/relayr)** | The bridge between artifactr and reflexr: chat events become events for rules, and runs act back in the chat. Rules can be drafted in chat. | 🚧 [v0.1 in progress](docs/relayr/rfcs/0001-v0.1-implementation-plan.md) |
 | **[grantr](packages/grantr)** | Identity and access: tenants, members, groups, roles, service principals and restricted items, checked before every command and read, with row-level security | ✅ v0.1 |
 | **[portalr](packages/portalr)** | The portal: an app UI to chat with agents and see their artifacts, proposals and runs, and an admin UI for access, feedback, traces and spend | 🚧 [v0.1 in progress](docs/portalr/rfcs/0001-v0.1-implementation-plan.md) |
-| **[lattice-core](packages/lattice-core)** | What the libraries share and must keep identical, which each depends on and re-exports; distributed as `lattice-core-ai` | 🚧 [moving in](docs/adr/0018-lattice-core-what-the-libraries-share.md) |
+| **[lattice-core](packages/lattice-core)** | What the packages share and must keep identical: infrastructure each depends on and re-exports, never imported by an application | 🚧 [moving in](docs/adr/0018-lattice-core-what-the-libraries-share.md) |
 | **[stackr](packages/stackr)** | The stack the libraries run on (Supabase or PostgreSQL, LiteLLM, OpenTelemetry, Grafana, Langfuse), an application template, and hosting recipes | ✅ template · 🚧 [hosting recipes](docs/stackr/rfcs/0004-hosting-recipes.md) |
 
 > [!NOTE]

@@ -13,7 +13,7 @@ it read, and says it is partial.
 import asyncio
 from collections import defaultdict
 from datetime import date, timedelta
-from typing import Annotated, Final, Self
+from typing import Final, Self
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
@@ -50,7 +50,7 @@ def workspace_tag(tenant: Tenant, workspace: str) -> str:
 class UsageQuery(Span):
     """Which usage to read: a window of at most ``MOST_DAYS``, and the workspaces to split it by."""
 
-    workspaces: Annotated[list[Id], Field(default_factory=list, max_length=MOST_WORKSPACES)]
+    workspaces: list[Id] = Field(default_factory=list, max_length=MOST_WORKSPACES)
 
     @model_validator(mode="after")
     def _at_most_a_quarter(self) -> Self:

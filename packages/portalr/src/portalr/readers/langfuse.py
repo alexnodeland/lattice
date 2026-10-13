@@ -12,9 +12,10 @@ answers what it read, and says it is partial (portalr ADR-0027).
 """
 
 import asyncio
+import contextlib
 import json
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Annotated, Final, Literal
 
 import httpx
@@ -45,9 +46,6 @@ BATCHES_AT_ONCE: Final = 4
 
 DEADLINE: Final = 20.0
 """How long a read may take, in seconds: past it, the read answers what it has, partial."""
-
-EARLIEST: Final = datetime.min.replace(tzinfo=UTC)
-"""The earliest moment there is, which a lookback stops at."""
 
 LOOKBACK: Final = timedelta(days=7)
 """How far before a window a trace may start and still be scored in it: a late thumb, or an
@@ -84,6 +82,9 @@ class Score(BaseModel):
     comment: str | None = None
     evaluator: str | None = None
     """The evaluator that gave it, from evalr's metadata; None for a person's feedback."""
+    feedback_type: str | None = None
+    """The feedback type a person's score came from, such as ``thumbs``, from the mirror's
+    metadata; None for an evaluator's."""
     workspace: str | None = None
     """The workspace its trace is tagged with; None for a trace tagged with none."""
 
@@ -134,6 +135,12 @@ class _Score(BaseModel):
         named = (self.metadata or {}).get("evaluator")
         return named if isinstance(named, str) else None
 
+    @property
+    def feedback_type(self) -> str | None:
+        """The feedback type the libraries' mirrors name in a person's score's metadata, if any."""
+        named = (self.metadata or {}).get("feedback_type")
+        return named if isinstance(named, str) else None
+
 
 class _Scores(BaseModel):
     data: list[_Score]
@@ -145,9 +152,10 @@ _SCORES: Final = TypeAdapter(_Scores)
 
 
 def trace_parameters(tenant: Tenant, span: Span, workspace: str | None = None) -> dict[str, str]:
-    """The observations API's parameters: each root observation in the span with the tags.
+    """The observations API's parameters: each root observation with the tags that may be scored.
 
-    The tenant's tag, and the workspace's, if one is named.
+    A trace may be scored in the span if it started in it or up to ``LOOKBACK`` before it. The
+    tags are the tenant's, and the workspace's, if one is named.
     """
     tags = [tenant_tag(tenant), *([f"{WORKSPACE_TAG}{workspace}"] if workspace else [])]
     conditions = [
@@ -157,7 +165,7 @@ def trace_parameters(tenant: Tenant, span: Span, workspace: str | None = None) -
             "type": "datetime",
             "column": "startTime",
             "operator": ">=",
-            "value": span.start.isoformat(),
+            "value": (span.start - LOOKBACK).isoformat(),
         },
         {"type": "datetime", "column": "startTime", "operator": "<", "value": span.end.isoformat()},
     ]
@@ -174,20 +182,44 @@ def score_parameters(traces: list[str], span: Span) -> dict[str, str]:
     }
 
 
-@dataclass(frozen=True)
-class Scores:
-    """The scores a read took, and whether they are all there were."""
+class Scores(BaseModel):
+    """The scores a read took, whether they are all there were, and since when they are known."""
+
+    model_config = ConfigDict(frozen=True)
 
     scores: list[Score]
     complete: bool
+    known_from: datetime | None = None
+    """Where a read stopped short of the oldest traces: the start of the oldest it read. Before
+    it, scores are unknown, not none. None when every trace was read."""
 
 
 @dataclass
 class _Traces:
-    """A tenant's traces, each with when it started and its workspace, and whether all were read."""
+    """A tenant's traces, each with when it started and its workspace, and whether all were read.
+
+    ``oldest`` is the start of the oldest trace read, and ``ordered`` whether Langfuse sent them
+    newest first, as each read assumes and checks.
+    """
 
     found: dict[str, tuple[datetime, str | None]]
     complete: bool
+    oldest: datetime | None = None
+    ordered: bool = True
+
+    def known_from(self, span: Span) -> datetime | None:
+        """Since when the traces are all read: None if they all were.
+
+        Else from the oldest read; or from the span's end, knowing none of it, if they weren't
+        sent newest first.
+        """
+        if self.complete:
+            return None
+        return self.oldest if self.ordered and self.oldest is not None else span.end
+
+
+class _Stop(Exception):
+    """A batch of scores was refused: raised in its task so the task group cancels the others."""
 
 
 @dataclass(frozen=True)
@@ -204,16 +236,18 @@ class Langfuse:
     project: str
     client: httpx.AsyncClient = field(default_factory=httpx.AsyncClient)
 
-    async def scores(self, tenant: Tenant, window: Window) -> Ok[list[Score]] | Unavailable:
-        """The tenant's scores in the window, newest first, as many as the window's limit.
+    async def scores(self, tenant: Tenant, window: Window) -> Ok[Scores] | Unavailable:
+        """The tenant's scores in the window, sorted newest first, as many as the window's limit.
 
-        Its newest traces are read first, so a read that stops at the limit holds the newest.
+        Its newest traces' scores are asked for first, but several batches at once, so a read
+        that stops at the limit holds scores from about its newest traces, not strictly the
+        newest scores; it says it is partial.
         """
         every = await self.every_score(tenant, window, most=window.limit)
         if isinstance(every, Unavailable):
             return every
         newest = sorted(every.data.scores, key=lambda score: score.timestamp, reverse=True)
-        return Ok(data=newest[: window.limit])
+        return Ok(data=every.data.model_copy(update={"scores": newest[: window.limit]}))
 
     async def every_score(
         self,
@@ -229,51 +263,63 @@ class Langfuse:
         many pages at most; their scores are read ``BATCHES_AT_ONCE`` requests at a time, each
         paged to its end. Past a bound, or the ``DEADLINE``, it answers what it read, partial.
         """
-        found: list[Score] = []
-        complete = True
+        found: dict[str, Score] = {}
+        traced: _Traces | Unavailable | None = None
+        known_from: datetime | None = None
         try:
             async with asyncio.timeout(DEADLINE):
                 traced = await self._traces(tenant, span, workspace)
                 if isinstance(traced, Unavailable):
                     return traced
-                complete = traced.complete
-                newest = sorted(
-                    traced.found, key=lambda trace: traced.found[trace][0], reverse=True
-                )
+                read = traced
+                known_from = read.known_from(span)
+                newest = sorted(read.found, key=lambda trace: read.found[trace][0], reverse=True)
                 gate = asyncio.Semaphore(BATCHES_AT_ONCE)
+                refused: list[Unavailable] = []
 
-                async def batch(traces: list[str]) -> Unavailable | None:
+                async def batch(traces: list[str]) -> bool:
                     async with gate:
                         if len(found) >= most:
-                            return None
-                        return await self._scores_of(traces, traced, span, found, most)
+                            return False
+                        scored = await self._scores_of(traces, read, span, found, most)
+                        if isinstance(scored, Unavailable):
+                            refused.append(scored)
+                            raise _Stop
+                        return scored
 
-                async with asyncio.TaskGroup() as group:
-                    tasks = [
-                        group.create_task(batch(newest[at : at + TRACES_PER_READ]))
-                        for at in range(0, len(newest), TRACES_PER_READ)
-                    ]
-                for task in tasks:
-                    if (refused := task.result()) is not None:
-                        return refused
+                tasks: list[asyncio.Task[bool]] = []
+                with contextlib.suppress(_Stop):
+                    async with asyncio.TaskGroup() as group:
+                        tasks.extend(
+                            group.create_task(batch(newest[at : at + TRACES_PER_READ]))
+                            for at in range(0, len(newest), TRACES_PER_READ)
+                        )
+                if refused:
+                    return refused[0]
+                complete = read.complete and all(task.result() for task in tasks)
         except TimeoutError:
+            if not isinstance(traced, _Traces):
+                return Unavailable(reason="langfuse didn't answer in time")
             complete = False
-        complete = complete and len(found) < most
-        return Ok(data=Scores(scores=found[:most], complete=complete))
+        return Ok(
+            data=Scores(
+                scores=list(found.values())[:most],
+                complete=complete and len(found) < most,
+                known_from=known_from,
+            )
+        )
 
     async def _traces(
         self, tenant: Tenant, span: Span, workspace: str | None
     ) -> _Traces | Unavailable:
-        """The tenant's traces that may be scored in the span: started up to ``LOOKBACK`` before."""
-        # A week before the start, or as far back as there is.
-        looked = Span(start=span.start - min(LOOKBACK, span.start - EARLIEST), end=span.end)
+        """The tenant's traces that may be scored in the span, newest first, so many pages."""
         tag = tenant_tag(tenant)
         traces = _Traces(found={}, complete=True)
         cursor: str | None = None
         seen: set[str] = set()
         for _ in range(MOST_TRACE_PAGES):
             params = {
-                **trace_parameters(tenant, looked, workspace),
+                **trace_parameters(tenant, span, workspace),
                 "limit": str(TRACES_PER_PAGE),
                 **({"cursor": cursor} if cursor else {}),
             }
@@ -292,6 +338,11 @@ class Langfuse:
                 return Unavailable(
                     reason="langfuse answered observations without their traces' tags"
                 )
+            # Langfuse sends the newest first, though it doesn't promise to: checked as read.
+            for observation in observed.data:
+                if traces.oldest is not None and observation.start > traces.oldest:
+                    traces.ordered = False
+                traces.oldest = min(traces.oldest or observation.start, observation.start)
             # Each trace's tags checked again: the tenant's, and the workspace's, if one is named.
             traces.found |= {
                 o.trace_id: (o.start, workspace_of(o.tags))
@@ -312,9 +363,12 @@ class Langfuse:
         return traces
 
     async def _scores_of(
-        self, batch: list[str], traced: _Traces, span: Span, found: list[Score], most: int
-    ) -> Unavailable | None:
-        """The batch's scores in the span, paged to the end or to `most`, added to `found`."""
+        self, batch: list[str], traced: _Traces, span: Span, found: dict[str, Score], most: int
+    ) -> bool | Unavailable:
+        """The batch's scores in the span, paged to the end or to `most`, added to `found` by id.
+
+        True if it read them all; False if it stopped at `most`, or at a page it had read.
+        """
         cursor: str | None = None
         seen: set[str] = set()
         while len(found) < most:
@@ -328,21 +382,25 @@ class Langfuse:
             )
             if page is None or isinstance(page, Unavailable):
                 return page or Unavailable(reason="langfuse has no scores API at that address")
-            found += [
-                Score(
+            found |= {
+                score.id: Score(
                     trace_id=trace,
                     evaluator=score.evaluator,
+                    feedback_type=score.feedback_type,
                     workspace=traced.found[trace][1],
                     **score.model_dump(exclude={"subject", "metadata"}),
                 )
                 for score in page.data
                 if (trace := score.subject.trace if score.subject else None) in batch
-            ]
+            }
             cursor = page.meta.cursor if page.meta else None
-            if not cursor or cursor in seen:
-                return None
+            if not cursor:
+                return True
+            if cursor in seen:
+                # A page that sends back to one already read: what was read is what there is.
+                return False
             seen.add(cursor)
-        return None
+        return False
 
     def trace_link(self, trace_id: str) -> str:
         """Langfuse's page for a trace."""

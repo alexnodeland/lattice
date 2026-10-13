@@ -165,6 +165,13 @@ export class Refused extends Error {
   }
 }
 
+/** Whether the server refused a read for what was asked: asking again would get the same. */
+export const refusedOutright = (error: unknown) =>
+  error instanceof Refused && error.status >= 400 && error.status < 500;
+
+/** A long read is tried again once, unless the server refused it outright. */
+const once = (count: number, error: unknown) => !refusedOutright(error) && count < 1;
+
 /** The query options of every read, over the given clients. */
 export function createQueries(api: Api) {
   const workspace = (tenant: string, id: string) => ({
@@ -450,6 +457,8 @@ export function createQueries(api: Api) {
                 params: { query: { start: window.start, end: window.end, limit: 1000 } },
               }),
             ),
+          // Reading scores takes Langfuse two steps: kept a minute.
+          staleTime: 60_000,
         }),
       /** One of the tenant's series over a window, from Prometheus. */
       metrics: (tenant: string, metric: Metric, window: TimeSpan) =>
@@ -487,7 +496,7 @@ export function createQueries(api: Api) {
             ),
           // Summing a window reads Langfuse at length: kept a while, and tried again once.
           staleTime: 10 * 60_000,
-          retry: 1,
+          retry: once,
         }),
       /**
        * The tenant's spend per day over a window, from its LiteLLM team, and each named
@@ -507,7 +516,7 @@ export function createQueries(api: Api) {
             ),
           // Summing a window reads LiteLLM at length: kept a while, and tried again once.
           staleTime: 10 * 60_000,
-          retry: 1,
+          retry: once,
         }),
       /** An operator's deep links into Langfuse and Grafana for a trace. */
       links: (user: string, trace: string) =>

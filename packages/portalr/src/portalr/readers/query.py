@@ -10,7 +10,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Final, Self
 
 from pydantic import (
-    AfterValidator,
+    AwareDatetime,
     BaseModel,
     ConfigDict,
     Field,
@@ -31,25 +31,23 @@ def quoted(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def _in_utc(at: datetime) -> datetime:
-    """A moment given with no zone, as one in UTC, so every moment compares with every other."""
-    return at if at.tzinfo is not None else at.replace(tzinfo=UTC)
-
-
-type Moment = Annotated[datetime, AfterValidator(_in_utc)]
-"""A moment: in UTC where it was given with no zone."""
+EARLIEST: Final = datetime(2000, 1, 1, tzinfo=UTC)
+"""The earliest a span may start: before anything the libraries record, and late enough that a
+reader may look back from it."""
 
 
 class Span(BaseModel):
-    """A span of time: its start, and its end, after it."""
+    """A span of time: its start, in 2000 or later, and its end, after it; each with its zone."""
 
     model_config = ConfigDict(frozen=True)
 
-    start: Moment
-    end: Moment
+    start: AwareDatetime
+    end: AwareDatetime
 
     @model_validator(mode="after")
     def _ends_after_it_starts(self) -> Self:
+        if self.start < EARLIEST:
+            raise ValueError(f"a span starts in {EARLIEST.year} or later")
         if self.end <= self.start:
             raise ValueError("a span ends after it starts")
         return self

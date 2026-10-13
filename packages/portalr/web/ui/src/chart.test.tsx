@@ -132,3 +132,60 @@ test("a line keeps its sign, a line ending at 0 is named, and labels don't overl
   expect(middle - top).toBeGreaterThanOrEqual(12);
   expect(bottom - middle).toBeGreaterThanOrEqual(12);
 });
+
+test("labels stay inside the plot, and a long name is cut, and given whole as a title", async () => {
+  await page.viewport(1024, 768);
+  const screen = await render(
+    <LineChart
+      label="All at the floor"
+      index={days}
+      series={[
+        { key: "a", name: "an evaluation with a long name" },
+        { key: "b", name: "b" },
+        { key: "c", name: "c" },
+      ]}
+      data={[{ day: "2026-10-12", a: 0, b: 0, c: 0 }]}
+      domain={[0, 1]}
+    />,
+  );
+  await expect.element(screen.getByRole("figure", { name: "All at the floor" })).toBeVisible();
+  await expect.poll(() => document.querySelectorAll("svg text title").length).toBe(1);
+  expect(document.querySelector("svg text title")?.textContent).toBe(
+    "an evaluation with a long name",
+  );
+  const labels = [...document.querySelectorAll("svg text")].filter((text) =>
+    ["an evaluation…", "b", "c"].includes(text.lastChild?.textContent ?? ""),
+  );
+  expect(labels).toHaveLength(3);
+  const floor = Math.max(
+    ...[...document.querySelectorAll(".recharts-cartesian-grid-horizontal line")].map((line) =>
+      Number(line.getAttribute("y1")),
+    ),
+  );
+  // Each label's middle, 4px above its baseline, is inside the plot.
+  for (const label of labels) {
+    expect(Number(label.getAttribute("y")) - 4).toBeLessThanOrEqual(floor);
+  }
+});
+
+test("the first rows a read didn't reach are shaded, and named so", async () => {
+  await page.viewport(1024, 768);
+  const screen = await render(
+    <BarChart
+      label="Partly read"
+      index={days}
+      series={[{ key: "up", name: "Thumbs up" }]}
+      data={[
+        { day: "10-11", up: null },
+        { day: "10-12", up: null },
+        { day: "10-13", up: 2 },
+      ]}
+      unknown={2}
+    />,
+  );
+  await expect.element(screen.getByRole("figure", { name: "Partly read" })).toBeVisible();
+  await expect.poll(() => document.querySelectorAll(".recharts-reference-area").length).toBe(1);
+  expect([...document.querySelectorAll("svg text")].map((text) => text.textContent)).toContain(
+    "Not read",
+  );
+});

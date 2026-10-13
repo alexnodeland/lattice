@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from portalr.readers import FeedbackQuery, Langfuse, Ok, Score, Unavailable, read_feedback
 from portalr.readers.feedback import COMMENTS, summarize
-from portalr.readers.langfuse import Scores
+from portalr.readers.langfuse import Scores, trace_parameters
 from portalr.readers.query import Span, days_in
 from portalr.tenant import allowed
 from tests.tools import Tool, json
@@ -32,6 +32,7 @@ def score(at: str, value: float | bool | str, evaluator: str | None = None, **fi
         source=fields.pop("source", "API"),
         timestamp=datetime.fromisoformat(at),
         evaluator=evaluator,
+        feedback_type=fields.pop("feedback_type", None if evaluator else "thumbs"),
         **fields,
     )
 
@@ -90,6 +91,8 @@ def test_thumbs_evaluations_and_comments_are_summed_by_day() -> None:
                 score("2026-10-11T11:00:00+00:00", True, source="ANNOTATION"),
                 # A person's number: neither a thumb nor what they wrote.
                 score("2026-10-11T11:00:00+00:00", 3),
+                # A person's yes-or-no of another feedback type: not a thumb.
+                score("2026-10-11T11:00:00+00:00", True, feedback_type="helpful"),
             ],
             complete=True,
         ),
@@ -111,6 +114,17 @@ def test_thumbs_evaluations_and_comments_are_summed_by_day() -> None:
     ]
     assert [c.text for c in summary.comments] == ["great", "wrong"]
     assert summary.complete
+    assert summary.known_from is None
+
+
+def test_the_days_before_the_oldest_trace_read_are_unknown() -> None:
+    def stopped(at: str) -> Scores:
+        return Scores(scores=[], complete=False, known_from=datetime.fromisoformat(at))
+
+    # The oldest trace read started on the 11th: the 12th on is known, the 11th isn't.
+    assert summarize(stopped("2026-10-11T10:00:00+00:00"), WINDOW).known_from == date(2026, 10, 12)
+    # It started before the window: every day of it is known.
+    assert summarize(stopped("2026-10-10T10:00:00+00:00"), WINDOW).known_from is None
 
 
 def test_the_newest_comments_alone_are_carried_and_a_partial_read_says_so() -> None:
@@ -144,6 +158,7 @@ def thumb(id: str, trace: str, value: int, at: str = "2026-10-11T01:00:00Z") -> 
         "value": value,
         "timestamp": at,
         "subject": {"kind": "trace", "id": trace},
+        "metadata": {"feedback_type": "thumbs"},
     }
 
 
@@ -182,7 +197,7 @@ async def test_every_page_is_read_and_a_named_workspaces_tag_is_checked_again() 
     assert asked[2].params["limit"] == "100"
 
 
-async def test_a_cursor_that_comes_round_again_ends_the_read_partial() -> None:
+async def test_a_trace_cursor_that_comes_round_again_ends_the_read_partial() -> None:
     looping = {
         "data": [{"traceId": "t1", "startTime": AT, "tags": ["tenant:acme"]}],
         "meta": {"cursor": "0"},
@@ -190,6 +205,24 @@ async def test_a_cursor_that_comes_round_again_ends_the_read_partial() -> None:
     tool = Tool(
         {
             "/api/public/v2/observations": paged([looping]),
+            "/api/public/v3/scores": json({"data": [thumb("s1", "t1", 1)]}),
+        }
+    )
+    langfuse = Langfuse("http://langfuse", project="p1", client=tool.client())
+    read = await langfuse.every_score(ACME, WINDOW)
+    assert isinstance(read, Ok)
+    assert not read.data.complete
+    assert read.data.known_from == datetime.fromisoformat(AT)
+    assert [s.id for s in read.data.scores] == ["s1"]
+    assert len(tool.requests) == 3
+
+
+async def test_a_score_cursor_that_comes_round_again_ends_the_read_partial_counting_once() -> None:
+    tool = Tool(
+        {
+            "/api/public/v2/observations": json(
+                {"data": [{"traceId": "t1", "startTime": AT, "tags": ["tenant:acme"]}]}
+            ),
             "/api/public/v3/scores": paged(
                 [{"data": [thumb("s1", "t1", 1)], "meta": {"cursor": "0"}}]
             ),
@@ -199,8 +232,10 @@ async def test_a_cursor_that_comes_round_again_ends_the_read_partial() -> None:
     read = await langfuse.every_score(ACME, WINDOW)
     assert isinstance(read, Ok)
     assert not read.data.complete
-    assert [s.id for s in read.data.scores] == ["s1", "s1"]
-    assert len(tool.requests) == 4
+    # The traces were all read: only the scores stopped short.
+    assert read.data.known_from is None
+    assert [s.id for s in read.data.scores] == ["s1"]
+    assert len(tool.requests) == 3
 
 
 async def test_traces_past_the_most_pages_make_the_read_partial(monkeypatch: Any) -> None:
@@ -219,7 +254,30 @@ async def test_traces_past_the_most_pages_make_the_read_partial(monkeypatch: Any
     read = await langfuse.every_score(ACME, WINDOW)
     assert isinstance(read, Ok)
     assert not read.data.complete
+    assert read.data.known_from == datetime.fromisoformat(AT)
     assert sum(r.url.path.endswith("observations") for r in tool.requests) == 2
+
+
+async def test_traces_not_sent_newest_first_leave_no_day_known(monkeypatch: Any) -> None:
+    monkeypatch.setattr("portalr.readers.langfuse.MOST_TRACE_PAGES", 2)
+    pages = [
+        {
+            "data": [{"traceId": f"t{n}", "startTime": at, "tags": ["tenant:acme"]}],
+            "meta": {"cursor": str(n + 1)},
+        }
+        # The second page is newer than the first: Langfuse didn't keep to newest first.
+        for n, at in enumerate(["2026-10-11T01:00:00Z", "2026-10-11T02:00:00Z", AT])
+    ]
+    tool = Tool(
+        {"/api/public/v2/observations": paged(pages), "/api/public/v3/scores": json({"data": []})}
+    )
+    langfuse = Langfuse("http://langfuse", project="p1", client=tool.client())
+    read = await langfuse.every_score(ACME, WINDOW)
+    assert isinstance(read, Ok)
+    assert read.data.known_from == WINDOW.end
+    summary = await read_feedback(langfuse, ACME, WINDOW)
+    assert isinstance(summary, Ok)
+    assert summary.data.known_from == date(2026, 10, 14)
 
 
 async def test_a_read_stops_at_most_and_exactly_at_it_is_partial() -> None:
@@ -255,7 +313,9 @@ async def test_a_read_stops_at_most_and_exactly_at_it_is_partial() -> None:
     assert both.data.complete
 
 
-async def test_a_read_past_its_deadline_answers_what_it_has(monkeypatch: Any) -> None:
+async def test_a_read_past_its_deadline_before_any_trace_is_unavailable(
+    monkeypatch: Any,
+) -> None:
     monkeypatch.setattr("portalr.readers.langfuse.DEADLINE", 0.05)
 
     async def slow(request: httpx.Request) -> httpx.Response:
@@ -268,7 +328,62 @@ async def test_a_read_past_its_deadline_answers_what_it_has(monkeypatch: Any) ->
         client=httpx.AsyncClient(transport=httpx.MockTransport(slow)),
     )
     read = await langfuse.every_score(ACME, WINDOW)
-    assert read == Ok(data=Scores(scores=[], complete=False))
+    assert read == Unavailable(reason="langfuse didn't answer in time")
+
+
+async def test_a_read_past_its_deadline_answers_the_scores_it_has(monkeypatch: Any) -> None:
+    monkeypatch.setattr("portalr.readers.langfuse.DEADLINE", 0.2)
+    monkeypatch.setattr("portalr.readers.langfuse.TRACES_PER_READ", 1)
+    traces = [{"traceId": f"t{n}", "startTime": AT, "tags": ["tenant:acme"]} for n in range(2)]
+
+    async def answer(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("observations"):
+            return httpx.Response(200, json={"data": traces})
+        trace = request.url.params["traceId"]
+        if trace == "t1":
+            # One batch's scores take too long; the other's are read.
+            await asyncio.sleep(5)
+        return httpx.Response(200, json={"data": [thumb(f"s-{trace}", trace, 1)]})
+
+    langfuse = Langfuse(
+        "http://langfuse",
+        project="p1",
+        client=httpx.AsyncClient(transport=httpx.MockTransport(answer)),
+    )
+    read = await langfuse.every_score(ACME, WINDOW)
+    assert isinstance(read, Ok)
+    assert [s.id for s in read.data.scores] == ["s-t0"]
+    assert not read.data.complete
+    assert read.data.known_from is None
+    # Nothing of the read is left running.
+    assert asyncio.all_tasks() == {asyncio.current_task()}
+
+
+async def test_a_batch_refused_stops_the_others(monkeypatch: Any) -> None:
+    monkeypatch.setattr("portalr.readers.langfuse.TRACES_PER_READ", 1)
+    traces = [{"traceId": f"t{n}", "startTime": AT, "tags": ["tenant:acme"]} for n in range(2)]
+    finished: list[str] = []
+
+    async def answer(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("observations"):
+            return httpx.Response(200, json={"data": traces})
+        trace = request.url.params["traceId"]
+        if trace == "t0":
+            return httpx.Response(503)
+        await asyncio.sleep(5)
+        finished.append(trace)
+        return httpx.Response(200, json={"data": []})
+
+    langfuse = Langfuse(
+        "http://langfuse",
+        project="p1",
+        client=httpx.AsyncClient(transport=httpx.MockTransport(answer)),
+    )
+    async with asyncio.timeout(1):
+        read = await langfuse.every_score(ACME, WINDOW)
+    assert read == Unavailable(reason="langfuse answered 503")
+    assert finished == []
+    assert asyncio.all_tasks() == {asyncio.current_task()}
 
 
 async def test_a_langfuse_without_its_score_api_is_unavailable() -> None:
@@ -289,16 +404,12 @@ async def test_a_langfuse_without_its_score_api_is_unavailable() -> None:
     )
 
 
-def test_a_moment_with_no_zone_is_in_utc() -> None:
-    naive = FeedbackQuery.model_validate(
-        {"start": "2026-10-11T00:00:00", "end": "2026-10-12T00:00:00Z"}
-    )
-    assert naive.start == START
-
-
-async def test_a_window_at_the_start_of_time_looks_back_no_further() -> None:
-    tool = Tool({"/api/public/v2/observations": json({"data": []})})
-    langfuse = Langfuse("http://langfuse", project="p1", client=tool.client())
-    earliest = datetime.min.replace(tzinfo=UTC)
-    read = await langfuse.every_score(ACME, Span(start=earliest, end=earliest + timedelta(days=1)))
-    assert read == Ok(data=Scores(scores=[], complete=True))
+def test_a_moment_has_its_zone_and_a_span_starts_this_century() -> None:
+    with pytest.raises(ValidationError, match="timezone"):
+        FeedbackQuery.model_validate(
+            {"start": "2026-10-11T00:00:00", "end": "2026-10-12T00:00:00Z"}
+        )
+    with pytest.raises(ValidationError, match="starts in 2000 or later"):
+        Span(start=datetime(1999, 12, 31, tzinfo=UTC), end=START)
+    earliest = Span(start=datetime(2000, 1, 1, tzinfo=UTC), end=START)
+    assert trace_parameters(ACME, earliest)["filter"].count("1999-12-25T00:00:00+00:00") == 1

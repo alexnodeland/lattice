@@ -18,6 +18,7 @@ import {
   PieChart,
   BarChart as RechartsBarChart,
   LineChart as RechartsLineChart,
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -54,9 +55,16 @@ const DASHES = ["0", "6 3", "2 3"] as const;
 const ink = (at: number) => INKS[at] ?? "var(--muted)";
 const dash = (at: number) => DASHES[at] ?? "0";
 
-/** The room a chart keeps to its right for its direct labels: enough for the longest, at most 96px. */
+/** The longest a direct label is, in characters: a longer name is cut, and given whole as a title. */
+const LONGEST_LABEL = 14;
+
+/** A series' name as its direct label: cut to `LONGEST_LABEL`, with an ellipsis. */
+const cut = (name: string) =>
+  name.length > LONGEST_LABEL ? `${name.slice(0, LONGEST_LABEL - 1)}…` : name;
+
+/** The room a chart keeps to its right for its direct labels: enough for the longest, cut. */
 const labelRoom = (series: readonly Series[]) =>
-  Math.min(96, 16 + 6 * Math.max(0, ...series.map((one) => one.name.length)));
+  16 + 6 * Math.max(0, ...series.map((one) => cut(one.name).length));
 
 /**
  * A series' pattern past the first, which is solid: its ink hatched at 45°, then at 135°; past
@@ -242,6 +250,29 @@ function Axes({
   );
 }
 
+/**
+ * The first rows of a chart that are unknown, rather than empty, shaded and named so: a read that
+ * stopped short of them. Their values are none, so the table shows them as "–".
+ */
+function Unknown({ data, index, rows }: { data: readonly Datum[]; index: string; rows: number }) {
+  const first = data[0]?.[index];
+  const last = data[Math.min(rows, data.length) - 1]?.[index];
+  if (rows <= 0 || first === undefined || last === undefined || first === null || last === null) {
+    return null;
+  }
+  return (
+    <ReferenceArea
+      x1={first}
+      x2={last}
+      fill="var(--line)"
+      fillOpacity={0.6}
+      stroke="none"
+      ifOverflow="extendDomain"
+      label={{ value: "Not read", position: "insideTop", fill: "var(--muted)" }}
+    />
+  );
+}
+
 /** Where a series is last drawn: its value in the last row it has one in, other than none. */
 function lastValue(data: readonly Datum[], key: string, bar: boolean): number | null {
   const row = data.findLast((one) => {
@@ -252,10 +283,14 @@ function lastValue(data: readonly Datum[], key: string, bar: boolean): number | 
   return typeof value === "number" ? value : null;
 }
 
+/** How far apart direct labels are kept, in px: a line of the chart's text. */
+const LABEL_GAP = 12;
+
 /**
  * Each series' name, in the margin to the plot's right, beside where it is last drawn: a line's
  * last point, or the middle of a bar series' last bar. The places are worked out from the data
- * and the chart's scale, then nudged apart, 12px at least, before anything is drawn.
+ * and the chart's scale, kept inside the plot's height, then nudged apart, `LABEL_GAP` at least,
+ * before anything is drawn; a name too long for the margin is cut, and given whole as a title.
  */
 function DirectLabels({
   data,
@@ -271,18 +306,33 @@ function DirectLabels({
   if (!scale || !plot) {
     return null;
   }
+  const top = plot.y + LABEL_GAP / 2;
+  const bottom = plot.y + plot.height - LABEL_GAP / 2;
   const placed = series
     .flatMap((one) => {
       const value = lastValue(data, one.key, bar);
       const y = value === null ? undefined : scale(bar ? value / 2 : value);
-      return typeof y === "number" ? [{ name: one.name, y }] : [];
+      return typeof y === "number"
+        ? [{ name: one.name, y: Math.min(Math.max(y, top), bottom) }]
+        : [];
     })
     .sort((a, b) => a.y - b.y);
-  // Each 12px below the one above, at least, so none overlaps.
+  // Each a gap below the one above, at least, so none overlaps; then, from the bottom, each a gap
+  // above the one below, so none is pushed out of the plot.
   for (const [at, label] of placed.entries()) {
     const above = placed[at - 1];
     if (above) {
-      placed[at] = { name: label.name, y: Math.max(label.y, above.y + 12) };
+      placed[at] = { name: label.name, y: Math.max(label.y, above.y + LABEL_GAP) };
+    }
+  }
+  for (let at = placed.length - 1; at >= 0; at -= 1) {
+    const label = placed[at];
+    const below = placed[at + 1];
+    if (label) {
+      placed[at] = {
+        name: label.name,
+        y: Math.min(label.y, below ? below.y - LABEL_GAP : bottom),
+      };
     }
   }
   return (
@@ -295,7 +345,8 @@ function DirectLabels({
           fill="var(--muted)"
           textAnchor="start"
         >
-          {label.name}
+          {cut(label.name) !== label.name && <title>{label.name}</title>}
+          {cut(label.name)}
         </text>
       ))}
     </g>
@@ -314,6 +365,7 @@ export function BarChart({
   series,
   format = String,
   diverging = false,
+  unknown = 0,
 }: {
   label: string;
   data: readonly Datum[];
@@ -321,6 +373,8 @@ export function BarChart({
   series: readonly Series[];
   format?: (value: number) => string;
   diverging?: boolean;
+  /** How many of the first rows are unknown, rather than empty: shaded, and named so. */
+  unknown?: number;
 }) {
   const id = useId();
   const drawn = series.slice(0, MAX_SERIES);
@@ -347,6 +401,7 @@ export function BarChart({
             {drawn.map((one, at) => at > 0 && <Hatch key={one.key} id={`${id}-${at}`} at={at} />)}
           </defs>
           <Axes index={index.key} shown={shown} />
+          <Unknown data={rows} index={index.key} rows={unknown} />
           {diverging && <ReferenceLine y={0} stroke="var(--edge)" />}
           <Tooltip
             cursor={{ fill: "var(--wash)" }}
@@ -380,6 +435,7 @@ export function LineChart({
   series,
   format = String,
   domain,
+  unknown = 0,
 }: {
   label: string;
   data: readonly Datum[];
@@ -388,6 +444,8 @@ export function LineChart({
   format?: (value: number) => string;
   /** The value axis's ends, such as [0, 1] for a rate; Recharts' own where none is given. */
   domain?: readonly [number, number];
+  /** How many of the first rows are unknown, rather than empty: shaded, and named so. */
+  unknown?: number;
 }) {
   const drawn = series.slice(0, MAX_SERIES);
   return (
@@ -398,6 +456,7 @@ export function LineChart({
           margin={{ top: 16, right: labelRoom(drawn), bottom: 0, left: 0 }}
         >
           <Axes index={index.key} shown={format} domain={domain} />
+          <Unknown data={data} index={index.key} rows={unknown} />
           <Tooltip
             cursor={{ stroke: "var(--edge)" }}
             content={(props) => <ChartTooltip {...props} series={drawn} shown={format} line />}

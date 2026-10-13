@@ -70,7 +70,7 @@ async def scored(langfuse: Langfuse, tenant: str) -> bool:
     window = Window(start=now - timedelta(hours=1), end=now + timedelta(minutes=10))
     answer = await langfuse.scores(allowed(tenant), window)
     for _ in range(TIMEOUT // 3):
-        if isinstance(answer, Ok) and any(score.trace_id == trace for score in answer.data):
+        if isinstance(answer, Ok) and any(score.trace_id == trace for score in answer.data.scores):
             return True
         await asyncio.sleep(3)
         answer = await langfuse.scores(allowed(tenant), window)

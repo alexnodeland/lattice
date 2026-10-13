@@ -20,7 +20,7 @@ from portalr.readers import (
     Unavailable,
     Window,
 )
-from portalr.readers.langfuse import workspace_of
+from portalr.readers.langfuse import Scores, workspace_of
 from portalr.tenant import allowed
 from tests.tools import Tool, fails, json
 
@@ -116,7 +116,7 @@ async def test_langfuse_reads_the_tenants_scores_newest_first_and_links_for_oper
                 "source": "API",
                 "timestamp": "2026-10-12T00:00:00Z",
                 "subject": {"kind": "trace", "id": "t1"},
-                "metadata": {"tenant": "acme", "person": "alice"},
+                "metadata": {"tenant": "acme", "person": "alice", "feedback_type": "thumbs"},
             },
             {
                 "id": "s2",
@@ -164,14 +164,17 @@ async def test_langfuse_reads_the_tenants_scores_newest_first_and_links_for_oper
     langfuse = Langfuse("http://langfuse", project="p1", client=tool.client())
     read = await langfuse.scores(ACME, Window(start=START, end=END))
     assert isinstance(read, Ok)
-    assert [(score.id, score.trace_id, score.value) for score in read.data] == [
+    assert read.data.complete
+    assert [(score.id, score.trace_id, score.value) for score in read.data.scores] == [
         ("s2", "t2", "good"),
         ("s1", "t1", True),
     ]
     # evalr names its evaluator in the metadata; a person's feedback names none.
-    assert [score.evaluator for score in read.data] == ["accuracy", None]
+    assert [score.evaluator for score in read.data.scores] == ["accuracy", None]
+    # The mirrors name a person's feedback type in it.
+    assert [score.feedback_type for score in read.data.scores] == [None, "thumbs"]
     # A trace's workspace tag names its scores' workspace; a trace with none, none.
-    assert [score.workspace for score in read.data] == ["notes", None]
+    assert [score.workspace for score in read.data.scores] == ["notes", None]
     assert tool.last.url.params["traceId"] == "t1,t2"
     assert langfuse.trace_link("t1") == "http://langfuse/project/p1/traces/t1"
     assert langfuse.session_link("thr_1") == "http://langfuse/project/p1/sessions/thr_1"
@@ -190,7 +193,9 @@ async def test_langfuse_names_at_most_fifty_traces_a_request() -> None:
         }
     )
     langfuse = Langfuse("http://langfuse", project="p1", client=tool.client())
-    assert await langfuse.scores(ACME, Window(start=START, end=END)) == Ok(data=[])
+    assert await langfuse.scores(ACME, Window(start=START, end=END)) == Ok(
+        data=Scores(scores=[], complete=True)
+    )
     named = [request.url.params["traceId"].split(",") for request in tool.requests[1:]]
     # Asked a few at a time, so in any order.
     assert sorted(len(traces) for traces in named) == [20, 50, 50]

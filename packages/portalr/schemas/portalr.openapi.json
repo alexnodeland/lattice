@@ -198,6 +198,18 @@
             "title": "Evaluations",
             "type": "array"
           },
+          "known_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known From"
+          },
           "workspaces": {
             "items": {
               "$ref": "#/components/schemas/WorkspaceTotals"
@@ -391,10 +403,6 @@
         ],
         "type": "string"
       },
-      "Moment": {
-        "format": "date-time",
-        "type": "string"
-      },
       "NewInvite": {
         "description": "Whom to invite to the tenant ``X-Tenant`` names.",
         "properties": {
@@ -427,6 +435,24 @@
           "data"
         ],
         "title": "Ok[Feedback]",
+        "type": "object"
+      },
+      "Ok_Scores_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Scores"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[Scores]",
         "type": "object"
       },
       "Ok_Union_Spend__NoneType__": {
@@ -539,28 +565,6 @@
           "data"
         ],
         "title": "Ok[list[Point]]",
-        "type": "object"
-      },
-      "Ok_list_Score__": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/Score"
-            },
-            "title": "Data",
-            "type": "array"
-          },
-          "status": {
-            "const": "ok",
-            "default": "ok",
-            "title": "Status",
-            "type": "string"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "title": "Ok[list[Score]]",
         "type": "object"
       },
       "Ok_list_TenantSpend__": {
@@ -709,6 +713,17 @@
             ],
             "title": "Evaluator"
           },
+          "feedback_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback Type"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -766,6 +781,40 @@
           "timestamp"
         ],
         "title": "Score",
+        "type": "object"
+      },
+      "Scores": {
+        "description": "The scores a read took, whether they are all there were, and since when they are known.",
+        "properties": {
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "known_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known From"
+          },
+          "scores": {
+            "items": {
+              "$ref": "#/components/schemas/Score"
+            },
+            "title": "Scores",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scores",
+          "complete"
+        ],
+        "title": "Scores",
         "type": "object"
       },
       "Span": {
@@ -1408,7 +1457,9 @@
             "name": "start",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/Moment"
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
             }
           },
           {
@@ -1416,7 +1467,9 @@
             "name": "end",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/Moment"
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
             }
           },
           {
@@ -1633,7 +1686,9 @@
             "name": "start",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/Moment"
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
             }
           },
           {
@@ -1641,7 +1696,9 @@
             "name": "end",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/Moment"
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
             }
           },
           {
@@ -1789,7 +1846,9 @@
             "name": "start",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/Moment"
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
             }
           },
           {
@@ -1797,7 +1856,9 @@
             "name": "end",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/Moment"
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
             }
           },
           {
@@ -1925,7 +1986,7 @@
     },
     "/portalr/v1/scores": {
       "get": {
-        "description": "The tenant's feedback and evaluation scores, from Langfuse.",
+        "description": "The tenant's feedback and evaluation scores, from Langfuse, and whether that's all.",
         "operationId": "scores_portalr_v1_scores_get",
         "parameters": [
           {
@@ -1933,7 +1994,9 @@
             "name": "start",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/Moment"
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
             }
           },
           {
@@ -1941,7 +2004,9 @@
             "name": "end",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/Moment"
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
             }
           },
           {
@@ -1980,7 +2045,7 @@
                 "schema": {
                   "discriminator": {
                     "mapping": {
-                      "ok": "#/components/schemas/Ok_list_Score__",
+                      "ok": "#/components/schemas/Ok_Scores_",
                       "unavailable": "#/components/schemas/Unavailable",
                       "unconfigured": "#/components/schemas/Unconfigured"
                     },
@@ -1988,7 +2053,7 @@
                   },
                   "oneOf": [
                     {
-                      "$ref": "#/components/schemas/Ok_list_Score__"
+                      "$ref": "#/components/schemas/Ok_Scores_"
                     },
                     {
                       "$ref": "#/components/schemas/Unavailable"
@@ -2153,7 +2218,9 @@
             "name": "start",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/Moment"
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
             }
           },
           {
@@ -2161,7 +2228,9 @@
             "name": "end",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/Moment"
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
             }
           },
           {
@@ -2415,7 +2484,9 @@
             "name": "start",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/Moment"
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
             }
           },
           {
@@ -2423,7 +2494,9 @@
             "name": "end",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/Moment"
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
             }
           },
           {

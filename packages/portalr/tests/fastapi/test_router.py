@@ -99,7 +99,7 @@ async def test_each_tools_read(client: httpx.AsyncClient, stack: Stack) -> None:
     assert stack.prometheus.last.url.params["tenant_id"] == "acme"
     assert (await client.get("/v1/scores", params=WINDOW, headers=alice)).json() == {
         "status": "ok",
-        "data": [],
+        "data": {"scores": [], "complete": True, "known_from": None},
     }
     summary = await client.get(
         "/v1/feedback", params={**WINDOW, "workspace": "notes"}, headers=alice
@@ -111,6 +111,14 @@ async def test_each_tools_read(client: httpx.AsyncClient, stack: Stack) -> None:
     assert (await client.get("/v1/feedback", params=too_long, headers=alice)).status_code == 422
     backwards = {"start": WINDOW["end"], "end": WINDOW["start"]}
     assert (await client.get("/v1/feedback", params=backwards, headers=alice)).status_code == 422
+    # A moment without its zone, or a span from before 2000, is refused, not read.
+    for wrong in (
+        {"start": "2026-10-12T00:00:00", "end": WINDOW["end"]},
+        {"start": "0001-01-01T00:00:00Z", "end": WINDOW["end"]},
+    ):
+        for path in ("/v1/feedback", "/v1/traces", "/v1/logs", "/v1/scores", "/v1/metrics"):
+            asked = {**wrong, "metric": "failed_turns"}
+            assert (await client.get(path, params=asked, headers=alice)).status_code == 422, path
     assert (await client.get("/v1/spend", headers=alice)).json() == {
         "status": "ok",
         "data": {"spend": 2.0, "max_budget": None, "budget_duration": None},

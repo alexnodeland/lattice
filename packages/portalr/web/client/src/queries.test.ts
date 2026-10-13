@@ -3,7 +3,7 @@ import type { Server } from "bun";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import type * as v1 from "./generated/artifactr.v1";
 import type * as reflexrV1 from "./generated/reflexr.v1";
-import { AUDIT_PAGE, createQueries, keys, stale } from "./queries";
+import { AUDIT_PAGE, createQueries, keys, Refused, stale } from "./queries";
 import { createApi, readConfig } from "./rest";
 
 interface Seen {
@@ -301,15 +301,19 @@ test("portalr's reads name their tenant and window", async () => {
   expect(seen.at(-1)?.url.searchParams.get("step")).toBeNull();
 });
 
-test("a feedback or usage read is kept ten minutes and tried again once", () => {
+test("a feedback or usage read is kept ten minutes and tried again once, unless refused outright", () => {
   const window = { start: DAY.start, end: DAY.end };
   for (const read of [
     queries.portalr.feedback("acme", window),
     queries.portalr.usage("acme", window),
   ]) {
     expect(read.staleTime).toBe(10 * 60_000);
-    expect(read.retry).toBe(1);
+    const retry = read.retry as (count: number, error: unknown) => boolean;
+    expect(retry(0, new Refused(503, null))).toBe(true);
+    expect(retry(1, new Refused(503, null))).toBe(false);
+    expect(retry(0, new Refused(422, null))).toBe(false);
   }
+  expect(queries.portalr.scores("acme", window).staleTime).toBe(60_000);
 });
 
 test("a usage read asks after the workspaces it names", async () => {

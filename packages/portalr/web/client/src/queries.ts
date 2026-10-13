@@ -13,6 +13,7 @@ import { isKnown } from "./artifactr";
 import type * as artifactrV1 from "./generated/artifactr.v1";
 import type { components as Grantr } from "./generated/grantr.openapi";
 import type * as reflexrV1 from "./generated/reflexr.v1";
+import { isKnown as isKnownToReflexr } from "./reflexr";
 import { type Api, named } from "./rest";
 
 type Check = Grantr["schemas"]["Check"];
@@ -327,21 +328,34 @@ export const stale = {
     }
   },
 
-  /** reflexr's rule events make its rules stale, and its run events its runs. */
+  /** reflexr's rule events make its rules stale, its run events its runs, and ticks its schedules. */
   reflexr(tenant: string, ws: string, envelope: reflexrV1.EventFrame) {
-    const { type } = envelope.event;
-    if (type.startsWith("reflexr:rule_")) {
-      const rule = envelope.event.rule;
-      return typeof rule === "string"
-        ? [keys.reflexr.rules(tenant, ws), keys.reflexr.rule(tenant, ws, rule)]
-        : [keys.reflexr.rules(tenant, ws)];
+    const { event } = envelope;
+    if (!isKnownToReflexr(event)) {
+      return [];
     }
-    if (type.startsWith("reflexr:run_")) {
-      return [keys.reflexr.runs(tenant, ws)];
+    switch (event.type) {
+      case "reflexr:rule_fired":
+      case "reflexr:rule_errored":
+      case "reflexr:rule_reset":
+      case "reflexr:rule_installed":
+      case "reflexr:rule_archived":
+        return [keys.reflexr.rules(tenant, ws), keys.reflexr.rule(tenant, ws, event.rule)];
+      case "reflexr:run_started":
+      case "reflexr:run_progressed":
+      case "reflexr:run_retrying":
+      case "reflexr:run_succeeded":
+      case "reflexr:run_dead_lettered":
+      case "reflexr:run_cancelled":
+      case "reflexr:run_requeued":
+      case "reflexr:run_skipped":
+        return [keys.reflexr.runs(tenant, ws)];
+      case "reflexr:tick":
+        return [keys.reflexr.schedules(tenant, ws)];
+      case "reflexr:feedback_given":
+        return [];
+      default:
+        return event satisfies never;
     }
-    if (type === "reflexr:tick") {
-      return [keys.reflexr.schedules(tenant, ws)];
-    }
-    return [];
   },
 };

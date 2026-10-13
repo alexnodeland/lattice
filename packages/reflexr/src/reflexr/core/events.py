@@ -26,13 +26,17 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    GetJsonSchemaHandler,
     JsonValue,
     PlainSerializer,
     PlainValidator,
     SerializationInfo,
+    TypeAdapter,
     ValidationError,
     WithJsonSchema,
 )
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import CoreSchema
 
 from reflexr.core.actors import Actor
 from reflexr.core.errors import ValidationFailed
@@ -147,6 +151,16 @@ def _register(event_type: "type[Event]", name: str | None) -> None:
     _types[event_type.event_type] = event_type
 
 
+def _typed(schema: dict[str, JsonValue], cls: type[BaseModel]) -> None:
+    """Put an event type's ``type`` in its JSON Schema, first and required, as on the wire."""
+    name = getattr(cls, "event_type", None)
+    if name is None:  # an abstract event type has no name of its own
+        return
+    properties = cast("dict[str, JsonValue]", schema.get("properties", {}))
+    schema["properties"] = {"type": {"const": name}, **properties}
+    schema["required"] = ["type", *cast("list[JsonValue]", schema.get("required", []))]
+
+
 class Event(BaseModel):
     """Base class for event types.
 
@@ -155,7 +169,7 @@ class Event(BaseModel):
     fields are rejected so that a producer's typo fails loudly.
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=_typed)
 
     event_type: ClassVar[str]
     """The qualified name: the namespace, a ``:``, and the local name, derived from the class
@@ -317,20 +331,63 @@ def _serialize_event(event: Event, info: SerializationInfo) -> dict[str, Any]:
     return dump_event(event, mode="json" if info.mode_is_json() else "python")
 
 
+def _other(schema: dict[str, JsonValue]) -> None:
+    """Say an other event's ``type`` is none of reflexr's own, so no event matches two."""
+    properties = cast("dict[str, dict[str, JsonValue]]", schema["properties"])
+    names: list[JsonValue] = [*sorted(event.event_type for event in SYSTEM_EVENTS)]
+    properties["type"]["not"] = {"enum": names}
+
+
+class OtherEvent(BaseModel):
+    """An event of the application's, or one this version doesn't know: its JSON Schema.
+
+    It describes the wire only. Events are validated through the registry, by their ``type``.
+    """
+
+    model_config = ConfigDict(extra="allow", json_schema_extra=_other)
+
+    type: Annotated[str, Field(pattern=_EVENT_NAME)]
+
+
+type LoggedEvent = (
+    RuleFired
+    | RuleErrored
+    | RuleReset
+    | RuleInstalled
+    | RuleArchived
+    | RunStarted
+    | RunProgressed
+    | RunRetrying
+    | RunSucceeded
+    | RunDeadLettered
+    | RunCancelled
+    | RunRequeued
+    | RunSkipped
+    | FeedbackGiven
+    | Tick
+    | OtherEvent
+)
+"""An event as the log holds it, in JSON Schema: one of reflexr's own, each named by its
+``type``, or another, kept open (lattice #83)."""
+
+
+class _LoggedEventSchema:
+    """Gives an event its JSON Schema, ``LoggedEvent``'s, as validated and as serialized."""
+
+    def __get_pydantic_json_schema__(
+        self, core_schema: CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return handler(TypeAdapter(LoggedEvent).core_schema)
+
+
 AnyEvent = Annotated[
     Event,
     PlainValidator(_validate_event),
     PlainSerializer(_serialize_event),
-    WithJsonSchema(
-        {
-            "type": "object",
-            "properties": {"type": {"type": "string", "pattern": _EVENT_NAME}},
-            "required": ["type"],
-            "additionalProperties": True,
-        }
-    ),
+    _LoggedEventSchema(),
 ]
-"""Any event, validated through the registry by its ``"type"``."""
+"""Any event, validated through the registry by its ``"type"``. Its JSON Schema names reflexr's
+own events, and leaves the rest open."""
 
 
 # ─── reflexr's own events ────────────────────────────────────────────────────

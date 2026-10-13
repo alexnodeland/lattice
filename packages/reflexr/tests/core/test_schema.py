@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from reflexr.core import SYSTEM_EVENTS, UnknownEvent
 from reflexr.core.schema import (
     PROTOCOL_SCHEMA_ID,
     RULES_SCHEMA_ID,
@@ -14,6 +15,7 @@ from reflexr.core.schema import (
     protocol_schema,
     rules_schema,
 )
+from tests.event_types import ServiceError
 
 SCHEMAS = Path(__file__).parent.parent.parent / "schemas"
 
@@ -42,3 +44,24 @@ def test_the_module_prints_the_schema(
     sys.modules.pop("reflexr.core.schema", None)
     runpy.run_module("reflexr.core.schema", run_name="__main__")
     assert json.loads(capsys.readouterr().out) == rules_schema()
+
+
+def test_the_protocol_names_reflexrs_own_events_and_leaves_the_rest_open() -> None:
+    defs = protocol_schema()["$defs"]
+    assert defs["EventFrame"]["properties"]["event"]["$ref"] == "#/$defs/LoggedEvent"
+    named = [variant["$ref"].removeprefix("#/$defs/") for variant in defs["LoggedEvent"]["anyOf"]]
+    assert named == [event.__name__ for event in SYSTEM_EVENTS] + ["OtherEvent"]
+    for event in SYSTEM_EVENTS:
+        schema = defs[event.__name__]
+        assert schema["properties"]["type"] == {"const": event.event_type}
+        assert (next(iter(schema["properties"])), schema["required"][0]) == ("type", "type")
+    other = defs["OtherEvent"]
+    assert other["additionalProperties"] is True
+    assert other["properties"]["type"]["not"] == {
+        "enum": sorted(event.event_type for event in SYSTEM_EVENTS)
+    }, "an application's event matches no event of reflexr's"
+
+
+def test_an_event_types_schema_names_its_type_and_an_abstract_ones_none() -> None:
+    assert ServiceError.model_json_schema()["properties"]["type"] == {"const": "app:service.error"}
+    assert "type" not in UnknownEvent.model_json_schema()["properties"]

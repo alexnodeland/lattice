@@ -16,6 +16,10 @@ Event types, their namespaces and registries, and the envelope each stored event
 
 ::: reflexr.core.AnyEvent
 
+::: reflexr.core.LoggedEvent
+
+::: reflexr.core.OtherEvent
+
 ::: reflexr.core.Envelope
 
 ::: reflexr.core.Causation

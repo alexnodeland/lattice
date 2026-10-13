@@ -607,18 +607,8 @@
           "type": "string"
         },
         "event": {
-          "additionalProperties": true,
-          "properties": {
-            "type": {
-              "pattern": "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "title": "Event",
-          "type": "object"
+          "$ref": "#/$defs/LoggedEvent",
+          "title": "Event"
         },
         "id": {
           "$ref": "#/$defs/EventId"
@@ -713,6 +703,37 @@
         "kind"
       ],
       "title": "ExternalAgentActor",
+      "type": "object"
+    },
+    "FeedbackGiven": {
+      "additionalProperties": false,
+      "description": "A person or an evaluator judged a run, a firing or a causal chain.",
+      "properties": {
+        "feedback_type": {
+          "title": "Feedback Type",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/FeedbackTarget"
+        },
+        "type": {
+          "const": "reflexr:feedback_given"
+        },
+        "value": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Value",
+          "type": "object"
+        }
+      },
+      "required": [
+        "type",
+        "feedback_type",
+        "target",
+        "value"
+      ],
+      "title": "FeedbackGiven",
       "type": "object"
     },
     "FeedbackTarget": {
@@ -906,6 +927,58 @@
       "type": "object"
     },
     "JsonValue": {},
+    "LoggedEvent": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RuleFired"
+        },
+        {
+          "$ref": "#/$defs/RuleErrored"
+        },
+        {
+          "$ref": "#/$defs/RuleReset"
+        },
+        {
+          "$ref": "#/$defs/RuleInstalled"
+        },
+        {
+          "$ref": "#/$defs/RuleArchived"
+        },
+        {
+          "$ref": "#/$defs/RunStarted"
+        },
+        {
+          "$ref": "#/$defs/RunProgressed"
+        },
+        {
+          "$ref": "#/$defs/RunRetrying"
+        },
+        {
+          "$ref": "#/$defs/RunSucceeded"
+        },
+        {
+          "$ref": "#/$defs/RunDeadLettered"
+        },
+        {
+          "$ref": "#/$defs/RunCancelled"
+        },
+        {
+          "$ref": "#/$defs/RunRequeued"
+        },
+        {
+          "$ref": "#/$defs/RunSkipped"
+        },
+        {
+          "$ref": "#/$defs/FeedbackGiven"
+        },
+        {
+          "$ref": "#/$defs/Tick"
+        },
+        {
+          "$ref": "#/$defs/OtherEvent"
+        }
+      ]
+    },
     "NotFilter": {
       "additionalProperties": false,
       "description": "Envelopes that do not match ``filter``.",
@@ -952,6 +1025,41 @@
         "kind"
       ],
       "title": "OnFilter",
+      "type": "object"
+    },
+    "OtherEvent": {
+      "additionalProperties": true,
+      "description": "An event of the application's, or one this version doesn't know: its JSON Schema.\n\nIt describes the wire only. Events are validated through the registry, by their ``type``.",
+      "properties": {
+        "type": {
+          "not": {
+            "enum": [
+              "reflexr:feedback_given",
+              "reflexr:rule_archived",
+              "reflexr:rule_errored",
+              "reflexr:rule_fired",
+              "reflexr:rule_installed",
+              "reflexr:rule_reset",
+              "reflexr:run_cancelled",
+              "reflexr:run_dead_lettered",
+              "reflexr:run_progressed",
+              "reflexr:run_requeued",
+              "reflexr:run_retrying",
+              "reflexr:run_skipped",
+              "reflexr:run_started",
+              "reflexr:run_succeeded",
+              "reflexr:tick"
+            ]
+          },
+          "pattern": "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "OtherEvent",
       "type": "object"
     },
     "Outcome": {
@@ -1048,18 +1156,8 @@
           "title": "Correlation Id"
         },
         "event": {
-          "additionalProperties": true,
-          "properties": {
-            "type": {
-              "pattern": "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "title": "Event",
-          "type": "object"
+          "$ref": "#/$defs/LoggedEvent",
+          "title": "Event"
         },
         "id": {
           "anyOf": [
@@ -1341,6 +1439,155 @@
       "title": "Rule",
       "type": "object"
     },
+    "RuleArchived": {
+      "additionalProperties": false,
+      "description": "A stored rule was archived, and its unfinished runs cancelled.",
+      "properties": {
+        "cancelled": {
+          "title": "Cancelled",
+          "type": "integer"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "rule": {
+          "$ref": "#/$defs/RuleName"
+        },
+        "type": {
+          "const": "reflexr:rule_archived"
+        },
+        "version": {
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "rule",
+        "version",
+        "cancelled"
+      ],
+      "title": "RuleArchived",
+      "type": "object"
+    },
+    "RuleErrored": {
+      "additionalProperties": false,
+      "description": "A rule could not evaluate one envelope; it is dead-lettered for that rule alone.",
+      "properties": {
+        "error": {
+          "title": "Error",
+          "type": "string"
+        },
+        "rule": {
+          "$ref": "#/$defs/RuleName"
+        },
+        "seq": {
+          "title": "Seq",
+          "type": "integer"
+        },
+        "type": {
+          "const": "reflexr:rule_errored"
+        }
+      },
+      "required": [
+        "type",
+        "rule",
+        "seq",
+        "error"
+      ],
+      "title": "RuleErrored",
+      "type": "object"
+    },
+    "RuleFired": {
+      "additionalProperties": false,
+      "description": "A rule's condition held for one scope; a run of its action was created.",
+      "properties": {
+        "firing_id": {
+          "$ref": "#/$defs/FiringId"
+        },
+        "matched": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Matched",
+          "type": "array"
+        },
+        "rule": {
+          "$ref": "#/$defs/RuleName"
+        },
+        "scope": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Scope",
+          "type": "object"
+        },
+        "scope_key": {
+          "$ref": "#/$defs/ScopeKey"
+        },
+        "type": {
+          "const": "reflexr:rule_fired"
+        }
+      },
+      "required": [
+        "type",
+        "rule",
+        "scope",
+        "scope_key",
+        "firing_id",
+        "matched"
+      ],
+      "title": "RuleFired",
+      "type": "object"
+    },
+    "RuleInstalled": {
+      "additionalProperties": false,
+      "description": "A stored rule was installed or updated: its new version, whole, and where it came from.\n\nThe facts are a stored rule's history: the version that fired a run is the latest one\nbefore its firing.",
+      "properties": {
+        "provenance": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Provenance",
+          "type": "object"
+        },
+        "rule": {
+          "$ref": "#/$defs/RuleName"
+        },
+        "spec": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Spec",
+          "type": "object"
+        },
+        "type": {
+          "const": "reflexr:rule_installed"
+        },
+        "version": {
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "rule",
+        "version",
+        "spec",
+        "provenance"
+      ],
+      "title": "RuleInstalled",
+      "type": "object"
+    },
     "RuleName": {
       "type": "string"
     },
@@ -1416,6 +1663,48 @@
       },
       "required": [],
       "title": "RuleProgress",
+      "type": "object"
+    },
+    "RuleReset": {
+      "additionalProperties": false,
+      "description": "A rule's state was reset, because its definition changed or it was replayed.",
+      "properties": {
+        "from_seq": {
+          "title": "From Seq",
+          "type": "integer"
+        },
+        "generation": {
+          "title": "Generation",
+          "type": "integer"
+        },
+        "reason": {
+          "enum": [
+            "changed",
+            "replayed"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "rule": {
+          "$ref": "#/$defs/RuleName"
+        },
+        "silent_through": {
+          "default": 0,
+          "title": "Silent Through",
+          "type": "integer"
+        },
+        "type": {
+          "const": "reflexr:rule_reset"
+        }
+      },
+      "required": [
+        "type",
+        "rule",
+        "generation",
+        "reason",
+        "from_seq"
+      ],
+      "title": "RuleReset",
       "type": "object"
     },
     "RuleVersionOutcome": {
@@ -1601,6 +1890,84 @@
       "title": "Run",
       "type": "object"
     },
+    "RunCancelled": {
+      "additionalProperties": false,
+      "description": "A run was cancelled.",
+      "properties": {
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "rule": {
+          "$ref": "#/$defs/RuleName"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "type": {
+          "const": "reflexr:run_cancelled"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "rule"
+      ],
+      "title": "RunCancelled",
+      "type": "object"
+    },
+    "RunDeadLettered": {
+      "additionalProperties": false,
+      "description": "A run exhausted its retries, or failed in a way retrying cannot fix.",
+      "properties": {
+        "attempts": {
+          "title": "Attempts",
+          "type": "integer"
+        },
+        "error": {
+          "title": "Error",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "rule": {
+          "$ref": "#/$defs/RuleName"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "type": {
+          "const": "reflexr:run_dead_lettered"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "rule",
+        "attempts",
+        "error"
+      ],
+      "title": "RunDeadLettered",
+      "type": "object"
+    },
     "RunId": {
       "type": "string"
     },
@@ -1623,6 +1990,204 @@
         "type"
       ],
       "title": "RunOutcome",
+      "type": "object"
+    },
+    "RunProgressed": {
+      "additionalProperties": false,
+      "description": "A graph run completed a step and saved a checkpoint.",
+      "properties": {
+        "rule": {
+          "$ref": "#/$defs/RuleName"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "step": {
+          "title": "Step",
+          "type": "string"
+        },
+        "type": {
+          "const": "reflexr:run_progressed"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "rule",
+        "step"
+      ],
+      "title": "RunProgressed",
+      "type": "object"
+    },
+    "RunRequeued": {
+      "additionalProperties": false,
+      "description": "Someone made a run runnable again. The envelope's actor records who.",
+      "properties": {
+        "rule": {
+          "$ref": "#/$defs/RuleName"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "type": {
+          "const": "reflexr:run_requeued"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "rule"
+      ],
+      "title": "RunRequeued",
+      "type": "object"
+    },
+    "RunRetrying": {
+      "additionalProperties": false,
+      "description": "An attempt failed, and the run will be tried again.",
+      "properties": {
+        "attempt": {
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "error": {
+          "title": "Error",
+          "type": "string"
+        },
+        "next_attempt_at": {
+          "format": "date-time",
+          "title": "Next Attempt At",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "rule": {
+          "$ref": "#/$defs/RuleName"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "type": {
+          "const": "reflexr:run_retrying"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "rule",
+        "attempt",
+        "error",
+        "next_attempt_at"
+      ],
+      "title": "RunRetrying",
+      "type": "object"
+    },
+    "RunSkipped": {
+      "additionalProperties": false,
+      "description": "A run was skipped without completing, unblocking its scope.",
+      "properties": {
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "rule": {
+          "$ref": "#/$defs/RuleName"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "type": {
+          "const": "reflexr:run_skipped"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "rule"
+      ],
+      "title": "RunSkipped",
+      "type": "object"
+    },
+    "RunStarted": {
+      "additionalProperties": false,
+      "description": "An attempt of a run began.",
+      "properties": {
+        "attempt": {
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "rule": {
+          "$ref": "#/$defs/RuleName"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "scope": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "default": {},
+          "title": "Scope",
+          "type": "object"
+        },
+        "scope_key": {
+          "$ref": "#/$defs/ScopeKey"
+        },
+        "type": {
+          "const": "reflexr:run_started"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "rule",
+        "scope_key",
+        "attempt"
+      ],
+      "title": "RunStarted",
+      "type": "object"
+    },
+    "RunSucceeded": {
+      "additionalProperties": false,
+      "description": "A run finished.",
+      "properties": {
+        "output": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "rule": {
+          "$ref": "#/$defs/RuleName"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "type": {
+          "const": "reflexr:run_succeeded"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "rule"
+      ],
+      "title": "RunSucceeded",
       "type": "object"
     },
     "RunTarget": {
@@ -1821,6 +2386,31 @@
         "per"
       ],
       "title": "Throttle",
+      "type": "object"
+    },
+    "Tick": {
+      "additionalProperties": false,
+      "description": "A schedule's tick. Ticks also move rules' clocks forward in quiet workspaces.",
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "schedule": {
+          "title": "Schedule",
+          "type": "string"
+        },
+        "type": {
+          "const": "reflexr:tick"
+        }
+      },
+      "required": [
+        "type",
+        "schedule",
+        "at"
+      ],
+      "title": "Tick",
       "type": "object"
     },
     "TraceId": {

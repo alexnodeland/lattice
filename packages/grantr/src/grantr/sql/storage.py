@@ -27,8 +27,10 @@ from sqlalchemy.orm import Session
 from grantr.core import (
     TENANT,
     TENANT_ID,
+    Agent,
     AuditEntry,
     AuditEvent,
+    AuditFilter,
     Grant,
     Grantee,
     Group,
@@ -117,6 +119,17 @@ def grantee(kind: str, workspace: str, id: str) -> Grantee:
     if kind == "rule":
         return RulePrincipal(workspace=workspace, rule=id)
     return _GRANTEE.validate_python({"kind": kind, "id": id})
+
+
+def actor_columns(by: Subject | None) -> Columns:
+    """The columns an audit entry's maker is stored in: a subject's, or none for no one."""
+    match by:
+        case None:
+            return ("", "", "")
+        case Agent():
+            return (by.kind, "", "")
+        case _:
+            return subject_columns(by)
 
 
 def resource_columns(resource: Resource) -> Columns:
@@ -477,7 +490,15 @@ class _Transaction(_Reads):
             "by": None if by is None else by.model_dump(mode="json"),
             "event": event.model_dump(mode="json"),
         }
-        row = AuditRow(tenant_id=_scope(tenant), body=body)
+        actor_kind, actor_workspace, actor_id = actor_columns(by)
+        row = AuditRow(
+            tenant_id=_scope(tenant),
+            event_type=event.type,
+            actor_kind=actor_kind,
+            actor_workspace=actor_workspace,
+            actor_id=actor_id,
+            body=body,
+        )
         self._session.add(row)
         await self._session.flush()
         return AuditEntry(seq=row.seq, at=at, tenant=tenant, by=by, event=event)
@@ -643,15 +664,31 @@ class SqlStorage:
             return list(ids)
 
     async def audit(
-        self, tenant: TenantId | None, *, after_seq: int = 0, limit: int = 100
+        self,
+        tenant: TenantId | None,
+        *,
+        after_seq: int = 0,
+        limit: int = 100,
+        keep: AuditFilter | None = None,
     ) -> list[AuditEntry]:
-        """A tenant's audit entries after ``after_seq``, in order, or the deployment's with None."""
-        query = (
-            select(AuditRow)
-            .where(AuditRow.tenant_id == _scope(tenant), AuditRow.seq > after_seq)
-            .order_by(AuditRow.seq)
-            .limit(limit)
+        """A tenant's audit entries after ``after_seq``, in order, or the deployment's with None.
+
+        It returns the first ``limit`` that ``keep`` keeps. A single type, or a single actor, is
+        one index's range; a type and an actor together are an index's range and a filter.
+        """
+        query = select(AuditRow).where(
+            AuditRow.tenant_id == _scope(tenant), AuditRow.seq > after_seq
         )
+        if keep is not None and keep.types:
+            query = query.where(AuditRow.event_type.in_(sorted(keep.types)))
+        if keep is not None and keep.by is not None:
+            kind, workspace, id = actor_columns(keep.by)
+            query = query.where(
+                AuditRow.actor_kind == kind,
+                AuditRow.actor_workspace == workspace,
+                AuditRow.actor_id == id,
+            )
+        query = query.order_by(AuditRow.seq).limit(limit)
         async with self._session(tenant) as session:
             rows = await _to_the_end(session.scalars(query))
             return [

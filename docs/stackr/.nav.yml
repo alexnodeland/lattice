@@ -62,6 +62,7 @@ nav:
     - adr/0031-clickhouses-admin-apart-from-langfuse.md
     - adr/0032-the-edge-the-services-and-the-state-host.md
     - adr/0033-the-combined-system-proved-in-ci.md
+    - adr/0034-the-stack-on-aws.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

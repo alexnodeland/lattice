@@ -35,5 +35,6 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0027](0027-the-application-installs-the-rules-people-accept.md) | The application installs the rules people accept | Accepted |
 | [0028](0028-a-principals-id-cant-pass-for-the-libraries-actors.md) | A principal's id can't pass for the libraries' actors | Accepted |
 | [0029](0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md) | A stored rule acts as itself, in its own workspace | Accepted |
+| [0030](0030-the-audit-log-read-by-type-and-actor.md) | The audit log, read by type and by actor | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

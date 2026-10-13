@@ -1,0 +1,16 @@
+# checkov over the stack module's own files (RFC-0004), run by deploy/aws/check: each module it
+# calls is scanned on its own, with its skips. Each check it skips here is skipped for this module
+# only, with its reason; nothing is skipped inline.
+framework:
+  - terraform
+compact: true
+quiet: true
+skip-check:
+  # Valkey's and Langfuse's keys, as the secrets module's: a generated secret rotates when its
+  # version is raised, with the consumers that read it, and AWS's key encrypts them until a
+  # customer-managed key per deployment (RFC-0004).
+  - CKV2_AWS_57
+  - CKV_AWS_149
+  # GoTrue's SMTP group is attached to its service through ecs-service, which a scan of the stack's
+  # own files doesn't follow; tests/stack.tofutest.hcl checks it.
+  - CKV2_AWS_5

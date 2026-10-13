@@ -14,6 +14,7 @@ from grantr.core import (
     TENANT,
     AuditEntry,
     AuditEvent,
+    AuditFilter,
     Grant,
     Grantee,
     Group,
@@ -271,8 +272,20 @@ class InMemoryStorage(_Reads):
         return sorted(self._data.tenants)
 
     async def audit(
-        self, tenant: TenantId | None, *, after_seq: int = 0, limit: int = 100
+        self,
+        tenant: TenantId | None,
+        *,
+        after_seq: int = 0,
+        limit: int = 100,
+        keep: AuditFilter | None = None,
     ) -> list[AuditEntry]:
-        """A tenant's audit entries after ``after_seq``, in order, or the deployment's with None."""
-        entries = [e for e in self._data.log if e.tenant == tenant and e.seq > after_seq]
+        """A tenant's audit entries after ``after_seq``, in order, or the deployment's with None.
+
+        It returns the first ``limit`` that ``keep`` keeps.
+        """
+        entries = [
+            e
+            for e in self._data.log
+            if e.tenant == tenant and e.seq > after_seq and (keep is None or keep.keeps(e))
+        ]
         return entries[:limit]

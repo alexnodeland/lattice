@@ -356,7 +356,7 @@ Langfuse's worker: runs ingestion and evaluation jobs from the queues.
 | Published ports | none |
 | Networks | `stackr`, `supabase_network_stackr-supabase` |
 | Volumes | none |
-| Depends on | `db-init` (completed), `redis` (healthy), `minio` (healthy), `clickhouse` (healthy) |
+| Depends on | `db-init` (completed), `redis` (healthy), `minio` (healthy), `clickhouse` (healthy), `langfuse-web` (healthy) |
 | Health check | `wget -q -O /dev/null http://127.0.0.1:3030/api/health`, every 5s |
 | Restart | `unless-stopped` |
 

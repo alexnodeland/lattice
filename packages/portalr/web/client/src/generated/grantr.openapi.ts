@@ -12,6 +12,9 @@ export interface paths {
         /**
          * Deployment Audit
          * @description The deployment's audit log: its operators, granted and revoked.
+         *
+         *     ``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``
+         *     one subject's changes.
          */
         get: operations["deployment_audit_grantr_v1_audit_get"];
         put?: never;
@@ -144,6 +147,9 @@ export interface paths {
         /**
          * Tenant Audit
          * @description A tenant's audit log after ``after_seq``, in order.
+         *
+         *     ``type`` keeps only some types of entry, and ``actor_kind``, ``actor`` and ``workspace``
+         *     one subject's changes.
          */
         get: operations["tenant_audit_grantr_v1_tenants__tenant__audit_get"];
         put?: never;
@@ -450,6 +456,8 @@ export interface components {
             tenant: components["schemas"]["TenantId"] | null;
         };
         AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"];
+        /** @enum {string} */
+        AuditType: "tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted";
         /**
          * Check
          * @description One question for ``/checks``: may the caller take this action on this resource?
@@ -865,6 +873,14 @@ export interface operations {
             query?: {
                 after_seq?: number;
                 limit?: number;
+                /** @description Keep only entries of these event types; it may repeat. */
+                type?: components["schemas"]["AuditType"][] | null;
+                /** @description Keep only the changes of one subject, of this kind. */
+                actor_kind?: ("user" | "service_principal" | "rule" | "agent") | null;
+                /** @description That subject's id: a user's or a service principal's, or a rule's name. */
+                actor?: string | null;
+                /** @description A rule's workspace, with `actor_kind=rule`. */
+                workspace?: string | null;
             };
             header?: never;
             path?: never;
@@ -1109,6 +1125,14 @@ export interface operations {
             query?: {
                 after_seq?: number;
                 limit?: number;
+                /** @description Keep only entries of these event types; it may repeat. */
+                type?: components["schemas"]["AuditType"][] | null;
+                /** @description Keep only the changes of one subject, of this kind. */
+                actor_kind?: ("user" | "service_principal" | "rule" | "agent") | null;
+                /** @description That subject's id: a user's or a service principal's, or a rule's name. */
+                actor?: string | null;
+                /** @description A rule's workspace, with `actor_kind=rule`. */
+                workspace?: string | null;
             };
             header?: never;
             path: {

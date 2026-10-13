@@ -5,6 +5,11 @@
 -- command line.
 \set ON_ERROR_STOP on
 
+-- GoTrue's migrations grant to a postgres role: plain PostgreSQL, local Supabase and RDS (whose
+-- master is named so) have one; Floci's RDS needn't (stackr ADR-0025).
+SELECT 'CREATE ROLE postgres NOLOGIN'
+WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'postgres') \gexec
+
 -- Langfuse
 \getenv langfuse_password LANGFUSE_DB_PASSWORD
 SELECT 'CREATE ROLE langfuse LOGIN'
@@ -66,3 +71,47 @@ ALTER DATABASE auth SET timezone TO 'UTC';
 REVOKE CONNECT ON DATABASE auth FROM PUBLIC;
 \connect auth
 CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION gotrue;
+
+-- The AWS recipe's own (stackr ADR-0034), each only when its password is given: on one machine,
+-- neither is.
+\connect postgres
+
+-- Grafana's users and alert state, on PostgreSQL rather than its task's disk.
+\getenv grafana_password GRAFANA_DB_PASSWORD
+\if :{?grafana_password}
+SELECT 'CREATE ROLE grafana LOGIN'
+WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'grafana') \gexec
+ALTER ROLE grafana WITH LOGIN PASSWORD :'grafana_password';
+SELECT CASE
+  WHEN current_setting('server_version_num')::int >= 160000
+    THEN NOT pg_has_role(current_user, 'grafana', 'SET')
+  ELSE NOT pg_has_role(current_user, 'grafana', 'MEMBER')
+END AS needs_grant \gset
+\if :needs_grant
+GRANT grafana TO CURRENT_USER;
+\endif
+SELECT 'CREATE DATABASE grafana OWNER grafana'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'grafana') \gexec
+\endif
+
+-- The application's database, and its owner, which migrates it. With grantr, its db-roles
+-- creates the role the application works as, so the owner may create roles: on PostgreSQL 16
+-- and later, it administers only the roles it creates.
+\getenv app_db_name APP_DB_NAME
+\getenv app_db_password APP_DB_PASSWORD
+\if :{?app_db_password}
+SELECT format('CREATE ROLE %I LOGIN', :'app_db_name')
+WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'app_db_name') \gexec
+SELECT format('ALTER ROLE %I WITH LOGIN CREATEROLE PASSWORD %L', :'app_db_name', :'app_db_password') \gexec
+SELECT CASE
+  WHEN current_setting('server_version_num')::int >= 160000
+    THEN NOT pg_has_role(current_user, :'app_db_name', 'SET')
+  ELSE NOT pg_has_role(current_user, :'app_db_name', 'MEMBER')
+END AS needs_grant \gset
+\if :needs_grant
+SELECT format('GRANT %I TO CURRENT_USER', :'app_db_name') \gexec
+\endif
+SELECT format('CREATE DATABASE %I OWNER %I', :'app_db_name', :'app_db_name')
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'app_db_name') \gexec
+SELECT format('ALTER DATABASE %I SET timezone TO %L', :'app_db_name', 'UTC') \gexec
+\endif

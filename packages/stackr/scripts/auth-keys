@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+"""Write GoTrue's key set and the service role's key to their secret, when it is empty.
+
+Usage: scripts/auth-keys   (AUTH_KEYS_ARN names the secret; AWS's credentials and region come
+from the environment, and AWS_ENDPOINT_URL points at an emulator such as Floci)
+
+The AWS recipe's one-off task (stackr RFC-0004, ADR-0034), in stackr-auth-keys' image: what
+`make env` does on one machine, with `_auth_keys.py`. The secret is JSON, with `jwt_keys`, the
+ES256 key set GoTrue signs with, and `service_role_key`, a JWT signed with it. A secret that
+already has a value is left as it is, so running this again changes nothing: replacing the key
+set is an operator's choice, since it ends every token signed with the old one.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+
+import boto3
+from botocore.exceptions import ClientError
+
+from _auth_keys import key_set, service_role_key
+
+
+def main() -> int:
+    arn = os.environ.get("AUTH_KEYS_ARN")
+    if not arn:
+        print("auth-keys: set AUTH_KEYS_ARN to the secret to write", file=sys.stderr)
+        return 2
+    secrets = boto3.client("secretsmanager")
+    try:
+        secrets.get_secret_value(SecretId=arn)
+    except ClientError as error:
+        # An empty secret has no current version: Secrets Manager says it can't find one.
+        if error.response.get("Error", {}).get("Code") != "ResourceNotFoundException":
+            raise
+    else:
+        print("auth-keys: the secret has its keys already; nothing written")
+        return 0
+    keys = key_set()
+    secret = json.dumps({"jwt_keys": keys, "service_role_key": service_role_key(keys)})
+    secrets.put_secret_value(SecretId=arn, SecretString=secret)
+    print("auth-keys: wrote a new key set, and the service role's key")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

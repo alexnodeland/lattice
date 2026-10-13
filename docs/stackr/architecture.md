@@ -51,7 +51,8 @@ deploy/postgres/    init.sql: each service's role and database, created by db-in
 supabase/           the Supabase CLI project: config.toml (project id stackr-supabase) and seed.sql
 scripts/            setup-env, validate, smoke, create-tenant, check-config, check-template, check-app
                     and docs-reference, run by make, moon and CI; _env.py reads the settings files
-                    for the Python ones
+                    for the Python ones; auth-keys, the AWS recipe's one-off task, which writes
+                    _auth_keys.py's keys to Secrets Manager
 ```
 
 stackr's documentation, this page, its ADRs and its RFCs included, is lattice's `docs/stackr/`, which lattice's one docs build makes into stackr's section of the site.

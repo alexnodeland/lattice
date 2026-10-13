@@ -549,11 +549,7 @@ reflexr, the sibling library for event-driven agents, is released on its own, an
 | MCP | Tenant in resource URIs | The same |
 | Commands | `Runner.execute(workspace, command, command_id=)` returns the `command_result`, remembered in a `CommandResults` port by tenant, workspace, participant and id; every MCP tool that changes something takes `command_id` | The same, as `Workspaces.execute` |
 
-What artifactr and reflexr shared verbatim moves into [lattice-core](../lattice-core/index.md), which both depend on ([lattice ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md)): `tag_required`, the NUL search, the SQLite engine, the tenant session, and the session helpers that await a database call to its end and lock a row are there already. Until the rest moves, it is copied at the same path under `src/reflexr/`, each copy's docstring says so, and a change to one is made to both:
-
-- `_logging_left_alone`, in `src/artifactr/mcp/server.py`
-- `litellm_model`, in `src/artifactr/litellm/gateway.py`
-- `langfuse_client`, in `src/artifactr/langfuse/client.py`
+What artifactr and reflexr shared verbatim is in [lattice-core](../lattice-core/index.md), which both depend on ([lattice ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md)): `tag_required`, the NUL search, the SQL helpers, the OpenTelemetry setup with its access-token redaction, Langfuse's span filters, `litellm_model`, and the guard that leaves logging alone as the MCP server is built. artifactr re-exports what it made public. Its `langfuse_client` stays its own: it defaults to artifactr's own span filter.
 
 ## Dependencies
 

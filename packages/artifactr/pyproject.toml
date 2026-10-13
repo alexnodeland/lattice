@@ -37,6 +37,7 @@ postgres = ["artifactr-ai[sql]", "asyncpg>=0.31"]
 fastapi = ["fastapi>=0.141", "starlette>=0.46.0"]
 mcp = ["mcp>=2.2", "starlette>=0.27"]
 otel = [
+    "lattice-core-ai[otel]>=0.1.0.dev0",
     "opentelemetry-exporter-otlp-proto-http>=1.45",
     "opentelemetry-instrumentation-asyncpg>=0.66b0",
     "opentelemetry-instrumentation-fastapi>=0.66b0",
@@ -47,12 +48,14 @@ otel = [
     "opentelemetry-sdk>=1.45",
 ]
 langfuse = [
+    "lattice-core-ai[langfuse]>=0.1.0.dev0",
     "langfuse>=4.15,<5",
     # The score mapping and ports that artifactr.scores' mirror builds on, and evalr.langfuse's
     # score adapters, which send the mirror's scores to Langfuse.
     "evalr[langfuse]>=0.1.0.dev0",
 ]
 litellm = [
+    "lattice-core-ai[litellm]>=0.1.0.dev0",
     "pydantic-ai-slim[openai]>=2.51",
     "httpx2>=2.7",
 ]

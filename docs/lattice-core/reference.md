@@ -34,3 +34,37 @@ The `sql` extra.
     options:
       show_root_heading: false
       show_root_toc_entry: false
+
+## lattice_core.otel
+
+The `otel` extra.
+
+::: lattice_core.otel.configure
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## lattice_core.langfuse
+
+The `langfuse` extra.
+
+::: lattice_core.langfuse
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## lattice_core.litellm
+
+The `litellm` extra.
+
+::: lattice_core.litellm
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## lattice_core.logs
+
+::: lattice_core.logs
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false

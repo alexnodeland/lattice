@@ -27,7 +27,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     ),
     "mcp": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.mcp"},
-        {"pydantic", "opentelemetry", "mcp", "starlette"},
+        {"pydantic", "opentelemetry", "mcp", "starlette", "lattice_core.logs"},
     ),
     # The feedback mirror, on evalr's score mapping and ports (ADR-0045).
     "scores": (
@@ -41,15 +41,15 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     ),
     "otel": (
         {"reflexr.telemetry", "reflexr.otel", "reflexr.langfuse"},
-        {"opentelemetry", "pydantic_ai", "fastapi", "sqlalchemy", "langfuse"},
+        {"opentelemetry", "pydantic_ai", "fastapi", "sqlalchemy", "langfuse", "lattice_core.otel"},
     ),
     "langfuse": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.langfuse"},
-        {"langfuse", "opentelemetry"},
+        {"langfuse", "opentelemetry", "lattice_core.langfuse"},
     ),
     "litellm": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.litellm"},
-        {"pydantic_ai", "opentelemetry", "httpx2"},
+        {"pydantic_ai", "opentelemetry", "httpx2", "lattice_core.litellm"},
     ),
     "agent": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.agent"},

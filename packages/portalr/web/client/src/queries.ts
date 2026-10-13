@@ -67,17 +67,17 @@ export const keys = {
   portalr: {
     tenant: (tenant: string) => ["portalr", tenant] as const,
     spend: (tenant: string) => [...keys.portalr.tenant(tenant), "spend"] as const,
-    scores: (tenant: string, window: Window) =>
+    scores: (tenant: string, window: TimeSpan) =>
       [...keys.portalr.tenant(tenant), "scores", window] as const,
-    metrics: (tenant: string, metric: Metric, window: Window) =>
+    metrics: (tenant: string, metric: Metric, window: TimeSpan) =>
       [...keys.portalr.tenant(tenant), "metrics", metric, window] as const,
-    /** The deployment's tenants, which only operators may read. */
-    tenants: () => ["portalr", "deployment", "tenants"] as const,
+    /** The deployment's tenants, as the signed-in person, `user`, reads them: an operator's. */
+    tenants: (user: string) => ["portalr", "deployment", "tenants", user] as const,
   },
 };
 
 /** A span of time to read, and for a series, the step between its points, in seconds. */
-export interface Window {
+export interface TimeSpan {
   readonly start: string;
   readonly end: string;
   readonly step?: number;
@@ -92,6 +92,23 @@ async function body<D>(
     throw new Refused(answered.status, error);
   }
   return data;
+}
+
+/** Whether a refusal is grantr's or portalr's `forbidden`: the reader may not, not that it failed. */
+function forbidden(error: unknown): boolean {
+  if (!(error instanceof Refused) || error.status !== 403) {
+    return false;
+  }
+  const { detail } = error;
+  return (
+    typeof detail === "object" &&
+    detail !== null &&
+    "detail" in detail &&
+    typeof detail.detail === "object" &&
+    detail.detail !== null &&
+    "type" in detail.detail &&
+    detail.detail.type === "forbidden"
+  );
 }
 
 /** The server refused a read: 401 when no one is signed in, 403 when they may not. */
@@ -303,7 +320,7 @@ export function createQueries(api: Api) {
           queryFn: () => body(api.portalr.GET("/portalr/v1/spend", named(tenant))),
         }),
       /** The tenant's feedback and evaluation scores in a window, from Langfuse. */
-      scores: (tenant: string, window: Window) =>
+      scores: (tenant: string, window: TimeSpan) =>
         queryOptions({
           queryKey: keys.portalr.scores(tenant, window),
           queryFn: () =>
@@ -315,7 +332,7 @@ export function createQueries(api: Api) {
             ),
         }),
       /** One of the tenant's series over a window, from Prometheus. */
-      metrics: (tenant: string, metric: Metric, window: Window) =>
+      metrics: (tenant: string, metric: Metric, window: TimeSpan) =>
         queryOptions({
           queryKey: keys.portalr.metrics(tenant, metric, window),
           queryFn: () =>
@@ -338,19 +355,21 @@ export function createQueries(api: Api) {
        * Every tenant, with their spend, for an operator; null for anyone else, whom it's refused,
        * so the one read also says whether the reader is an operator.
        */
-      tenants: () =>
+      tenants: (user: string) =>
         queryOptions({
-          queryKey: keys.portalr.tenants(),
+          queryKey: keys.portalr.tenants(user),
           queryFn: async () => {
             try {
               return await body(api.portalr.GET("/portalr/v1/deployment/tenants"));
             } catch (error) {
-              if (error instanceof Refused && error.status === 403) {
+              if (forbidden(error)) {
                 return null;
               }
               throw error;
             }
           },
+          // Who is an operator changes rarely: a minute, then it's read again.
+          staleTime: 60_000,
         }),
     },
   };

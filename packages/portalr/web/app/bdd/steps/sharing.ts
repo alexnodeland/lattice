@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
-import { account, signIn } from "./app";
+import { account } from "./app";
 import { started, Then, When } from "./fixtures";
-import { password } from "./people";
+import { password, signIn } from "./people";
 
 /** The workspace's threads, once its log has been read: Start is enabled only then. */
 async function threads(page: Page) {

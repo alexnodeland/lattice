@@ -68,12 +68,15 @@ async def test_loki_down_or_absent_is_unavailable() -> None:
 async def test_prometheus_reads_a_metric_through_the_proxy_with_the_tenant() -> None:
     answer = {"data": {"result": [{"metric": {}, "values": [[1.5, "0.25"], [2.5, "0.5"]]}]}}
     tool = Tool({"/api/v1/query_range": json(answer)})
-    query = MetricQuery(start=START, end=END, metric="failed_runs", step=60)
+    query = MetricQuery(start=START, end=END, metric="failed_turns", step=60)
     series = await Prometheus("http://proxy", tool.client()).series(ACME, query)
     assert isinstance(series, Ok)
     assert [(point.time, point.value) for point in series.data] == [(1.5, 0.25), (2.5, 0.5)]
     assert tool.last.url.params["tenant_id"] == "acme"
     assert tool.last.url.params["step"] == "60"
+    assert tool.last.url.params["query"] == (
+        'sum(increase(artifactr_turns_total{artifactr_turn_outcome="failed",tenant_id="acme"}[60s]))'
+    ), "each point counts the failures in the step before it"
 
 
 async def test_prometheus_answering_nonsense_or_nothing_is_unavailable() -> None:
@@ -107,6 +110,7 @@ async def test_langfuse_reads_the_tenants_scores_newest_first_and_links_for_oper
                 "source": "API",
                 "timestamp": "2026-10-12T00:00:00Z",
                 "subject": {"kind": "trace", "id": "t1"},
+                "metadata": {"tenant": "acme", "person": "alice"},
             },
             {
                 "id": "s2",
@@ -117,6 +121,7 @@ async def test_langfuse_reads_the_tenants_scores_newest_first_and_links_for_oper
                 "timestamp": "2026-10-12T01:00:00Z",
                 "comment": "fine",
                 "subject": {"kind": "observation", "id": "o1", "traceId": "t2"},
+                "metadata": {"evaluator": "accuracy", "version": "1"},
             },
             # On a trace that isn't the tenant's, or on no trace: dropped.
             {
@@ -157,6 +162,8 @@ async def test_langfuse_reads_the_tenants_scores_newest_first_and_links_for_oper
         ("s2", "t2", "good"),
         ("s1", "t1", True),
     ]
+    # evalr names its evaluator in the metadata; a person's feedback names none.
+    assert [score.evaluator for score in read.data] == ["accuracy", None]
     assert tool.last.url.params["traceId"] == "t1,t2"
     assert langfuse.trace_link("t1") == "http://langfuse/project/p1/traces/t1"
     assert langfuse.session_link("thr_1") == "http://langfuse/project/p1/sessions/thr_1"

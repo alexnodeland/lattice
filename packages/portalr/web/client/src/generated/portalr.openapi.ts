@@ -285,7 +285,7 @@ export interface components {
             time_ns: number;
         };
         /** @enum {string} */
-        Metric: "turn_latency" | "failed_runs";
+        Metric: "turn_latency" | "failed_turns";
         /**
          * NewInvite
          * @description Whom to invite to the tenant ``X-Tenant`` names.
@@ -407,6 +407,8 @@ export interface components {
              * @enum {string}
              */
             data_type: "NUMERIC" | "BOOLEAN" | "CATEGORICAL" | "TEXT" | "CORRECTION";
+            /** Evaluator */
+            evaluator?: string | null;
             /** Id */
             id: string;
             /** Name */

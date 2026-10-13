@@ -1,8 +1,10 @@
-# portalr's acceptance stack (lattice ADR-0015): its test application, and the tools its readers
-# read, as stackr runs them, with stackr's own configurations. Langfuse and LiteLLM aren't here:
-# their reads are unavailable (portalr ADR-0011). `moon run portalr:api` runs it. With the `bdd`
-# profile, Supabase Auth (GoTrue, alone) and its database come too, for the UIs' scenarios
-# (`moon run app:bdd`, portalr ADR-0013).
+# portalr's acceptance stack (lattice ADR-0015): its test application, the tools its readers read,
+# and stackr's Collector, which the application sends its own telemetry through, each as stackr
+# runs it, with stackr's own configurations (portalr ADR-0023). Langfuse and LiteLLM aren't here:
+# their reads are unavailable (portalr ADR-0011), or unconfigured where their URL is set empty.
+# `moon run portalr:api` runs it. With the `bdd` profile, Supabase Auth (GoTrue, alone) and its
+# database come too, for the UIs' scenarios (`moon run app:bdd` and `admin:bdd`, portalr
+# ADR-0013 and ADR-0023).
 #
 # Ports are the system's to pick, which the scripts read back.
 
@@ -23,8 +25,12 @@ services:
       # Empty leaves the tool unconfigured, as admin's scenarios run it; unset, it's unavailable.
       PORTALR_LANGFUSE_URL: ${PORTALR_LANGFUSE_URL-http://langfuse:3000}
       PORTALR_LITELLM_URL: ${PORTALR_LITELLM_URL-http://litellm:4000}
-      # Its own telemetry, through stackr's Collector, as an application's goes (portalr ADR-0023).
+      # Its own telemetry, through stackr's Collector, as an application's goes (portalr ADR-0023),
+      # but not of compose's health check, which asks for config.json every two seconds.
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_PYTHON_FASTAPI_EXCLUDED_URLS: portalr/config.json
+      # Each second, so a scenario reads a turn's metrics back while it runs.
+      OTEL_METRIC_EXPORT_INTERVAL: "1000"
     # Loki's image has no shell or probe of its own, so the application's check waits for it too.
     healthcheck:
       test:

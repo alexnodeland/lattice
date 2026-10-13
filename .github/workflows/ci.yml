@@ -139,7 +139,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: uv run --no-project python scripts/affected.py api
       # app's and admin's scenarios, through playwright-bdd in Chromium, against portalr's test
-      # application with Supabase Auth (portalr ADR-0013, ADR-0023); each task installs Chromium.
+      # application with Supabase Auth (portalr ADR-0013, ADR-0023); ui's one task installs
+      # Chromium for both.
       - run: uv run --no-project python scripts/affected.py bdd
       # Schemathesis's JUnit report for each library, to read what failed.
       - name: Upload the reports

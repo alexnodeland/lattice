@@ -25,8 +25,9 @@ at() { printf 'http://%s' "$(docker compose port "$1" "$2")"; }
 app=$(at app 8000)
 
 # Each person the scenarios sign in as, with their password; Supabase Auth confirms them at once.
-# ops is the deployment's operator, alice acme's owner, bob an editor and dana a workspace's admin.
-for person in alice bob dana ops; do
+# ops is the deployment's operator, alice acme's owner, olga an admin of both tenants, bob an
+# editor and dana a workspace's admin.
+for person in alice bob dana olga ops; do
   curl -fsS -o /dev/null -H 'Content-Type: application/json' \
     --data "{\"email\": \"$person@portalr.test\", \"password\": \"$person-password\"}" \
     "$app/auth/v1/signup"

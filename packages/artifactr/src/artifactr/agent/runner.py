@@ -710,6 +710,10 @@ class Runner[AppDepsT]:
         }
         started = time.perf_counter()
         outcome: TurnOutcome = "failed"
+        # The failed series is there before its first failure, at zero, so an increase over a
+        # window counts that failure too: a series' first sample is no increase to Prometheus.
+        failing = {**tenancy, TURN_TRIGGER: session.trigger, TURN_OUTCOME: "failed"}
+        self._telemetry.add(TURNS, 0, failing)
         # A turn is its own trace (ADR-0035), so it starts from an empty context: nothing its
         # caller propagated, such as the Langfuse attributes of a run that sent its message,
         # reaches its spans.

@@ -28,7 +28,7 @@ export type Command =
 export type CorrelationId = string | null;
 /**
  * This interface was referenced by `ReflexrV1`'s JSON-Schema
- * via the `definition` "LoggedEvent".
+ * via the `definition` "_LoggedEvent".
  */
 export type LoggedEvent =
   | RuleFired
@@ -572,12 +572,12 @@ export interface Tick {
   type: "reflexr:tick";
 }
 /**
- * An event of the application's, or one this version doesn't know: its JSON Schema.
+ * An event of the application's, or one this version doesn't know, in JSON Schema only.
  *
- * It describes the wire only. Events are validated through the registry, by their ``type``.
+ * Events are validated through the registry, by their ``type``; this only describes the wire.
  *
  * This interface was referenced by `ReflexrV1`'s JSON-Schema
- * via the `definition` "OtherEvent".
+ * via the `definition` "_OtherEvent".
  */
 export interface OtherEvent {
   type: Type1;

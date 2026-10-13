@@ -9,11 +9,11 @@
  */
 
 import { queryOptions } from "@tanstack/react-query";
-import { isKnown } from "./artifactr";
+import * as artifactr from "./artifactr";
 import type * as artifactrV1 from "./generated/artifactr.v1";
 import type { components as Grantr } from "./generated/grantr.openapi";
 import type * as reflexrV1 from "./generated/reflexr.v1";
-import { isKnown as isKnownToReflexr } from "./reflexr";
+import * as reflexr from "./reflexr";
 import { type Api, named } from "./rest";
 
 type Check = Grantr["schemas"]["Check"];
@@ -285,7 +285,7 @@ export const stale = {
   /** Every event artifactr's schema names is listed, so a new one fails the typecheck here. */
   artifactr(tenant: string, ws: string, envelope: artifactrV1.EventFrame) {
     const { event } = envelope;
-    if (!isKnown(event)) {
+    if (!artifactr.isKnown(event)) {
       return [];
     }
     switch (event.type) {
@@ -331,7 +331,7 @@ export const stale = {
   /** reflexr's rule events make its rules stale, its run events its runs, and ticks its schedules. */
   reflexr(tenant: string, ws: string, envelope: reflexrV1.EventFrame) {
     const { event } = envelope;
-    if (!isKnownToReflexr(event)) {
+    if (!reflexr.isKnown(event)) {
       return [];
     }
     switch (event.type) {

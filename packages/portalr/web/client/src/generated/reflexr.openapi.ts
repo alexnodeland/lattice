@@ -514,7 +514,7 @@ export interface components {
             /** Correlation Id */
             correlation_id: string;
             /** Event */
-            event: components["schemas"]["LoggedEvent"];
+            event: components["schemas"]["_LoggedEvent"];
             id: components["schemas"]["EventId"];
             /** Seq */
             seq: number;
@@ -666,7 +666,6 @@ export interface components {
             type: "install_rule";
         };
         JsonValue: unknown;
-        LoggedEvent: components["schemas"]["RuleFired"] | components["schemas"]["RuleErrored"] | components["schemas"]["RuleReset"] | components["schemas"]["RuleInstalled"] | components["schemas"]["RuleArchived"] | components["schemas"]["RunStarted"] | components["schemas"]["RunProgressed"] | components["schemas"]["RunRetrying"] | components["schemas"]["RunSucceeded"] | components["schemas"]["RunDeadLettered"] | components["schemas"]["RunCancelled"] | components["schemas"]["RunRequeued"] | components["schemas"]["RunSkipped"] | components["schemas"]["FeedbackGiven"] | components["schemas"]["Tick"] | components["schemas"]["OtherEvent"];
         /**
          * NotFilter
          * @description Envelopes that do not match ``filter``.
@@ -704,18 +703,6 @@ export interface components {
             /** Types */
             types: string[];
         };
-        /**
-         * OtherEvent
-         * @description An event of the application's, or one this version doesn't know: its JSON Schema.
-         *
-         *     It describes the wire only. Events are validated through the registry, by their ``type``.
-         */
-        OtherEvent: {
-            /** Type */
-            type: string;
-        } & {
-            [key: string]: unknown;
-        };
         Outcome: components["schemas"]["PublishedOutcome"] | components["schemas"]["RecordedOutcome"] | components["schemas"]["RunOutcome"] | components["schemas"]["RuleOutcome"] | components["schemas"]["RuleVersionOutcome"];
         "Pattern-Input": components["schemas"]["EachPattern"] | components["schemas"]["CountPattern"] | components["schemas"]["SequencePattern-Input"] | components["schemas"]["AbsencePattern"];
         "Pattern-Output": components["schemas"]["EachPattern"] | components["schemas"]["CountPattern"] | components["schemas"]["SequencePattern-Output"] | components["schemas"]["AbsencePattern"];
@@ -742,7 +729,7 @@ export interface components {
             /** Correlation Id */
             correlation_id?: string | null;
             /** Event */
-            event: components["schemas"]["LoggedEvent"];
+            event: components["schemas"]["_LoggedEvent"];
             id?: components["schemas"]["EventId"] | null;
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -766,7 +753,7 @@ export interface components {
          */
         PublishItem: {
             /** Event */
-            event: components["schemas"]["LoggedEvent"];
+            event: components["schemas"]["_LoggedEvent"];
             id?: components["schemas"]["EventId"] | null;
         };
         /**
@@ -1641,6 +1628,20 @@ export interface components {
             rule: components["schemas"]["Rule-Output"];
             /** Version */
             version?: number | null;
+        };
+        /** LoggedEvent */
+        _LoggedEvent: components["schemas"]["RuleFired"] | components["schemas"]["RuleErrored"] | components["schemas"]["RuleReset"] | components["schemas"]["RuleInstalled"] | components["schemas"]["RuleArchived"] | components["schemas"]["RunStarted"] | components["schemas"]["RunProgressed"] | components["schemas"]["RunRetrying"] | components["schemas"]["RunSucceeded"] | components["schemas"]["RunDeadLettered"] | components["schemas"]["RunCancelled"] | components["schemas"]["RunRequeued"] | components["schemas"]["RunSkipped"] | components["schemas"]["FeedbackGiven"] | components["schemas"]["Tick"] | components["schemas"]["_OtherEvent"];
+        /**
+         * OtherEvent
+         * @description An event of the application's, or one this version doesn't know, in JSON Schema only.
+         *
+         *     Events are validated through the registry, by their ``type``; this only describes the wire.
+         */
+        _OtherEvent: {
+            /** Type */
+            type: string;
+        } & {
+            [key: string]: unknown;
         };
     };
     responses: never;

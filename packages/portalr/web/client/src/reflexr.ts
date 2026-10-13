@@ -61,10 +61,6 @@ type Handlers = {
   ) => Workspace;
 };
 
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function withRun(state: Workspace, id: string, change: Partial<Run>): Workspace {
   const run: Run = state.runs[id] ?? {
     id,
@@ -124,16 +120,12 @@ const handlers: Handlers = {
   "reflexr:run_progressed": ignore,
   "reflexr:tick": ignore,
   "reflexr:feedback_given": (state, event, envelope) => {
-    const { target, value } = event;
+    const { target } = event;
     const run = target.kind === "run" ? state.runs[target.run_id] : null;
     if (!run) {
       return state; // a firing's or a chain's, or a run before what the store read
     }
-    const feedback = {
-      actor: envelope.actor,
-      type: event.feedback_type,
-      value: isRecord(value) ? value : {},
-    };
+    const feedback = { actor: envelope.actor, type: event.feedback_type, value: event.value };
     return withRun(state, run.id, { feedback: [...run.feedback, feedback] });
   },
 };

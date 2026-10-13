@@ -18,7 +18,7 @@ events are wrapped in an :class:`Envelope` with their position in the workspace'
 import re
 from collections.abc import Iterator, Mapping
 from functools import cached_property
-from typing import Annotated, Any, ClassVar, Literal, cast, override
+from typing import Annotated, Any, ClassVar, Final, Literal, cast, get_args, override
 
 from pydantic import (
     AfterValidator,
@@ -151,16 +151,6 @@ def _register(event_type: "type[Event]", name: str | None) -> None:
     _types[event_type.event_type] = event_type
 
 
-def _typed(schema: dict[str, JsonValue], cls: type[BaseModel]) -> None:
-    """Put an event type's ``type`` in its JSON Schema, first and required, as on the wire."""
-    name = getattr(cls, "event_type", None)
-    if name is None:  # an abstract event type has no name of its own
-        return
-    properties = cast("dict[str, JsonValue]", schema.get("properties", {}))
-    schema["properties"] = {"type": {"const": name}, **properties}
-    schema["required"] = ["type", *cast("list[JsonValue]", schema.get("required", []))]
-
-
 class Event(BaseModel):
     """Base class for event types.
 
@@ -169,7 +159,7 @@ class Event(BaseModel):
     fields are rejected so that a producer's typo fails loudly.
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid", json_schema_extra=_typed)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     event_type: ClassVar[str]
     """The qualified name: the namespace, a ``:``, and the local name, derived from the class
@@ -331,53 +321,26 @@ def _serialize_event(event: Event, info: SerializationInfo) -> dict[str, Any]:
     return dump_event(event, mode="json" if info.mode_is_json() else "python")
 
 
-def _other(schema: dict[str, JsonValue]) -> None:
-    """Say an other event's ``type`` is none of reflexr's own, so no event matches two."""
-    properties = cast("dict[str, dict[str, JsonValue]]", schema["properties"])
-    names: list[JsonValue] = [*sorted(event.event_type for event in SYSTEM_EVENTS)]
-    properties["type"]["not"] = {"enum": names}
-
-
-class OtherEvent(BaseModel):
-    """An event of the application's, or one this version doesn't know: its JSON Schema.
-
-    It describes the wire only. Events are validated through the registry, by their ``type``.
-    """
-
-    model_config = ConfigDict(extra="allow", json_schema_extra=_other)
-
-    type: Annotated[str, Field(pattern=_EVENT_NAME)]
-
-
-type LoggedEvent = (
-    RuleFired
-    | RuleErrored
-    | RuleReset
-    | RuleInstalled
-    | RuleArchived
-    | RunStarted
-    | RunProgressed
-    | RunRetrying
-    | RunSucceeded
-    | RunDeadLettered
-    | RunCancelled
-    | RunRequeued
-    | RunSkipped
-    | FeedbackGiven
-    | Tick
-    | OtherEvent
-)
-"""An event as the log holds it, in JSON Schema: one of reflexr's own, each named by its
-``type``, or another, kept open (lattice #83)."""
-
-
 class _LoggedEventSchema:
-    """Gives an event its JSON Schema, ``LoggedEvent``'s, as validated and as serialized."""
+    """Gives an event the JSON Schema of the wire, ``LoggedEvent``, as validated and serialized.
+
+    Each of reflexr's own events is named by its ``type``, and left open to fields a newer
+    version adds, as the protocol's changes within v1 are additive. Their models' own schemas,
+    which an agent's tools show it, keep neither: a model validates an event's fields alone.
+    """
 
     def __get_pydantic_json_schema__(
         self, core_schema: CoreSchema, handler: GetJsonSchemaHandler
     ) -> JsonSchemaValue:
-        return handler(TypeAdapter(LoggedEvent).core_schema)
+        schema = handler(TypeAdapter(_LoggedEvent).core_schema)
+        union = handler.resolve_ref_schema(schema)
+        for variant, event in zip(union["anyOf"], _OWN_EVENTS, strict=False):
+            wire = handler.resolve_ref_schema(variant)
+            wire.pop("additionalProperties", None)
+            wire["properties"]["type"] = {"const": event.event_type}
+            if "type" not in wire["required"]:
+                wire["required"].append("type")
+        return schema
 
 
 AnyEvent = Annotated[
@@ -578,6 +541,35 @@ SYSTEM_EVENTS: tuple[type[Event], ...] = (
     Tick,
 )
 """Every event type reflexr itself appends."""
+
+
+_OWN_EVENTS: Final[tuple[type[Event], ...]] = (*get_args(SystemEvent), FeedbackGiven, Tick)
+"""reflexr's own events, which the wire's schema names, in the order ``_LoggedEvent`` has them."""
+
+
+def _others(schema: dict[str, JsonValue]) -> None:
+    """Say another event's ``type`` is none of reflexr's own, so no event matches two."""
+    properties = cast("dict[str, dict[str, JsonValue]]", schema["properties"])
+    properties["type"]["not"] = {"enum": [*sorted(event.event_type for event in _OWN_EVENTS)]}
+
+
+class _OtherEvent(BaseModel):
+    """An event of the application's, or one this version doesn't know, in JSON Schema only.
+
+    Events are validated through the registry, by their ``type``; this only describes the wire.
+    """
+
+    model_config = ConfigDict(
+        frozen=True, extra="allow", title="OtherEvent", json_schema_extra=_others
+    )
+
+    type: Annotated[str, Field(pattern=_EVENT_NAME)]
+
+
+type _LoggedEvent = Annotated[
+    SystemEvent | FeedbackGiven | Tick | _OtherEvent, Field(title="LoggedEvent")
+]
+"""An event as the log holds it, in JSON Schema: one of reflexr's own, or another (lattice #83)."""
 
 
 # ─── envelopes ───────────────────────────────────────────────────────────────

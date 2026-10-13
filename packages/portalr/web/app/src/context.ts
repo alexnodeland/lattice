@@ -3,9 +3,8 @@
  * and the commands sent over REST.
  */
 
-import type { Config, createCommands, createQueries } from "@portalr/client";
+import type { Config, createCommands, createQueries, Signed } from "@portalr/client";
 import type { QueryClient } from "@tanstack/react-query";
-import type { Signed } from "./signed";
 
 export interface Context {
   readonly config: Config;

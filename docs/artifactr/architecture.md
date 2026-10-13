@@ -484,7 +484,7 @@ The metric registry, `artifactr.telemetry.metrics`, declares every metric with i
 |---|---|---|
 | `artifactr.commands` | counter | `artifactr.command.type`, `artifactr.outcome`, `artifactr.rejection`, `artifactr.actor.kind` |
 | `artifactr.commit.duration` | histogram, s | `artifactr.command.type`, `artifactr.outcome` |
-| `artifactr.turns`, `artifactr.turn.duration` | counter; histogram, s | `artifactr.turn.trigger`, `artifactr.turn.outcome` |
+| `artifactr.turns`, `artifactr.turn.duration` | counter; histogram, s | `artifactr.turn.trigger`, `artifactr.turn.outcome`; each turn starts its `failed` series at zero, so a first failure counts ([ADR-0067](adr/0067-a-failed-turns-series-starts-at-zero.md)) |
 | `artifactr.runs` | counter | `artifactr.run.status` and `artifactr.run.reason`, for each segment that ends or pauses |
 | `artifactr.tool_calls` | counter | `gen_ai.tool.name`, `artifactr.tool.status` |
 | `artifactr.tokens` | counter | `gen_ai.token.type` |

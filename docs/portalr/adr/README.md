@@ -28,5 +28,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0020](0020-the-rules-area.md) | The Rules area: stored rules as reflexr's JSON, sent over its REST | Accepted |
 | [0021](0021-the-areas-on-the-frame-and-what-admin-needs.md) | The areas on the frame, a danger colour, budget badges, and what admin's frame decides | Accepted |
 | [0022](0022-restricting-and-sharing-a-thread.md) | Restricting and sharing a thread, from its menu | Accepted |
+| [0023](0023-admins-shell-and-home.md) | admin's shell and Home: its own tenant, every tenant for operators, and a card per read | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

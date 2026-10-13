@@ -12,6 +12,7 @@ import {
   type Reflexr,
   type ReflexrStream,
   reflexr,
+  type Signed,
   type Snapshot,
   Stream,
   type Surfaces,
@@ -27,7 +28,6 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import type { Signed } from "./signed";
 
 interface Streams {
   readonly artifactr: ArtifactrStream;

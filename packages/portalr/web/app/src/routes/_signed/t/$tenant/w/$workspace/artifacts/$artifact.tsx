@@ -1,4 +1,4 @@
-import { changes, keys, Refused, thumbs } from "@portalr/client";
+import { allowedIn, changes, keys, Refused, thumbs, useMe, workspaceOf } from "@portalr/client";
 import {
   ArtifactContent,
   Card,
@@ -14,8 +14,6 @@ import {
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
-import { allowedIn, workspaceOf } from "../../../../../../../allowed";
-import { useMe } from "../../../../../../../me";
 import { RENDERERS } from "../../../../../../../renderers";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
 

@@ -1,37 +1,74 @@
 import "@portalr/ui/styles.css";
-import { AppShell, EmptyState, NavLink, PageHeader, SideNav } from "@portalr/ui";
-import { House } from "lucide-react";
+import {
+  type Config,
+  createApi,
+  createQueries,
+  createQueryClient,
+  readConfig,
+  Signed,
+} from "@portalr/client";
+import { Plain } from "@portalr/ui";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
+import { routeTree } from "./routeTree.gen";
 
 /**
- * admin's frame, with admin's own mark (lattice ADR-0014): its areas, and signing in, arrive with
- * portalr's phase 6, which decides the rest of the frame (portalr ADR-0021).
+ * admin: the UI for a tenant's owners and admins, and the deployment's operators (lattice
+ * RFC-0002). It shares the app's session, so signing in to either signs in to both.
  */
-const root = document.getElementById("root");
-if (!root) {
+function start(root: Root, config: Config) {
+  const signed = new Signed(config, () => {
+    queryClient.clear();
+    void router.navigate({ to: "/sign-in" });
+  });
+  // A read refused as unsigned ends the session, which goes back to signing in.
+  const queryClient = createQueryClient(() => void signed.signOut());
+  const router = createRouter({
+    routeTree,
+    basepath: import.meta.env.BASE_URL,
+    context: {
+      config,
+      signed,
+      queries: createQueries(createApi(config.surfaces, () => signed.session())),
+      queryClient,
+    },
+  });
+  root.render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </StrictMode>,
+  );
+  return router;
+}
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: ReturnType<typeof start>;
+  }
+}
+
+const element = document.getElementById("root");
+if (!element) {
   throw new Error("index.html has no #root");
 }
-createRoot(root).render(
-  <StrictMode>
-    <AppShell
+const root = createRoot(element);
+try {
+  start(root, await readConfig(location.origin));
+} catch (error) {
+  root.render(
+    <Plain
       ui="admin"
       home={<a href={import.meta.env.BASE_URL} />}
-      switcher={null}
-      account={null}
-      nav={
-        <SideNav label="Admin">
-          <NavLink icon={House} href={import.meta.env.BASE_URL} aria-current="page">
-            Home
-          </NavLink>
-        </SideNav>
-      }
+      title="portalr admin can't start"
     >
-      <PageHeader title="portalr admin" />
-      <EmptyState title="Nothing to manage here yet">
-        Access, the audit log, feedback, traces, and usage and spend arrive here, for a tenant's
-        owners and admins and for the deployment's operators.
-      </EmptyState>
-    </AppShell>
-  </StrictMode>,
-);
+      <p role="alert">
+        The deployment's settings couldn't be read:{" "}
+        {error instanceof Error ? error.message : String(error)}.
+      </p>
+    </Plain>,
+  );
+}

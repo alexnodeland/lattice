@@ -208,8 +208,11 @@ node_modules/
 packages/portalr/src/portalr/static/
 # playwright-bdd generates its specs from the features, and Playwright writes its reports.
 packages/portalr/web/app/.features-gen/
+packages/portalr/web/admin/.features-gen/
 packages/portalr/web/app/test-results/
+packages/portalr/web/admin/test-results/
 packages/portalr/web/app/playwright-report/
+packages/portalr/web/admin/playwright-report/
 
 # OpenTofu's working directories, and the lock files of stackr's AWS modules, if one is ever made:
 # deploy/aws/.terraform.lock.hcl, which their tests use, is committed

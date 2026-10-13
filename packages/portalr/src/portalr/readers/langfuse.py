@@ -42,6 +42,8 @@ class Score(BaseModel):
     source: str
     timestamp: datetime
     comment: str | None = None
+    evaluator: str | None = None
+    """The evaluator that gave it, from evalr's metadata; None for a person's feedback."""
 
 
 class _Observation(BaseModel):
@@ -76,6 +78,13 @@ class _Score(BaseModel):
     timestamp: datetime
     comment: str | None = None
     subject: _Subject | None = None
+    metadata: dict[str, object] | None = None
+
+    @property
+    def evaluator(self) -> str | None:
+        """The evaluator evalr names in the score's metadata, if any: a person's has none."""
+        named = (self.metadata or {}).get("evaluator")
+        return named if isinstance(named, str) else None
 
 
 class _Scores(BaseModel):
@@ -173,7 +182,8 @@ class Langfuse:
             for score in page.data:
                 trace = score.subject.trace if score.subject else None
                 if trace is not None and trace in batch:
-                    mine.append(Score(trace_id=trace, **score.model_dump(exclude={"subject"})))
+                    fields = score.model_dump(exclude={"subject", "metadata"})
+                    mine.append(Score(trace_id=trace, evaluator=score.evaluator, **fields))
         newest = sorted(mine, key=lambda score: score.timestamp, reverse=True)
         return Ok(data=newest[: window.limit])
 

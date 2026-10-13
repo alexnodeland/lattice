@@ -23,7 +23,7 @@ An application mounts `portalr_router(resolve_actor=, grants=, readers=, invite=
 | `GET /portalr/config.json` | Supabase's URL and publishable key, the surfaces' paths, and which tools are configured | Nothing |
 | `GET /portalr/v1/traces`, `/traces/{id}` | The tenant's traces, a session's or a run's, and one trace's spans, from Tempo | `portalr:read_telemetry` |
 | `GET /portalr/v1/logs` | The tenant's logs, a thread's or a run's, from Loki | `portalr:read_telemetry` |
-| `GET /portalr/v1/metrics` | `turn_latency` or `failed_runs` over time, from Prometheus through prom-label-proxy | `portalr:read_telemetry` |
+| `GET /portalr/v1/metrics` | `turn_latency`, or `failed_turns` counted over each step, over time, from Prometheus through prom-label-proxy | `portalr:read_telemetry` |
 | `GET /portalr/v1/scores` | The tenant's feedback and evaluation scores, from Langfuse | `portalr:read_telemetry` |
 | `GET /portalr/v1/spend` | The tenant's spend against its budget, from its LiteLLM team | `portalr:read_spend` |
 | `GET /portalr/v1/deployment/tenants` | Every tenant, and their spend from one LiteLLM team list | `portalr:read_deployment` |
@@ -97,6 +97,21 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 
 `ui` imports `client`'s types alone, which a root test holds it to.
 
+## admin
+
+`web/admin` is the UI for a tenant's owners and admins and the deployment's operators, at `/portalr/admin/`, on the app's session ([ADR-0023](adr/0023-admins-shell-and-home.md)). The session, where each UI opens, `allowedIn` and `useMe` are `client`'s; signing in, the account and the tenant switch are `ui`'s.
+
+| Route | Shows |
+|---|---|
+| `/sign-in` | An email and a password |
+| `/` | Where admin opens: its last choice while still the person's, their one tenant, every tenant for an operator, a choice, or no access |
+| `/t/$tenant` | A tenant someone owns or administers, in admin's frame, with the areas grantr allows |
+| `/t/$tenant/` | Home: members, workspaces, feedback, failed turns and spend, each a card from one read, with its own state |
+| `/deployment` | Every tenant, for operators, with the deployment's areas alone |
+| `/deployment/` | Home: the tenants, and their spend |
+
+`moon run admin:bdd` runs admin's features against the test application, which sends its telemetry through stackr's Collector to Tempo, Loki and Prometheus, with Langfuse and LiteLLM unconfigured.
+
 ## The kit's look
 
 `ui`'s tokens are lattice ADR-0014's, with `--edge`, `--wash`, `--accent-hover` and `--scrim` beside them ([ADR-0019](adr/0019-the-kits-look.md)), and `--danger`, for destructive actions alone ([ADR-0021](adr/0021-the-areas-on-the-frame-and-what-admin-needs.md)), each pair's contrast asserted in both schemes. Its typefaces, Schibsted Grotesk and Fragment Mono, are served from the UIs' own origin. The frame and its parts:
@@ -114,6 +129,9 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `StatusBadge` | How a thing is going, as a shape and a word; only waiting for you in the working colour; a budget near or over as a word and a shape of its own, with no warning colour |
 | `ConfirmDialog` | A destructive action, asked first: what will be lost, the focus on Cancel, and a name to type where asked |
 | `SegmentedFilter` | One filter of a few, side by side |
+| `TenantSwitcher` | admin's tenant, or every tenant, and a menu of the others |
+| `StatCard` | One figure, read on its own, or why there's none |
+| `SignIn`, `Account` | Signing in, and the account menu over a session, for both UIs |
 | `Dialog` | A dialog over the page, opened by its caller, with where focus starts and where it returns ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
 | `Menu` | A button and the actions it opens, each of which may be disabled while it's being done |
 | `SelectField` | A labelled choice among a few, as the platform's own select, which submits with its form |

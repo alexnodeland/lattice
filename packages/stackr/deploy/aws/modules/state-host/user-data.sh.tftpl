@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# The state host's first boot (RFC-0004): Docker and Compose; the data volume at /data; lattice at
+# ${lattice_ref}; ClickHouse's passwords from Secrets Manager into a private .env; and a systemd unit
+# that runs deploy/aws/state-host's Compose at every boot.
+set -euo pipefail
+exec >/var/log/stackr-state-host.log 2>&1
+
+apt-get update -q
+DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker.io docker-compose-v2 git
+
+# The data volume, by its id: formatted the first time, mounted at /data at every boot.
+device=/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${replace(volume_id, "-", "")}
+for _ in $(seq 1 120); do [[ -e $device ]] && break; sleep 5; done
+blkid "$device" >/dev/null || mkfs.ext4 -q -L stackr-data "$device"
+mkdir -p /data
+grep -q stackr-data /etc/fstab || echo "LABEL=stackr-data /data ext4 defaults,nofail 0 2" >>/etc/fstab
+mount -a
+mkdir -p /data/clickhouse /data/clickhouse-logs /data/prometheus
+chown -R 101:101 /data/clickhouse /data/clickhouse-logs
+chown -R 65534:65534 /data/prometheus
+
+git clone --quiet --depth 1 --branch '${lattice_ref}' https://github.com/alexnodeland/lattice /opt/lattice
+cd /opt/lattice/packages/stackr/deploy/aws/state-host
+
+# The passwords go from the AWS CLI's output into the file, never onto a command line.
+secret() {
+  docker run --rm '${aws_cli_image}' secretsmanager get-secret-value --region '${region}' \
+    --secret-id "$1" --query SecretString --output text
+}
+password=$(secret '${secret_arn}')
+admin=$(secret '${admin_arn}')
+(
+  umask 077
+  printf 'STATE_HOST_ADDRESS=%s\nCLICKHOUSE_PASSWORD=%s\nCLICKHOUSE_ADMIN_PASSWORD=%s\n' \
+    '${address}' "$password" "$admin" >.env
+)
+
+cat >/etc/systemd/system/stackr-state.service <<UNIT
+[Unit]
+Description=stackr's state host: ClickHouse, Prometheus and prom-label-proxy
+Requires=docker.service
+After=docker.service data.mount
+RequiresMountsFor=/data
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+WorkingDirectory=/opt/lattice/packages/stackr/deploy/aws/state-host
+ExecStart=/usr/bin/docker compose up --detach --wait
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=15min
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now stackr-state.service

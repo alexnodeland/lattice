@@ -1,0 +1,66 @@
+# The AWS recipe's state host (RFC-0004): ClickHouse, Prometheus and prom-label-proxy, the services
+# that need a disk that outlives a task, under Compose and systemd on one EC2 instance, with their
+# data on its EBS volume at /data. Their images are compose.yaml's, which scripts/check-config holds
+# them to. Each port binds the instance's private address, STATE_HOST_ADDRESS, which only the
+# services' security group reaches. ClickHouse's users are deploy/clickhouse/users.xml's, as on one
+# machine (ADR-0031): an admin, and Langfuse's, on its own database. .env beside this file holds the
+# address and both passwords, which the instance's user data writes from Secrets Manager.
+
+name: stackr-state
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.9.3.38@sha256:12b16e744f91d8228705e136bd2b0ab14c939c87ff82443090279b65255c50c1
+    restart: unless-stopped
+    user: "101:101"
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+      CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?the user data writes it}
+      CLICKHOUSE_LANGFUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?the user data writes it}
+    volumes:
+      - ../../clickhouse/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
+      - /data/clickhouse:/var/lib/clickhouse
+      - /data/clickhouse-logs:/var/log/clickhouse-server
+    ports:
+      - ${STATE_HOST_ADDRESS:?the user data writes it}:8123:8123
+      - ${STATE_HOST_ADDRESS:?the user data writes it}:9000:9000
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8123/ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  prometheus:
+    image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
+    restart: unless-stopped
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-otlp-receiver
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - /data/prometheus:/prometheus
+    ports:
+      - ${STATE_HOST_ADDRESS:?the user data writes it}:9090:9090
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  prom-label-proxy:
+    image: quay.io/prometheuscommunity/prom-label-proxy:v0.15.1@sha256:186f9fe791158ef25d6f810109746ac0acdb35cb8401b554526c77c065483373
+    restart: unless-stopped
+    command:
+      - -label=tenant_id
+      - -upstream=http://prometheus:9090
+      - -insecure-listen-address=0.0.0.0:8080
+      - -internal-listen-address=127.0.0.1:8081
+    ports:
+      - ${STATE_HOST_ADDRESS:?the user data writes it}:9091:8080
+    depends_on:
+      - prometheus

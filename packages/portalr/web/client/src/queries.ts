@@ -17,6 +17,7 @@ import type {
 } from "./generated/grantr.openapi";
 import type { components as Portalr } from "./generated/portalr.openapi";
 import type * as reflexrV1 from "./generated/reflexr.v1";
+import { reasons } from "./reasons";
 import * as reflexr from "./reflexr";
 import { type Api, named } from "./rest";
 
@@ -159,7 +160,7 @@ export class Refused extends Error {
   readonly detail: unknown;
 
   constructor(status: number, detail: unknown) {
-    super(`the server refused the read (${status}): ${JSON.stringify(detail)}`);
+    super(`the server refused the read (${status}): ${reasons(status, detail).join("; ")}`);
     this.status = status;
     this.detail = detail;
   }

@@ -83,7 +83,7 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.workspace` | core, telemetry, lattice-core's `text` | Inner; owns the `Storage` port | `Workspaces`, `Workspace`, storage protocols, in-memory storage. |
 | `artifactr.agent` | workspace, telemetry, pydantic-ai | Inner; owns the `TurnContext`, `TurnEvaluator` and `CommandResults` ports | The `ArtifactWorkspace` capability, `Session`, `Runner`, live-output helpers, and the memory of commands' results. |
 | `artifactr.scores` (needs evalr, from the `langfuse` or `evals` extra) | telemetry, workspace, evalr's core | Uses evalr's `ScoreSink` and `ScoreConfigStore` ports | Feedback as scores, named as each type is registered, and the mirror that records a workspace's feedback in a sink. |
-| `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic | Adapter for `Storage` | Durable storage on PostgreSQL and SQLite, and its migrations. |
+| `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic, lattice-core's `sql` | Adapter for `Storage` | Durable storage on PostgreSQL and SQLite, and its migrations. |
 | `artifactr.otel` (extra) | telemetry, the OpenTelemetry SDK, exporters and instrumentations | Adapter for the OpenTelemetry API | `configure_telemetry`: providers, OTLP export, instrumentations and metric views, for applications, composed with other libraries' contributions ([ADR-0046](adr/0046-telemetry-that-composes-across-libraries.md)). |
 | `artifactr.litellm` (extra) | agent, pydantic-ai's OpenAI support | Adapter for pydantic-ai's `Model` | `litellm_model` and the `LiteLLMGateway` capability: each request's tenancy, session, trace, key and guardrails, and guardrail blocks as typed failures ([ADR-0043](adr/0043-the-litellm-adapter.md)). |
 | `artifactr.langfuse` (extra) | agent, langfuse | Adapter for `TurnContext` | A span filter that keeps whole traces, and each turn's trace attributes ([ADR-0039](adr/0039-the-langfuse-adapter.md)); feedback reaches Langfuse through evalr's score adapters ([ADR-0049](adr/0049-scores-on-evalr.md)). |
@@ -549,13 +549,11 @@ reflexr, the sibling library for event-driven agents, is released on its own, an
 | MCP | Tenant in resource URIs | The same |
 | Commands | `Runner.execute(workspace, command, command_id=)` returns the `command_result`, remembered in a `CommandResults` port by tenant, workspace, participant and id; every MCP tool that changes something takes `command_id` | The same, as `Workspaces.execute` |
 
-What artifactr and reflexr shared verbatim moves into [lattice-core](../lattice-core/index.md), which both depend on ([lattice ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md)): `tag_required` and the NUL search are there already. Until the rest moves, it is copied at the same path under `src/reflexr/`, each copy's docstring says so, and a change to one is made to both:
+What artifactr and reflexr shared verbatim moves into [lattice-core](../lattice-core/index.md), which both depend on ([lattice ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md)): `tag_required`, the NUL search, the SQLite engine, the tenant session, and the session helpers that await a database call to its end and lock a row are there already. Until the rest moves, it is copied at the same path under `src/reflexr/`, each copy's docstring says so, and a change to one is made to both:
 
 - `_logging_left_alone`, in `src/artifactr/mcp/server.py`
 - `litellm_model`, in `src/artifactr/litellm/gateway.py`
-- `create_sqlite_engine`, in `src/artifactr/sql/sqlite.py`
 - `langfuse_client`, in `src/artifactr/langfuse/client.py`
-- `_to_the_end` and `_awaited_to_the_end`, in `src/artifactr/sql/storage.py` ([ADR-0047](adr/0047-cancel-safe-storage.md))
 
 ## Dependencies
 

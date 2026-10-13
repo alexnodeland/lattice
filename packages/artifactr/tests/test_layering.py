@@ -40,7 +40,10 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"pydantic", "lattice_core.text", *OTEL_API},
     ),
     "agent": (INNER, {"pydantic", "pydantic_ai", *OTEL_API}),
-    "sql": ({"artifactr.core", "artifactr.workspace", "artifactr.sql"}, {"sqlalchemy", "alembic"}),
+    "sql": (
+        {"artifactr.core", "artifactr.workspace", "artifactr.sql"},
+        {"sqlalchemy", "alembic", "lattice_core.sql"},
+    ),
     # Feedback as scores: the mirror, on evalr's mapping and ports (ADR-0049).
     "scores": (
         {"artifactr.core", "artifactr.telemetry", "artifactr.workspace", "artifactr.scores"},

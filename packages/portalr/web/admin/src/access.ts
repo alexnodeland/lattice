@@ -130,6 +130,9 @@ type Keyed<K extends string> = K extends unknown ? { kind: K; id: string } : nev
 
 const keyed = <K extends string>(kind: K, id: string) => ({ kind, id }) as Keyed<K>;
 
+/** A name's possessive, as English writes it: "triager's", but "ops'" and "reviewers'". */
+export const possessive = (name: string) => (/s$/i.test(name) ? `${name}'` : `${name}'s`);
+
 /** What a form last said: done, or refused, and why. */
 export type Said = { readonly said: string; readonly refused: boolean } | null;
 

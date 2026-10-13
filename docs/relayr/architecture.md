@@ -23,7 +23,7 @@ graph LR
 |---|---|---|
 | `relayr.events` | The bridged types, under `ArtifactrEvent` (`event_namespace="artifactr"`); `BRIDGED`; and `Projections`, the default set with the application's own mappings | artifactr, reflexr, pydantic |
 | `relayr.ledger` | The `Ledger` port, `DeadLetter`, `Cause`, `WorkspaceKey`, and `InMemoryLedger` | pydantic |
-| `relayr.sql` | `SqlLedger`, its tables and Alembic migrations, and `create_sqlite_engine`. The `sql`, `sqlite` and `postgres` extras | `relayr.ledger`, SQLAlchemy, Alembic |
+| `relayr.sql` | `SqlLedger`, its tables and Alembic migrations, and `create_sqlite_engine`. The `sql`, `sqlite` and `postgres` extras | `relayr.ledger`, SQLAlchemy, Alembic, and lattice-core's `sql`, which holds the SQLite engine, the tenant session and the session helpers the libraries share ([lattice ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md)) |
 | `relayr.inbound` | `Followers`, and the two actors a follower acts as | `relayr.events`, `relayr.ledger`, artifactr, reflexr |
 | `relayr.outbound` | `Outbound` and its per-attempt `RunActions`, `Allowlist`, `NotAllowed`, `Refused`, the rule's actor, `turn_cause`, and `ArtifactrCapability` with its tools | `relayr.events`, `relayr.ledger`, artifactr, reflexr, pydantic, pydantic-ai |
 | `relayr.rules` | `RuleDraft`, the `rule` artifact type; `check_draft` and `preview`; `RuleDrafting`, the chat agent's `draft_rule`; and relayr's rules from chat, `RULES_FROM_CHAT` and `RULE_DRIFT`, with `Installer`'s actions, `ALLOWLISTS` and `anyone` | `relayr.events`, `relayr.outbound`, artifactr, reflexr, pydantic, pydantic-ai |

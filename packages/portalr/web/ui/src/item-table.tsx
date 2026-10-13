@@ -3,30 +3,34 @@ import { Card } from "./card";
 import { EmptyState } from "./empty-state";
 import { Table } from "./table";
 
-/** One of an item table's columns: its own key, its heading, and what it shows of each item. */
+/**
+ * One of an item table's columns: its own key, its heading, and what it shows of each item; and,
+ * so stacked tables line up, its width, such as "40%".
+ */
 export interface Column<T> {
   readonly key: string;
   readonly label: string;
   readonly cell: (item: T) => ReactNode;
+  readonly width?: string;
 }
 
 /**
  * Items as a table from 640 pixels, the breakpoint the app's run lists use, and as a list of
  * cards below, rather than a table scrolled sideways on a phone (portalr ADR-0021). Only one is
- * shown, so only one is in the accessibility tree: the table named by `caption`, each row named
- * by its first cell, or the list, named the same, each card headed and named by its first cell,
- * with the others beside their labels and the item's actions last. With no items, it says so.
+ * shown, so only one is in the accessibility tree: the table named by `caption`, or by the
+ * heading `labelledBy` names, each row named by its first cell, or the list, named the same, each
+ * card headed and named by its first cell, with the others beside their labels and the item's
+ * actions last. With no items, it says so. Columns given widths are laid out to them.
  */
 export function ItemTable<T>({
-  caption,
   columns,
   items,
   keyOf,
   named,
   actions,
   empty,
-}: {
-  caption: string;
+  ...naming
+}: ({ caption: string } | { labelledBy: string }) & {
   columns: readonly [Column<T>, ...Column<T>[]];
   items: readonly T[];
   keyOf: (item: T) => string;
@@ -38,6 +42,9 @@ export function ItemTable<T>({
   empty: { readonly title: string; readonly body: ReactNode };
 }) {
   const prefix = useId();
+  const caption = "caption" in naming ? naming.caption : undefined;
+  const labelledBy = "labelledBy" in naming ? naming.labelledBy : undefined;
+  const fixed = columns.some((column) => column.width !== undefined);
   if (items.length === 0) {
     return <EmptyState title={empty.title}>{empty.body}</EmptyState>;
   }
@@ -49,11 +56,11 @@ export function ItemTable<T>({
   return (
     <>
       <div className="max-sm:hidden">
-        <Table caption={caption}>
+        <Table {...naming} className={fixed ? "table-fixed" : undefined}>
           <thead>
             <tr>
               {columns.map((column) => (
-                <th key={column.key} scope="col">
+                <th key={column.key} scope="col" style={{ width: column.width }}>
                   {column.label}
                 </th>
               ))}
@@ -67,7 +74,7 @@ export function ItemTable<T>({
           <tbody>
             {items.map((item, index) => (
               <tr key={keyOf(item)} {...name(item, index, "row")}>
-                <th id={id(index, "row")} scope="row" className="font-semibold text-fg">
+                <th id={id(index, "row")} scope="row">
                   {first.cell(item)}
                 </th>
                 {rest.map((column) => (
@@ -79,7 +86,11 @@ export function ItemTable<T>({
           </tbody>
         </Table>
       </div>
-      <ul aria-label={caption} className="flex flex-col gap-2 sm:hidden">
+      <ul
+        aria-label={caption}
+        aria-labelledby={labelledBy}
+        className="flex flex-col gap-2 sm:hidden"
+      >
         {items.map((item, index) => (
           <li key={keyOf(item)} {...name(item, index, "card")}>
             <Card className="flex flex-col gap-2">

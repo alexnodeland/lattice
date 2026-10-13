@@ -76,3 +76,30 @@ test("an item named apart from its first cell is named so, as a row and as a car
   await page.viewport(414, 896);
   await expect.element(wide.getByRole("listitem", { name: "bob as viewer" })).toBeVisible();
 });
+
+test("named by a heading beside it, the table, and on a phone the list, take its name", async () => {
+  const table = (
+    <div>
+      <h2 id="workspace-notes">Workspace notes</h2>
+      <ItemTable
+        labelledBy="workspace-notes"
+        columns={[
+          { key: "to", label: "To", cell: (grant) => grant.to, width: "40%" },
+          { key: "role", label: "Role", cell: (grant) => grant.role },
+        ]}
+        items={[{ to: "bob", role: "editor" }]}
+        keyOf={(grant) => grant.to}
+        empty={{ title: "No grants", body: "None yet." }}
+      />
+    </div>
+  );
+  await page.viewport(1024, 768);
+  onTestFinished(() => page.viewport(414, 896));
+  const screen = await render(table);
+  const wide = screen.getByRole("table", { name: "Workspace notes" });
+  await expect.element(wide).toBeVisible();
+  // A column given a width is laid out to it, so stacked tables line up.
+  expect(getComputedStyle(wide.element()).tableLayout).toBe("fixed");
+  await page.viewport(414, 896);
+  await expect.element(screen.getByRole("list", { name: "Workspace notes" })).toBeVisible();
+});

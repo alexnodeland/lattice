@@ -1,0 +1,7 @@
+# zizmor's audits, as CI and the hooks run them over the workflows and the actions.
+rules:
+  # It asks for GitHub's newer `uses: $/...` in place of `./...` for an action of lattice's own.
+  # actionlint, which checks the same workflows, doesn't accept that syntax yet: re-enable this
+  # once it does, and switch.
+  self-repository:
+    disable: true

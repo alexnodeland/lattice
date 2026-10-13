@@ -74,7 +74,7 @@ repos:
         name: zizmor
         entry: uv run zizmor
         language: system
-        files: ^\.github/workflows/
+        files: ^\.github/(workflows|actions)/|^\.github/zizmor\.yml$
       # pyright, and TypeScript in the web packages, in every project, as each package's hook ran
       # it; moon's cache skips the projects the change doesn't affect.
       - id: typecheck

@@ -1,5 +1,7 @@
-# The tools CI installs through moonrepo/setup-toolchain, and proto installs anywhere else
-# (`proto use`). Renovate's proto manager keeps them current.
+# The tools CI installs through .github/actions/toolchain, and proto installs anywhere else
+# (`proto use`). Renovate's proto manager keeps them current, and its custom managers proto
+# itself, tofu and tflint. Pinning proto pins it everywhere: proto runs the version named here.
+proto = "0.63.1"
 bun = "1.4.3"
 moon = "2.5.6"
 uv = "0.12.12"

@@ -7,6 +7,15 @@
   },
   "customManagers": [
     {
+      "description": "proto's own version in .prototools, which CI's toolchain action installs (lattice ADR-0017).",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.prototools$/"],
+      "matchStrings": ["(?<depName>proto) = \"(?<currentValue>\\d[^\"]*)\""],
+      "datasourceTemplate": "github-releases",
+      "packageNameTemplate": "moonrepo/proto",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
       "description": "OpenTofu and TFLint in .prototools, whose plugins are lattice's own, so Renovate's proto manager doesn't know them (stackr ADR-0029).",
       "customType": "regex",
       "managerFilePatterns": ["/^\\.prototools$/"],

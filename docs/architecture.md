@@ -158,7 +158,7 @@ moon runs every task, and only those a change affects; uv and Bun manage the dep
 | `.moon/tasks/typescript.yml` | For every web package: `lint` (Biome), `typecheck` (`tsc`), `test` (Vitest), `build` (Vite), `format` and `check`. The root's `package.json`, `bun.lock`, `biome.json` and `tsconfig.base.json` are inputs of every task. `client` and `ui` have no `build`, and `app` and `admin` no `test` until they have code to test |
 | `<project>/moon.yml` | The project's language, layer, tags and `dependsOn`, and tasks of its own |
 | `moon.yml` | The root project, `lattice`: lint, types and tests for the root's Python and lattice's tests; `docs` and `docs-serve`; `workflows`, which runs actionlint and zizmor; `knip`, over the Bun workspace; and `check`. It inherits no task, which would check every package again |
-| `.prototools` | The versions of moon, uv and Bun, which CI's `moonrepo/setup-toolchain` installs, and proto anywhere else. `detect-strategy = "only-prototools"` leaves Python to uv, from `.python-version` |
+| `.prototools` | The versions of proto, moon, uv and Bun, which CI's `.github/actions/toolchain` installs, and proto anywhere else. `detect-strategy = "only-prototools"` leaves Python to uv, from `.python-version` |
 
 - **`check` is one task per project** that runs nothing itself and depends on the project's checks, so the list lives in one place. `make check` runs `moon run :check`, and CI and Nightly run the same tasks.
 - **artifactr's and reflexr's contributor tasks,** `schema`, `dashboards`, `pg-up`, `pg-down`, `app-up` and `test-pg`, are ones CI doesn't run and moon doesn't cache (RFC-0003, D2). stackr keeps its Makefile for the stack, and its checks are tasks: `validate`, `reference`, `template`, `smoke` and `smoke-app`.
@@ -194,7 +194,7 @@ A change to evalr runs the checks of evalr and of every project above it; a chan
 - **Every workflow is hardened the same way:** each action pinned to a commit, with its version beside it; `permissions: {}` at the top, and each job granted what it needs; and no checkout keeps its credentials. actionlint and zizmor check the workflows, in the hooks and in the root's `workflows` task.
 - **Every test and every job has a timeout:** a test fails after a minute, printing every thread's stack, and each job has a limit of a few times its usual length ([ADR-0007](adr/0007-a-timeout-on-every-test-and-every-job.md)).
 - **Every project's tests run in a random order,** through pytest-randomly in the root's `dev` group, and each run prints the seed that reproduces it ([ADR-0010](adr/0010-every-projects-tests-run-in-a-random-order.md)).
-- **Every job that runs moon, uv or Bun installs them** through `moonrepo/setup-toolchain`, at the versions in `.prototools`. The jobs that run checks and tests install the web packages with `bun install --frozen-lockfile`.
+- **Every job that runs moon, uv or Bun installs them** through `.github/actions/toolchain`, at the versions in `.prototools`: from a cache of `~/.proto` when it can, and otherwise with each download retried ([ADR-0017](adr/0017-ci-installs-its-toolchain-from-a-cache-with-retries.md)). The jobs that run checks and tests install the web packages with `bun install --frozen-lockfile`.
 
 ## Hooks
 

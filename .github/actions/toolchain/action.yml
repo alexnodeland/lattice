@@ -1,0 +1,16 @@
+name: Toolchain
+description: >-
+  proto, at the version .prototools pins, and the tools .prototools lists, restored from a cache
+  when they can be, and otherwise downloaded with retries (lattice ADR-0017).
+runs:
+  using: composite
+  steps:
+    - name: Restore proto and its tools
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.proto
+        key: proto-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.prototools', 'packages/stackr/deploy/aws/tools/*.toml') }}
+        restore-keys: proto-${{ runner.os }}-${{ runner.arch }}-
+    - name: Install proto and its tools
+      shell: bash
+      run: '"$GITHUB_ACTION_PATH/install"'

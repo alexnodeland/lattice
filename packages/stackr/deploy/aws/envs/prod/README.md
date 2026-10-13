@@ -19,9 +19,9 @@ aws s3api put-public-access-block --bucket "$bucket" --public-access-block-confi
 
 ## A deployment
 
-You need OpenTofu (lattice's `.prototools`), AWS CLI v2, which runs the one-off tasks, and credentials for the account.
+You need OpenTofu (lattice's `.prototools`), AWS CLI v2, and credentials for the account. OpenTofu runs the one-off tasks (db-init, auth-keys, db-roles) with the AWS CLI, in your shell's environment: if the provider's credentials come from anywhere else, such as a profile you don't export, give them in `run_task_environment` (`{ AWS_PROFILE = "<profile>" }`).
 
-1. Copy `prod.tfvars.example` to `<deployment>.tfvars`, outside the repository or ignored by it, and fill it in. It holds no secret.
+1. Copy `prod.tfvars.example` to `<deployment>.tfvars`, and fill it in. The repository ignores `*.tfvars`, and the file holds no secret.
 2. Initialize with the deployment's key:
 
    ```sh
@@ -35,6 +35,12 @@ You need OpenTofu (lattice's `.prototools`), AWS CLI v2, which runs the one-off 
    tofu apply -var-file=<deployment>.tfvars
    ```
 
-4. Write the secrets that `secrets_written_elsewhere` lists, such as the providers' API keys. LiteLLM starts once each has a value.
+4. Write the secrets that `secrets_written_elsewhere` lists, such as the providers' API keys. OpenTofu can't see them change, so deploy their reader again after writing one:
+
+   ```sh
+   aws ecs update-service --cluster <name> --service litellm --force-new-deployment
+   ```
+
+   LiteLLM starts once each provider's key has a value, and GoTrue once its SMTP password does, if it has SMTP.
 
 Operators reach Grafana, Langfuse and LiteLLM's admin UI with SSM port forwarding through `state_host_instance_id`.

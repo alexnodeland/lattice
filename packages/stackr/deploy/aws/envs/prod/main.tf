@@ -19,4 +19,6 @@ module "stack" {
   gateway_providers = var.gateway_providers
   auth_smtp         = var.auth_smtp
   secret_versions   = var.secret_versions
+
+  run_task_environment = var.run_task_environment
 }

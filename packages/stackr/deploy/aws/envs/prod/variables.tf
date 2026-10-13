@@ -81,3 +81,9 @@ variable "secret_versions" {
   type        = map(number)
   default     = {}
 }
+
+variable "run_task_environment" {
+  description = "What the AWS CLI that runs the one-off tasks needs beside your shell's environment, such as AWS_PROFILE when the provider's credentials come from a profile you don't export."
+  type        = map(string)
+  default     = {}
+}

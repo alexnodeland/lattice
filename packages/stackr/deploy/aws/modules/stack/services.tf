@@ -11,6 +11,13 @@ locals {
 
   # Where AWS is, for a client that is told: only where it isn't AWS's own.
   endpoint = var.aws_endpoint_url == null ? {} : { AWS_ENDPOINT_URL = var.aws_endpoint_url }
+  # S3 as Tempo, Loki and Pyroscope take it: a host and port, whether it is plain HTTP, and
+  # whether buckets are paths, as an emulator serves them, rather than names.
+  s3 = var.aws_endpoint_url == null ? { endpoint = "s3.${local.region}.amazonaws.com", insecure = "false", path_style = "false" } : {
+    endpoint   = regex("^https?://([^/]+)", var.aws_endpoint_url)[0]
+    insecure   = tostring(startswith(var.aws_endpoint_url, "http://"))
+    path_style = "true"
+  }
 
   # The state host's services, which Langfuse and the Collector need: the instance, or the three
   # services on Fargate. Neither says when ClickHouse is up inside them (ADR-0034).
@@ -19,13 +26,15 @@ locals {
     { for name, service in module.state_services : "state/${name}" => service.service_arn },
   )
 
-  # What a service's task role may do in a bucket: under a prefix of it, or all of it.
+  # What a service's task role may do in a bucket: under a prefix of it, or all of it. A prefix is
+  # letters alone, as Pyroscope takes one, and each store puts its objects under <prefix>/.
   storage = {
     langfuse  = { bucket = module.data.buckets["langfuse"], prefix = "" }
-    tempo     = { bucket = module.data.buckets["telemetry"], prefix = "tempo/" }
-    loki      = { bucket = module.data.buckets["telemetry"], prefix = "loki/" }
-    pyroscope = { bucket = module.data.buckets["telemetry"], prefix = "pyroscope/" }
+    tempo     = { bucket = module.data.buckets["telemetry"], prefix = "tempo" }
+    loki      = { bucket = module.data.buckets["telemetry"], prefix = "loki" }
+    pyroscope = { bucket = module.data.buckets["telemetry"], prefix = "pyroscope" }
   }
+  objects = { for service, storage in local.storage : service => storage.prefix == "" ? "*" : "${storage.prefix}/*" }
   storage_policy = { for service, storage in local.storage : service => jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -33,12 +42,12 @@ locals {
         Effect    = "Allow"
         Action    = "s3:ListBucket"
         Resource  = storage.bucket.arn
-        Condition = { StringLike = { "s3:prefix" = ["${storage.prefix}*"] } }
+        Condition = { StringLike = { "s3:prefix" = [local.objects[service]] } }
       },
       {
         Effect   = "Allow"
         Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-        Resource = "${storage.bucket.arn}/${storage.prefix}*"
+        Resource = "${storage.bucket.arn}/${local.objects[service]}"
       },
     ]
   }) }
@@ -97,10 +106,15 @@ module "telemetry" {
     environment = merge(
       local.endpoint,
       {
-        S3_BUCKET = local.storage[each.key].bucket.name
-        S3_REGION = local.region
-        S3_PREFIX = local.storage[each.key].prefix
+        S3_BUCKET     = local.storage[each.key].bucket.name
+        S3_REGION     = local.region
+        S3_PREFIX     = local.storage[each.key].prefix
+        S3_ENDPOINT   = local.s3.endpoint
+        S3_INSECURE   = local.s3.insecure
+        S3_PATH_STYLE = local.s3.path_style
       },
+      # Each store's own name for its S3 backend; on one machine, its local disk.
+      { tempo = { TEMPO_BACKEND = "s3" }, loki = { LOKI_OBJECT_STORE = "aws" }, pyroscope = { PYROSCOPE_BACKEND = "s3" } }[each.key],
       each.key == "tempo" ? { PROMETHEUS_ADDRESS = local.dns.prometheus } : {},
     )
   }

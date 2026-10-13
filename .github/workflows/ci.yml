@@ -110,6 +110,31 @@ jobs:
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv run --no-project python scripts/affected.py image
 
+  # stackr's thin images (RFC-0004, stackr ADR-0034), built natively for each architecture the AWS
+  # recipe runs on, Fargate's arm64 and the runners' amd64, and each checked as it starts.
+  # Nothing is published: the release does that.
+  thin-images:
+    name: Thin images (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - run: uv run --no-project python scripts/affected.py images
+
   # Each library's acceptance tests, against its reference application (stackr RFC-0003's phase 5,
   # lattice ADR-0015): its `api` task starts docplan or oncall from the package's compose.yaml,
   # runs the package's Bruno collection and Schemathesis over its committed OpenAPI document, and
@@ -363,7 +388,7 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [check, tests, images, acceptance, aws, template, smoke, dependency-review, osv]
+    needs: [check, tests, images, thin-images, acceptance, aws, template, smoke, dependency-review, osv]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}

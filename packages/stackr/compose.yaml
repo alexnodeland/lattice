@@ -116,7 +116,7 @@ services:
     image: grafana/tempo:3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5
     profiles: [observability]
     restart: unless-stopped
-    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    command: ["-config.file=/etc/tempo/tempo.yaml", "-config.expand-env=true"]
     volumes:
       - ./deploy/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
       - tempo-data:/var/tempo
@@ -178,7 +178,7 @@ services:
     image: grafana/loki:3.7.8@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193
     profiles: [observability]
     restart: unless-stopped
-    command: ["-config.file=/etc/loki/loki.yaml"]
+    command: ["-config.file=/etc/loki/loki.yaml", "-config.expand-env=true"]
     volumes:
       - ./deploy/loki/loki.yaml:/etc/loki/loki.yaml:ro
       - loki-data:/loki
@@ -191,7 +191,7 @@ services:
     image: grafana/pyroscope:2.3.1@sha256:86a9ee7448487409ead8ada78789de7b78b739711b92b5d7224a1a54abf3eeb2
     profiles: [observability]
     restart: unless-stopped
-    command: ["-config.file=/etc/pyroscope/config.yaml"]
+    command: ["-config.file=/etc/pyroscope/config.yaml", "-config.expand-env=true"]
     volumes:
       - ./deploy/pyroscope/config.yaml:/etc/pyroscope/config.yaml:ro
       - pyroscope-data:/data
@@ -209,6 +209,11 @@ services:
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
       GF_NEWS_NEWS_FEED_ENABLED: "false"
+      # The data sources' addresses, which the provisioning file reads.
+      PROMETHEUS_ADDRESS: prometheus
+      TEMPO_ADDRESS: tempo
+      LOKI_ADDRESS: loki
+      PYROSCOPE_ADDRESS: pyroscope
     volumes:
       - ./deploy/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./deploy/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro

@@ -92,7 +92,7 @@ Traces, with its metrics generator for span metrics and service graphs.
 | Networks | `stackr` |
 | Volumes | `./deploy/tempo/tempo.yaml` → `/etc/tempo/tempo.yaml` (read-only), `tempo-data` → `/var/tempo` |
 | Depends on | `prometheus` |
-| Runs | `-config.file=/etc/tempo/tempo.yaml` |
+| Runs | `-config.file=/etc/tempo/tempo.yaml -config.expand-env=true` |
 | Restart | `unless-stopped` |
 
 ### `prometheus`
@@ -139,7 +139,7 @@ Logs, over OTLP.
 | Networks | `stackr` |
 | Volumes | `./deploy/loki/loki.yaml` → `/etc/loki/loki.yaml` (read-only), `loki-data` → `/loki` |
 | Depends on | none |
-| Runs | `-config.file=/etc/loki/loki.yaml` |
+| Runs | `-config.file=/etc/loki/loki.yaml -config.expand-env=true` |
 | Restart | `unless-stopped` |
 
 ### `pyroscope`
@@ -154,7 +154,7 @@ Profiles, pushed by applications.
 | Networks | `stackr` |
 | Volumes | `./deploy/pyroscope/config.yaml` → `/etc/pyroscope/config.yaml` (read-only), `pyroscope-data` → `/data` |
 | Depends on | none |
-| Runs | `-config.file=/etc/pyroscope/config.yaml` |
+| Runs | `-config.file=/etc/pyroscope/config.yaml -config.expand-env=true` |
 | Restart | `unless-stopped` |
 
 ### `grafana`
@@ -182,6 +182,10 @@ Dashboards and exploration, over the four backends.
     | `GF_ANALYTICS_CHECK_FOR_UPDATES` | `false` |
     | `GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES` | `false` |
     | `GF_NEWS_NEWS_FEED_ENABLED` | `false` |
+    | `PROMETHEUS_ADDRESS` | `prometheus` |
+    | `TEMPO_ADDRESS` | `tempo` |
+    | `LOKI_ADDRESS` | `loki` |
+    | `PYROSCOPE_ADDRESS` | `pyroscope` |
 
 ### `postgres`
 

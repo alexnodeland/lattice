@@ -40,10 +40,10 @@ The traces pipeline's exporters come from `STACKR_TRACES_EXPORTERS`, which `make
 
 | Exporter | Endpoint | Sends | Headers |
 |---|---|---|---|
-| `otlp_grpc/tempo` | `tempo:4317` | OTLP gRPC, without TLS |  |
-| `otlp_http/prometheus` | `http://prometheus:9090/api/v1/otlp` | OTLP HTTP, without TLS |  |
-| `otlp_http/loki` | `http://loki:3100/otlp` | OTLP HTTP, without TLS |  |
-| `otlp_http/langfuse` | `http://langfuse-web:3000/api/public/otel` | OTLP HTTP, without TLS | `Authorization: Basic ${env:LANGFUSE_OTLP_AUTH}`, `x-langfuse-ingestion-version: 4` |
+| `otlp_grpc/tempo` | `${env:TEMPO_ADDRESS:-tempo}:4317` | OTLP gRPC, without TLS |  |
+| `otlp_http/prometheus` | `http://${env:PROMETHEUS_ADDRESS:-prometheus}:9090/api/v1/otlp` | OTLP HTTP, without TLS |  |
+| `otlp_http/loki` | `http://${env:LOKI_ADDRESS:-loki}:3100/otlp` | OTLP HTTP, without TLS |  |
+| `otlp_http/langfuse` | `http://${env:LANGFUSE_ADDRESS:-langfuse-web}:3000/api/public/otel` | OTLP HTTP, without TLS | `Authorization: Basic ${env:LANGFUSE_OTLP_AUTH}`, `x-langfuse-ingestion-version: 4` |
 
 ### Extensions
 

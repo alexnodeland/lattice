@@ -167,10 +167,15 @@ run "stack_services_find_each_other_and_their_storage" {
   }
   assert {
     condition = (
-      { for setting in module.telemetry["tempo"].containers[0].environment : setting.name => setting.value }["S3_PREFIX"] == "tempo/"
+      { for setting in module.telemetry["tempo"].containers[0].environment : setting.name => setting.value }["S3_PREFIX"] == "tempo"
+      && { for setting in module.telemetry["tempo"].containers[0].environment : setting.name => setting.value }["TEMPO_BACKEND"] == "s3"
+      && { for setting in module.telemetry["loki"].containers[0].environment : setting.name => setting.value }["LOKI_OBJECT_STORE"] == "aws"
+      && { for setting in module.telemetry["pyroscope"].containers[0].environment : setting.name => setting.value }["PYROSCOPE_BACKEND"] == "s3"
+      && { for setting in module.telemetry["loki"].containers[0].environment : setting.name => setting.value }["S3_ENDPOINT"] == "s3.us-east-1.amazonaws.com"
+      && { for setting in module.telemetry["loki"].containers[0].environment : setting.name => setting.value }["S3_INSECURE"] == "false"
       && { for setting in module.telemetry["loki"].containers[0].environment : setting.name => setting.value }["S3_BUCKET"] == "stackr-mocked"
     )
-    error_message = "Tempo, Loki and Pyroscope keep their blocks in the telemetry bucket, each under its own prefix."
+    error_message = "Tempo, Loki and Pyroscope keep their blocks in S3, in the telemetry bucket, each under its own prefix, over TLS."
   }
   assert {
     condition = (
@@ -278,6 +283,14 @@ run "stack_the_state_host_on_fargate_for_floci" {
       && { for setting in module.langfuse_web.containers[0].environment : setting.name => setting.value }["LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT"] == "http://floci:4566"
     )
     error_message = "Without TLS to the data stores, and with S3 at Floci's address."
+  }
+  assert {
+    condition = (
+      { for setting in module.telemetry["tempo"].containers[0].environment : setting.name => setting.value }["S3_ENDPOINT"] == "floci:4566"
+      && { for setting in module.telemetry["tempo"].containers[0].environment : setting.name => setting.value }["S3_INSECURE"] == "true"
+      && { for setting in module.telemetry["tempo"].containers[0].environment : setting.name => setting.value }["S3_PATH_STYLE"] == "true"
+    )
+    error_message = "On Floci, the telemetry stores reach its S3 by host and port, over HTTP, with buckets as paths."
   }
   assert {
     condition     = aws_secretsmanager_secret.valkey.recovery_window_in_days == 0

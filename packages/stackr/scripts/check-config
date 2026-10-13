@@ -29,7 +29,8 @@ commands, health checks, settings and mount points. Its Prometheus
 configuration is deploy/prometheus's, with the services' names in the private
 namespace in place of Compose's. GoTrue's proxy, the edge's caddy_image, is the
 single host's Caddy, and the images the stack module runs as they are, such as
-GoTrue's and Langfuse's, are compose.yaml's.
+GoTrue's and Langfuse's, are compose.yaml's, and so are the bases of the images
+deploy/*/Dockerfile builds.
 """
 
 from __future__ import annotations
@@ -292,10 +293,16 @@ def check_aws() -> list[str]:
     for image in re.findall(r'"([^"\s]+@sha256:[0-9a-f]{64})"', STACK.read_text()):
         if image not in images:
             problems.append(f"deploy/aws/modules/stack runs {image}, which compose.yaml doesn't")
+    for dockerfile in sorted((ROOT / "deploy").glob("*/Dockerfile")):
+        for base in re.findall(r"^FROM (\S+)", dockerfile.read_text(), re.MULTILINE):
+            if base not in images:
+                where = dockerfile.relative_to(ROOT)
+                problems.append(f"{where} builds on {base}, which compose.yaml doesn't pin")
     if not problems:
         print(f"ok: the state host runs {', '.join(state)} as compose.yaml does")
         print("ok: GoTrue's proxy runs the single host's Caddy")
         print("ok: the stack runs the upstream images compose.yaml pins")
+        print("ok: the thin images build on the images compose.yaml pins")
     return problems
 
 

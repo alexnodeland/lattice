@@ -1,0 +1,5 @@
+*
+!packages/stackr/deploy/grafana/provisioning/
+!packages/stackr/deploy/grafana/dashboards/stackr/
+!packages/artifactr/deploy/grafana/dashboards/
+!packages/reflexr/deploy/grafana/dashboards/

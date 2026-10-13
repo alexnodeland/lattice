@@ -3215,21 +3215,21 @@ dependencies = [
 
 [package.dev-dependencies]
 app = [
-    { name = "artifactr-ai" },
+    { name = "artifactr-ai", extra = ["otel"] },
     { name = "pyjwt" },
-    { name = "reflexr" },
+    { name = "reflexr", extra = ["otel"] },
     { name = "uvicorn" },
     { name = "websockets" },
 ]
 dev = [
-    { name = "artifactr-ai" },
+    { name = "artifactr-ai", extra = ["otel"] },
     { name = "pyjwt" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
-    { name = "reflexr" },
+    { name = "reflexr", extra = ["otel"] },
     { name = "ruff" },
     { name = "uvicorn" },
     { name = "websockets" },
@@ -3256,21 +3256,21 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 app = [
-    { name = "artifactr-ai", editable = "packages/artifactr" },
+    { name = "artifactr-ai", extras = ["otel"], editable = "packages/artifactr" },
     { name = "pyjwt", specifier = ">=2.15" },
-    { name = "reflexr", editable = "packages/reflexr" },
+    { name = "reflexr", extras = ["otel"], editable = "packages/reflexr" },
     { name = "uvicorn", specifier = ">=0.54" },
     { name = "websockets", specifier = ">=15" },
 ]
 dev = [
-    { name = "artifactr-ai", editable = "packages/artifactr" },
+    { name = "artifactr-ai", extras = ["otel"], editable = "packages/artifactr" },
     { name = "pyjwt", specifier = ">=2.15" },
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "pytest-cov", specifier = ">=7.1" },
     { name = "pytest-timeout", specifier = ">=2.4" },
-    { name = "reflexr", editable = "packages/reflexr" },
+    { name = "reflexr", extras = ["otel"], editable = "packages/reflexr" },
     { name = "ruff", specifier = ">=0.16" },
     { name = "uvicorn", specifier = ">=0.54" },
     { name = "websockets", specifier = ">=15" },

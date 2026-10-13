@@ -20,6 +20,11 @@ services:
     environment:
       PORTALR_JWT_SECRET: &secret portalr-test-only-jwt-secret-not-for-use
       PORTALR_GOTRUE_URL: http://gotrue:9999
+      # Empty leaves the tool unconfigured, as admin's scenarios run it; unset, it's unavailable.
+      PORTALR_LANGFUSE_URL: ${PORTALR_LANGFUSE_URL-http://langfuse:3000}
+      PORTALR_LITELLM_URL: ${PORTALR_LITELLM_URL-http://litellm:4000}
+      # Its own telemetry, through stackr's Collector, as an application's goes (portalr ADR-0023).
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     # Loki's image has no shell or probe of its own, so the application's check waits for it too.
     healthcheck:
       test:
@@ -34,12 +39,32 @@ services:
       timeout: 5s
       retries: 60
     depends_on:
+      otel-collector:
+        condition: service_started
       tempo:
         condition: service_healthy
       loki:
         condition: service_started
       prom-label-proxy:
         condition: service_healthy
+
+  # stackr's Collector, with its own configuration: it copies the libraries' tenant attributes to
+  # `tenant.id`, and sends traces to Tempo alone, metrics to Prometheus, and logs to Loki. It
+  # publishes nothing; the application reaches it on compose's network.
+  otel-collector:
+    profiles: [app]
+    image: otel/opentelemetry-collector-contrib:0.161.0@sha256:fd328de2552466ad78385e1b1289c3f2402b1c45f265b252aab1955b42845ac1
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      STACKR_ENVIRONMENT: test
+      STACKR_TRACES_EXPORTERS: "[otlp_grpc/tempo]"
+      LANGFUSE_OTLP_AUTH: unused
+    volumes:
+      - ../stackr/deploy/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    depends_on:
+      - tempo
+      - loki
+      - prometheus
 
   tempo:
     image: grafana/tempo:3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# admin's scenarios (portalr ADR-0023), as the app's are run (portalr ADR-0013): portalr's test
+# application, with Supabase Auth (GoTrue, alone), its database, and stackr's Collector with
+# Tempo, Loki and Prometheus, from portalr's compose.yaml, as a compose project of its own on
+# ports the system picks, all on 127.0.0.1. It signs up the people the scenarios sign in as,
+# runs the features through playwright-bdd, and stops everything however they end.
+#
+# Usage, from admin's directory, as its `bdd` task, after the UIs are built: scripts/bdd
+set -euo pipefail
+export COMPOSE_FILE=../../compose.yaml COMPOSE_PROFILES=app,bdd COMPOSE_PROJECT_NAME=portalr-admin-bdd
+# Langfuse and LiteLLM aren't in the compose: the application runs without them, as one may.
+export PORTALR_LANGFUSE_URL= PORTALR_LITELLM_URL=
+
+stop() {
+  local status=$?
+  if ((status != 0)); then
+    docker compose logs --no-color --tail=200 app gotrue otel-collector
+  fi
+  docker compose down --volumes
+}
+trap stop EXIT
+docker compose down --volumes # anything a run that was killed left behind
+docker compose up --detach --build --wait --quiet-pull
+at() { printf 'http://%s' "$(docker compose port "$1" "$2")"; }
+app=$(at app 8000)
+
+# Each person the scenarios sign in as, with their password; Supabase Auth confirms them at once.
+# ops is the deployment's operator, alice acme's owner, bob an editor and dana a workspace's admin.
+for person in alice bob dana ops; do
+  curl -fsS -o /dev/null -H 'Content-Type: application/json' \
+    --data "{\"email\": \"$person@portalr.test\", \"password\": \"$person-password\"}" \
+    "$app/auth/v1/signup"
+done
+
+bun x --bun --no-install bddgen
+PORTALR_APP_URL=$app bun x --bun --no-install playwright test

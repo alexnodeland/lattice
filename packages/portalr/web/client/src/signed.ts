@@ -1,11 +1,16 @@
 /**
  * Who is signed in, through Supabase Auth's client alone (portalr ADR-0014), and the token every
- * request and stream carries.
+ * request and stream carries, for app and admin alike.
  */
 
-import type { Config, Session, StreamSession } from "@portalr/client";
 import { type Session as AuthSession, GoTrueClient } from "@supabase/auth-js";
-import { authUrl } from "./deployment";
+import type { Config } from "./rest";
+import type { Session, StreamSession } from "./session";
+
+/** The project's own URL, or, when `config.json` names a path, the one at that path on this origin. */
+export function authUrl(supabase: string, origin: string): string {
+  return new URL("auth/v1", new URL(supabase.replace(/\/?$/, "/"), origin)).toString();
+}
 
 /** What the app keeps of a session: its token, and who it is for. */
 interface Current {
@@ -22,14 +27,17 @@ const kept = (session: AuthSession | null): Current | null =>
   };
 
 /** What a session did that a stream must follow: its token was refreshed, or it ended. */
-export type Change = "refreshed" | "ended";
+export type SessionChange = "refreshed" | "ended";
 
 export class Signed {
   readonly auth: GoTrueClient;
   private current: Current | null = null;
-  private readonly watchers = new Set<(change: Change) => void>();
+  private readonly watchers = new Set<(change: SessionChange) => void>();
 
-  /** `onSignedOut` runs when the session ends: here, in another tab, or as it expires. */
+  /**
+   * `onSignedOut` runs when the session ends: here, in another tab, or as it expires. app and
+   * admin keep one session on their one origin, so signing in to either signs in to both.
+   */
   constructor(config: Config, onSignedOut: () => void) {
     this.auth = new GoTrueClient({
       url: authUrl(config.supabase.url, location.origin),
@@ -69,12 +77,12 @@ export class Signed {
   }
 
   /** Calls `watcher` each time the session is refreshed or ends, until the returned function is. */
-  watch(watcher: (change: Change) => void): () => void {
+  watch(watcher: (change: SessionChange) => void): () => void {
     this.watchers.add(watcher);
     return () => this.watchers.delete(watcher);
   }
 
-  private tell(change: Change): void {
+  private tell(change: SessionChange): void {
     for (const watcher of this.watchers) {
       watcher(change);
     }

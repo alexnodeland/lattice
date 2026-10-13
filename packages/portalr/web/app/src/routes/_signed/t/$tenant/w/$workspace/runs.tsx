@@ -1,4 +1,4 @@
-import { type Reflexr, thumbs } from "@portalr/client";
+import { allowedIn, type Reflexr, thumbs, useMe, workspaceOf } from "@portalr/client";
 import {
   CommandButton,
   PageHeader,
@@ -14,8 +14,6 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
-import { allowedIn, workspaceOf } from "../../../../../../allowed";
-import { useMe } from "../../../../../../me";
 import {
   Connection,
   useAutomation,

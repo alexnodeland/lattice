@@ -4,9 +4,10 @@
  * is no permission.
  */
 
-import type { createQueries, GrantrApi } from "@portalr/client";
+import type { components } from "./generated/grantr.openapi";
+import type { createQueries } from "./queries";
 
-type Resource = GrantrApi.components["schemas"]["Resource"];
+type Resource = components["schemas"]["Resource"];
 
 /** A workspace, as grantr names one. */
 export const workspaceOf = (workspace: string): Resource => ({ kind: "workspace", workspace });

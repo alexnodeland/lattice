@@ -1,6 +1,6 @@
 import { useRender } from "@base-ui/react/use-render";
 import type { ReactElement, ReactNode } from "react";
-import { Lockup } from "./marks";
+import { Lockup, type Ui } from "./marks";
 import { PageHeader } from "./page-header";
 
 /**
@@ -9,11 +9,14 @@ import { PageHeader } from "./page-header";
  * choosing a tenant or a workspace, and what went wrong.
  */
 export function Plain({
+  ui = "app",
   home,
   title,
   account,
   children,
 }: {
+  /** Whose lockup it shows: `app`'s or `admin`'s. */
+  ui?: Ui;
   /** The link home, such as the router's, that the lockup renders as. */
   home: ReactElement;
   title: string;
@@ -24,10 +27,10 @@ export function Plain({
     defaultTagName: "a",
     render: home,
     props: {
-      "aria-label": "portalr",
+      "aria-label": ui === "admin" ? "portalr admin" : "portalr",
       className:
         "inline-flex rounded-md outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus",
-      children: <Lockup />,
+      children: <Lockup ui={ui} />,
     },
   });
   return (

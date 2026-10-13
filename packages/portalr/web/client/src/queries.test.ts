@@ -40,6 +40,12 @@ beforeAll(() => {
       if (url.pathname.endsWith("/missing") || url.pathname.startsWith("/missing/")) {
         return Response.json({ detail: "not found" }, { status: 404 });
       }
+      if (url.pathname === "/portalr/v1/deployment/tenants") {
+        const operator = request.headers.get("authorization") === "Bearer t0k3n";
+        return operator
+          ? Response.json({ tenants: ["acme"], spend: { status: "unconfigured" } })
+          : Response.json({ detail: "not an operator" }, { status: 403 });
+      }
       if (url.pathname === "/portalr/config.json") {
         return Response.json(CONFIG);
       }
@@ -102,6 +108,7 @@ test("every read has its own path", async () => {
     ],
     [queries.reflexr.schedules("acme", "ws_1"), "/reflexr/v1/workspaces/ws_1/schedules"],
     [queries.grantr.members("acme"), "/grantr/v1/tenants/acme/members"],
+    [queries.portalr.spend("acme"), "/portalr/v1/spend"],
     [queries.grantr.grants("acme", "ws_1"), "/grantr/v1/tenants/acme/grants"],
     [queries.grantr.restrictions("acme", "ws_1"), "/grantr/v1/tenants/acme/restrictions"],
   ] as const;
@@ -243,4 +250,44 @@ test("reflexr's rule events make its rules stale, its run events its runs, and t
 test("config.json is read from the deployment, or its failure said", async () => {
   expect(await readConfig(origin)).toEqual(CONFIG);
   await expect(readConfig(`${origin}/missing`)).rejects.toThrow(/config.json answered 404/);
+});
+
+const DAY = { start: "2026-10-11T00:00:00Z", end: "2026-10-12T00:00:00Z", step: 3600 };
+
+test("portalr's reads name their tenant and window", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  await client.fetchQuery(queries.portalr.metrics("acme", "failed_runs", DAY));
+  const metrics = seen.at(-1);
+  expect(metrics?.url.pathname).toBe("/portalr/v1/metrics");
+  expect(Object.fromEntries(metrics?.url.searchParams ?? [])).toEqual({
+    metric: "failed_runs",
+    start: DAY.start,
+    end: DAY.end,
+    step: "3600",
+    limit: "1000",
+  });
+  expect(metrics?.headers.get("x-tenant")).toBe("acme");
+  await client.fetchQuery(queries.portalr.scores("acme", { start: DAY.start, end: DAY.end }));
+  expect(seen.at(-1)?.url.pathname).toBe("/portalr/v1/scores");
+  expect(seen.at(-1)?.url.searchParams.get("step")).toBeNull();
+});
+
+test("the deployment's tenants are an operator's, and null for anyone else", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  expect(await client.fetchQuery(queries.portalr.tenants())).toEqual({
+    tenants: ["acme"],
+    spend: { status: "unconfigured" },
+  });
+  const stranger = createQueries(
+    createApi({ artifactr: "", reflexr: "", grantr: origin }, () => ({ token: "wrong" })),
+  );
+  expect(await new QueryClient().fetchQuery(stranger.portalr.tenants())).toBeNull();
+  const away = createQueries(
+    createApi({ artifactr: "", reflexr: "", grantr: `${origin}/missing` }, () => ({ token: "x" })),
+  );
+  await expect(
+    new QueryClient({ defaultOptions: { queries: { retry: false } } }).fetchQuery(
+      away.portalr.tenants(),
+    ),
+  ).rejects.toThrow(/refused the read \(404\)/);
 });

@@ -25,7 +25,7 @@ tasks:
     # The test application's image carries whichever UIs are built; these scenarios need admin.
     deps:
       - 'admin:build'
-      - 'admin:chromium'
+      - 'ui:chromium'
     inputs:
       - 'bdd/**/*'
       - 'src/**/*'
@@ -38,13 +38,5 @@ tasks:
       - '/packages/artifactr/src/**/*'
       - '/packages/reflexr/src/**/*'
       - '/packages/stackr/deploy/otel-collector/**/*'
-    options:
-      cache: false
-
-  # Chromium's headless shell for Playwright, with what it needs of the system, only when the
-  # scenarios run.
-  chromium:
-    description: 'Install Chromium for the scenarios'
-    command: 'bun x --bun --no-install playwright install --with-deps --only-shell chromium'
     options:
       cache: false

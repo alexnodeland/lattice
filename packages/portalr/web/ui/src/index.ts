@@ -40,6 +40,7 @@ export { ConfirmDialog } from "./confirm-dialog";
 export { Dialog } from "./dialog";
 export { EmptyState } from "./empty-state";
 export { Icon } from "./icon";
+export { type Column, ItemTable } from "./item-table";
 export { Markdown } from "./markdown";
 export { Lockup, Mark, type Ui } from "./marks";
 export { Menu, type MenuItem } from "./menu";

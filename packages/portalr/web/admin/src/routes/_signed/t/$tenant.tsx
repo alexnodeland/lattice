@@ -2,7 +2,9 @@ import { administered } from "@portalr/client";
 import { NavLink, Plain, SideNav, TextLink } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, Outlet } from "@tanstack/react-router";
-import { House } from "lucide-react";
+import { House, KeyRound } from "lucide-react";
+import { useMemo } from "react";
+import { accessIn, anyPart } from "../../../access";
 import { Frame } from "../../../frame";
 import { remember } from "../../../last";
 
@@ -21,6 +23,7 @@ export const Route = createFileRoute("/_signed/t/$tenant")({
     if (!administered(memberships).includes(params.tenant)) {
       throw notFound();
     }
+    await queryClient.ensureQueryData(accessIn(queries, params.tenant));
     remember(params.tenant);
   },
   notFoundComponent: () => (
@@ -37,6 +40,8 @@ function Tenant() {
   const { queries, user, signed } = Route.useRouteContext();
   const { data: memberships } = useSuspenseQuery(queries.grantr.memberships(user));
   const { data: every } = useSuspenseQuery(queries.portalr.tenants());
+  const checks = useMemo(() => accessIn(queries, tenant), [queries, tenant]);
+  const { data: allowed } = useSuspenseQuery(checks);
   return (
     <Frame
       tenant={tenant}
@@ -51,6 +56,11 @@ function Tenant() {
           >
             Home
           </NavLink>
+          {anyPart(allowed) && (
+            <NavLink icon={KeyRound} render={<Link to="/t/$tenant/access" params={{ tenant }} />}>
+              Access
+            </NavLink>
+          )}
         </SideNav>
       }
     >

@@ -8,6 +8,7 @@
  */
 
 import type { components as Grantr } from "./generated/grantr.openapi";
+import type { components as components_portalr } from "./generated/portalr.openapi";
 import type { components } from "./generated/reflexr.openapi";
 import { type Api, named } from "./rest";
 
@@ -16,6 +17,9 @@ type Result = components["schemas"]["CommandResult"];
 type GrantRequest = Grantr["schemas"]["GrantRequest"];
 type Restriction = Grantr["schemas"]["Restriction"];
 type AuditEntry = Grantr["schemas"]["AuditEntry"];
+type Member = Grantr["schemas"]["Member"];
+type IssuedKey = Grantr["schemas"]["IssuedKey"];
+type Invited = components_portalr["schemas"]["Invited"];
 
 /** A command's answer: carried out, with what the server answered, or refused, with each reason. */
 export type Answer<R = Result> = { readonly outcome: "done"; readonly result: R } | Refusal;
@@ -50,6 +54,17 @@ function at(loc: Invalid["loc"]): string {
 /** What a field or a form says of a command that wasn't done, after what it would have done. */
 export const refusal = (undone: string, refused: Refusal) =>
   `${undone}: ${refused.reasons.join("; ")}`;
+
+/**
+ * What a done command answered, or an error that says why it wasn't done, for a caller that
+ * stays open on a throw, such as a confirming dialog.
+ */
+export function orThrow<R>(undone: string, answer: Answer<R>): R {
+  if (answer.outcome === "refused") {
+    throw new Error(refusal(undone, answer));
+  }
+  return answer.result;
+}
 
 /**
  * Each reason a refusal gives: a rejection's problems or its message, the body's errors, or a
@@ -154,6 +169,71 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
             body: restriction,
           }),
         ),
+      /** Add a user or a service principal to the tenant: a service principal is made so. */
+      addMember: (tenant: string, member: Member): Promise<Answer<AuditEntry>> =>
+        answer(
+          api.grantr.POST("/grantr/v1/tenants/{tenant}/members", {
+            ...inTenant(tenant),
+            body: { member },
+          }),
+        ),
+      /** Remove a member, with their grants, their places in groups, and their keys. */
+      removeMember: (tenant: string, member: Member): Promise<Answer<AuditEntry>> =>
+        member.kind === "user"
+          ? answer(
+              api.grantr.DELETE("/grantr/v1/tenants/{tenant}/members/user/{member_id}", {
+                ...named(tenant),
+                params: { path: { tenant, member_id: member.id } },
+              }),
+            )
+          : answer(
+              api.grantr.DELETE(
+                "/grantr/v1/tenants/{tenant}/members/service_principal/{member_id}",
+                { ...named(tenant), params: { path: { tenant, member_id: member.id } } },
+              ),
+            ),
+      /** Create a group, or replace its members. */
+      defineGroup: (
+        tenant: string,
+        group: string,
+        members: readonly Member[],
+      ): Promise<Answer<AuditEntry>> =>
+        answer(
+          api.grantr.PUT("/grantr/v1/tenants/{tenant}/groups/{group}", {
+            ...named(tenant),
+            params: { path: { tenant, group } },
+            body: { members: [...members] },
+          }),
+        ),
+      /** Delete a group, with its grants. */
+      deleteGroup: (tenant: string, group: string): Promise<Answer<AuditEntry>> =>
+        answer(
+          api.grantr.DELETE("/grantr/v1/tenants/{tenant}/groups/{group}", {
+            ...named(tenant),
+            params: { path: { tenant, group } },
+          }),
+        ),
+      /** Issue a key for a service principal: its secret is in the answer, and nowhere after. */
+      issueKey: (tenant: string, principal: string): Promise<Answer<IssuedKey>> =>
+        answer(
+          api.grantr.POST("/grantr/v1/tenants/{tenant}/keys", {
+            ...inTenant(tenant),
+            body: { principal },
+          }),
+        ),
+      /** Revoke a key, by its public id. */
+      revokeKey: (tenant: string, key: string): Promise<Answer<AuditEntry>> =>
+        answer(
+          api.grantr.DELETE("/grantr/v1/tenants/{tenant}/keys/{key_id}", {
+            ...named(tenant),
+            params: { path: { tenant, key_id: key } },
+          }),
+        ),
+    },
+    portalr: {
+      /** Invite someone by email to the tenant, through Supabase Auth, and add them to it. */
+      invite: (tenant: string, email: string): Promise<Answer<Invited>> =>
+        answer(api.portalr.POST("/portalr/v1/invites", { ...named(tenant), body: { email } })),
     },
   };
 }

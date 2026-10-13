@@ -63,6 +63,11 @@ export const keys = {
     grants: (tenant: string, ws: string) => [...keys.grantr.access(tenant), "grants", ws] as const,
     restrictions: (tenant: string, ws: string) =>
       [...keys.grantr.access(tenant), "restrictions", ws] as const,
+    /** Every grant in the tenant, on it and on everything in it. */
+    tenantGrants: (tenant: string) => [...keys.grantr.access(tenant), "grants"] as const,
+    groups: (tenant: string) => [...keys.grantr.access(tenant), "groups"] as const,
+    roles: (tenant: string) => [...keys.grantr.access(tenant), "roles"] as const,
+    keyring: (tenant: string) => [...keys.grantr.access(tenant), "keys"] as const,
   },
   portalr: {
     tenant: (tenant: string) => ["portalr", tenant] as const,
@@ -291,6 +296,54 @@ export function createQueries(api: Api) {
               api.grantr.GET("/grantr/v1/tenants/{tenant}/restrictions", {
                 ...named(tenant),
                 params: { path: { tenant }, query: { workspace: ws } },
+              }),
+            ),
+        }),
+      /** Every grant in the tenant, for those who may grant there (`grantr:grant`). */
+      tenantGrants: (tenant: string) =>
+        queryOptions({
+          queryKey: keys.grantr.tenantGrants(tenant),
+          queryFn: () =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/grants", {
+                ...named(tenant),
+                params: { path: { tenant } },
+              }),
+            ),
+        }),
+      /** The tenant's groups, by name, with their members (`grantr:manage_groups`). */
+      groups: (tenant: string) =>
+        queryOptions({
+          queryKey: keys.grantr.groups(tenant),
+          queryFn: () =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/groups", {
+                ...named(tenant),
+                params: { path: { tenant } },
+              }),
+            ),
+        }),
+      /** The tenant's own roles (`grantr:define_role`). */
+      roles: (tenant: string) =>
+        queryOptions({
+          queryKey: keys.grantr.roles(tenant),
+          queryFn: () =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/roles", {
+                ...named(tenant),
+                params: { path: { tenant } },
+              }),
+            ),
+        }),
+      /** The tenant's keys, by public id and principal, never their secrets (`grantr:issue_key`). */
+      keyring: (tenant: string) =>
+        queryOptions({
+          queryKey: keys.grantr.keyring(tenant),
+          queryFn: () =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/keys", {
+                ...named(tenant),
+                params: { path: { tenant } },
               }),
             ),
         }),

@@ -28,10 +28,72 @@ export type Command =
 export type CorrelationId = string | null;
 /**
  * This interface was referenced by `ReflexrV1`'s JSON-Schema
- * via the `definition` "EventId".
+ * via the `definition` "_LoggedEvent".
  */
-export type EventId = string;
-export type Type1 = "publish";
+export type LoggedEvent =
+  | RuleFired
+  | RuleErrored
+  | RuleReset
+  | RuleInstalled
+  | RuleArchived
+  | RunStarted
+  | RunProgressed
+  | RunRetrying
+  | RunSucceeded
+  | RunDeadLettered
+  | RunCancelled
+  | RunRequeued
+  | RunSkipped
+  | FeedbackGiven
+  | Tick
+  | OtherEvent;
+/**
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "FiringId".
+ */
+export type FiringId = string;
+export type Matched = number[];
+/**
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RuleName".
+ */
+export type RuleName = string;
+/**
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "JsonValue".
+ */
+export type JsonValue = unknown;
+/**
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "ScopeKey".
+ */
+export type ScopeKey = string;
+export type Error = string;
+export type Seq = number;
+export type FromSeq = number;
+export type Generation = number;
+export type Reason = "changed" | "replayed";
+export type SilentThrough = number;
+export type Version = number;
+export type Cancelled = number;
+export type Reason1 = string | null;
+export type Version1 = number;
+export type Attempt = number;
+/**
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RunId".
+ */
+export type RunId = string;
+export type Step = string;
+export type Attempt1 = number;
+export type Error1 = string;
+export type NextAttemptAt = string;
+export type Reason2 = string | null;
+export type Attempts = number;
+export type Error2 = string;
+export type Reason3 = string | null;
+export type Reason4 = string | null;
+export type Reason5 = string | null;
 export type FeedbackType = string;
 /**
  * This interface was referenced by `ReflexrV1`'s JSON-Schema
@@ -39,38 +101,28 @@ export type FeedbackType = string;
  */
 export type FeedbackTarget = RunTarget | FiringTarget | ChainTarget;
 export type Kind = "run";
-/**
- * This interface was referenced by `ReflexrV1`'s JSON-Schema
- * via the `definition` "RunId".
- */
-export type RunId = string;
-/**
- * This interface was referenced by `ReflexrV1`'s JSON-Schema
- * via the `definition` "FiringId".
- */
-export type FiringId = string;
 export type Kind1 = "firing";
 export type CorrelationId1 = string;
 export type Kind2 = "chain";
-export type Type2 = "give_feedback";
+export type At = string;
+export type Schedule = string;
+export type Type1 = string;
 /**
  * This interface was referenced by `ReflexrV1`'s JSON-Schema
- * via the `definition` "JsonValue".
+ * via the `definition` "EventId".
  */
-export type JsonValue = unknown;
-export type Type3 = "retry_run";
-export type Reason = string | null;
-export type Type4 = "skip_run";
-export type Reason1 = string | null;
-export type Type5 = "cancel_run";
-export type FromSeq = number;
+export type EventId = string;
+export type Type2 = "publish";
+export type FeedbackType1 = string;
+export type Type3 = "give_feedback";
+export type Type4 = "retry_run";
+export type Reason6 = string | null;
+export type Type5 = "skip_run";
+export type Reason7 = string | null;
+export type Type6 = "cancel_run";
+export type FromSeq1 = number;
 export type Mode = "rebuild" | "refire";
-/**
- * This interface was referenced by `ReflexrV1`'s JSON-Schema
- * via the `definition` "RuleName".
- */
-export type RuleName = string;
-export type Type6 = "replay_rule";
+export type Type7 = "replay_rule";
 export type Description = string;
 export type Enabled = boolean;
 /**
@@ -138,14 +190,14 @@ export type Kind12 = "absence";
 export type Within3 = string;
 export type AtMost = number;
 export type Per = string;
-export type Type7 = "install_rule";
+export type Type8 = "install_rule";
 export type ExpectedVersion = number | null;
-export type Type8 = "update_rule";
+export type Type9 = "update_rule";
 export type ExpectedVersion1 = number | null;
-export type Reason2 = string | null;
-export type Type9 = "archive_rule";
+export type Reason8 = string | null;
+export type Type10 = "archive_rule";
 export type CommandId = string;
-export type Type10 = "command";
+export type Type11 = "command";
 /**
  * This interface was referenced by `ReflexrV1`'s JSON-Schema
  * via the `definition` "ServerFrame".
@@ -154,7 +206,7 @@ export type ServerFrame = Welcome | EventFrame | ReplayComplete | CommandResult 
 export type HeadSeq = number;
 export type Protocol1 = string;
 export type Reset = boolean;
-export type Type11 = "welcome";
+export type Type12 = "welcome";
 /**
  * This interface was referenced by `ReflexrV1`'s JSON-Schema
  * via the `definition` "WorkspaceId".
@@ -176,14 +228,14 @@ export type Kind17 = "source";
 export type Name5 = string;
 export type Kind18 = "evaluator";
 export type Name6 = string;
-export type Version = string;
+export type Version2 = string;
 export type Depth = number;
 export type CorrelationId2 = string;
-export type Seq = number;
+export type Seq1 = number;
 export type Traceparent = string | null;
 export type Ts = string;
-export type Type12 = "event";
-export type Type13 = "replay_complete";
+export type Type13 = "event";
+export type Type14 = "replay_complete";
 export type UpToSeq = number;
 export type CommandId1 = string;
 export type Ok = boolean;
@@ -194,28 +246,23 @@ export type Ok = boolean;
 export type Outcome =
   PublishedOutcome | RecordedOutcome | RunOutcome | RuleOutcome | RuleVersionOutcome;
 export type Duplicate = boolean;
-export type Seq1 = number;
-export type Type14 = "published";
 export type Seq2 = number;
-export type Type15 = "recorded";
-export type Attempts = number;
+export type Type15 = "published";
+export type Seq3 = number;
+export type Type16 = "recorded";
+export type Attempts1 = number;
 export type Checkpoints = number;
 export type CorrelationId3 = string;
 export type CreatedAt = string;
 export type Depth1 = number;
-export type Error = string | null;
+export type Error3 = string | null;
 export type FiredSeq = number;
-export type Matched = number[];
-export type NextAttemptAt = string;
-export type Reason3 = string | null;
-/**
- * This interface was referenced by `ReflexrV1`'s JSON-Schema
- * via the `definition` "ScopeKey".
- */
-export type ScopeKey = string;
+export type Matched1 = number[];
+export type NextAttemptAt1 = string;
+export type Reason9 = string | null;
 export type Status =
   "pending" | "running" | "retrying" | "succeeded" | "dead" | "cancelled" | "skipped";
-export type Step = string | null;
+export type Step1 = string | null;
 /**
  * This interface was referenced by `ReflexrV1`'s JSON-Schema
  * via the `definition` "TraceId".
@@ -223,22 +270,22 @@ export type Step = string | null;
 export type TraceId = string;
 export type TraceIds = TraceId[];
 export type UpdatedAt = string;
-export type Type16 = "run";
+export type Type17 = "run";
 export type Cursor = number;
 export type Definition = string;
-export type Generation = number;
-export type SilentThrough = number;
-export type Type17 = "rule";
+export type Generation1 = number;
+export type SilentThrough1 = number;
+export type Type18 = "rule";
 export type Duplicate1 = boolean;
-export type Seq3 = number;
-export type Type18 = "rule_version";
-export type Version1 = number;
+export type Seq4 = number;
+export type Type19 = "rule_version";
+export type Version3 = number;
 export type Rejection = {
   [k: string]: JsonValue;
 } | null;
-export type Type19 = "command_result";
+export type Type20 = "command_result";
 export type Message = string;
-export type Type20 = "error";
+export type Type21 = "error";
 
 /**
  * Frames of the reflexr.v1 workspace protocol: `client` is any frame a client sends, `server` any frame a server sends.
@@ -271,7 +318,7 @@ export interface Hello {
 export interface CommandFrame {
   command: Command;
   command_id: CommandId;
-  type: Type10;
+  type: Type11;
 }
 /**
  * Publish an event. Publishing an ``id`` already in the log appends nothing.
@@ -281,24 +328,203 @@ export interface CommandFrame {
  */
 export interface Publish {
   correlation_id?: CorrelationId;
-  event: Event;
+  event: LoggedEvent;
   id?: EventId | null;
-  type: Type1;
-}
-export interface Event {
-  type: string;
-  [k: string]: unknown;
+  type: Type2;
 }
 /**
- * Give typed feedback on a run, a firing or a causal chain.
+ * A rule's condition held for one scope; a run of its action was created.
  *
  * This interface was referenced by `ReflexrV1`'s JSON-Schema
- * via the `definition` "GiveFeedback".
+ * via the `definition` "RuleFired".
  */
-export interface GiveFeedback {
+export interface RuleFired {
+  firing_id: FiringId;
+  matched: Matched;
+  rule: RuleName;
+  scope: Scope;
+  scope_key: ScopeKey;
+  type: "reflexr:rule_fired";
+}
+export interface Scope {
+  [k: string]: JsonValue;
+}
+/**
+ * A rule could not evaluate one envelope; it is dead-lettered for that rule alone.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RuleErrored".
+ */
+export interface RuleErrored {
+  error: Error;
+  rule: RuleName;
+  seq: Seq;
+  type: "reflexr:rule_errored";
+}
+/**
+ * A rule's state was reset, because its definition changed or it was replayed.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RuleReset".
+ */
+export interface RuleReset {
+  from_seq: FromSeq;
+  generation: Generation;
+  reason: Reason;
+  rule: RuleName;
+  silent_through?: SilentThrough;
+  type: "reflexr:rule_reset";
+}
+/**
+ * A stored rule was installed or updated: its new version, whole, and where it came from.
+ *
+ * The facts are a stored rule's history: the version that fired a run is the latest one
+ * before its firing.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RuleInstalled".
+ */
+export interface RuleInstalled {
+  provenance: Provenance;
+  rule: RuleName;
+  spec: Spec;
+  type: "reflexr:rule_installed";
+  version: Version;
+}
+export interface Provenance {
+  [k: string]: JsonValue;
+}
+export interface Spec {
+  [k: string]: JsonValue;
+}
+/**
+ * A stored rule was archived, and its unfinished runs cancelled.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RuleArchived".
+ */
+export interface RuleArchived {
+  cancelled: Cancelled;
+  reason?: Reason1;
+  rule: RuleName;
+  type: "reflexr:rule_archived";
+  version: Version1;
+}
+/**
+ * An attempt of a run began.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RunStarted".
+ */
+export interface RunStarted {
+  attempt: Attempt;
+  rule: RuleName;
+  run_id: RunId;
+  scope?: Scope1;
+  scope_key: ScopeKey;
+  type: "reflexr:run_started";
+}
+export interface Scope1 {
+  [k: string]: JsonValue;
+}
+/**
+ * A graph run completed a step and saved a checkpoint.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RunProgressed".
+ */
+export interface RunProgressed {
+  rule: RuleName;
+  run_id: RunId;
+  step: Step;
+  type: "reflexr:run_progressed";
+}
+/**
+ * An attempt failed, and the run will be tried again.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RunRetrying".
+ */
+export interface RunRetrying {
+  attempt: Attempt1;
+  error: Error1;
+  next_attempt_at: NextAttemptAt;
+  reason?: Reason2;
+  rule: RuleName;
+  run_id: RunId;
+  type: "reflexr:run_retrying";
+}
+/**
+ * A run finished.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RunSucceeded".
+ */
+export interface RunSucceeded {
+  output?: JsonValue;
+  rule: RuleName;
+  run_id: RunId;
+  type: "reflexr:run_succeeded";
+}
+/**
+ * A run exhausted its retries, or failed in a way retrying cannot fix.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RunDeadLettered".
+ */
+export interface RunDeadLettered {
+  attempts: Attempts;
+  error: Error2;
+  reason?: Reason3;
+  rule: RuleName;
+  run_id: RunId;
+  type: "reflexr:run_dead_lettered";
+}
+/**
+ * A run was cancelled.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RunCancelled".
+ */
+export interface RunCancelled {
+  reason?: Reason4;
+  rule: RuleName;
+  run_id: RunId;
+  type: "reflexr:run_cancelled";
+}
+/**
+ * Someone made a run runnable again. The envelope's actor records who.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RunRequeued".
+ */
+export interface RunRequeued {
+  rule: RuleName;
+  run_id: RunId;
+  type: "reflexr:run_requeued";
+}
+/**
+ * A run was skipped without completing, unblocking its scope.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "RunSkipped".
+ */
+export interface RunSkipped {
+  reason?: Reason5;
+  rule: RuleName;
+  run_id: RunId;
+  type: "reflexr:run_skipped";
+}
+/**
+ * A person or an evaluator judged a run, a firing or a causal chain.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "FeedbackGiven".
+ */
+export interface FeedbackGiven {
   feedback_type: FeedbackType;
   target: FeedbackTarget;
-  type: Type2;
+  type: "reflexr:feedback_given";
   value: Value;
 }
 /**
@@ -335,6 +561,44 @@ export interface Value {
   [k: string]: JsonValue;
 }
 /**
+ * A schedule's tick. Ticks also move rules' clocks forward in quiet workspaces.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "Tick".
+ */
+export interface Tick {
+  at: At;
+  schedule: Schedule;
+  type: "reflexr:tick";
+}
+/**
+ * An event of the application's, or one this version doesn't know, in JSON Schema only.
+ *
+ * Events are validated through the registry, by their ``type``; this only describes the wire.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "_OtherEvent".
+ */
+export interface OtherEvent {
+  type: Type1;
+  [k: string]: unknown;
+}
+/**
+ * Give typed feedback on a run, a firing or a causal chain.
+ *
+ * This interface was referenced by `ReflexrV1`'s JSON-Schema
+ * via the `definition` "GiveFeedback".
+ */
+export interface GiveFeedback {
+  feedback_type: FeedbackType1;
+  target: FeedbackTarget;
+  type: Type3;
+  value: Value1;
+}
+export interface Value1 {
+  [k: string]: JsonValue;
+}
+/**
  * Make a run runnable now.
  *
  * This interface was referenced by `ReflexrV1`'s JSON-Schema
@@ -342,7 +606,7 @@ export interface Value {
  */
 export interface RetryRun {
   run_id: RunId;
-  type: Type3;
+  type: Type4;
 }
 /**
  * Give up on a waiting or dead-lettered run.
@@ -351,9 +615,9 @@ export interface RetryRun {
  * via the `definition` "SkipRun".
  */
 export interface SkipRun {
-  reason?: Reason;
+  reason?: Reason6;
   run_id: RunId;
-  type: Type4;
+  type: Type5;
 }
 /**
  * Cancel a run that has not finished, stopping its action if it is running.
@@ -362,9 +626,9 @@ export interface SkipRun {
  * via the `definition` "CancelRun".
  */
 export interface CancelRun {
-  reason?: Reason1;
+  reason?: Reason7;
   run_id: RunId;
-  type: Type5;
+  type: Type6;
 }
 /**
  * Reset a rule to evaluate the log again, rebuilding its state or firing again.
@@ -373,10 +637,10 @@ export interface CancelRun {
  * via the `definition` "ReplayRule".
  */
 export interface ReplayRule {
-  from_seq?: FromSeq;
+  from_seq?: FromSeq1;
   mode?: Mode;
   rule: RuleName;
-  type: Type6;
+  type: Type7;
 }
 /**
  * Install a stored rule: its first version, or the next version of an archived one.
@@ -385,11 +649,11 @@ export interface ReplayRule {
  * via the `definition` "InstallRule".
  */
 export interface InstallRule {
-  provenance?: Provenance;
+  provenance?: Provenance1;
   rule: Rule;
-  type: Type7;
+  type: Type8;
 }
-export interface Provenance {
+export interface Provenance1 {
   [k: string]: JsonValue;
 }
 /**
@@ -405,7 +669,7 @@ export interface Rule {
   on_dead_letter?: OnDeadLetter;
   ordering?: Ordering;
   retry?: RetryPolicy;
-  scope?: Scope;
+  scope?: Scope2;
   start?: Start;
   then: ActionRef;
   timeout?: Timeout;
@@ -429,7 +693,7 @@ export interface RetryPolicy {
  * This interface was referenced by `ReflexrV1`'s JSON-Schema
  * via the `definition` "Scope".
  */
-export interface Scope {
+export interface Scope2 {
   fields?: Fields;
 }
 /**
@@ -598,11 +862,11 @@ export interface Throttle {
  */
 export interface UpdateRule {
   expected_version?: ExpectedVersion;
-  provenance?: Provenance1;
+  provenance?: Provenance2;
   rule: Rule;
-  type: Type8;
+  type: Type9;
 }
-export interface Provenance1 {
+export interface Provenance2 {
   [k: string]: JsonValue;
 }
 /**
@@ -613,9 +877,9 @@ export interface Provenance1 {
  */
 export interface ArchiveRule {
   expected_version?: ExpectedVersion1;
-  reason?: Reason2;
+  reason?: Reason8;
   rule: RuleName;
-  type: Type9;
+  type: Type10;
 }
 /**
  * The server's answer to ``hello``.
@@ -627,7 +891,7 @@ export interface Welcome {
   head_seq: HeadSeq;
   protocol?: Protocol1;
   reset?: Reset;
-  type: Type11;
+  type: Type12;
   workspace_id: WorkspaceId;
 }
 /**
@@ -640,12 +904,12 @@ export interface EventFrame {
   actor: Actor;
   causation?: Causation | null;
   correlation_id: CorrelationId2;
-  event: Event1;
+  event: LoggedEvent;
   id: EventId;
-  seq: Seq;
+  seq: Seq1;
   traceparent?: Traceparent;
   ts: Ts;
-  type: Type12;
+  type: Type13;
   workspace_id: WorkspaceId;
 }
 /**
@@ -716,7 +980,7 @@ export interface SourceActor {
 export interface EvaluatorActor {
   kind: Kind18;
   name: Name6;
-  version: Version;
+  version: Version2;
 }
 /**
  * What caused an event that a run emitted, and how deep its causal chain is.
@@ -729,10 +993,6 @@ export interface Causation {
   firing_id: FiringId;
   run_id: RunId;
 }
-export interface Event1 {
-  type: string;
-  [k: string]: unknown;
-}
 /**
  * Every event up to ``up_to_seq`` has been replayed; what follows is live.
  *
@@ -740,7 +1000,7 @@ export interface Event1 {
  * via the `definition` "ReplayComplete".
  */
 export interface ReplayComplete {
-  type: Type13;
+  type: Type14;
   up_to_seq: UpToSeq;
 }
 /**
@@ -754,7 +1014,7 @@ export interface CommandResult {
   ok: Ok;
   outcome?: Outcome | null;
   rejection?: Rejection;
-  type: Type19;
+  type: Type20;
 }
 /**
  * What publishing did: the event's position, and whether it was already there.
@@ -765,8 +1025,8 @@ export interface CommandResult {
 export interface PublishedOutcome {
   duplicate?: Duplicate;
   id: EventId;
-  seq: Seq1;
-  type: Type14;
+  seq: Seq2;
+  type: Type15;
 }
 /**
  * Where a fact the command recorded, such as feedback, was appended.
@@ -776,8 +1036,8 @@ export interface PublishedOutcome {
  */
 export interface RecordedOutcome {
   id: EventId;
-  seq: Seq2;
-  type: Type15;
+  seq: Seq3;
+  type: Type16;
 }
 /**
  * A run after the command changed it.
@@ -787,7 +1047,7 @@ export interface RecordedOutcome {
  */
 export interface RunOutcome {
   run: Run;
-  type: Type16;
+  type: Type17;
 }
 /**
  * One firing's action: its status, attempts, and a graph's latest checkpoint.
@@ -796,28 +1056,28 @@ export interface RunOutcome {
  * via the `definition` "Run".
  */
 export interface Run {
-  attempts?: Attempts;
+  attempts?: Attempts1;
   checkpoint?: JsonValue;
   checkpoints?: Checkpoints;
   correlation_id: CorrelationId3;
   created_at: CreatedAt;
   depth?: Depth1;
-  error?: Error;
+  error?: Error3;
   fired_seq: FiredSeq;
   id: RunId;
-  matched: Matched;
-  next_attempt_at: NextAttemptAt;
+  matched: Matched1;
+  next_attempt_at: NextAttemptAt1;
   output?: JsonValue;
-  reason?: Reason3;
+  reason?: Reason9;
   rule: RuleName;
-  scope: Scope1;
+  scope: Scope3;
   scope_key: ScopeKey;
   status?: Status;
-  step?: Step;
+  step?: Step1;
   trace_ids?: TraceIds;
   updated_at: UpdatedAt;
 }
-export interface Scope1 {
+export interface Scope3 {
   [k: string]: JsonValue;
 }
 /**
@@ -829,7 +1089,7 @@ export interface Scope1 {
 export interface RuleOutcome {
   progress: RuleProgress;
   rule: RuleName;
-  type: Type17;
+  type: Type18;
 }
 /**
  * Where a rule is in a workspace's log, stored with its cursor.
@@ -841,8 +1101,8 @@ export interface RuleProgress {
   cursor?: Cursor;
   deadlines?: Deadlines;
   definition?: Definition;
-  generation?: Generation;
-  silent_through?: SilentThrough;
+  generation?: Generation1;
+  silent_through?: SilentThrough1;
 }
 export interface Deadlines {
   [k: string]: string;
@@ -856,9 +1116,9 @@ export interface Deadlines {
 export interface RuleVersionOutcome {
   duplicate?: Duplicate1;
   rule: RuleName;
-  seq: Seq3;
-  type: Type18;
-  version: Version1;
+  seq: Seq4;
+  type: Type19;
+  version: Version3;
 }
 /**
  * A frame the server could not understand.
@@ -868,5 +1128,5 @@ export interface RuleVersionOutcome {
  */
 export interface ErrorFrame {
   message: Message;
-  type: Type20;
+  type: Type21;
 }

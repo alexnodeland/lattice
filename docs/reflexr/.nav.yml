@@ -100,6 +100,7 @@ nav:
     - adr/0061-the-openapi-documents-describe-refusals.md
     - adr/0062-row-level-security-under-the-scoping.md
     - adr/0063-a-stored-rules-history.md
+    - adr/0064-the-protocol-schema-names-reflexrs-own-events.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

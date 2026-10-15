@@ -1,4 +1,4 @@
-import { Plain, TextLink } from "@portalr/ui";
+import { failureSaid, Plain, TextLink } from "@portalr/ui";
 import {
   createRootRouteWithContext,
   type ErrorComponentProps,
@@ -7,7 +7,6 @@ import {
   Outlet,
 } from "@tanstack/react-router";
 import type { Context } from "../context";
-import { failureSaid } from "../format";
 
 export const Route = createRootRouteWithContext<Context>()({
   head: () => ({ meta: [{ title: "portalr admin" }] }),

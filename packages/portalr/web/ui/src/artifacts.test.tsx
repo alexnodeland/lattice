@@ -107,11 +107,15 @@ test("only paired marks go from a title: a name with underscores or a sum is as 
     "emphasis and strong and code and gone",
   );
   expect(plainTitle("an *unpaired star")).toBe("an *unpaired star");
+  // Two stars that don't flank a word aren't a pair.
+  expect(plainTitle("2*3 + 4*5")).toBe("2*3 + 4*5");
+  expect(plainTitle("a * b * c")).toBe("a * b * c");
+  expect(plainTitle("**bold** and *it*")).toBe("bold and it");
   // JSON's title is plain text: Markdown's marks aren't stripped from it.
   expect(json.title({ title: "  a_b  *c*  \n d " })).toBe("a_b *c* d");
 });
 
-test("a title is read from a bounded line, so a hostile one is quick", () => {
+test("a title is read from a line's first 400 characters, so a hostile line is quick", () => {
   const hostile = `a${"[](".repeat(100_000)}x`;
   const started = performance.now();
   expect(plainTitle(hostile)).not.toBeNull();

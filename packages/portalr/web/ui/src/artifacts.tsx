@@ -62,8 +62,16 @@ export function plainTitle(text: string): string | null {
   return capped(
     line
       .replace(/^\s{0,3}(?:#{1,6}\s+|>+\s*|[-*+]\s+|\d{1,9}[.)]\s+)/, "")
+      // A link's text, and its address up to 200 characters: a longer one is left as it is.
       .replace(/!?\[([^\]]{0,200})\]\([^)]{0,200}\)/g, "$1")
-      .replace(/(\*\*|~~|\*|`)([^\n]{1,200}?)\1/g, "$2")
+      // Paired marks that flank text: the opener before a non-space and not inside a word, the
+      // closer after a non-space and not inside one, so "2*3 + 4*5" and "a * b * c" keep their
+      // stars. Code is paired backticks, wherever they are.
+      .replace(
+        /(?<![\p{L}\p{N}*~])(\*\*|~~|\*)(?=\S)(.{1,200}?)(?<=\S)\1(?![\p{L}\p{N}*~])/gu,
+        "$2",
+      )
+      .replace(/`([^`]{1,200})`/g, "$1")
       .replace(UNDERSCORED, "$1"),
   );
 }

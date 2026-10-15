@@ -51,6 +51,7 @@ export { type CheckboxChoice, CheckboxGroup } from "./checkbox";
 export { ConfirmDialog } from "./confirm-dialog";
 export { Dialog } from "./dialog";
 export { EmptyState } from "./empty-state";
+export { failureSaid } from "./failure";
 export { Icon } from "./icon";
 export { type Column, ItemTable } from "./item-table";
 export { Markdown } from "./markdown";

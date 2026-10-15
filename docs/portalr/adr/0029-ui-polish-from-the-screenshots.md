@@ -32,7 +32,7 @@ Screenshots of main on 2026-10-13, light and dark, wide and on a phone, showed s
   - A rule's JSON wraps inside its box; the install textarea scrolls sideways, and keeps its indentation.
   - A rule's row keeps its state and how far behind it is on one line.
   - Access's tabs are one row, which scrolls on a phone.
-  - A failure's message starts with a capital where it starts a sentence: "The server refused the read".
+  - A failure's message starts with a capital where it starts a sentence: "The server refused the read". `ui`'s `failureSaid` does it for both UIs; a message that follows a colon, as the app's start-up failure's does, is left as it is.
   - The grant dialogs name a person by their id alone, and anyone else for what they are: "Make bob admin of acme?", "Make the group ops admin of acme?", "Revoke admin from the service principal ci?". A person and a service principal may share an id.
   - Home's Failed turns card says "agent turns in the last day", and, on hover, that a rule's run that fails isn't counted.
   - The test application's scripted model proposes a note about what the person asked, so two proposals aren't one.

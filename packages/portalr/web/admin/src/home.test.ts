@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { failureSaid, figure } from "./format";
+import { figure } from "./format";
 import {
   budget,
   counted,
@@ -119,7 +119,7 @@ test("failed turns are the last point's count, of the day before it", () => {
       ],
     }),
   ).toMatchObject({ figure: "3", line: "agent turns in the last day" });
-  expect(failuresSaid({ status: "ok", data: [{ time: 1, value: 1 }] }).note).toMatch(/rule's run/);
+  expect(failuresSaid({ status: "ok", data: [{ time: 1, value: 1 }] }).note).toMatch(/rules' runs/);
   expect(failuresSaid({ status: "ok", data: [] })).toMatchObject({
     figure: "0",
     line: "agent turns in the last day",
@@ -177,12 +177,4 @@ test("the deployment's spend is every tenant's together", () => {
     }),
   ).toEqual({ figure: "$12.50", line: "across every tenant's LiteLLM team" });
   expect(deploymentSpendSaid({ status: "unconfigured" }).line).toBe("LiteLLM isn't configured.");
-});
-
-test("a failure's message starts its own failureSaid with a capital", () => {
-  expect(failureSaid(new Error("the server refused the read (422): no"))).toBe(
-    "The server refused the read (422): no",
-  );
-  expect(failureSaid("down")).toBe("Down");
-  expect(failureSaid(new Error(""))).toBe("");
 });

@@ -31,12 +31,13 @@ const button =
 
 /**
  * The frame of every signed-in screen. One header holds the mark, the switcher, the navigation
- * and the account, each rendered once: from 1024 pixels it is a rail on the surface that stays as
- * the page scrolls; narrower, it is a bar of the mark, the switcher and the account, and Menu
- * opens a drawer of the switcher, the navigation and the account, whose name is shown. The
- * drawer is a Base UI dialog that keeps the focus, closes on Escape, on Close, on following a
- * link or on widening past the rail's width, and gives the focus back to Menu. `ui` chooses the
- * mark: `admin`'s opens to the other side. A page with no navigation of its own leaves `nav` out.
+ * and the account: from 1024 pixels it is a rail on the surface that stays as the page scrolls;
+ * narrower, it is a bar of the mark, the switcher and the account, and Menu opens a drawer that
+ * holds the switcher, the navigation and the account too, whose name is shown. While the drawer
+ * is open, then, each is there twice, behind it and in it. The drawer is a Base UI dialog that
+ * keeps the focus, closes on Escape, on Close, on following a link or on widening past the
+ * rail's width, and gives the focus back to Menu. `ui` chooses the mark: `admin`'s opens to the
+ * other side. A page with no navigation of its own leaves `nav` out.
  */
 export function AppShell({
   ui = "app",
@@ -117,8 +118,11 @@ export function AppShell({
           </Home>
         </div>
         <div className="ml-1 min-w-0 flex-1 lg:ml-0 lg:flex-none">{switcher}</div>
-        {nav && <div className="hidden flex-1 overflow-y-auto lg:block">{nav}</div>}
-        {!nav && <div className="max-lg:hidden lg:flex-1" />}
+        {nav ? (
+          <div className="hidden flex-1 overflow-y-auto lg:block">{nav}</div>
+        ) : (
+          <div className="hidden lg:block lg:flex-1" />
+        )}
         <div className="lg:border-line lg:border-t lg:pt-3">{account}</div>
       </header>
       <main

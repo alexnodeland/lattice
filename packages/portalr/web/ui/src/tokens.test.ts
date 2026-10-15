@@ -36,8 +36,9 @@ function hue(rgb: string): number {
 // Each scheme's project runs this once, so it holds in both: violet's hue, not the cyan the dark
 // scheme once had (190°), nor the magenta and pink (300° and over) that are the other inks.
 test("the focus ring is violet in this scheme", () => {
-  expect(hue(token("focus"))).toBeGreaterThanOrEqual(255);
-  expect(hue(token("focus"))).toBeLessThanOrEqual(285);
+  const violet = hue(token("focus"));
+  expect(violet).toBeGreaterThanOrEqual(255);
+  expect(violet).toBeLessThanOrEqual(285);
 });
 
 test("a surface is raised: lighter than the paper, in both schemes", () => {

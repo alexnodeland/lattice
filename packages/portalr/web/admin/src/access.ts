@@ -112,7 +112,7 @@ export function whomIn(grantee: Grantee): string {
       return `the service principal ${grantee.id}`;
     case "rule":
       return `the rule ${grantee.rule} in ${grantee.workspace}`;
-    default:
+    case "user":
       return grantee.id;
   }
 }

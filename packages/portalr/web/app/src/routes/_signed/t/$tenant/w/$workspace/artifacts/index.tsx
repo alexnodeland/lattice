@@ -44,6 +44,7 @@ function Artifacts() {
           {listed.map((artifact) => (
             <Row key={artifact.id}>
               <RowLink
+                aria-describedby={`${artifact.id}-meta`}
                 render={
                   <Link
                     to="/t/$tenant/w/$workspace/artifacts/$artifact"
@@ -57,8 +58,12 @@ function Artifacts() {
                   <span className="font-mono">{artifact.id}</span>
                 )}
               </RowLink>
-              <span className="text-muted">
-                {titles.has(artifact.id) && <span className="font-mono">{artifact.id}, </span>}
+              <span id={`${artifact.id}-meta`} className="text-muted">
+                {titles.has(artifact.id) && (
+                  <>
+                    <span className="font-mono">{artifact.id}</span>,{" "}
+                  </>
+                )}
                 {artifact.kind}, version {artifact.version}
               </span>
             </Row>

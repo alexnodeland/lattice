@@ -3,10 +3,9 @@
  * failed, a way to read it again, and any other way on, such as clearing a filter.
  */
 
-import { Button, EmptyState } from "@portalr/ui";
+import { Button, EmptyState, failureSaid } from "@portalr/ui";
 import { type ErrorComponentProps, useRouter } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { failureSaid } from "./format";
 
 export function ReadFailed({
   title,

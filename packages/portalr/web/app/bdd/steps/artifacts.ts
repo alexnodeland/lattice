@@ -50,8 +50,9 @@ When("they open the note", async ({ page, scenario }) => {
 
 Then("the note reads {string}", async ({ page }, text: string) => {
   // The note's own paragraph: its title, in the heading, may say the same.
-  const whole = new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`);
-  await expect(artifactPage(page).getByRole("paragraph").filter({ hasText: whole })).toBeVisible();
+  await expect(
+    artifactPage(page).getByText(text, { exact: true }).and(page.locator("p")),
+  ).toBeVisible();
 });
 
 Then(

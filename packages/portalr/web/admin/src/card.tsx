@@ -18,7 +18,8 @@ export function SaidCard({ title, said }: { title: string; said: Said }) {
       figure={said.figure}
       badge={said.badge && <StatusBadge tone={said.badge.tone}>{said.badge.word}</StatusBadge>}
     >
-      {said.note ? <span title={said.note}>{said.line}</span> : said.line}
+      {said.line}
+      {said.note && <small className="mt-1 block text-muted text-xs">{said.note}</small>}
     </StatCard>
   );
 }

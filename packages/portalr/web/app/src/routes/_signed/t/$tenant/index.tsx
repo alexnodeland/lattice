@@ -54,11 +54,8 @@ function Workspaces() {
         <ul aria-label="Workspaces" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {workspaces.map((workspace) => (
             <li key={workspace}>
-              <Card
-                render={<section aria-labelledby={`workspace-${workspace}`} />}
-                className="flex h-full flex-col gap-3"
-              >
-                <h2 id={`workspace-${workspace}`} className="font-semibold text-lg">
+              <Card className="flex h-full flex-col gap-3">
+                <h2 className="font-semibold text-lg">
                   <TextLink
                     render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}
                   >

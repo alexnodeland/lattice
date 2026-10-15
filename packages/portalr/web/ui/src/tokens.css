@@ -30,6 +30,14 @@
   --danger: light-dark(#9b1c3c, #ff9fb2);
   --on-danger: light-dark(#ffffff, #17111f);
   --danger-hover: color-mix(in srgb, var(--danger) 88%, var(--on-danger));
+  /*
+   * A chart's series, in this order and no more: the inks as marks, never as text (ADR-0021).
+   * Each pair passes the dataviz palette check in its scheme (lightness, chroma, colour-blind
+   * separation), and is 3:1 or more on the surface; every series is labelled too.
+   */
+  --chart-1: light-dark(#0096d6, #1a9fd6);
+  --chart-2: light-dark(#e4007c, #ea3a8c);
+  --chart-3: light-dark(#6b2fa0, #9b6ad2);
   /* Behind a drawer or a dialog. */
   --scrim: light-dark(rgb(28 29 38 / 45%), rgb(0 0 0 / 60%));
 }

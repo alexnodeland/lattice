@@ -17,8 +17,9 @@ What lattice's packages share and must keep identical. artifactr, reflexr and gr
 |---|---|---|
 | [`lattice_core.schema`](reference.md#lattice_coreschema) | `tag_required`, which makes a union member's tag required in its JSON Schema | artifactr, reflexr |
 | [`lattice_core.text`](reference.md#lattice_coretext) | `holds_nul`, which finds a NUL character, which PostgreSQL's text can't store, anywhere in a value | artifactr, reflexr |
+| [`lattice_core.sql`](reference.md#lattice_coresql) (the `sql` extra) | `create_sqlite_engine`, whose transactions take turns; `TenantSession`, `tenant_policy` and `grant`, for row-level security; and `to_the_end`, `awaited_to_the_end` and `lock_row`, which await a database call to its end and lock a row | artifactr, reflexr, grantr, relayr |
 
-The SQL helpers, the OpenTelemetry setup and the REST routers' refusal schema move here next, as ADR-0018 plans.
+The OpenTelemetry setup and the REST routers' refusal schema move here next, as ADR-0018 plans.
 
 ## What belongs here
 

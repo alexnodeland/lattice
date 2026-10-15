@@ -1,5 +1,16 @@
 import { expect, test } from "vitest";
-import { anyPart, byKind, fromKey, keyOf, PARTS, TENANT_ACTIONS, where, who, whom } from "./access";
+import {
+  anyPart,
+  byKind,
+  fromKey,
+  keyOf,
+  PARTS,
+  possessive,
+  TENANT_ACTIONS,
+  where,
+  who,
+  whom,
+} from "./access";
 
 test("each part of Access reads with an action Access asks about", () => {
   for (const { reads } of PARTS) {
@@ -40,4 +51,12 @@ test("a form's kind:id names a grantee of the kinds it takes, and nothing else",
   for (const key of ["ops", "service_principal:ci", "user:", "rule:x"]) {
     expect(fromKey(key, kinds)).toBeNull();
   }
+});
+
+test("a possessive is written as English writes it", () => {
+  expect(possessive("triager")).toBe("triager's");
+  expect(possessive("ops")).toBe("ops'");
+  expect(possessive("reviewers")).toBe("reviewers'");
+  expect(possessive("OPS")).toBe("OPS'");
+  expect(possessive("team-1")).toBe("team-1's");
 });

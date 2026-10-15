@@ -4,7 +4,7 @@
  */
 
 import type { AuditFilter, GrantrApi } from "@portalr/client";
-import { where, who, whom } from "./access";
+import { possessive, where, who, whom } from "./access";
 
 type Subject = GrantrApi.components["schemas"]["Subject"];
 type AuditEvent = GrantrApi.components["schemas"]["AuditEvent"];
@@ -33,11 +33,11 @@ export function said(event: AuditEvent): string {
     case "member_removed":
       return `removed ${who(event.member)}`;
     case "group_defined":
-      return `set ${event.group}'s members to ${listed(event.members.map(who))}`;
+      return `set ${possessive(event.group)} members to ${listed(event.members.map(who))}`;
     case "group_deleted":
       return `deleted the group ${event.group}`;
     case "role_defined":
-      return `set ${event.role.name}'s actions to ${listed([...event.role.actions].sort())}`;
+      return `set ${possessive(event.role.name)} actions to ${listed([...event.role.actions].sort())}`;
     case "role_deleted":
       return `deleted the role ${event.role}`;
     case "granted":

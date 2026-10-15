@@ -34,7 +34,7 @@ interface Words {
   readonly of: string;
   /** Creating one, such as "Create a group". */
   readonly create: string;
-  /** Changing `name`'s, such as "Change ops's members". */
+  /** Changing `name`'s, such as "Change ops' members". */
   readonly change: (name: string) => string;
   /** The buttons that create and save, such as "Create the group" and "Save the group". */
   readonly created: string;

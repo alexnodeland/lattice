@@ -31,7 +31,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-sql = ["sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
+sql = ["lattice-core-ai[sql]>=0.1.0.dev0", "sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
 sqlite = ["reflexr[sql]", "aiosqlite>=0.22"]
 postgres = ["reflexr[sql]", "asyncpg>=0.31"]
 fastapi = ["fastapi>=0.141", "starlette>=0.46.0"]

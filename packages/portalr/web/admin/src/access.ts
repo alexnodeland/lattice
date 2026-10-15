@@ -34,6 +34,7 @@ export const TENANT_ACTIONS = [
   "grantr:revoke",
   "grantr:delete_tenant",
   "grantr:read_audit",
+  "portalr:read_telemetry",
 ] as const;
 
 /** Each part of Access, and the action its read takes. */
@@ -127,6 +128,9 @@ export function fromKey<K extends "user" | "service_principal" | "group">(
 type Keyed<K extends string> = K extends unknown ? { kind: K; id: string } : never;
 
 const keyed = <K extends string>(kind: K, id: string) => ({ kind, id }) as Keyed<K>;
+
+/** A name's possessive, as English writes it: "triager's", but "ops'" and "reviewers'". */
+export const possessive = (name: string) => (/s$/i.test(name) ? `${name}'` : `${name}'s`);
 
 /** What a form last said: done, or refused, and why. */
 export type Said = { readonly said: string; readonly refused: boolean } | null;

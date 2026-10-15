@@ -7,7 +7,6 @@ import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import AsyncEngine
-from sqlalchemy.pool import NullPool
 
 from grantr.core import (
     DEPLOYMENT,
@@ -24,11 +23,10 @@ from grantr.core import (
     User,
 )
 from grantr.grants import Grants
-from grantr.sql import SqlStorage, create_schema, create_sqlite_engine
+from grantr.sql import SqlStorage, create_schema
 from grantr.sql.storage import (
     Columns,
     _scope,
-    _to_the_end,
     audit_query,
     grantee,
     resource,
@@ -80,46 +78,6 @@ async def test_a_refused_command_leaves_no_row(engine: AsyncEngine) -> None:
         await grants.create_tenant("acme", owner="alice", by=Agent())
     async with engine.connect() as connection:
         assert await connection.scalar(select(func.count()).select_from(TenantRow)) == 0
-
-
-@pytest.mark.parametrize("ending", ["returns", "raises", "is cancelled"])
-async def test_a_cancelled_call_ends_before_the_cancellation_is_raised(ending: str) -> None:
-    release = asyncio.Event()
-    ended: list[str] = []
-
-    async def call() -> None:
-        await release.wait()
-        ended.append(ending)
-        if ending == "raises":
-            raise RuntimeError("the statement failed")
-        if ending == "is cancelled":
-            raise asyncio.CancelledError
-
-    caller = asyncio.create_task(_to_the_end(call()))
-    for _ in range(3):  # cancelled again at every await, as anyio does
-        await asyncio.sleep(0)
-        caller.cancel()
-    await asyncio.sleep(0)
-    assert not caller.done(), "the call is still running"
-    release.set()
-    with pytest.raises(asyncio.CancelledError):
-        await caller
-    assert ended == [ending]
-
-
-async def test_an_engine_can_pool_connections_its_own_way(tmp_path: Path) -> None:
-    engine = create_sqlite_engine(
-        f"sqlite+aiosqlite:///{tmp_path / 'grantr.db'}", poolclass=NullPool
-    )
-    try:
-        assert isinstance(engine.pool, NullPool)
-        await create_schema(engine)
-        grants = Grants(SqlStorage(engine))
-        await grants.first_operator("root")
-        await grants.create_tenant("acme", owner="alice", by=User(id="root"))
-        assert await grants.member("acme", "alice") is not None
-    finally:
-        await engine.dispose()
 
 
 VIEWER = Grant(tenant="acme", role="viewer", on=TENANT, to=User(id="bob"))

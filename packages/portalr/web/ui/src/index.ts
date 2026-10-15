@@ -22,6 +22,15 @@ export {
 export { Button } from "./button";
 export { Card } from "./card";
 export {
+  BarChart,
+  type Datum,
+  DonutChart,
+  LineChart,
+  MAX_SERIES,
+  type Part,
+  type Series,
+} from "./chart";
+export {
   CommandButton,
   Composer,
   type GiveThumbs,

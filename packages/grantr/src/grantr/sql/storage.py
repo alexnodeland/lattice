@@ -9,14 +9,11 @@ cancellation is raised after it. SQLAlchemy takes a statement cancelled part-way
 connection, which on SQLite can keep the database's write lock, or the pool's one connection.
 """
 
-import asyncio
 import contextlib
-import functools
 from collections.abc import AsyncGenerator, Awaitable, Callable, Collection
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from types import CoroutineType
-from typing import Any, Final
+from typing import Final
 
 from pydantic import TypeAdapter
 from sqlalchemy import ColumnElement, Select, and_, delete, false, or_, select, update
@@ -58,8 +55,8 @@ from grantr.sql.tables import (
     RoleRow,
     TenantRow,
 )
-from grantr.sql.tenancy import TENANT as TENANT_KEY
-from grantr.sql.tenancy import TenantSession
+from lattice_core.sql.sessions import awaited_to_the_end, to_the_end
+from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 
 Clock = Callable[[], datetime]
 """Returns the current time; injectable so tests control it."""
@@ -69,38 +66,6 @@ _GRANTEE: TypeAdapter[Grantee] = TypeAdapter(Grantee)
 
 def _utc_now() -> datetime:
     return datetime.now(UTC)
-
-
-# Shared verbatim with artifactr's src/artifactr/sql/storage.py, reflexr's
-# src/reflexr/sql/storage.py and relayr's src/relayr/sql/ledger.py; change all four.
-async def _to_the_end[T](call: Awaitable[T]) -> T:
-    """Await a database call to its end; a cancellation that came meanwhile is raised after."""
-    task = asyncio.ensure_future(call)
-    cancelled: asyncio.CancelledError | None = None
-    while not task.done():
-        try:
-            await asyncio.wait([task])
-        except asyncio.CancelledError as error:
-            cancelled = error
-    if cancelled is not None:
-        if not task.cancelled():
-            task.exception()
-        raise cancelled
-    return task.result()
-
-
-# Shared verbatim with artifactr's src/artifactr/sql/storage.py, reflexr's
-# src/reflexr/sql/storage.py and relayr's src/relayr/sql/ledger.py; change all four.
-def _awaited_to_the_end[**P, T](
-    method: Callable[P, Awaitable[T]],
-) -> Callable[P, "CoroutineType[Any, Any, T]"]:  # subscriptable at run time from Python 3.13
-    """Await every call of a method to its end, with :func:`_to_the_end`."""
-
-    @functools.wraps(method)
-    async def call(*args: P.args, **kwargs: P.kwargs) -> T:
-        return await _to_the_end(method(*args, **kwargs))
-
-    return call
 
 
 type Columns = tuple[str, str, str]
@@ -203,12 +168,12 @@ class _Reads:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def tenant(self, tenant: TenantId) -> bool:
         row = await self._session.get(TenantRow, tenant)
         return row is not None and row.live
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def grants(
         self, tenant: TenantId | None, to: Grantee, *, on: Collection[Resource] | None = None
     ) -> list[Grant]:
@@ -225,7 +190,7 @@ class _Reads:
             query = query.where(_on(on))
         return [_grant(row) for row in await self._session.scalars(query)]
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def has(self, grant: Grant) -> bool:
         key = (
             _scope(grant.tenant),
@@ -235,7 +200,7 @@ class _Reads:
         )
         return await self._session.get(GrantRow, key) is not None
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def granted(
         self, tenant: TenantId | None, on: Resource, *, role: str | None = None
     ) -> list[Grant]:
@@ -244,7 +209,7 @@ class _Reads:
             query = query.where(GrantRow.role == role)
         return [_grant(row) for row in await self._session.scalars(query)]
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def grants_in(
         self, tenant: TenantId, *, workspace: WorkspaceId | None = None
     ) -> list[Grant]:
@@ -253,12 +218,12 @@ class _Reads:
             query = query.where(GrantRow.resource_workspace == workspace)
         return [_grant(row) for row in await self._session.scalars(query)]
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def roles(self, tenant: TenantId) -> dict[str, Role]:
         rows = await self._session.scalars(select(RoleRow).where(RoleRow.tenant_id == tenant))
         return {row.name: Role(name=row.name, actions=frozenset(row.actions)) for row in rows}
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def group(self, tenant: TenantId, group: Group) -> frozenset[Member] | None:
         if await self._session.get(GroupRow, (tenant, group.id)) is None:
             return None
@@ -269,7 +234,7 @@ class _Reads:
         )
         return frozenset(_member(kind, id) for kind, id in members)
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def groups(self, tenant: TenantId) -> dict[str, frozenset[Member]]:
         groups = await self._session.scalars(
             select(GroupRow.group_id).where(GroupRow.tenant_id == tenant)
@@ -284,7 +249,7 @@ class _Reads:
             found[group].add(_member(kind, id))
         return {group: frozenset(members) for group, members in found.items()}
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def restricted(
         self, tenant: TenantId, workspace: WorkspaceId | None = None
     ) -> list[Resource]:
@@ -303,17 +268,17 @@ class _Reads:
         )
         return [resource(*columns) for columns in rows]
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def is_restricted(self, tenant: TenantId, on: Resource) -> bool:
         row = await self._session.get(ResourceRow, (tenant, *resource_columns(on)))
         return row is not None and row.restricted
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def keys(self, tenant: TenantId) -> list[Key]:
         rows = await self._session.scalars(select(KeyRow).where(KeyRow.tenant_id == tenant))
         return [_stored_key(row) for row in rows]
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def resources(self, tenant: TenantId, kind: ListableKind) -> list[Resource]:
         named = await self._session.execute(
             select(GrantRow.resource_kind, GrantRow.resource_workspace, GrantRow.resource_id)
@@ -342,13 +307,13 @@ class _Transaction(_Reads):
         super().__init__(session)
         self._clock = clock
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def create_tenant(self, tenant: TenantId) -> None:
         await self._session.execute(
             update(TenantRow).where(TenantRow.id == tenant).values(live=True)
         )
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def delete_tenant(self, tenant: TenantId) -> None:
         for model in (GrantRow, GroupRow, GroupMemberRow, RoleRow, KeyRow, ResourceRow):
             await self._session.execute(delete(model).where(model.tenant_id == tenant))
@@ -356,7 +321,7 @@ class _Transaction(_Reads):
             update(TenantRow).where(TenantRow.id == tenant).values(live=False)
         )
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def add_grant(self, grant: Grant) -> None:
         resource_kind, resource_workspace, resource_id = resource_columns(grant.on)
         subject_kind, subject_workspace, subject_id = subject_columns(grant.to)
@@ -374,7 +339,7 @@ class _Transaction(_Reads):
         )
         await self._session.flush()
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def remove_grant(self, grant: Grant) -> None:
         await self._session.execute(
             delete(GrantRow).where(
@@ -385,7 +350,7 @@ class _Transaction(_Reads):
             )
         )
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def remove_member(self, tenant: TenantId, member: Member) -> None:
         await self._session.execute(
             delete(GrantRow).where(GrantRow.tenant_id == tenant, _to(member))
@@ -402,7 +367,7 @@ class _Transaction(_Reads):
                 delete(KeyRow).where(KeyRow.tenant_id == tenant, KeyRow.principal_id == member.id)
             )
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def put_group(self, tenant: TenantId, group: Group, members: frozenset[Member]) -> None:
         if await self._session.get(GroupRow, (tenant, group.id)) is None:
             self._session.add(GroupRow(tenant_id=tenant, group_id=group.id))
@@ -419,7 +384,7 @@ class _Transaction(_Reads):
         )
         await self._session.flush()
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def remove_group(self, tenant: TenantId, group: Group) -> None:
         for statement in (
             delete(GrantRow).where(GrantRow.tenant_id == tenant, _to(group)),
@@ -430,14 +395,14 @@ class _Transaction(_Reads):
         ):
             await self._session.execute(statement)
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def put_role(self, tenant: TenantId, role: Role) -> None:
         await self._session.merge(
             RoleRow(tenant_id=tenant, name=role.name, actions=sorted(role.actions))
         )
         await self._session.flush()
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def remove_role(self, tenant: TenantId, name: str) -> None:
         for statement in (
             delete(GrantRow).where(GrantRow.tenant_id == tenant, GrantRow.role == name),
@@ -445,7 +410,7 @@ class _Transaction(_Reads):
         ):
             await self._session.execute(statement)
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def set_restricted(self, tenant: TenantId, on: Resource, restricted: bool) -> None:
         kind, workspace, id = resource_columns(on)
         await self._session.merge(
@@ -459,7 +424,7 @@ class _Transaction(_Reads):
         )
         await self._session.flush()
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def add_key(self, key: Key) -> None:
         self._session.add(
             KeyRow(
@@ -471,7 +436,7 @@ class _Transaction(_Reads):
         )
         await self._session.flush()
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def remove_key(self, tenant: TenantId, key_id: str) -> Key | None:
         row = await self._session.get(KeyRow, key_id)
         if row is None or row.tenant_id != tenant:
@@ -480,7 +445,7 @@ class _Transaction(_Reads):
         await self._session.flush()
         return _stored_key(row)
 
-    @_awaited_to_the_end
+    @awaited_to_the_end
     async def append(
         self, tenant: TenantId | None, by: Subject | None, event: AuditEvent
     ) -> AuditEntry:
@@ -573,11 +538,11 @@ class SqlStorage:
         """
         session = self._session(tenant)
         try:
-            await _to_the_end(_lock(session, _scope(tenant)))
+            await to_the_end(_lock(session, _scope(tenant)))
             yield _Transaction(session, self._clock)
-            await _to_the_end(session.commit())
+            await to_the_end(session.commit())
         finally:
-            await _to_the_end(session.close())
+            await to_the_end(session.close())
 
     async def _read[T](self, tenant: TenantId | None, read: Callable[[_Reads], Awaitable[T]]) -> T:
         async with self._session(tenant) as session:
@@ -647,18 +612,18 @@ class SqlStorage:
             _to(User(id=user)),
         )
         async with self._across() as session:
-            return [_grant(row) for row in await _to_the_end(session.scalars(query))]
+            return [_grant(row) for row in await to_the_end(session.scalars(query))]
 
     async def key(self, key_id: str) -> Key | None:
         """A key, by its public id, in any tenant."""
         async with self._across() as session:
-            row = await _to_the_end(session.get(KeyRow, key_id))
+            row = await to_the_end(session.get(KeyRow, key_id))
             return None if row is None else _stored_key(row)
 
     async def tenants(self) -> list[TenantId]:
         """Every tenant, in order."""
         async with self._across() as session:
-            ids = await _to_the_end(
+            ids = await to_the_end(
                 session.scalars(select(TenantRow.id).where(TenantRow.live).order_by(TenantRow.id))
             )
             return list(ids)
@@ -685,7 +650,7 @@ class SqlStorage:
             tenant, after_seq=after_seq, before_seq=before_seq, limit=limit, last=last, keep=keep
         )
         async with self._session(tenant) as session:
-            rows = list(await _to_the_end(session.scalars(query)))
+            rows = list(await to_the_end(session.scalars(query)))
             if last is not None:
                 rows.reverse()
             return [

@@ -2,7 +2,8 @@ import { PageHeader } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { SaidCard } from "../../../card";
-import { deploymentSpendSaid, figure } from "../../../home";
+import { figure } from "../../../format";
+import { deploymentSpendSaid } from "../../../home";
 
 /** Every tenant at a glance, for operators: how many there are, and what they spend. */
 export const Route = createFileRoute("/_signed/deployment/")({ component: Home });

@@ -20,7 +20,6 @@ from sqlalchemy.pool import QueuePool
 from reflexr import SourceActor
 from reflexr.core import new_event_id
 from reflexr.sql import SqlStorage
-from reflexr.sql.storage import _to_the_end
 from reflexr.workspace import RunPolicy, WorkspaceRef, Workspaces, utc_now
 from tests.databases import Database
 from tests.event_types import Deploy
@@ -34,31 +33,6 @@ LOCK_TIMEOUT = timedelta(milliseconds=250)
 
 type Operation = Callable[[], Awaitable[object]]
 type Cancel = Callable[[Operation, random.Random], Awaitable[None]]
-
-
-@pytest.mark.parametrize("ending", ["returns", "raises", "is cancelled"])
-async def test_a_cancelled_call_ends_before_the_cancellation_is_raised(ending: str) -> None:
-    release = asyncio.Event()
-    ended: list[str] = []
-
-    async def call() -> None:
-        await release.wait()
-        ended.append(ending)
-        if ending == "raises":
-            raise RuntimeError("the statement failed")
-        if ending == "is cancelled":
-            raise asyncio.CancelledError
-
-    caller = asyncio.create_task(_to_the_end(call()))
-    for _ in range(3):  # cancelled again at every await, as anyio does
-        await asyncio.sleep(0)
-        caller.cancel()
-    await asyncio.sleep(0)
-    assert not caller.done(), "the call is still running"
-    release.set()
-    with pytest.raises(asyncio.CancelledError):
-        await caller
-    assert ended == [ending]
 
 
 async def cancel_after_some_yields(operation: Operation, rng: random.Random) -> None:

@@ -15,3 +15,22 @@ The reference is generated from lattice-core's docstrings and type annotations. 
     options:
       show_root_heading: false
       show_root_toc_entry: false
+
+## lattice_core.sql
+
+The `sql` extra.
+
+::: lattice_core.sql.sqlite
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+::: lattice_core.sql.sessions
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+::: lattice_core.sql.tenancy
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false

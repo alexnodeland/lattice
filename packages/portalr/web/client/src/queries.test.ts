@@ -3,7 +3,7 @@ import type { Server } from "bun";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import type * as v1 from "./generated/artifactr.v1";
 import type * as reflexrV1 from "./generated/reflexr.v1";
-import { AUDIT_PAGE, createQueries, keys, stale } from "./queries";
+import { AUDIT_PAGE, createQueries, keys, Refused, stale } from "./queries";
 import { createApi, readConfig } from "./rest";
 
 interface Seen {
@@ -128,6 +128,14 @@ test("every read has its own path", async () => {
     [queries.grantr.catalog(), "/grantr/v1/catalog"],
     [queries.grantr.keyring("acme"), "/grantr/v1/tenants/acme/keys"],
     [queries.portalr.spend("acme"), "/portalr/v1/spend"],
+    [
+      queries.portalr.feedback("acme", {
+        start: "2026-10-07T00:00:00Z",
+        end: "2026-10-14T00:00:00Z",
+      }),
+      "/portalr/v1/feedback",
+    ],
+    [queries.portalr.links("ops", "t1"), "/portalr/v1/deployment/links"],
     [queries.grantr.grants("acme", "ws_1"), "/grantr/v1/tenants/acme/grants"],
     [queries.grantr.restrictions("acme", "ws_1"), "/grantr/v1/tenants/acme/restrictions"],
   ] as const;
@@ -293,6 +301,16 @@ test("portalr's reads name their tenant and window", async () => {
   expect(seen.at(-1)?.url.searchParams.get("step")).toBeNull();
 });
 
+test("a feedback read is kept ten minutes and tried again once, unless refused outright", () => {
+  const feedback = queries.portalr.feedback("acme", { start: DAY.start, end: DAY.end });
+  expect(feedback.staleTime).toBe(10 * 60_000);
+  const retry = feedback.retry as (count: number, error: unknown) => boolean;
+  expect(retry(0, new Refused(503, null))).toBe(true);
+  expect(retry(1, new Refused(503, null))).toBe(false);
+  expect(retry(0, new Refused(422, null))).toBe(false);
+  expect(queries.portalr.scores("acme", { start: DAY.start, end: DAY.end }).staleTime).toBe(60_000);
+});
+
 test("the deployment's tenants are an operator's, and null for anyone else", async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   expect(await client.fetchQuery(queries.portalr.tenants("alice"))).toEqual({
@@ -361,4 +379,32 @@ test("an audit read with no filter asks for every entry", async () => {
 test("a workspace's grants and the tenant's are read apart", () => {
   expect(keys.grantr.grants("acme")).not.toEqual(keys.grantr.grants("acme", "ws_1"));
   expect(queries.grantr.grants("acme").queryKey).toEqual(keys.grantr.grants("acme"));
+});
+
+test("a refusal says why, and never shows its body as it came", () => {
+  const said = (status: number, detail: unknown) => new Refused(status, detail).message;
+  expect(said(422, { detail: "no such subject" })).toBe(
+    "the server refused the read (422): no such subject",
+  );
+  expect(said(403, { detail: { type: "forbidden", message: "not an operator" } })).toBe(
+    "the server refused the read (403): not an operator",
+  );
+  expect(
+    said(422, {
+      detail: [
+        { loc: ["query", "start"], msg: "Input should be a valid datetime", input: "x", ctx: {} },
+        { loc: ["query", "end"], msg: "Field required", url: "https://errors.pydantic.dev" },
+      ],
+    }),
+  ).toBe(
+    "the server refused the read (422): start: Input should be a valid datetime; end: Field required",
+  );
+  expect(said(502, "<html>Bad gateway</html>")).toBe(
+    "the server refused the read (502): The server answered 502.",
+  );
+  expect(said(403, { detail: { type: "forbidden", message: { nested: true } } })).toBe(
+    "the server refused the read (403): The server answered 403.",
+  );
+  expect(said(500, null)).toBe("the server refused the read (500): The server answered 500.");
+  expect(said(500, undefined)).toBe("the server refused the read (500): The server answered 500.");
 });

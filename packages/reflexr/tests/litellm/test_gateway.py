@@ -9,6 +9,7 @@ from typing import Any
 
 import httpx2
 import pytest
+from langfuse import propagate_attributes
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -105,6 +106,25 @@ async def settle(
     await ws.publish(Deploy(service="auth"))
     await Reactor(workspaces, actions={"review": action}).settle()
     return ws
+
+
+async def test_the_trace_tags_langfuse_propagates_reach_the_proxy_once_each() -> None:
+    proxy = FakeProxy()
+    gateway = LiteLLMGateway(tags=("oncall",))
+    with propagate_attributes(tags=["tenant:acme", "thread:th_1", "rule:app:review"]):
+        ws = await settle(review(proxy.model(), gateway), UserActor(id="ada"))
+    [done] = await ws.runs()
+    assert done.status == "succeeded"
+    [(body, _)] = proxy.requests
+    assert body["metadata"]["tags"] == [
+        "reflexr",
+        "tenant:acme",
+        "workspace:prod",
+        "tenant-workspace:acme/prod",
+        "rule:app:review",
+        "oncall",
+        "thread:th_1",
+    ]
 
 
 async def test_each_request_carries_the_tenant_chain_trace_key_and_guardrails() -> None:

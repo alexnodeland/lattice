@@ -33,4 +33,4 @@ reflexr's `time_to_resolution` measures a causal chain from its first event to t
 
 ## Cost per chain
 
-A chain's runs are its Langfuse session, and a turn a rule's run started is tagged `chain:<correlation id>` ([ADR-0024](../adr/0024-langfuse-sessions-tagged-with-each-other.md)). A chain's cost is its session's traces with the traces tagged with it, the turns it started included. LiteLLM's own spend records don't carry relayr's tags yet ([lattice #86](https://github.com/alexnodeland/lattice/issues/86)).
+A chain's runs are its Langfuse session, and a turn a rule's run started is tagged `chain:<correlation id>` ([ADR-0024](../adr/0024-langfuse-sessions-tagged-with-each-other.md)). A chain's cost is its session's traces with the traces tagged with it, the turns it started included. LiteLLM's own spend records carry the same tags, from the libraries' gateways ([lattice ADR-0022](../../adr/0022-litellm-requests-carry-the-propagated-trace-tags.md)).

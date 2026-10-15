@@ -38,7 +38,7 @@ The agent's and each run's `model_settings` override these key by key, so an `ex
 | Where | What | Used by LiteLLM for |
 |---|---|---|
 | `metadata.tenant_id`, `workspace_id`, `thread_id`, `run_id` | artifactr's ids | Spend and logs by tenant and workspace |
-| `metadata.tags` | `artifactr`, `tenant:<id>`, `workspace:<id>`, `tenant-workspace:<tenant>/<workspace>` with each id percent-encoded, and yours ([lattice ADR-0019](../../adr/0019-a-tag-for-each-tenants-workspace.md)) | Tag-based spend tracking and routing, and each tenant's workspaces' spend |
+| `metadata.tags` | `artifactr`, `tenant:<id>`, `workspace:<id>`, `tenant-workspace:<tenant>/<workspace>` with each id percent-encoded, yours, and the trace tags Langfuse is propagating, such as relayr's `chain:` and `rule:` ([lattice ADR-0019](../../adr/0019-a-tag-for-each-tenants-workspace.md), [ADR-0022](../../adr/0022-litellm-requests-carry-the-propagated-trace-tags.md)) | Tag-based spend tracking and routing, and each tenant's workspaces' spend |
 | `metadata.session_id`, `trace_user_id` | The thread, and the person who asked | Sessions and users in its Langfuse logging |
 | `metadata.existing_trace_id`, and the `traceparent` header | The turn's trace | Joining the turn's trace in Langfuse and OpenTelemetry |
 | `guardrails` | The workspace's guardrails | Which guardrails check the request |

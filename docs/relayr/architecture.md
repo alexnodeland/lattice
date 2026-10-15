@@ -108,4 +108,4 @@ One contract test, `tests/ledger/test_contract.py`, runs against memory, SQLite 
 
 ## What isn't built yet
 
-LiteLLM's metadata doesn't carry relayr's tags yet ([lattice #86](https://github.com/alexnodeland/lattice/issues/86)).
+Nothing in v0.1's plan is left. The libraries' LiteLLM gateways carry relayr's tags, `thread:`, `chain:` and `rule:`, on their requests ([lattice ADR-0022](../adr/0022-litellm-requests-carry-the-propagated-trace-tags.md)).

@@ -24,7 +24,7 @@ ADR-0001 to ADR-0007 record the decisions D1 to D7 of [stackr RFC-0002](../../st
 | [0016](0016-followers-start-on-open.md) | Followers start on open | Accepted |
 | [0017](0017-the-follower-acts-as-the-application.md) | The follower acts as the application | Accepted |
 | [0018](0018-bridged-events-their-fields-ids-and-projections.md) | Bridged events, their fields, ids and projections | Accepted |
-| [0019](0019-runs-act-once-through-derived-ids-and-keyed-edits.md) | Runs act once, through derived ids and keyed edits | Accepted, amended by 0026 |
+| [0019](0019-runs-act-once-through-derived-ids-and-keyed-edits.md) | Runs act once, through derived ids and keyed edits | Accepted, amended by 0026 and lattice ADR-0022 |
 | [0020](0020-allowlists.md) | Allowlists | Accepted, amended by 0029 |
 | [0021](0021-chains-continue-across-the-bridge.md) | Chains continue across the bridge | Accepted, amended by 0025 and 0026 |
 | [0022](0022-what-a-rules-actor-needs-in-artifactr.md) | What a rule's actor needs in artifactr | Accepted |

@@ -29,6 +29,7 @@ nav:
       - adr/0018-lattice-core-what-the-libraries-share.md
       - adr/0019-a-tag-for-each-tenants-workspace.md
       - adr/0020-the-telemetry-contract-needs-no-extra.md
+      - adr/0021-the-refusal-schema-needs-no-extra.md
       - Template: adr/template.md
   - Brand: assets/brand/README.md
   - artifactr: artifactr

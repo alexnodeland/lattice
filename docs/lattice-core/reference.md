@@ -92,3 +92,10 @@ The `litellm` extra.
     options:
       show_root_heading: false
       show_root_toc_entry: false
+
+## lattice_core.refusals
+
+::: lattice_core.refusals
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false

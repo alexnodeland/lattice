@@ -240,10 +240,15 @@ def portalr_router(
 
     @api.get("/v1/traces/{trace_id}", response_model=reading(Trace | None))
     async def trace(
-        trace_id: Id, tenant: Tenant = telemetry
+        trace_id: Id, content: bool = False, tenant: Tenant = telemetry
     ) -> Ok[Trace | None] | Unavailable | Unconfigured:
-        """A trace, if it is the tenant's: its spans, for its waterfall."""
-        return await readers.tempo.trace(tenant, trace_id) if readers.tempo else Unconfigured()
+        """A trace, if it is the tenant's: its spans, for its waterfall.
+
+        What was said in a span, its prompt and completion, is left out unless ``content`` asks.
+        """
+        if not readers.tempo:
+            return Unconfigured()
+        return await readers.tempo.trace(tenant, trace_id, content=content)
 
     @api.get("/v1/logs", response_model=reading(list[LogLine]))
     async def logs(

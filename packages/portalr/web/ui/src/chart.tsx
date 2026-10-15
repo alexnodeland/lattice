@@ -62,9 +62,13 @@ const LONGEST_LABEL = 14;
 const cut = (name: string) =>
   name.length > LONGEST_LABEL ? `${name.slice(0, LONGEST_LABEL - 1)}…` : name;
 
-/** The room a chart keeps to its right for its direct labels: enough for the longest, cut. */
+/**
+ * The room a chart keeps to its right for its direct labels: enough for the longest, cut, at the
+ * width a chart's small type takes, 7px a character, which a name of wide letters, such as
+ * "Thumbs down", needs more of than 6.
+ */
 const labelRoom = (series: readonly Series[]) =>
-  16 + 6 * Math.max(0, ...series.map((one) => cut(one.name).length));
+  14 + 7 * Math.max(0, ...series.map((one) => cut(one.name).length));
 
 /**
  * A series' pattern past the first, which is solid: its ink hatched at 45°, then at 135°; past

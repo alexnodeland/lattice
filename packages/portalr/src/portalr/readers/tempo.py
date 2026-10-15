@@ -6,10 +6,10 @@ shown only if one of its spans names the tenant and none names another.
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Final
+from typing import Annotated, Any, Final
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, TypeAdapter
 
 from portalr.readers.http import read
 from portalr.readers.query import Id, Window, quoted
@@ -27,6 +27,26 @@ RUN_ATTRIBUTES: Final = ("artifactr.run.id", "reflexr.run.id")
 """The span attributes that name a run, in either library."""
 
 
+CONTENT_ATTRIBUTES: Final = frozenset(
+    {
+        "gen_ai.input.messages",
+        "gen_ai.output.messages",
+        "gen_ai.system_instructions",
+        "gen_ai.tool.call.arguments",
+        "gen_ai.tool.call.result",
+    }
+)
+"""The span attributes that hold what was said: prompts, completions, instructions and a tool's
+arguments and result, which pydantic-ai records when the application asks it to (portalr
+ADR-0030). A trace read leaves them out unless asked for them."""
+
+
+def _padded(trace_id: str) -> str:
+    """A trace's id as 32 hex digits: Tempo's search answers one without its leading zeros."""
+    hex_digits = all(digit in "0123456789abcdefABCDEF" for digit in trace_id)
+    return trace_id.zfill(32) if len(trace_id) < 32 and hex_digits else trace_id
+
+
 class TraceQuery(Window):
     """Which of a tenant's traces to find: a session's, a run's, or any, in a window."""
 
@@ -42,7 +62,7 @@ class TraceSummary(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    trace_id: str = Field(validation_alias="traceID")
+    trace_id: Annotated[str, AfterValidator(_padded)] = Field(validation_alias="traceID")
     root_service: str | None = Field(default=None, validation_alias="rootServiceName")
     root_name: str | None = Field(default=None, validation_alias="rootTraceName")
     start_ns: int = Field(validation_alias="startTimeUnixNano")
@@ -61,6 +81,8 @@ class Span(BaseModel):
     end_ns: int
     attributes: Mapping[str, str | int | float | bool]
     error: bool
+    withheld: tuple[str, ...] = ()
+    """The names of the content attributes the span has and this read left out."""
 
 
 class Trace(BaseModel):
@@ -124,6 +146,31 @@ def _spans(document: Mapping[str, Any]) -> list[Span]:
     ]
 
 
+def _without_repeats(spans: list[Span]) -> list[Span]:
+    """Each span once, the first: Tempo may answer one more than once, when its batches repeat."""
+    once: dict[str, Span] = {}
+    for span in spans:
+        once.setdefault(span.span_id, span)
+    return list(once.values())
+
+
+def _withholding(spans: list[Span]) -> list[Span]:
+    """The spans without their content attributes, each naming what it withheld."""
+    return [
+        span.model_copy(
+            update={
+                "attributes": {
+                    name: value
+                    for name, value in span.attributes.items()
+                    if name not in CONTENT_ATTRIBUTES
+                },
+                "withheld": tuple(sorted(CONTENT_ATTRIBUTES & span.attributes.keys())),
+            }
+        )
+        for span in spans
+    ]
+
+
 def belongs(tenant: Tenant, spans: list[Span]) -> bool:
     """Whether a trace is the tenant's: one span names it, and none names another."""
     named = {
@@ -172,14 +219,20 @@ class Tempo:
         ]
         return Ok(data=sorted(traces, key=lambda trace: trace.start_ns, reverse=True))
 
-    async def trace(self, tenant: Tenant, trace_id: Id) -> Ok[Trace | None] | Unavailable:
-        """A trace by its id, if it is the tenant's; ``None`` if it isn't, or doesn't exist."""
+    async def trace(
+        self, tenant: Tenant, trace_id: Id, *, content: bool = False
+    ) -> Ok[Trace | None] | Unavailable:
+        """A trace by its id, if it is the tenant's; ``None`` if it isn't, or doesn't exist.
+
+        Each span is once, and without what was said in it, unless ``content`` asks for that.
+        """
         document = await read(self.client, "tempo", f"{self.url}/api/v2/traces/{trace_id}", _OTLP)
         if isinstance(document, Unavailable):
             return document
         if document is None:
             return Ok(data=None)  # Tempo has no such trace
-        spans = _spans(document)
-        return Ok(
-            data=Trace(trace_id=trace_id, spans=tuple(spans)) if belongs(tenant, spans) else None
-        )
+        spans = _without_repeats(_spans(document))
+        if not belongs(tenant, spans):
+            return Ok(data=None)
+        shown = spans if content else _withholding(spans)
+        return Ok(data=Trace(trace_id=_padded(trace_id), spans=tuple(shown)))

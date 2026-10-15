@@ -218,6 +218,8 @@ export interface paths {
         /**
          * Trace
          * @description A trace, if it is the tenant's: its spans, for its waterfall.
+         *
+         *     What was said in a span, its prompt and completion, is left out unless ``content`` asks.
          */
         get: operations["trace_portalr_v1_traces__trace_id__get"];
         put?: never;
@@ -608,6 +610,11 @@ export interface components {
             span_id: string;
             /** Start Ns */
             start_ns: number;
+            /**
+             * Withheld
+             * @default []
+             */
+            withheld: string[];
         };
         /**
          * Spend
@@ -1373,7 +1380,9 @@ export interface operations {
     };
     trace_portalr_v1_traces__trace_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                content?: boolean;
+            };
             header?: {
                 "X-Tenant"?: components["schemas"]["TenantId"] | null;
             };

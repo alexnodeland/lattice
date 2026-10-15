@@ -135,6 +135,14 @@ test("every read has its own path", async () => {
       }),
       "/portalr/v1/feedback",
     ],
+    [
+      queries.portalr.traces("acme", {
+        start: "2026-10-07T00:00:00Z",
+        end: "2026-10-14T00:00:00Z",
+      }),
+      "/portalr/v1/traces",
+    ],
+    [queries.portalr.trace("acme", "c029eec9"), "/portalr/v1/traces/c029eec9"],
     [queries.portalr.links("ops", "t1"), "/portalr/v1/deployment/links"],
     [queries.grantr.grants("acme", "ws_1"), "/grantr/v1/tenants/acme/grants"],
     [queries.grantr.restrictions("acme", "ws_1"), "/grantr/v1/tenants/acme/restrictions"],
@@ -423,4 +431,31 @@ test("a refusal says why, and never shows its body as it came", () => {
   );
   expect(said(500, null)).toBe("the server refused the read (500): The server answered 500.");
   expect(said(500, undefined)).toBe("the server refused the read (500): The server answered 500.");
+});
+
+test("a traces read names its window, its limit and its filter; a trace read, whether it wants content", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const window = { start: "2026-10-07T00:00:00Z", end: "2026-10-14T00:00:00Z" };
+  await client.fetchQuery(
+    queries.portalr.traces("acme", window, { session: "thr_1", run: "run_2" }),
+  );
+  const list = seen.at(-1);
+  expect(Object.fromEntries(list?.url.searchParams ?? [])).toEqual({
+    start: window.start,
+    end: window.end,
+    limit: "100",
+    session: "thr_1",
+    run: "run_2",
+  });
+  expect(list?.headers.get("x-tenant")).toBe("acme");
+  await client.fetchQuery(queries.portalr.traces("acme", window));
+  expect(seen.at(-1)?.url.searchParams.has("session")).toBe(false);
+  await client.fetchQuery(queries.portalr.trace("acme", "c029eec9"));
+  expect(seen.at(-1)?.url.searchParams.get("content")).toBe("false");
+  await client.fetchQuery(queries.portalr.trace("acme", "c029eec9", true));
+  expect(seen.at(-1)?.url.searchParams.get("content")).toBe("true");
+  // With content, and without, are two reads: one's key isn't the other's.
+  expect(keys.portalr.trace("acme", "c029eec9", true)).not.toEqual(
+    keys.portalr.trace("acme", "c029eec9", false),
+  );
 });

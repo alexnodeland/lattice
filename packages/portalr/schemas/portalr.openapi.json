@@ -870,6 +870,14 @@
           "start_ns": {
             "title": "Start Ns",
             "type": "integer"
+          },
+          "withheld": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Withheld",
+            "type": "array"
           }
         },
         "required": [
@@ -2378,7 +2386,7 @@
     },
     "/portalr/v1/traces/{trace_id}": {
       "get": {
-        "description": "A trace, if it is the tenant's: its spans, for its waterfall.",
+        "description": "A trace, if it is the tenant's: its spans, for its waterfall.\n\nWhat was said in a span, its prompt and completion, is left out unless ``content`` asks.",
         "operationId": "trace_portalr_v1_traces__trace_id__get",
         "parameters": [
           {
@@ -2389,6 +2397,16 @@
               "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$",
               "title": "Trace Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "content",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Content",
+              "type": "boolean"
             }
           },
           {

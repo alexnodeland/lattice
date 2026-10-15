@@ -20,6 +20,8 @@ import { Route as SignedTTenantAccessGroupsRouteImport } from './routes/_signed/
 import { Route as SignedTTenantAccessKeysRouteImport } from './routes/_signed/t/$tenant/access/keys'
 import { Route as SignedTTenantAccessMembersRouteImport } from './routes/_signed/t/$tenant/access/members'
 import { Route as SignedTTenantAccessRolesRouteImport } from './routes/_signed/t/$tenant/access/roles'
+import { Route as SignedTTenantTracesIndexRouteImport } from './routes/_signed/t/$tenant/traces/index'
+import { Route as SignedTTenantTracesTraceRouteImport } from './routes/_signed/t/$tenant/traces/$trace'
 
 const SignedRoute = SignedRouteImport.update({
   id: '/_signed',
@@ -110,6 +112,18 @@ const SignedTTenantAccessRolesRoute =
     path: '/roles',
     getParentRoute: () => SignedTTenantAccessRoute,
   } as any)
+const SignedTTenantTracesIndexRoute =
+  SignedTTenantTracesIndexRouteImport.update({
+    id: '/traces/',
+    path: '/traces/',
+    getParentRoute: () => SignedTTenantRoute,
+  } as any)
+const SignedTTenantTracesTraceRoute =
+  SignedTTenantTracesTraceRouteImport.update({
+    id: '/traces/$trace',
+    path: '/traces/$trace',
+    getParentRoute: () => SignedTTenantRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof SignedIndexRoute
@@ -127,7 +141,9 @@ export interface FileRoutesByFullPath {
   '/t/$tenant/access/keys': typeof SignedTTenantAccessKeysRoute
   '/t/$tenant/access/members': typeof SignedTTenantAccessMembersRoute
   '/t/$tenant/access/roles': typeof SignedTTenantAccessRolesRoute
+  '/t/$tenant/traces/$trace': typeof SignedTTenantTracesTraceRoute
   '/t/$tenant/access/': typeof SignedTTenantAccessIndexRoute
+  '/t/$tenant/traces/': typeof SignedTTenantTracesIndexRoute
 }
 export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
@@ -142,7 +158,9 @@ export interface FileRoutesByTo {
   '/t/$tenant/access/keys': typeof SignedTTenantAccessKeysRoute
   '/t/$tenant/access/members': typeof SignedTTenantAccessMembersRoute
   '/t/$tenant/access/roles': typeof SignedTTenantAccessRolesRoute
+  '/t/$tenant/traces/$trace': typeof SignedTTenantTracesTraceRoute
   '/t/$tenant/access': typeof SignedTTenantAccessIndexRoute
+  '/t/$tenant/traces': typeof SignedTTenantTracesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -162,7 +180,9 @@ export interface FileRoutesById {
   '/_signed/t/$tenant/access/keys': typeof SignedTTenantAccessKeysRoute
   '/_signed/t/$tenant/access/members': typeof SignedTTenantAccessMembersRoute
   '/_signed/t/$tenant/access/roles': typeof SignedTTenantAccessRolesRoute
+  '/_signed/t/$tenant/traces/$trace': typeof SignedTTenantTracesTraceRoute
   '/_signed/t/$tenant/access/': typeof SignedTTenantAccessIndexRoute
+  '/_signed/t/$tenant/traces/': typeof SignedTTenantTracesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -182,7 +202,9 @@ export interface FileRouteTypes {
     | '/t/$tenant/access/keys'
     | '/t/$tenant/access/members'
     | '/t/$tenant/access/roles'
+    | '/t/$tenant/traces/$trace'
     | '/t/$tenant/access/'
+    | '/t/$tenant/traces/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/sign-in'
@@ -197,7 +219,9 @@ export interface FileRouteTypes {
     | '/t/$tenant/access/keys'
     | '/t/$tenant/access/members'
     | '/t/$tenant/access/roles'
+    | '/t/$tenant/traces/$trace'
     | '/t/$tenant/access'
+    | '/t/$tenant/traces'
   id:
     | '__root__'
     | '/_signed'
@@ -216,7 +240,9 @@ export interface FileRouteTypes {
     | '/_signed/t/$tenant/access/keys'
     | '/_signed/t/$tenant/access/members'
     | '/_signed/t/$tenant/access/roles'
+    | '/_signed/t/$tenant/traces/$trace'
     | '/_signed/t/$tenant/access/'
+    | '/_signed/t/$tenant/traces/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -345,6 +371,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedTTenantAccessRolesRouteImport
       parentRoute: typeof SignedTTenantAccessRoute
     }
+    '/_signed/t/$tenant/traces/': {
+      id: '/_signed/t/$tenant/traces/'
+      path: '/traces'
+      fullPath: '/t/$tenant/traces/'
+      preLoaderRoute: typeof SignedTTenantTracesIndexRouteImport
+      parentRoute: typeof SignedTTenantRoute
+    }
+    '/_signed/t/$tenant/traces/$trace': {
+      id: '/_signed/t/$tenant/traces/$trace'
+      path: '/traces/$trace'
+      fullPath: '/t/$tenant/traces/$trace'
+      preLoaderRoute: typeof SignedTTenantTracesTraceRouteImport
+      parentRoute: typeof SignedTTenantRoute
+    }
   }
 }
 
@@ -386,6 +426,8 @@ interface SignedTTenantRouteChildren {
   SignedTTenantFeedbackRoute: typeof SignedTTenantFeedbackRoute
   SignedTTenantUsageRoute: typeof SignedTTenantUsageRoute
   SignedTTenantIndexRoute: typeof SignedTTenantIndexRoute
+  SignedTTenantTracesTraceRoute: typeof SignedTTenantTracesTraceRoute
+  SignedTTenantTracesIndexRoute: typeof SignedTTenantTracesIndexRoute
 }
 
 const SignedTTenantRouteChildren: SignedTTenantRouteChildren = {
@@ -394,6 +436,8 @@ const SignedTTenantRouteChildren: SignedTTenantRouteChildren = {
   SignedTTenantFeedbackRoute: SignedTTenantFeedbackRoute,
   SignedTTenantUsageRoute: SignedTTenantUsageRoute,
   SignedTTenantIndexRoute: SignedTTenantIndexRoute,
+  SignedTTenantTracesTraceRoute: SignedTTenantTracesTraceRoute,
+  SignedTTenantTracesIndexRoute: SignedTTenantTracesIndexRoute,
 }
 
 const SignedTTenantRouteWithChildren = SignedTTenantRoute._addFileChildren(

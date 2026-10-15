@@ -55,7 +55,7 @@ async def test_a_search_sends_the_tenants_traceql_and_answers_newest_first() -> 
     tool = Tool({"/api/search": json(found)})
     answer = await Tempo("http://tempo", tool.client()).search(ACME, QUERY)
     assert isinstance(answer, Ok)
-    assert [trace.trace_id for trace in answer.data] == ["b", "a"]
+    assert [trace.trace_id for trace in answer.data] == ["0" * 31 + "b", "0" * 31 + "a"]
     # The root may be another tenant's span: its service and name aren't shown.
     assert [(trace.root_service, trace.root_name, trace.duration_ms) for trace in answer.data] == [
         (None, None, None),
@@ -91,6 +91,54 @@ async def test_a_trace_is_shown_when_a_span_names_the_tenant_and_none_names_anot
         "empty": 0,
         "tenant.id": "acme",
     }
+
+
+def said(span_id: str, tenant: str, content: dict[str, str]) -> dict[str, Any]:
+    made = span(span_id, tenant)
+    made["attributes"] += [
+        {"key": name, "value": {"stringValue": value}} for name, value in content.items()
+    ]
+    return made
+
+
+async def test_a_span_appears_once_and_a_traces_ids_are_whole() -> None:
+    again = span("1", "acme")
+    tool = Tool(
+        {
+            "/api/v2/traces/f1": json(document(again, span("2", None, parent="1"), again)),
+            "/api/search": json({"traces": [{"traceID": "c029eec9", "startTimeUnixNano": "1"}]}),
+        }
+    )
+    tempo = Tempo("http://tempo", tool.client())
+    answer = await tempo.trace(ACME, "f1")
+    assert isinstance(answer, Ok)
+    assert answer.data is not None
+    assert [span.span_id for span in answer.data.spans] == ["1", "2"]
+    assert answer.data.trace_id == "0" * 30 + "f1"
+    # What isn't hex is left as it came.
+    assert (await tempo.trace(ACME, "t1")) == Ok(data=None)
+    found = await tempo.search(ACME, QUERY)
+    assert isinstance(found, Ok)
+    assert found.data[0].trace_id == "0" * 24 + "c029eec9"
+
+
+async def test_what_was_said_in_a_span_is_left_out_unless_asked_for() -> None:
+    chat = said("1", "acme", {"gen_ai.input.messages": "[hello]", "gen_ai.output.messages": "[hi]"})
+    tool = Tool({"/api/v2/traces/t1": json(document(chat))})
+    tempo = Tempo("http://tempo", tool.client())
+    plain = await tempo.trace(ACME, "t1")
+    assert isinstance(plain, Ok)
+    assert plain.data is not None
+    (left,) = plain.data.spans
+    assert left.withheld == ("gen_ai.input.messages", "gen_ai.output.messages")
+    assert "gen_ai.input.messages" not in left.attributes
+    assert left.attributes["artifactr.run.id"] == "run_1"
+    whole = await tempo.trace(ACME, "t1", content=True)
+    assert isinstance(whole, Ok)
+    assert whole.data is not None
+    (given,) = whole.data.spans
+    assert given.withheld == ()
+    assert given.attributes["gen_ai.output.messages"] == "[hi]"
 
 
 async def test_a_trace_that_names_another_tenant_or_none_isnt_shown() -> None:

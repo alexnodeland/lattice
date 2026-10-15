@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { figure } from "./format";
 import {
   budget,
   counted,
@@ -7,8 +8,6 @@ import {
   duration,
   failuresSaid,
   feedbackSaid,
-  figure,
-  LIMIT,
   membersSaid,
   type ScoresReading,
   spanOf,
@@ -17,15 +16,15 @@ import {
   workspacesSaid,
 } from "./home";
 
-const score = (value: boolean | string, evaluator?: string) => ({
+const score = (value: boolean | number | string, evaluator?: string, feedbackType = "thumbs") => ({
   id: `s-${Math.random()}`,
   trace_id: "t1",
   name: "thumbs.up",
-  data_type: typeof value === "boolean" ? ("BOOLEAN" as const) : ("CATEGORICAL" as const),
+  data_type: typeof value === "string" ? ("CATEGORICAL" as const) : ("BOOLEAN" as const),
   value,
   source: "API",
   timestamp: "2026-10-12T00:00:00Z",
-  ...(evaluator && { evaluator }),
+  ...(evaluator ? { evaluator } : { feedback_type: feedbackType }),
 });
 
 test("a tool that didn't answer, or isn't configured, says so with a shape and a word", () => {
@@ -56,8 +55,7 @@ test("a span runs to this second, over the days before it", () => {
 
 test("figures are grouped, and a capped one shows it may be more", () => {
   expect(figure(1234)).toBe("1,234");
-  expect(figure(999, LIMIT)).toBe("999");
-  expect(figure(1000, LIMIT)).toBe("1,000+");
+  expect(figure(1000, true)).toBe("1,000+");
   expect(counted(1, "member")).toBe("1 member");
   expect(counted(2, "person", "people")).toBe("2 people");
   expect(dollars(1234.5)).toBe("$1,234.50");
@@ -80,15 +78,33 @@ test("members are counted as people and service principals", () => {
 test("feedback is people's alone: N pieces, and x of y thumbs up", () => {
   const reading: ScoresReading = {
     status: "ok",
-    data: [score(true), score(true), score(false), score("good"), score(true, "accuracy")],
+    data: {
+      scores: [
+        score(true),
+        // Langfuse sends a yes-or-no as 1 or 0.
+        score(1),
+        score(0),
+        score("good"),
+        score(true, "accuracy"),
+        // A yes-or-no of another feedback type isn't a thumb.
+        score(true, undefined, "helpful"),
+      ],
+      complete: true,
+    },
   };
   expect(feedbackSaid(reading)).toEqual({
-    figure: "4",
+    figure: "5",
     line: "pieces of feedback in the last week; 2 of 3 thumbs up",
   });
-  expect(feedbackSaid({ status: "ok", data: [score("good")] })).toEqual({
-    figure: "1",
+  expect(feedbackSaid({ status: "ok", data: { scores: [score("good")], complete: true } })).toEqual(
+    { figure: "1", line: "pieces of feedback in the last week" },
+  );
+  expect(
+    feedbackSaid({ status: "ok", data: { scores: [score("good")], complete: false } }),
+  ).toEqual({
+    figure: "1+",
     line: "pieces of feedback in the last week",
+    badge: { tone: "stopped", word: "Partial" },
   });
   expect(feedbackSaid({ status: "unconfigured" }).badge?.word).toBe("Not configured");
 });

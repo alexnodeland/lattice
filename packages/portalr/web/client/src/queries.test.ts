@@ -128,6 +128,14 @@ test("every read has its own path", async () => {
     [queries.grantr.catalog(), "/grantr/v1/catalog"],
     [queries.grantr.keyring("acme"), "/grantr/v1/tenants/acme/keys"],
     [queries.portalr.spend("acme"), "/portalr/v1/spend"],
+    [
+      queries.portalr.feedback("acme", {
+        start: "2026-10-07T00:00:00Z",
+        end: "2026-10-14T00:00:00Z",
+      }),
+      "/portalr/v1/feedback",
+    ],
+    [queries.portalr.links("ops", "t1"), "/portalr/v1/deployment/links"],
     [queries.grantr.grants("acme", "ws_1"), "/grantr/v1/tenants/acme/grants"],
     [queries.grantr.restrictions("acme", "ws_1"), "/grantr/v1/tenants/acme/restrictions"],
   ] as const;
@@ -291,6 +299,16 @@ test("portalr's reads name their tenant and window", async () => {
   await client.fetchQuery(queries.portalr.scores("acme", { start: DAY.start, end: DAY.end }));
   expect(seen.at(-1)?.url.pathname).toBe("/portalr/v1/scores");
   expect(seen.at(-1)?.url.searchParams.get("step")).toBeNull();
+});
+
+test("a feedback read is kept ten minutes and tried again once, unless refused outright", () => {
+  const feedback = queries.portalr.feedback("acme", { start: DAY.start, end: DAY.end });
+  expect(feedback.staleTime).toBe(10 * 60_000);
+  const retry = feedback.retry as (count: number, error: unknown) => boolean;
+  expect(retry(0, new Refused(503, null))).toBe(true);
+  expect(retry(1, new Refused(503, null))).toBe(false);
+  expect(retry(0, new Refused(422, null))).toBe(false);
+  expect(queries.portalr.scores("acme", { start: DAY.start, end: DAY.end }).staleTime).toBe(60_000);
 });
 
 test("the deployment's tenants are an operator's, and null for anyone else", async () => {

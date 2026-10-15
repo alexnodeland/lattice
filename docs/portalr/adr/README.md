@@ -32,5 +32,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0024](0024-access-members-groups-and-keys.md) | Access: members, groups and keys, each where grantr allows its read | Accepted |
 | [0025](0025-access-roles-and-grants.md) | Access: roles and grants, on grantr's catalog | Accepted |
 | [0026](0026-audit.md) | Audit: grantr's log, newest on top, filtered by type and maker | Accepted |
+| [0027](0027-feedback-and-evaluations.md) | Feedback and evaluations, summed by day, and the first charts | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

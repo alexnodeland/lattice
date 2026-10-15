@@ -30,13 +30,15 @@ from portalr.fastapi.site import Site, Surfaces
 from portalr.fastapi.ui import ui_router
 from portalr.invites import Invite, InviteFailed
 from portalr.readers import (
+    Feedback,
+    FeedbackQuery,
     LogLine,
     LogQuery,
     MetricQuery,
     Ok,
     Point,
     Readers,
-    Score,
+    Scores,
     Spend,
     TenantSpend,
     Trace,
@@ -45,6 +47,7 @@ from portalr.readers import (
     Unavailable,
     Unconfigured,
     Window,
+    read_feedback,
     reading,
 )
 from portalr.readers.query import Id
@@ -255,12 +258,25 @@ def portalr_router(
             return Unconfigured()
         return await readers.prometheus.series(tenant, query)
 
-    @api.get("/v1/scores", response_model=reading(list[Score]))
+    @api.get("/v1/scores", response_model=reading(Scores))
     async def scores(
         window: Annotated[Window, Query()], tenant: Tenant = telemetry
-    ) -> Ok[list[Score]] | Unavailable | Unconfigured:
-        """The tenant's feedback and evaluation scores, from Langfuse."""
+    ) -> Ok[Scores] | Unavailable | Unconfigured:
+        """The tenant's feedback and evaluation scores, from Langfuse, and whether that's all."""
         return await readers.langfuse.scores(tenant, window) if readers.langfuse else Unconfigured()
+
+    @api.get("/v1/feedback", response_model=reading(Feedback))
+    async def feedback(
+        query: Annotated[FeedbackQuery, Query()], tenant: Tenant = telemetry
+    ) -> Ok[Feedback] | Unavailable | Unconfigured:
+        """The tenant's feedback and evaluations from Langfuse, or one workspace's, by day.
+
+        The window is at most 91 days. Every score in it is read and summed, within the read's
+        bounds: ``complete`` is false where one was reached.
+        """
+        if not readers.langfuse:
+            return Unconfigured()
+        return await read_feedback(readers.langfuse, tenant, query)
 
     @api.get("/v1/spend", response_model=reading(Spend | None))
     async def spend(tenant: Tenant = spending) -> Ok[Spend | None] | Unavailable | Unconfigured:

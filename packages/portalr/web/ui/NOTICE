@@ -1,0 +1,13 @@
+portalr's ui kit, part of lattice
+Copyright (c) 2026 Alex Nodeland
+
+src/chart.tsx is adapted from Tremor's BarChart, LineChart and DonutChart (Tremor Raw,
+https://github.com/tremorlabs/tremor: v1.0.0 of each, src/components/BarChart/BarChart.tsx,
+src/components/LineChart/LineChart.tsx and src/components/DonutChart/DonutChart.tsx at commit
+ca4d588f47820ff3d514d37fa4ee08a4222dec11),
+Copyright 2025 Tremor, licensed under the Apache License, Version 2.0, whose text is
+licenses/tremor.txt.
+
+Changes: only the bar, line and donut charts admin draws were kept, on Recharts 3; the colours,
+legend, tooltip and axes were restyled to the kit's tokens; each series was given a pattern and a
+direct label, or a list beside the donut; and the figures are offered as a table.

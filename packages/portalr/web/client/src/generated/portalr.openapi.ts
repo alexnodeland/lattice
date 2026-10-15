@@ -62,6 +62,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portalr/v1/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Feedback
+         * @description The tenant's feedback and evaluations from Langfuse, or one workspace's, by day.
+         *
+         *     The window is at most 91 days. Every score in it is read and summed, within the read's
+         *     bounds: ``complete`` is false where one was reached.
+         */
+        get: operations["feedback_portalr_v1_feedback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portalr/v1/invites": {
         parameters: {
             query?: never;
@@ -134,7 +157,7 @@ export interface paths {
         };
         /**
          * Scores
-         * @description The tenant's feedback and evaluation scores, from Langfuse.
+         * @description The tenant's feedback and evaluation scores, from Langfuse, and whether that's all.
          */
         get: operations["scores_portalr_v1_scores_get"];
         put?: never;
@@ -210,6 +233,25 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * Comment
+         * @description What a person wrote, on which trace, in which workspace, and when.
+         */
+        Comment: {
+            /** Id */
+            id: string;
+            /** Text */
+            text: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Trace Id */
+            trace_id: string;
+            /** Workspace */
+            workspace: string | null;
+        };
+        /**
          * Config
          * @description ``config.json``: what the UIs need of the deployment they run in.
          */
@@ -230,6 +272,38 @@ export interface components {
             spend: components["schemas"]["Ok_list_TenantSpend__"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
             /** Tenants */
             tenants: string[];
+        };
+        /**
+         * Evaluation
+         * @description One evaluator's score of one name, per day, and over the window.
+         */
+        Evaluation: {
+            /** Count */
+            count: number;
+            /** Days */
+            days: components["schemas"]["Mean"][];
+            /** Evaluator */
+            evaluator: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * Feedback
+         * @description The window's feedback and evaluations, and whether every score was read.
+         */
+        Feedback: {
+            /** Comments */
+            comments: components["schemas"]["Comment"][];
+            /** Complete */
+            complete: boolean;
+            /** Days */
+            days: components["schemas"]["Thumbs"][];
+            /** Evaluations */
+            evaluations: components["schemas"]["Evaluation"][];
+            /** Known From */
+            known_from?: string | null;
+            /** Workspaces */
+            workspaces: components["schemas"]["WorkspaceTotals"][];
         };
         /**
          * FieldError
@@ -284,6 +358,21 @@ export interface components {
             /** Time Ns */
             time_ns: number;
         };
+        /**
+         * Mean
+         * @description An evaluation's scores on one day: how many, and their mean; None for a day with none.
+         */
+        Mean: {
+            /** Count */
+            count: number;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Mean */
+            mean: number | null;
+        };
         /** @enum {string} */
         Metric: "turn_latency" | "failed_turns";
         /**
@@ -293,6 +382,24 @@ export interface components {
         NewInvite: {
             /** Email */
             email: string;
+        };
+        /** Ok[Feedback] */
+        Ok_Feedback_: {
+            data: components["schemas"]["Feedback"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+        };
+        /** Ok[Scores] */
+        Ok_Scores_: {
+            data: components["schemas"]["Scores"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
         };
         /** Ok[Union[Spend, NoneType]] */
         Ok_Union_Spend__NoneType__: {
@@ -326,16 +433,6 @@ export interface components {
         Ok_list_Point__: {
             /** Data */
             data: components["schemas"]["Point"][];
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            status: "ok";
-        };
-        /** Ok[list[Score]] */
-        Ok_list_Score__: {
-            /** Data */
-            data: components["schemas"]["Score"][];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -409,6 +506,8 @@ export interface components {
             data_type: "NUMERIC" | "BOOLEAN" | "CATEGORICAL" | "TEXT" | "CORRECTION";
             /** Evaluator */
             evaluator?: string | null;
+            /** Feedback Type */
+            feedback_type?: string | null;
             /** Id */
             id: string;
             /** Name */
@@ -424,6 +523,20 @@ export interface components {
             trace_id: string;
             /** Value */
             value: number | boolean | string;
+            /** Workspace */
+            workspace?: string | null;
+        };
+        /**
+         * Scores
+         * @description The scores a read took, whether they are all there were, and since when they are known.
+         */
+        Scores: {
+            /** Complete */
+            complete: boolean;
+            /** Known From */
+            known_from?: string | null;
+            /** Scores */
+            scores: components["schemas"]["Score"][];
         };
         /**
          * Span
@@ -511,6 +624,21 @@ export interface components {
             tenant: string;
         };
         /**
+         * Thumbs
+         * @description People's thumbs on one day, in UTC.
+         */
+        Thumbs: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Down */
+            down: number;
+            /** Up */
+            up: number;
+        };
+        /**
          * Trace
          * @description A trace and its spans.
          */
@@ -561,6 +689,20 @@ export interface components {
              * @enum {string}
              */
             status: "unconfigured";
+        };
+        /**
+         * WorkspaceTotals
+         * @description One workspace's thumbs and evaluations; None for traces tagged with no workspace.
+         */
+        WorkspaceTotals: {
+            /** Down */
+            down: number;
+            /** Evaluated */
+            evaluated: number;
+            /** Up */
+            up: number;
+            /** Workspace */
+            workspace: string | null;
         };
     };
     responses: never;
@@ -667,6 +809,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeploymentTenants"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    feedback_portalr_v1_feedback_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+                workspace?: components["schemas"]["Id"] | null;
+            };
+            header?: {
+                "X-Tenant"?: components["schemas"]["TenantId"] | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok_Feedback_"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
                 };
             };
             /** @description Refused */
@@ -927,7 +1131,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Ok_list_Score__"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
+                    "application/json": components["schemas"]["Ok_Scores_"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
                 };
             };
             /** @description Refused */

@@ -168,6 +168,8 @@ jobs:
         run: |
           # moon's answer first, on its own: if moon fails, so does this, rather than skipping.
           affected=$(moon query tasks --affected --id images)
+          # An answer of moon's shape, or fail: a malformed one isn't "not affected".
+          jq --exit-status '.tasks | type == "object"' <<<"$affected" >/dev/null
           if jq --exit-status '.tasks.stackr.images' <<<"$affected" >/dev/null; then
             packages/stackr/deploy/image-archive "$ARCH" 0.0.0-ci archives
             echo "built=true" >>"$GITHUB_OUTPUT"
@@ -286,11 +288,69 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.terraform.d/plugin-cache
-          key: opentofu-providers-${{ runner.os }}-${{ hashFiles('packages/stackr/deploy/aws/**/.terraform.lock.hcl') }}
+          key: opentofu-providers-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/stackr/deploy/aws/**/.terraform.lock.hcl') }}
       # TFLint fetches its AWS ruleset from GitHub's API, which limits requests without a token.
       - run: uv run --no-project python scripts/affected.py aws
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+  # Whether a pull request changes tier 2's inputs: the recipe, the images' files, or the template
+  # it generates the application from. Asked on a small runner, so an unaffected pull request
+  # starts no arm64 one.
+  aws-tier2-affected:
+    name: AWS (tier 2) affected
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      affected: ${{ steps.affected.outputs.affected }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - id: affected
+        shell: bash
+        run: |
+          # moon's answer first, on its own: if moon fails, so does this, rather than skipping.
+          echo "Comparing $MOON_HEAD with $MOON_BASE: $(git diff --name-only "$MOON_BASE...$MOON_HEAD" | wc -l) files changed"
+          affected=$(moon query tasks --affected --id aws-tier2)
+          # An answer of moon's shape, or fail: a malformed one isn't "not affected".
+          jq --exit-status '.tasks | type == "object"' <<<"$affected" >/dev/null
+          if jq --exit-status '.tasks.stackr["aws-tier2"]' <<<"$affected" >/dev/null; then
+            echo "affected=true" >>"$GITHUB_OUTPUT"
+            echo "stackr:aws-tier2 is affected"
+          else
+            echo "stackr:aws-tier2 isn't affected"
+          fi
+
+  # stackr's AWS recipe, tier 2 (stackr RFC-0004, ADR-0036): envs/floci applied against Floci,
+  # with the thin images and an application from the template, smoked and destroyed, when the
+  # job above finds its inputs changed. On arm64, as Fargate runs the tasks. What it starts is
+  # published on the runner's 127.0.0.1 alone, and it never reaches AWS.
+  aws-tier2:
+    name: AWS (tier 2)
+    needs: aws-tier2-affected
+    if: needs.aws-tier2-affected.outputs.affected == 'true'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      # The whole history: moon compares with the pull request's base, as MOON_BASE names it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - run: proto trust .prototools && proto install tofu
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: opentofu-providers-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/stackr/deploy/aws/**/.terraform.lock.hcl') }}
+      - run: moon run stackr:aws-tier2
 
   # Each variant of the application template, generated and checked as its own CI would: lint,
   # strict types, and the tests with 100% coverage. It installs the libraries from the checkout, so
@@ -480,13 +540,13 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [check, tests, images, thin-images, release-images, release-images-publish, acceptance, aws, template, smoke, dependency-review, osv]
+    needs: [check, tests, images, thin-images, release-images, release-images-publish, acceptance, aws, aws-tier2-affected, aws-tier2, template, smoke, dependency-review, osv]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
     steps:
       - uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
-          # It runs only when the images changed.
-          allowed-skips: release-images-publish
+          # Each runs only when its inputs changed.
+          allowed-skips: release-images-publish, aws-tier2
           jobs: ${{ toJSON(needs) }}

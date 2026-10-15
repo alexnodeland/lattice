@@ -821,6 +821,13 @@ ENV
     log "FAIL: app: creating the role it works as"
     return 1
   fi
+  # Its schema is the role's own search_path, before anything is migrated: psql asks for none.
+  if [[ $(app_sql app "SHOW search_path") == "$app_package" ]]; then
+    log "ok: the role the application works as finds its schema by itself"
+  else
+    log "FAIL: the role the application works as has no search_path of its own"
+    status=1
+  fi
   if ! app_compose up --detach --wait --wait-timeout 300 >/dev/null; then
     log "FAIL: app: starting it in the app profile"
     app_compose logs --no-color --tail=100 >&2 || true

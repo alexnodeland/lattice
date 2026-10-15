@@ -305,11 +305,11 @@ async def read_usage(
                                 )
                             )
                         )
+            if refused:
+                return refused[0]
     except TimeoutError:
         if teams.pages == 0:
             return Unavailable(reason="litellm didn't answer in time")
-    if refused:
-        return refused[0]
     days = days_in(query)
     workspaces = [
         WorkspaceSpend(

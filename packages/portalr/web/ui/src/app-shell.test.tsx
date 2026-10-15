@@ -54,6 +54,11 @@ test("narrower, the navigation waits behind Menu, in a drawer that keeps the foc
   const drawer = screen.getByRole("dialog", { name: "Navigation" });
   await expect.element(drawer).toHaveAttribute("aria-modal", "true");
   await expect.element(drawer.getByRole("navigation", { name: "Workspace" })).toBeVisible();
+  // The switcher and the account are in the drawer too, not only on the bar behind it.
+  await expect
+    .element(drawer.getByRole("button", { name: "Workspace: acme / notes" }))
+    .toBeVisible();
+  await expect.element(drawer.getByRole("button", { name: "Account: Alex" })).toBeVisible();
   await expect.element(screen.getByRole("main")).not.toBeInTheDocument();
   for (let i = 0; i < 5; i += 1) {
     await userEvent.tab();

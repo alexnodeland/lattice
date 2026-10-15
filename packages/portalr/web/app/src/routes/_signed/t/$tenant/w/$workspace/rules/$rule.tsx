@@ -161,7 +161,14 @@ function RulePage() {
             value={text}
             onValueChange={setText}
             error={refused}
-            render={<textarea rows={20} className="font-mono" spellCheck={false} />}
+            render={
+              <textarea
+                rows={20}
+                wrap="off"
+                className="overflow-x-auto font-mono whitespace-pre"
+                spellCheck={false}
+              />
+            }
             required
           />
           <Button type="submit" disabled={saving} className="self-start">
@@ -170,7 +177,7 @@ function RulePage() {
         </form>
       ) : (
         <section aria-label="The rule, as reflexr's JSON">
-          <pre className="overflow-x-auto rounded-lg border border-line bg-surface p-4 font-mono text-sm">
+          <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-surface p-4 font-mono text-sm">
             {shown(held.rule)}
           </pre>
         </section>

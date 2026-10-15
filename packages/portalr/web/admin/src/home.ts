@@ -107,13 +107,16 @@ export function feedbackSaid(reading: ScoresReading): Said {
   };
 }
 
-/** Failed turns over the window: the last point, which counts the failures in the step before it. */
+/**
+ * Failed turns over the window: the last point, which counts the failures in the step before it.
+ * They are artifactr's agent turns, not reflexr's rule runs.
+ */
 export function failuresSaid(reading: PointsReading): Said {
   if (reading.status !== "ok") {
     return unread("Prometheus", reading);
   }
   const last = reading.data.at(-1)?.value ?? 0;
-  return { figure: figure(Math.round(last)), line: "in the last day" };
+  return { figure: figure(Math.round(last)), line: "agent turns in the last day, not rule runs" };
 }
 
 /** How far through its budget a tenant's spend is: under, near (80% or more), over it, or none. */

@@ -20,6 +20,13 @@ test("the focus ring stands out from every surface", () => {
   }
 });
 
+test("the focus ring is the brand's violet, in both schemes", () => {
+  const [red = 0, green = 0, blue = 0] = (token("focus").match(/\d+/g) ?? []).map(Number);
+  // Violet: more blue than green, and more red than green; the cyan the dark scheme once had wasn't.
+  expect(blue).toBeGreaterThan(green);
+  expect(red).toBeGreaterThan(green);
+});
+
 test("a surface is raised: lighter than the paper, in both schemes", () => {
   expect(luminance(token("surface"))).toBeGreaterThan(luminance(token("paper")));
 });

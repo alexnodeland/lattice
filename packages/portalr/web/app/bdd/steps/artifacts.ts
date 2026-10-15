@@ -21,19 +21,29 @@ When("they keep the note the assistant proposed an edit to", async ({ page, scen
 
 When("they open the workspace's {word}", async ({ page }, area: string) => {
   const name = area.charAt(0).toUpperCase() + area.slice(1);
-  await page.getByRole("navigation", { name: "Workspace" }).getByRole("link", { name }).click();
+  await page
+    .getByRole("navigation", { name: "Workspace", exact: true })
+    .getByRole("link", { name })
+    .click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(name);
 });
 
 When("they open the note", async ({ page, scenario }) => {
   const note = kept(scenario.note);
-  await page.getByRole("list", { name: "Artifacts" }).getByRole("link", { name: note }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(note);
+  // The list names a note by its title, and gives its id beside it.
+  await page
+    .getByRole("list", { name: "Artifacts" })
+    .getByRole("listitem")
+    .filter({ hasText: note })
+    .getByRole("link")
+    .click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/\S/);
+  await expect(page.getByText(note).first()).toBeVisible();
 });
 
 Then("the note reads {string}", async ({ page, scenario }, text: string) => {
-  const note = page.getByRole("region", { name: kept(scenario.note) });
-  await expect(note.getByText(text, { exact: true })).toBeVisible();
+  kept(scenario.note);
+  await expect(page.getByRole("main").getByText(text, { exact: true }).first()).toBeVisible();
 });
 
 Then(
@@ -69,14 +79,13 @@ Then("they are told it isn't found", async ({ page }) => {
 });
 
 When("they find the note helpful", async ({ page, scenario }) => {
-  const note = page.getByRole("region", { name: kept(scenario.note) });
-  await note.getByRole("button", { name: "Helpful", exact: true }).click();
+  kept(scenario.note);
+  await page.getByRole("main").getByRole("button", { name: "Helpful", exact: true }).click();
 });
 
 Then("the note shows them finding it helpful", async ({ page, scenario }) => {
-  const note = page.getByRole("region", { name: kept(scenario.note) });
-  await expect(note.getByRole("button", { name: "Helpful", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  kept(scenario.note);
+  await expect(
+    page.getByRole("main").getByRole("button", { name: "Helpful", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
 });

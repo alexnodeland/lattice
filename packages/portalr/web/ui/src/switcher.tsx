@@ -39,8 +39,9 @@ function Choices({
 }
 
 /**
- * Where a person is: their tenant and workspace, and a menu of the others to move to. Choosing
- * hands the id to the caller, which navigates.
+ * Where a person is: their tenant and workspace, or the tenant alone where they are choosing a
+ * workspace, and a menu of the others to move to. Choosing hands the id to the caller, which
+ * navigates.
  */
 export function Switcher({
   tenant,
@@ -52,7 +53,8 @@ export function Switcher({
   every,
 }: {
   tenant: string;
-  workspace: string;
+  /** The workspace they are in; none on the tenant's list of workspaces. */
+  workspace?: string;
   tenants: readonly Choice[];
   /** The workspaces in this tenant. */
   workspaces: readonly Choice[];
@@ -64,18 +66,28 @@ export function Switcher({
   return (
     <Menu.Root>
       <Menu.Trigger
-        aria-label={`Workspace: ${tenant}, ${workspace}`}
+        aria-label={
+          workspace === undefined ? `Tenant: ${tenant}` : `Workspace: ${tenant}, ${workspace}`
+        }
         className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-edge bg-paper px-3 py-1.5 font-semibold text-fg text-sm outline-offset-2 hover:bg-wash focus-visible:outline-2 focus-visible:outline-focus"
       >
-        <span aria-hidden="true" className="truncate font-medium text-muted">
-          {tenant}
-        </span>
-        <span aria-hidden="true" className="font-normal text-muted">
-          /
-        </span>
-        <span aria-hidden="true" className="truncate">
-          {workspace}
-        </span>
+        {workspace === undefined ? (
+          <span aria-hidden="true" className="truncate">
+            {tenant}
+          </span>
+        ) : (
+          <>
+            <span aria-hidden="true" className="truncate font-medium text-muted">
+              {tenant}
+            </span>
+            <span aria-hidden="true" className="font-normal text-muted">
+              /
+            </span>
+            <span aria-hidden="true" className="truncate">
+              {workspace}
+            </span>
+          </>
+        )}
         <Icon icon={ChevronDown} className="ml-auto text-muted" />
       </Menu.Trigger>
       <Menu.Portal>
@@ -84,7 +96,7 @@ export function Switcher({
             <Choices
               label={`Workspaces in ${tenant}`}
               choices={workspaces}
-              chosen={workspace}
+              chosen={workspace ?? ""}
               onChoose={onWorkspace}
             />
             {every && <Menu.Separator className={separator} />}

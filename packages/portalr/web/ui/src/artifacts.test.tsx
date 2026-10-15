@@ -1,7 +1,15 @@
 import type { Change } from "@portalr/client";
 import { expect, test } from "vitest";
 import { render } from "vitest-browser-react";
-import { ArtifactContent, Diff, json, markdown, rendererFor } from "./artifacts";
+import {
+  ArtifactContent,
+  Diff,
+  json,
+  LONGEST_TITLE,
+  markdown,
+  plainTitle,
+  rendererFor,
+} from "./artifacts";
 import { contrast, token } from "./test/colours";
 
 const renderers = new Map([["note", markdown()]]);
@@ -75,4 +83,34 @@ test("a diff takes a caller's classes", async () => {
 test("changes too large to compare say so", async () => {
   const screen = await render(<Diff changes={null} />);
   await expect.element(screen.getByText("Too large to compare.")).toBeVisible();
+});
+
+test("a title is the first line's words, without Markdown's marks, one line, and cut", () => {
+  expect(markdown().title({ text: "# Launch **plan**\n\nOn [Tuesday](https://x.test)." })).toBe(
+    "Launch plan",
+  );
+  expect(plainTitle("\n\n- `code` _in_ a list")).toBe("code in a list");
+  expect(plainTitle("> quoted\n")).toBe("quoted");
+  expect(plainTitle("a   b\t c")).toBe("a b c");
+  expect(plainTitle("---\n***\nafter the rules")).toBe("after the rules");
+  const long = plainTitle("x".repeat(500)) ?? "";
+  expect([...long]).toHaveLength(LONGEST_TITLE);
+  expect(long.endsWith("…")).toBe(true);
+  // A letter outside the basic plane, past the cut, isn't split in half; an emoji alone is no title.
+  expect(plainTitle("𝒜".repeat(200))).toBe(`${"𝒜".repeat(LONGEST_TITLE - 1)}…`);
+  expect(plainTitle("😀😀")).toBeNull();
+});
+
+test("a title is null, not an error, where the data hold none or odd ones", () => {
+  expect(plainTitle("")).toBeNull();
+  expect(plainTitle("   \n\n")).toBeNull();
+  expect(plainTitle("# \n---")).toBeNull();
+  expect(markdown().title({})).toBeNull();
+  expect(markdown().title({ text: 3 })).toBeNull();
+  expect(markdown("body").title({ body: "Plans\nmore" })).toBe("Plans");
+  expect(json.title({ title: "Q3 numbers" })).toBe("Q3 numbers");
+  expect(json.title({ title: 7 })).toBeNull();
+  expect(json.title({ title: { nested: true } })).toBeNull();
+  expect(json.title({ name: "no title field" })).toBeNull();
+  expect(json.title({})).toBeNull();
 });

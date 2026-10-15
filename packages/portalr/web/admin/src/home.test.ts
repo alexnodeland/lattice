@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { figure } from "./format";
+import { figure, sentence } from "./format";
 import {
   budget,
   counted,
@@ -118,10 +118,10 @@ test("failed turns are the last point's count, of the day before it", () => {
         { time: 2, value: 3.0000001 },
       ],
     }),
-  ).toEqual({ figure: "3", line: "in the last day" });
+  ).toEqual({ figure: "3", line: "agent turns in the last day, not rule runs" });
   expect(failuresSaid({ status: "ok", data: [] })).toEqual({
     figure: "0",
-    line: "in the last day",
+    line: "agent turns in the last day, not rule runs",
   });
   expect(failuresSaid({ status: "unavailable", reason: "down" }).badge?.tone).toBe("failed");
 });
@@ -176,4 +176,12 @@ test("the deployment's spend is every tenant's together", () => {
     }),
   ).toEqual({ figure: "$12.50", line: "across every tenant's LiteLLM team" });
   expect(deploymentSpendSaid({ status: "unconfigured" }).line).toBe("LiteLLM isn't configured.");
+});
+
+test("a failure's message starts its own sentence with a capital", () => {
+  expect(sentence(new Error("the server refused the read (422): no"))).toBe(
+    "The server refused the read (422): no",
+  );
+  expect(sentence("down")).toBe("Down");
+  expect(sentence(new Error(""))).toBe("");
 });

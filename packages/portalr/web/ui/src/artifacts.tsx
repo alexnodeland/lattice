@@ -18,6 +18,11 @@ export interface Renderer {
   render(data: Data): ReactNode;
   /** The text a revision's changes are read from. */
   text(data: Data): string;
+  /**
+   * A short title for the artifact, as plain text, or null if its data hold none: pure, cheap,
+   * at most `LONGEST_TITLE` characters, and never throws on data of any shape.
+   */
+  title(data: Data): string | null;
   /** How finely those changes are cut. */
   readonly diff: Granularity;
 }
@@ -25,7 +30,30 @@ export interface Renderer {
 /** The application's renderers, by artifact kind. */
 export type Renderers = ReadonlyMap<string, Renderer>;
 
-/** Any kind without a renderer: its data as JSON, changed line by line. */
+/** The longest a title is, in characters: a longer one is cut, with an ellipsis. */
+export const LONGEST_TITLE = 80;
+
+/**
+ * Text as a one-line title: the first line with words in it, without Markdown's marks (a
+ * heading's `#`, a list's or a quote's marker, emphasis, code, a link's address), white space
+ * collapsed, cut to `LONGEST_TITLE`. Null where nothing is left.
+ */
+export function plainTitle(text: string): string | null {
+  const line = text.split(/\r?\n/).find((each) => /[\p{L}\p{N}]/u.test(each)) ?? "";
+  const plain = line
+    .replace(/^\s*(?:#{1,6}\s+|>+\s*|[-*+]\s+|\d+[.)]\s+)/, "")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[`*_~]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!/[\p{L}\p{N}]/u.test(plain)) {
+    return null;
+  }
+  const chars = [...plain];
+  return chars.length > LONGEST_TITLE ? `${chars.slice(0, LONGEST_TITLE - 1).join("")}…` : plain;
+}
+
+/** Any kind without a renderer: its data as JSON, changed line by line; titled by its `title`. */
 export const json: Renderer = {
   render: (data) => (
     <pre className="overflow-x-auto rounded-md bg-paper p-3 font-mono text-fg text-xs">
@@ -33,6 +61,7 @@ export const json: Renderer = {
     </pre>
   ),
   text: (data) => JSON.stringify(data, null, 2),
+  title: (data) => (typeof data.title === "string" ? plainTitle(data.title) : null),
   diff: "lines",
 };
 
@@ -42,7 +71,12 @@ export function markdown(field = "text"): Renderer {
     const value = data[field];
     return typeof value === "string" ? value : "";
   };
-  return { render: (data) => <Markdown>{text(data)}</Markdown>, text, diff: "words" };
+  return {
+    render: (data) => <Markdown>{text(data)}</Markdown>,
+    text,
+    title: (data) => plainTitle(text(data)),
+    diff: "words",
+  };
 }
 
 /** The renderer for a kind: the application's, or JSON. */

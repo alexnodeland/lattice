@@ -15,6 +15,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
 import { RENDERERS } from "../../../../../../../renderers";
+import { titleOf } from "../../../../../../../titles";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
 
 /**
@@ -98,6 +99,7 @@ function Artifact() {
     return null; // the loader found it; it can't have no revisions
   }
   const { latest, versions } = history;
+  const title = titleOf(latest.kind, latest.data);
   const open = Object.values(snapshot.state.proposals).filter(
     (proposal) => proposal.status === "open" && proposedOn(proposal) === id,
   );
@@ -120,11 +122,11 @@ function Artifact() {
     />
   );
   return (
-    <section aria-labelledby="artifact" className="flex flex-col gap-6">
+    <section aria-labelledby="artifact" className="flex max-w-190 flex-col gap-6">
       <PageHeader
         id="artifact"
-        title={id}
-        mono
+        title={title ?? id}
+        mono={title === null}
         crumb={
           <TextLink
             render={<Link to="/t/$tenant/w/$workspace/artifacts" params={{ tenant, workspace }} />}
@@ -132,46 +134,42 @@ function Artifact() {
             Artifacts
           </TextLink>
         }
-        meta={`${latest.kind}, version ${latest.version}${latest.archived ? ", archived" : ""}`}
+        meta={`${title === null ? "" : `${id}, `}${latest.kind}, version ${latest.version}${latest.archived ? ", archived" : ""}`}
         actions={feedback}
       />
       <Connection snapshot={snapshot} waiting="the workspace" />
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="flex min-w-0 flex-col gap-6">
-          <Card>
-            <ArtifactContent kind={latest.kind} data={latest.data} renderers={RENDERERS} />
-          </Card>
-          <section aria-labelledby="revisions" className="flex flex-col gap-3">
-            <SectionTitle id="revisions">Revisions</SectionTitle>
-            <ol aria-label="Revisions" className="flex flex-col gap-3">
-              {versions.map(({ revision, changes }) => (
-                <li
-                  key={revision.version}
-                  aria-label={`Version ${revision.version}`}
-                  className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-4"
-                >
-                  <span className="font-semibold text-sm">Version {revision.version}</span>
-                  <Diff changes={changes} />
-                </li>
-              ))}
-            </ol>
-          </section>
-        </div>
-        {open.length > 0 && (
-          <section aria-labelledby="open" className="flex flex-col gap-3">
-            <SectionTitle id="open">Open proposals</SectionTitle>
-            {open.map((proposal) => (
-              <ProposalCard
-                key={proposal.id}
-                proposal={proposal}
-                onRespond={(decision) =>
-                  stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision })
-                }
-              />
-            ))}
-          </section>
-        )}
-      </div>
+      <Card>
+        <ArtifactContent kind={latest.kind} data={latest.data} renderers={RENDERERS} />
+      </Card>
+      {open.length > 0 && (
+        <section aria-labelledby="open" className="flex flex-col gap-3">
+          <SectionTitle id="open">Open proposals</SectionTitle>
+          {open.map((proposal) => (
+            <ProposalCard
+              key={proposal.id}
+              proposal={proposal}
+              onRespond={(decision) =>
+                stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision })
+              }
+            />
+          ))}
+        </section>
+      )}
+      <section aria-labelledby="revisions" className="flex flex-col gap-3">
+        <SectionTitle id="revisions">Revisions</SectionTitle>
+        <ol aria-label="Revisions" className="flex flex-col gap-3">
+          {versions.map(({ revision, changes }) => (
+            <li
+              key={revision.version}
+              aria-label={`Version ${revision.version}`}
+              className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-4"
+            >
+              <span className="font-semibold text-sm">Version {revision.version}</span>
+              <Diff changes={changes} />
+            </li>
+          ))}
+        </ol>
+      </section>
     </section>
   );
 }

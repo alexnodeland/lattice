@@ -102,11 +102,14 @@ function Rules() {
             <span className="text-muted">
               {rule.origin === "code" ? "in code" : `stored, version ${rule.version}`}
             </span>
-            <StatusBadge tone={rule.enabled ? "done" : "stopped"}>
-              {rule.enabled ? "Enabled" : "Disabled"}
-            </StatusBadge>
-            <span className="text-muted">
-              {rule.lag === 0 ? "caught up" : `${rule.lag} behind`}
+            {/* Its state and how far behind it is, kept on one line where the row wraps. */}
+            <span className="flex items-center gap-3">
+              <StatusBadge tone={rule.enabled ? "done" : "stopped"}>
+                {rule.enabled ? "Enabled" : "Disabled"}
+              </StatusBadge>
+              <span className="text-muted">
+                {rule.lag === 0 ? "caught up" : `${rule.lag} behind`}
+              </span>
             </span>
             {rule.dead_letters > 0 && (
               <span className="text-muted">
@@ -147,7 +150,14 @@ function Rules() {
             value={text}
             onValueChange={setText}
             error={refused}
-            render={<textarea rows={14} className="font-mono" spellCheck={false} />}
+            render={
+              <textarea
+                rows={14}
+                wrap="off"
+                className="overflow-x-auto font-mono whitespace-pre"
+                spellCheck={false}
+              />
+            }
             required
           />
           <Button type="submit" disabled={pending} className="self-start">

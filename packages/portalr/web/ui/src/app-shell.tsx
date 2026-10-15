@@ -33,7 +33,7 @@ const button =
  * The frame of every signed-in screen. One header holds the mark, the switcher, the navigation
  * and the account, each rendered once: from 1024 pixels it is a rail on the surface that stays as
  * the page scrolls; narrower, it is a bar of the mark, the switcher and the account, and Menu opens
- * the navigation in a drawer. The drawer is a Base UI dialog that keeps the focus, closes on
+ * a drawer of the switcher, the navigation and the account. The drawer is a Base UI dialog that keeps the focus, closes on
  * Escape, on Close, on following a link or on widening past the rail's width, and gives the focus
  * back to Menu. `ui` chooses the mark: `admin`'s opens to the other side.
  */
@@ -101,7 +101,9 @@ export function AppShell({
                   Close
                 </Dialog.Close>
               </div>
-              {nav}
+              <div className="px-1">{switcher}</div>
+              <div className="flex-1 overflow-y-auto">{nav}</div>
+              <div className="border-line border-t pt-3">{account}</div>
             </Dialog.Popup>
           </Dialog.Portal>
         </Dialog.Root>

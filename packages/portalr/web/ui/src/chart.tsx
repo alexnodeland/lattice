@@ -223,10 +223,13 @@ function Axes({
   index,
   shown,
   domain,
+  tick,
 }: {
   index: string;
   shown: (value: number) => string;
   domain?: readonly [number, number] | undefined;
+  /** An index as the axis writes it, where it is shorter than the table's and the tooltip's. */
+  tick?: ((index: string) => string) | undefined;
 }) {
   return (
     <>
@@ -237,6 +240,7 @@ function Axes({
         axisLine={false}
         stroke="var(--muted)"
         minTickGap={16}
+        {...(tick && { tickFormatter: tick })}
       />
       <YAxis
         tickLine={false}
@@ -366,6 +370,7 @@ export function BarChart({
   format = String,
   diverging = false,
   unknown = 0,
+  tick,
 }: {
   label: string;
   data: readonly Datum[];
@@ -375,6 +380,8 @@ export function BarChart({
   diverging?: boolean;
   /** How many of the first rows are unknown, rather than empty: shaded, and named so. */
   unknown?: number;
+  /** An index as the axis writes it, such as a date without its year; the rows keep it whole. */
+  tick?: (index: string) => string;
 }) {
   const id = useId();
   const drawn = series.slice(0, MAX_SERIES);
@@ -400,7 +407,7 @@ export function BarChart({
           <defs>
             {drawn.map((one, at) => at > 0 && <Hatch key={one.key} id={`${id}-${at}`} at={at} />)}
           </defs>
-          <Axes index={index.key} shown={shown} />
+          <Axes index={index.key} shown={shown} tick={tick} />
           <Unknown data={rows} index={index.key} rows={unknown} />
           {diverging && <ReferenceLine y={0} stroke="var(--edge)" />}
           <Tooltip

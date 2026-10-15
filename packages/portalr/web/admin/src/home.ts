@@ -7,7 +7,7 @@
 
 import type { GrantrApi, PortalrApi, TimeSpan } from "@portalr/client";
 import type { Tone } from "@portalr/ui";
-import { figure, numbers } from "./format";
+import { dollars, figure, numbers } from "./format";
 
 type Schemas = PortalrApi.components["schemas"];
 
@@ -37,10 +37,6 @@ export interface Said {
 /** A count of something, with its noun as one or many. */
 export const counted = (count: number, one: string, many = `${one}s`) =>
   `${numbers.format(count)} ${count === 1 ? one : many}`;
-
-/** An amount of money, as LiteLLM counts spend: in US dollars. */
-export const dollars = (amount: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
 
 /** A card's words for a tool that didn't answer, or that the application runs without. */
 export function unread(tool: string, reading: Unread): Said {

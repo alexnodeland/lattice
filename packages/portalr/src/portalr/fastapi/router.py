@@ -46,8 +46,11 @@ from portalr.readers import (
     TraceSummary,
     Unavailable,
     Unconfigured,
+    Usage,
+    UsageQuery,
     Window,
     read_feedback,
+    read_usage,
     reading,
 )
 from portalr.readers.query import Id
@@ -282,6 +285,19 @@ def portalr_router(
     async def spend(tenant: Tenant = spending) -> Ok[Spend | None] | Unavailable | Unconfigured:
         """The tenant's usage and spend, against its budget, from its LiteLLM team."""
         return await readers.litellm.spend(tenant) if readers.litellm else Unconfigured()
+
+    @api.get("/v1/usage", response_model=reading(Usage))
+    async def usage(
+        query: Annotated[UsageQuery, Query()], tenant: Tenant = spending
+    ) -> Ok[Usage] | Unavailable | Unconfigured:
+        """The tenant's spend per day from LiteLLM, and each named workspace's, with its budget.
+
+        The window is at most 91 days, and the read is bounded: ``complete`` is false where it
+        stopped at a bound. Only the named workspaces' tags are asked after.
+        """
+        if not readers.litellm:
+            return Unconfigured()
+        return await read_usage(readers.litellm, tenant, query)
 
     @api.get("/v1/deployment/tenants")
     async def deployment_tenants(by: Subject = operating) -> DeploymentTenants:

@@ -16,6 +16,7 @@ from portalr.readers.prometheus import Metric, MetricQuery, Point, Prometheus
 from portalr.readers.query import Window
 from portalr.readers.reading import Ok, Unavailable, Unconfigured, reading
 from portalr.readers.tempo import Span, Tempo, Trace, TraceQuery, TraceSummary
+from portalr.readers.usage import Usage, UsageQuery, read_usage
 
 
 @dataclass(frozen=True)
@@ -68,7 +69,10 @@ __all__ = [
     "TraceSummary",
     "Unavailable",
     "Unconfigured",
+    "Usage",
+    "UsageQuery",
     "Window",
     "read_feedback",
+    "read_usage",
     "reading",
 ]

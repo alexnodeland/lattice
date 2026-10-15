@@ -68,6 +68,36 @@
         "title": "Config",
         "type": "object"
       },
+      "DaySpend": {
+        "description": "What was spent on one day, in UTC: dollars, tokens and requests.",
+        "properties": {
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "requests": {
+            "title": "Requests",
+            "type": "integer"
+          },
+          "spend": {
+            "title": "Spend",
+            "type": "number"
+          },
+          "tokens": {
+            "title": "Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day",
+          "spend",
+          "tokens",
+          "requests"
+        ],
+        "title": "DaySpend",
+        "type": "object"
+      },
       "DeploymentTenants": {
         "description": "Every tenant, and their spend, as one LiteLLM team list reads it.",
         "properties": {
@@ -473,6 +503,24 @@
           "data"
         ],
         "title": "Ok[Union[Trace, NoneType]]",
+        "type": "object"
+      },
+      "Ok_Usage_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Usage"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[Usage]",
         "type": "object"
       },
       "Ok_list_LogLine__": {
@@ -1093,6 +1141,87 @@
           }
         },
         "title": "Unconfigured",
+        "type": "object"
+      },
+      "Usage": {
+        "description": "The window's spend per day, each workspace's, the team's budget, and whether all was read.",
+        "properties": {
+          "budget": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Spend"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "daily_budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Budget"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/DaySpend"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "workspaces": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceSpend"
+            },
+            "title": "Workspaces",
+            "type": "array"
+          }
+        },
+        "required": [
+          "days",
+          "workspaces",
+          "budget",
+          "daily_budget",
+          "complete"
+        ],
+        "title": "Usage",
+        "type": "object"
+      },
+      "WorkspaceName": {
+        "pattern": "^[^\\x00]{1,256}$",
+        "type": "string"
+      },
+      "WorkspaceSpend": {
+        "description": "One workspace's spend over the window.",
+        "properties": {
+          "spend": {
+            "title": "Spend",
+            "type": "number"
+          },
+          "tokens": {
+            "title": "Tokens",
+            "type": "integer"
+          },
+          "workspace": {
+            "title": "Workspace",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace",
+          "spend",
+          "tokens"
+        ],
+        "title": "WorkspaceSpend",
         "type": "object"
       },
       "WorkspaceTotals": {
@@ -2351,6 +2480,135 @@
           }
         },
         "summary": "Trace"
+      }
+    },
+    "/portalr/v1/usage": {
+      "get": {
+        "description": "The tenant's spend per day from LiteLLM, and each named workspace's, with its budget.\n\nThe window is at most 91 days, and the read is bounded: ``complete`` is false where it\nstopped at a bound. Only the named workspaces' tags are asked after.",
+        "operationId": "usage_portalr_v1_usage_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspaces",
+            "required": false,
+            "schema": {
+              "items": {
+                "$ref": "#/components/schemas/WorkspaceName"
+              },
+              "maxItems": 50,
+              "title": "Workspaces",
+              "type": "array"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "ok": "#/components/schemas/Ok_Usage_",
+                      "unavailable": "#/components/schemas/Unavailable",
+                      "unconfigured": "#/components/schemas/Unconfigured"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Ok_Usage_"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unavailable"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unconfigured"
+                    }
+                  ],
+                  "title": "Response Usage Portalr V1 Usage Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          }
+        },
+        "summary": "Usage"
       }
     }
   }

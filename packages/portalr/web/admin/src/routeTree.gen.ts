@@ -13,6 +13,7 @@ import { Route as SignedTTenantIndexRouteImport } from './routes/_signed/t/$tena
 import { Route as SignedTTenantAccessRouteImport } from './routes/_signed/t/$tenant/access'
 import { Route as SignedTTenantAuditRouteImport } from './routes/_signed/t/$tenant/audit'
 import { Route as SignedTTenantFeedbackRouteImport } from './routes/_signed/t/$tenant/feedback'
+import { Route as SignedTTenantUsageRouteImport } from './routes/_signed/t/$tenant/usage'
 import { Route as SignedTTenantAccessIndexRouteImport } from './routes/_signed/t/$tenant/access/index'
 import { Route as SignedTTenantAccessGrantsRouteImport } from './routes/_signed/t/$tenant/access/grants'
 import { Route as SignedTTenantAccessGroupsRouteImport } from './routes/_signed/t/$tenant/access/groups'
@@ -69,6 +70,11 @@ const SignedTTenantFeedbackRoute = SignedTTenantFeedbackRouteImport.update({
   path: '/feedback',
   getParentRoute: () => SignedTTenantRoute,
 } as any)
+const SignedTTenantUsageRoute = SignedTTenantUsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => SignedTTenantRoute,
+} as any)
 const SignedTTenantAccessIndexRoute =
   SignedTTenantAccessIndexRouteImport.update({
     id: '/',
@@ -114,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/t/$tenant/access': typeof SignedTTenantAccessRouteWithChildren
   '/t/$tenant/audit': typeof SignedTTenantAuditRoute
   '/t/$tenant/feedback': typeof SignedTTenantFeedbackRoute
+  '/t/$tenant/usage': typeof SignedTTenantUsageRoute
   '/t/$tenant/': typeof SignedTTenantIndexRoute
   '/t/$tenant/access/grants': typeof SignedTTenantAccessGrantsRoute
   '/t/$tenant/access/groups': typeof SignedTTenantAccessGroupsRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/deployment': typeof SignedDeploymentIndexRoute
   '/t/$tenant/audit': typeof SignedTTenantAuditRoute
   '/t/$tenant/feedback': typeof SignedTTenantFeedbackRoute
+  '/t/$tenant/usage': typeof SignedTTenantUsageRoute
   '/t/$tenant': typeof SignedTTenantIndexRoute
   '/t/$tenant/access/grants': typeof SignedTTenantAccessGrantsRoute
   '/t/$tenant/access/groups': typeof SignedTTenantAccessGroupsRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/_signed/t/$tenant/access': typeof SignedTTenantAccessRouteWithChildren
   '/_signed/t/$tenant/audit': typeof SignedTTenantAuditRoute
   '/_signed/t/$tenant/feedback': typeof SignedTTenantFeedbackRoute
+  '/_signed/t/$tenant/usage': typeof SignedTTenantUsageRoute
   '/_signed/t/$tenant/': typeof SignedTTenantIndexRoute
   '/_signed/t/$tenant/access/grants': typeof SignedTTenantAccessGrantsRoute
   '/_signed/t/$tenant/access/groups': typeof SignedTTenantAccessGroupsRoute
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
     | '/t/$tenant/access'
     | '/t/$tenant/audit'
     | '/t/$tenant/feedback'
+    | '/t/$tenant/usage'
     | '/t/$tenant/'
     | '/t/$tenant/access/grants'
     | '/t/$tenant/access/groups'
@@ -180,6 +190,7 @@ export interface FileRouteTypes {
     | '/deployment'
     | '/t/$tenant/audit'
     | '/t/$tenant/feedback'
+    | '/t/$tenant/usage'
     | '/t/$tenant'
     | '/t/$tenant/access/grants'
     | '/t/$tenant/access/groups'
@@ -198,6 +209,7 @@ export interface FileRouteTypes {
     | '/_signed/t/$tenant/access'
     | '/_signed/t/$tenant/audit'
     | '/_signed/t/$tenant/feedback'
+    | '/_signed/t/$tenant/usage'
     | '/_signed/t/$tenant/'
     | '/_signed/t/$tenant/access/grants'
     | '/_signed/t/$tenant/access/groups'
@@ -284,6 +296,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignedTTenantFeedbackRouteImport
       parentRoute: typeof SignedTTenantRoute
     }
+    '/_signed/t/$tenant/usage': {
+      id: '/_signed/t/$tenant/usage'
+      path: '/usage'
+      fullPath: '/t/$tenant/usage'
+      preLoaderRoute: typeof SignedTTenantUsageRouteImport
+      parentRoute: typeof SignedTTenantRoute
+    }
     '/_signed/t/$tenant/access/': {
       id: '/_signed/t/$tenant/access/'
       path: '/'
@@ -365,6 +384,7 @@ interface SignedTTenantRouteChildren {
   SignedTTenantAccessRoute: typeof SignedTTenantAccessRouteWithChildren
   SignedTTenantAuditRoute: typeof SignedTTenantAuditRoute
   SignedTTenantFeedbackRoute: typeof SignedTTenantFeedbackRoute
+  SignedTTenantUsageRoute: typeof SignedTTenantUsageRoute
   SignedTTenantIndexRoute: typeof SignedTTenantIndexRoute
 }
 
@@ -372,6 +392,7 @@ const SignedTTenantRouteChildren: SignedTTenantRouteChildren = {
   SignedTTenantAccessRoute: SignedTTenantAccessRouteWithChildren,
   SignedTTenantAuditRoute: SignedTTenantAuditRoute,
   SignedTTenantFeedbackRoute: SignedTTenantFeedbackRoute,
+  SignedTTenantUsageRoute: SignedTTenantUsageRoute,
   SignedTTenantIndexRoute: SignedTTenantIndexRoute,
 }
 

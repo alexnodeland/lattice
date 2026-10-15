@@ -1,10 +1,9 @@
 import { expect, test } from "vitest";
-import { figure } from "./format";
+import { dollars, figure } from "./format";
 import {
   budget,
   counted,
   deploymentSpendSaid,
-  dollars,
   duration,
   failuresSaid,
   feedbackSaid,

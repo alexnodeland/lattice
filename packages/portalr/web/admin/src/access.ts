@@ -35,6 +35,7 @@ export const TENANT_ACTIONS = [
   "grantr:delete_tenant",
   "grantr:read_audit",
   "portalr:read_telemetry",
+  "portalr:read_spend",
 ] as const;
 
 /** Each part of Access, and the action its read takes. */

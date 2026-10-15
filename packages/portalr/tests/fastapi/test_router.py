@@ -47,8 +47,8 @@ async def test_a_tenant_admin_reads_their_tenants_traces(
 async def test_every_read_is_refused_without_the_tenants_grant(
     client: httpx.AsyncClient, stack: Stack
 ) -> None:
-    reads = ["/v1/traces", "/v1/traces/t1", "/v1/logs", "/v1/scores", "/v1/feedback", "/v1/spend"]
-    for path in reads:
+    reads = ["/v1/traces", "/v1/traces/t1", "/v1/logs", "/v1/scores", "/v1/feedback"]
+    for path in [*reads, "/v1/spend", "/v1/usage"]:
         for who, tenant in (("bob", "acme"), ("carol", "acme"), ("alice", "globex")):
             response = await client.get(
                 path, params={**WINDOW, "metric": "failed_turns"}, headers=headers(who, tenant)
@@ -123,6 +123,17 @@ async def test_each_tools_read(client: httpx.AsyncClient, stack: Stack) -> None:
         "status": "ok",
         "data": {"spend": 2.0, "max_budget": None, "budget_duration": None},
     }
+    stack.litellm.paths["/team/daily/activity"] = json({"results": []})
+    stack.litellm.paths["/tag/daily/activity"] = json({"results": []})
+    usage = await client.get(
+        "/v1/usage", params={**WINDOW, "workspaces": ["notes", "plans"]}, headers=alice
+    )
+    assert usage.json()["status"] == "ok"
+    assert usage.json()["data"]["complete"] is True
+    tagged = [r for r in stack.litellm.requests if r.url.path == "/tag/daily/activity"]
+    assert [r.url.params["tags"] for r in tagged] == [
+        "tenant-workspace:acme/notes,tenant-workspace:acme/plans"
+    ]
 
 
 async def test_a_tool_that_is_down_fails_only_its_own_read(
@@ -149,6 +160,7 @@ async def test_a_tool_the_application_doesnt_run_is_unconfigured(grants: Grants,
             "/v1/scores",
             "/v1/feedback",
             "/v1/spend",
+            "/v1/usage",
         ):
             response = await client.get(
                 path, params={**WINDOW, "metric": "failed_turns"}, headers=alice

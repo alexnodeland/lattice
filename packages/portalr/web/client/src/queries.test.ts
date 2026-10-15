@@ -301,14 +301,30 @@ test("portalr's reads name their tenant and window", async () => {
   expect(seen.at(-1)?.url.searchParams.get("step")).toBeNull();
 });
 
-test("a feedback read is kept ten minutes and tried again once, unless refused outright", () => {
-  const feedback = queries.portalr.feedback("acme", { start: DAY.start, end: DAY.end });
-  expect(feedback.staleTime).toBe(10 * 60_000);
-  const retry = feedback.retry as (count: number, error: unknown) => boolean;
-  expect(retry(0, new Refused(503, null))).toBe(true);
-  expect(retry(1, new Refused(503, null))).toBe(false);
-  expect(retry(0, new Refused(422, null))).toBe(false);
-  expect(queries.portalr.scores("acme", { start: DAY.start, end: DAY.end }).staleTime).toBe(60_000);
+test("a feedback or usage read is kept ten minutes and tried again once, unless refused outright", () => {
+  const window = { start: DAY.start, end: DAY.end };
+  for (const read of [
+    queries.portalr.feedback("acme", window),
+    queries.portalr.usage("acme", window),
+  ]) {
+    expect(read.staleTime).toBe(10 * 60_000);
+    const retry = read.retry as (count: number, error: unknown) => boolean;
+    expect(retry(0, new Refused(503, null))).toBe(true);
+    expect(retry(1, new Refused(503, null))).toBe(false);
+    expect(retry(0, new Refused(422, null))).toBe(false);
+  }
+  expect(queries.portalr.scores("acme", window).staleTime).toBe(60_000);
+});
+
+test("a usage read asks after the workspaces it names", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  await client.fetchQuery(
+    queries.portalr.usage("acme", { start: DAY.start, end: DAY.end }, ["notes", "plans"]),
+  );
+  const usage = seen.at(-1);
+  expect(usage?.url.pathname).toBe("/portalr/v1/usage");
+  expect(usage?.url.searchParams.getAll("workspaces")).toEqual(["notes", "plans"]);
+  expect(usage?.headers.get("x-tenant")).toBe("acme");
 });
 
 test("the deployment's tenants are an operator's, and null for anyone else", async () => {

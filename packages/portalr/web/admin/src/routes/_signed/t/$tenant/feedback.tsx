@@ -19,9 +19,10 @@ import {
   type SearchSchemaInput,
 } from "@tanstack/react-router";
 import { opening } from "../../../../access";
-import { type Shown, shownOf, unknownDays, WINDOWS, windowOf } from "../../../../feedback";
+import { type Shown, shownOf, unknownDays } from "../../../../feedback";
 import { figure } from "../../../../format";
 import { ReadFailed } from "../../../../read-failed";
+import { WINDOWS, windowOf } from "../../../../window";
 
 type Summary = PortalrApi.components["schemas"]["Feedback"];
 type Comment = PortalrApi.components["schemas"]["Comment"];

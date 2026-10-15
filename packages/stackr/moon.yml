@@ -71,10 +71,44 @@ tasks:
       - 'scripts/auth-keys'
       - 'scripts/_auth_keys.py'
       - 'pyproject.toml'
+      - '/pyproject.toml'
       - '/uv.lock'
       - 'compose.yaml'
       - '/packages/artifactr/deploy/grafana/**/*'
       - '/packages/reflexr/deploy/grafana/**/*'
+
+  # On an arm64 Docker; CI runs it when the recipe or an image changes, and nightly.
+  aws-tier2:
+    description: "The AWS recipe's tier 2: envs/floci against Floci, with the thin images and an application, smoked"
+    command: 'deploy/aws/tier2'
+    # The recipe, the images' files, and the application it generates from the template.
+    inputs:
+      - 'deploy/aws/**/*'
+      - 'deploy/host/compose.prod.yaml'
+      - 'deploy/image-archive'
+      - 'deploy/otel-collector/**/*'
+      - 'deploy/tempo/**/*'
+      - 'deploy/loki/**/*'
+      - 'deploy/pyroscope/**/*'
+      - 'deploy/grafana/**/*'
+      - 'deploy/litellm/**/*'
+      - 'deploy/db-init/**/*'
+      - 'deploy/auth-keys/**/*'
+      - 'deploy/postgres/init.sql'
+      - 'scripts/auth-keys'
+      - 'scripts/_auth_keys.py'
+      - 'pyproject.toml'
+      - 'compose.yaml'
+      - 'copier.yml'
+      - 'template/**/*'
+      - '/copier.yml'
+      - '/pyproject.toml'
+      - '/uv.lock'
+      - '/.prototools'
+      - '/packages/artifactr/deploy/grafana/**/*'
+      - '/packages/reflexr/deploy/grafana/**/*'
+    options:
+      cache: false
 
   check:
     description: "Run the project's checks, as CI does"

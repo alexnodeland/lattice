@@ -12,8 +12,17 @@ locals {
     SUBNETS    = join(",", module.network.private_subnet_ids)
     AWS_REGION = local.region
   })
-  # Each one-off task's security groups, as run-task takes them.
-  one_off_groups = { for task, groups in local.groups_of : task => join(",", groups) if contains(["db-init", "auth-keys", "db-roles"], task) }
+  # Each one-off task's log group, by its name: db-roles' only with grantr.
+  one_off_logs = merge(
+    { db-init = module.db_init.log_group_name, auth-keys = module.auth_keys.log_group_name },
+    { for task in module.db_roles : "db-roles" => task.log_group_name },
+  )
+  # What run-task takes for each: its security groups, and where its container logs.
+  one_off_environment = { for task, groups in local.groups_of : task => {
+    SECURITY_GROUPS   = join(",", groups)
+    LOG_GROUP         = local.one_off_logs[task]
+    LOG_STREAM_PREFIX = "${task}/${task}"
+  } if contains(keys(local.one_off_logs), task) }
   # The databases' versions, which db-init sets their roles' passwords from.
   database_versions = { for key, version in var.secret_versions : key => version if startswith(key, "database-") }
 }
@@ -39,6 +48,7 @@ module "db_init" {
       PGSSLMODE         = local.postgres_tls
       PGCONNECT_TIMEOUT = "10"
       APP_DB_NAME       = local.app_database
+      APP_DB_SCHEMA     = local.app_schema
     }, local.grantr ? { APP_DB_CREATES_ROLES = "true" } : {})
     secrets = {
       PGPASSWORD           = "${module.data.postgres.master_secret_arn}:password::"
@@ -56,7 +66,7 @@ resource "terraform_data" "db_init" {
 
   provisioner "local-exec" {
     command     = "${path.module}/run-task"
-    environment = merge(local.run_task, { TASK_DEFINITION = module.db_init.task_definition_arn, SECURITY_GROUPS = local.one_off_groups["db-init"] })
+    environment = merge(local.run_task, local.one_off_environment["db-init"], { TASK_DEFINITION = module.db_init.task_definition_arn })
   }
   # Each run needs the private subnets' route out, to pull its image and read its secrets, and its
   # group's rule to PostgreSQL: with no rule, its group reaches nothing there.
@@ -97,7 +107,7 @@ resource "terraform_data" "auth_keys" {
 
   provisioner "local-exec" {
     command     = "${path.module}/run-task"
-    environment = merge(local.run_task, { TASK_DEFINITION = module.auth_keys.task_definition_arn, SECURITY_GROUPS = local.one_off_groups["auth-keys"] })
+    environment = merge(local.run_task, local.one_off_environment["auth-keys"], { TASK_DEFINITION = module.auth_keys.task_definition_arn })
   }
   depends_on = [module.network]
 }
@@ -135,7 +145,7 @@ resource "terraform_data" "db_roles" {
 
   provisioner "local-exec" {
     command     = "${path.module}/run-task"
-    environment = merge(local.run_task, { TASK_DEFINITION = module.db_roles[0].task_definition_arn, SECURITY_GROUPS = local.one_off_groups["db-roles"] })
+    environment = merge(local.run_task, local.one_off_environment["db-roles"], { TASK_DEFINITION = module.db_roles[0].task_definition_arn })
   }
   depends_on = [module.network, aws_vpc_security_group_ingress_rule.call, aws_vpc_security_group_egress_rule.call]
 }

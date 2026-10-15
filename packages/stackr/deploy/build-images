@@ -130,7 +130,8 @@ for image in "${images[@]}"; do
     db-init)
       # Against a PostgreSQL of its own, whose superuser is admin, as RDS's is rdsadmin. db-init
       # works as postgres, which may create roles and databases and is no superuser, as RDS's
-      # master. One machine's settings first, then the AWS recipe's, twice, then without grantr.
+      # master. One machine's settings first, then the AWS recipe's, twice, then without grantr,
+      # then without the application's schema; and an empty schema, refused.
       docker run --detach --name "$network-postgres" --network "$network" --network-alias postgres \
         --label "stackr-images=$network" --env POSTGRES_USER=admin --env POSTGRES_PASSWORD=check \
         "$postgres_image" >/dev/null
@@ -149,13 +150,15 @@ for image in "${images[@]}"; do
         --env PGCONNECT_TIMEOUT=5 --env LANGFUSE_DB_PASSWORD=check --env LITELLM_DB_PASSWORD=check
         --env AUTH_DB_PASSWORD=check --env "PGOPTIONS=-c client_min_messages=warning")
       aws=(--env GRAFANA_DB_PASSWORD=check --env APP_DB_NAME=acme --env APP_DB_PASSWORD=check)
+      schema=(--env APP_DB_SCHEMA=tables)
       for run in "one machine's settings" "the AWS recipe's settings" "the AWS recipe's settings, again" \
-        "the AWS recipe's settings, without grantr"; do
+        "the AWS recipe's settings, without grantr" "the AWS recipe's settings, without a schema"; do
         settings=("${db[@]}")
         case $run in
           "one machine's settings") ;;
-          *grantr) settings+=("${aws[@]}") ;;
-          *) settings+=("${aws[@]}" --env APP_DB_CREATES_ROLES=true) ;;
+          *grantr) settings+=("${aws[@]}" "${schema[@]}") ;;
+          *schema) settings+=("${aws[@]}") ;;
+          *) settings+=("${aws[@]}" "${schema[@]}" --env APP_DB_CREATES_ROLES=true) ;;
         esac
         if ! docker run --rm --network "$network" --label "stackr-images=$network" "${settings[@]}" "$tag" >/dev/null; then
           fail "db-init on $run"
@@ -171,6 +174,9 @@ for image in "${images[@]}"; do
           *again)
             [[ $(sql admin postgres "SELECT rolcreaterole FROM pg_roles WHERE rolname = 'acme'") == t ]] ||
               fail "with grantr, the application's owner may not create roles"
+            # As the owner, in its database, asking for nothing as it connects, as psql doesn't.
+            [[ $(sql acme acme "SHOW search_path") == tables ]] ||
+              fail "the application's owner doesn't find its schema by itself"
             # What the application's db-roles does: create the role it works as.
             sql acme acme "CREATE ROLE acme_app LOGIN; DROP ROLE acme_app" ||
               fail "the application's owner can't create and drop its role"
@@ -179,8 +185,21 @@ for image in "${images[@]}"; do
             [[ $(sql admin postgres "SELECT rolcreaterole FROM pg_roles WHERE rolname = 'acme'") == f ]] ||
               fail "without grantr, the application's owner may still create roles"
             ;;
+          *schema)
+            [[ $(sql acme acme "SHOW search_path") == "\"\$user\", public" ]] ||
+              fail "without a schema, the application's owner keeps the one set before"
+            ;;
         esac
       done
+      # Refused, and for that reason: an error of any other kind would pass for it otherwise.
+      if refused=$(docker run --rm --network "$network" --label "stackr-images=$network" "${db[@]}" "${aws[@]}" \
+        --env APP_DB_SCHEMA= "$tag" 2>&1); then
+        fail "db-init takes an empty schema"
+      elif [[ $refused == *"APP_DB_SCHEMA is empty"* ]]; then
+        echo "ok: db-init refuses an empty schema"
+      else
+        fail "db-init fails an empty schema for another reason: $refused"
+      fi
       ;;
     auth-keys)
       # Its usage without its secrets, then the script against a stubbed Secrets Manager.

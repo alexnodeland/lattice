@@ -163,6 +163,15 @@ async def test_db_roles_needs_postgresql_and_a_role_of_its_own(unready: Settings
         await run(["db-roles"], unready)
 
 
+async def test_db_roles_needs_one_database_for_both(capsys: pytest.CaptureFixture[str]) -> None:
+    other = Settings(
+        database_url=APP, database_admin_url="postgresql+asyncpg://postgres:postgres@db/other"
+    )
+    with pytest.raises(SystemExit):
+        await run(["db-roles"], other)
+    assert "must name the same database" in capsys.readouterr().err
+
+
 async def test_db_roles_creates_the_role_as_the_owner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -215,11 +224,14 @@ class Recorder:
     dialect = postgresql.dialect()
 
     def __init__(self, *, found: bool = False, exempt: bool = False) -> None:
-        self.answers = iter([1 if found else None, exempt])
+        self.answers = iter([1 if found else None, exempt, "the app"])
         self.executed: list[str] = []
 
-    def scalar(self, statement: object, parameters: dict[str, str]) -> object:
-        assert parameters["role"] == "my app"
+    def scalar(self, statement: object, parameters: dict[str, str] | None = None) -> object:
+        if parameters is None:
+            assert str(statement) == "SELECT current_database()"
+        else:
+            assert parameters["role"] == "my app"
         return next(self.answers)
 
     def exec_driver_sql(self, statement: str) -> None:
@@ -230,14 +242,17 @@ class Recorder:
 def test_the_role_is_created_or_its_password_set(found: bool, verb: str) -> None:
     recorder = Recorder(found=found)
     create_role(cast(Connection, recorder), "my app", "it's secret", "app")
-    [statement] = recorder.executed
+    statement, search_path = recorder.executed
     assert statement.startswith(f'{verb} ROLE "my app" LOGIN PASSWORD \'SCRAM-SHA-256$4096:')
     assert "secret" not in statement, "only the password's verifier is sent"
+    assert search_path == 'ALTER ROLE "my app" IN DATABASE "the app" SET search_path TO app'
 
 
 def test_a_role_that_row_level_security_doesnt_hold_is_refused() -> None:
+    recorder = Recorder(exempt=True)
     with pytest.raises(Invalid, match="bypasses row-level security"):
-        create_role(cast(Connection, Recorder(exempt=True)), "my app", "secret", "app")
+        create_role(cast(Connection, recorder), "my app", "secret", "app")
+    assert len(recorder.executed) == 1, "a refused role is given no search_path"
 
 
 RFC_7677 = SimpleNamespace(

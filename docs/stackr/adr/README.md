@@ -39,5 +39,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0033](0033-the-combined-system-proved-in-ci.md) | The combined system, proved in CI | Accepted |
 | [0034](0034-the-stack-on-aws.md) | The stack on AWS | Accepted, amended by [0035](0035-the-thin-images.md) |
 | [0035](0035-the-thin-images.md) | The thin images | Accepted |
+| [0036](0036-tier-2-against-floci.md) | Tier 2, against Floci | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

@@ -1,0 +1,47 @@
+# checkov over envs/floci's plan, in tier 2 (stackr ADR-0036): the whole stack as one plan, which
+# the modules' own scans (deploy/aws/check) can't see; tier2 gives checkov this file alone. Each
+# check it skips is skipped for this plan alone, with its reason; nothing is skipped inline.
+framework:
+  - terraform_plan
+compact: true
+quiet: true
+skip-check:
+  # The modules' own skips, for the reasons each module's .checkov.yaml gives:
+  # one zone and one copy, with Multi-AZ, replicas and cross-region copies later (data);
+  - CKV_AWS_157
+  - CKV2_AWS_50
+  - CKV_AWS_144
+  # a customer-managed key per deployment later: AWS's keys encrypt these at rest (data, secrets,
+  # ecs-service, network);
+  - CKV_AWS_145
+  - CKV_AWS_149
+  - CKV_AWS_158
+  - CKV_AWS_191
+  - CKV_AWS_354
+  # nothing consumes bucket events or access logs yet, and RDS has its own logs (data);
+  - CKV2_AWS_62
+  - CKV_AWS_18
+  - CKV_AWS_118
+  # container and flow logs keep their days by a variable, not a year (ecs-service, network);
+  - CKV_AWS_338
+  # a generated secret rotates when its version is raised, with its readers (secrets);
+  - CKV2_AWS_57
+  # TLS ends at the ALB, and port 80 only redirects to it; WAF comes later (edge, network);
+  - CKV_AWS_378
+  - CKV_AWS_260
+  - CKV2_AWS_28
+  # each group is attached in the module that makes the service, beyond what checkov follows
+  # (stack, network, data, state-host).
+  - CKV2_AWS_5
+  # Every deployment's, which no module's scan of the HCL reports: most upstream images write to
+  # their root filesystem, and a service turns it read-only through ecs-service's
+  # readonly_root_filesystem where its image allows, as Langfuse's wait does.
+  - CKV_AWS_336
+  # envs/floci's own: a destroyable deployment, whose run ends in a destroy, as the manual gate's
+  # does, so RDS and the ALB have no deletion protection (envs/prod keeps both). The data module
+  # skips CKV_AWS_293 too, for its HCL scan, which can't follow the variable that sets it.
+  - CKV_AWS_150
+  - CKV_AWS_293
+  # And the test domain's zone, which Floci keeps: on AWS, the zone is the operator's, and DNSSEC
+  # theirs.
+  - CKV2_AWS_38

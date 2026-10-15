@@ -91,7 +91,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Request` | What a paused run waits on: a call to approve, or a question | An approval, a denial or an answer |
 | `ProposalCard` | A proposed change, its rationale and how it was resolved | Accept or reject |
 | `RunStatus` | How a run is going | Nothing |
-| `ArtifactContent`, `rendererFor`, `markdown`, `json` | An artifact, through the renderer its kind is registered with, or as JSON | Nothing |
+| `ArtifactContent`, `rendererFor`, `markdown`, `json` | An artifact, through the renderer its kind is registered with, or as JSON; a renderer also gives its title ([ADR-0029](adr/0029-ui-polish-from-the-screenshots.md)) | Nothing |
 | `Diff` | What a revision changed, as `client`'s `changes` cut it | Nothing |
 | `Thumbs` | The reader's thumbs on a message, an artifact or a run, and why | Thumbs, then a comment ([ADR-0018](adr/0018-the-runs-area-and-feedback.md)) |
 | `CommandButton` | One action, waiting while its command is in flight | The command |
@@ -126,7 +126,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 |---|---|
 | `AppShell` | The frame: a rail from 1024 pixels, a bar and a drawer below, and the mark of `app` or `admin` |
 | `SideNav`, `NavLink` | The areas, the current one marked, with how many wait for the reader |
-| `Switcher` | The tenant and the workspace, and a menu of the others |
+| `Switcher` | The tenant and the workspace, or the tenant alone, and a menu of the others |
 | `AccountMenu` | Who is signed in, their scheme, and signing out |
 | `PageHeader` | A page's way back, its one heading, a line about it, and its actions |
 | `Card`, `EmptyState`, `Table` | What asks something of the reader; nothing yet, and what to do; rows, named by a caption or by a heading beside them, a row's header in the row's own type |
@@ -138,7 +138,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `TenantSwitcher` | admin's tenant, or every tenant, and a menu of the others |
 | `StatCard` | One figure, read on its own, or why there's none |
 | `ItemTable` | Items as a table from 640 pixels, each row named by its first cell or a name of its own, and as headed cards below, one in the accessibility tree; an `EmptyState` with none |
-| `TabNav`, `TabLink` | An area's parts as tabs of links, the current one marked with `aria-current` |
+| `TabNav`, `TabLink` | An area's parts as tabs of links, the current one marked with `aria-current`, on one row that scrolls on a phone |
 | `CheckboxGroup` | Several choices, any of them checked, named by a legend |
 | `SignIn`, `Account` | Signing in, and the account menu over a session, for both UIs |
 | `BarChart`, `LineChart`, `DonutChart` | Tremor's charts, adapted, on Recharts: the inks as marks, a pattern and a label per series, and the figures as a table ([ADR-0027](adr/0027-feedback-and-evaluations.md)) |

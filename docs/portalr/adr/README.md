@@ -34,5 +34,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0026](0026-audit.md) | Audit: grantr's log, newest on top, filtered by type and maker | Accepted |
 | [0027](0027-feedback-and-evaluations.md) | Feedback and evaluations, summed by day, and the first charts | Accepted |
 | [0028](0028-usage-and-spend.md) | Usage and spend, per day and per workspace, against the budget's share | Accepted |
+| [0029](0029-ui-polish-from-the-screenshots.md) | UI polish from the screenshots: one width rule, titles, a violet focus ring | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

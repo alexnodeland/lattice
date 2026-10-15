@@ -155,7 +155,7 @@ test("a filter grantr refuses says why, and clearing it reads the log again", as
   const { screen, router } = await open("/t/acme/audit?actor_kind=user&actor=nobody");
   await expect
     .element(screen.getByRole("alert"))
-    .toHaveTextContent("the server refused the read (422): no such subject");
+    .toHaveTextContent("The server refused the read (422): no such subject");
   await screen.getByRole("button", { name: "Clear the filter" }).click();
   await expect.element(screen.getByRole("table", { name: "Audit log" })).toBeVisible();
   expect(router.state.location.search).toEqual({});

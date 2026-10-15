@@ -3,9 +3,10 @@
 The agent answers from a script, so the app's scenarios choose its path by the first word they
 post: ``ask`` makes it ask a question, ``publish`` makes it call a tool that waits for approval,
 ``propose`` makes it write a note of its own and propose an edit to it, which it names in its
-answer, so each scenario resolves a proposal of its own, ``wait`` keeps its turn running until it
-is stopped, and ``fail`` fails its turn, for admin's count of failed turns. Anything else gets its
-words back. Each run streams, as every run does.
+answer, so each scenario resolves a proposal of its own; what follows ``propose``, such as
+``a tighter plan``, is what the note is about, so two proposals aren't one. ``wait`` keeps its
+turn running until it is stopped, and ``fail`` fails its turn, for admin's count of failed turns.
+Anything else gets its words back. Each run streams, as every run does.
 """
 
 import asyncio
@@ -59,6 +60,30 @@ class Thumbs(Feedback, name="thumbs", targets={"message", "artifact", "turn"}):
     comment: str | None = None
 
 
+DEFAULT_TOPIC = "launch"
+"""What a note is about when ``propose`` says no more than "an edit"."""
+
+
+def topic_of(prompt: str) -> str:
+    """What ``propose ...`` asks a note about: the words after it, without their article."""
+    words = re.sub(r"^(?:an?|the)\s+", "", prompt.removeprefix("propose").strip())
+    return DEFAULT_TOPIC if words in ("", "edit") else words
+
+
+def first_prompt(messages: list[ModelMessage]) -> str:
+    """What the person first asked of the agent in this turn's conversation."""
+    return next(
+        (
+            str(part.content)
+            for message in messages
+            if isinstance(message, ModelRequest)
+            for part in message.parts
+            if isinstance(part, UserPromptPart)
+        ),
+        "",
+    )
+
+
 async def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
     """The script: what the agent says or calls, from what it was just given."""
     given = messages[-1]
@@ -69,7 +94,7 @@ async def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelRespons
     prompt = " ".join(str(part.content) for part in parts if isinstance(part, UserPromptPart))
     match prompt.split(maxsplit=1)[:1]:
         case ["propose"]:
-            note = {"kind": "note", "data": {"text": "Launch on Monday."}}
+            note = {"kind": "note", "data": {"text": f"{topic_of(prompt).capitalize()} on Monday."}}
             return ModelResponse(parts=[ToolCallPart("create_artifact", note)])
         case ["publish"]:
             return ModelResponse(parts=[ToolCallPart("publish", {"note": "the notes"})])
@@ -89,13 +114,14 @@ def after(returned: ToolReturnPart, messages: list[ModelMessage]) -> ModelRespon
     how the tool went."""
     told = returned.model_response_str()
     if returned.tool_name == "create_artifact" and (created := CREATED.search(told)):
+        about = topic_of(first_prompt(messages))
         edit = {
             "artifact_id": created["note"],
             "old": "Monday",
             "new": "Tuesday",
-            "summary": "Move the launch to Tuesday",
+            "summary": f"Move the {about} to Tuesday",
             "propose": True,
-            "rationale": "Monday is a holiday.",
+            "rationale": f"Monday is a holiday, so the {about} moves.",
         }
         return ModelResponse(parts=[ToolCallPart("edit_text", edit)])
     if returned.tool_name == "edit_text":

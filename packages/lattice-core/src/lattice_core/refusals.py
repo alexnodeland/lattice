@@ -6,11 +6,11 @@ types are the OpenAPI document's own: moving them here changes none of their nam
 pydantic alone: a router passes ``refusals(...)`` to FastAPI's ``APIRouter(responses=...)``.
 """
 
-from typing import Any, Final
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-__all__ = ["REFUSALS", "FieldError", "Refused", "RejectionDetail", "refusals"]
+__all__ = ["FieldError", "Refused", "RejectionDetail", "refusals"]
 
 
 class RejectionDetail(BaseModel):
@@ -46,14 +46,10 @@ def refusals(*statuses: int) -> dict[int | str, dict[str, Any]]:
     """Return the refused responses to document, for ``APIRouter(responses=...)``.
 
     Each status is described in words of its own, since FastAPI's default is Python's phrase
-    for the status, which changes between versions.
+    for the status, which changes between versions. A router documents only the statuses it
+    answers: artifactr's and reflexr's refuse with 400, 401, 403, 404, 409 and 422.
 
     Args:
         *statuses: The HTTP statuses a router's routes refuse with.
     """
     return {status: {"model": Refused, "description": "Refused"} for status in statuses}
-
-
-REFUSALS: Final = refusals(400, 401, 403, 404, 409, 422)
-"""The refused responses artifactr's and reflexr's routes document: a malformed request, no or
-a wrong identity, a missing thing, a conflict, and a request that does not validate."""

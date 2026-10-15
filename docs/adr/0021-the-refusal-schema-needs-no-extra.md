@@ -16,7 +16,8 @@ relayr has a `Refused` of its own, an exception of its outbound actions, which i
 ## Decision
 
 - **The schema is `lattice_core.refusals`, and needs no extra.** It imports pydantic alone, so the `fastapi` extra and the name `lattice_core.fastapi` ADR-0018 planned would gate and name a dependency it doesn't have. A package that serves REST depends on FastAPI itself; portalr needs lattice-core with no extra.
-- **`refusals(*statuses)` builds the responses to document,** and `REFUSALS` is `refusals(400, 401, 403, 404, 409, 422)`, the six artifactr's and reflexr's routes document. portalr documents `refusals(400, 401, 403, 422)`, so its document keeps the statuses its routes answer. A router documents only what it answers.
+- **`refusals(*statuses)` builds the responses to document,** and lattice-core ships no list of statuses. Each router defines its own `REFUSALS`: artifactr and reflexr `refusals(400, 401, 403, 404, 409, 422)`, the six their routes answer, and portalr `refusals(400, 401, 403, 422)`. A router documents only what it answers.
+- **`lattice_core.fastapi` stays free** for a later helper that depends on FastAPI, behind a real `fastapi` extra. [ADR-0020](0020-the-telemetry-contract-needs-no-extra.md) is the precedent for a contract that needs no extra, beside the code that does.
 - **The docstrings name no package,** since they are the OpenAPI components' descriptions. The three documents' descriptions for these components are now the same words, and the generated TypeScript client is regenerated from them.
 - **Each package keeps its public API.** No name is public in a package's `__init__`; a package's tests and routers import the schema from lattice-core.
 
@@ -26,7 +27,7 @@ relayr has a `Refused` of its own, an exception of its outbound actions, which i
 |---|---|---|
 | **A base module, `lattice_core.refusals` (chosen)** | No extra to install or gate; portalr depends on lattice-core as it is | ADR-0018's name and extra change |
 | `lattice_core.fastapi` behind a `fastapi` extra, as planned | As ADR-0018 says | The extra would install nothing the module imports |
-| One `REFUSALS` for every router | No builder | portalr would document 404 and 409 it never answers, and its committed document would change |
+| One `REFUSALS` in lattice-core for every router | No builder | portalr would document 404 and 409 it never answers, and its committed document would change; and a list of statuses is a router's own |
 | Leave portalr's copy | Nothing moves | A third copy to keep in step, which ADR-0018 exists to end |
 
 ## Consequences

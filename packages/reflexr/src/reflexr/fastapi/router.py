@@ -1,14 +1,14 @@
 """The router: REST endpoints and the WebSocket stream, over one command handler."""
 
 from collections.abc import Awaitable, Callable
-from typing import Annotated
+from typing import Annotated, Final
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, WebSocket
 from opentelemetry import trace
 from pydantic import BaseModel, ConfigDict
 from starlette.requests import HTTPConnection
 
-from lattice_core.refusals import REFUSALS, Refused
+from lattice_core.refusals import Refused, refusals
 from reflexr.core import (
     Actor,
     AnyEvent,
@@ -50,6 +50,10 @@ STATUS_CODES: dict[str, int] = {
     "unsupported_protocol": 400,
 }
 """The HTTP status for each rejection ``type``."""
+
+REFUSALS: Final = refusals(400, 401, 403, 404, 409, 422)
+"""The refused responses every route documents: a malformed request, no or a wrong identity, a
+missing thing, a conflict, and a request that does not validate."""
 
 
 Count = Annotated[int, Query(ge=0, le=MAX_COUNT)]

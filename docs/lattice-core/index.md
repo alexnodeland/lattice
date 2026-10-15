@@ -24,7 +24,7 @@ What lattice's packages share and must keep identical. artifactr, reflexr and gr
 | [`lattice_core.litellm`](reference.md#lattice_corelitellm) (the `litellm` extra) | `litellm_model`, a pydantic-ai model over a LiteLLM proxy's model group | artifactr, reflexr |
 | [`lattice_core.tags`](reference.md#lattice_coretags) | `request_tags`, the tags that file a model request's spend under its tenant and workspace, and `workspace_tag` and `parse_workspace_tag`, which write and read the `tenant-workspace:` tag ([ADR-0019](../adr/0019-a-tag-for-each-tenants-workspace.md)) | artifactr, reflexr, portalr |
 | [`lattice_core.logs`](reference.md#lattice_corelogs) | `logging_left_alone`, which puts the root logger back as it was | artifactr, reflexr |
-| [`lattice_core.refusals`](reference.md#lattice_corerefusals) | `Refused`, `RejectionDetail` and `FieldError`, the body of a refused REST request, and `refusals` and `REFUSALS`, the responses a router documents ([ADR-0021](../adr/0021-the-refusal-schema-needs-no-extra.md)) | artifactr, reflexr, portalr |
+| [`lattice_core.refusals`](reference.md#lattice_corerefusals) | `Refused`, `RejectionDetail` and `FieldError`, the body of a refused REST request, and `refusals`, which builds the responses a router documents ([ADR-0021](../adr/0021-the-refusal-schema-needs-no-extra.md)) | artifactr, reflexr, portalr |
 
 That completes the plan in ADR-0018.
 

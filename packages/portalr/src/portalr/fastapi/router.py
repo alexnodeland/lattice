@@ -123,7 +123,7 @@ class Links(BaseModel):
 
 REFUSALS: Final = refusals(400, 401, 403, 422)
 """The refused responses every route under ``/v1`` documents: no route of portalr's answers 404 or
-409, which artifactr's and reflexr's document (``lattice_core.refusals.REFUSALS``)."""
+409, which artifactr's and reflexr's document."""
 
 
 TenantHeader = Annotated[TenantId | None, Header(alias="X-Tenant")]

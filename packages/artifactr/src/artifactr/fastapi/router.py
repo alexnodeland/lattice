@@ -1,7 +1,7 @@
 """The router: REST endpoints and the WebSocket stream."""
 
 from collections.abc import Awaitable, Callable
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, WebSocket
 from fastapi.responses import JSONResponse
@@ -28,7 +28,7 @@ from artifactr.core import (
 from artifactr.fastapi.stream import Stream
 from artifactr.telemetry import Telemetry, annotate, attribution
 from artifactr.workspace import MAX_COUNT, Workspace, Workspaces
-from lattice_core.refusals import REFUSALS, Refused
+from lattice_core.refusals import Refused, refusals
 
 ResolveActor = Callable[[HTTPConnection], Awaitable[tuple[TenantId, Actor]]]
 """Authenticates a request or connection: returns its tenant and actor, or raises Unauthorized."""
@@ -43,6 +43,10 @@ STATUS_CODES: dict[str, int] = {
     "unsupported_protocol": 400,
 }
 """The HTTP status for each rejection ``type``."""
+
+REFUSALS: Final = refusals(400, 401, 403, 404, 409, 422)
+"""The refused responses every route documents: a malformed request, no or a wrong identity, a
+missing thing, a conflict, and a request that does not validate."""
 
 
 Count = Annotated[int, Query(ge=0, le=MAX_COUNT)]

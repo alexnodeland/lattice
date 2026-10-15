@@ -3,7 +3,7 @@
 import pytest
 from fastapi import APIRouter, FastAPI, HTTPException
 
-from lattice_core.refusals import REFUSALS, FieldError, Refused, RejectionDetail, refusals
+from lattice_core.refusals import FieldError, Refused, RejectionDetail, refusals
 
 
 def test_refusals_describe_each_status_with_the_refused_body() -> None:
@@ -11,10 +11,6 @@ def test_refusals_describe_each_status_with_the_refused_body() -> None:
         403: {"model": Refused, "description": "Refused"},
         422: {"model": Refused, "description": "Refused"},
     }
-
-
-def test_the_default_refusals_are_the_six_statuses_the_libraries_document() -> None:
-    assert list(REFUSALS) == [400, 401, 403, 404, 409, 422]
 
 
 @pytest.mark.parametrize(
@@ -35,7 +31,7 @@ def test_refused_reads_each_shape_of_detail(body: dict[str, object]) -> None:
 
 
 def test_a_router_documents_the_refused_body() -> None:
-    router = APIRouter(responses=REFUSALS)
+    router = APIRouter(responses=refusals(400, 401, 403, 404, 409, 422))
 
     @router.get("/items")
     async def items() -> list[str]:

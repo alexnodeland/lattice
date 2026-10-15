@@ -8,7 +8,6 @@ cancellation is raised after it. SQLAlchemy takes a statement cancelled part-way
 connection, which on SQLite can keep the database's write lock, or the pool's one connection.
 """
 
-import contextlib
 from datetime import UTC, timedelta
 from typing import Final
 
@@ -17,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
 
-from lattice_core.sql.sessions import awaited_to_the_end
+from lattice_core.sql.sessions import awaited_to_the_end, lock_row
 from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 from relayr.ledger import Cause, CauseKind, Clock, DeadLetter, WorkspaceKey, utc_now
 from relayr.sql.tables import CauseRow, DeadLetterRow, FollowerRow
@@ -30,14 +29,10 @@ def _follower(workspace: WorkspaceKey) -> ColumnElement[bool]:
 
 
 async def _locked(session: AsyncSession, workspace: WorkspaceKey) -> FollowerRow:
-    """Lock a workspace's row (`SELECT ... FOR UPDATE`), inserting it first if it isn't there."""
-    while (row := await session.get(FollowerRow, workspace, with_for_update=True)) is None:
-        # A concurrent transaction may insert the row first. Then this insert fails, and the
-        # next lookup waits for that transaction to end and locks its row instead.
-        with contextlib.suppress(IntegrityError):
-            async with session.begin_nested():
-                session.add(FollowerRow(**workspace._asdict(), seq=0))
-    return row
+    """Lock a workspace's row, which starts with its cursor at 0."""
+    return await lock_row(
+        session, FollowerRow, workspace, FollowerRow(**workspace._asdict(), seq=0)
+    )
 
 
 ACROSS_TENANTS: Final = frozenset({"followed"})

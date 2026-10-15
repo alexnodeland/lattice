@@ -97,7 +97,7 @@ async def workspace(tenant_id: str, workspace_id: str, **providers: Any) -> Work
     return await workspaces.open(tenant_id, workspace_id, actor=ALICE)
 
 
-async def test_the_trace_tags_langfuse_propagates_reach_the_proxy_once_each() -> None:
+async def test_the_bounded_trace_tags_langfuse_propagates_reach_the_proxy_once_each() -> None:
     proxy = FakeProxy()
     gateway = LiteLLMGateway(tags=("docplan",))
     ws = await workspace("acme", "launch")
@@ -105,7 +105,9 @@ async def test_the_trace_tags_langfuse_propagates_reach_the_proxy_once_each() ->
 
     @contextlib.asynccontextmanager
     async def turn_context(session: Session[Any]) -> AsyncIterator[None]:
-        with propagate_attributes(tags=["workspace:launch", "rule:page", "chain:c1"]):
+        with propagate_attributes(
+            tags=["workspace:launch", "rule:page", "kind:note", "thread:th_1", "chain:c1"]
+        ):
             yield
 
     # A turn runs in a context of its own, so a TurnContext, as relayr's, sets the tags.
@@ -119,8 +121,8 @@ async def test_the_trace_tags_langfuse_propagates_reach_the_proxy_once_each() ->
         "tenant-workspace:acme/launch",
         "docplan",
         "rule:page",
-        "chain:c1",
-    ]
+        "kind:note",
+    ], "thread: and chain: tags stay in Langfuse"
 
 
 async def test_each_request_carries_the_tenant_session_trace_key_and_guardrails(

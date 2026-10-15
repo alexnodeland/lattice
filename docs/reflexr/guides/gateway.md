@@ -47,7 +47,7 @@ The agent's and each run's `model_settings` override these key by key, so an `ex
 | Where | What | Used by LiteLLM for |
 |---|---|---|
 | `metadata.tenant_id`, `workspace_id`, `rule`, `scope`, `run_id` | reflexr's ids | Spend and logs by tenant, workspace and rule |
-| `metadata.tags` | `reflexr`, `tenant:<id>`, `workspace:<id>`, `tenant-workspace:<tenant>/<workspace>` with each id percent-encoded, `rule:<name>`, yours, and the trace tags Langfuse is propagating, such as relayr's `thread:` ([lattice ADR-0019](../../adr/0019-a-tag-for-each-tenants-workspace.md), [ADR-0022](../../adr/0022-litellm-requests-carry-the-propagated-trace-tags.md)) | Tag-based spend tracking and routing, and each tenant's workspaces' spend |
+| `metadata.tags` | `reflexr`, `tenant:<id>`, `workspace:<id>`, `tenant-workspace:<tenant>/<workspace>` with each id percent-encoded, `rule:<name>`, yours, and the `rule:` and `kind:` trace tags Langfuse is propagating ([lattice ADR-0019](../../adr/0019-a-tag-for-each-tenants-workspace.md), [ADR-0022](../../adr/0022-litellm-requests-carry-the-propagated-trace-tags.md)) | Tag-based spend tracking and routing, and each tenant's workspaces' spend |
 | `metadata.session_id` | The run's causal chain | Grouping every request one incident caused into one session |
 | `metadata.trace_user_id` | The person whose event made the rule fire, when a person published it | Users in its Langfuse logging |
 | `metadata.existing_trace_id`, and the `traceparent` header | The run attempt's trace, when telemetry is configured | Joining the attempt's trace in Langfuse and OpenTelemetry |

@@ -90,8 +90,8 @@ class LiteLLMGateway(AbstractCapability[Reaction[Any]]):
 
     - LiteLLM metadata: the tenant, workspace, rule, scope and run, the causal chain as the
       session, the person whose event fired the rule as the user, the trace id (so LiteLLM's
-      own traces join the run's), and tags, including the trace tags Langfuse is propagating,
-      such as relayr's ``thread:``
+      own traces join the run's), and tags, including the ``rule:`` and ``kind:`` trace tags
+      Langfuse is propagating
     - the W3C trace context, as ``traceparent``
     - the guardrails the rule's policy names
     - the tenant's virtual key, as the request's ``Authorization``, from ``tenant_key``

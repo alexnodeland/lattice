@@ -108,10 +108,14 @@ async def settle(
     return ws
 
 
-async def test_the_trace_tags_langfuse_propagates_reach_the_proxy_once_each() -> None:
+async def test_the_bounded_trace_tags_langfuse_propagates_reach_the_proxy_once_each() -> None:
     proxy = FakeProxy()
     gateway = LiteLLMGateway(tags=("oncall",))
-    with propagate_attributes(tags=["tenant:acme", "thread:th_1", "rule:app:review"]):
+    # The reactor runs a rule in the caller's context, so tags propagated around it reach the
+    # run, as a RunContext's, such as relayr's, do.
+    with propagate_attributes(
+        tags=["tenant:acme", "thread:th_1", "rule:app:review", "kind:incident"]
+    ):
         ws = await settle(review(proxy.model(), gateway), UserActor(id="ada"))
     [done] = await ws.runs()
     assert done.status == "succeeded"
@@ -123,8 +127,8 @@ async def test_the_trace_tags_langfuse_propagates_reach_the_proxy_once_each() ->
         "tenant-workspace:acme/prod",
         "rule:app:review",
         "oncall",
-        "thread:th_1",
-    ]
+        "kind:incident",
+    ], "thread: tags stay in Langfuse"
 
 
 async def test_each_request_carries_the_tenant_chain_trace_key_and_guardrails() -> None:

@@ -9,13 +9,21 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.litellm import LiteLLMProvider
 from pydantic_ai.settings import ModelSettings
 
-__all__ = ["add_propagated_tags", "litellm_model"]
+__all__ = ["PROPAGATED_TAG_PREFIXES", "add_propagated_tags", "litellm_model"]
 
 _PROPAGATED_TAGS: Final = "langfuse.propagated.tags"
 """The key Langfuse's ``propagate_attributes(tags=...)`` keeps a trace's tags under in
-OpenTelemetry's context (langfuse 4). The Langfuse SDK has no public getter for it; a test of the
-libraries' gateways sets the tags with ``propagate_attributes`` and reads them back, so an SDK
-that renames the key fails there."""
+OpenTelemetry's context. It is Langfuse's internal one, built by ``_get_propagated_context_key``
+in ``langfuse/_client/propagation.py`` (the SDK has no public getter), and verified in the version
+the lockfile holds, langfuse 4.16.0, of the supported range. The libraries' gateway tests set tags
+with ``propagate_attributes`` and read them in the request, so a release that renames the key
+fails there (lattice ADR-0022)."""
+
+PROPAGATED_TAG_PREFIXES: Final = ("rule:", "kind:")
+"""The kinds of trace tag that reach LiteLLM: a rule's name and an artifact's kind, which are as
+many as the application defines. ``thread:`` and ``chain:`` tags stay in Langfuse, since each
+thread and each chain would add a row to LiteLLM's tag spend per day, without bound; a thread's
+cost is read from Langfuse's session. ``tenant:`` and ``workspace:`` are in a request already."""
 
 
 def litellm_model(
@@ -49,17 +57,20 @@ def litellm_model(
 
 
 def add_propagated_tags(tags: Sequence[str]) -> list[str]:
-    """Return ``tags`` and the trace tags Langfuse is propagating in the current context.
+    """Return ``tags`` and the bounded trace tags Langfuse is propagating in the current context.
 
-    A run or turn's Langfuse tags, such as ``rule:<name>``, ``chain:<id>`` or ``thread:<id>``
-    (lattice ADR-0022), reach LiteLLM's spend and logs this way, whichever package set them. A tag
-    already in ``tags`` is not added again, so the request lists each once, in order: ``tags``,
-    then the propagated tags in the order Langfuse holds them. Without Langfuse, or outside a
-    ``propagate_attributes`` block, it returns ``tags``.
+    The trace tags whose prefix is in :data:`PROPAGATED_TAG_PREFIXES`, such as ``rule:<name>`` or
+    ``kind:<artifact kind>``, reach LiteLLM's spend and logs this way, whichever package set them
+    (lattice ADR-0022). A tag already in ``tags`` is not added again, so the request lists each
+    once, in order: ``tags``, then the propagated tags in the order Langfuse holds them. Without
+    Langfuse, or outside a ``propagate_attributes`` block, it returns ``tags``.
 
     Args:
         tags: The tags a request carries already.
     """
     propagated = context.get_value(_PROPAGATED_TAGS)
     held = cast("list[object]", propagated) if isinstance(propagated, list) else []
-    return list(dict.fromkeys([*tags, *(tag for tag in held if isinstance(tag, str))]))
+    extra = (
+        tag for tag in held if isinstance(tag, str) and tag.startswith(PROPAGATED_TAG_PREFIXES)
+    )
+    return list(dict.fromkeys([*tags, *extra]))

@@ -215,7 +215,7 @@ export function TraceView({
           }}
           className="max-h-[28rem] min-h-24 overflow-auto rounded-lg border border-line bg-surface"
         >
-          <div style={{ height: virtual.getTotalSize() }} className="relative w-full min-w-[34rem]">
+          <div style={{ height: virtual.getTotalSize() }} className="relative w-full min-w-[26rem]">
             {virtual.getVirtualItems().map((item) => {
               const each = shown[item.index];
               if (!each) {
@@ -242,7 +242,7 @@ export function TraceView({
                   }}
                   style={{ height: ROW, transform: `translateY(${item.start}px)` }}
                   className={cn(
-                    "absolute inset-x-0 top-0 grid cursor-default grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-center gap-3 border-line border-b px-2 text-sm outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-focus",
+                    "absolute inset-x-0 top-0 grid cursor-default grid-cols-[minmax(11rem,2fr)_minmax(8rem,3fr)_4.5rem] items-center gap-3 border-line border-b px-2 text-sm outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-focus",
                     on ? "bg-wash" : "hover:bg-wash/60",
                   )}
                 >
@@ -277,6 +277,9 @@ export function TraceView({
                     )}
                   </div>
                   <Bar row={row} total={outline.duration} />
+                  <span aria-hidden="true" className="text-right text-muted text-xs tabular-nums">
+                    {duration(row.duration)}
+                  </span>
                 </div>
               );
             })}
@@ -314,9 +317,6 @@ function Bar({ row, total }: { row: Row; total: number }) {
             : "bg-[var(--chart-1)]",
         )}
       />
-      <span className="absolute top-0 right-0 text-muted text-xs tabular-nums">
-        {duration(row.duration)}
-      </span>
     </div>
   );
 }
@@ -401,11 +401,12 @@ function Details({
         {attributes.length === 0 ? (
           <p className="text-muted text-sm">None.</p>
         ) : (
-          <dl className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
+          <dl className="flex flex-col gap-2 text-xs">
             {attributes.map(([key, value]) => (
-              <Fact key={key} term={key} mono>
-                {String(value)}
-              </Fact>
+              <div key={key} className="flex min-w-0 flex-col">
+                <dt className="break-words font-mono text-muted">{key}</dt>
+                <dd className="min-w-0 break-all font-mono text-fg">{String(value)}</dd>
+              </div>
             ))}
           </dl>
         )}
@@ -415,21 +416,11 @@ function Details({
 }
 
 /** One fact of a span: its term, and what it is. */
-function Fact({
-  term,
-  mono = false,
-  children,
-}: {
-  term: string;
-  mono?: boolean;
-  children: ReactNode;
-}) {
+function Fact({ term, children }: { term: string; children: ReactNode }) {
   return (
     <>
-      <dt className={cn("break-all text-muted", mono && "font-mono")}>{term}</dt>
-      <dd className={cn("min-w-0 break-words text-fg", mono && "break-all font-mono")}>
-        {children}
-      </dd>
+      <dt className="text-muted">{term}</dt>
+      <dd className="min-w-0 break-words text-fg">{children}</dd>
     </>
   );
 }

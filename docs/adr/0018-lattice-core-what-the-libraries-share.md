@@ -1,6 +1,6 @@
 # ADR-0018: lattice-core, what the libraries share
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0020](0020-the-telemetry-contract-needs-no-extra.md)
 **Date:** 2026-10-13
 **Deciders:** Alex Nodeland
 **Amends:** [reflexr ADR-0003](../reflexr/adr/0003-independent-sibling-of-artifactr.md): artifactr and reflexr still import neither each other nor grantr, but they share one package
@@ -12,7 +12,7 @@ reflexr ADR-0003 kept artifactr and reflexr independent, with aligned convention
 What is copied, word for word but for the package's name:
 
 - in artifactr, reflexr, grantr and relayr: the SQLite engine, the tenant session for row-level security, and the session helpers SQL storage locks and awaits with;
-- in artifactr and reflexr: the OpenTelemetry setup, with the access-token redaction; the Langfuse client; the MCP server's logging guard; the LiteLLM model; `tag_required`; and the search for a NUL character;
+- in artifactr and reflexr: the OpenTelemetry setup, with the access-token redaction; the Langfuse client (which only looked alike, and stayed per library: [ADR-0020](0020-the-telemetry-contract-needs-no-extra.md)); the MCP server's logging guard; the LiteLLM model; `tag_required`; and the search for a NUL character;
 - in artifactr, reflexr and portalr: the REST routers' refusal schema, `RejectionDetail`, `FieldError`, `Refused` and `REFUSALS`.
 
 ## Decision
@@ -25,7 +25,7 @@ What is copied, word for word but for the package's name:
 - **It moves in over four pull requests,** each removing the markers it resolves:
   1. the package, with `tag_required` and the NUL search;
   2. the SQL helpers, behind a `sql` extra, for artifactr, reflexr, grantr and relayr;
-  3. the OpenTelemetry setup and the redaction, the Langfuse client, the MCP logging guard and the LiteLLM model, behind extras, for artifactr and reflexr;
+  3. the OpenTelemetry setup and the redaction, the MCP logging guard, the LiteLLM model and Langfuse's span filters, behind extras, for artifactr and reflexr (the Langfuse client stayed per library, see [ADR-0020](0020-the-telemetry-contract-needs-no-extra.md));
   4. the routers' refusal schema, in `lattice_core.fastapi` behind a `fastapi` extra, for artifactr, reflexr and portalr.
 
 ## Options considered

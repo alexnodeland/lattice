@@ -19,13 +19,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Final, Literal
 
+from lattice_core.otel.contribution import MetricsDetail
 from reflexr.telemetry import attributes as a
 
 type Instrument = Literal["counter", "up_down_counter", "histogram", "gauge"]
 """The kind of OpenTelemetry instrument a metric is recorded with."""
-
-type MetricsDetail = Literal["workspace", "tenant", "none"]
-"""How much tenancy detail metrics keep: tenant and workspace, the tenant only, or neither."""
 
 SCOPE: Final = "reflexr"
 """The instrumentation scope of reflexr's own spans and metrics."""

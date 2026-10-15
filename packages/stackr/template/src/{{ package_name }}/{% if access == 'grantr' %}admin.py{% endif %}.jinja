@@ -190,6 +190,8 @@ async def run(arguments: Sequence[str], settings: Settings) -> str:
             )
         if url.username == admin.username:
             parser.error("DATABASE_URL must name a role of its own, not the tables' owner")
+        if url.database != admin.database:
+            parser.error("DATABASE_URL and DATABASE_ADMIN_URL must name the same database")
         return await db_roles(admin, url.username, url.password, settings.database_schema)
     database = open_database(
         settings.database_url,
@@ -244,13 +246,17 @@ def create_role(connection: Connection, role: str, password: str, schema: str) -
 
     It runs as the tables' owner, which must be allowed to create roles. The password is sent
     as a SCRAM-SHA-256 verifier, never in the clear, as psql's password command does. Running it
-    again sets the password again, so a changed ``DATABASE_URL`` takes effect.
+    again sets the password again, so a changed ``DATABASE_URL`` takes effect. The role's
+    ``search_path`` is its schema, in this database: a connection asks for it too, but a proxy
+    that drops what a client asks for at its start, as Floci's RDS does, would leave the role
+    without its tables.
 
     Raises:
         Invalid: If the role is a superuser, bypasses row-level security, or owns the schema
             or is a member of its owner's role.
     """
-    quoted = connection.dialect.identifier_preparer.quote(role)
+    preparer = connection.dialect.identifier_preparer
+    quoted = preparer.quote(role)
     found = connection.scalar(text("SELECT 1 FROM pg_roles WHERE rolname = :role"), {"role": role})
     verb = "ALTER" if found else "CREATE"
     connection.exec_driver_sql(f"{verb} ROLE {quoted} LOGIN PASSWORD '{scram_verifier(password)}'")
@@ -264,6 +270,10 @@ def create_role(connection: Connection, role: str, password: str, schema: str) -
     )
     if exempt:
         raise Invalid(f"{role} owns the schema, or bypasses row-level security: name another")
+    database = preparer.quote(connection.scalar(text("SELECT current_database()")))
+    connection.exec_driver_sql(
+        f"ALTER ROLE {quoted} IN DATABASE {database} SET search_path TO {preparer.quote(schema)}"
+    )
 
 
 def scram_verifier(password: str, *, salt: bytes | None = None) -> str:

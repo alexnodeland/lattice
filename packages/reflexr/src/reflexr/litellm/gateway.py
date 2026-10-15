@@ -7,20 +7,29 @@ from collections.abc import AsyncIterable, Awaitable, Callable, Mapping, Sequenc
 from dataclasses import dataclass
 from typing import Any, cast, override
 
-import httpx2
 from opentelemetry import propagate
 from pydantic_ai import AgentStreamEvent, RunContext
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.messages import ModelResponse
 from pydantic_ai.models import ModelRequestContext
-from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic_ai.providers.litellm import LiteLLMProvider
 from pydantic_ai.settings import ModelSettings
 
+from lattice_core.litellm import litellm_model
+from lattice_core.tags import request_tags
 from reflexr.core import RuleName, TenantId, UserActor, WorkspaceId
 from reflexr.telemetry import current_trace_id
 from reflexr.workspace import Reaction, RunFailure
+
+__all__ = [
+    "GUARDRAIL_BLOCKED",
+    "GuardrailBlocked",
+    "GuardrailPolicy",
+    "LiteLLMGateway",
+    "TenantKey",
+    "guardrail_block",
+    "litellm_model",
+]
 
 TenantKey = Callable[[TenantId], Awaitable[str | None]]
 """Returns the LiteLLM virtual key of a tenant's team, or None for the model's own key.
@@ -72,40 +81,6 @@ def guardrail_block(error: ModelHTTPError) -> GuardrailBlocked | None:
     return GuardrailBlocked(name.group(1) if name else None)
 
 
-def litellm_model(
-    model: str,
-    *,
-    api_base: str | None = None,
-    api_key: str | None = None,
-    http_client: httpx2.AsyncClient | None = None,
-    settings: ModelSettings | None = None,
-) -> OpenAIChatModel:
-    """Return a pydantic-ai model that calls a LiteLLM proxy's model group.
-
-    Routing, fallbacks, budgets and guardrails are the proxy's configuration; the model only
-    names the group.
-
-    Shared verbatim with artifactr's ``src/artifactr/litellm/gateway.py``; change both.
-
-    Args:
-        model: The proxy's model group, such as ``claude-sonnet``.
-        api_base: The proxy's URL, such as ``http://litellm:4000``. Defaults to the provider's
-            environment variables.
-        api_key: The proxy key used when a request carries no tenant's key.
-        http_client: The HTTP client, for tests or a shared connection pool.
-        settings: The model's default settings, as every pydantic-ai model takes them, such as
-            a ``temperature``, or ``extra_body={"mock_response": "..."}`` for a reply the proxy
-            mocks. An agent's or a run's ``model_settings`` override them key by key, so an
-            ``extra_body`` there replaces this one; :class:`LiteLLMGateway` adds its metadata
-            to whichever ``extra_body`` a request ends up with.
-    """
-    if http_client is None:
-        provider = LiteLLMProvider(api_key=api_key, api_base=api_base)
-    else:
-        provider = LiteLLMProvider(api_key=api_key, api_base=api_base, http_client=http_client)
-    return OpenAIChatModel(model, provider=provider, settings=settings)
-
-
 @dataclass
 class LiteLLMGateway(AbstractCapability[Reaction[Any]]):
     """Attach tenancy, the chain, the trace, a tenant's key and guardrails to each request.
@@ -120,13 +95,18 @@ class LiteLLMGateway(AbstractCapability[Reaction[Any]]):
     - the guardrails the rule's policy names
     - the tenant's virtual key, as the request's ``Authorization``, from ``tenant_key``
 
+    An ``extra_body`` the settings already carry is kept beside the gateway's metadata, so a
+    model's ``extra_body={"mock_response": "..."}`` still has the proxy mock its reply.
+
     A request a guardrail blocks fails the attempt with a :class:`GuardrailBlocked`: the run is
     dead-lettered as ``guardrail_blocked``, never retried.
 
     Args:
         tenant_key: Returns a tenant's LiteLLM key; the model's own key is used without one.
         guardrails: Returns the guardrails a rule's requests use in a workspace.
-        tags: More tags for every request, such as the application's name.
+        tags: More tags for every request, such as the application's name. They must not
+            repeat the gateway's own, nor start as they do: ``reflexr``, ``tenant:``,
+            ``workspace:``, ``tenant-workspace:`` or ``rule:``.
     """
 
     tenant_key: TenantKey | None = None
@@ -160,8 +140,7 @@ class LiteLLMGateway(AbstractCapability[Reaction[Any]]):
             "session_id": run.correlation_id,
             "tags": [
                 "reflexr",
-                f"tenant:{tenant_id}",
-                f"workspace:{workspace_id}",
+                *request_tags(tenant_id, workspace_id),
                 f"rule:{run.rule}",
                 *self.tags,
             ],

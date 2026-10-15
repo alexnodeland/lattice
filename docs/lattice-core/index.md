@@ -18,8 +18,14 @@ What lattice's packages share and must keep identical. artifactr, reflexr and gr
 | [`lattice_core.schema`](reference.md#lattice_coreschema) | `tag_required`, which makes a union member's tag required in its JSON Schema | artifactr, reflexr |
 | [`lattice_core.text`](reference.md#lattice_coretext) | `holds_nul`, which finds a NUL character, which PostgreSQL's text can't store, anywhere in a value | artifactr, reflexr |
 | [`lattice_core.sql`](reference.md#lattice_coresql) (the `sql` extra) | `create_sqlite_engine`, whose transactions take turns; `TenantSession`, `tenant_policy` and `grant`, for row-level security; and `to_the_end`, `awaited_to_the_end` and `lock_row`, which await a database call to its end and lock a row | artifactr, reflexr, grantr, relayr |
+| [`lattice_core.otel.contribution`](reference.md#lattice_coreotelcontribution) | The contract a library's contribution follows: `Contribution`, `TelemetryContribution`, `MetricsDetail` and `Instrumented` ([ADR-0020](../adr/0020-the-telemetry-contract-needs-no-extra.md)) | artifactr, reflexr, relayr |
+| [`lattice_core.otel.configure`](reference.md#lattice_coreotelconfigure) (the `otel` extra) | `configure_telemetry`, `TelemetryHandle` and the contributions it composes, the tenant on every span's records, and `redact_access_token` | artifactr, reflexr |
+| [`lattice_core.langfuse`](reference.md#lattice_corelangfuse) (the `langfuse` extra) | `span_filter` and `no_spans`, a Langfuse client's span filters | artifactr, reflexr |
+| [`lattice_core.litellm`](reference.md#lattice_corelitellm) (the `litellm` extra) | `litellm_model`, a pydantic-ai model over a LiteLLM proxy's model group | artifactr, reflexr |
+| [`lattice_core.tags`](reference.md#lattice_coretags) | `request_tags`, the tags that file a model request's spend under its tenant and workspace, and `workspace_tag` and `parse_workspace_tag`, which write and read the `tenant-workspace:` tag ([ADR-0019](../adr/0019-a-tag-for-each-tenants-workspace.md)) | artifactr, reflexr, portalr |
+| [`lattice_core.logs`](reference.md#lattice_corelogs) | `logging_left_alone`, which puts the root logger back as it was | artifactr, reflexr |
 
-The OpenTelemetry setup and the REST routers' refusal schema move here next, as ADR-0018 plans.
+The REST routers' refusal schema moves here next, as ADR-0018 plans.
 
 ## What belongs here
 

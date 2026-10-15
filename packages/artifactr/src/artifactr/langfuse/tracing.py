@@ -1,7 +1,7 @@
 """Traces in Langfuse: span filters that keep whole traces, or none, and a turn's attributes."""
 
 import contextlib
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator
 from typing import Any
 
 from langfuse import propagate_attributes
@@ -11,6 +11,16 @@ from opentelemetry.sdk.trace import ReadableSpan
 from artifactr.agent import Session
 from artifactr.core import UserActor
 from artifactr.telemetry import is_trace_scope
+from lattice_core.langfuse import no_spans, span_filter
+
+__all__ = [
+    "MAX_ATTRIBUTE",
+    "langfuse_turn",
+    "no_spans",
+    "should_export_span",
+    "span_filter",
+    "turn_attributes",
+]
 
 MAX_ATTRIBUTE = 200
 """The longest trace attribute value Langfuse accepts."""
@@ -26,30 +36,6 @@ def should_export_span(span: ReadableSpan) -> bool:
     """
     scope = span.instrumentation_scope.name if span.instrumentation_scope else ""
     return is_trace_scope(scope) or is_default_export_span(span)
-
-
-def span_filter(*keeps: Callable[[ReadableSpan], bool]) -> Callable[[ReadableSpan], bool]:
-    """Return a span filter that keeps Langfuse's LLM spans and every span one of ``keeps`` keeps.
-
-    ``configure_telemetry(langfuse="traces")`` builds its filter this way, from the libraries'
-    contributions (ADR-0046), so an application of several libraries keeps each one's spans.
-    """
-
-    def keep(span: ReadableSpan) -> bool:
-        return is_default_export_span(span) or any(kept(span) for kept in keeps)
-
-    return keep
-
-
-def no_spans(span: ReadableSpan) -> bool:
-    """Keep no spans: the filter for a client that only sets trace attributes and sends scores.
-
-    ``configure_telemetry(langfuse="scores")`` uses it when a Collector sends Langfuse every
-    trace already, so no span arrives twice. The client's span processor still sets each
-    turn's session, user and tags on the spans, which reach Langfuse through the Collector.
-    """
-    del span
-    return False
 
 
 async def turn_attributes(session: Session[Any]) -> dict[str, Any]:

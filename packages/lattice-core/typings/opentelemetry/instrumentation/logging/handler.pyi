@@ -1,4 +1,4 @@
-"""Minimal type stubs for the parts of opentelemetry-instrumentation-logging artifactr uses."""
+"""Minimal type stubs for the parts of opentelemetry-instrumentation-logging lattice-core uses."""
 
 import logging
 

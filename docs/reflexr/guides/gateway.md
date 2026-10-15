@@ -47,7 +47,7 @@ The agent's and each run's `model_settings` override these key by key, so an `ex
 | Where | What | Used by LiteLLM for |
 |---|---|---|
 | `metadata.tenant_id`, `workspace_id`, `rule`, `scope`, `run_id` | reflexr's ids | Spend and logs by tenant, workspace and rule |
-| `metadata.tags` | `reflexr`, `tenant:<id>`, `workspace:<id>`, `rule:<name>`, and yours | Tag-based spend tracking and routing |
+| `metadata.tags` | `reflexr`, `tenant:<id>`, `workspace:<id>`, `tenant-workspace:<tenant>/<workspace>` with each id percent-encoded, `rule:<name>`, and yours ([lattice ADR-0019](../../adr/0019-a-tag-for-each-tenants-workspace.md)) | Tag-based spend tracking and routing, and each tenant's workspaces' spend |
 | `metadata.session_id` | The run's causal chain | Grouping every request one incident caused into one session |
 | `metadata.trace_user_id` | The person whose event made the rule fire, when a person published it | Users in its Langfuse logging |
 | `metadata.existing_trace_id`, and the `traceparent` header | The run attempt's trace, when telemetry is configured | Joining the attempt's trace in Langfuse and OpenTelemetry |

@@ -117,7 +117,13 @@ async def test_each_request_carries_the_tenant_session_trace_key_and_guardrails(
         "thread_id": thread.id,
         "run_id": handle.run_id,
         "session_id": thread.id,
-        "tags": ["artifactr", "tenant:acme", "workspace:launch", "docplan"],
+        "tags": [
+            "artifactr",
+            "tenant:acme",
+            "workspace:launch",
+            "tenant-workspace:acme/launch",
+            "docplan",
+        ],
         "trace_user_id": "alice",
         "existing_trace_id": trace_id(turn),
     }

@@ -19,6 +19,7 @@ from artifactr.agent import RunFailure, Session
 from artifactr.core import TenantId, UserActor, WorkspaceId
 from artifactr.telemetry import current_trace_id
 from lattice_core.litellm import litellm_model
+from lattice_core.tags import request_tags
 
 __all__ = [
     "GUARDRAIL_BLOCKED",
@@ -99,7 +100,9 @@ class LiteLLMGateway(AbstractCapability[Session[Any]]):
     Args:
         tenant_key: Returns a tenant's LiteLLM key; the model's own key is used without one.
         guardrails: Returns the guardrails a workspace's requests use.
-        tags: More tags for every request, such as the application's name.
+        tags: More tags for every request, such as the application's name. They must not
+            repeat the gateway's own, nor start as they do: ``artifactr``, ``tenant:``,
+            ``workspace:`` or ``tenant-workspace:``.
     """
 
     tenant_key: TenantKey | None = None
@@ -127,7 +130,7 @@ class LiteLLMGateway(AbstractCapability[Session[Any]]):
             "thread_id": session.thread_id,
             "run_id": session.run_id,
             "session_id": session.thread_id,
-            "tags": ["artifactr", f"tenant:{tenant_id}", f"workspace:{workspace_id}", *self.tags],
+            "tags": ["artifactr", *request_tags(tenant_id, workspace_id), *self.tags],
         }
         if isinstance(person := session.on_behalf_of, UserActor):
             metadata["trace_user_id"] = person.id

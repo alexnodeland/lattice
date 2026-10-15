@@ -24,6 +24,7 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0016](0016-a-merge-queue-on-mergify.md) | A merge queue on Mergify | Accepted |
 | [0017](0017-ci-installs-its-toolchain-from-a-cache-with-retries.md) | CI installs its toolchain from a cache, with retries | Accepted |
 | [0018](0018-lattice-core-what-the-libraries-share.md) | lattice-core, what the libraries share | Accepted, amended by [0020](0020-the-telemetry-contract-needs-no-extra.md) |
+| [0019](0019-a-tag-for-each-tenants-workspace.md) | A tag for each tenant's workspace | Accepted |
 | [0020](0020-the-telemetry-contract-needs-no-extra.md) | The telemetry contract needs no extra | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

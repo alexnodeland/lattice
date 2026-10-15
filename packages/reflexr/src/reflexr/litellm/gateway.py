@@ -16,6 +16,7 @@ from pydantic_ai.models import ModelRequestContext
 from pydantic_ai.settings import ModelSettings
 
 from lattice_core.litellm import litellm_model
+from lattice_core.tags import request_tags
 from reflexr.core import RuleName, TenantId, UserActor, WorkspaceId
 from reflexr.telemetry import current_trace_id
 from reflexr.workspace import Reaction, RunFailure
@@ -103,7 +104,9 @@ class LiteLLMGateway(AbstractCapability[Reaction[Any]]):
     Args:
         tenant_key: Returns a tenant's LiteLLM key; the model's own key is used without one.
         guardrails: Returns the guardrails a rule's requests use in a workspace.
-        tags: More tags for every request, such as the application's name.
+        tags: More tags for every request, such as the application's name. They must not
+            repeat the gateway's own, nor start as they do: ``reflexr``, ``tenant:``,
+            ``workspace:``, ``tenant-workspace:`` or ``rule:``.
     """
 
     tenant_key: TenantKey | None = None
@@ -137,8 +140,7 @@ class LiteLLMGateway(AbstractCapability[Reaction[Any]]):
             "session_id": run.correlation_id,
             "tags": [
                 "reflexr",
-                f"tenant:{tenant_id}",
-                f"workspace:{workspace_id}",
+                *request_tags(tenant_id, workspace_id),
                 f"rule:{run.rule}",
                 *self.tags,
             ],

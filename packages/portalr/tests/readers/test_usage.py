@@ -151,8 +151,76 @@ async def test_every_page_is_read_up_to_the_most(monkeypatch: Any) -> None:
     read = await read_usage(LiteLLM("http://litellm", tool.client()), ACME, query)
     assert isinstance(read, Ok)
     assert not read.data.complete
-    # The third day was never reached: it is unknown, not 0, so it isn't in the answer.
-    assert [(d.day.day, d.spend) for d in read.data.days] == [(11, 1.0), (12, 1.0)]
+    # The third day was never reached, and the second, read last, may be part-read: both are
+    # unknown, not 0, so neither is in the answer.
+    assert [(d.day.day, d.spend) for d in read.data.days] == [(11, 1.0)]
+
+
+async def test_a_day_with_no_spend_inside_what_a_partial_read_reached_is_a_measured_zero(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setattr("portalr.readers.usage.MOST_PAGES", 3)
+    # Rows for the 11th, the 13th and the 14th, and no row for the 12th: nothing was spent.
+    on = {1: "2026-10-11", 2: "2026-10-13", 3: "2026-10-14"}
+
+    def pages(request: httpx.Request) -> httpx.Response:
+        page = int(request.url.params["page"])
+        return httpx.Response(
+            200,
+            json={
+                "results": [day(on[page], **{"tenant-acme": (1.0, 1, 1)})],
+                "metadata": {"page": page, "total_pages": 9},
+            },
+        )
+
+    tool = Tool({"/team/info": json(INFO), "/team/daily/activity": pages})
+    query = UsageQuery(start=START, end=START + timedelta(days=5))
+    read = await read_usage(LiteLLM("http://litellm", tool.client()), ACME, query)
+    assert isinstance(read, Ok)
+    assert not read.data.complete
+    # The 14th was read last, and the 15th never: left out. The 12th is a 0 between two reads.
+    assert [(d.day.day, d.spend) for d in read.data.days] == [(11, 1.0), (12, 0), (13, 1.0)]
+
+
+async def test_a_partial_read_of_one_day_leaves_it_out_as_it_may_be_part_read(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setattr("portalr.readers.usage.MOST_PAGES", 1)
+    team = {
+        "results": [day("2026-10-11", **{"tenant-acme": (1.0, 1, 1)})],
+        "metadata": {"page": 1, "total_pages": 2},
+    }
+    tool = Tool({"/team/info": json(INFO), "/team/daily/activity": json(team)})
+    query = UsageQuery(start=START, end=START + timedelta(days=2))
+    read = await read_usage(LiteLLM("http://litellm", tool.client()), ACME, query)
+    assert isinstance(read, Ok)
+    assert not read.data.complete
+    assert read.data.days == []
+
+
+async def test_a_tags_activity_stopped_at_the_page_cap_makes_the_read_partial(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setattr("portalr.readers.usage.MOST_PAGES", 1)
+    team = {"results": [day("2026-10-11", **{"tenant-acme": (1.0, 1, 1)})]}
+    tags = {
+        "results": [day("2026-10-11", **{"tenant-workspace:acme/notes": (0.5, 5, 1)})],
+        "metadata": {"page": 1, "total_pages": 2},
+    }
+    tool = Tool(
+        {
+            "/team/info": json(INFO),
+            "/team/daily/activity": json(team),
+            "/tag/daily/activity": json(tags),
+        }
+    )
+    query = UsageQuery(start=START, end=START + timedelta(days=1), workspaces=["notes"])
+    read = await read_usage(LiteLLM("http://litellm", tool.client()), ACME, query)
+    assert isinstance(read, Ok)
+    # The team's days were read to their end; only the workspaces' split is partial.
+    assert not read.data.complete
+    assert [d.spend for d in read.data.days] == [1.0]
+    assert [(w.workspace, w.spend) for w in read.data.workspaces] == [("notes", 0.5)]
 
 
 async def test_a_day_split_across_pages_is_summed() -> None:

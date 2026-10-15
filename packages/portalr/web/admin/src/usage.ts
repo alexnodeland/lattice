@@ -22,7 +22,7 @@ export const shownOf = (search: Record<string, unknown>): Required<Shown> => ({
   days: daysOf(search.days),
 });
 
-/** The most workspaces one read splits the spend by: portalr's `MOST_WORKSPACES`, as it allows. */
+/** The most workspaces one read splits the spend by: portalr's `MOST_WORKSPACES`, which the schema's `maxItems` pins in a test. */
 export const MOST_WORKSPACES = 50;
 
 /** The workspaces a read asks after: the tenant's, in order, fifty at most. */
@@ -47,6 +47,36 @@ export function levelOf(spend: number, share: number): number {
   }
   return spend >= share * 0.8 ? 2 : 1;
 }
+
+const UNITS: Record<string, [one: string, many: string]> = {
+  s: ["second", "seconds"],
+  m: ["minute", "minutes"],
+  h: ["hour", "hours"],
+  d: ["day", "days"],
+  w: ["week", "weeks"],
+  mo: ["month", "months"],
+};
+
+const NAMED = { hourly: "an hour", daily: "a day", weekly: "a week", monthly: "a month" } as const;
+
+/** A LiteLLM budget duration in words, after "of $90.00": `30d` as "over 30 days", `monthly` as "a month". */
+export function durationSaid(duration: string): string {
+  const named = NAMED[duration.trim().toLowerCase() as keyof typeof NAMED];
+  if (named) {
+    return named;
+  }
+  const [, count = "", unit = ""] = /^(\d+)(mo|[smhdw])$/.exec(duration.trim()) ?? [];
+  const words = UNITS[unit];
+  return words ? `over ${count} ${Number(count) === 1 ? words[0] : words[1]}` : `per ${duration}`;
+}
+
+/** What a tracker of days against the budget's share is called: the share, and the budget it is of. */
+export const trackerLabel = (share: number, budget: Usage["budget"]) =>
+  `Each day's spend against its share of the budget: ${dollars(share)} a day${
+    budget?.max_budget
+      ? `, of ${dollars(budget.max_budget)} ${durationSaid(budget.budget_duration ?? "")}`
+      : ""
+  }`;
 
 /** A day as an axis reads it, in UTC: `10-13`. The tables and titles keep the whole date. */
 export const short = (day: string) => day.slice(5);

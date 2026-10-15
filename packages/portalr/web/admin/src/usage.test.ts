@@ -1,14 +1,20 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test } from "vitest";
 import {
   askedOf,
   blocksOf,
+  durationSaid,
   LEVELS,
   levelOf,
   MOST_WORKSPACES,
   partsOf,
   short,
   shownOf,
+  trackerLabel,
 } from "./usage";
+
+const PORTALR_SCHEMA = join(import.meta.dirname, "../../../schemas/portalr.openapi.json");
 
 const usage = {
   days: [
@@ -24,6 +30,30 @@ const usage = {
   daily_budget: 3,
   complete: true,
 };
+
+test("a budget's duration is read in words", () => {
+  expect(durationSaid("30d")).toBe("over 30 days");
+  expect(durationSaid("1mo")).toBe("over 1 month");
+  expect(durationSaid("2w")).toBe("over 2 weeks");
+  expect(durationSaid(" Monthly ")).toBe("a month");
+  expect(durationSaid("hourly")).toBe("an hour");
+  expect(durationSaid("soon")).toBe("per soon");
+  expect(trackerLabel(3, { spend: 6, max_budget: 90, budget_duration: "30d" })).toBe(
+    "Each day's spend against its share of the budget: $3.00 a day, of $90.00 over 30 days",
+  );
+  expect(trackerLabel(3, { spend: 6, max_budget: null, budget_duration: null })).toBe(
+    "Each day's spend against its share of the budget: $3.00 a day",
+  );
+});
+
+test("the most workspaces is what the schema allows", () => {
+  const schema = JSON.parse(readFileSync(PORTALR_SCHEMA, "utf8"));
+  const parameters: { name: string; schema: { maxItems: number } }[] =
+    schema.paths["/portalr/v1/usage"].get.parameters;
+  expect(parameters.find((one) => one.name === "workspaces")?.schema.maxItems).toBe(
+    MOST_WORKSPACES,
+  );
+});
 
 test("the address keeps a window Usage offers", () => {
   expect(shownOf({})).toEqual({ days: 7 });

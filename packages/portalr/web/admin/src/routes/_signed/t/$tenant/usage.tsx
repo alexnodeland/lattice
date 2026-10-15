@@ -27,6 +27,7 @@ import {
   type Shown,
   short,
   shownOf,
+  trackerLabel,
 } from "../../../../usage";
 import { WINDOWS, windowOf } from "../../../../window";
 
@@ -114,8 +115,9 @@ function UsagePage() {
       {!usage.complete && (
         <p role="status" className="flex flex-wrap items-center gap-2 text-muted text-sm">
           <StatusBadge tone="stopped">Partial</StatusBadge>
-          The read stopped at one of its bounds. Days it didn't reach are left out, not shown as
-          nothing spent, and the sums are of what it read. A shorter window may read it all.
+          The read stopped at one of its bounds. The days it didn't reach, and the last it read,
+          which may be part-read, are left out, not shown as nothing spent, and the sums are of what
+          it read. A shorter window may read it all.
         </p>
       )}
       <Spent usage={usage} />
@@ -141,7 +143,7 @@ function Spent({ usage }: { usage: Usage }) {
       </p>
       {share != null && budget && (
         <Tracker
-          label={`Each day's spend against its share of the budget: ${dollars(share)} a day, of ${dollars(budget.max_budget ?? 0)} every ${budget.budget_duration}`}
+          label={trackerLabel(share, budget)}
           index={DAY.name}
           figure="Spend"
           levels={LEVELS}

@@ -21,16 +21,13 @@ from datetime import date, timedelta
 from typing import Final, Self
 from urllib.parse import quote, unquote
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
 
 from portalr.readers.http import read
 from portalr.readers.litellm import LiteLLM, Spend, team
-from portalr.readers.query import Id, Span, day_of, days_in
+from portalr.readers.query import BoundedSpan, Id, day_of, days_in
 from portalr.readers.reading import Ok, Unavailable
 from portalr.tenant import Tenant
-
-MOST_DAYS: Final = 91
-"""The longest window a read sums, in days, as Feedback's."""
 
 MOST_WORKSPACES: Final = 50
 """The most workspaces one read asks after."""
@@ -90,7 +87,7 @@ def tagged_workspace(tenant: Tenant, tag: str) -> str | None:
     return unquote(workspace)
 
 
-class UsageQuery(Span):
+class UsageQuery(BoundedSpan):
     """Which usage to read: a window of at most ``MOST_DAYS``, and the workspaces to split it by.
 
     LiteLLM sums by whole UTC day, so the window is read as the days it touches: its first and
@@ -105,12 +102,6 @@ class UsageQuery(Span):
     @classmethod
     def _each_once(cls, workspaces: list[str]) -> list[str]:
         return list(dict.fromkeys(workspaces))
-
-    @model_validator(mode="after")
-    def _within_most_days(self) -> Self:
-        if self.end - self.start > timedelta(days=MOST_DAYS):
-            raise ValueError(f"a window is at most {MOST_DAYS} days")
-        return self
 
 
 class DaySpend(BaseModel):
@@ -141,7 +132,8 @@ class Usage(BaseModel):
 
     days: list[DaySpend]
     """Each day of the window, a day with no spend as 0; but where the read stopped short, only
-    the days it read: a day it never reached is unknown, not 0, and isn't here."""
+    the span of days it read whole, less the last it read, which may be part-read: a day it never
+    reached is unknown, not 0, and isn't here."""
     workspaces: list[WorkspaceSpend]
     """The most spent first; a workspace with nothing recorded under its tag isn't in it."""
     budget: Spend | None
@@ -158,8 +150,8 @@ class _Metrics(BaseModel):
     total_tokens: int = 0
     api_requests: int = 0
 
-    def __add__(self, other: "_Metrics") -> "_Metrics":
-        return _Metrics(
+    def __add__(self, other: Self) -> Self:
+        return type(self)(
             spend=self.spend + other.spend,
             total_tokens=self.total_tokens + other.total_tokens,
             api_requests=self.api_requests + other.api_requests,
@@ -201,8 +193,8 @@ class _Found:
     )
     pages: int = 0
     complete: bool = False
-    days: set[date] = field(default_factory=set[date])
-    """The days the pages held, whoever's spend was on them."""
+    days: dict[date, None] = field(default_factory=dict[date, None])
+    """The days the pages held, whoever's spend was on them, in the order they were read."""
 
 
 class _Stop(Exception):
@@ -231,7 +223,7 @@ async def _activity(
         if answer is None or isinstance(answer, Unavailable):
             return answer or Unavailable(reason=f"litellm has no {path} at that address")
         for day in answer.results:
-            found.days.add(day.date)
+            found.days[day.date] = None
             # Only what was asked for: another team's, or another tenant's tag, is left out.
             for entity, metrics in day.breakdown.entities.items():
                 if (kept := keep(entity)) is not None:
@@ -243,6 +235,19 @@ async def _activity(
             found.complete = True
             return None
     return None
+
+
+def _reached(window: list[date], read: dict[date, None]) -> list[date]:
+    """The days of the window a partial read reached, and read whole.
+
+    That is the span of the days it read, less the one it read last, which a stop may have cut
+    short, since LiteLLM pages its rows before it groups them by day. A day with no spend inside
+    the span is a measured nothing, and is in it.
+    """
+    whole = list(read)[:-1]
+    if not whole:
+        return []
+    return [day for day in window if min(whole) <= day <= max(whole)]
 
 
 def _days(by_day: dict[date, _Metrics], days: list[date]) -> list[DaySpend]:
@@ -328,7 +333,7 @@ async def read_usage(
     # Every day of the window where the team's activity was read to its end, zeros measured; else
     # the days it did reach, so a day never read isn't drawn as nothing spent.
     window = days_in(query)
-    days = window if teams.complete else [day for day in window if day in teams.days]
+    days = window if teams.complete else _reached(window, teams.days)
     workspaces = [
         WorkspaceSpend(
             workspace=workspace,

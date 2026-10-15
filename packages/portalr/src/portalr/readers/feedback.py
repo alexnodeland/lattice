@@ -10,12 +10,12 @@ given; a score is counted on the day it was given.
 
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from typing import Final, Self
+from typing import Final
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict
 
 from portalr.readers.langfuse import Langfuse, Score, Scores
-from portalr.readers.query import Id, Span, day_of, days_in
+from portalr.readers.query import BoundedSpan, Id, Span, day_of, days_in
 from portalr.readers.reading import Ok, Unavailable
 from portalr.tenant import Tenant
 
@@ -25,20 +25,11 @@ COMMENTS: Final = 20
 THUMBS: Final = "thumbs"
 """The feedback type whose yes-or-no scores are thumbs."""
 
-MOST_DAYS: Final = 91
-"""The longest window a summary sums, in days: a quarter, and a day's slack for its edges."""
 
-
-class FeedbackQuery(Span):
+class FeedbackQuery(BoundedSpan):
     """Which feedback to sum: a window of at most ``MOST_DAYS``, and one workspace's, or all."""
 
     workspace: Id | None = None
-
-    @model_validator(mode="after")
-    def _within_most_days(self) -> Self:
-        if self.end - self.start > timedelta(days=MOST_DAYS):
-            raise ValueError(f"a window is at most {MOST_DAYS} days")
-        return self
 
 
 class Thumbs(BaseModel):

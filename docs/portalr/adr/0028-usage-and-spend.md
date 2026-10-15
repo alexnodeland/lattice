@@ -1,7 +1,7 @@
 # ADR-0028: Usage and spend, per day and per workspace, against the budget's share
 
 **Status:** Accepted
-**Date:** 2026-10-13
+**Date:** 2026-10-15
 **Deciders:** Alex Nodeland
 
 ## Context
@@ -29,7 +29,7 @@ Usage reads as Feedback does, within bounds:
   - `workspace_tag` and `tagged_workspace` are portalr's own until lattice-core's helpers (lattice ADR-0019, PR #190) merge; then they move there, and portalr's keep only the test that a `%` in an id round-trips.
   - This is the format relayr's lattice-core helper sends. Until that PR merges, portalr is built against fixtures in it.
 - **`GET /portalr/v1/usage`**, for whoever may read the tenant's spend (`portalr:read_spend`), takes a window, at most 91 days, and up to 50 `workspaces`, each asked after once. It answers:
-  - `days`: the team's spend, tokens and requests on each day the window touches, in UTC, from `/team/daily/activity`, asked for the tenant's team alone. Where the read ran to its end, every day is in it, one with no spend as 0. Where it stopped short, only the days it reached are, since a day it never reached is unknown, not nothing spent, as Feedback's `known_from` says of its days;
+  - `days`: the team's spend, tokens and requests on each day the window touches, in UTC, from `/team/daily/activity`, asked for the tenant's team alone. Where the read ran to its end, every day is in it, one with no spend as 0. Where it stopped short, only the span of days it read whole is, less the day it read last. LiteLLM pages its rows before it groups them by day, so a stop may have cut that day short: its figure would be understated, and the Tracker could call it "under" when it isn't. A day with no row inside the span is a measured 0, and is in it. A day beyond it is unknown, not nothing spent, as Feedback's `known_from` says of its days;
   - `workspaces`: each named workspace's spend and tokens over the window, from `/tag/daily/activity`, the most spent first. A workspace with nothing under its tag isn't in it. No per-day figure is sent: nothing shows one;
   - `budget`: the team's spend and budget, from `/team/info`. It is None for a tenant with no team, and where the deadline came before `/team/info` answered, which only a partial read can be; the day's share is then None with it;
   - `daily_budget`: a day's share of the budget;
@@ -49,7 +49,7 @@ Usage reads as Feedback does, within bounds:
   - The workspaces to split by are the tenant's from artifactr, in order, at most 50. If artifactr refuses the list, the spend is read whole, and the page says so. Where there are more than 50, it says only the first 50 are split out.
 - **The page:**
   - It shows the window's spend and requests, and the spend per day as a bar chart.
-  - Where the team has a budget with a share, a Tracker shows each day against that share: nothing spent, under it, near it (80% or more), or over it. A day a partial read never reached is no block and no bar.
+  - Where the team has a budget with a share, a Tracker shows each day against that share: nothing spent, under it, near it (80% or more), or over it. A day a partial read never reached, and the last it read, is no block and no bar.
   - Each workspace's part is a donut, with what no workspace's tag holds as "No workspace", and every workspace is in a table. "No workspace" is the team's total less the workspaces', so it is shown only where both reads ran to their end: a partial read's two totals cover different days.
   - The tables and tooltips give the whole date, and the bars' axis the date without its year.
   - Beneath, quietly: "Spend recorded before the libraries tagged each request with its workspace has no workspace split, and is counted under 'No workspace'."
@@ -76,4 +76,4 @@ Usage reads as Feedback does, within bounds:
 - Harder:
   - Until the gateways send the tag, no spend has a workspace. A workspace past the first 50 is under "No workspace".
   - Today's block is a part of a day against a whole day's share.
-  - After a partial read, some days are unknown and left out, and "No workspace" isn't shown.
+  - After a partial read, some days are unknown and left out, with the last day read, and "No workspace" isn't shown.

@@ -53,6 +53,20 @@ class Span(BaseModel):
         return self
 
 
+MOST_DAYS: Final = 91
+"""The longest window a read sums, in days: a quarter, and a day's slack for its edges."""
+
+
+class BoundedSpan(Span):
+    """A span of at most ``MOST_DAYS``, for a read that sums by day."""
+
+    @model_validator(mode="after")
+    def _within_most_days(self) -> Self:
+        if self.end - self.start > timedelta(days=MOST_DAYS):
+            raise ValueError(f"a window is at most {MOST_DAYS} days")
+        return self
+
+
 class Window(Span):
     """A span of time, and how many results to return from it."""
 

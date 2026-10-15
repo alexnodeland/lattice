@@ -115,7 +115,7 @@ test("the week's spend, each day against its share, and each workspace's part", 
     .click();
   await expect.element(screen.getByText("$7.00")).toBeVisible();
   const tracker = screen.getByRole("figure", {
-    name: "Each day's spend against its share of the budget: $3.00 a day, of $90.00 every 30d",
+    name: "Each day's spend against its share of the budget: $3.00 a day, of $90.00 over 30 days",
   });
   await expect.element(tracker).toBeVisible();
   await tracker.getByText("Show the figures").click();
@@ -165,11 +165,13 @@ test("without artifactr's list, the spend is read whole, and says so", async () 
 test("a partial read says so, with a badge", async () => {
   shape = "partial";
   const { screen } = await open("/t/acme/usage");
-  await expect.element(screen.getByText(/Days it didn't reach are left out/)).toBeVisible();
+  await expect.element(screen.getByText(/The days it didn't reach/)).toBeVisible();
   // The four days never reached are no blocks and no bars, not nothing spent.
   const tracker = screen.getByRole("figure", { name: /against its share of the budget/ });
   await tracker.getByText("Show the figures").click();
-  await expect.poll(() => tracker.getByRole("row").elements()).toHaveLength(4);
+  // Three days, and the table's header row.
+  const rows = 3 + 1;
+  await expect.poll(() => tracker.getByRole("row").elements()).toHaveLength(rows);
   // And the part no workspace's tag holds isn't made up from totals of different days.
   const donut = screen.getByRole("figure", { name: "Spend by workspace" });
   expect(
@@ -196,8 +198,8 @@ test("the list of workspaces is read once, by the loader: a refusal isn't read a
   artifactr = "refused-once";
   const { screen } = await open("/t/acme/usage");
   await expect.element(screen.getByText(/so the spend is read whole/)).toBeVisible();
-  // Give a second read time to happen, and to change what the page was asked.
-  await new Promise((done) => setTimeout(done, 500));
+  // Give a second read, if the page made one, a moment to happen and change what it asked.
+  await new Promise((done) => setTimeout(done, 150));
   expect(listings).toBe(1);
   expect(reads.map((asked) => asked.getAll("workspaces"))).toEqual([[]]);
 });

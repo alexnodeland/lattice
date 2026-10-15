@@ -48,6 +48,18 @@ jobs:
           token: ${{ steps.app.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      # Each released package's commit, which the jobs below check out: a full sha for every one,
+      # or this fails the workflow. A checkout given no ref uses this push's commit, which is what
+      # they must not build from.
+      - name: The released commits
+        env:
+          RELEASES: ${{ toJSON(steps.release.outputs) }}
+          RELEASED: ${{ steps.release.outputs.paths_released || '[]' }}
+        run: |
+          jq --exit-status --argjson paths "$RELEASED" \
+            '. as $outputs | [$paths[] | ($outputs[. + "--sha"] // "") | test("^[0-9a-f]{40}$")] | all' \
+            <<<"$RELEASES" >/dev/null ||
+            { echo "release-please gave a released package no commit: $RELEASED" >&2; exit 1; }
       # The released packages that ship a wheel: all of them but stackr.
       - id: wheels
         env:
@@ -71,8 +83,11 @@ jobs:
     env:
       TAG: ${{ fromJSON(needs.release-please.outputs.releases)[format('{0}--tag_name', matrix.path)] }}
     steps:
+      # The commit release-please tagged for this package, not the push that ran the workflow: the
+      # two differ when a release is created on a later push, or the workflow is run again.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ fromJSON(needs.release-please.outputs.releases)[format('{0}--sha', matrix.path)] }}
           persist-credentials: false
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
         with:

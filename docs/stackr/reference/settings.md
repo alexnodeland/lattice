@@ -134,7 +134,7 @@ The plain PostgreSQL adapter's admin password and published port. Local Supabase
 
 ### Identity: GoTrue, the auth profile
 
-Supabase's auth server alone, on the postgres adapter (local Supabase runs its own). AUTH_PUBLIC_URL is where users and applications reach it, and its tokens' issuer; on a single host, https://auth.<your host>.
+Supabase's auth server alone, on the postgres adapter (local Supabase runs its own). AUTH_PUBLIC_URL is where users and applications reach it, and its tokens' issuer; on a single host, `https://auth.<your host>`.
 
 | Setting | In `.env.example` |
 |---|---|

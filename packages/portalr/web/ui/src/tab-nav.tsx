@@ -18,6 +18,8 @@ export function TabNav({ label, children }: { label: string; children: ReactNode
  * One of a tab bar's links: a router's link, through `render`, which marks the current part with
  * `aria-current="page"`, underlined in the working colour.
  */
+// A tab's outline is drawn inside it (-outline-offset-2): the row scrolls, so it clips what is
+// drawn outside it, and a ring outside the tab would be cut off at the row's edge.
 export function TabLink({
   render,
   children,

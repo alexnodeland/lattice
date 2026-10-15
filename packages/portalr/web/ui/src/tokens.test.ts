@@ -20,11 +20,24 @@ test("the focus ring stands out from every surface", () => {
   }
 });
 
-test("the focus ring is the brand's violet, in both schemes", () => {
-  const [red = 0, green = 0, blue = 0] = (token("focus").match(/\d+/g) ?? []).map(Number);
-  // Violet: more blue than green, and more red than green; the cyan the dark scheme once had wasn't.
-  expect(blue).toBeGreaterThan(green);
-  expect(red).toBeGreaterThan(green);
+/** A colour's hue, in degrees, from its `rgb(r, g, b)`. */
+function hue(rgb: string): number {
+  const [r = 0, g = 0, b = 0] = (rgb.match(/\d+/g) ?? []).map((part) => Number(part) / 255);
+  const top = Math.max(r, g, b);
+  const spread = top - Math.min(r, g, b);
+  if (spread === 0) {
+    return 0;
+  }
+  const sector =
+    top === r ? ((g - b) / spread) % 6 : top === g ? (b - r) / spread + 2 : (r - g) / spread + 4;
+  return (sector * 60 + 360) % 360;
+}
+
+// Each scheme's project runs this once, so it holds in both: violet's hue, not the cyan the dark
+// scheme once had (190°), nor the magenta and pink (300° and over) that are the other inks.
+test("the focus ring is violet in this scheme", () => {
+  expect(hue(token("focus"))).toBeGreaterThanOrEqual(255);
+  expect(hue(token("focus"))).toBeLessThanOrEqual(285);
 });
 
 test("a surface is raised: lighter than the paper, in both schemes", () => {

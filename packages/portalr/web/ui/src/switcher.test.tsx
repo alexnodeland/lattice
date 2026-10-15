@@ -27,7 +27,7 @@ test("the switcher says where the reader is", async () => {
     .toHaveAttribute("aria-haspopup", "menu");
 });
 
-test("choosing a workspace, the switcher names the tenant alone, and marks no workspace", async () => {
+test("on the tenant's page of workspaces, the switcher names the tenant alone and marks no workspace", async () => {
   const screen = await render(
     <Switcher
       tenant="acme"

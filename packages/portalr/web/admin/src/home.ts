@@ -29,6 +29,8 @@ interface Badge {
 export interface Said {
   readonly figure: string | null;
   readonly line: string;
+  /** More of what the line says, on hover: where the line is short, and a fuller word is useful. */
+  readonly note?: string;
   readonly badge?: Badge;
 }
 
@@ -116,7 +118,11 @@ export function failuresSaid(reading: PointsReading): Said {
     return unread("Prometheus", reading);
   }
   const last = reading.data.at(-1)?.value ?? 0;
-  return { figure: figure(Math.round(last)), line: "agent turns in the last day, not rule runs" };
+  return {
+    figure: figure(Math.round(last)),
+    line: "agent turns in the last day",
+    note: "A turn is the agent's, in artifactr. A rule's run that fails is reflexr's, and isn't counted here.",
+  };
 }
 
 /** How far through its budget a tenant's spend is: under, near (80% or more), over it, or none. */

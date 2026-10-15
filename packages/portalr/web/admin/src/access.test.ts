@@ -42,7 +42,7 @@ test("a grant reads as whom it is to, and where", () => {
   expect(whom({ kind: "user", id: "bob" })).toBe("bob (person)");
   // In a sentence, a member is their id, and a group or a rule is named as one.
   expect(whomIn({ kind: "user", id: "bob" })).toBe("bob");
-  expect(whomIn({ kind: "service_principal", id: "ci" })).toBe("ci");
+  expect(whomIn({ kind: "service_principal", id: "ci" })).toBe("the service principal ci");
   expect(whomIn({ kind: "group", id: "ops" })).toBe("the group ops");
   expect(whomIn({ kind: "rule", rule: "tickets:triage", workspace: "ws_1" })).toBe(
     "the rule tickets:triage in ws_1",

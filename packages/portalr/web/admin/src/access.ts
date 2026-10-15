@@ -100,13 +100,16 @@ export function whom(grantee: Grantee): string {
 }
 
 /**
- * Whom a grant is to, in a sentence: a member by their id alone, and a group or a rule named as
- * one, as in "Make bob admin of acme?" or "Make the group ops admin of acme?".
+ * Whom a grant is to, in a sentence: a person by their id alone, and anyone else named for what
+ * they are, as in "Make bob admin of acme?" or "Make the group ops admin of acme?". A person and
+ * a service principal may share an id, so the second is never taken for the first.
  */
 export function whomIn(grantee: Grantee): string {
   switch (grantee.kind) {
     case "group":
       return `the group ${grantee.id}`;
+    case "service_principal":
+      return `the service principal ${grantee.id}`;
     case "rule":
       return `the rule ${grantee.rule} in ${grantee.workspace}`;
     default:

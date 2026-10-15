@@ -9,6 +9,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
  */
 export const Route = createFileRoute("/_signed/t/$tenant/")({
   head: ({ params }) => ({ meta: [{ title: `Workspaces · ${params.tenant} · portalr` }] }),
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(context.queries.grantr.memberships(context.user)),
   component: Workspaces,
 });
 
@@ -43,45 +45,42 @@ function Workspaces() {
           }
         />
       }
-      nav={null}
       account={<Account signed={signed} />}
     >
       <PageHeader title={tenant} meta="The workspaces you can open here" />
       {workspaces.length === 0 ? (
         <p>There is no workspace here you can open.</p>
       ) : (
-        <nav aria-label="Workspaces">
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {workspaces.map((workspace) => (
-              <li key={workspace}>
-                <Card
-                  render={<section aria-labelledby={`workspace-${workspace}`} />}
-                  className="flex h-full flex-col gap-3"
-                >
-                  <h2 id={`workspace-${workspace}`} className="font-semibold text-lg">
-                    <TextLink
-                      render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}
-                    >
-                      {workspace}
-                    </TextLink>
-                  </h2>
-                  <ul
-                    aria-label={`${workspace}'s areas`}
-                    className="flex flex-wrap gap-x-4 gap-y-1"
+        <ul aria-label="Workspaces" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {workspaces.map((workspace) => (
+            <li key={workspace}>
+              <Card
+                render={<section aria-labelledby={`workspace-${workspace}`} />}
+                className="flex h-full flex-col gap-3"
+              >
+                <h2 id={`workspace-${workspace}`} className="font-semibold text-lg">
+                  <TextLink
+                    render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}
                   >
-                    {AREAS.map(({ to, label }) => (
-                      <li key={label}>
-                        <TextLink render={<Link to={to} params={{ tenant, workspace }} />}>
-                          <span className="text-sm">{label}</span>
-                        </TextLink>
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-              </li>
-            ))}
-          </ul>
-        </nav>
+                    {workspace}
+                  </TextLink>
+                </h2>
+                <ul aria-label={`${workspace}'s areas`} className="flex flex-wrap gap-x-4 gap-y-1">
+                  {AREAS.map(({ to, label }) => (
+                    <li key={label}>
+                      <TextLink
+                        className="text-sm"
+                        render={<Link to={to} params={{ tenant, workspace }} />}
+                      >
+                        {label}
+                      </TextLink>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </li>
+          ))}
+        </ul>
       )}
     </AppShell>
   );

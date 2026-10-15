@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { figure, sentence } from "./format";
+import { failureSaid, figure } from "./format";
 import {
   budget,
   counted,
@@ -118,10 +118,11 @@ test("failed turns are the last point's count, of the day before it", () => {
         { time: 2, value: 3.0000001 },
       ],
     }),
-  ).toEqual({ figure: "3", line: "agent turns in the last day, not rule runs" });
-  expect(failuresSaid({ status: "ok", data: [] })).toEqual({
+  ).toMatchObject({ figure: "3", line: "agent turns in the last day" });
+  expect(failuresSaid({ status: "ok", data: [{ time: 1, value: 1 }] }).note).toMatch(/rule's run/);
+  expect(failuresSaid({ status: "ok", data: [] })).toMatchObject({
     figure: "0",
-    line: "agent turns in the last day, not rule runs",
+    line: "agent turns in the last day",
   });
   expect(failuresSaid({ status: "unavailable", reason: "down" }).badge?.tone).toBe("failed");
 });
@@ -178,10 +179,10 @@ test("the deployment's spend is every tenant's together", () => {
   expect(deploymentSpendSaid({ status: "unconfigured" }).line).toBe("LiteLLM isn't configured.");
 });
 
-test("a failure's message starts its own sentence with a capital", () => {
-  expect(sentence(new Error("the server refused the read (422): no"))).toBe(
+test("a failure's message starts its own failureSaid with a capital", () => {
+  expect(failureSaid(new Error("the server refused the read (422): no"))).toBe(
     "The server refused the read (422): no",
   );
-  expect(sentence("down")).toBe("Down");
-  expect(sentence(new Error(""))).toBe("");
+  expect(failureSaid("down")).toBe("Down");
+  expect(failureSaid(new Error(""))).toBe("");
 });

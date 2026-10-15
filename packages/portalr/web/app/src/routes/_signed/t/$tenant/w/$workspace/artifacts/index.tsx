@@ -7,6 +7,15 @@ import { Connection, useWorkspace } from "../../../../../../../workspace";
 /** The workspace's artifacts, as its log holds them: each by kind, and its latest version. */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/artifacts/")({
   head: ({ params }) => ({ meta: [{ title: `Artifacts · ${params.workspace} · portalr` }] }),
+  // The titles are read before the page shows, so no id turns into a title as it opens. They are
+  // only names: where they can't be read, the page shows ids, and reads them again on the page.
+  // What the log later says changed an artifact makes them stale (`client`'s `stale`), and the
+  // page reads them again.
+  loader: async ({ context, params }) => {
+    await context.queryClient
+      .ensureQueryData(context.queries.artifactr.artifacts(params.tenant, params.workspace))
+      .catch(() => undefined);
+  },
   component: Artifacts,
 });
 
@@ -14,8 +23,7 @@ function Artifacts() {
   const { tenant, workspace } = Route.useParams();
   const { queries } = Route.useRouteContext();
   const snapshot = useWorkspace();
-  // Titles are read from the artifacts' data, which the log doesn't carry: until they arrive, or
-  // where they can't be read, an artifact is named by its id.
+  // Titles are read from the artifacts' data, which the log doesn't carry; the loader has them.
   const { data: read } = useQuery(queries.artifactr.artifacts(tenant, workspace));
   const titles = titlesOf(read);
   const listed = Object.values(snapshot.state.artifacts)

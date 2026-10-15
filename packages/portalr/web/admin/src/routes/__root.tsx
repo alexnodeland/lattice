@@ -7,7 +7,7 @@ import {
   Outlet,
 } from "@tanstack/react-router";
 import type { Context } from "../context";
-import { sentence } from "../format";
+import { failureSaid } from "../format";
 
 export const Route = createRootRouteWithContext<Context>()({
   head: () => ({ meta: [{ title: "portalr admin" }] }),
@@ -25,7 +25,7 @@ export const Route = createRootRouteWithContext<Context>()({
 function Failed({ error }: ErrorComponentProps) {
   return (
     <Plain ui="admin" home={<Link to="/" />} title="Something went wrong">
-      <p role="alert">{sentence(error)}</p>
+      <p role="alert">{failureSaid(error)}</p>
     </Plain>
   );
 }

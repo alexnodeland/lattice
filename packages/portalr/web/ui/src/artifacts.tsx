@@ -33,24 +33,39 @@ export type Renderers = ReadonlyMap<string, Renderer>;
 /** The longest a title is, in characters: a longer one is cut, with an ellipsis. */
 export const LONGEST_TITLE = 80;
 
-/**
- * Text as a one-line title: the first line with words in it, without Markdown's marks (a
- * heading's `#`, a list's or a quote's marker, emphasis, code, a link's address), white space
- * collapsed, cut to `LONGEST_TITLE`. Null where nothing is left.
- */
-export function plainTitle(text: string): string | null {
-  const line = text.split(/\r?\n/).find((each) => /[\p{L}\p{N}]/u.test(each)) ?? "";
-  const plain = line
-    .replace(/^\s*(?:#{1,6}\s+|>+\s*|[-*+]\s+|\d+[.)]\s+)/, "")
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/[`*_~]+/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!/[\p{L}\p{N}]/u.test(plain)) {
+/** The most of a line a title is read from: its regular expressions run on no more than this. */
+const READ = 400;
+
+const HAS_WORDS = /[\p{L}\p{N}]/u;
+
+/** Emphasis in underscores, which, as in CommonMark, never starts or ends inside a word. */
+const UNDERSCORED = /(?<![\p{L}\p{N}_])(?:__|_)([^\n_]{1,200}?)(?:__|_)(?![\p{L}\p{N}_])/gu;
+
+/** White space collapsed, and the text cut to `LONGEST_TITLE` code points, ellipsis included. */
+function capped(text: string): string | null {
+  const plain = text.replace(/\s+/g, " ").trim();
+  if (!HAS_WORDS.test(plain)) {
     return null;
   }
   const chars = [...plain];
   return chars.length > LONGEST_TITLE ? `${chars.slice(0, LONGEST_TITLE - 1).join("")}…` : plain;
+}
+
+/**
+ * Markdown as a one-line title: the first line with words in it, without Markdown's marks (a
+ * heading's `#`, a list's or a quote's marker, paired emphasis and code, a link's address), cut to
+ * `LONGEST_TITLE`. Null where nothing is left. Only paired marks go, so `my_file_name` and `2*3`
+ * stay as written; every pattern is bounded, and none reads more than `READ` characters of a line.
+ */
+export function plainTitle(text: string): string | null {
+  const line = (text.split(/\r?\n/).find((each) => HAS_WORDS.test(each)) ?? "").slice(0, READ);
+  return capped(
+    line
+      .replace(/^\s{0,3}(?:#{1,6}\s+|>+\s*|[-*+]\s+|\d{1,9}[.)]\s+)/, "")
+      .replace(/!?\[([^\]]{0,200})\]\([^)]{0,200}\)/g, "$1")
+      .replace(/(\*\*|~~|\*|`)([^\n]{1,200}?)\1/g, "$2")
+      .replace(UNDERSCORED, "$1"),
+  );
 }
 
 /** Any kind without a renderer: its data as JSON, changed line by line; titled by its `title`. */
@@ -61,7 +76,8 @@ export const json: Renderer = {
     </pre>
   ),
   text: (data) => JSON.stringify(data, null, 2),
-  title: (data) => (typeof data.title === "string" ? plainTitle(data.title) : null),
+  // A JSON title is plain text, as written: only its white space and its length are ours.
+  title: (data) => (typeof data.title === "string" ? capped(data.title.slice(0, READ)) : null),
   diff: "lines",
 };
 

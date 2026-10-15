@@ -1,5 +1,4 @@
 import { expect, test } from "vitest";
-import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { TabLink, TabNav } from "./tab-nav";
 
@@ -19,24 +18,28 @@ test("a tab bar names its links, and marks the current part", async () => {
   await expect.element(tabs.getByRole("link", { name: "Keys" })).toHaveAttribute("href", "#keys");
 });
 
-test("on a phone, the tabs stay on one row, which scrolls", async () => {
-  await page.viewport(390, 844);
+test("tabs too many for their room stay on one row, which scrolls", async () => {
   const screen = await render(
-    <TabNav label="Access">
-      {["Members", "Groups", "Keys", "Roles", "Grants"].map((part) => (
-        <TabLink key={part} href={`#${part}`}>
-          {part}
-        </TabLink>
-      ))}
-    </TabNav>,
+    <div style={{ width: 240 }}>
+      <TabNav label="Access">
+        {["Members", "Groups", "Keys", "Roles", "Grants"].map((part) => (
+          <TabLink key={part} href={`#${part}`}>
+            {part}
+          </TabLink>
+        ))}
+      </TabNav>
+    </div>,
   );
   const tabs = screen.getByRole("navigation", { name: "Access" });
   await expect.element(tabs).toBeVisible();
+  const row = tabs.element();
+  // They don't fit, and don't wrap: one row, scrolled sideways.
+  expect(row.scrollWidth).toBeGreaterThan(row.clientWidth);
   const tops = tabs
     .getByRole("link")
     .elements()
-    .map((link) => link.getBoundingClientRect().top);
+    .map((link) => Math.round(link.getBoundingClientRect().top));
   expect(new Set(tops).size).toBe(1);
-  const row = tabs.element();
-  expect(getComputedStyle(row).overflowX).toBe("auto");
+  row.scrollLeft = row.scrollWidth;
+  expect(row.scrollLeft).toBeGreaterThan(0);
 });

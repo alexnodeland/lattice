@@ -15,13 +15,14 @@ function Choices({
 }: {
   label: string;
   choices: readonly Choice[];
-  chosen: string;
+  /** The id chosen now, if one is. */
+  chosen?: string | undefined;
   onChoose: (id: string) => void;
 }) {
   return (
     <Menu.Group>
       <Menu.GroupLabel className={groupLabel}>{label}</Menu.GroupLabel>
-      <Menu.RadioGroup value={chosen} onValueChange={(id: string) => onChoose(id)}>
+      <Menu.RadioGroup value={chosen ?? ""} onValueChange={(id: string) => onChoose(id)}>
         {choices.map(({ id, detail }) => (
           <Menu.RadioItem key={id} value={id} className={item}>
             <span className="data-checked:font-semibold">{id}</span>
@@ -63,30 +64,29 @@ export function Switcher({
   /** A link to every workspace in the tenant, such as the router's, shown under them. */
   every?: ReactElement;
 }) {
+  const where = workspace === undefined ? null : { tenant, workspace };
   return (
     <Menu.Root>
       <Menu.Trigger
-        aria-label={
-          workspace === undefined ? `Tenant: ${tenant}` : `Workspace: ${tenant}, ${workspace}`
-        }
+        aria-label={where ? `Workspace: ${tenant}, ${where.workspace}` : `Tenant: ${tenant}`}
         className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-edge bg-paper px-3 py-1.5 font-semibold text-fg text-sm outline-offset-2 hover:bg-wash focus-visible:outline-2 focus-visible:outline-focus"
       >
-        {workspace === undefined ? (
-          <span aria-hidden="true" className="truncate">
-            {tenant}
-          </span>
-        ) : (
+        {where ? (
           <>
             <span aria-hidden="true" className="truncate font-medium text-muted">
-              {tenant}
+              {where.tenant}
             </span>
             <span aria-hidden="true" className="font-normal text-muted">
               /
             </span>
             <span aria-hidden="true" className="truncate">
-              {workspace}
+              {where.workspace}
             </span>
           </>
+        ) : (
+          <span aria-hidden="true" className="truncate">
+            {tenant}
+          </span>
         )}
         <Icon icon={ChevronDown} className="ml-auto text-muted" />
       </Menu.Trigger>
@@ -96,7 +96,7 @@ export function Switcher({
             <Choices
               label={`Workspaces in ${tenant}`}
               choices={workspaces}
-              chosen={workspace ?? ""}
+              chosen={workspace}
               onChoose={onWorkspace}
             />
             {every && <Menu.Separator className={separator} />}

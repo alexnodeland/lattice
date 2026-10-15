@@ -7,8 +7,8 @@ export const numbers = new Intl.NumberFormat("en-US");
 export const figure = (count: number, short = false) =>
   `${numbers.format(count)}${short ? "+" : ""}`;
 
-/** A failure's message as a sentence of its own: its first letter a capital. */
-export const sentence = (error: unknown) => {
+/** What a failure says, as a sentence of its own: its message's first letter a capital. */
+export const failureSaid = (error: unknown) => {
   const said = error instanceof Error ? error.message : String(error);
   return said.charAt(0).toUpperCase() + said.slice(1);
 };

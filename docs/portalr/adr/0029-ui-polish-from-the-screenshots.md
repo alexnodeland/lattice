@@ -20,19 +20,21 @@ Screenshots of main on 2026-10-13, light and dark, wide and on a phone, showed s
   - Artifact's open proposals sit in its column, under the content, not in a column of their own.
 - **The workspaces page is in the frame.** The tenant's page of workspaces uses the app's frame like every other page: the mark, a switcher that names the tenant alone, and the account. Each workspace is a card with its name, which opens it, and a link to each of its areas. Nothing is read per workspace: grantr and artifactr give no description of one, and a read each would be a request for every card. What isn't known isn't shown.
 - **An artifact has a title, and its id beside it.**
-  - A renderer says `title(data)`: a note's first line of words, without Markdown's marks; JSON's `title` field. It is pure, cheap, at most 80 characters, cut with an ellipsis, and null for data of any shape that hold none. It never throws.
-  - The Artifacts list and an artifact's page show the title, and the id as muted meta. Where there is no title, or the list hasn't been read yet, the id stands in, in the mono face, as before.
-  - The list reads artifactr's artifacts, whose data carries what the title is made from; the stream's log doesn't.
-- **The focus ring is the brand's violet in both schemes:** `--focus` in the dark scheme is `#a77bdf`, not cyan. It is 3:1 or more on the paper, the surface and the wash, which the token test holds, and a second test holds that it is violet in hue.
+  - A renderer says `title(data)`: a note's first line of words, without Markdown's marks; JSON's `title` field, as written. It is pure, cheap, and null for data of any shape that hold none. It never throws.
+  - A title is at most 80 code points, the ellipsis that marks a cut one included. Only paired marks are stripped from Markdown, so `my_file_name` and `2*3` stay as written. Every pattern is bounded, and none reads more than 400 characters of a line, so a hostile line is quick.
+  - The Artifacts list and an artifact's page show the title, and the id as muted meta. Where there is no title, the id stands in, in the mono face, as before.
+  - The list reads artifactr's artifacts, whose data carries what the title is made from; the stream's log doesn't. The route's loader reads them, so no id turns into a title as the page opens; where they can't be read, the page shows ids. The list's rows come from the log, live, and the titles from this read: an artifact the log says was made or changed makes the read stale (`client`'s `stale`), and it is read again, so a title follows its artifact.
+- **The focus ring is the brand's violet in both schemes:** `--focus` in the dark scheme is `#a77bdf`, not cyan. It is 3:1 or more on the paper, the surface and the wash, which the token test holds, and a second test holds that its hue is violet's, 255° to 285°, in each scheme.
 - **A menu is edged**, as a control is: a menu's popup takes `--edge`, so it stands against the rail in the dark scheme, where `--line` alone didn't.
-- **The phone's drawer holds the switcher and the account** as well as the navigation. The bar behind it keeps its own.
+- **The phone's drawer holds the switcher and the account,** with its name shown, as well as the navigation. The bar behind it keeps its own, which shows an avatar alone. A page with no areas to go between, the workspaces page, leaves the navigation out, and its rail holds the mark, the switcher and the account.
+- **A tab's focus ring is drawn inside it.** Access's tab row scrolls, which clips what is drawn outside it, so a tab's outline has a negative offset.
 - **Smaller faults:**
   - A rule's JSON wraps inside its box; the install textarea scrolls sideways, and keeps its indentation.
   - A rule's row keeps its state and how far behind it is on one line.
   - Access's tabs are one row, which scrolls on a phone.
   - A failure's message starts with a capital where it starts a sentence: "The server refused the read".
-  - The grant dialogs name a member by their id alone, and a group or a rule as one: "Make bob admin of acme?", "Make the group ops admin of acme?".
-  - Home's Failed turns card says it counts agent turns, not rule runs.
+  - The grant dialogs name a person by their id alone, and anyone else for what they are: "Make bob admin of acme?", "Make the group ops admin of acme?", "Revoke admin from the service principal ci?". A person and a service principal may share an id.
+  - Home's Failed turns card says "agent turns in the last day", and, on hover, that a rule's run that fails isn't counted.
   - The test application's scripted model proposes a note about what the person asked, so two proposals aren't one.
 
 ## Options considered

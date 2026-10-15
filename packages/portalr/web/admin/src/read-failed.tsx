@@ -6,7 +6,7 @@
 import { Button, EmptyState } from "@portalr/ui";
 import { type ErrorComponentProps, useRouter } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { sentence } from "./format";
+import { failureSaid } from "./format";
 
 export function ReadFailed({
   title,
@@ -43,7 +43,7 @@ export function ReadFailed({
           </div>
         }
       >
-        <p role="alert">{sentence(error)}</p>
+        <p role="alert">{failureSaid(error)}</p>
       </EmptyState>
     </>
   );

@@ -30,7 +30,7 @@ When("they choose the tenant {string}", async ({ page }, tenant: string) => {
 
 When("they open the workspace {string}", async ({ page }, workspace: string) => {
   await page
-    .getByRole("navigation", { name: "Workspaces" })
+    .getByRole("list", { name: "Workspaces" })
     .getByRole("link", { name: workspace, exact: true })
     .click();
 });
@@ -58,7 +58,7 @@ Then("they see the page {string}", async ({ page }, title: string) => {
 Then(
   "they see the workspaces {string} and {string}",
   async ({ page }, one: string, other: string) => {
-    const workspaces = page.getByRole("navigation", { name: "Workspaces" }).getByRole("heading");
+    const workspaces = page.getByRole("list", { name: "Workspaces" }).getByRole("heading");
     await expect(workspaces).toHaveText([one, other]);
   },
 );

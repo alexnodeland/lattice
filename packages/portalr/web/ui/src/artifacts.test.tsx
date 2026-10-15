@@ -101,6 +101,25 @@ test("a title is the first line's words, without Markdown's marks, one line, and
   expect(plainTitle("😀😀")).toBeNull();
 });
 
+test("only paired marks go from a title: a name with underscores or a sum is as written", () => {
+  expect(plainTitle("my_file_name and 2*3")).toBe("my_file_name and 2*3");
+  expect(plainTitle("_emphasis_ and __strong__ and `code` and ~~gone~~")).toBe(
+    "emphasis and strong and code and gone",
+  );
+  expect(plainTitle("an *unpaired star")).toBe("an *unpaired star");
+  // JSON's title is plain text: Markdown's marks aren't stripped from it.
+  expect(json.title({ title: "  a_b  *c*  \n d " })).toBe("a_b *c* d");
+});
+
+test("a title is read from a bounded line, so a hostile one is quick", () => {
+  const hostile = `a${"[](".repeat(100_000)}x`;
+  const started = performance.now();
+  expect(plainTitle(hostile)).not.toBeNull();
+  expect(plainTitle(`a${"[\\".repeat(100_000)}x`)).not.toBeNull();
+  expect(json.title({ title: "y".repeat(1_000_000) })?.length).toBe(LONGEST_TITLE);
+  expect(performance.now() - started).toBeLessThan(1000);
+});
+
 test("a title is null, not an error, where the data hold none or odd ones", () => {
   expect(plainTitle("")).toBeNull();
   expect(plainTitle("   \n\n")).toBeNull();

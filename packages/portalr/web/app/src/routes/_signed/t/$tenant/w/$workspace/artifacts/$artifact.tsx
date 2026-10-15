@@ -134,7 +134,14 @@ function Artifact() {
             Artifacts
           </TextLink>
         }
-        meta={`${title === null ? "" : `${id}, `}${latest.kind}, version ${latest.version}${latest.archived ? ", archived" : ""}`}
+        meta={[
+          title === null ? null : id,
+          latest.kind,
+          `version ${latest.version}`,
+          latest.archived ? "archived" : null,
+        ]
+          .filter(Boolean)
+          .join(", ")}
         actions={feedback}
       />
       <Connection snapshot={snapshot} waiting="the workspace" />

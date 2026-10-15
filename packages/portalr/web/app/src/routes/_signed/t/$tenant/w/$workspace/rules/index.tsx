@@ -150,14 +150,7 @@ function Rules() {
             value={text}
             onValueChange={setText}
             error={refused}
-            render={
-              <textarea
-                rows={14}
-                wrap="off"
-                className="overflow-x-auto font-mono whitespace-pre"
-                spellCheck={false}
-              />
-            }
+            render={<textarea rows={14} wrap="off" className="font-mono" spellCheck={false} />}
             required
           />
           <Button type="submit" disabled={pending} className="self-start">

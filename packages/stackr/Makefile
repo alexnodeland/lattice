@@ -115,7 +115,8 @@ endif
 ifneq ($(strip $(START_SUPABASE)),)
 	$(SUPABASE) start $(SUPABASE_START_FLAGS)
 endif
-	$(COMPOSE_ENV) $(STACK) $(PROFILE_FLAGS) up --detach --wait --build
+# Ten minutes: the first start pulls and builds every image. The app stack's up waits five.
+	$(COMPOSE_ENV) $(STACK) $(PROFILE_FLAGS) up --detach --wait --wait-timeout 600 --build
 
 down: ## Stop the stack, keeping its data
 	$(STACK) --profile '*' down

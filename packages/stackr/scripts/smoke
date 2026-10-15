@@ -74,14 +74,21 @@ stack_compose() { docker compose ${compose_files[@]+"${compose_files[@]}"} "$@";
 
 # The checks' requests run in the probe container, on the stack's networks, so they reach each
 # service by name and need no published port: a single host publishes only Caddy's.
-# Each request is bounded by curl's own limits, and the container run around it by `timeout`
-# where there is one (the runners'; macOS has it with coreutils as gtimeout), so a stalled service
-# fails the check, and `eventually` goes on, rather than hanging the run.
-bound=()
-command -v timeout >/dev/null && bound=(timeout 150)
+# Each request is bounded to a quarter of the retry budget (`eventually`'s `timeout`: 30 seconds
+# of 120), by curl's own limit and, where `timeout` or `gtimeout` is on PATH, around the container
+# run too. A stalled service fails that attempt, and `eventually` makes three or four more.
+# (`timeout` runs programs, not functions, so this repeats stack_compose's one line.)
+bounder=""
+for candidate in timeout gtimeout; do
+  if command -v "$candidate" >/dev/null; then
+    bounder=$candidate
+    break
+  fi
+done
 probe() {
-  ${bound[@]+"${bound[@]}"} docker compose ${compose_files[@]+"${compose_files[@]}"} --profile smoke run --rm \
-    --no-deps -T ${edge_ca[@]+"${edge_ca[@]}"} probe --connect-timeout 10 --max-time 120 "$@"
+  local max=$((timeout / 4 < 10 ? 10 : timeout / 4))
+  ${bounder:+$bounder $((max * 2))} docker compose ${compose_files[@]+"${compose_files[@]}"} --profile smoke run \
+    --rm --no-deps -T ${edge_ca[@]+"${edge_ca[@]}"} probe --connect-timeout 10 --max-time "$max" "$@"
 }
 prometheus=http://prometheus:9090
 prom_label_proxy=http://prom-label-proxy:8080
@@ -179,7 +186,10 @@ loki_has_tenants_log() {
 }
 # tenant_id is structured metadata, not an index label: a label per tenant would multiply streams.
 loki_keeps_the_tenant_out_of_its_labels() {
-  ! probe -fsS "$loki/loki/api/v1/labels" | grep -q '"tenant_id"'
+  local labels
+  # The labels first, on their own: a request that fails or stalls is a failure, not "no label".
+  labels=$(probe -fsS "$loki/loki/api/v1/labels") || return 1
+  ! grep -q '"tenant_id"' <<<"$labels"
 }
 proxy_has() {
   probe -fsS --get "$prom_label_proxy/api/v1/query" --data-urlencode "tenant_id=$1" \

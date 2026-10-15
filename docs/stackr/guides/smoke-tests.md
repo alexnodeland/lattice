@@ -17,7 +17,7 @@ make smoke
 make up PROFILES=observability && make smoke PROFILES=observability
 ```
 
-It runs one set of checks per profile, and a database check when a profile keeps data in PostgreSQL. Its requests run in the `probe` container, curl on the stack's networks, so they reach each service by name and need no published port: a single host publishes only Caddy's. portalr's readers and `scripts/create-tenant` run on this machine, at Langfuse's and the gateway's ports, which stay on `127.0.0.1` on a single host too. Each check is retried every 3 seconds until it passes or `SMOKE_TIMEOUT` (120 seconds by default) runs out, and every failure is reported before it exits non-zero.
+It runs one set of checks per profile, and a database check when a profile keeps data in PostgreSQL. Its requests run in the `probe` container, curl on the stack's networks, so they reach each service by name and need no published port: a single host publishes only Caddy's. portalr's readers and `scripts/create-tenant` run on this machine, at Langfuse's and the gateway's ports, which stay on `127.0.0.1` on a single host too. Each check is retried every 3 seconds until it passes or `SMOKE_TIMEOUT` (120 seconds by default) runs out, and every failure is reported before it exits non-zero. A request that stalls is cut off after a quarter of that budget (30 seconds by default), which fails that attempt, not the run, and the check tries again; `make up` waits at most 10 minutes for the stack to be healthy.
 
 ### `observability`
 

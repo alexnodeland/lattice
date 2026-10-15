@@ -3357,6 +3357,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "grantr", extra = ["fastapi"] },
     { name = "httpx" },
+    { name = "lattice-core-ai" },
     { name = "pydantic" },
     { name = "starlette" },
 ]
@@ -3398,6 +3399,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.141" },
     { name = "grantr", extras = ["fastapi"], editable = "packages/grantr" },
     { name = "httpx", specifier = ">=0.28" },
+    { name = "lattice-core-ai", editable = "packages/lattice-core" },
     { name = "pydantic", specifier = ">=2.13" },
     { name = "starlette", specifier = ">=0.46.0" },
 ]

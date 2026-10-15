@@ -1196,6 +1196,10 @@
         "title": "Usage",
         "type": "object"
       },
+      "WorkspaceName": {
+        "pattern": "^[^\\x00]{1,256}$",
+        "type": "string"
+      },
       "WorkspaceSpend": {
         "description": "One workspace's spend over the window.",
         "properties": {
@@ -2509,7 +2513,7 @@
             "required": false,
             "schema": {
               "items": {
-                "$ref": "#/components/schemas/Id"
+                "$ref": "#/components/schemas/WorkspaceName"
               },
               "maxItems": 50,
               "title": "Workspaces",

@@ -18,14 +18,14 @@ from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import Final, Self
-from urllib.parse import quote, unquote
+from typing import Annotated, Final, Self
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter, field_validator
 
+from lattice_core.tags import parse_workspace_tag, workspace_tag
 from portalr.readers.http import read
 from portalr.readers.litellm import LiteLLM, Spend, team
-from portalr.readers.query import BoundedSpan, Id, day_of, days_in
+from portalr.readers.query import BoundedSpan, day_of, days_in
 from portalr.readers.reading import Ok, Unavailable
 from portalr.tenant import Tenant
 
@@ -40,12 +40,6 @@ PAGE_SIZE: Final = 1000
 
 DEADLINE: Final = 20.0
 """How long a read may take, in seconds: past it, the read answers what it has, partial."""
-
-WORKSPACE_TAG: Final = "tenant-workspace:"
-"""How a request's tag names its tenant and workspace: ``tenant-workspace:<tenant>/<workspace>``,
-each percent-encoded, so neither holds the ``/`` between them, nor the ``,`` LiteLLM splits
-``tags=`` on."""
-
 
 _DURATION: Final = re.compile(r"(\d+)(mo|[smhdw])")
 _UNITS: Final = {"s": 1 / 86_400, "m": 1 / 1_440, "h": 1 / 24, "d": 1, "w": 7, "mo": 30}
@@ -72,19 +66,10 @@ def daily_budget(spend: Spend | None) -> float | None:
     return budget / days if budget > 0 and days else None
 
 
-def workspace_tag(tenant: Tenant, workspace: str) -> str:
-    """The tag the libraries' gateways send for a workspace's requests, each id percent-encoded."""
-    return f"{WORKSPACE_TAG}{quote(tenant.id, safe='')}/{quote(workspace, safe='')}"
-
-
-def tagged_workspace(tenant: Tenant, tag: str) -> str | None:
-    """The workspace a tag names, decoded, if it is a workspace tag of the tenant's; else None."""
-    if not tag.startswith(WORKSPACE_TAG):
-        return None
-    owner, slash, workspace = tag.removeprefix(WORKSPACE_TAG).partition("/")
-    if not slash or unquote(owner) != tenant.id:
-        return None
-    return unquote(workspace)
+type WorkspaceName = Annotated[str, StringConstraints(pattern=r"^[^\x00]{1,256}$")]
+"""A workspace's id as artifactr has it: any text but a NUL, which no storage holds. It is sent
+in a tag, percent-encoded, and in a query's parameters, never in a query language, so it needn't
+be as plain as an id that is."""
 
 
 class UsageQuery(BoundedSpan):
@@ -96,7 +81,7 @@ class UsageQuery(BoundedSpan):
     ``workspaces`` are asked after once each, in the order given.
     """
 
-    workspaces: list[Id] = Field(default_factory=list, max_length=MOST_WORKSPACES)
+    workspaces: list[WorkspaceName] = Field(default_factory=list, max_length=MOST_WORKSPACES)
 
     @field_validator("workspaces")
     @classmethod
@@ -237,6 +222,12 @@ async def _activity(
     return None
 
 
+def _asked_workspace(tenant: Tenant, tag: str, asked: set[str]) -> str | None:
+    """The workspace a tag names, if it is the tenant's and one the read asked after."""
+    named = parse_workspace_tag(tag)
+    return named[1] if named and named[0] == tenant.id and named[1] in asked else None
+
+
 def _reached(window: list[date], read: dict[date, None]) -> list[date]:
     """The days of the window a partial read reached, and read whole.
 
@@ -276,7 +267,7 @@ async def read_usage(
         "end_date": day_of(query.end - timedelta(microseconds=1)).isoformat(),
     }
     asked = set(query.workspaces)
-    tags = [workspace_tag(tenant, workspace) for workspace in query.workspaces]
+    tags = [workspace_tag(tenant.id, workspace) for workspace in query.workspaces]
     teams, tagged = _Found(), _Found(complete=not tags)
     spent: list[Spend | None] = []
     refused: list[Unavailable] = []
@@ -316,11 +307,7 @@ async def read_usage(
                                     litellm,
                                     "/tag/daily/activity",
                                     {"tags": ",".join(tags), **dates},
-                                    lambda tag: (
-                                        workspace
-                                        if (workspace := tagged_workspace(tenant, tag)) in asked
-                                        else None
-                                    ),
+                                    lambda tag: _asked_workspace(tenant, tag, asked),
                                     tagged,
                                 )
                             )

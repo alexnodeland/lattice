@@ -8,9 +8,10 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
+from lattice_core.tags import workspace_tag
 from portalr.readers import LiteLLM, Ok, Unavailable, UsageQuery, read_usage
 from portalr.readers.litellm import Spend
-from portalr.readers.usage import budget_days, daily_budget, tagged_workspace, workspace_tag
+from portalr.readers.usage import budget_days, daily_budget
 from portalr.tenant import allowed
 from tests.tools import Tool, json
 
@@ -37,25 +38,54 @@ def day(at: str, **entities: tuple[float, int, int]) -> dict[str, Any]:
     }
 
 
-def test_a_workspaces_tag_names_its_tenant() -> None:
-    assert workspace_tag(ACME, "notes") == "tenant-workspace:acme/notes"
+async def test_workspace_ids_with_a_percent_a_slash_or_a_comma_round_trip_through_the_read() -> (
+    None
+):
+    odd = ["100%", "a%2Fb", "q3,plan", "eu/west"]
+    tags = {
+        "results": [
+            day(
+                "2026-10-11",
+                **{
+                    workspace_tag("acme", workspace): (float(at + 1), 10, 1)
+                    for at, workspace in enumerate(odd)
+                },
+                # Not asked after: "100%25" is another workspace, which "100%" doesn't name.
+                **{workspace_tag("acme", "100%25"): (50.0, 1, 1)},
+                # Another tenant's workspace of the same id is never counted.
+                **{workspace_tag("globex", "100%"): (60.0, 1, 1)},
+            )
+        ]
+    }
+    tool = Tool(
+        {
+            "/team/info": json(INFO),
+            "/team/daily/activity": json({"results": []}),
+            "/tag/daily/activity": json(tags),
+        }
+    )
+    query = UsageQuery(start=START, end=START + timedelta(days=1), workspaces=odd)
+    read = await read_usage(LiteLLM("http://litellm", tool.client()), ACME, query)
+    assert isinstance(read, Ok)
+    assert {w.workspace: w.spend for w in read.data.workspaces} == {
+        "eu/west": 4.0,
+        "q3,plan": 3.0,
+        "a%2Fb": 2.0,
+        "100%": 1.0,
+    }
+    asked = next(r.url.params for r in tool.requests if r.url.path == "/tag/daily/activity")
+    # The tags asked for are lattice-core's, encoded: no comma but the list's own.
+    assert asked["tags"].split(",") == [workspace_tag("acme", workspace) for workspace in odd]
 
 
-def test_a_tags_ids_are_percent_encoded_and_read_back_for_their_tenant_alone() -> None:
-    odd = "a/b,c d"
-    tag = workspace_tag(ACME, odd)
-    # Neither the "/" between the ids nor the "," LiteLLM splits tags= on is in an id.
-    assert tag == "tenant-workspace:acme/a%2Fb%2Cc%20d"
-    assert "," not in tag
-    assert tag.count("/") == 1
-    assert tagged_workspace(ACME, tag) == odd
-    slashed = allowed("ac/me")
-    assert workspace_tag(slashed, "notes") == "tenant-workspace:ac%2Fme/notes"
-    assert tagged_workspace(slashed, workspace_tag(slashed, "notes")) == "notes"
-    # Another tenant's, a tag of another kind, or one with no workspace: none of acme's.
-    assert tagged_workspace(ACME, workspace_tag(allowed("globex"), odd)) is None
-    assert tagged_workspace(ACME, "workspace:notes") is None
-    assert tagged_workspace(ACME, "tenant-workspace:acme") is None
+def test_a_workspace_name_is_any_text_but_a_nul() -> None:
+    names = ["100%", "a b", "é", "x" * 256]
+    assert (
+        UsageQuery(start=START, end=START + timedelta(days=1), workspaces=names).workspaces == names
+    )
+    for bad in ("", "a\x00b", "x" * 257):
+        with pytest.raises(ValidationError):
+            UsageQuery(start=START, end=START + timedelta(days=1), workspaces=[bad])
 
 
 def test_a_window_is_at_most_its_most_days_and_names_at_most_fifty_workspaces() -> None:
@@ -65,8 +95,6 @@ def test_a_window_is_at_most_its_most_days_and_names_at_most_fifty_workspaces() 
         UsageQuery(
             start=START, end=START + timedelta(days=1), workspaces=[f"w{n}" for n in range(51)]
         )
-    with pytest.raises(ValidationError):
-        UsageQuery(start=START, end=START + timedelta(days=1), workspaces=["a b"])
 
 
 async def test_spend_per_day_and_per_workspace_from_the_teams_and_the_tenants_tags_alone() -> None:

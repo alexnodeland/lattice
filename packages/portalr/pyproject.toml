@@ -28,6 +28,7 @@ classifiers = [
 ]
 dependencies = [
     "grantr[fastapi]>=0.1.0.dev0",
+    "lattice-core-ai>=0.1.0.dev0",
     "fastapi>=0.141",
     "httpx>=0.28",
     "pydantic>=2.13",
@@ -70,10 +71,17 @@ dev = [
 grantr = { workspace = true }
 artifactr-ai = { workspace = true }
 reflexr = { workspace = true }
+lattice-core-ai = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
+
+# ─── dependencies ─────────────────────────────────────────────────────────────
+
+# deptry can't tell from the workspace's editable install which module lattice-core-ai provides.
+[tool.deptry.package_module_name_map]
+lattice-core-ai = "lattice_core"
 
 # ─── types ────────────────────────────────────────────────────────────────────
 

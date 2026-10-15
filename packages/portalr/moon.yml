@@ -7,6 +7,7 @@ dependsOn:
   - 'grantr'
   - 'artifactr' # its test application mounts artifactr's router and reflexr's
   - 'reflexr'
+  - 'lattice-core' # the workspace tag it reads spend by
 
 fileGroups:
   python:

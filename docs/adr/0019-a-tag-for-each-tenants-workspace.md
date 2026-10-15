@@ -6,7 +6,7 @@
 
 ## Context
 
-artifactr's and reflexr's LiteLLM gateways tag every model request with `tenant:<id>` and `workspace:<id>`, and LiteLLM adds up each tag's spend by day. A workspace id is chosen by its tenant's callers, so two tenants can have a workspace of the same id, and LiteLLM's total for `workspace:<id>` is theirs together. portalr's admin Usage page needs each tenant's spend by workspace, which neither tag gives (portalr ADR-0028, in [#188](https://github.com/alexnodeland/lattice/pull/188)).
+artifactr's and reflexr's LiteLLM gateways tag every model request with `tenant:<id>` and `workspace:<id>`, and LiteLLM adds up each tag's spend by day. A workspace id is chosen by its tenant's callers, so two tenants can have a workspace of the same id, and LiteLLM's total for `workspace:<id>` is theirs together. portalr's admin Usage page needs each tenant's spend by workspace, which neither tag gives ([portalr ADR-0028](../portalr/adr/0028-usage-and-spend.md)).
 
 The proxy stackr runs, `ghcr.io/berriai/litellm-non_root` v1.103.0, stores a tag as text of any length and character, and checks neither. Its tag queries, such as `/tag/daily/activity?tags=` (`tag_management_endpoints.py:759`), take a comma-separated list, and keep `%` as it is. Tenant and workspace ids are plain strings in the libraries: they may hold a `/`, a comma, a `%`, or anything else.
 

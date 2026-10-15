@@ -13,7 +13,7 @@ lattice RFC-0002 gives admin a Usage and spend area. Each tenant is a LiteLLM te
 
 Both answer per day, with a breakdown per team or per tag.
 
-A team's activity has no workspace, so a workspace's spend needs a tag on each request. The libraries' LiteLLM gateways tag each request `tenant-workspace:<tenant>/<workspace>`, through a helper in lattice-core that relayr's work adds (lattice ADR-0019; [PR #190](https://github.com/alexnodeland/lattice/pull/190) until it merges). Spend recorded before the tag was sent has no workspace, and no read can give it one.
+A team's activity has no workspace, so a workspace's spend needs a tag on each request. The libraries' LiteLLM gateways tag each request `tenant-workspace:<tenant>/<workspace>`, through lattice-core's `lattice_core.tags` ([lattice ADR-0019](../../adr/0019-a-tag-for-each-tenants-workspace.md)). Spend recorded before the tag was sent has no workspace, and no read can give it one.
 
 Usage reads as Feedback does, within bounds:
 
@@ -24,9 +24,10 @@ Usage reads as Feedback does, within bounds:
 
 ## Decision
 
-- **A workspace's tag is `tenant-workspace:<tenant>/<workspace>`, each id percent-encoded** (`quote(id, safe="")`), as `portalr.readers.usage.workspace_tag` builds it and `tagged_workspace` reads it back.
+- **A workspace's tag is `tenant-workspace:<tenant>/<workspace>`, each id percent-encoded,** as [lattice ADR-0019](../../adr/0019-a-tag-for-each-tenants-workspace.md) decides: `quote(id, safe="")`, so a `/` in an id isn't the separator and a comma doesn't split `tags=`.
   - Encoding keeps the `/` between the ids unambiguous. It also keeps out the `,` that LiteLLM's `/tag/daily/activity` splits `tags=` on.
-  - `workspace_tag` and `tagged_workspace` are portalr's own until lattice-core's helpers (lattice ADR-0019, PR #190) merge; then they move there, and portalr's keep only the test that a `%` in an id round-trips.
+  - portalr writes the tags it asks for with `lattice_core.tags.workspace_tag` and reads each answer's with `parse_workspace_tag`, which are the gateways' own, and depends on lattice-core-ai with no extra. It keeps no copy of the format, only a test that ids holding `%`, `/` or a comma round-trip through the read.
+  - A workspace's id is any text but a NUL, as artifactr's is, since it is sent in a percent-encoded tag and in a parameter, never in a query language.
   - This is the format relayr's lattice-core helper sends. Until that PR merges, portalr is built against fixtures in it.
 - **`GET /portalr/v1/usage`**, for whoever may read the tenant's spend (`portalr:read_spend`), takes a window, at most 91 days, and up to 50 `workspaces`, each asked after once. It answers:
   - `days`: the team's spend, tokens and requests on each day the window touches, in UTC, from `/team/daily/activity`, asked for the tenant's team alone. Where the read ran to its end, every day is in it, one with no spend as 0. Where it stopped short, only the span of days it read whole is, less the day it read last. LiteLLM pages its rows before it groups them by day, so a stop may have cut that day short: its figure would be understated, and the Tracker could call it "under" when it isn't. A day with no row inside the span is a measured 0, and is in it. A day beyond it is unknown, not nothing spent, as Feedback's `known_from` says of its days;

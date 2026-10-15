@@ -754,6 +754,7 @@ export interface components {
             /** Workspaces */
             workspaces: components["schemas"]["WorkspaceSpend"][];
         };
+        WorkspaceName: string;
         /**
          * WorkspaceSpend
          * @description One workspace's spend over the window.
@@ -1435,7 +1436,7 @@ export interface operations {
             query: {
                 start: string;
                 end: string;
-                workspaces?: components["schemas"]["Id"][];
+                workspaces?: components["schemas"]["WorkspaceName"][];
             };
             header?: {
                 "X-Tenant"?: components["schemas"]["TenantId"] | null;

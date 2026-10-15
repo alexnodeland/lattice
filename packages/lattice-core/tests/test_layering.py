@@ -21,14 +21,14 @@ EXTRAS = {
 }
 """What each extra's module or subpackage may import beyond the standard library and pydantic."""
 
-LAZY: dict[str | None, set[str]] = {
+LAZY: dict[str, set[str]] = {
     # The instrumentations import FastAPI and SQLAlchemy only when they are installed, and the
     # Langfuse client only for configure_telemetry(langfuse=...).
-    "otel": {"fastapi", "sqlalchemy", "langfuse", "lattice_core.langfuse"},
+    "lattice_core.otel.configure": {"fastapi", "sqlalchemy", "langfuse", "lattice_core.langfuse"},
     # The contract names the SDK's types in its annotations alone.
-    None: {"opentelemetry"},
+    "lattice_core.otel.contribution": {"opentelemetry"},
 }
-"""What a module may import only lazily: inside a function, or under ``TYPE_CHECKING``."""
+"""What each module may import only lazily: inside a function, or under ``TYPE_CHECKING``."""
 
 BASE = {"lattice_core.otel", "lattice_core.otel.contribution"}
 """The modules inside an extra's subpackage that need no extra (lattice ADR-0020)."""
@@ -95,7 +95,7 @@ def test_the_modules_that_need_no_extra_are_found() -> None:
 @pytest.mark.parametrize("module", sorted(MODULES))
 def test_shipped_code_imports_only_what_its_extra_installs(module: str) -> None:
     extra = MODULES[module]
-    eager, lazy = {"pydantic", *EXTRAS.get(extra or "", ())}, LAZY.get(extra, set())
+    eager, lazy = {"pydantic", *EXTRAS.get(extra or "", ())}, LAZY.get(module, set())
     for name, deferred in _imports(_source(module)):
         where = f"{module} imports {name}"
         if _within(name, lazy):

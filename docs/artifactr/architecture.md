@@ -85,11 +85,11 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.scores` (needs evalr, from the `langfuse` or `evals` extra) | telemetry, workspace, evalr's core | Uses evalr's `ScoreSink` and `ScoreConfigStore` ports | Feedback as scores, named as each type is registered, and the mirror that records a workspace's feedback in a sink. |
 | `artifactr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic, lattice-core's `sql` | Adapter for `Storage` | Durable storage on PostgreSQL and SQLite, and its migrations. |
 | `artifactr.otel` (extra) | telemetry, the OpenTelemetry SDK, lattice-core's `otel` | Adapter for the OpenTelemetry API | `configure_telemetry`: providers, OTLP export, instrumentations and metric views, for applications, composed with other libraries' contributions ([ADR-0046](adr/0046-telemetry-that-composes-across-libraries.md)). |
-| `artifactr.litellm` (extra) | agent, pydantic-ai's OpenAI support | Adapter for pydantic-ai's `Model` | `litellm_model` and the `LiteLLMGateway` capability: each request's tenancy, session, trace, key and guardrails, and guardrail blocks as typed failures ([ADR-0043](adr/0043-the-litellm-adapter.md)). |
-| `artifactr.langfuse` (extra) | agent, langfuse | Adapter for `TurnContext` | A span filter that keeps whole traces, and each turn's trace attributes ([ADR-0039](adr/0039-the-langfuse-adapter.md)); feedback reaches Langfuse through evalr's score adapters ([ADR-0049](adr/0049-scores-on-evalr.md)). |
+| `artifactr.litellm` (extra) | agent, lattice-core's `litellm` | Adapter for pydantic-ai's `Model` | `litellm_model` and the `LiteLLMGateway` capability: each request's tenancy, session, trace, key and guardrails, and guardrail blocks as typed failures ([ADR-0043](adr/0043-the-litellm-adapter.md)). |
+| `artifactr.langfuse` (extra) | agent, langfuse, lattice-core's `langfuse` | Adapter for `TurnContext` | A span filter that keeps whole traces, and each turn's trace attributes ([ADR-0039](adr/0039-the-langfuse-adapter.md)); feedback reaches Langfuse through evalr's score adapters ([ADR-0049](adr/0049-scores-on-evalr.md)). |
 | `artifactr.evals` (extra) | agent, evalr | Adapter for `TurnEvaluator`, and for evalr's `FeedbackSource` and experiment `Task` | Datasets from the log, experiments that replay turns, online evaluation of turns with verdicts recorded as feedback, and the end-to-end measures ([ADR-0044](adr/0044-the-evalr-adapter.md)). |
 | `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
-| `artifactr.mcp` (extra) | agent, mcp | Driving adapter | Artifacts as MCP resources, commands and reads as MCP tools. |
+| `artifactr.mcp` (extra) | agent, mcp, lattice-core's `logs` | Driving adapter | Artifacts as MCP resources, commands and reads as MCP tools. |
 
 ### `artifactr.core`: sans-IO
 

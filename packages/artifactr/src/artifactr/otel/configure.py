@@ -26,7 +26,11 @@ from lattice_core.otel.configure import (
     redact_access_token,
 )
 from lattice_core.otel.configure import configure_telemetry as _configure_telemetry
-from lattice_core.otel.contribution import Contribution, Instrumented, TelemetryContribution
+from lattice_core.otel.contribution import (
+    Contribution,
+    Instrumented,
+    TelemetryContribution,
+)
 
 __all__ = [
     "BAGGAGE_KEYS",
@@ -35,6 +39,7 @@ __all__ = [
     "Contribution",
     "Instrumented",
     "LangfuseMode",
+    "MetricsDetail",
     "TelemetryContribution",
     "TelemetryHandle",
     "configure_telemetry",
@@ -109,63 +114,10 @@ def configure_telemetry(
     langfuse_options: Mapping[str, Any] | None = None,
     set_global: bool = True,
 ) -> TelemetryHandle:
-    """Set up OpenTelemetry for an application: providers, OTLP export and instrumentation.
+    """Set up OpenTelemetry for an application, with artifactr's contribution added last.
 
-    Call it once, as early as the application starts, before it creates its FastAPI app and
-    agents, with the contributions of the other libraries the application uses, such as
-    ``reflexr.otel.telemetry()``; artifactr's own is always included. reflexr's
-    ``configure_telemetry`` takes the same contributions and does the same. It sets up:
-
-    - tracer, meter and logger providers, with ``service.name``, ``service.version`` and
-      ``deployment.environment.name`` on their resource
-    - OTLP over HTTP to ``otlp_endpoint``, or to the endpoint the ``OTEL_EXPORTER_OTLP_*``
-      environment variables name (a local Collector by default)
-    - every contribution's views, which apply each library's metric cardinality policy at
-      ``metrics_detail``
-    - a baggage processor that copies a turn's session onto every span in it
-    - the open instrumentations the contributions advise (FastAPI, SQLAlchemy, httpx and
-      httpx2), or those ``instrument`` names, with the stable HTTP semantic conventions
-      (``OTEL_SEMCONV_STABILITY_OPT_IN=http``, unless it is set already)
-    - pydantic-ai's instrumentation settings, which :meth:`TelemetryHandle.capability` wraps
-      for an agent
-    - with ``langfuse``, a Langfuse client from the ``[langfuse]`` extra, on the same tracer
-      provider, which sends Langfuse whole traces, or only scores
-
-    Nothing in artifactr requires it: it is one way to configure the SDK, which artifactr
-    only ever records to through the API.
-
-    Args:
-        *contributions: Other libraries' contributions (:class:`TelemetryContribution`), or
-            the application's own. One is kept per name, the first given, and artifactr's
-            own, :func:`telemetry`, is added unless one is named ``artifactr``.
-        service_name: The service's name, as it appears in every backend.
-        service_version: The service's version.
-        environment: The deployment environment, such as ``production``.
-        otlp_endpoint: The OTLP/HTTP base URL, such as ``http://collector:4318``. Defaults to
-            the ``OTEL_EXPORTER_OTLP_ENDPOINT`` environment variable.
-        otlp_headers: Headers for every OTLP request, such as a backend's credentials.
-        instrument: Which libraries to instrument. Defaults to those the contributions advise
-            that are installed.
-        engines: SQLAlchemy engines that already exist, to trace their queries.
-        include_content: Whether pydantic-ai records prompts, completions and tool arguments.
-        metrics_detail: How much tenancy detail the libraries' metrics keep.
-        logs: Whether to export the ``logging`` module's records through OTLP.
-        span_exporter: Where spans go instead of OTLP, such as an in-memory exporter in tests.
-        metric_reader: How metrics are read instead of a periodic OTLP export.
-        log_exporter: Where log records go instead of OTLP.
-        span_processors: More span processors to add, such as a backend's own.
-        langfuse: What the application sends Langfuse itself (:data:`LangfuseMode`):
-            ``"traces"``, with a span filter that keeps a span any contribution keeps, and
-            Langfuse's own LLM spans; or ``"scores"``, when the Collector sends Langfuse the
-            traces. Its keys come from the ``LANGFUSE_*`` environment variables or
-            ``langfuse_options``.
-        langfuse_options: Passed to ``Langfuse(...)``; a ``should_export_span`` here replaces
-            the filter ``langfuse`` chooses.
-        set_global: Whether to make the providers the global ones, which artifactr, pydantic-ai
-            and the instrumentations default to.
-
-    Returns:
-        A handle that shuts it all down.
+    Call it once, with the other libraries' contributions; it takes lattice-core's
+    :func:`~lattice_core.otel.configure.configure_telemetry` arguments, and returns its handle.
     """
     return _configure_telemetry(
         *contributions,

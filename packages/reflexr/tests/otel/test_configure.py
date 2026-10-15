@@ -16,6 +16,7 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from lattice_core.otel.configure import configure_telemetry as core_configure_telemetry
+from reflexr.otel import configure as reflexr_configure
 from reflexr.otel import configure_telemetry, metric_views
 from reflexr.telemetry import SCOPE, Telemetry
 from reflexr.telemetry.attributes import EVENT_TYPE, TENANT_ID, WORKSPACE_ID
@@ -136,3 +137,35 @@ def test_apps_built_after_configuring_are_traced_without_their_access_tokens(
 
 def test_it_takes_lattice_cores_parameters() -> None:
     assert inspect.signature(configure_telemetry) == inspect.signature(core_configure_telemetry)
+
+
+def test_it_forwards_its_arguments_and_adds_its_own_contribution_last(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+
+    def record(*contributions: Any, **options: Any) -> str:
+        calls.append((contributions, options))
+        return "handle"
+
+    monkeypatch.setattr(reflexr_configure, "_configure_telemetry", record)
+    other = reflexr_configure.Contribution(
+        name="other",
+        metric_views=lambda detail: [],
+        should_export_span=lambda span: False,
+        instrument=frozenset(),
+    )
+    handle = configure_telemetry(
+        other,
+        service_name="app",
+        set_global=False,
+        langfuse="scores",
+        langfuse_options={"public_key": "pk"},
+    )
+    [(contributions, options)] = calls
+    assert (handle, contributions[0], contributions[1].name) == ("handle", other, SCOPE)
+    assert (options["set_global"], options["langfuse"], options["langfuse_options"]) == (
+        False,
+        "scores",
+        {"public_key": "pk"},
+    )

@@ -76,10 +76,10 @@ Dependencies point one way. Each layer is usable without the ones above it, and 
 | `reflexr.agent` | workspace, pydantic-ai, pydantic-graph | Agent actions with the `EventContext` capability, graph actions with checkpoints (adapters of the action port), and `function_model` for tests. |
 | `reflexr.sql` (extra) | workspace, SQLAlchemy 2 async, Alembic, lattice-core's `sql` | `SqlStorage` on PostgreSQL and SQLite, and its packaged migrations. |
 | `reflexr.fastapi` (extra) | workspace, FastAPI | HTTP ingest, REST reads and administration, and the WebSocket stream protocol, over one command handler. |
-| `reflexr.mcp` (extra) | workspace, mcp | Publishing, reading and administration as MCP tools, and runs as resources. |
+| `reflexr.mcp` (extra) | workspace, mcp, lattice-core's `logs` | Publishing, reading and administration as MCP tools, and runs as resources. |
 | `reflexr.otel` (extra) | telemetry, the OpenTelemetry SDK, lattice-core's `otel` | `configure_telemetry`: the SDK behind the API, with the metric views, composed with other libraries' contributions. |
-| `reflexr.langfuse` (extra) | workspace, Langfuse | Whole traces and run attributes in Langfuse; feedback reaches it as scores through evalr's adapters. |
-| `reflexr.litellm` (extra) | workspace, pydantic-ai's OpenAI-compatible models | Models over the LiteLLM proxy, with tenancy, keys and guardrails per request. |
+| `reflexr.langfuse` (extra) | workspace, Langfuse, lattice-core's `langfuse` | Whole traces and run attributes in Langfuse; feedback reaches it as scores through evalr's adapters. |
+| `reflexr.litellm` (extra) | workspace, lattice-core's `litellm` | Models over the LiteLLM proxy, with tenancy, keys and guardrails per request. |
 | `examples/oncall` | every layer | The reference implementation: incident response with a triage agent, a runbook graph, a paging function, every surface and a terminal client. |
 
 ### Ports and adapters

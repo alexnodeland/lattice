@@ -5,6 +5,7 @@ layer: 'library'
 tags: ['distribution', 'api']
 dependsOn:
   - 'grantr'
+  - 'lattice-core'
   - 'artifactr' # its test application mounts artifactr's router and reflexr's
   - 'reflexr'
   - 'lattice-core' # the workspace tag it reads spend by

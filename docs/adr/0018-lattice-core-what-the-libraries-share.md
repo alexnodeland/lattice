@@ -1,6 +1,6 @@
 # ADR-0018: lattice-core, what the libraries share
 
-**Status:** Accepted, amended by [ADR-0020](0020-the-telemetry-contract-needs-no-extra.md)
+**Status:** Accepted, amended by [ADR-0020](0020-the-telemetry-contract-needs-no-extra.md) and [ADR-0021](0021-the-refusal-schema-needs-no-extra.md)
 **Date:** 2026-10-13
 **Deciders:** Alex Nodeland
 **Amends:** [reflexr ADR-0003](../reflexr/adr/0003-independent-sibling-of-artifactr.md): artifactr and reflexr still import neither each other nor grantr, but they share one package

@@ -17,6 +17,7 @@ package (lattice ADR-0018).
 - :mod:`lattice_core.langfuse`: a Langfuse client's span filters, behind the ``langfuse`` extra.
 - :mod:`lattice_core.litellm`: a model over a LiteLLM proxy, behind the ``litellm`` extra.
 - :mod:`lattice_core.logs`: logging left as the application configured it.
+- :mod:`lattice_core.refusals`: the refused body and responses a REST router documents.
 """
 
 from importlib.metadata import version

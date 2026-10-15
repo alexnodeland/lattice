@@ -30,6 +30,7 @@ dependencies = [
     "grantr[fastapi]>=0.1.0.dev0",
     "lattice-core-ai>=0.1.0.dev0",
     "fastapi>=0.141",
+    "lattice-core-ai>=0.1.0.dev0",
     "httpx>=0.28",
     "pydantic>=2.13",
     "starlette>=0.46.0",
@@ -66,9 +67,11 @@ dev = [
     { include-group = "app" },
 ]
 
-# In lattice, grantr is the checkout's. A built wheel keeps the range in [project] alone.
+# In lattice, grantr and lattice-core are the checkout's. A built wheel keeps the ranges in
+# [project] alone.
 [tool.uv.sources]
 grantr = { workspace = true }
+lattice-core-ai = { workspace = true }
 artifactr-ai = { workspace = true }
 reflexr = { workspace = true }
 lattice-core-ai = { workspace = true }

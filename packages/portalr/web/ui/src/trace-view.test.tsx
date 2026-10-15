@@ -1,32 +1,80 @@
-import { type Outline, outline, type Trace } from "@portalr/client";
+import type { Outline, Row } from "@portalr/client";
 import { expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { viewport } from "./test/viewport";
 import { duration, TraceView } from "./trace-view";
 
-type Spans = Trace["spans"];
+/** A span, as a test says it: where it is in the tree, when, and what it holds. */
+interface Spec {
+  readonly id: string;
+  readonly parent: string | null;
+  readonly start: number;
+  readonly end: number;
+  readonly attributes?: Row["attributes"];
+  readonly error?: boolean;
+  readonly withheld?: readonly string[];
+}
 
 const span = (
   id: string,
   parent: string | null,
   start: number,
   end: number,
-  attributes: Spans[number]["attributes"] = {},
-  rest: Partial<Spans[number]> = {},
-): Spans[number] => ({
-  span_id: id,
-  parent_id: parent,
-  name: `span ${id}`,
-  start_ns: start * 1_000_000,
-  end_ns: end * 1_000_000,
-  attributes,
-  error: false,
-  withheld: [],
-  ...rest,
-});
+  attributes: Row["attributes"] = {},
+  rest: Partial<Spec> = {},
+): Spec => ({ id, parent, start, end, attributes, ...rest });
 
-const made = (...spans: Spans): Outline => outline({ trace_id: "t".repeat(32), spans });
+const KIND: Record<string, Row["kind"]> = {
+  invoke_workflow: "workflow",
+  chat: "llm",
+  execute_tool: "tool",
+};
+
+const SAID_ATTRIBUTES: [string, string][] = [
+  ["gen_ai.input.messages", "Prompt"],
+  ["gen_ai.output.messages", "Completion"],
+];
+
+/** An outline from specs given in tree order, as `outline` would lay them out. */
+function made(...specs: Spec[]): Outline {
+  const depths = new Map<string, number>();
+  const rows = specs.map((one): Row => {
+    const depth = one.parent === null ? 0 : (depths.get(one.parent) ?? -1) + 1;
+    depths.set(one.id, depth);
+    const operation = one.attributes?.["gen_ai.operation.name"];
+    const input = one.attributes?.["gen_ai.usage.input_tokens"];
+    const output = one.attributes?.["gen_ai.usage.output_tokens"];
+    return {
+      id: one.id,
+      name: `span ${one.id}`,
+      kind: typeof operation === "string" ? (KIND[operation] ?? "other") : "other",
+      depth,
+      parent: specs.some((other) => other.parent === one.id),
+      parentId: one.parent,
+      offset: one.start,
+      duration: one.end - one.start,
+      error: one.error ?? false,
+      model: (one.attributes?.["gen_ai.request.model"] as string | undefined) ?? null,
+      tool: (one.attributes?.["gen_ai.tool.name"] as string | undefined) ?? null,
+      tokens:
+        typeof input === "number" || typeof output === "number"
+          ? {
+              input: typeof input === "number" ? input : null,
+              output: typeof output === "number" ? output : null,
+            }
+          : null,
+      attributes: one.attributes ?? {},
+      withheld: one.withheld ?? [],
+      said: SAID_ATTRIBUTES.flatMap(([attribute, label]) => {
+        const value = one.attributes?.[attribute];
+        return typeof value === "string" ? [{ label, text: value }] : [];
+      }),
+    };
+  });
+  const last = Math.max(0, ...specs.map((one) => one.end));
+  return { rows, duration: last };
+}
 
 const TURN = made(
   span("1", null, 0, 100, { "gen_ai.operation.name": "invoke_workflow" }),

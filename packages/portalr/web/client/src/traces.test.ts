@@ -92,19 +92,17 @@ test("a span's model, tool, tokens, error and what it withheld are read from it"
     tokens: { input: 120, output: 30 },
     withheld: ["gen_ai.input.messages"],
   });
-  expect(rows[1]).toMatchObject({ tool: "publish", model: "r", tokens: null });
+  expect(rows[1]).toMatchObject({ tool: "publish", model: "r", tokens: null, said: [] });
   expect(rows[2]?.tokens).toEqual({ input: null, output: 4 });
 });
 
 test("what was said is each part, labelled, its JSON indented, and nothing if it wasn't read", () => {
-  expect(said({ attributes: {} })).toEqual([]);
+  expect(said({})).toEqual([]);
   expect(
     said({
-      attributes: {
-        "gen_ai.input.messages": '[{"role":"user"}]',
-        "gen_ai.output.messages": "not json",
-        "gen_ai.tool.call.result": 3,
-      },
+      "gen_ai.input.messages": '[{"role":"user"}]',
+      "gen_ai.output.messages": "not json",
+      "gen_ai.tool.call.result": 3,
     }),
   ).toEqual([
     { label: "Prompt", text: '[\n  {\n    "role": "user"\n  }\n]' },

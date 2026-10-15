@@ -9,7 +9,6 @@
  */
 
 import type { Kind, Outline, Row } from "@portalr/client";
-import { said } from "@portalr/client";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Bot,
@@ -52,7 +51,7 @@ export function duration(ms: number): string {
 }
 
 /** Where what was said in a span stands: not asked for, being read, read, or not readable. */
-export type Said = "hidden" | "reading" | "read" | "failed";
+export type Standing = "hidden" | "reading" | "read" | "failed";
 
 /** A row with its place among its siblings, as the tree's ARIA wants it. */
 interface Placed {
@@ -103,7 +102,7 @@ export function TraceView({
 }: {
   outline: Outline;
   /** Where the trace's content stands: the caller reads it when a span asks. */
-  said: Said;
+  said: Standing;
   /** A span asked to see what was said in it: the caller reads it, and gives the trace with it. */
   onAskToSee: () => void;
 }) {
@@ -329,12 +328,12 @@ function Details({
   onAskToSee,
 }: {
   row: Row;
-  standing: Said;
+  standing: Standing;
   seen: boolean;
   onAskToSee: () => void;
 }) {
   const attributes = Object.entries(row.attributes).sort(([a], [b]) => a.localeCompare(b));
-  const spoken = said(row);
+  const spoken = row.said;
   return (
     <section
       aria-labelledby="span"

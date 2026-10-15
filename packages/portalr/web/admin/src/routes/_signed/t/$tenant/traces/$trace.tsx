@@ -1,5 +1,5 @@
 import { outline } from "@portalr/client";
-import { EmptyState, PageHeader, type Said, TextLink, TraceView } from "@portalr/ui";
+import { EmptyState, PageHeader, type Standing, TextLink, TraceView } from "@portalr/ui";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -44,7 +44,7 @@ function TracePage() {
   const full = asked && spoken.data?.status === "ok" ? spoken.data.data : null;
   const traced = full ?? base;
   const laid = useMemo(() => (traced === null ? null : outline(traced)), [traced]);
-  let standing: Said = "hidden";
+  let standing: Standing = "hidden";
   if (asked) {
     standing = full ? "read" : spoken.isPending ? "reading" : "failed";
   }

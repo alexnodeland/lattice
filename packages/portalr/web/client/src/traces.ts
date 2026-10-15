@@ -61,6 +61,14 @@ export interface Row {
   readonly attributes: Span["attributes"];
   /** The names of what was said in it that this read left out. */
   readonly withheld: readonly string[];
+  /** What was said in it, if this read has it: each part, labelled, its JSON indented. */
+  readonly said: readonly Said[];
+}
+
+/** One part of what was said in a span. */
+export interface Said {
+  readonly label: string;
+  readonly text: string;
 }
 
 /** A trace laid out: every span in order, its parents before its children, and how long it ran. */
@@ -116,6 +124,7 @@ export function outline(trace: Trace): Outline {
       tokens: input === null && output === null ? null : { input, output },
       attributes,
       withheld: span.withheld ?? [],
+      said: said(attributes),
     });
     for (const child of [...below].sort((a, b) => a.start_ns - b.start_ns)) {
       place(child, depth + 1);
@@ -144,9 +153,9 @@ const SAID: readonly [attribute: string, label: string][] = [
 export const CONTENT: readonly string[] = SAID.map(([attribute]) => attribute);
 
 /** What was said in a span, if its read has it: each part, labelled, its JSON indented. */
-export function said(row: Pick<Row, "attributes">): { label: string; text: string }[] {
+export function said(attributes: Span["attributes"]): Said[] {
   return SAID.flatMap(([attribute, label]) => {
-    const value = row.attributes[attribute];
+    const value = attributes[attribute];
     if (typeof value !== "string") {
       return [];
     }

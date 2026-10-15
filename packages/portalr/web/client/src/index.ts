@@ -55,4 +55,13 @@ export {
   Stream,
   type StreamOptions,
 } from "./stream";
-export { CONTENT, type Kind, type Outline, outline, type Row, said, type Trace } from "./traces";
+export {
+  CONTENT,
+  type Kind,
+  type Outline,
+  outline,
+  type Row,
+  type Said,
+  said,
+  type Trace,
+} from "./traces";

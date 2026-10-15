@@ -74,7 +74,15 @@ stack_compose() { docker compose ${compose_files[@]+"${compose_files[@]}"} "$@";
 
 # The checks' requests run in the probe container, on the stack's networks, so they reach each
 # service by name and need no published port: a single host publishes only Caddy's.
-probe() { stack_compose --profile smoke run --rm --no-deps -T ${edge_ca[@]+"${edge_ca[@]}"} probe "$@"; }
+# Each request is bounded by curl's own limits, and the container run around it by `timeout`
+# where there is one (the runners'; macOS has it with coreutils as gtimeout), so a stalled service
+# fails the check, and `eventually` goes on, rather than hanging the run.
+bound=()
+command -v timeout >/dev/null && bound=(timeout 150)
+probe() {
+  ${bound[@]+"${bound[@]}"} docker compose ${compose_files[@]+"${compose_files[@]}"} --profile smoke run --rm \
+    --no-deps -T ${edge_ca[@]+"${edge_ca[@]}"} probe --connect-timeout 10 --max-time 120 "$@"
+}
 prometheus=http://prometheus:9090
 prom_label_proxy=http://prom-label-proxy:8080
 tempo=http://tempo:3200

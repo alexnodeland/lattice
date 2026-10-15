@@ -29,7 +29,7 @@ def _follower(workspace: WorkspaceKey) -> ColumnElement[bool]:
 
 
 async def _locked(session: AsyncSession, workspace: WorkspaceKey) -> FollowerRow:
-    """Lock a workspace's row (`SELECT ... FOR UPDATE`), inserting it first if it isn't there."""
+    """Lock a workspace's row, which starts with its cursor at 0."""
     return await lock_row(
         session, FollowerRow, workspace, FollowerRow(**workspace._asdict(), seq=0)
     )

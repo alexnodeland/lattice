@@ -23,7 +23,8 @@
   --line: light-dark(#dcd5e6, #3a3247);
   --accent: var(--portalr-violet);
   --on-accent: light-dark(#ffffff, #17111f);
-  --focus: light-dark(#6b2fa0, #38c6f4);
+  /* The focus ring: the brand's violet in both schemes, lighter in the dark, never another ink. */
+  --focus: light-dark(#6b2fa0, #a77bdf);
   /* A control's boundary: 3:1 or more on every surface, as WCAG asks of one. */
   --edge: light-dark(#857a97, #7d7091);
   /* What a destructive action is in, and nothing else: deleting, removing, revoking, archiving. */

@@ -24,6 +24,7 @@ import {
   useAccess,
   where,
   whom,
+  whomIn,
 } from "../../../../../access";
 
 type Grant = GrantrApi.components["schemas"]["Grant"];
@@ -208,7 +209,7 @@ function Granted({
                   <ConfirmDialog
                     label="Revoke"
                     name={`Revoke ${said(grant)}`}
-                    title={`Revoke ${grant.role} from ${whom(grant.to)}?`}
+                    title={`Revoke ${grant.role} from ${whomIn(grant.to)}?`}
                     confirm="Revoke"
                     onConfirm={async () =>
                       orThrow(
@@ -417,7 +418,7 @@ function Granting({
           <ConfirmDialog
             label="Grant"
             className="self-start"
-            title={`Make ${whom(to)} ${fields.role} of ${tenant}?`}
+            title={`Make ${whomIn(to)} ${fields.role} of ${tenant}?`}
             confirm={`Grant ${fields.role}`}
             onConfirm={async () => {
               orThrow("Not granted", await grant());

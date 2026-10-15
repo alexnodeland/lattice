@@ -15,13 +15,14 @@ function Choices({
 }: {
   label: string;
   choices: readonly Choice[];
-  chosen: string;
+  /** The id chosen now, if one is. */
+  chosen?: string | undefined;
   onChoose: (id: string) => void;
 }) {
   return (
     <Menu.Group>
       <Menu.GroupLabel className={groupLabel}>{label}</Menu.GroupLabel>
-      <Menu.RadioGroup value={chosen} onValueChange={(id: string) => onChoose(id)}>
+      <Menu.RadioGroup value={chosen ?? ""} onValueChange={(id: string) => onChoose(id)}>
         {choices.map(({ id, detail }) => (
           <Menu.RadioItem key={id} value={id} className={item}>
             <span className="data-checked:font-semibold">{id}</span>
@@ -39,8 +40,9 @@ function Choices({
 }
 
 /**
- * Where a person is: their tenant and workspace, and a menu of the others to move to. Choosing
- * hands the id to the caller, which navigates.
+ * Where a person is: their tenant and workspace, or the tenant alone where they are choosing a
+ * workspace, and a menu of the others to move to. Choosing hands the id to the caller, which
+ * navigates.
  */
 export function Switcher({
   tenant,
@@ -52,7 +54,8 @@ export function Switcher({
   every,
 }: {
   tenant: string;
-  workspace: string;
+  /** The workspace they are in; none on the tenant's list of workspaces. */
+  workspace?: string;
   tenants: readonly Choice[];
   /** The workspaces in this tenant. */
   workspaces: readonly Choice[];
@@ -61,21 +64,30 @@ export function Switcher({
   /** A link to every workspace in the tenant, such as the router's, shown under them. */
   every?: ReactElement;
 }) {
+  const where = workspace === undefined ? null : { tenant, workspace };
   return (
     <Menu.Root>
       <Menu.Trigger
-        aria-label={`Workspace: ${tenant}, ${workspace}`}
+        aria-label={where ? `Workspace: ${tenant}, ${where.workspace}` : `Tenant: ${tenant}`}
         className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-edge bg-paper px-3 py-1.5 font-semibold text-fg text-sm outline-offset-2 hover:bg-wash focus-visible:outline-2 focus-visible:outline-focus"
       >
-        <span aria-hidden="true" className="truncate font-medium text-muted">
-          {tenant}
-        </span>
-        <span aria-hidden="true" className="font-normal text-muted">
-          /
-        </span>
-        <span aria-hidden="true" className="truncate">
-          {workspace}
-        </span>
+        {where ? (
+          <>
+            <span aria-hidden="true" className="truncate font-medium text-muted">
+              {where.tenant}
+            </span>
+            <span aria-hidden="true" className="font-normal text-muted">
+              /
+            </span>
+            <span aria-hidden="true" className="truncate">
+              {where.workspace}
+            </span>
+          </>
+        ) : (
+          <span aria-hidden="true" className="truncate">
+            {tenant}
+          </span>
+        )}
         <Icon icon={ChevronDown} className="ml-auto text-muted" />
       </Menu.Trigger>
       <Menu.Portal>

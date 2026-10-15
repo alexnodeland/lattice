@@ -1,7 +1,15 @@
 import type { Change } from "@portalr/client";
 import { expect, test } from "vitest";
 import { render } from "vitest-browser-react";
-import { ArtifactContent, Diff, json, markdown, rendererFor } from "./artifacts";
+import {
+  ArtifactContent,
+  Diff,
+  json,
+  LONGEST_TITLE,
+  markdown,
+  plainTitle,
+  rendererFor,
+} from "./artifacts";
 import { contrast, token } from "./test/colours";
 
 const renderers = new Map([["note", markdown()]]);
@@ -75,4 +83,57 @@ test("a diff takes a caller's classes", async () => {
 test("changes too large to compare say so", async () => {
   const screen = await render(<Diff changes={null} />);
   await expect.element(screen.getByText("Too large to compare.")).toBeVisible();
+});
+
+test("a title is the first line's words, without Markdown's marks, one line, and cut", () => {
+  expect(markdown().title({ text: "# Launch **plan**\n\nOn [Tuesday](https://x.test)." })).toBe(
+    "Launch plan",
+  );
+  expect(plainTitle("\n\n- `code` _in_ a list")).toBe("code in a list");
+  expect(plainTitle("> quoted\n")).toBe("quoted");
+  expect(plainTitle("a   b\t c")).toBe("a b c");
+  expect(plainTitle("---\n***\nafter the rules")).toBe("after the rules");
+  const long = plainTitle("x".repeat(500)) ?? "";
+  expect([...long]).toHaveLength(LONGEST_TITLE);
+  expect(long.endsWith("…")).toBe(true);
+  // A letter outside the basic plane, past the cut, isn't split in half; an emoji alone is no title.
+  expect(plainTitle("𝒜".repeat(200))).toBe(`${"𝒜".repeat(LONGEST_TITLE - 1)}…`);
+  expect(plainTitle("😀😀")).toBeNull();
+});
+
+test("only paired marks go from a title: a name with underscores or a sum is as written", () => {
+  expect(plainTitle("my_file_name and 2*3")).toBe("my_file_name and 2*3");
+  expect(plainTitle("_emphasis_ and __strong__ and `code` and ~~gone~~")).toBe(
+    "emphasis and strong and code and gone",
+  );
+  expect(plainTitle("an *unpaired star")).toBe("an *unpaired star");
+  // Two stars that don't flank a word aren't a pair.
+  expect(plainTitle("2*3 + 4*5")).toBe("2*3 + 4*5");
+  expect(plainTitle("a * b * c")).toBe("a * b * c");
+  expect(plainTitle("**bold** and *it*")).toBe("bold and it");
+  // JSON's title is plain text: Markdown's marks aren't stripped from it.
+  expect(json.title({ title: "  a_b  *c*  \n d " })).toBe("a_b *c* d");
+});
+
+test("a title is read from a line's first 400 characters, so a hostile line is quick", () => {
+  const hostile = `a${"[](".repeat(100_000)}x`;
+  const started = performance.now();
+  expect(plainTitle(hostile)).not.toBeNull();
+  expect(plainTitle(`a${"[\\".repeat(100_000)}x`)).not.toBeNull();
+  expect(json.title({ title: "y".repeat(1_000_000) })?.length).toBe(LONGEST_TITLE);
+  expect(performance.now() - started).toBeLessThan(1000);
+});
+
+test("a title is null, not an error, where the data hold none or odd ones", () => {
+  expect(plainTitle("")).toBeNull();
+  expect(plainTitle("   \n\n")).toBeNull();
+  expect(plainTitle("# \n---")).toBeNull();
+  expect(markdown().title({})).toBeNull();
+  expect(markdown().title({ text: 3 })).toBeNull();
+  expect(markdown("body").title({ body: "Plans\nmore" })).toBe("Plans");
+  expect(json.title({ title: "Q3 numbers" })).toBe("Q3 numbers");
+  expect(json.title({ title: 7 })).toBeNull();
+  expect(json.title({ title: { nested: true } })).toBeNull();
+  expect(json.title({ name: "no title field" })).toBeNull();
+  expect(json.title({})).toBeNull();
 });

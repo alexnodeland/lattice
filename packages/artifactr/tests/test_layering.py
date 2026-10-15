@@ -56,7 +56,14 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # The OpenAPI document's bare application gives its runner an agent, which never runs.
     "fastapi": (
         {*INNER, "artifactr.fastapi"},
-        {"fastapi", "starlette", "pydantic", "pydantic_ai", *OTEL_API},
+        {
+            "fastapi",
+            "starlette",
+            "pydantic",
+            "pydantic_ai",
+            "lattice_core.refusals",
+            *OTEL_API,
+        },
     ),
     "mcp": (
         {*INNER, "artifactr.mcp"},

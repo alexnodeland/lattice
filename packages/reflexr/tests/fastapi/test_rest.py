@@ -8,10 +8,10 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
+from lattice_core.refusals import Refused, RejectionDetail
 from reflexr import Rule, SourceActor, on, run
 from reflexr.core import Event, PredicateFilter
 from reflexr.fastapi import reflexr_router
-from reflexr.fastapi.router import Refused, RejectionDetail
 from reflexr.workspace import InMemoryStorage, Reactor, Schedule, Workspaces
 from tests.event_types import Deploy
 from tests.fastapi.conftest import (

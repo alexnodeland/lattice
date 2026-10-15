@@ -1,15 +1,14 @@
-"""Minimal type stubs for the parts of opentelemetry-instrumentation-asyncpg artifactr uses."""
+"""Minimal stubs for the parts of opentelemetry-instrumentation-sqlalchemy lattice-core uses."""
 
 from collections.abc import Collection
 from typing import Any, override
 
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 
-class AsyncPGInstrumentor(BaseInstrumentor):
-    def __init__(self, capture_parameters: bool = False) -> None: ...
+class SQLAlchemyInstrumentor(BaseInstrumentor):
     @override
     def instrumentation_dependencies(self) -> Collection[str]: ...
     @override
-    def _instrument(self, **kwargs: Any) -> None: ...
+    def _instrument(self, **kwargs: Any) -> Any: ...
     @override
     def _uninstrument(self, **kwargs: Any) -> None: ...

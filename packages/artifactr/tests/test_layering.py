@@ -34,7 +34,11 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (artifactr packages it may import, third-party modules it may import)
     # lattice-core's helpers, shared with reflexr (lattice ADR-0018).
     "core": ({"artifactr.core"}, {"pydantic", "jsonpatch", "jsonpointer", "lattice_core.schema"}),
-    "telemetry": ({"artifactr.core", "artifactr.telemetry"}, OTEL_API),
+    # The telemetry contract's MetricsDetail, which needs no extra (lattice ADR-0020).
+    "telemetry": (
+        {"artifactr.core", "artifactr.telemetry"},
+        {"lattice_core.otel.contribution", *OTEL_API},
+    ),
     "workspace": (
         {"artifactr.core", "artifactr.telemetry", "artifactr.workspace"},
         {"pydantic", "lattice_core.text", *OTEL_API},
@@ -54,19 +58,26 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {*INNER, "artifactr.fastapi"},
         {"fastapi", "starlette", "pydantic", "pydantic_ai", *OTEL_API},
     ),
-    "mcp": ({*INNER, "artifactr.mcp"}, {"mcp", "starlette", "pydantic", *OTEL_API}),
-    # The OpenTelemetry SDK adapter; it imports FastAPI and SQLAlchemy only to instrument them.
+    "mcp": (
+        {*INNER, "artifactr.mcp"},
+        {"mcp", "starlette", "pydantic", "lattice_core.logs", *OTEL_API},
+    ),
+    # The OpenTelemetry SDK adapter, on lattice-core's; it names SQLAlchemy's engines only in
+    # its annotations.
     "otel": (
-        {"artifactr.core", "artifactr.telemetry", "artifactr.otel", "artifactr.langfuse"},
-        {"opentelemetry", "pydantic_ai", "fastapi", "sqlalchemy", "langfuse"},
+        {"artifactr.telemetry", "artifactr.otel"},
+        {"opentelemetry", "sqlalchemy", "lattice_core.otel"},
     ),
     # The LiteLLM adapter: a model over the proxy, and a capability for each request.
     "litellm": (
         {*INNER, "artifactr.litellm"},
-        {"pydantic_ai", "httpx2", "opentelemetry.propagate", *OTEL_API},
+        {"pydantic_ai", "opentelemetry.propagate", "lattice_core.litellm", *OTEL_API},
     ),
     # The Langfuse adapter: a TurnContext, a span filter and the client. Scores are evalr's.
-    "langfuse": ({*INNER, "artifactr.langfuse"}, {"langfuse", "opentelemetry"}),
+    "langfuse": (
+        {*INNER, "artifactr.langfuse"},
+        {"langfuse", "opentelemetry", "lattice_core.langfuse"},
+    ),
     # The evalr adapter: a feedback source, experiment tasks, a TurnEvaluator and measures.
     # Only this layer and the score mirror may import evalr.
     "evals": (

@@ -1,5 +1,14 @@
 import { expect, test } from "vitest";
-import { askedOf, blocksOf, LEVELS, levelOf, MOST_WORKSPACES, partsOf, shownOf } from "./usage";
+import {
+  askedOf,
+  blocksOf,
+  LEVELS,
+  levelOf,
+  MOST_WORKSPACES,
+  partsOf,
+  short,
+  shownOf,
+} from "./usage";
 
 const usage = {
   days: [
@@ -8,8 +17,8 @@ const usage = {
     { day: "2026-10-13", spend: 4, tokens: 400, requests: 8 },
   ],
   workspaces: [
-    { workspace: "plans", spend: 3, tokens: 300, days: [] },
-    { workspace: "notes", spend: 1, tokens: 100, days: [] },
+    { workspace: "plans", spend: 3, tokens: 300 },
+    { workspace: "notes", spend: 1, tokens: 100 },
   ],
   budget: { spend: 6, max_budget: 90, budget_duration: "30d" },
   daily_budget: 3,
@@ -36,10 +45,14 @@ test("a day's spend is nothing, under, near or over its share", () => {
     "over",
   ]);
   expect(blocksOf(usage, 3)).toEqual([
-    { key: "2026-10-11", name: "10-11", level: 0, figure: "$0.00" },
-    { key: "2026-10-12", name: "10-12", level: 1, figure: "$2.00" },
-    { key: "2026-10-13", name: "10-13", level: 3, figure: "$4.00" },
+    { key: "2026-10-11", name: "2026-10-11", level: 0, figure: "$0.00" },
+    { key: "2026-10-12", name: "2026-10-12", level: 1, figure: "$2.00" },
+    { key: "2026-10-13", name: "2026-10-13", level: 3, figure: "$4.00" },
   ]);
+  expect(short("2026-10-13")).toBe("10-13");
+  // A day a partial read never reached isn't in the answer, so it is no block.
+  const partial = { ...usage, complete: false, days: usage.days.slice(1) };
+  expect(blocksOf(partial, 3).map((block) => block.key)).toEqual(["2026-10-12", "2026-10-13"]);
 });
 
 test("what no workspace's tag holds is a part of its own, if a cent or more", () => {
@@ -50,7 +63,12 @@ test("what no workspace's tag holds is a part of its own, if a cent or more", ()
   ]);
   const tagged = {
     ...usage,
-    workspaces: [{ workspace: "notes", spend: 6.001, tokens: 1, days: [] }],
+    workspaces: [{ workspace: "notes", spend: 6.001, tokens: 1 }],
   };
   expect(partsOf(tagged)).toEqual([{ key: "notes", name: "notes", value: 6.001 }]);
+  // Where a read stopped short, the two totals cover different days: no part is made of the rest.
+  expect(partsOf({ ...usage, complete: false }).map((part) => part.key)).toEqual([
+    "plans",
+    "notes",
+  ]);
 });

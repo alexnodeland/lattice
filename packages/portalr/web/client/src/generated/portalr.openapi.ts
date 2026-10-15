@@ -756,11 +756,9 @@ export interface components {
         };
         /**
          * WorkspaceSpend
-         * @description One workspace's spend over the window, and per day.
+         * @description One workspace's spend over the window.
          */
         WorkspaceSpend: {
-            /** Days */
-            days: components["schemas"]["DaySpend"][];
             /** Spend */
             spend: number;
             /** Tokens */

@@ -1197,15 +1197,8 @@
         "type": "object"
       },
       "WorkspaceSpend": {
-        "description": "One workspace's spend over the window, and per day.",
+        "description": "One workspace's spend over the window.",
         "properties": {
-          "days": {
-            "items": {
-              "$ref": "#/components/schemas/DaySpend"
-            },
-            "title": "Days",
-            "type": "array"
-          },
           "spend": {
             "title": "Spend",
             "type": "number"
@@ -1222,8 +1215,7 @@
         "required": [
           "workspace",
           "spend",
-          "tokens",
-          "days"
+          "tokens"
         ],
         "title": "WorkspaceSpend",
         "type": "object"

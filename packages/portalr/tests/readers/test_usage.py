@@ -58,7 +58,7 @@ def test_a_tags_ids_are_percent_encoded_and_read_back_for_their_tenant_alone() -
     assert tagged_workspace(ACME, "tenant-workspace:acme") is None
 
 
-def test_a_window_is_at_most_a_quarter_and_names_at_most_fifty_workspaces() -> None:
+def test_a_window_is_at_most_its_most_days_and_names_at_most_fifty_workspaces() -> None:
     with pytest.raises(ValidationError, match="at most 91 days"):
         UsageQuery(start=START, end=START + timedelta(days=92))
     with pytest.raises(ValidationError):
@@ -110,7 +110,6 @@ async def test_spend_per_day_and_per_workspace_from_the_teams_and_the_tenants_ta
         ("plans", 2.0, 150),
         ("notes", 1.5, 100),
     ]
-    assert [d.spend for d in usage.workspaces[0].days] == [0, 2.0]
     assert usage.budget is not None
     assert usage.budget.max_budget == 100
     assert usage.daily_budget == pytest.approx(100 / 30)
@@ -148,11 +147,12 @@ async def test_every_page_is_read_up_to_the_most(monkeypatch: Any) -> None:
         )
 
     tool = Tool({"/team/info": json(INFO), "/team/daily/activity": pages})
-    query = UsageQuery(start=START, end=START + timedelta(days=2))
+    query = UsageQuery(start=START, end=START + timedelta(days=3))
     read = await read_usage(LiteLLM("http://litellm", tool.client()), ACME, query)
     assert isinstance(read, Ok)
     assert not read.data.complete
-    assert [d.spend for d in read.data.days] == [1.0, 1.0]
+    # The third day was never reached: it is unknown, not 0, so it isn't in the answer.
+    assert [(d.day.day, d.spend) for d in read.data.days] == [(11, 1.0), (12, 1.0)]
 
 
 async def test_a_day_split_across_pages_is_summed() -> None:
@@ -202,9 +202,12 @@ async def test_a_read_past_its_deadline_answers_what_it_read(monkeypatch: Any) -
     litellm = LiteLLM("http://litellm", httpx.AsyncClient(transport=httpx.MockTransport(answer)))
     read = await read_usage(litellm, ACME, WINDOW)
     assert isinstance(read, Ok)
+    # The team's activity was read to its end: a day with nothing in it is a measured 0.
     assert [d.spend for d in read.data.days] == [1.5, 0]
     assert read.data.workspaces == []
+    # The budget hadn't answered by the deadline, so it is None, and its share with it.
     assert read.data.budget is None
+    assert read.data.daily_budget is None
     assert not read.data.complete
     assert asyncio.all_tasks() == {asyncio.current_task()}
 
@@ -269,3 +272,8 @@ def test_a_days_share_of_the_budget_needs_a_budget_and_a_duration() -> None:
     assert daily_budget(Spend(spend=1, max_budget=0, budget_duration="7d")) is None
     assert daily_budget(Spend(spend=1, max_budget=70)) is None
     assert daily_budget(Spend(spend=1, max_budget=70, budget_duration="soon")) is None
+
+
+def test_a_workspace_asked_after_twice_is_asked_after_once() -> None:
+    query = UsageQuery(start=START, end=START + timedelta(days=1), workspaces=["b", "a", "b"])
+    assert query.workspaces == ["b", "a"]

@@ -35,7 +35,7 @@ class FeedbackQuery(Span):
     workspace: Id | None = None
 
     @model_validator(mode="after")
-    def _at_most_a_quarter(self) -> Self:
+    def _within_most_days(self) -> Self:
         if self.end - self.start > timedelta(days=MOST_DAYS):
             raise ValueError(f"a window is at most {MOST_DAYS} days")
         return self

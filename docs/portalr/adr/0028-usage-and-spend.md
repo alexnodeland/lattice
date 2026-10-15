@@ -13,31 +13,31 @@ lattice RFC-0002 gives admin a Usage and spend area. Each tenant is a LiteLLM te
 
 Both answer per day, with a breakdown per team or per tag.
 
-A team's activity has no workspace. The user decided two things:
+A team's activity has no workspace, so a workspace's spend needs a tag on each request. The libraries' LiteLLM gateways tag each request `tenant-workspace:<tenant>/<workspace>`, through a helper in lattice-core that relayr's work adds (lattice ADR-0019; [PR #190](https://github.com/alexnodeland/lattice/pull/190) until it merges). Spend recorded before the tag was sent has no workspace, and no read can give it one.
 
-1. **A tenant-scoped tag.** The libraries' LiteLLM gateways also tag each request `tenant-workspace:<tenant>/<workspace>`, through a lattice-core helper that relayr's work adds.
-2. **How Usage reads, and its bounds.**
-   - It reads the tenant's spend per day from its team.
-   - It reads per-workspace spend from the tags of the tenant's own workspaces only, never every tag, checking each answer's tag again, as Feedback does.
-   - Its bounds are like Feedback's: a window of at most 91 days, a deadline, kept a while, retried once, and a partial flag.
-   - A Tracker shows each day's spend against its share of the team's budget, hidden where there is no budget.
+Usage reads as Feedback does, within bounds:
 
-Spend recorded before the tag lands has no workspace, and the page says so, quietly.
+- the tenant's spend per day from its team;
+- per-workspace spend from the tags of the tenant's own workspaces only, never every tag, each answer's tag checked again;
+- a window of at most 91 days, a deadline, kept a while, retried once, and a partial flag;
+- a Tracker of each day's spend against its share of the team's budget, hidden where there is no budget.
 
 ## Decision
 
 - **A workspace's tag is `tenant-workspace:<tenant>/<workspace>`, each id percent-encoded** (`quote(id, safe="")`), as `portalr.readers.usage.workspace_tag` builds it and `tagged_workspace` reads it back.
   - Encoding keeps the `/` between the ids unambiguous. It also keeps out the `,` that LiteLLM's `/tag/daily/activity` splits `tags=` on.
+  - `workspace_tag` and `tagged_workspace` are portalr's own until lattice-core's helpers (lattice ADR-0019, PR #190) merge; then they move there, and portalr's keep only the test that a `%` in an id round-trips.
   - This is the format relayr's lattice-core helper sends. Until that PR merges, portalr is built against fixtures in it.
-- **`GET /portalr/v1/usage`**, for whoever may read the tenant's spend (`portalr:read_spend`), takes a window, at most 91 days, and up to 50 `workspaces`. It answers:
-  - `days`: the team's spend, tokens and requests on each day the window touches, in UTC, from `/team/daily/activity`, asked for the tenant's team alone;
-  - `workspaces`: each named workspace's spend and tokens, over the window and per day, from `/tag/daily/activity`, the most spent first. A workspace with nothing under its tag isn't in it;
-  - `budget`: the team's spend and budget, from `/team/info`;
+- **`GET /portalr/v1/usage`**, for whoever may read the tenant's spend (`portalr:read_spend`), takes a window, at most 91 days, and up to 50 `workspaces`, each asked after once. It answers:
+  - `days`: the team's spend, tokens and requests on each day the window touches, in UTC, from `/team/daily/activity`, asked for the tenant's team alone. Where the read ran to its end, every day is in it, one with no spend as 0. Where it stopped short, only the days it reached are, since a day it never reached is unknown, not nothing spent, as Feedback's `known_from` says of its days;
+  - `workspaces`: each named workspace's spend and tokens over the window, from `/tag/daily/activity`, the most spent first. A workspace with nothing under its tag isn't in it. No per-day figure is sent: nothing shows one;
+  - `budget`: the team's spend and budget, from `/team/info`. It is None for a tenant with no team, and where the deadline came before `/team/info` answered, which only a partial read can be; the day's share is then None with it;
   - `daily_budget`: a day's share of the budget;
   - `complete`: false where the read stopped at one of its bounds.
   - It is a reading, as every one is: `ok`, `unavailable` or `unconfigured`.
 - **Only the tenant's own tags are asked for**: those of the workspaces the request names, which admin takes from artifactr's list of the tenant's workspaces. The read never lists every tag. Each tag in an answer is decoded and kept only if it names the tenant and a workspace the read asked for, and each team only if it is the tenant's. So another tenant's workspace of the same name is never counted.
 - **A day's share of the budget** is the team's `max_budget` over its `budget_duration` in days, read as LiteLLM reads a duration: seconds, minutes, hours, days, weeks or months, or `hourly`, `daily`, `weekly` or `monthly`, with a month taken as 30 days. With no budget, a budget of 0, or a duration that can't be read, there is no share, and none is guessed.
+- **A window is read as the days it touches.** LiteLLM sums by whole UTC day, so the first and last days of a window are whole days, whatever time it starts or ends. Today is a part of a day, set beside a whole day's share of the budget, so today's block reads low until the day is done.
 - **The read is bounded**, as Feedback's is:
   - The team's activity, the tags' and the budget are read at once, 1,000 records a page, up to 20 pages each. A day split across two pages, as LiteLLM pages its rows before grouping them by day, is summed.
   - Past 20 pages, the read is partial.
@@ -49,8 +49,9 @@ Spend recorded before the tag lands has no workspace, and the page says so, quie
   - The workspaces to split by are the tenant's from artifactr, in order, at most 50. If artifactr refuses the list, the spend is read whole, and the page says so. Where there are more than 50, it says only the first 50 are split out.
 - **The page:**
   - It shows the window's spend and requests, and the spend per day as a bar chart.
-  - Where the team has a budget with a share, a Tracker shows each day against that share: nothing spent, under it, near it (80% or more), or over it.
-  - Each workspace's part is a donut, with what no workspace's tag holds as "No workspace", and every workspace is in a table.
+  - Where the team has a budget with a share, a Tracker shows each day against that share: nothing spent, under it, near it (80% or more), or over it. A day a partial read never reached is no block and no bar.
+  - Each workspace's part is a donut, with what no workspace's tag holds as "No workspace", and every workspace is in a table. "No workspace" is the team's total less the workspaces', so it is shown only where both reads ran to their end: a partial read's two totals cover different days.
+  - The tables and tooltips give the whole date, and the bars' axis the date without its year.
   - Beneath, quietly: "Spend recorded before the libraries tagged each request with its workspace has no workspace split, and is counted under 'No workspace'."
 - **`ui`'s Tracker is Tremor's, adapted**, as the charts are (ADR-0027), and the NOTICE names it.
   - Its blocks take a level each, in the kit's tokens: the muted line, then the inks. Past the second level, a block has a pattern too, striped then hatched, so colour is never its only cue (ADR-0021).
@@ -72,4 +73,7 @@ Spend recorded before the tag lands has no workspace, and the page says so, quie
 ## Consequences
 
 - Easier: a tenant sees what each workspace spent, from the same sums LiteLLM budgets by, and each day against its share.
-- Harder: until the gateways send the tag, no spend has a workspace. A workspace past the first 50 is under "No workspace".
+- Harder:
+  - Until the gateways send the tag, no spend has a workspace. A workspace past the first 50 is under "No workspace".
+  - Today's block is a part of a day against a whole day's share.
+  - After a partial read, some days are unknown and left out, and "No workspace" isn't shown.

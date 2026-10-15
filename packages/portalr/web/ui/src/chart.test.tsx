@@ -189,3 +189,25 @@ test("the first rows a read didn't reach are shaded, and named so", async () => 
     "Not read",
   );
 });
+
+test("an axis may write an index shorter than the table does", async () => {
+  await page.viewport(1024, 768);
+  const screen = await render(
+    <BarChart
+      label="Spend"
+      index={days}
+      series={[{ key: "up", name: "Spend" }]}
+      data={[
+        { day: "2025-12-31", up: 1 },
+        { day: "2026-01-01", up: 2 },
+      ]}
+      tick={(index) => index.slice(5)}
+    />,
+  );
+  const figure = screen.getByRole("figure", { name: "Spend" });
+  await expect
+    .poll(() => [...document.querySelectorAll("svg text")].map((text) => text.textContent))
+    .toEqual(expect.arrayContaining(["12-31", "01-01"]));
+  await figure.getByText("Show the figures").click();
+  await expect.element(figure.getByRole("row", { name: "2025-12-31" })).toBeVisible();
+});

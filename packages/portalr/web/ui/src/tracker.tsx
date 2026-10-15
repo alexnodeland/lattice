@@ -25,9 +25,6 @@ export interface Block {
   readonly figure: string;
 }
 
-/** The most levels a tracker draws: none, then each ink. */
-export const MAX_LEVELS = 4;
-
 /** A stripe of an ink, then a wash of it, at an angle: a level's pattern past solid. */
 const stripes = (ink: string, angle: number) =>
   `repeating-linear-gradient(${angle}deg, ${ink} 0 3px, color-mix(in srgb, ${ink} 35%, transparent) 3px 6px)`;
@@ -39,7 +36,7 @@ const MARKS: readonly CSSProperties[] = [
   { background: stripes("var(--chart-2)", 45) },
 ];
 
-/** A level's mark, by its place: past the last, the muted line's. */
+/** A level's mark, by its place: past the last, the muted line's. A tracker names `MARKS.length`. */
 const mark = (level: number): CSSProperties => MARKS[level] ?? { background: "var(--line)" };
 
 /** A tracker: its blocks in a row, its levels named in a legend, and its figures as a table. */
@@ -51,7 +48,7 @@ export function Tracker({
   figure,
 }: {
   label: string;
-  /** The levels, the least first: at most `MAX_LEVELS`. */
+  /** The levels, the least first: as many as the tracker has marks for, four. */
   levels: readonly Level[];
   blocks: readonly Block[];
   /** What the blocks are, as the table's first column names them, such as "Day (UTC)". */
@@ -71,7 +68,7 @@ export function Tracker({
         {label}
       </figcaption>
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-muted text-xs">
-        {levels.slice(0, MAX_LEVELS).map((level, at) => (
+        {levels.slice(0, MARKS.length).map((level, at) => (
           <li key={level.key} className="inline-flex items-center gap-1.5">
             <span aria-hidden="true" className="h-2.5 w-4 shrink-0 rounded-xs" style={mark(at)} />
             {level.name}

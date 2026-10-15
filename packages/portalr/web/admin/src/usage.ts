@@ -22,7 +22,7 @@ export const shownOf = (search: Record<string, unknown>): Required<Shown> => ({
   days: daysOf(search.days),
 });
 
-/** The most workspaces one read splits the spend by, as portalr allows. */
+/** The most workspaces one read splits the spend by: portalr's `MOST_WORKSPACES`, as it allows. */
 export const MOST_WORKSPACES = 50;
 
 /** The workspaces a read asks after: the tenant's, in order, fifty at most. */
@@ -48,11 +48,17 @@ export function levelOf(spend: number, share: number): number {
   return spend >= share * 0.8 ? 2 : 1;
 }
 
-/** Each day as a block of the tracker, against its share of the budget. */
+/** A day as an axis reads it, in UTC: `10-13`. The tables and titles keep the whole date. */
+export const short = (day: string) => day.slice(5);
+
+/**
+ * Each day the read reached as a block of the tracker, against its share of the budget. A day a
+ * partial read never reached isn't in `usage.days`, so it is no block: unknown isn't nothing spent.
+ */
 export const blocksOf = (usage: Usage, share: number): Block[] =>
   usage.days.map((day) => ({
     key: day.day,
-    name: day.day.slice(5),
+    name: day.day,
     level: levelOf(day.spend, share),
     figure: dollars(day.spend),
   }));
@@ -61,8 +67,10 @@ export const blocksOf = (usage: Usage, share: number): Block[] =>
 const CENT = 0.005;
 
 /**
- * Each workspace's part of the window's spend, and the part no workspace's tag holds: spend
- * before the libraries tagged it, or on a workspace the read didn't ask after.
+ * Each workspace's part of the window's spend, and, where both reads ran to their end, the part
+ * no workspace's tag holds: spend before the libraries tagged it, or on a workspace the read
+ * didn't ask after. A partial read's two totals cover different days, so their difference is no
+ * part of anything.
  */
 export function partsOf(usage: Usage): Part[] {
   const spent = usage.days.reduce((sum, day) => sum + day.spend, 0);
@@ -72,5 +80,7 @@ export function partsOf(usage: Usage): Part[] {
     value: place.spend,
   }));
   const rest = spent - parts.reduce((sum, part) => sum + part.value, 0);
-  return rest >= CENT ? [...parts, { key: "~untagged", name: "No workspace", value: rest }] : parts;
+  return usage.complete && rest >= CENT
+    ? [...parts, { key: "~untagged", name: "No workspace", value: rest }]
+    : parts;
 }

@@ -19,7 +19,9 @@ const days = (count: number, from = new Date()) =>
 /** How the next read differs from a week's: no budget, partial, or none. */
 let shape: "week" | "unbudgeted" | "partial" = "week";
 let litellm: "ok" | "unconfigured" | "unavailable" = "ok";
-let artifactr: "ok" | "refused" = "ok";
+let artifactr: "ok" | "refused" | "refused-once" = "ok";
+/** How many times artifactr's list of workspaces was read. */
+let listings = 0;
 
 function usage() {
   const week = days(7);
@@ -31,8 +33,8 @@ function usage() {
       requests: at === 6 ? 10 : at === 5 ? 4 : 0,
     })),
     workspaces: [
-      { workspace: "notes", spend: 4, tokens: 400, days: [] },
-      { workspace: "plans", spend: 1, tokens: 100, days: [] },
+      { workspace: "notes", spend: 4, tokens: 400 },
+      { workspace: "plans", spend: 1, tokens: 100 },
     ],
     budget: { spend: 7, max_budget: 90, budget_duration: "30d" },
     daily_budget: 3,
@@ -46,7 +48,8 @@ function usage() {
         daily_budget: null,
       };
     case "partial":
-      return { ...base, complete: false };
+      // The read never reached the week's first four days: they aren't in the answer.
+      return { ...base, complete: false, days: base.days.slice(4) };
     default:
       return base;
   }
@@ -70,9 +73,12 @@ async function portalr(request: Request, path: string): Promise<Response | undef
     );
   }
   if (path === "/artifactr/v1/workspaces") {
-    return artifactr === "ok"
-      ? Response.json(["plans", "notes"])
-      : Response.json({ detail: { type: "forbidden", message: "no" } }, { status: 403 });
+    listings += 1;
+    // "refused-once": the first read is refused, and any later one would succeed.
+    const refused = artifactr === "refused" || (artifactr === "refused-once" && listings === 1);
+    return refused
+      ? Response.json({ detail: { type: "forbidden", message: "no" } }, { status: 403 })
+      : Response.json(["plans", "notes"]);
   }
   return undefined;
 }
@@ -89,6 +95,7 @@ afterEach(() => {
   shape = "week";
   litellm = "ok";
   artifactr = "ok";
+  listings = 0;
   vi.unstubAllGlobals();
 });
 
@@ -112,7 +119,7 @@ test("the week's spend, each day against its share, and each workspace's part", 
   });
   await expect.element(tracker).toBeVisible();
   await tracker.getByText("Show the figures").click();
-  const today = days(7)[6]?.slice(5) ?? "";
+  const today = days(7)[6] ?? "";
   await expect
     .element(tracker.getByRole("row", { name: today }))
     .toHaveTextContent(`${today}$5.00Over its share`);
@@ -158,7 +165,19 @@ test("without artifactr's list, the spend is read whole, and says so", async () 
 test("a partial read says so, with a badge", async () => {
   shape = "partial";
   const { screen } = await open("/t/acme/usage");
-  await expect.element(screen.getByText(/some days' spend may be missing/)).toBeVisible();
+  await expect.element(screen.getByText(/Days it didn't reach are left out/)).toBeVisible();
+  // The four days never reached are no blocks and no bars, not nothing spent.
+  const tracker = screen.getByRole("figure", { name: /against its share of the budget/ });
+  await tracker.getByText("Show the figures").click();
+  await expect.poll(() => tracker.getByRole("row").elements()).toHaveLength(4);
+  // And the part no workspace's tag holds isn't made up from totals of different days.
+  const donut = screen.getByRole("figure", { name: "Spend by workspace" });
+  expect(
+    donut
+      .getByRole("listitem")
+      .elements()
+      .map((item) => item.textContent),
+  ).toEqual(["notes$4.00 · 80%", "plans$1.00 · 20%"]);
 });
 
 test("LiteLLM not configured says so", async () => {
@@ -171,4 +190,14 @@ test("LiteLLM not answering says why", async () => {
   litellm = "unavailable";
   const { screen } = await open("/t/acme/usage?days=30");
   await expect.element(screen.getByRole("alert")).toHaveTextContent("litellm answered 502");
+});
+
+test("the list of workspaces is read once, by the loader: a refusal isn't read again", async () => {
+  artifactr = "refused-once";
+  const { screen } = await open("/t/acme/usage");
+  await expect.element(screen.getByText(/so the spend is read whole/)).toBeVisible();
+  // Give a second read time to happen, and to change what the page was asked.
+  await new Promise((done) => setTimeout(done, 500));
+  expect(listings).toBe(1);
+  expect(reads.map((asked) => asked.getAll("workspaces"))).toEqual([[]]);
 });

@@ -9,7 +9,7 @@ import {
   StatusBadge,
   Tracker,
 } from "@portalr/ui";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import {
   createFileRoute,
   type ErrorComponentProps,
@@ -25,6 +25,7 @@ import {
   MOST_WORKSPACES,
   partsOf,
   type Shown,
+  short,
   shownOf,
 } from "../../../../usage";
 import { WINDOWS, windowOf } from "../../../../window";
@@ -79,9 +80,10 @@ function UsagePage() {
   const { tenant } = Route.useParams();
   const shown = Route.useSearch();
   const { window } = Route.useLoaderDeps();
-  const { queries } = Route.useRouteContext();
-  // As the loader read them: none, if artifactr refused the list.
-  const { data: listed } = useQuery(queries.artifactr.workspaces(tenant));
+  const { queries, queryClient } = Route.useRouteContext();
+  // As the loader read them, and not read again here: the list the usage read was asked with is
+  // the list this page shows. None, if artifactr refused it, and the spend is read whole.
+  const listed = queryClient.getQueryData(queries.artifactr.workspaces(tenant).queryKey);
   const workspaces = askedOf(listed ?? []);
   const { data: reading } = useSuspenseQuery(queries.portalr.usage(tenant, window, workspaces));
   if (reading.status === "unconfigured") {
@@ -112,8 +114,8 @@ function UsagePage() {
       {!usage.complete && (
         <p role="status" className="flex flex-wrap items-center gap-2 text-muted text-sm">
           <StatusBadge tone="stopped">Partial</StatusBadge>
-          The read stopped at one of its bounds: some days' spend may be missing. A shorter window
-          may read it all.
+          The read stopped at one of its bounds. Days it didn't reach are left out, not shown as
+          nothing spent, and the sums are of what it read. A shorter window may read it all.
         </p>
       )}
       <Spent usage={usage} />
@@ -137,7 +139,7 @@ function Spent({ usage }: { usage: Usage }) {
         <span className="font-semibold text-fg text-xl tabular-nums">{dollars(spent)}</span> in{" "}
         {numbers.format(requests)} requests over the window.
       </p>
-      {share !== null && share !== undefined && budget && (
+      {share != null && budget && (
         <Tracker
           label={`Each day's spend against its share of the budget: ${dollars(share)} a day, of ${dollars(budget.max_budget ?? 0)} every ${budget.budget_duration}`}
           index={DAY.name}
@@ -150,8 +152,9 @@ function Spent({ usage }: { usage: Usage }) {
         label="Spend per day"
         index={DAY}
         series={[{ key: "spend", name: "Spend" }]}
-        data={usage.days.map((day) => ({ day: day.day.slice(5), spend: day.spend }))}
+        data={usage.days.map((day) => ({ day: day.day, spend: day.spend }))}
         format={dollars}
+        tick={short}
       />
     </>
   );
@@ -196,7 +199,7 @@ function Workspaces({ usage, listed, more }: { usage: Usage; listed: boolean; mo
 function Filter({ shown }: { shown: Required<Shown> }) {
   const navigate = Route.useNavigate();
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="sm:max-w-xs">
       <SelectField
         label="Window"
         value={String(shown.days)}

@@ -23,6 +23,7 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import HTTPException
+from jwt.algorithms import ECAlgorithm
 from starlette.requests import HTTPConnection
 
 from artifactr.workspace import ACTIONS as ARTIFACTR
@@ -183,7 +184,7 @@ class Published:
 
     def __init__(self, key: ec.EllipticCurvePrivateKey) -> None:
         self.key = jwt.PyJWK.from_dict(
-            json.loads(jwt.algorithms.ECAlgorithm.to_jwk(key.public_key())) | {"alg": "ES256"}
+            json.loads(ECAlgorithm.to_jwk(key.public_key())) | {"alg": "ES256"}
         )
 
     def get_signing_key_from_jwt(self, _token: str) -> jwt.PyJWK:

@@ -65,6 +65,7 @@ export async function open(
   allowed: readonly string[],
   serve: Serve,
   tenants: readonly string[] = ["acme"],
+  readers: Config["readers"] = CONFIG.readers,
 ) {
   vi.stubGlobal("fetch", vi.fn(server(allowed, serve, tenants)));
   const queryClient = createQueryClient(() => undefined);
@@ -74,7 +75,7 @@ export async function open(
     routeTree,
     history: createMemoryHistory({ initialEntries: [path] }),
     context: {
-      config: CONFIG,
+      config: { ...CONFIG, readers },
       signed,
       queries: createQueries(api),
       commands: createCommands(api, () => undefined),

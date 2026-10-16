@@ -32,6 +32,11 @@ export interface paths {
         /**
          * Links
          * @description Deep links into Langfuse and Grafana, which aren't tenant-scoped, for operators.
+         *
+         *     What those tools show isn't behind portalr's gates, so each call that makes a link is
+         *     recorded: who, the kinds of id, and the tenant's id if one was asked for, never a trace's,
+         *     a session's or a run's, nor a URL. A tenant that doesn't exist is refused, and nothing is
+         *     recorded for a refusal.
          */
         get: operations["links_portalr_v1_deployment_links_get"];
         put?: never;
@@ -425,10 +430,16 @@ export interface components {
         Links: {
             /** Grafana Logs */
             grafana_logs?: string | null;
+            /** Grafana Tenant Logs */
+            grafana_tenant_logs?: string | null;
+            /** Grafana Tenant Traces */
+            grafana_tenant_traces?: string | null;
             /** Grafana Trace */
             grafana_trace?: string | null;
             /** Langfuse Session */
             langfuse_session?: string | null;
+            /** Langfuse Tenant */
+            langfuse_tenant?: string | null;
             /** Langfuse Trace */
             langfuse_trace?: string | null;
         };
@@ -917,6 +928,7 @@ export interface operations {
                 trace_id?: components["schemas"]["Id"] | null;
                 session_id?: components["schemas"]["Id"] | null;
                 run_id?: components["schemas"]["Id"] | null;
+                tenant_id?: components["schemas"]["TenantId"] | null;
             };
             header?: never;
             path?: never;

@@ -8,16 +8,16 @@
 
 [ADR-0011](0011-the-application-template-in-detail.md) left the database driver uninstrumented, because the libraries polled their storage and each poll would have been a trace of its own. It kept Langfuse's client from exporting spans with a span filter of the template's own, and started a feedback mirror per workspace that read the log from the start each time. It named the polls and the mirror's missing cursor as things to revisit.
 
-The libraries have since changed all three (artifactr [ADR-0046](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0046-telemetry-that-composes-across-libraries.md), reflexr [ADR-0040](https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0040-telemetry-that-composes-across-libraries.md)):
+The libraries have since changed all three (artifactr [ADR-0046](../../artifactr/adr/0046-telemetry-that-composes-across-libraries.md), reflexr [ADR-0040](../../reflexr/adr/0040-telemetry-that-composes-across-libraries.md)):
 
 - Each library contributes its metric views and the instrumentations it advises to one `configure_telemetry`.
 - They poll untraced, so the driver's instrumentation traces no poll.
 - `langfuse="scores"` sends Langfuse scores and trace attributes but no spans.
 - A `FeedbackMirror` carries on after a named cursor.
 
-artifactr's `Runner` also owns its runs now, and `Runner.aclose()` stops them at shutdown; a closed runner starts no turn ([ADR-0047](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0047-cancel-safe-storage.md)).
+artifactr's `Runner` also owns its runs now, and `Runner.aclose()` stops them at shutdown; a closed runner starts no turn ([ADR-0047](../../artifactr/adr/0047-cancel-safe-storage.md)).
 
-reflexr now names every event type and rule in a namespace, `namespace:name`, declared once per process on an abstract base, and reserves `reflexr` for its own facts ([ADR-0039](https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0039-namespaced-event-types.md)). A generated application needs one.
+reflexr now names every event type and rule in a namespace, `namespace:name`, declared once per process on an abstract base, and reserves `reflexr` for its own facts ([ADR-0039](../../reflexr/adr/0039-namespaced-event-types.md)). A generated application needs one.
 
 ## Decision
 

@@ -105,7 +105,17 @@ async def test_operators_list_create_and_delete_tenants(client: httpx.AsyncClien
     assert (await client.put("/operators/carol", headers=AS_ROOT)).status_code == 200
     assert (await client.delete("/operators/carol", headers=AS_ROOT)).status_code == 200
     audit = (await client.get("/audit", headers=AS_ROOT)).json()
-    assert [e["event"]["type"] for e in audit] == ["granted", "granted", "revoked"]
+    assert [(e["event"]["type"], e["tenant"]) for e in audit] == [
+        ("granted", None),
+        ("deployment_tenant_created", None),
+        ("deployment_tenant_created", None),
+        ("granted", None),
+        ("revoked", None),
+    ]
+    assert [e["event"]["tenant"] for e in audit if e["event"]["type"].startswith("deployment")] == [
+        "acme",
+        "globex",
+    ]
     assert (await client.delete("/tenants/globex", headers=AS_BOB)).status_code == 200
 
 
@@ -240,7 +250,10 @@ async def test_the_audit_log_is_read_of_some_types_or_by_one_subject(
     by_root = await client.get(
         "/audit", params={"actor_kind": "user", "actor": "root"}, headers=AS_ROOT
     )
-    assert [e["event"]["grant"]["to"]["id"] for e in by_root.json()] == ["carol"]
+    assert [e["event"]["type"] for e in by_root.json()] == [
+        "deployment_tenant_created",
+        "granted",
+    ], "root created acme, and made carol an operator"
 
 
 async def test_the_audit_log_reads_its_last_and_pages_back_from_an_entry(

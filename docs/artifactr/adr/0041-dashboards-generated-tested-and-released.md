@@ -29,7 +29,7 @@ Grafana's dashboard JSON is long and repetitive, and hand edits to it drift: a p
 
 ### Amendment (2026-09-29): as stackr runs them
 
-reflexr's port of these dashboards, run against stackr's Prometheus and Grafana ([reflexr ADR-0038](https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0038-dashboards-generated-tested-and-released.md)), found three problems that artifactr's dashboards had too:
+reflexr's port of these dashboards, run against stackr's Prometheus and Grafana ([reflexr ADR-0038](../../reflexr/adr/0038-dashboards-generated-tested-and-released.md)), found three problems that artifactr's dashboards had too:
 
 - **The release asset is `artifactr-dashboards-<version>.tar.gz`**, with the tag's `v` left out: the archive stackr's `scripts/fetch-dashboards` downloads from the release tagged `v<version>`. stackr would never have found the `artifactr-grafana-dashboards-<tag>.tar.gz` bundle above. The workflow still attaches each dashboard file too, and still creates no releases or tags.
 - **Every query has a one-minute min step.** The OpenTelemetry SDK exports metrics once a minute by default, and stackr's data source leaves Grafana's scrape interval at 15 seconds, so `$__rate_interval` came out at one minute: most windows held one sample, and rate panels showed "No data". With the min step, Grafana makes `$__rate_interval` at least four minutes, so every rate spans several exports.

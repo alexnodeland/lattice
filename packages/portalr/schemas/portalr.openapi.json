@@ -319,6 +319,28 @@
             ],
             "title": "Grafana Logs"
           },
+          "grafana_tenant_logs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grafana Tenant Logs"
+          },
+          "grafana_tenant_traces": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grafana Tenant Traces"
+          },
           "grafana_trace": {
             "anyOf": [
               {
@@ -340,6 +362,17 @@
               }
             ],
             "title": "Langfuse Session"
+          },
+          "langfuse_tenant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Langfuse Tenant"
           },
           "langfuse_trace": {
             "anyOf": [
@@ -1455,7 +1488,7 @@
     },
     "/portalr/v1/deployment/links": {
       "get": {
-        "description": "Deep links into Langfuse and Grafana, which aren't tenant-scoped, for operators.",
+        "description": "Deep links into Langfuse and Grafana, which aren't tenant-scoped, for operators.\n\nWhat those tools show isn't behind portalr's gates, so each call that makes a link is\nrecorded: who, the kinds of id, and the tenant's id if one was asked for, never a trace's,\na session's or a run's, nor a URL. A tenant that doesn't exist is refused, and nothing is\nrecorded for a refusal.",
         "operationId": "links_portalr_v1_deployment_links_get",
         "parameters": [
           {
@@ -1504,6 +1537,22 @@
                 }
               ],
               "title": "Run Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tenant_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tenant Id"
             }
           }
         ],

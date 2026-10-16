@@ -35,7 +35,7 @@ Feature: Home
     Given ops has signed in to admin
     Then they're in "All tenants"
     And they see the page "All tenants"
-    And the areas are "Home, Tenants, Audit"
+    And the areas are "Home, Tenants, Audit, Tools"
     And the "Tenants" card shows a figure
     And the "Spend" card says "LiteLLM isn't configured."
 

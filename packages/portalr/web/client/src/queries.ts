@@ -129,8 +129,19 @@ export const keys = {
     /** Deep links into the tools for a trace, which only an operator, `user`, reads. */
     links: (user: string, trace: string) =>
       ["portalr", "deployment", "links", user, trace] as const,
+    /** An operator's links into the tools for the ids they gave, in Tools. */
+    toolLinks: (user: string, ids: ToolIds) =>
+      ["portalr", "deployment", "tool-links", user, ids] as const,
   },
 };
+
+/** What Tools makes links for: a trace's, a session's or a run's id, and a tenant, each optional. */
+export interface ToolIds {
+  readonly trace?: string | undefined;
+  readonly session?: string | undefined;
+  readonly run?: string | undefined;
+  readonly tenant?: string | undefined;
+}
 
 /** A span of time to read, and for a series, the step between its points, in seconds. */
 export interface TimeSpan {
@@ -673,6 +684,33 @@ export function createQueries(api: Api) {
               }),
             ),
           staleTime: Number.POSITIVE_INFINITY,
+        }),
+      /**
+       * An operator's links into Langfuse and Grafana for the ids given. Each read is one that the
+       * server records, so it is never kept: not fresh, not cached once nothing shows it, and not
+       * read again on focus, on reconnecting, or by a retry.
+       */
+      toolLinks: (user: string, ids: ToolIds) =>
+        queryOptions({
+          queryKey: keys.portalr.toolLinks(user, ids),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/deployment/links", {
+                params: {
+                  query: {
+                    trace_id: ids.trace ?? null,
+                    session_id: ids.session ?? null,
+                    run_id: ids.run ?? null,
+                    tenant_id: ids.tenant ?? null,
+                  },
+                },
+              }),
+            ),
+          staleTime: 0,
+          gcTime: 0,
+          retry: false,
+          refetchOnWindowFocus: false,
+          refetchOnReconnect: false,
         }),
       /**
        * Every tenant, with their spend, for an operator; null for anyone else, whom it's refused,

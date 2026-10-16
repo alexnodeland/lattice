@@ -185,6 +185,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portalr/v1/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Names
+         * @description The emails of people, by user id: of the tenant ``X-Tenant`` names, for its members.
+         *
+         *     An operator sees anyone's email, with or without a tenant; a member of the tenant sees
+         *     its other members'. An id the caller may not see, with no user or with no email, is left
+         *     out, alike, and Supabase is asked only about the ids the caller may see. At most 100 ids.
+         *     The answer is personal data and is not to be kept, so it is ``no-store``.
+         */
+        get: operations["names_portalr_v1_people_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portalr/v1/scores": {
         parameters: {
             query?: never;
@@ -320,6 +345,8 @@ export interface components {
          * @description ``config.json``: what the UIs need of the deployment they run in.
          */
         Config: {
+            /** People */
+            people: boolean;
             /** Readers */
             readers: {
                 [key: string]: boolean;
@@ -501,6 +528,19 @@ export interface components {
         };
         /** @enum {string} */
         Metric: "turn_latency" | "failed_turns";
+        /**
+         * Names
+         * @description The emails of the people asked after whom the caller may see, by user id.
+         *
+         *     An id left out is one the caller may not see, one with no user, or one with no email, and the
+         *     answer is the same for all three.
+         */
+        Names: {
+            /** People */
+            people: {
+                [key: string]: string;
+            };
+        };
         /**
          * NewInvite
          * @description Whom to invite to the tenant ``X-Tenant`` names.
@@ -1389,6 +1429,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Ok_list_Point__"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    names_portalr_v1_people_get: {
+        parameters: {
+            query: {
+                id: components["schemas"]["Id"][];
+            };
+            header?: {
+                "X-Tenant"?: components["schemas"]["TenantId"] | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Names"];
                 };
             };
             /** @description Refused */

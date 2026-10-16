@@ -39,6 +39,7 @@ export {
   Refused,
   stale,
   type TimeSpan,
+  type ToolIds,
   TRACES_LIMIT,
   type TraceFilter,
 } from "./queries";

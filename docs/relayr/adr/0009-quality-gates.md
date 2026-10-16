@@ -28,5 +28,5 @@ The only coverage exclusions are configured centrally in `pyproject.toml` (`if T
 - Easier: refactoring, and moving the libraries' pins, with confidence; untested code cannot merge.
 - Harder: defensive code needs a test or needs to go.
 
-[a-adr-0015]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0015-quality-gates.md
-[r-adr-0013]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0013-quality-gates.md
+[a-adr-0015]: ../../artifactr/adr/0015-quality-gates.md
+[r-adr-0013]: ../../reflexr/adr/0013-quality-gates.md

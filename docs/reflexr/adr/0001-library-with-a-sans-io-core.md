@@ -8,7 +8,7 @@
 
 Reflex was a template to copy with Copier, plus a package that the copy imported. Copies of a template diverge, and fixes never reach them. The package itself mixed decisions with I/O: filters, triggers, retries and locking were entangled with a PostgreSQL store and global settings, so its tests mocked the store and the most important code (the event loop, 13% covered) was barely tested.
 
-artifactr faced the same choice and became a library with a pure core ([artifactr ADR-0001 and ADR-0013](https://github.com/alexnodeland/artifactr/tree/main/docs/adr)). reflexr should meet the same standard.
+artifactr faced the same choice and became a library with a pure core ([artifactr ADR-0001](../../artifactr/adr/0001-python-library-with-sans-io-core.md) and [ADR-0013](../../artifactr/adr/0013-library-with-reference-implementation.md)). reflexr should meet the same standard.
 
 ## Decision
 

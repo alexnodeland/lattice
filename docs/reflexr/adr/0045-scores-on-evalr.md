@@ -6,7 +6,7 @@
 
 ## Context
 
-Evaluation backends see feedback as scores, one per field. evalr holds the mapping from a field to a score, the ports scores leave through, and the one Langfuse `ScoreSink` and `ScoreConfigStore`, for evaluators and the libraries' mirrors alike; its `Score` checks its own value ([evalr ADR-0012](https://github.com/alexnodeland/evalr/blob/main/docs/adr/0012-langfuse-score-adapters-in-evalr.md)). This record states where scores live, superseding [ADR-0025](0025-ports-and-adapters.md)'s amendment, the last amendment of [ADR-0020](0020-evalr-shared-eval-kit.md), and the part of [ADR-0029](0029-metric-detail-through-sdk-views.md) that keeps the score adapters in `reflexr.langfuse`.
+Evaluation backends see feedback as scores, one per field. evalr holds the mapping from a field to a score, the ports scores leave through, and the one Langfuse `ScoreSink` and `ScoreConfigStore`, for evaluators and the libraries' mirrors alike; its `Score` checks its own value ([evalr ADR-0012](../../evalr/adr/0012-langfuse-score-adapters-in-evalr.md)). This record states where scores live, superseding [ADR-0025](0025-ports-and-adapters.md)'s amendment, the last amendment of [ADR-0020](0020-evalr-shared-eval-kit.md), and the part of [ADR-0029](0029-metric-detail-through-sdk-views.md) that keeps the score adapters in `reflexr.langfuse`.
 
 ## Decision
 

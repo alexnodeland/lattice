@@ -194,13 +194,7 @@ test("a server that fails to name people leaves short ids, and no error", async 
 });
 
 test("without a people route in the deployment, the server is not asked", async () => {
-  const config = {
-    supabase: { url: "http://127.0.0.1:9", key: "sb_publishable_x" },
-    surfaces: { artifactr: "/artifactr/v1", reflexr: "/reflexr/v1", grantr: "", portalr: "" },
-    readers: { tempo: false },
-    people: false,
-  };
-  const { screen } = await open("/t/acme/access/members", config);
+  const { screen } = await open("/t/acme/access/members", { people: false });
   await expect.element(screen.getByRole("rowheader", { name: "3f2a91c4…" })).toBeVisible();
   expect(asked).toEqual([]);
 });

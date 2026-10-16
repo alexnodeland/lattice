@@ -10,7 +10,8 @@ Copyright 2025 Tremor, licensed under the Apache License, Version 2.0, whose tex
 licenses/tremor.txt.
 
 Changes: only the bar, line and donut charts admin draws were kept, on Recharts 3; the colours,
-legend, tooltip and axes were restyled to the kit's tokens; each series was given a pattern and a
-direct label, or a list beside the donut; and the figures are offered as a table. The tracker's
-blocks take a level each, marked in the kit's tokens, past the second with a pattern, and named
-in a legend; its hover card is a title, and its figures are a table too.
+legend, tooltip and axes were restyled to the kit's tokens, in a theme of the kit's own
+(src/chart-theme.tsx); each series is named in a legend, and directly where a chart has several,
+or in a list beside the donut; and the figures are offered as a table. The tracker's blocks take
+a level each, marked in the kit's tokens, and named in a legend; its hover card is a title, and
+its figures are a table too.

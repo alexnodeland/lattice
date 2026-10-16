@@ -9,7 +9,6 @@ import {
   levelOf,
   MOST_WORKSPACES,
   partsOf,
-  short,
   shownOf,
   trackerLabel,
 } from "./usage";
@@ -79,7 +78,6 @@ test("a day's spend is nothing, under, near or over its share", () => {
     { key: "2026-10-12", name: "2026-10-12", level: 1, figure: "$2.00" },
     { key: "2026-10-13", name: "2026-10-13", level: 3, figure: "$4.00" },
   ]);
-  expect(short("2026-10-13")).toBe("10-13");
   // A day a partial read never reached isn't in the answer, so it is no block.
   const partial = { ...usage, complete: false, days: usage.days.slice(1) };
   expect(blocksOf(partial, 3).map((block) => block.key)).toEqual(["2026-10-12", "2026-10-13"]);

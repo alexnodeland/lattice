@@ -1,4 +1,4 @@
-"""grantr: identity and access for artifactr and reflexr.
+"""grantr: identity and access for artifactr, reflexr and portalr.
 
 Tenants, their members, groups, roles and service principals, and the grants that bind them to
 tenants, workspaces, threads, artifacts and rules. The libraries ask it, through their own hooks,

@@ -8,8 +8,10 @@ import { Button } from "./button";
  * or more from the surface where the wash alone would not.
  */
 
-export const popup =
-  "min-w-56 rounded-lg border border-edge bg-surface p-1.5 text-fg text-sm shadow-lg outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none";
+/** The surface everything that floats over the page shares: a menu, and a chart's tooltip. */
+export const popover = "rounded-lg border border-edge bg-surface text-fg text-sm shadow-lg";
+
+export const popup = `${popover} min-w-56 p-1.5 outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none`;
 
 export const groupLabel = "px-2.5 pt-1.5 pb-1 font-semibold text-muted text-xs";
 

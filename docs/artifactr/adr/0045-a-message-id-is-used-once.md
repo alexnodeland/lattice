@@ -6,7 +6,7 @@
 
 ## Context
 
-`PostMessage` carries a `message_id`, but core never checked it, so a repeated post appended a second message and, through the runner, started or steered a second turn ([#61](https://github.com/alexnodeland/artifactr/issues/61)). The runner's memory of `command_id`s ([ADR-0022](0022-surfaces-over-one-command-handler.md)) lives in one process and forgets. [stackr RFC-0002](https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md) posts messages from reflexr runs, which retry, and counts `invalid_state` on a create with its own id as done. Messages are not entities ([ADR-0037](0037-feedback-targets-and-evaluators.md)), so core had nothing to check an id against without reading the log. Every other command a client may retry is already refused durably or repeats as a no-op, except `give_feedback`, which has no id and which RFC-0002 doesn't need.
+`PostMessage` carries a `message_id`, but core never checked it, so a repeated post appended a second message and, through the runner, started or steered a second turn ([#61](https://github.com/alexnodeland/artifactr/issues/61)). The runner's memory of `command_id`s ([ADR-0022](0022-surfaces-over-one-command-handler.md)) lives in one process and forgets. [stackr RFC-0002](../../stackr/rfcs/0002-the-combined-system.md) posts messages from reflexr runs, which retry, and counts `invalid_state` on a create with its own id as done. Messages are not entities ([ADR-0037](0037-feedback-targets-and-evaluators.md)), so core had nothing to check an id against without reading the log. Every other command a client may retry is already refused durably or repeats as a no-op, except `give_feedback`, which has no id and which RFC-0002 doesn't need.
 
 ## Decision
 

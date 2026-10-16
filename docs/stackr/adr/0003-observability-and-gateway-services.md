@@ -6,7 +6,7 @@
 
 ## Context
 
-The libraries emit OpenTelemetry (API only), send LLM traffic through LiteLLM, and want Langfuse for LLM traces, scores and datasets ([artifactr ADR-0027](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0027-opentelemetry-observability-with-langfuse.md), [ADR-0031](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0031-litellm-proxy-first.md)). The tooling should be open.
+The libraries emit OpenTelemetry (API only), send LLM traffic through LiteLLM, and want Langfuse for LLM traces, scores and datasets ([artifactr ADR-0027](../../artifactr/adr/0027-opentelemetry-observability-with-langfuse.md), [ADR-0031](../../artifactr/adr/0031-litellm-proxy-first.md)). The tooling should be open.
 
 ## Decision
 

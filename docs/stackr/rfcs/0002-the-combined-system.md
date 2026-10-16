@@ -9,7 +9,7 @@
 
 - [reflexr ADR-0003][r-adr-0003] keeps the libraries independent and leaves the adapters between them to this system. [artifactr ADR-0032][a-adr-0032] makes it an application built from stackr's template.
 - [reflexr #21][r-21] (runtime rule management) is what lets a rule proposed in chat go live.
-- [evalr RFC-0001](https://github.com/alexnodeland/evalr/blob/main/docs/rfcs/0001-v0.1-implementation-plan.md) provides the measures it is judged by.
+- [evalr RFC-0001](../../evalr/rfcs/0001-v0.1-implementation-plan.md) provides the measures it is judged by.
 
 ## Summary
 
@@ -244,7 +244,7 @@ Changing the rule means another proposal on the artifact, which installs a new v
 | Chain time to resolution | `reflexr.evals.time_to_resolution` | the combined experiment |
 | Cost per chain, including the turns it caused | the `chain:` tag on bridge-started turns, and LiteLLM spend | Langfuse |
 
-The template's `evals/` gains a combined experiment that replays the example scenarios. Online judging of proposals uses evalr's sampling by run id ([evalr ADR-0009](https://github.com/alexnodeland/evalr/blob/main/docs/adr/0009-online-evaluation.md)).
+The template's `evals/` gains a combined experiment that replays the example scenarios. Online judging of proposals uses evalr's sampling by run id ([evalr ADR-0009](../../evalr/adr/0009-online-evaluation.md)).
 
 One gap has no home yet. evalr's `Session` is "a conversation or a causal chain" with a single id, so nothing measures a thread together with the chains it started. That is an unresolved question.
 
@@ -414,23 +414,23 @@ A notice is committed directly, without `Runner.send`, so it starts no turn. A n
 
 Carried past v0.1: LiteLLM's metadata, which waited on [lattice #86](https://github.com/alexnodeland/lattice/issues/86) and is done in [lattice ADR-0022](../../adr/0022-litellm-requests-carry-the-propagated-trace-tags.md), and the [unresolved questions](#unresolved-questions).
 
-[a-adr-0032]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0032-libraries-and-the-stackr-template.md
-[a-adr-0033]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0033-trace-links-on-runs-and-revisions.md
-[a-adr-0034]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0034-ports-and-adapters-for-integrations.md
-[a-adr-0035]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0035-a-turn-is-its-own-trace.md
+[a-adr-0032]: ../../artifactr/adr/0032-libraries-and-the-stackr-template.md
+[a-adr-0033]: ../../artifactr/adr/0033-trace-links-on-runs-and-revisions.md
+[a-adr-0034]: ../../artifactr/adr/0034-ports-and-adapters-for-integrations.md
+[a-adr-0035]: ../../artifactr/adr/0035-a-turn-is-its-own-trace.md
 [a-50]: https://github.com/alexnodeland/artifactr/issues/50
 [a-60]: https://github.com/alexnodeland/artifactr/issues/60
 [a-61]: https://github.com/alexnodeland/artifactr/issues/61
 [a-62]: https://github.com/alexnodeland/artifactr/issues/62
 [a-63]: https://github.com/alexnodeland/artifactr/issues/63
-[r-adr-0003]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0003-independent-sibling-of-artifactr.md
-[r-adr-0006]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0006-rules-as-typed-serializable-data.md
-[r-adr-0010]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0010-loop-and-spend-safety.md
-[r-adr-0016]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0016-tenants-and-workspaces-like-artifactr.md
-[r-adr-0018]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0018-opentelemetry-observability-with-langfuse.md
-[r-adr-0024]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0024-causal-chains-and-operator-actions.md
-[r-adr-0039]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0039-namespaced-event-types.md
-[r-adr-0027]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0027-executing-runs.md
+[r-adr-0003]: ../../reflexr/adr/0003-independent-sibling-of-artifactr.md
+[r-adr-0006]: ../../reflexr/adr/0006-rules-as-typed-serializable-data.md
+[r-adr-0010]: ../../reflexr/adr/0010-loop-and-spend-safety.md
+[r-adr-0016]: ../../reflexr/adr/0016-tenants-and-workspaces-like-artifactr.md
+[r-adr-0018]: ../../reflexr/adr/0018-opentelemetry-observability-with-langfuse.md
+[r-adr-0024]: ../../reflexr/adr/0024-causal-chains-and-operator-actions.md
+[r-adr-0039]: ../../reflexr/adr/0039-namespaced-event-types.md
+[r-adr-0027]: ../../reflexr/adr/0027-executing-runs.md
 [r-21]: https://github.com/alexnodeland/reflexr/issues/21
 [r-45]: https://github.com/alexnodeland/reflexr/issues/45
 [r-62]: https://github.com/alexnodeland/reflexr/issues/62

@@ -22,7 +22,7 @@ relayr is built in the open, in small steps, by a small team and agents working 
 - Easier: every commit on `main` is a reviewed, releasable change, and the reasoning behind it survives in the repository.
 - Harder: every behaviour change carries a documentation obligation in the same pull request, and large work must be sliced into steps that each leave `main` green.
 
-[a-adr-0014]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0014-trunk-based-development-with-rfcs-and-adrs.md
-[e-adr-0004]: https://github.com/alexnodeland/evalr/blob/main/docs/adr/0004-trunk-based-development-with-rfcs-and-adrs.md
-[r-adr-0012]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0012-trunk-based-development-with-rfcs-and-adrs.md
-[rfc-0002]: https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md
+[a-adr-0014]: ../../artifactr/adr/0014-trunk-based-development-with-rfcs-and-adrs.md
+[e-adr-0004]: ../../evalr/adr/0004-trunk-based-development-with-rfcs-and-adrs.md
+[r-adr-0012]: ../../reflexr/adr/0012-trunk-based-development-with-rfcs-and-adrs.md
+[rfc-0002]: ../../stackr/rfcs/0002-the-combined-system.md

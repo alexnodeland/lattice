@@ -28,4 +28,4 @@ A message that people send through artifactr's surfaces starts a turn: a model c
 - Harder: a notice posted while a turn is running still reaches that turn, and nothing marks it as a notice for other clients. [artifactr #63][a-63] closes that gap, and phase 2 waits for it.
 
 [a-63]: https://github.com/alexnodeland/artifactr/issues/63
-[rfc-0002]: https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md#d7-may-a-rule-start-a-turn
+[rfc-0002]: ../../stackr/rfcs/0002-the-combined-system.md#d7-may-a-rule-start-a-turn

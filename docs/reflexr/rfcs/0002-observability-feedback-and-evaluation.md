@@ -6,9 +6,9 @@
 **Discussion:** accepted on 2026-09-28
 **Siblings:**
 
-- [artifactr RFC-0002](https://github.com/alexnodeland/artifactr/blob/main/docs/rfcs/0002-observability-feedback-and-evaluation.md) makes the same changes in artifactr.
-- [evalr RFC-0001](https://github.com/alexnodeland/evalr/blob/main/docs/rfcs/0001-v0.1-implementation-plan.md) builds the shared eval kit.
-- [stackr RFC-0001](https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0001-v0.1-implementation-plan.md) builds the infrastructure template.
+- [artifactr RFC-0002](../../artifactr/rfcs/0002-observability-feedback-and-evaluation.md) makes the same changes in artifactr.
+- [evalr RFC-0001](../../evalr/rfcs/0001-v0.1-implementation-plan.md) builds the shared eval kit.
+- [stackr RFC-0001](../../stackr/rfcs/0001-v0.1-implementation-plan.md) builds the infrastructure template.
 
 ## Summary
 

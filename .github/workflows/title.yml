@@ -27,8 +27,25 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+    # The draft pull requests Mergify's merge queue makes to test a batch (ADR-0024) have titles of
+    # Mergify's, and a title that isn't a Conventional Commit would fail the check on every batch.
+    # The job still runs, and concludes success, since a skipped job is not a success to the
+    # ruleset's required checks, which Mergify counts: only its steps are skipped, for a pull
+    # request that Mergify's App opened, in this repository, on a branch of the queue's. A fork
+    # can't name its branch to be skipped, and no one else's pull request is. What is skipped is
+    # this title check and the public-API check below (scripts/breaks.py); both were passed by the
+    # pull requests in the batch, and the squash commit's title and body come from each original
+    # pull request (`commit_message_format` in .mergify.yml), not from the draft.
+    env:
+      QUEUE_BATCH: >-
+        ${{ github.event.pull_request.user.login == 'mergify[bot]'
+        && github.event.pull_request.head.repo.full_name == github.repository
+        && startsWith(github.head_ref, 'mergify/merge-queue/') }}
     steps:
-      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+      - if: env.QUEUE_BATCH == 'true'
+        run: echo "A merge queue's batch; the pull requests in it were checked on their own."
+      - if: env.QUEUE_BATCH != 'true'
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -43,14 +60,17 @@ jobs:
             ci
             chore
             revert
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: env.QUEUE_BATCH != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # the release tags, and the base branch to compare with
           persist-credentials: false
-      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - if: env.QUEUE_BATCH != 'true'
+        uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       # The checkout is the pull request's merge commit, so its first parent is the base it merges
       # into, as CI tested it.
       - name: Public APIs
+        if: env.QUEUE_BATCH != 'true'
         env:
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}

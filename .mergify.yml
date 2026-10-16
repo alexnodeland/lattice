@@ -2,14 +2,20 @@
 # queued with `@mergifyio queue`, is tested together with the others waiting, in temporary draft
 # pull requests that hold the batch, and squash-merged when its batch passes.
 #
-# - Up to two checks run at once (`max_parallel_checks`), and a batch holds one to three pull
-#   requests: one when the queue is short, more as it backs up (`batch_size`), waiting at most two
-#   minutes for a batch to fill (`batch_max_wait_time`).
-# - What a batch must pass is `CI`, on its draft pull request. The ruleset's required checks, `CI`
-#   and `Title`, are still required of the pull request itself to enter the queue; `Title` is
-#   not a merge condition, since the draft pull request's title is Mergify's own.
-# - A batch that fails is split and tested again until the pull request that broke it is found
-#   and taken out of the queue, with a comment saying so; the others go on.
+# - Up to two checks run at once (`max_parallel_checks`), and a batch holds one or two pull
+#   requests: one when the queue is short, two as it backs up (`batch_size`), waiting at most
+#   thirty seconds, Mergify's default, for a batch to fill (`batch_max_wait_time`). Raise the
+#   maximum after a week of queue statistics.
+# - What a batch must pass is `CI`, on its draft pull request (`merge_conditions`). The ruleset's
+#   required checks, `CI` and `Title`, are also required of each pull request itself to enter the
+#   queue. `Title` runs on the draft pull requests too, and concludes success without checking
+#   them, whose titles are Mergify's own (title.yml); the squash commit's title and body come from
+#   each original pull request (`commit_message_format`).
+# - A batch that fails is split and tested again, into `max_parallel_checks` parts each time,
+#   until the pull request that broke it is found and taken out of the queue, with a comment
+#   saying so; the others go on. `batch_max_failure_resolution_attempts` caps the splitting.
+#   Two pull requests that conflict in one batch are taken out with a comment: the draft branch
+#   can't be made, so there is nothing to split.
 # - This needs the ruleset not to require branches to be up to date
 #   (`strict_required_status_checks_policy: false`): a pull request's checks are those of the batch
 #   it is in, not of its own head against the `main` of the moment.
@@ -17,8 +23,9 @@ queue_rules:
   - name: default
     batch_size:
       min: 1
-      max: 3
-    batch_max_wait_time: 2 min
+      max: 2
+    batch_max_wait_time: 30 seconds
+    batch_max_failure_resolution_attempts: 3
     merge_method: squash
     commit_message_format:
       title: pr-title

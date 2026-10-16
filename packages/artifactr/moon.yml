@@ -26,6 +26,25 @@ tasks:
       # cache; locally, `moon run artifactr:test --force` runs the PostgreSQL tests past a cached
       # run without them.
 
+  # TLC over the thread claim's TLA+ spec (lattice ADR-0025), at the bounds a pull request checks.
+  # CI's Specs job runs it when artifactr or its spec changes; it needs Java 11 or later.
+  spec:
+    description: "Model-check the thread claim's TLA+ spec with TLC, at a pull request's bounds"
+    command: '$workspaceRoot/scripts/tlc $workspaceRoot/docs/artifactr/spec/ThreadClaim.tla ThreadClaim.cfg ThreadClaimLive.cfg'
+    inputs:
+      - '/docs/artifactr/spec/**/*'
+      - '/scripts/tlc'
+      - 'src/**/*'
+
+  # The same at the deeper bounds, which Nightly runs.
+  spec-deep:
+    description: "Model-check the thread claim's TLA+ spec with TLC, at Nightly's deeper bounds"
+    command: '$workspaceRoot/scripts/tlc $workspaceRoot/docs/artifactr/spec/ThreadClaim.tla ThreadClaimDeep.cfg'
+    inputs:
+      - '/docs/artifactr/spec/**/*'
+      - '/scripts/tlc'
+      - 'src/**/*'
+
   schema:
     description: "Regenerate the protocol JSON Schema, and the REST surface's OpenAPI document"
     script: >-

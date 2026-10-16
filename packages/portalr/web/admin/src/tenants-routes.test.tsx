@@ -182,6 +182,12 @@ test("a tenant is confirmed, created once, and shown, and its owner's email is k
   tenants = ["acme", "globex", "initech"];
   await dialog.getByRole("button", { name: "Create the tenant" }).click();
   await expect.element(screen.getByText("initech is created, owned by dan.")).toBeVisible();
+  // Starting another tenant puts the last one's status away.
+  await screen.getByRole("textbox", { name: "Tenant" }).fill("next");
+  await expect
+    .element(screen.getByText("initech is created, owned by dan."))
+    .not.toBeInTheDocument();
+  await screen.getByRole("textbox", { name: "Tenant" }).fill("");
   expect(created).toEqual([{ tenant: "initech", owner_email: "dan@initech.com" }]);
   // The list is read again, with the new tenant in it; the form is empty, and focus is on it.
   await expect

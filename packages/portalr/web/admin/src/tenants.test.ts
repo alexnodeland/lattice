@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { budgetSaid, isEmail, isTenantId, PAGE, rowsOf, spendSaid } from "./tenants";
+import { budgetSaid, isEmail, isTenantId, PAGE, rowsFor, rowsOf, spendSaid } from "./tenants";
 
 const team = (
   tenant: string,
@@ -56,4 +56,11 @@ test("a tenant id is not empty and has no tilde; an email has an at and a dot an
   expect(
     ["", "dan", "dan@x", "d an@x.com", "a@b@c.com", `${"x".repeat(250)}@y.com`].some(isEmail),
   ).toBe(false);
+});
+
+test("someone who isn't an operator has no tenants to list", () => {
+  expect(rowsFor(null)).toEqual([]);
+  expect(
+    rowsFor({ tenants: ["b", "a"], spend: { status: "unconfigured" } }).map((row) => row.tenant),
+  ).toEqual(["a", "b"]);
 });

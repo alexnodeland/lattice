@@ -39,8 +39,8 @@ The user decided:
   - The action is sent once however often it is submitted while under way, and the dialog can't be dismissed meanwhile ([ADR-0032](0032-runs-in-admin.md)). A refusal is said in the dialog, which stays.
   - On success the form is emptied, the list is read again, a status says "`<tenant>` is created, owned by `<user id>`", and focus goes to the form's first field, since the trigger is then disabled.
   - The email is kept nowhere in the browser: not in a query key or the cache, not in the address or storage, and not on the page once the tenant is made. A test checks storage and the page.
-- **The deployment's audit log is `/deployment/audit`.** It lists, newest first and a page back at a time, what grantr's `GET /audit` gives, with the same sentences and names as a tenant's Audit: who was made an operator, who stopped being one, by whom and when. It needs `grantr:grant_operator`, which operators hold; its failure is a way on. A tenant's creation is not in it: grantr keeps `tenant_created` in the new tenant's own log, where its owner reads it.
-- **`ConfirmDialog`** can be disabled until what it acts on is filled in, and can send focus somewhere else than its trigger when it closes (`finalFocus`).
+- **The deployment's audit log is `/deployment/audit`.** It lists, newest first and a page back at a time, what grantr's `GET /audit` gives, with the same sentences and names as a tenant's Audit: who was made an operator, who stopped being one, by whom and when. It needs `grantr:grant_operator`, which operators hold; its failure is a way on. A tenant's creation is not in it, for now: grantr keeps `tenant_created` in the new tenant's own log, where its owner reads it. A follow-up change to grantr, its own pull request, makes it also write a deployment-scoped entry (who made which tenant); once that lands, this view shows creations, and not before: it is not changed for it here.
+- **`ConfirmDialog`** can be disabled until what it acts on is filled in, and can send focus somewhere else than its trigger once the action is done (`finalFocus`); cancelling, Escape and the backdrop return it to the trigger as ever.
 - **Home's areas are Home, Tenants and Audit.**
 
 ## Options considered
@@ -50,7 +50,7 @@ The user decided:
 | **Owner by email, through Supabase Auth (chosen)** | An operator knows an email, not a user id; the route's invitation is the members' | A new operator-only route, and the Supabase admin key on it |
 | Owner by user id | No new server code | No operator knows one: it is Supabase's id |
 | Check, then invite (chosen) | No one is invited by a caller who may not, or for a tenant that exists | A second check of the tenant, which grantr's transaction makes the real one |
-| Invite, then create | One less read | A refused creation has invited someone |
+| Invite, then create, with no check first | One less read | Every refused creation, such as one for a tenant that exists, has invited someone and sent an email |
 | **Confirm every creation (chosen)** | A tenant is a lasting thing, with a person given ownership of it and perhaps an email sent | One more step |
 | Create at once | Quick | A mistyped id or email can't be taken back from here |
 | Delete tenants too | A whole life cycle | grantr deletes only what it holds: every library's data would stay, orphaned |
@@ -58,6 +58,10 @@ The user decided:
 ## Consequences
 
 - Easier: an operator makes a tenant for someone from their email, without a command line, and sees every tenant and its spend in one place.
-- Easier: operators changes are readable in the UI.
+- Easier: changes to who operates the deployment are readable in the UI.
 - Harder: the owner route holds an email for the length of a request, and an application without Supabase's admin API has no route.
 - Accepted: a tenant with no LiteLLM team shows no budget until someone sets one outside admin.
+- Accepted: **an invited user, and the email sent to them, can outlive a refused creation.** The checks come before Supabase is asked, which keeps most refusals from inviting anyone, but a creation can still fail after the invitation: a lost race on the tenant's name, the operator's grant revoked in between, or a storage error, which is answered 503 with nothing of what storage said. Supabase invitations are not rolled back; the person has an account and no membership, and inviting them again to anything finds them.
+- Accepted: **an operator can learn whether an email has an account, and its user id.** The route answers the owner's user id for an email, and a new person and an existing one take different time (Supabase sends an email to the first). Operators are trusted with every tenant, and the members invite route tells a tenant's admins the same.
+- Accepted: **the route has no rate limit,** though it can send invitation emails. It is operator-only, sends one at most per request, and each needs a tenant name that doesn't exist yet. A deployment that wants a limit puts it on the route at its proxy.
+- Supabase normalises an email's case and unicode, and decides whether two spellings are one person; plus-addressing (`dan+x@initech.com`) stays a distinct address. portalr does not normalise it again: Supabase's answer, the user id, is the authority.

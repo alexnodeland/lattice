@@ -389,6 +389,8 @@ def _tenant_creation(router: APIRouter, grants: Grants, invite: Invite, operatin
         request invites no one again and creates nothing twice. The email is never logged or
         answered with: the answer names the tenant and the owner's user id.
         """
+        # grantr checks this again on every call below, but its refusals come after the email is
+        # read: asking here answers a caller who may not with a plain 403 first, whatever they sent.
         if not await grants.check(DEPLOYMENT_CHECK, by, "grantr:create_tenant", DEPLOYMENT):
             raise _refusal("forbidden", "the caller may not create tenants")
         email = body.owner_email.strip()
@@ -405,6 +407,11 @@ def _tenant_creation(router: APIRouter, grants: Grants, invite: Invite, operatin
             await grants.create_tenant(body.tenant, owner=owner, by=by)
         except (Forbidden, Invalid) as error:
             raise _refused(error) from error
+        except Exception as error:
+            # A storage error: the owner was invited, and no tenant was made. What storage said
+            # may name the owner or the tenant, so none of it is answered.
+            detail = {"type": "unavailable", "message": "the tenant couldn't be created"}
+            raise HTTPException(status_code=503, detail=detail) from error
         return CreatedTenant(tenant=body.tenant, owner=owner)
 
 

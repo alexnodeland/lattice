@@ -19,6 +19,12 @@ export interface Row {
   readonly team: TenantSpend | null;
 }
 
+/** The deployment's tenants read, which is nothing for someone who isn't an operator. */
+type Every = PortalrApi.components["schemas"]["DeploymentTenants"] | null;
+
+/** The rows of a read of the deployment's tenants: none for none. */
+export const rowsFor = (every: Every): Row[] => (every ? rowsOf(every.tenants, every.spend) : []);
+
 /** The tenants, by name, each with its team: `reading` is LiteLLM's one team list. */
 export function rowsOf(
   tenants: readonly string[],
@@ -60,6 +66,10 @@ export function budgetSaid(row: Row, answered: boolean): string {
 /** A tenant id as grantr takes one: not empty, with no `~`. */
 export const isTenantId = (text: string) => text.trim() !== "" && !text.includes("~");
 
-/** An email as portalr takes one for an owner: something@something.something, no spaces. */
+/**
+ * An email as portalr takes one for an owner: something@something.something, no spaces, up to 254
+ * characters. This is portalr's own rule, `EMAIL` and `MOST_EMAIL` in its router, kept in step with
+ * it by hand: the server decides, and this only keeps the button from asking for what it refuses.
+ */
 export const isEmail = (text: string) =>
   text.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(text);

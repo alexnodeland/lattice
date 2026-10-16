@@ -52,7 +52,7 @@ function Audit() {
         named={(entry) => `${said(entry.event)}, ${new Date(entry.at).toLocaleString()}`}
         empty={{
           title: "No changes yet",
-          body: "Each operator made or stopped is kept here.",
+          body: "Each time someone is made an operator, or stops being one, it is kept here.",
         }}
       />
       <p role="status" className="sr-only">

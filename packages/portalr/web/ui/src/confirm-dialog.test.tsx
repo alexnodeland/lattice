@@ -319,3 +319,29 @@ test("a trigger can be disabled until what it acts on is filled in, and focus ca
   await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();
   await expect.element(screen.getByRole("textbox", { name: "Name" })).toHaveFocus();
 });
+
+test("cancelling a dialog that sends focus elsewhere when done still returns it to the trigger", async () => {
+  function Form() {
+    const field = useRef<HTMLInputElement>(null);
+    return (
+      <>
+        <input ref={field} aria-label="Name" />
+        <ConfirmDialog
+          label="Create"
+          title="Create it?"
+          confirm="Create it"
+          calm
+          finalFocus={field}
+          onConfirm={async () => undefined}
+        >
+          It is made.
+        </ConfirmDialog>
+      </>
+    );
+  }
+  const screen = await render(<Form />);
+  await screen.getByRole("button", { name: "Create", exact: true }).click();
+  await screen.getByRole("alertdialog").getByRole("button", { name: "Cancel" }).click();
+  await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();
+  await expect.element(screen.getByRole("button", { name: "Create", exact: true })).toHaveFocus();
+});

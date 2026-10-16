@@ -614,3 +614,27 @@ async def test_grantr_refusing_the_creation_refuses_it(
     async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
         response = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
     assert response.status_code == status
+
+
+async def test_a_storage_error_after_the_invitation_is_a_clean_503_that_says_nothing_of_it(
+    stack: Stack, invite: Invite, invited: list[str], ui: Path
+) -> None:
+    class Failing(Grants):
+        """grantr, whose storage fails creating the tenant, in words that name the owner."""
+
+        async def create_tenant(self, tenant: str, *, owner: str, by: Subject) -> AuditEntry:
+            if tenant == "initech":
+                raise RuntimeError("insert failed for dan@initech.com")
+            return await super().create_tenant(tenant, owner=owner, by=by)
+
+    transport = httpx.ASGITransport(app=app_for(await seeded(Failing), stack.readers(), invite, ui))
+    async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
+        response = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "type": "unavailable",
+        "message": "the tenant couldn't be created",
+    }
+    assert "dan" not in response.text
+    # The owner was invited before it failed: an invitation can outlive a refused creation.
+    assert invited == ["dan@initech.com"]

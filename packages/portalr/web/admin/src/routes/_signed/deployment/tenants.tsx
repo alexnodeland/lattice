@@ -10,10 +10,10 @@ import {
 } from "@portalr/ui";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
-import { useId, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { unread } from "../../../home";
 import { ReadFailed } from "../../../read-failed";
-import { budgetSaid, isEmail, isTenantId, PAGE, rowsOf, spendSaid } from "../../../tenants";
+import { budgetSaid, isEmail, isTenantId, PAGE, rowsFor, spendSaid } from "../../../tenants";
 
 const HEADER = <PageHeader title="Tenants" meta="Every tenant in grantr, and what it spends" />;
 
@@ -37,8 +37,8 @@ function Tenants() {
   const { queries, user } = Route.useRouteContext();
   const { data: every } = useSuspenseQuery(queries.portalr.tenants(user));
   const [shown, setShown] = useState(PAGE);
-  // The layout let only an operator in, so there is a read.
-  const rows = every ? rowsOf(every.tenants, every.spend) : [];
+  // The layout let only an operator in, so there is a read; sorted when it changes, not on each render.
+  const rows = useMemo(() => rowsFor(every), [every]);
   const answered = every?.spend.status === "ok";
   return (
     <div className="flex flex-col gap-8">
@@ -100,7 +100,10 @@ function Create() {
         autoComplete="off"
         spellCheck={false}
         value={tenant}
-        onValueChange={(value) => setTenant(String(value))}
+        onValueChange={(value) => {
+          setMade(null);
+          setTenant(String(value));
+        }}
       />
       <TextField
         label="Owner's email"
@@ -108,7 +111,10 @@ function Create() {
         type="email"
         autoComplete="off"
         value={email}
-        onValueChange={(value) => setEmail(String(value))}
+        onValueChange={(value) => {
+          setMade(null);
+          setEmail(String(value));
+        }}
       />
       <ConfirmDialog
         label="Create tenant"

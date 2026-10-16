@@ -59,7 +59,10 @@ export function ConfirmDialog({
   asking?: string;
   /** Whether the action is one that loses nothing, so it isn't in the danger colour. */
   calm?: boolean;
-  /** Where focus goes when it closes, if not back to the trigger, such as a trigger that is then disabled. */
+  /**
+   * Where focus goes when the action is done, if not back to the trigger, such as a trigger that
+   * is then disabled. Cancelling, Escape and the backdrop send it back to the trigger as ever.
+   */
   finalFocus?: RefObject<HTMLElement | null>;
   /** Whether the trigger can't be used yet, as when what it acts on isn't filled in. */
   disabled?: boolean;
@@ -79,6 +82,8 @@ export function ConfirmDialog({
   const [pending, setPending] = useState(false);
   // Whether the action is under way: read at once, where a state would be a render behind.
   const busy = useRef(false);
+  // Whether the dialog closes because the action was done: only then does focus go elsewhere.
+  const done = useRef(false);
   const counter = useId();
   const shown = useRef(false);
   shown.current = open;
@@ -104,6 +109,7 @@ export function ConfirmDialog({
     setFailed(null);
     try {
       await onConfirm(reason.trim());
+      done.current = true;
       setOpen(false);
     } catch (error) {
       setFailed(error instanceof Error ? error.message : String(error));
@@ -121,6 +127,7 @@ export function ConfirmDialog({
           return;
         }
         setOpen(next);
+        done.current = false;
         onOpenChange?.(next);
         setEntered("");
         setReason("");
@@ -138,7 +145,7 @@ export function ConfirmDialog({
         <AlertDialog.Popup
           className={popup}
           initialFocus={typed === undefined ? cancel : true}
-          {...(finalFocus && { finalFocus })}
+          {...(finalFocus && { finalFocus: () => (done.current ? finalFocus.current : true) })}
         >
           <AlertDialog.Title className={heading}>{title}</AlertDialog.Title>
           <AlertDialog.Description render={<div />} className={description}>

@@ -102,7 +102,10 @@ async function intervene(
     .click();
   const dialog = page.getByRole("alertdialog", { name: `${verb} this run?` });
   await dialog.getByRole("textbox", { name: "Reason (optional)" }).fill(reason);
-  await dialog.getByRole("button", { name: `${verb} the run` }).click();
+  // Cancel is confirmed as "Cancel run", so no two buttons are called Cancel.
+  await dialog
+    .getByRole("button", { name: verb === "Cancel" ? "Cancel run" : `${verb} the run` })
+    .click();
   await expect(dialog).toHaveCount(0);
 }
 

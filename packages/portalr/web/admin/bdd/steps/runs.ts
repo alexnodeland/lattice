@@ -25,7 +25,11 @@ Given("bob has published a ticket that fails in acme", async ({ request, made })
     data: {
       type: "command",
       command_id: crypto.randomUUID(),
-      command: { type: "create_thread", thread_id: `thr_${crypto.randomUUID().replaceAll("-", "")}`, title: "Runs" },
+      command: {
+        type: "create_thread",
+        thread_id: `thr_${crypto.randomUUID().replaceAll("-", "")}`,
+        title: "Runs",
+      },
     },
   });
   expect(thread.ok()).toBe(true);

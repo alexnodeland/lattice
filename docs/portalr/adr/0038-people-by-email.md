@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-10-16
 **Deciders:** Alex Nodeland
-**Amends:** [ADR-0022](0022-restricting-and-sharing-a-thread.md) and [ADR-0024](0024-access-members-groups-and-keys.md), which name people by grantr's id because nothing portalr read mapped an id to an email
+**Amends:** [ADR-0022](0022-restricting-and-sharing-a-thread.md), [ADR-0024](0024-access-members-groups-and-keys.md) and [ADR-0034](0034-tenants-and-the-deployments-audit.md), whose deployment Audit now shows who created which tenant (grantr ADR-0033), and which name people by grantr's id because nothing portalr read mapped an id to an email
 
 ## Context
 

@@ -122,7 +122,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `/deployment` | Every tenant, for operators, with the deployment's areas alone |
 | `/deployment/` | Home: the tenants, and their spend |
 | `/deployment/tenants` | Tenants: every tenant with its spend and budget, fifty at a time, and a tenant created with its owner by email, once confirmed ([ADR-0034](adr/0034-tenants-and-the-deployments-audit.md)) |
-| `/deployment/audit` | The deployment's audit log: operators made and revoked, newest first ([ADR-0034](adr/0034-tenants-and-the-deployments-audit.md)) |
+| `/deployment/audit` | The deployment's audit log: operators made and revoked, and which tenant each operator created and for whom, newest first ([ADR-0034](adr/0034-tenants-and-the-deployments-audit.md)) |
 
 `moon run admin:bdd` runs admin's features against the test application, which sends its telemetry through stackr's Collector to Tempo, Loki and Prometheus, with Langfuse and LiteLLM unconfigured.
 

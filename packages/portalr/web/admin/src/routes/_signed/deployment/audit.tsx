@@ -6,11 +6,15 @@ import { actor, peopleOf, said } from "../../../audit";
 import { ReadFailed } from "../../../read-failed";
 
 const HEADER = (
-  <PageHeader title="Audit" meta="Who was made an operator, and who stopped being one" />
+  <PageHeader
+    title="Audit"
+    meta="Who was made an operator, who stopped being one, and who created which tenant"
+  />
 );
 
 /**
- * The deployment's audit log, for its operators: each change to who may operate the deployment, who
+ * The deployment's audit log, for its operators: each change to who may operate the deployment, and
+ * each tenant created, for whom, who
  * made it, and when, the newest first, a page at a time (grantr's `GET /audit`, which needs
  * `grantr:grant_operator`). A tenant's own changes are in its Audit (portalr ADR-0034).
  */
@@ -55,7 +59,7 @@ function Audit() {
         named={(entry) => `${said(entry.event, names)}, ${new Date(entry.at).toLocaleString()}`}
         empty={{
           title: "No changes yet",
-          body: "Each time someone is made an operator, or stops being one, it is kept here.",
+          body: "Each time someone is made an operator, or stops being one, or a tenant is created, it is kept here.",
         }}
       />
       <p role="status" className="sr-only">

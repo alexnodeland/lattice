@@ -96,6 +96,13 @@ async function serve(request: Request, path: string): Promise<Response | undefin
         tenant: null,
         event: { type: "granted", grant: grant("operator", user(GONE), { kind: "deployment" }) },
       },
+      {
+        seq: 3,
+        at,
+        by: user(ADA),
+        tenant: null,
+        event: { type: "deployment_tenant_created", tenant: "globex", owner: GONE },
+      },
     ]);
   }
   if (path === "/grantr/v1/tenants/acme/audit") {
@@ -260,8 +267,24 @@ test("the deployment's audit log, for an operator, names people in no tenant", a
   await expect
     .element(log.getByRole("rowheader", { name: /to c0ffee00… \(person\)$/ }))
     .toBeVisible();
-  await expect.element(log.getByRole("cell", { name: "ada@acme.test (person)" })).toBeVisible();
+  await expect
+    .element(log.getByRole("cell", { name: "ada@acme.test (person)" }).first())
+    .toBeVisible();
   expect(asked.at(-1)?.tenant).toBeNull();
+});
+
+test("the deployment's audit log shows who created which tenant, and for whom", async () => {
+  const { screen } = await open("/deployment/audit");
+  const log = screen.getByRole("table", { name: "Deployment audit log" });
+  await expect
+    .element(
+      log.getByRole("rowheader", {
+        name: "created the tenant globex, owned by c0ffee00… (person)",
+      }),
+    )
+    .toBeVisible();
+  // The owner is named too: the creation's owner is among the ids asked after.
+  expect(asked.at(-1)?.ids).toContain(GONE);
 });
 
 test("another tenant opened on the same screen is not shown the first tenant's emails", async () => {

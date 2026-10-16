@@ -6,6 +6,7 @@ nav:
       - rfcs/README.md
       - rfcs/0001-grantr-identity-and-access.md
       - rfcs/0002-portalr-the-portal.md
+      - rfcs/0003-native-files-as-artifacts.md
       - Template: rfcs/template.md
   - Decisions:
       - adr/README.md

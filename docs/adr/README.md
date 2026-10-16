@@ -11,7 +11,7 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0003](0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md) | CI on pull requests, Nightly on main, and a required Title check | Accepted, amended by [0012](0012-title-checks-the-breaks-in-the-public-apis.md), [0016](0016-a-merge-queue-on-mergify.md) and [0017](0017-ci-installs-its-toolchain-from-a-cache-with-retries.md) |
 | [0004](0004-one-github-app-for-release-please-and-renovate.md) | One GitHub App for release-please and Renovate | Accepted |
 | [0005](0005-renovate-runs-in-lattices-own-actions.md) | Renovate runs in lattice's own Actions | Accepted |
-| [0006](0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md) | release-please: first versions, pre-1.0 bumps, and what releases | Accepted |
+| [0006](0006-release-please-first-versions-pre-1-0-bumps-and-what-releases.md) | release-please: first versions, pre-1.0 bumps, and what releases | Accepted, amended by [0023](0023-publishing-to-pypi-from-the-release-workflow.md) |
 | [0007](0007-a-timeout-on-every-test-and-every-job.md) | A timeout on every test and every job | Accepted |
 | [0008](0008-one-resolution-litellm-held-at-1-83-0.md) | One resolution, with litellm held at 1.83.0 | Accepted |
 | [0009](0009-one-dev-container-at-the-root.md) | One dev container, at the root | Accepted |
@@ -28,6 +28,7 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0020](0020-the-telemetry-contract-needs-no-extra.md) | The telemetry contract needs no extra | Accepted |
 | [0021](0021-the-refusal-schema-needs-no-extra.md) | The refusal schema needs no extra | Accepted |
 | [0022](0022-litellm-requests-carry-the-propagated-trace-tags.md) | LiteLLM requests carry the propagated trace tags | Accepted |
+| [0023](0023-publishing-to-pypi-from-the-release-workflow.md) | Publishing to PyPI from the release workflow | Accepted |
 | [0024](0024-a-parallel-batched-merge-queue.md) | A parallel, batched merge queue | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

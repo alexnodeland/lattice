@@ -23,7 +23,7 @@ application's wiring of grantr goes then.
 
 import asyncio
 import os
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Collection
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -165,6 +165,14 @@ async def invite(email: str) -> str:
     return email.partition("@")[0]
 
 
+async def people(ids: Collection[str]) -> dict[str, str]:
+    """Name people without Supabase: a user's email is their id at the scenarios' domain.
+
+    Nobody is named ``ghost``, so a scenario can show an id Auth does not know.
+    """
+    return {each: f"{each}@{PEOPLE}" for each in ids if each != "ghost"}
+
+
 def readers() -> Readers:
     """The tools, at the URLs the environment names; Langfuse and LiteLLM not at all where their
     URL is set empty."""
@@ -242,6 +250,7 @@ def create_app(ui: Path = UI) -> FastAPI:
             grants=grants,
             readers=readers(),
             invite=invite,
+            people=people,
             site=Site(supabase_url="/", supabase_key="sb_publishable_test"),
             ui=ui,
         ),

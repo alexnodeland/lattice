@@ -47,7 +47,7 @@ const READERS = {
   grafana: true,
 };
 const open = (path: string, readers: Record<string, boolean> = READERS) =>
-  opened(path, [], portalr, ["acme"], readers);
+  opened(path, [], portalr, ["acme"], { readers });
 
 beforeEach(async () => {
   links = { ...FULL };

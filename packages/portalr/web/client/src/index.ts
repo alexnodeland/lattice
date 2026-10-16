@@ -27,11 +27,14 @@ export {
   type Landing,
   landing,
 } from "./landing";
+export type { LogRecord, Logs } from "./logs";
 export { useMe } from "./me";
 export {
   type AuditFilter,
   createQueries,
   keys,
+  LOGS_LIMIT,
+  type LogFilter,
   Refused,
   stale,
   type TimeSpan,

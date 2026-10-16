@@ -8,6 +8,7 @@ import {
   KeyRound,
   ListChecks,
   ScrollText,
+  Terminal,
   ThumbsUp,
   Route as TracesIcon,
 } from "lucide-react";
@@ -92,6 +93,11 @@ function Tenant() {
           {allowed.has("portalr:read_telemetry") && (
             <NavLink icon={TracesIcon} render={<Link to="/t/$tenant/traces" params={{ tenant }} />}>
               Traces
+            </NavLink>
+          )}
+          {allowed.has("portalr:read_telemetry") && (
+            <NavLink icon={Terminal} render={<Link to="/t/$tenant/logs" params={{ tenant }} />}>
+              Logs
             </NavLink>
           )}
           {allowed.has("reflexr:read_runs") && (

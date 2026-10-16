@@ -10,6 +10,7 @@ from grantr.grants import Grants
 from portalr.fastapi import portalr_router
 from portalr.invites import Invite, InviteFailed
 from portalr.readers import Readers
+from portalr.readers.loki import _identify
 from tests.fastapi.conftest import ALICE, SITE, Stack, app_for, resolve_actor, seeded
 from tests.tools import fails, json
 
@@ -132,11 +133,79 @@ async def test_what_a_span_withheld_needs_the_grant_and_the_tenants_own_trace(
     assert "[secret prompt]" not in mixed.text + other.text
 
 
+PHRASE = "alice@example.com said launch on Tuesday"
+
+
+def _loki(*records: tuple[str, str, dict[str, str]]) -> dict[str, Any]:
+    """Loki's answer: each record's time, line and labels."""
+    return {
+        "data": {
+            "result": [
+                {"stream": {"service_name": "docplan", **labels}, "values": [[time, line]]}
+                for time, line, labels in records
+            ]
+        }
+    }
+
+
+async def test_a_logs_read_has_no_lines_and_one_records_line_is_asked_for_by_its_id(
+    client: httpx.AsyncClient, stack: Stack
+) -> None:
+    mine = {"tenant_id": "acme", "email": "a@b.c", "artifactr_run_id": "run_1"}
+    stack.loki.paths["/loki/api/v1/query_range"] = json(_loki(("5", PHRASE, mine)))
+    alice = headers("alice")
+    listed = await client.get("/v1/logs", params=WINDOW, headers=alice)
+    assert PHRASE not in listed.text
+    assert "cache-control" not in listed.headers
+    (record,) = listed.json()["data"]["records"]
+    assert (record["length"], record["run"], record["withheld"], record["line"]) == (
+        len(PHRASE),
+        "run_1",
+        ["email"],
+        None,
+    )
+    line = await client.get(f"/v1/logs/{record['id']}", headers=alice)
+    assert line.headers["cache-control"] == "no-store"
+    assert line.json()["data"]["line"] == PHRASE
+    # An id that names no record, or none at all, is none; the same is said of both.
+    answer = await client.get(f"/v1/logs/5-{'0' * 16}-0", headers=alice)
+    assert answer.json() == {"status": "ok", "data": None}
+    # One past the largest time Loki takes names nothing, and isn't looked for.
+    past = await client.get(f"/v1/logs/{2**63}-{'0' * 16}-0", headers=alice)
+    assert past.json() == {"status": "ok", "data": None}
+    # An id that isn't one is refused, and is not looked for.
+    for wrong in ("nonsense", "5-0-0", f"\u0661-{'0' * 16}-0"):
+        assert (await client.get(f"/v1/logs/{wrong}", headers=alice)).status_code == 422, wrong
+    # A window of more than a day is refused.
+    wide = {"start": "2026-10-12T00:00:00Z", "end": "2026-10-13T00:00:01Z"}
+    assert (await client.get("/v1/logs", params=wide, headers=alice)).status_code == 422
+
+
+async def test_a_logs_line_needs_the_grant_and_the_tenants_own_record(
+    client: httpx.AsyncClient, stack: Stack
+) -> None:
+    theirs = {"tenant_id": "globex"}
+    stack.loki.paths["/loki/api/v1/query_range"] = json(_loki(("5", PHRASE, theirs)))
+    for who, tenant in (("bob", "acme"), ("carol", "acme"), ("alice", "globex")):
+        refused = await client.get(f"/v1/logs/5-{'a' * 16}-0", headers=headers(who, tenant))
+        assert refused.status_code == 403, (who, tenant)
+    assert not stack.loki.requests
+    # A record of another tenant's that Loki gives all the same isn't shown, by list or by id.
+    listed = await client.get("/v1/logs", params=WINDOW, headers=headers("alice"))
+    assert listed.json()["data"]["records"] == []
+    globex_id = _identify([(5, PHRASE, {"service_name": "docplan", "tenant_id": "globex"})])[0][
+        0
+    ].id
+    asked = await client.get(f"/v1/logs/{globex_id}", headers=headers("alice"))
+    assert asked.json() == {"status": "ok", "data": None}
+    assert PHRASE not in listed.text + asked.text
+
+
 async def test_every_read_is_refused_without_the_tenants_grant(
     client: httpx.AsyncClient, stack: Stack
 ) -> None:
     reads = ["/v1/traces", "/v1/traces/t1", "/v1/logs", "/v1/scores", "/v1/feedback"]
-    for path in [*reads, "/v1/spend", "/v1/usage"]:
+    for path in [*reads, "/v1/spend", "/v1/usage", f"/v1/logs/5-{'a' * 16}-0"]:
         for who, tenant in (("bob", "acme"), ("carol", "acme"), ("alice", "globex")):
             response = await client.get(
                 path, params={**WINDOW, "metric": "failed_turns"}, headers=headers(who, tenant)
@@ -178,7 +247,7 @@ async def test_each_tools_read(client: httpx.AsyncClient, stack: Stack) -> None:
     }
     assert (await client.get("/v1/logs", params=WINDOW, headers=alice)).json() == {
         "status": "ok",
-        "data": [],
+        "data": {"records": [], "complete": True},
     }
     metrics = await client.get(
         "/v1/metrics", params={**WINDOW, "metric": "turn_latency"}, headers=alice
@@ -199,10 +268,11 @@ async def test_each_tools_read(client: httpx.AsyncClient, stack: Stack) -> None:
     assert (await client.get("/v1/feedback", params=too_long, headers=alice)).status_code == 422
     backwards = {"start": WINDOW["end"], "end": WINDOW["start"]}
     assert (await client.get("/v1/feedback", params=backwards, headers=alice)).status_code == 422
-    # A moment without its zone, or a span from before 2000, is refused, not read.
+    # A moment without its zone, a span from before 2000, or past 2200, is refused, not read.
     for wrong in (
         {"start": "2026-10-12T00:00:00", "end": WINDOW["end"]},
         {"start": "0001-01-01T00:00:00Z", "end": WINDOW["end"]},
+        {"start": WINDOW["start"], "end": "9999-12-31T00:00:00Z"},
     ):
         for path in ("/v1/feedback", "/v1/traces", "/v1/logs", "/v1/scores", "/v1/metrics"):
             asked = {**wrong, "metric": "failed_turns"}
@@ -249,6 +319,7 @@ async def test_a_tool_the_application_doesnt_run_is_unconfigured(grants: Grants,
             "/v1/feedback",
             "/v1/spend",
             "/v1/usage",
+            f"/v1/logs/5-{'a' * 16}-0",
         ):
             response = await client.get(
                 path, params={**WINDOW, "metric": "failed_turns"}, headers=alice

@@ -39,12 +39,14 @@ class Alice extends Signed {
 export type Serve = (request: Request, path: string) => Promise<Response | undefined>;
 
 /** The server: alice's memberships and checks, then `serve`'s answers, then a refusal. */
-function server(allowed: readonly string[], serve: Serve) {
+function server(allowed: readonly string[], serve: Serve, tenants: readonly string[]) {
   return async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
     if (path === "/grantr/v1/me") {
-      return Response.json({ memberships: [{ tenant: "acme", user: "alice", roles: ["owner"] }] });
+      return Response.json({
+        memberships: tenants.map((tenant) => ({ tenant, user: "alice", roles: ["owner"] })),
+      });
     }
     if (path === "/grantr/v1/checks") {
       const asked: { action: string }[] = await request.json();
@@ -54,9 +56,17 @@ function server(allowed: readonly string[], serve: Serve) {
   };
 }
 
-/** admin, opened at `path`, with grantr allowing `allowed` in acme: its screen and its router. */
-export async function open(path: string, allowed: readonly string[], serve: Serve) {
-  vi.stubGlobal("fetch", vi.fn(server(allowed, serve)));
+/**
+ * admin, opened at `path`, with grantr allowing `allowed` in each of `tenants`, acme alone unless
+ * a test names more: its screen and its router.
+ */
+export async function open(
+  path: string,
+  allowed: readonly string[],
+  serve: Serve,
+  tenants: readonly string[] = ["acme"],
+) {
+  vi.stubGlobal("fetch", vi.fn(server(allowed, serve, tenants)));
   const queryClient = createQueryClient(() => undefined);
   const api = createApi(CONFIG.surfaces, () => ({ token: "t0k3n" }));
   const signed = new Alice(CONFIG, () => undefined);

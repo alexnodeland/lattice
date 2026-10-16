@@ -11,7 +11,8 @@ export const RANGES = [
   { hours: 24, label: "The last 24 hours" },
   { hours: 168, label: "The last 7 days" },
 ] as const;
-export type Hours = (typeof RANGES)[number]["hours"];
+
+type Hours = (typeof RANGES)[number]["hours"];
 
 /** What an id may be, as portalr takes one: the pattern its reads check ids by. */
 export const ID_PATTERN = "[A-Za-z0-9][A-Za-z0-9_.:@\\-]{0,127}";
@@ -46,7 +47,7 @@ export function shownOf(search: Record<string, unknown>): Required<Shown> {
 const MINUTE = 60_000;
 
 /** The window ending at the next whole minute, so a read of it holds a minute, whenever in it. */
-export function windowOf(hours: Hours, now: Date): TimeSpan {
+export function windowOf(hours: number, now: Date): TimeSpan {
   const end = Math.ceil(now.getTime() / MINUTE) * MINUTE;
   return {
     start: new Date(end - hours * 3_600_000).toISOString(),

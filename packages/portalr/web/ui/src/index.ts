@@ -7,6 +7,7 @@
 
 export { Account } from "./account";
 export { AccountMenu, type Appearance } from "./account-menu";
+export { AnsiText, type Run, runs } from "./ansi";
 export { AppShell } from "./app-shell";
 export { useAppearance } from "./appearance";
 export {
@@ -54,6 +55,7 @@ export { EmptyState } from "./empty-state";
 export { failureSaid } from "./failure";
 export { Icon } from "./icon";
 export { type Column, ItemTable } from "./item-table";
+export { type LineReveal, LogList } from "./log-list";
 export { Markdown } from "./markdown";
 export { Lockup, Mark, type Ui } from "./marks";
 export { Menu, type MenuItem } from "./menu";

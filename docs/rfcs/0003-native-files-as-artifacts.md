@@ -14,7 +14,7 @@
 
 ## Summary
 
-A new package, `artifactr-craft`, gives artifactr artifact types for files in native formats: Word documents first, then presentations, spreadsheets, PDF, SVG, images, CAD and audio. An artifact of such a type is a small Pydantic manifest that points, by SHA-256, to the file's bytes in a blob store; the file is the source of truth, and nothing parses it into Pydantic fields. Edits are made by a native application, a "craft" app, run headless in a sandbox: an agent or a person sends a batch of the app's own commands, the app produces new bytes, and the new revision is an ordinary JSON Patch on the manifest whose first operation tests the old digest. artifactr's core does not change, and lattice-core does not change. The pilot is one app, WordCraft, for `.docx`; a second app waits for the exit criteria in [Phases](#phases).
+A new package, `artifactr-craft`, gives artifactr artifact types for files in native formats: Word documents first, then presentations, spreadsheets, PDF, SVG, images, CAD and audio. An artifact of such a type is a small Pydantic manifest that points, by SHA-256, to the file's bytes in a blob store; the file is the source of truth, and nothing parses it into Pydantic fields. People edit in the app's browser build, hosted by the deployment; agents edit through the same app run headless in a sandbox, by batches of its own commands. Either way the new revision is an ordinary JSON Patch on the manifest whose first operation tests the old digest. Each type declares how concurrent writers are kept apart (`lock` by default, `rebase` where the app's commands name what they change by stable id), and what changed inside the file, such as a new comment, is read from it and recorded with the revision, so a comment can start an agent's turn. artifactr's core does not change, and lattice-core does not change. The pilot is one app, WordCraft, for `.docx`; a second app waits for the exit criteria in [Phases](#phases).
 
 This changes artifactr's documentation, portalr and stackr as well as adding a package, so it is in lattice's series rather than artifactr's.
 
@@ -31,8 +31,9 @@ This changes artifactr's documentation, portalr and stackr as well as adding a p
 
 ```mermaid
 graph LR
+    person["a person, in the app's<br/>browser build (own origin)"] -- "bytes on save" --> portal
     agent["agent tools<br/>(edit_native, view_page, ...)"] --> craft["artifactr_craft"]
-    portal["portalr<br/>(upload, preview, history)"] --> router["craft_router"]
+    portal["portalr<br/>(the bridge: lease, save,<br/>preview, history)"] --> router["craft_router"]
     router --> craft
     craft -- "1. source bytes,<br/>command batch" --> worker["craft worker<br/>(sandboxed, no network)"]
     worker -- "2. new bytes,<br/>outline, text" --> craft
@@ -41,12 +42,14 @@ graph LR
     ws --> log[("artifactr's log<br/>and revisions")]
 ```
 
+For an agent's edit:
+
 1. The package loads the artifact's current manifest and its bytes.
-2. It sends the bytes and a batch of commands to the app's worker, which returns the new bytes, a bounded outline and the plain text.
+2. It sends the bytes and a batch of commands to the app's worker, which returns the new bytes, a bounded outline, the plain text, and the comments and tracked changes.
 3. It puts the new bytes, the batch and the text into the blob store, each under its digest.
 4. It commits an `EditArtifact` through the one write path ([ADR-0002][a-adr-0002]). The patch tests the digest it started from, then replaces the content and the outline.
 
-If anything fails before step 4, nothing is committed, and what step 3 wrote is collected as unreferenced.
+If anything fails before step 4, nothing is committed, and what step 3 wrote is collected as unreferenced. A person's save skips step 2's commands: the worker only reads the bytes the browser saved, and steps 3 and 4 are the same.
 
 ### The package
 
@@ -54,7 +57,7 @@ If anything fails before step 4, nothing is committed, and what step 3 wrote is 
 packages/artifactr-craft/
 ├── pyproject.toml           distribution artifactr-craft, import artifactr_craft
 ├── src/artifactr_craft/
-│   ├── types.py             NativeFile, Blob, Derivation, and WordDocument
+│   ├── types.py             NativeFile, Blob, Provenance, and WordDocument
 │   ├── blobs/               the Blobs port, InMemoryBlobs; sql/ behind the [sql] extra
 │   ├── apps/                the CraftApp port, FakeApp, and wordcraft/ (the adapter)
 │   ├── agent.py             NativeFileTools, a pydantic-ai toolset
@@ -78,25 +81,39 @@ class Blob(BaseModel):
     media_type: str
 
 
-class Derivation(BaseModel):
-    """How a revision's content was made: by which app, from what, with which commands."""
-    app: str                      # "wordcraft"
-    app_version: str              # the app's own version
-    image: str | None             # the worker image's digest, when run in one
-    base: str | None              # the sha256 the commands ran on; None for a new file
-    commands: Blob                # the batch, as canonical JSON
+class Change(BaseModel):
+    """One thing that changed inside the file, read from both versions."""
+    kind: str                     # "comment_added", "change_tracked", "slide_added", ...
+    ref: str | None = None        # a stable id in the file, such as a comment's
+    text: str = Field("", max_length=500)
+    anchor: str = Field("", max_length=200)
+    author: str | None = None     # as the file says: shown, never trusted
+
+
+class Provenance(BaseModel):
+    """How a revision's content was made. Who made it is the revision's actor."""
+    source: Literal["upload", "save", "commands", "sync"]
+    app: str | None = None        # "wordcraft"
+    app_version: str | None = None
+    build: str | None = None      # the worker image's or the web build's digest
+    base: str | None = None       # the sha256 it was made from; None for a new file
+    commands: Blob | None = None  # the batch, as canonical JSON, when there is one
+    changes: tuple[Change, ...] = Field((), max_length=50)
+    via: str | None = None        # the device, for a revision from the sync bridge
 
 
 class NativeFile(Artifact, abstract=True):
-    formats: ClassVar[frozenset[str]]          # the media types the type accepts
+    formats: ClassVar[frozenset[str]]                  # the media types the type accepts
+    merge: ClassVar[Literal["lock", "rebase"]] = "lock"
     write_policy: ClassVar[WritePolicy] = "propose"
 
     name: str                                   # the file name people see
     content: Blob
     text: Blob | None = None                    # the plain text, for diffs and search
+    review: Blob | None = None                  # comments and tracked changes, as JSON
     outline: str = Field("", max_length=4_000)  # what the agent sees
     pages: int | None = None
-    derivation: Derivation | None = None        # None for an upload
+    provenance: Provenance
 
     def render_for_agent(self) -> str:
         return f"{self.name} ({self.pages} pages)\n{self.outline}"
@@ -109,7 +126,7 @@ class WordDocument(NativeFile):  # registered as "word_document"
 - **The file is the source of truth.** The manifest holds what artifactr needs to version, show and route it, and the outline and text are derived from the file by the app when the revision is made. Nothing is parsed into Pydantic fields, so nothing is lost in a model the format doesn't fit.
 - **Bytes never enter the log.** `ArtifactCreated` and `ArtifactChanged` carry the data, every revision stores the resulting data ([ADR-0004][a-adr-0004]), every WebSocket replay sends the log, and relayr bridges both events into reflexr with their data. A manifest is a few kilobytes; a `.docx` is often megabytes. Every byte in the manifest is paid per revision and per bridged event, which is why the outline is bounded and the full text is a blob.
 - **`render_for_agent` is synchronous and does no IO.** The agent can't call the app when it reads an artifact, so what it sees by default is the outline the app wrote when the revision was made. Deeper reads are the toolset's (see [What the agent sees](#what-the-agent-sees)).
-- **The command batch is provenance, not the change.** It is stored as its own blob and named by `derivation.commands`, so a revision says how it was made, the batch can be replayed onto a newer head ([Concurrency](#concurrency)), and the manifest stays small.
+- **The command batch is provenance, not the change.** It is stored as its own blob and named by `provenance.commands`, so a revision says how it was made, a batch can be replayed onto a newer head where the type allows it ([Merge strategies](#merge-strategies)), and the manifest stays small.
 - **Write policy defaults to `propose`.** A change to a binary is harder to check by eye than a JSON diff, and an app in alpha may lose formatting. An application can choose `direct`.
 
 ### Edits: no third patch kind
@@ -127,7 +144,7 @@ A whole-file replace is already expressible. The revision is a JSON Patch on the
   {"op": "replace", "path": "/text",           "value": {"sha256": "...", "size": 9120,  "media_type": "text/plain"}},
   {"op": "replace", "path": "/outline",        "value": "..."},
   {"op": "replace", "path": "/pages",          "value": 3},
-  {"op": "replace", "path": "/derivation",     "value": {"app": "wordcraft", "base": "...", "commands": {"sha256": "...", ...}}}
+  {"op": "replace", "path": "/provenance",     "value": {"source": "commands", "app": "wordcraft", "base": "...", "commands": {...}, "changes": [...]}}
 ]
 ```
 
@@ -136,18 +153,35 @@ The `test` operation is what makes a binary safe under artifactr's rules: a prop
 - **Summaries come from the batch.** The package passes `summary=` on the command, written by the agent or from the batch, so change notes don't read `test /content/sha256; replace /content; …`. The type's `describe_change` covers commits that don't.
 - **What this records instead:** an artifactr ADR, "native files are manifests over JSON Patch", which confirms ADR-0003 and adds a section to the artifact types guide.
 
-### Concurrency
+### Merge strategies
 
-Binary files don't merge. Two edits from the same version can't both apply; the second is refused, and replayed or re-planned.
+Binary files don't merge, and artifactr doesn't need them to. Each native type declares, in `merge`, how concurrent writers are kept apart, chosen from what its app can do:
 
-| Situation | What core does | What the package does |
-|---|---|---|
-| Direct edit, head moved | `VersionConflict` on `base_version` | Replays the batch once onto the new head and commits again, if the app's commands are anchored (see below); otherwise returns the conflict |
-| Proposal, head moved before accept | `PatchFailed` from the `test` | portalr offers "replay onto the current version", which makes a new proposal from the same batch; the old one is rejected with that reason |
-| Replay fails (a command no longer applies) | Nothing is committed | The conflict reaches the agent as a tool result, with the summaries of what changed since ([ADR-0008][a-adr-0008]); a person sees both versions' pages |
-| Accept with changes (`RespondToProposal.changes`) | Applies a JSON Patch to the manifest | portalr offers accept or reject only, for native kinds; edits after accepting are a new revision |
+| Strategy | How | For | WordCraft |
+|---|---|---|---|
+| `lock` (the default) | One writer at a time, through a renewable lease. Anyone else's change becomes a proposal | Every app; the only choice where commands don't name their targets by stable id: images, audio, CAD, video, and today's documents | Yes |
+| `rebase` | Command batches that name what they change by stable id, ordered by the server. A stale batch is refused with `VersionConflict`, and its author replays it on the new head | Apps whose commands are anchored to ids | No: its commands act on positions and the selection |
+| `crdt` | The app's own CRDT updates, stored with revisions | Only an app whose document model is a CRDT | Reserved: no craft app has one |
 
-Replay is only sound if a batch names what it changes by content, not by position. WordCraft's commands act on the current selection, so a batch is positional unless it first selects by content: its MCP server has `select_text(text, occurrence)`, which is the same anchor as artifactr's text edits. So the package replays a batch only if every command that changes the document follows a `select_text` in the same batch; any other batch is refused on conflict, and the agent plans again against the new head, which is what ADR-0004 expects of it anyway. Whether this rule is enough in practice (tables, styles, images) is the pilot's first question, and an exit criterion.
+**Lock.** The lease is artifactr's own: `Storage.acquire_lease(scope, "artifactr-craft:edit:<artifact>", holder, ttl)`, the mechanism thread claims use ([ADR-0019][a-adr-0019]), so it needs no core change. It lasts 60 seconds and is renewed every 20: by the portal page while a person has the file open, and by the toolset for the length of an agent's edit.
+
+- **The holder commits directly,** subject to the write policy. Anyone else gets their change recorded as a proposal (`ProposeChange`), which the holder sees when they finish. Nothing waits on the lock, which was ADR-0004's objection to locks: an agent doesn't hold one across model calls, and doesn't wait for one either. It proposes and moves on.
+- **The lock is advisory.** Core doesn't know about it, so `edit_artifact` over REST or MCP isn't stopped. The `test` keeps such a write from being silent: either it fails, or the holder's next save does.
+- **A person's stale save is never discarded.** If their lease lapsed and someone committed meanwhile, the `test` fails, and the package records their bytes as a proposal against the head, saying which version they were saved over. The reviewer sees both versions' pages and chooses. Rejecting and replaying is not available for a person, because their edit is bytes, not commands.
+- **An agent's stale edit is refused,** and the agent plans again against the new head, with the summaries of what changed ([ADR-0008][a-adr-0008]), as ADR-0004 expects.
+
+**Rebase** needs commands that say what they change by stable id, so that a batch means the same thing on a newer head. The server orders everything already: every workspace's log is numbered without gaps ([ADR-0005][a-adr-0005]), and every edit names its base version. WordCraft doesn't qualify. A position is a story, a path of block indexes and a byte offset; paragraphs, tables and cells have no ids; and accepting a tracked change or resolving a comment acts on the selection. Comments (a durable id) and bookmarks (a name) are its only stable handles. `select_text` anchors by content, as artifactr's text edits do, but a rule built on it would be a heuristic, so WordCraft stays `lock`. `rebase` waits for an app whose model has ids.
+
+**Why not CRDTs.** A CRDT lets replicas edit without coordinating and still converge. lattice has the coordinator a CRDT exists to do without:
+
+- **A server orders every write.** It is always there, because agents run on it, and it numbers each workspace's events (ADR-0005). Ordered operations with optimistic checks give the same convergence with no merge function.
+- **Collaboration is turn-based by design** (ADR-0004). Revisions, proposals and write policies ([ADR-0009][a-adr-0009]) are discrete, attributed, reviewable changes. A CRDT's keystroke-level stream would have to be cut back into exactly those.
+- **Convergence is not validity.** A merged document must still be a valid file, with consistent numbering, comment anchors and tracked-change ids, and a CRDT promises only that replicas agree.
+- **No craft app has a CRDT model.** No CRDT or OT library is in any of the thirteen apps' lock files. Mapping `.docx` onto Yjs, Automerge or Loro and back is the lossy conversion D1 rejects. FigCraft, the one app with collaboration, chose server-ordered last-writer-wins over property-level change sets: central ordering again.
+
+That flips if an app ships its own CRDT model that its files round-trip; if people must edit offline, on several devices, for hours; or if several people must type in one document at once and a lock with proposals isn't good enough. `crdt` would then store the app's updates. A blob of updates per revision needs no core change; a new patch kind would change ADR-0003. That choice waits for the app.
+
+**Proposals on native files.** A proposal accepted after the head has moved fails the `test` as `PatchFailed`. Where the type is `rebase`, portalr offers to replay the proposal onto the current version, which makes a new proposal from the same batch. Where it is `lock`, the reviewer sees both versions' pages and accepts one. Accepting with changes (`RespondToProposal.changes`) isn't offered for native kinds; edits after accepting are a new revision.
 
 ### Blob storage
 
@@ -216,6 +250,7 @@ Opening a user's `.docx` runs a young parser on hostile input: a zip bomb, XML n
 |---|---|---|
 | What the file is | `render_for_agent`: name, pages and the outline the app wrote at the revision | The outline's 4,000 characters, which is the capability's `max_render_chars` |
 | Its words | `read_native(artifact_id, pages)`: the text blob, cut to the pages asked for | 8,000 characters a call, with how much remains |
+| Its comments and tracked changes | `read_review(artifact_id)`: the `review` blob, with each comment's id | 50 items a call |
 | Its look | `view_page(artifact_id, page)`: one rendered page, as an image, for models that take images | One page a call, at a fixed resolution; off unless the application turns it on |
 | What it can do | `find_commands(query)`: the app's commands that match, through its `list_commands` | Ten a call; the full catalog (617 commands in WordCraft 0.7.0) is never in the prompt |
 | To change it | `edit_native(artifact_id, base_version, commands, summary)` | One batch a call; returns `Applied`, `Proposed`, or the conflict |
@@ -231,9 +266,89 @@ The toolset is `NativeFileTools`, registered on the agent beside the application
 - **No entry points.** A `artifactr.types` entry-point group would load code because a package is on the path, which is a supply-chain door with no benefit: the application still has to list the type.
 - **Compatibility** is the monorepo's CI and the lower bound above, and the layering test that imports only `__all__` names.
 
-### Events, feedback and telemetry
+### People edit in the browser
 
-- **No new events.** A native edit is an `artifact_changed` like any other, with the manifest patch, its summary and the trace it was committed in ([ADR-0033][a-adr-0033]). relayr bridges it unchanged, so a reflexr rule can react to a Word document changing, and sees the manifest, never the bytes.
+People edit in the craft app's web build, served by the deployment, so nothing is installed. Agents still edit on the server, through the worker.
+
+**What the web build is today.** For WordCraft 0.7.0, verified:
+
+- **A standalone UI.** It exports no JavaScript API and listens for no `postMessage`. Files come in through a picker, drag and drop or paste, and go out through `showSaveFilePicker` or a download. The control channel has nothing in the browser to replace it, and there is no AutoSave and no recovery.
+- **Its hosting needs are modest.** It is 40 MB of WebAssembly, 15 MB gzipped (its `HOSTING.md` says 13 and 5). It needs no COOP or COEP and runs no workers. Its CSP must allow `wasm-unsafe-eval` and one inline module script. It calls no remote host.
+- **It runs the CLI's engine.** The web build and the CLI depend on the same engine crates, so a file saved in the browser and one written by the worker come from the same code at the same release. Only fonts differ between the two, and fonts change renders, not the `.docx`.
+
+So the pilot needs an embedding API that doesn't exist yet:
+
+| Option | What | Assessment |
+|---|---|---|
+| **A. An embedding API upstream (recommended)** | A small `postMessage` protocol in the web build: open bytes with a name, save to bytes, report dirty and idle, a read-only mode | Least for us to own, and useful to upstream; depends on upstream taking it |
+| B. Our own shell over the upstream crates | A crate that depends on WordCraft's engine and UI crates by git, pinned by commit, adding that API, built in CI | Works without upstream, but makes us maintain a WebAssembly build that tracks an alpha |
+| **C. Check out and check in (works today)** | portalr takes the lease and downloads the revision, and opens the hosted app in a new tab. The person saves to disk and uploads, which commits the revision and releases the lease | Clunky, but needs nothing from upstream |
+
+The pilot ships C, which proves the hosting, the lease and save-to-revision, and proposes A upstream at the same time. B is built only if A is refused and the pilot shows embedding is worth a build of our own.
+
+With an embedding API, the editor is an iframe:
+
+- **On an origin of its own.** stackr serves the release's files, pinned by version and checksum, from a host name of their own, never portalr's. An iframe with `allow-scripts allow-same-origin` is a sandbox only when its origin differs from the page's, and only that origin needs `wasm-unsafe-eval`; portalr's CSP gains only a `frame-src` naming it.
+- **Sandboxed and unframeable elsewhere.** The iframe gets `sandbox="allow-scripts allow-same-origin allow-downloads"`. The editor's origin sends `frame-ancestors` naming the portal and a CSP of `default-src 'self'`, plus the inline script's hash and `wasm-unsafe-eval`.
+- **The portal page is the bridge.** It fetches the revision through `craft_router`, under artifactr's read check, and posts the bytes into the iframe. It takes the lease and renews it while the editor is open. On save it sends the bytes to `craft_router`, which commits a revision as the person, with `source: "save"`. Messages are checked by origin in both directions. The iframe holds no token and calls no API, so tenant scoping stays in the portal page and on the server.
+- **No keystrokes reach the server.** A revision is made on save and on close, and after a minute idle with unsaved changes once the app reports idle.
+- **Hostile files now also open in the browser,** inside the person's own browser sandbox, which is what it is for. That doesn't replace the worker: the server still opens every revision to read its outline, text, comments and changes.
+
+Embedding is not added to portalr's bundle. It loads only when a person opens a native file, from the editor's origin, with no extra weight for anyone else.
+
+### Events and user-side edits
+
+artifactr records revisions, never keystrokes. How finely a person's work becomes revisions depends on what the app reports:
+
+| Level | What reaches lattice | What it needs from the app | WordCraft 0.7.0 |
+|---|---|---|---|
+| 1. Save | Bytes, when the person saves | Nothing | Yes, in the browser and on the desktop |
+| 2. File watch | Bytes, once a file in a synced folder settles | Saves that never leave a half-written file | Desktop saves write a temporary file and rename it |
+| 3. Commands | Bytes, with the commands that made them | A command journal or stream | No stream. A macro can be recorded and read back over the desktop control channel, by polling. GridCraft has `engine.journal` |
+| 4. Presence | Who has the file open, and where | Events the app pushes | None: both surfaces only answer requests |
+
+Level 1 is the pilot's. Level 2 is the desktop phase's. Level 3 only attaches the commands to a revision that is still made on save, as its `provenance.commands`; it never puts one event per command in the log. Level 4 is live state, not history. It would need an app that pushes events, and a live channel for artifacts, which artifactr doesn't have, so it waits.
+
+**Provenance on every revision.**
+
+| Question | Where the answer is |
+|---|---|
+| Who | The revision's actor, as artifactr records it (`user`, `agent`, `external_agent`, `system`), never the name in the file |
+| How | `provenance.source`: `upload`, `save`, `commands` or `sync` |
+| Made from | The previous version, and `provenance.base`, the digest of the content it was made from |
+| What | `content.sha256` |
+| By which build | `provenance.app`, `app_version` and `build` |
+
+**What changed inside the file.** For every revision, the worker reads the new bytes' comments, tracked changes and outline, and stores them as the `review` blob. It then compares them with the previous revision's and writes what changed into `provenance.changes`:
+
+- a comment added, replied to, resolved or deleted, keyed by its durable id;
+- a tracked change made, accepted or rejected;
+- pages added or removed;
+- for later formats, their own kinds, such as a slide added.
+
+There are at most 50 changes, and each text is cut to 500 characters. They travel in the revision's patch, so change notes, relayr's bridged `artifact_changed` and its reflexr rules, and portalr's history see them with no new event type. The spike found `inspect_document` gives only counts and indexes, while `review.comments` and `review.changes` give the author, date, anchor, text and id, so the worker reads those.
+
+**A comment can start a turn.** Suppose a person's save, or a synced file, adds a comment that addresses the agent by the handle the application configures, such as `@agent`. The package then posts a message in the artifact's thread, as that person, quoting the comment, its anchor and its id. The agent answers in the file with `review.reply`. Comment ids are stable, so the reply is anchored even under `lock`. While the person holds the lease, the reply is a proposal.
+
+The guardrails:
+
+- **Only new comments start a turn:** ones the previous revision didn't have.
+- **Never from an upload.** A received file's comments are someone else's words.
+- **The file's author field is shown, never trusted.** The message is attributed to the person whose save added the comment.
+- **The comment reaches the model as untrusted text,** as that person's message, like anything else they type.
+
+**The desktop sync bridge** comes in a later phase. It is a separate adapter: a small program on the person's machine that watches a folder, waits for a file to settle after its rename, and commits the revision as the person, with their grantr token, with `source: "sync"` and `via` naming the device. It is not an actor of its own, because the edit is the person's and a bridge actor would hide who made it.
+
+The spike found two hazards:
+
+- **WordCraft doesn't notice a file changed on disk.**
+- **Its desktop AutoSave is on by default,** so it would silently overwrite anything the bridge wrote into a file the person has open.
+
+So the bridge never writes into a watched file. An agent's revision reaches the person as a proposal, or as a file beside theirs.
+
+### The log, feedback and telemetry
+
+- **No new events.** A native edit, whoever makes it, is an `artifact_changed` like any other, with the manifest patch, its summary and the trace it was committed in ([ADR-0033][a-adr-0033]). relayr bridges it unchanged, so a reflexr rule can react to a Word document changing, and sees the manifest, never the bytes.
 - **Feedback** targets an artifact version, as it does today ([ADR-0028][a-adr-0028], [ADR-0038][a-adr-0038]). A score on a revision of a native file attaches to the trace that made it.
 - **Spans** for `apply`, `inspect` and `render`, children of the tool call or request, with the app, its version, the image digest, the command count, the bytes in and out and the outcome. Digests, never content: a document's text never reaches a span.
 - **Metrics:** a duration histogram per operation and a count of failures by kind, through the same SDK views as artifactr's metrics ([ADR-0036][a-adr-0036]), with the tenant attribute artifactr uses, so portalr's per-tenant readers see them.
@@ -243,11 +358,13 @@ The toolset is `NativeFileTools`, registered on the agent beside the application
 - **A renderer for native files** in `ui`'s registry: a page strip of previews, the file's name and size, a download link, and the outline. Its `text(data)` is the outline, so revision diffs work before any preview loads; the full text diff reads the text blob.
 - **Revision history** is artifactr's revisions, as for every kind. A diff between two revisions shows the changed text and, side by side, the pages whose renders differ.
 - **Routes in `craft_router`,** mounted by the application beside artifactr's, with the same `resolve_actor` and authorization: upload a file as a new artifact or a new revision, download a revision's content, and fetch a revision's page. Every route names the artifact and the revision, never a bare digest, so the check is artifactr's read or edit of that artifact.
-- **Editing in the browser is deferred.** The craft apps have web builds, but embedding one means multi-megabyte WebAssembly in the app bundle, a Content-Security-Policy that allows `wasm-unsafe-eval`, a second renderer whose output can differ from the worker's, and an editor whose every change must still become a command through the one write path. Previews and command-based edits come first; embedding is its own RFC, after the pilot.
+- **Editing** opens the app's browser build, as [People edit in the browser](#people-edit-in-the-browser) describes: check-out and check-in first, then an embedded editor.
+- **Conflicts and proposals:** a stale save shown as a proposal with both versions' pages, and the lease's holder shown on the artifact while it is held.
 
 ### stackr
 
-- **A recipe, not a default.** The template gains a `native_files` question, off by default. On, it adds the worker service, its internal network and its limits, and wires `Worker` into the application.
+- **A recipe, not a default.** The template gains a `native_files` question, off by default. On, it adds the worker service, its internal network and its limits, wires `Worker` into the application, and serves the app's browser build.
+- **The browser build is static files on a host name of their own,** served by the stack's edge (Caddy on the single host), from the release's `wordcraft-web` archive, checked against `SHA256SUMS.txt` and pinned to the same version as the worker. The files keep their hashed names and their SRI, and are cached for a long time. The headers are a CSP for that origin alone, `frame-ancestors` naming the portal, and `application/wasm`. Nothing calls out.
 - **The image is stackr's thin image.** WordCraft publishes no image the spike could find, and its Linux CLI comes only inside the full app's tarball. stackr builds an image from that tarball's `wordcraft-cli`, checked against the release's `SHA256SUMS.txt`, in the way and with the provenance of [ADR-0035][s-adr-0035], pinned by version and digest. The CLI needs only the C library, so the image is a slim base, the CLI, the runner and no fonts. Upstream signs nothing and publishes no SBOM, so the checksum is the whole chain of custody from upstream, and stackr's attestation starts at its own build.
 - **Notices.** The image carries the app's licence files and a `NOTICE` naming its source and version, and the template's licence notes list it. A recipe is added only for an app whose licence is verified.
 
@@ -268,8 +385,8 @@ A format is supported when its corpus round-trips through the app without loss i
 |---|---|---|
 | artifactr | An ADR and a section of the artifact types guide: native files are manifests over JSON Patch, with a `test` on the content digest | No |
 | artifactr-craft | New | |
-| portalr | The native file renderer in `ui`, previews and the revision page diff in `app` | No |
-| stackr | The `native_files` question, the worker service and network, the worker's thin image | No |
+| portalr | The native file renderer in `ui`; previews, the revision page diff, check-out and check-in, and later the embedded editor and its bridge, in `app` | No |
+| stackr | The `native_files` question; the worker service and network; the worker's thin image; the browser build on its own origin | No |
 | lattice-core | Nothing | |
 
 ### Phases
@@ -277,18 +394,22 @@ A format is supported when its corpus round-trips through the app without loss i
 | Phase | Deliverable | Exit criteria |
 |---|---|---|
 | 0. Spike | This RFC's [evidence](#evidence) | Done |
-| 1. The package | `NativeFile`, `Blob`, `Derivation`; the `Blobs` port with in-memory and SQL adapters, migrations and row-level security; the `CraftApp` port and `FakeApp`; the layering test | 100% coverage; the blob contract suite passes on memory, SQLite and PostgreSQL; a two-tenant test reads nothing across tenants; `collect` keeps every referenced blob, pending proposals' included |
-| 2. WordCraft | The `Subprocess` adapter over stdio MCP; the `.docx` corpus and the fidelity report; determinism measured | The report runs nightly; the feature matrix is published; whether commands are anchored is answered |
-| 3. The agent | `NativeFileTools`; the outline and text at every revision; conflicts, and replay if phase 2 allows it | Scripted-model tests (`FunctionModel`) for an edit, a proposal, a conflict and a replay |
-| 4. The worker | The runner, stackr's image and recipe, the hostile corpus | Every hostile file ends in a typed failure within its deadline; egress from the worker fails; the template with `native_files` passes its CI |
-| 5. portalr | The renderer, previews, the revision page diff, upload and download | Each `bdd` scenario passes |
-| 6. Docs and ADRs | The package's site section, its guide, the ADRs this RFC leads to | The section builds |
+| 1. The package | `NativeFile`, `Blob`, `Provenance`; the `Blobs` port with in-memory and SQL adapters, migrations and row-level security; the `CraftApp` port and `FakeApp`; the edit lease | 100% coverage; the blob contract suite passes on memory, SQLite and PostgreSQL; a two-tenant test reads nothing across tenants; `collect` keeps every referenced blob, pending proposals' included |
+| 2. WordCraft, headless | The `Subprocess` adapter over stdio MCP; outline, text and `review` at every revision; the `.docx` corpus and the fidelity report | The report runs nightly, and the feature matrix is published |
+| 3. The worker and the agent | The runner, stackr's image and recipe, the hostile corpus; `NativeFileTools`; `lock`, with an agent's work as proposals while a person holds the lease | Every hostile file ends in a typed failure within its deadline; egress from the worker fails; scripted-model tests (`FunctionModel`) for an edit, a proposal and a conflict |
+| 4. The browser pilot | The browser build on its own origin; portalr's renderer, previews, page diffs, and check-out and check-in under the lease; a stale save kept as a proposal; the embedding API proposed upstream | Each `bdd` scenario passes, a stale save included; the editor's origin serves nothing that calls out |
+| 5. Events | `provenance.changes`; a comment that addresses the agent starts a turn, answered by `review.reply`; the embedded editor, if phase 4 got an embedding API | A person's comment, saved in the browser, gets the agent's reply in the file as a proposal, in a `bdd` scenario |
+| 6. The desktop bridge | The sync adapter, with its own design note first | A file saved on the desktop becomes a revision within its settle time, and an agent's revision never lands in an open file |
+| 7. Docs and ADRs | The package's site section, its guide, the ADRs this RFC leads to | The section builds |
+
+Phases 3 and 4 depend only on 2, and can run side by side.
 
 **Before a second app:**
 
 - WordCraft's feature matrix has held across two of its releases, with no feature moving from supported to dropped.
 - No hostile input has escaped its limits.
 - The second app's licence is verified from its repository, and it has a headless surface with the four operations of `CraftApp`, tagged releases with Linux binaries, and checksums.
+- Its merge strategy is declared from what its commands are shown to address, not from its documentation.
 - Its adapter needs no change to `CraftApp`, `Blobs` or `NativeFile`. If it does, the port was WordCraft-shaped, and is fixed before the app is added.
 
 ## Decisions
@@ -300,23 +421,29 @@ Recommended, for the maintainer to decide.
 | D1 | Artifact shape | A small manifest and content-addressed blobs; the file is the source of truth | Parsing the file into Pydantic fields; bytes inline in the data |
 | D2 | Edits | JSON Patch on the manifest, testing the old digest; the command batch as a provenance blob. ADR-0003 unchanged | A third patch kind, "command batch", which pure core can't apply |
 | D3 | Blob storage | A `Blobs` port in the package, keyed by tenant, workspace, artifact and digest; PostgreSQL `bytea` with a 25 MiB default limit; put first, collect what is unreferenced | Methods on artifactr's `Storage`; an object store first; deduplication across artifacts or tenants |
-| D4 | Concurrency | Refuse a stale edit; replay the batch only if the app's commands are anchored | Last write wins; locks across app calls; merging binaries |
-| D5 | The app port | Stateless calls over MCP on stdio, one process per call | The control channel's TCP port; the CLI per operation; linking the crates |
+| D4 | Merge | A strategy each type declares: `lock` by default, through artifactr's leases, with others' work as proposals; `rebase` only for apps whose commands name stable ids; `crdt` reserved for an app whose own model is one | A CRDT library chosen by lattice, with `.docx` converted to it; last write wins; merging binaries |
+| D5 | The app port | Stateless calls over MCP on stdio, one process per call; an adapter per app | The control channel's TCP port; one adapter for every app (their protocols differ); the CLI per operation; linking the crates |
 | D6 | The sandbox | A worker per app on an internal network, with no published port and no egress, under rlimits and container limits; stackr owns the policy | The app's CLI in the application's own container; a long-lived app server shared by tenants |
-| D7 | Agent perception | A bounded outline in the manifest; text, pages and the command catalog through tools | Calling the app from `render_for_agent`; the whole catalog in the prompt |
+| D7 | Agent perception | A bounded outline in the manifest; text, review, pages and the command catalog through tools | Calling the app from `render_for_agent`; the whole catalog in the prompt |
 | D8 | Discovery | Explicit: import the type, list it, give the toolset an app | An entry-point group |
-| D9 | Events and telemetry | No new events; spans and metrics on the package's own calls, digests only | New event types for native edits |
-| D10 | portalr | Server-rendered previews and page diffs; artifact-scoped routes | Embedding the apps' WebAssembly builds now; routes by digest |
-| D11 | stackr | An opt-in recipe; a thin image built from the release binary, pinned by digest, with its notices | A worker in every generated application; an upstream image, if one appears, unpinned |
-| D12 | Fidelity | A corpus, measured on normalized parts, and a feature matrix per format | Byte comparison; "supported" for a format as a whole |
-| D13 | Scope | WordCraft only until the exit criteria hold | Several apps at once |
+| D9 | The log and telemetry | No new events; spans and metrics on the package's own calls, digests only | New event types for native edits |
+| D10 | People's editing | Browser first: check-out and check-in in the pilot, then an embedded editor through an embedding API proposed upstream; a desktop bridge later | Desktop and a bridge first; building our own shell over the crates before asking upstream |
+| D11 | The browser editor's security | Its own origin, a sandboxed iframe, origin-checked messages; the portal page holds the token and the lease | Serving it from portalr's origin, with `wasm-unsafe-eval` in portalr's CSP |
+| D12 | User-side events | Revisions on save, never keystrokes; provenance on every revision; changes read from the file and carried in the patch | Keystroke or command events in the log; new event types for comments; trusting the file's author names |
+| D13 | Comments | A new comment that addresses the agent, saved by a person, starts a turn as that person's message; never from an upload | Every comment starts a turn; comments ignored |
+| D14 | The desktop bridge | An adapter that commits as the person, with the device in the provenance; never writes into a watched file | A bridge actor of its own; writing agents' revisions into the person's open file |
+| D15 | stackr | An opt-in recipe; a thin image and the browser build from one release, checked against its checksums, pinned by digest, with their notices | A worker in every generated application; upstream artifacts unpinned |
+| D16 | Fidelity | A corpus, measured on normalized parts, and a feature matrix per format | Byte comparison; "supported" for a format as a whole |
+| D17 | Scope | WordCraft only until the exit criteria hold | Several apps at once |
 
 ## Drawbacks
 
 - **A young dependency on the critical path.** WordCraft's repository is nine days old, with six releases in seven days, and calls itself alpha. Its own documents disagree on how many commands it has (422, "over 270", and 617 in the binary). Its commands, tools and output can change in any release, and the adapter has to follow.
 - **Two stores to keep consistent.** The manifest is transactional and the bytes are not; put-first and collection make the gap safe, not absent, and a hand-made patch can still name missing content.
-- **No merging.** Two people editing the same document concurrently means one of them replays or re-plans. Collaboration stays turn-based, as ADR-0004 chose, but the turns are coarser than in a Markdown document.
-- **Seconds per edit.** Every edit spawns a process and round-trips the file. The evidence measures what that costs.
+- **One writer at a time.** Under `lock`, a second person or the agent proposes rather than edits while someone has the file open. Collaboration stays turn-based, as ADR-0004 chose, but the turns are coarser than in a Markdown document.
+- **The browser pilot is clunky** until an embedding API exists: download, edit in another tab, save and upload. Its value is proving the hosting, the lease and save-to-revision, not the experience.
+- **A 40 MB download** the first time a person opens a native file, 15 MB compressed, then cached.
+- **A round trip per edit.** Every edit sends the whole file to the worker and back, and spawns a process. On the spike's small files that took milliseconds; on a large document it is the transfer and the parse, which phase 2 measures.
 - **A worker service to run,** with its own image to build, pin and patch, in every deployment that turns it on.
 - **The name.** `artifactr-craft` borrows the apps' brand, and WordCraft's `NOTICE` says the ArtCraft name, wordmark and logos are trademarks, outside the open-source licence. The neutral parts (manifest, blobs, sandbox) don't depend on the apps, so a neutral name costs nothing; see the unresolved questions.
 
@@ -326,11 +453,14 @@ Recommended, for the maintainer to decide.
 - **Keep files outside artifactr,** with a link in an artifact. No revisions, no proposals, no attribution, and nothing for the agent to perceive.
 - **LibreOffice headless** as the app. Mature, with every office format, but a large C++ process whose edits are UNO calls rather than commands, MPL-licensed, and harder to sandbox per call. It remains the obvious fallback if the craft apps don't mature, and the `CraftApp` port admits it.
 - **Format libraries in Python** (`python-docx`, `openpyxl`, `python-pptx`). In-process, so no isolation from hostile files, and each format would grow its own edit model in the application's code: the scattered per-type behaviour ADR-0003 exists to prevent.
-- **A CRDT per format.** True simultaneous editing, and a research project per format.
+- **A CRDT per format, chosen by lattice.** True simultaneous editing, a lossy conversion of every format into it, and a research project per format. [Merge strategies](#merge-strategies) says why ordered operations on the server suit lattice better, and when that flips.
+- **One adapter for every craft app.** Their control channels share a JSON-lines shape and `engine.execute`, but differ in authentication (two have none), method names, MCP tool names and flags, and their commands are all their own. A port with one adapter per app is honest about that.
 
 ## Unresolved questions
 
-- **Is "select by content first" enough to make replay sound** for tables, styles and images, or only for text (D4)?
+- **Will upstream take an embedding API** (D10)? If not, is an embedded editor worth a WebAssembly build of our own?
+- **The agent's handle** in comments, and whether a comment can address a particular agent when an application has several.
+- **The bridge's identity** (D14): committing as the person keeps attribution, but needs a person's token on a device, which grantr's service principals don't cover yet.
 - **The name** of the package. `artifactr-files`, with `wordcraft` as an adapter module, avoids the apps' trademark; `artifactr-craft` was the working name.
 - **Upstream's supply chain.** Checksums only, no signatures, SBOM or attestations, and a very young organization whose repositories gathered tens of thousands of stars in days. Whether to wait for signed releases before phase 4, or build the CLI from a pinned source commit in CI instead of taking the binary.
 - **Quotas.** A per-workspace or per-tenant limit on blob bytes, beyond the per-blob limit, and where it is enforced.
@@ -416,11 +546,34 @@ From [getartcraft.com/apps](https://getartcraft.com/apps) on 2026-10-16 and each
 
 Every repository was created between 2026-09-30 and 2026-10-09, all thirteen were pushed to on 2026-10-16, and their stars run from about 1,900 to 64,700. A fourteenth repository, AniCraft, isn't on the page and has no licence GitHub detects.
 
+### Events, the web build and merging
+
+A second round, against the same WordCraft commit, `craft-libs` at `83bf4cb2`, DeckCraft at `1dc69720`, GridCraft at `f1894c6d`, PhotoCraft at `2a952f16` and FigCraft at `d1d8c3f6`, and every app's `Cargo.lock` at its head on 2026-10-16.
+
+| Question | Finding | |
+|---|---|---|
+| Does WordCraft push anything? | No. Every write in the control server's loop answers the request just read. MCP declares no `subscribe` or `listChanged`, sends no notifications, and answers `resources/subscribe` with "method not found" | Verified in code |
+| Can a person's edits be seen as commands? | Only after the fact. `edit.undoHistory` gives the undo stack's labels; `tools.recordMacro` records every command the session runs, read back with `tools.macros`, over the desktop control channel. Whether every interaction is captured (drags, dialogs) wasn't checked. GridCraft has `engine.journal`, "commands run so far (replayable)" | Verified in code; capture not tested |
+| One protocol for every app? | No. `craft-libs` has no control or automation crate. All bind 127.0.0.1 and speak JSON lines with `engine.execute`, but WordCraft and PhotoCraft authenticate with incompatible handshakes, DeckCraft and GridCraft not at all, and their MCP tool names and bridge flags differ. Every repository has an `AGENTS.md` | Verified, for four apps' protocols |
+| Saves | Atomic: a temporary file beside the target, `fsync`, then a rename | Verified in code |
+| AutoSave and recovery | Desktop AutoSave is on by default, only for files saved this session; off in the browser. Recovery snapshots on the desktop only | Verified in code |
+| Locks and outside changes | No lock files for documents, and nothing notices a file changed on disk, so AutoSave overwrites an outside change | Verified absent |
+| Comments and tracked changes | Comments have a durable id, author, date, parent, resolved and anchors; tracked changes have kind, author and date. `inspect_document` gives counts and indexes only. `review.comments` and `review.changes` give author, date, anchor, text and id, run in the sandbox on the corpus. Accepting, rejecting and resolving act on the selection | Verified, live |
+| How commands address content | By position and selection: a story, a path of block indexes and a byte offset. Paragraphs, tables, rows and cells have no ids; comments, bookmarks and pictures do | Verified in code |
+| CRDT or OT | No CRDT or OT library in any of the thirteen lock files. FigCraft has its own collaboration: property-level change sets, server-ordered last-writer-wins, over WebSockets. WordCraft lists real-time co-authoring as a gap | Verified |
+| The web build's API | None: the JavaScript exports only its initializer; no `postMessage`; open by picker, drag and drop or paste; save by `showSaveFilePicker` or download | Verified in the release files and code |
+| Its size and hosting | `wordcraft-web-0.7.0.zip`, checksum matched: 11 files, 40,011,614 bytes; the WebAssembly is 39,785,016 bytes, 14.9 MB with `gzip -9`. SRI on its script and WebAssembly. No COOP or COEP, no `SharedArrayBuffer`, no workers. Its `HOSTING.md` expects iframing, asks that no restrictive `frame-ancestors` be sent, and lists the sandbox flags it needs | Verified; not served or run |
+| Its CSP | `wasm-unsafe-eval` and the inline module script; `blob:` for downloads | Inferred from the files, not tested |
+| Calling home | No URLs in the JavaScript beyond fetching its own WebAssembly; the WebAssembly's URLs are namespaces and About links. No remote fonts | Verified by search |
+| The same engine as the CLI | Yes: the web build and the CLI both depend on WordCraft's engine and document crates. Whether a browser save matches the worker's bytes wasn't run | Verified in the manifests |
+
 [a-adr-0001]: ../artifactr/adr/0001-python-library-with-sans-io-core.md
 [a-adr-0002]: ../artifactr/adr/0002-single-write-path.md
 [a-adr-0003]: ../artifactr/adr/0003-artifact-types-as-pydantic-subclasses.md
 [a-adr-0004]: ../artifactr/adr/0004-optimistic-concurrency-and-revisions.md
+[a-adr-0005]: ../artifactr/adr/0005-one-event-log-per-workspace.md
 [a-adr-0008]: ../artifactr/adr/0008-agent-perception-and-steering.md
+[a-adr-0009]: ../artifactr/adr/0009-write-policies-and-non-blocking-proposals.md
 [a-adr-0017]: ../artifactr/adr/0017-application-toolsets-and-capability-events.md
 [a-adr-0019]: ../artifactr/adr/0019-storage-protocol-and-workspace-handles.md
 [a-adr-0021]: ../artifactr/adr/0021-sql-storage.md

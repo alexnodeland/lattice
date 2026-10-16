@@ -191,6 +191,9 @@ class _Postgres:
     async def connection(self) -> SimpleNamespace:
         return SimpleNamespace(dialect=postgresql.dialect())
 
+    async def execute(self, statement: Select[Any]) -> None:
+        self.asked.append(str(statement.compile(dialect=postgresql.dialect())))
+
     async def scalar(self, statement: Select[Any]) -> int:
         self.asked.append(str(statement.compile(dialect=postgresql.dialect())))
         return 41
@@ -199,6 +202,8 @@ class _Postgres:
 async def test_a_row_of_another_scope_takes_its_number_from_the_sequence_on_postgresql() -> None:
     session = _Postgres("acme")
     transaction = _Transaction(cast("AsyncSession", session), _utc_now)
-    assert await transaction._named_seq("~deployment") == 41
-    assert "nextval(pg_get_serial_sequence(" in session.asked[0]
-    assert await transaction._named_seq("acme") is None, "its own rows take the insert's number"
+    assert await transaction._next_seq("~deployment") == 41
+    assert "pg_advisory_xact_lock(" in session.asked[0], "the deployment log's lock, first"
+    assert "nextval(pg_get_serial_sequence(" in session.asked[1]
+    assert await transaction._next_seq("acme") is None, "its own rows take the insert's number"
+    assert len(session.asked) == 2, "and take no lock"

@@ -81,7 +81,7 @@ const LABELS: Record<AuditType, string> = {
   restricted: "Restrictions",
   unrestricted: "Restrictions lifted",
   tenant_created: "Tenant created",
-  deployment_tenant_created: "Tenants created",
+  deployment_tenant_created: "Tenant created (deployment)",
   tenant_deleted: "Tenant deleted",
 };
 

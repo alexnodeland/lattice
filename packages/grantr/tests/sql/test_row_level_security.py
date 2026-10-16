@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from grantr.core import User
@@ -256,3 +256,149 @@ async def test_the_policy_is_for_insert_alone(engines: tuple[AsyncEngine, AsyncE
     )
     async with owner.connect() as connection:
         assert [tuple(row) for row in await connection.execute(policies)] == [("INSERT", True)]
+
+
+async def _deployment_seq(owner: AsyncEngine) -> int:
+    async with owner.connect() as connection:
+        return int(
+            await connection.scalar(
+                text("SELECT min(seq) FROM grantr_audit WHERE tenant_id = '~deployment'")
+            )
+            or 0
+        )
+
+
+EXPLICIT = text(
+    "INSERT INTO grantr_audit"
+    " (seq, tenant_id, event_type, actor_kind, actor_workspace, actor_id, body)"
+    " VALUES (:seq, '~deployment', :event_type, 'user', '', 'root', CAST(:body AS json))"
+)
+
+
+@pytest.mark.postgres
+async def test_a_creation_filed_under_the_tenants_own_id_is_the_tenants_own_row(
+    engines: tuple[AsyncEngine, AsyncEngine],
+) -> None:
+    """The existing tenant policy lets a tenant add rows of its own, whatever their type."""
+    owner, application = engines
+    own = text(
+        "INSERT INTO grantr_audit (tenant_id, event_type, actor_kind, actor_workspace,"
+        " actor_id, body) VALUES ('acme', :event_type, 'user', '', 'root', CAST(:body AS json))"
+    )
+    async with _session(application, "acme") as session:
+        await session.execute(own, _entry(CREATION, tenant="acme"))
+        mine = text(
+            "SELECT count(*) FROM grantr_audit WHERE tenant_id = 'acme' AND event_type = :t"
+        )
+        assert await session.scalar(mine, {"t": CREATION}) == 1, "in its own log"
+    async with owner.connect() as connection:
+        assert len(list(await connection.execute(DEPLOYMENTS_ENTRIES))) == 3, "not the deployment's"
+
+
+@pytest.mark.postgres
+async def test_a_duplicate_number_is_refused_and_reveals_only_that_it_exists(
+    engines: tuple[AsyncEngine, AsyncEngine],
+) -> None:
+    """A unique violation says the number is taken, whose row it is stays unread."""
+    owner, application = engines
+    taken = await _deployment_seq(owner)
+    with pytest.raises(IntegrityError, match="duplicate key"):
+        async with _session(application, "acme") as session:
+            await session.execute(EXPLICIT, {"seq": taken, **_entry(CREATION, tenant="acme")})
+    async with _session(application, "acme") as session:
+        await session.execute(EXPLICIT, {"seq": 10_000, **_entry(CREATION, tenant="acme")})
+    async with owner.connect() as connection:
+        assert 10_000 in set(await connection.scalars(text("SELECT seq FROM grantr_audit")))
+
+
+@pytest.mark.postgres
+async def test_on_conflict_do_nothing_adds_nothing_to_a_taken_number(
+    engines: tuple[AsyncEngine, AsyncEngine],
+) -> None:
+    owner, application = engines
+    taken = await _deployment_seq(owner)
+    skipping = text(f"{EXPLICIT.text} ON CONFLICT DO NOTHING")
+    async with _session(application, "acme") as session:
+        connection = await session.connection()
+        result = await connection.execute(
+            skipping, {"seq": taken, **_entry(CREATION, tenant="acme")}
+        )
+        assert result.rowcount == 0
+    async with owner.connect() as connection:
+        assert len(list(await connection.execute(DEPLOYMENTS_ENTRIES))) == 3, "nothing was added"
+
+
+@pytest.mark.postgres
+async def test_on_conflict_do_update_is_refused_for_the_deployments_entries(
+    engines: tuple[AsyncEngine, AsyncEngine],
+) -> None:
+    owner, application = engines
+    taken = await _deployment_seq(owner)
+    updating = text(f"{EXPLICIT.text} ON CONFLICT (seq) DO UPDATE SET actor_id = 'x'")
+    with pytest.raises(ProgrammingError, match="row-level security"):
+        async with _session(application, "acme") as session:
+            await session.execute(updating, {"seq": taken, **_entry(CREATION, tenant="acme")})
+    async with owner.connect() as connection:
+        actors = set(
+            await connection.scalars(
+                text("SELECT actor_id FROM grantr_audit WHERE tenant_id = '~deployment'")
+            )
+        )
+        assert "x" not in actors
+
+
+COLUMNS = ["tenant_id", "event_type", "actor_kind", "actor_workspace", "actor_id", "body"]
+
+
+async def _copy(application: AsyncEngine, records: list[tuple[str, ...]]) -> None:
+    async with _session(application, "acme") as session:
+        raw = (await (await session.connection()).get_raw_connection()).driver_connection
+        assert raw is not None
+        await raw.copy_records_to_table("grantr_audit", records=records, columns=COLUMNS)
+
+
+def _record(entry: dict[str, str]) -> tuple[str, ...]:
+    return ("~deployment", entry["event_type"], "user", "", "root", entry["body"])
+
+
+@pytest.mark.postgres
+async def test_copy_from_is_refused_outright_under_row_level_security(
+    engines: tuple[AsyncEngine, AsyncEngine],
+) -> None:
+    """PostgreSQL does not run ``COPY FROM`` into a table with policies, so it adds nothing."""
+    owner, application = engines
+    with pytest.raises(Exception, match="COPY FROM not supported with row-level security"):
+        await _copy(application, [_record(_entry(CREATION, tenant="acme"))])
+    async with owner.connect() as connection:
+        assert len(list(await connection.execute(DEPLOYMENTS_ENTRIES))) == 3
+
+
+@pytest.mark.postgres
+async def test_the_maker_columns_and_the_events_maker_may_disagree(
+    engines: tuple[AsyncEngine, AsyncEngine],
+) -> None:
+    """The policy pins the type and the tenant, not who made it (ADR-0033)."""
+    owner, application = engines
+    entry = _entry(CREATION, tenant="acme")  # whose body names no maker
+    forged = text(DEPLOYMENT_ENTRY.text.replace("'root'", "'mallory'"))
+    async with _session(application, "acme") as session:
+        await session.execute(forged, entry)
+    async with owner.connect() as connection:
+        makers = set(
+            await connection.scalars(
+                text("SELECT actor_id FROM grantr_audit WHERE tenant_id = '~deployment'")
+            )
+        )
+        assert "mallory" in makers
+
+
+@pytest.mark.postgres
+async def test_a_connection_that_names_no_tenant_adds_no_creation_either(
+    engines: tuple[AsyncEngine, AsyncEngine],
+) -> None:
+    """A pooled connection reads an empty tenant after a transaction, which matches no event's."""
+    _, application = engines
+    async with application.connect() as connection:
+        await connection.execute(text("SELECT set_config('lattice.tenant_id', '', false)"))
+        with pytest.raises(ProgrammingError, match="row-level security"):
+            await connection.execute(DEPLOYMENT_ENTRY, _entry(CREATION, tenant=""))

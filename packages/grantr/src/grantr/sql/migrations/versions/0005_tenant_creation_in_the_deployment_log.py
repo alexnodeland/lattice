@@ -3,7 +3,8 @@
 Creating a tenant is recorded in the deployment's audit log as well as the tenant's, in the same
 transaction, which names the new tenant and so can add only that tenant's rows. One policy lets
 it add one more row, for ``INSERT`` alone: a deployment entry of the type
-``deployment_tenant_created``, whose event names the transaction's own tenant. No other command
+``deployment_tenant_created``, whose event names the transaction's own tenant, if it names
+one. No other command
 and no other deployment entry is allowed, and the deployment's audit rows stay unreadable, so the
 application's role cannot read, change or delete them. PostgreSQL only.
 
@@ -33,6 +34,7 @@ def upgrade() -> None:
     op.execute(
         f"CREATE POLICY {POLICY} ON grantr_audit FOR INSERT WITH CHECK ("
         " tenant_id = '~deployment'"
+        f" AND {CURRENT} <> ''"
         " AND event_type = 'deployment_tenant_created'"
         " AND body #>> '{event,type}' = 'deployment_tenant_created'"
         f" AND body #>> '{{event,tenant}}' = {CURRENT}"

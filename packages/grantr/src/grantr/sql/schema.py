@@ -104,6 +104,7 @@ def row_level_security() -> list[str]:
     statements.append(
         f"CREATE POLICY {TENANT_CREATION_POLICY} ON grantr_audit FOR INSERT WITH CHECK ("
         f" tenant_id = '{DEPLOYMENT}'"
+        f" AND {CURRENT} <> ''"
         " AND event_type = 'deployment_tenant_created'"
         " AND body #>> '{event,type}' = 'deployment_tenant_created'"
         f" AND body #>> '{{event,tenant}}' = {CURRENT}"

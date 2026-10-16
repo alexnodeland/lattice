@@ -87,6 +87,7 @@ def test_the_creation_migration_adds_and_drops_one_insert_only_policy(
         "CREATE POLICY grantr_audit_tenant_creation ON grantr_audit FOR INSERT"
     )
     assert "tenant_id = '~deployment'" in policy
+    assert "current_setting('lattice.tenant_id', true) <> ''" in policy, "a tenant is named"
     assert "event_type = 'deployment_tenant_created'" in policy
     assert "= current_setting('lattice.tenant_id', true)" in policy, "of the transaction's tenant"
     recorder.calls.clear()

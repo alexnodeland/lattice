@@ -519,8 +519,7 @@ class Grants:
             await self._require(tx, None, by, "grantr:create_tenant", DEPLOYMENT)
             if await tx.tenant(tenant):
                 raise Invalid(f"{tenant} exists")
-            created, _ = await self._create(tx, record, tenant, owner, by)
-            return created
+            return (await self._create(tx, record, tenant, owner, by))[0]
 
     async def provision_tenant(
         self, tenant: TenantId, *, owner: UserId, admins: Iterable[UserId] = ()
@@ -885,18 +884,19 @@ class Grants:
         tenant: TenantId,
         owner: UserId,
         by: Subject | None,
-    ) -> tuple[AuditEntry, AuditEntry]:
+    ) -> list[AuditEntry]:
         """Create a tenant whose first owner is a member and its owner.
 
-        It records the creation in the tenant's log and in the deployment's, in the transaction
-        that creates it, so neither exists without the other.
+        It records the creation in the tenant's log and in the deployment's, in the transaction that
+        creates it, so neither exists without the other, and returns the tenant's entry and the
+        deployment's.
         """
         await tx.create_tenant(tenant)
         for role in (MEMBER, "owner"):
             await tx.add_grant(Grant(tenant=tenant, role=role, on=TENANT, to=User(id=owner)))
         created = await record(tenant, by, TenantCreated(owner=owner))
         deployments = await record(None, by, DeploymentTenantCreated(tenant=tenant, owner=owner))
-        return created, deployments
+        return [created, deployments]
 
     async def _is_member(self, reads: Reads, tenant: TenantId, member: Member) -> bool:
         return await reads.has(Grant(tenant=tenant, role=MEMBER, on=TENANT, to=member))

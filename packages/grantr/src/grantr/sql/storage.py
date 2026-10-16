@@ -455,7 +455,7 @@ class _Transaction(_Reads):
         }
         actor_kind, actor_workspace, actor_id = actor_columns(by)
         row = AuditRow(
-            seq=await self._named_seq(_scope(tenant)),
+            seq=await self._next_seq(_scope(tenant)),
             tenant_id=_scope(tenant),
             event_type=event.type,
             actor_kind=actor_kind,
@@ -467,21 +467,42 @@ class _Transaction(_Reads):
         await self._session.flush()
         return AuditEntry(seq=row.seq, at=at, tenant=tenant, by=by, event=event)
 
-    async def _named_seq(self, scope: str) -> int | None:
+    async def _next_seq(self, scope: str) -> int | None:
         """The sequence number of a row of another scope than the transaction's, on PostgreSQL.
 
         A tenant's transaction adds the deployment log's entry of the tenant's creation, which
         its policy lets it insert but not read back. ``INSERT ... RETURNING`` reads the new row
-        through the read policy, so it names the number itself, from the table's own sequence;
-        any other row takes the number the insert returns.
+        through the read policy, so it names the number itself, from the table's own sequence,
+        after taking the deployment log's lock, which every writer of the deployment's entries
+        holds until it commits: the numbers of the deployment's log are taken, and commit, in
+        order. Any other row takes the number the insert returns.
         """
         if scope == self._session.info.get(TENANT_KEY):
             return None
-        if (await self._session.connection()).dialect.name != "postgresql":
+        if not await _serialize_deployment_log(self._session):
             return None
         return await self._session.scalar(
             select(func.nextval(func.pg_get_serial_sequence(AuditRow.__tablename__, "seq")))
         )
+
+
+async def _serialize_deployment_log(session: AsyncSession) -> bool:
+    """Take the lock every writer of the deployment log's entries holds until it commits.
+
+    It is a transaction-scoped advisory lock, which row-level security does not apply to, on the
+    audit table of the current schema. It is always taken after the tenant's row lock, so two
+    transactions never wait on each other's. Returns whether it was taken: only on PostgreSQL.
+    """
+    if (await session.connection()).dialect.name != "postgresql":
+        return False
+    await session.execute(
+        select(
+            func.pg_advisory_xact_lock(
+                func.hashtextextended(func.current_schema() + "." + AuditRow.__tablename__, 0)
+            )
+        )
+    )
+    return True
 
 
 async def _lock(session: AsyncSession, scope: str) -> None:
@@ -544,11 +565,17 @@ class SqlStorage:
     async def transaction(self, tenant: TenantId | None) -> AsyncGenerator[_Transaction]:
         """Begin a change; it holds the tenant's row's lock until it ends.
 
+        A change to the deployment also takes the deployment log's lock, after it, as a tenant's
+        creation does when it adds its entry there: the lock order is always the tenant's, then
+        the log's.
+
         Closing the session rolls back whatever it did not commit, and returns its connection.
         """
         session = self._session(tenant)
         try:
             await to_the_end(_lock(session, _scope(tenant)))
+            if tenant is None:
+                await to_the_end(_serialize_deployment_log(session))
             yield _Transaction(session, self._clock)
             await to_the_end(session.commit())
         finally:

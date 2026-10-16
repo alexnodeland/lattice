@@ -26,6 +26,36 @@ tasks:
       # cache; locally, `moon run artifactr:test --force` runs the PostgreSQL tests past a cached
       # run without them.
 
+  # TLC over the thread claim's TLA+ spec (lattice ADR-0025), at a pull request's bounds. CI's Specs
+  # job runs it in each affected project; it needs Java 11 or later. The inputs are what the spec
+  # models: the runner and its capability, the workspace and its claim, and core's run rules.
+  spec:
+    description: "Model-check the thread claim's TLA+ spec with TLC, at a pull request's bounds"
+    command: >-
+      $workspaceRoot/scripts/tlc $workspaceRoot/docs/artifactr/spec/ThreadClaim.tla
+      ThreadClaim.cfg ThreadClaimLive.cfg
+    inputs:
+      - '/docs/artifactr/spec/**/*'
+      - '/scripts/tlc'
+      - '/scripts/tlc.sha256'
+      - 'src/artifactr/agent/**/*'
+      - 'src/artifactr/workspace/**/*'
+      - 'src/artifactr/core/rules.py'
+
+  # The same at Nightly's deeper bounds, and with claims that lapse under a live holder.
+  spec-deep:
+    description: "Model-check the thread claim's TLA+ spec with TLC, at Nightly's deeper bounds"
+    command: >-
+      $workspaceRoot/scripts/tlc $workspaceRoot/docs/artifactr/spec/ThreadClaim.tla
+      ThreadClaimDeep.cfg ThreadClaimLapse.cfg
+    inputs:
+      - '/docs/artifactr/spec/**/*'
+      - '/scripts/tlc'
+      - '/scripts/tlc.sha256'
+      - 'src/artifactr/agent/**/*'
+      - 'src/artifactr/workspace/**/*'
+      - 'src/artifactr/core/rules.py'
+
   schema:
     description: "Regenerate the protocol JSON Schema, and the REST surface's OpenAPI document"
     script: >-

@@ -3,8 +3,8 @@
 An executor claims a due run under its lease, starts an attempt, runs the action while
 renewing the lease, and records the outcome. Every step that changes the run is one
 transaction, and the outcome is recorded only if the attempt is still the run's current one,
-so an executor that lost its lease, or a run an operator cancelled, cannot overwrite a newer
-state.
+so an executor that lost its lease, or a run an operator cancelled or retried, cannot overwrite
+a newer state.
 """
 
 import asyncio
@@ -196,7 +196,7 @@ class Executor[D]:
             if claimed is None:
                 return False
             run, rule, events = claimed
-            span.set_attribute(a.ATTEMPT, run.attempts)
+            span.set_attributes({a.ATTEMPT: run.attempts, a.EPOCH: run.epoch})
             for envelope in events:
                 linked = parse_traceparent(envelope.traceparent)
                 if linked is not None:

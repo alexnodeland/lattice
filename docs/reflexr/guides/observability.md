@@ -77,9 +77,9 @@ telemetry = configure_telemetry(artifactr.otel.telemetry(), service_name="app")
 | `reflexr.retry_run`, `reflexr.skip_run`, `reflexr.cancel_run` | Someone operates a run | `reflexr.run.id`, `reflexr.rule` |
 | `reflexr.replay_rule` | A rule is replayed | `reflexr.rule` |
 | `reflexr.evaluate` | The reactor evaluates a workspace's new envelopes; a check that finds none records nothing | `reflexr.evaluation.rules` (the rules that evaluated), `reflexr.evaluation.firings` |
-| `invoke_workflow {rule}` | A run attempt | `gen_ai.operation.name`, `gen_ai.workflow.name`, `reflexr.rule`, `reflexr.scope`, `reflexr.run.id`, `reflexr.attempt` |
+| `invoke_workflow {rule}` | A run attempt | `gen_ai.operation.name`, `gen_ai.workflow.name`, `reflexr.rule`, `reflexr.scope`, `reflexr.run.id`, `reflexr.attempt`, `reflexr.attempt.epoch` |
 | `execute_step {node}` | A graph action runs a step | `reflexr.run.id` |
-| `reflexr.checkpoint_run` | A graph run saves its progress after a step | `reflexr.run.id`, `reflexr.attempt` |
+| `reflexr.checkpoint_run` | A graph run saves its progress after a step | `reflexr.run.id`, `reflexr.attempt`, `reflexr.attempt.epoch` |
 | `reflexr.schedule {name}` | A schedule's ticks are due in a workspace | `reflexr.schedule`, `reflexr.event.count` |
 | `reflexr.stream` | A WebSocket connection, for as long as it is open. A server span | `reflexr.stream.close_code` |
 

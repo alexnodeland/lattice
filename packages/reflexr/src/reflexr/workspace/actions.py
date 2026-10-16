@@ -85,11 +85,11 @@ class Reaction[D]:
         The saved state is ``reaction.run.checkpoint`` on the next attempt.
 
         Raises:
-            InvalidState: If this attempt is no longer the run's current one; the action
-                should stop.
+            InvalidState: If this attempt is no longer the run's current one (the run was
+                cancelled or retried, or another executor took it over); the action should stop.
         """
         self.run = await self.workspace.checkpoint_run(
-            self.run.id, epoch=self.run.epoch, step=step, state=state
+            self.run.id, attempt=self.run.attempts, epoch=self.run.epoch, step=step, state=state
         )
         self._emitted = 0  # events after a checkpoint are numbered afresh, in its segment
 

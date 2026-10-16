@@ -22,7 +22,9 @@
 - **The fence is `Run.is_running(epoch)`:** the run is `running`, at that epoch. Since only `start()` makes a run `running`, and it gives each attempt a new epoch, the fence holds for one attempt at a time, and only until the run leaves `running`, whatever sequence of cancels, retries, skips and lapsed leases comes between.
 - **Every write an attempt makes checks it,** in the transaction that makes the write:
   - the executor's completion, which records `run_succeeded`, `run_retrying` or `run_dead_lettered`
-  - `Workspace.checkpoint_run(run_id, *, epoch, step, state)`, which `Reaction.checkpoint` calls with its run's epoch; it took `attempt=` before
+  - `Workspace.checkpoint_run(run_id, *, attempt, epoch, step, state)`, which `Reaction.checkpoint` calls with its run's attempt and epoch; the epoch is the fence, and the attempt names it on the span and in the error
+- **The epoch is on the spans** as `reflexr.attempt.epoch`, beside `reflexr.attempt`, on `invoke_workflow` and `reflexr.checkpoint_run`.
+- **A graph resumed from a checkpoint prefixes its restored node runs' ids with the epoch,** not the attempt number, which a retry repeats.
 - **The lease keeper checks it too.** An attempt whose run is running another attempt is stopped at its next renewal, as a cancelled one is, even if its executor took the lease back.
 - **No column, and no migration.** A run is stored as the JSON of its model ([ADR-0030](0030-sql-storage.md)), so the epoch is a field of the body, and a run stored before it reads as epoch 0. Every transaction locks its workspace's row before it reads ([ADR-0030](0030-sql-storage.md)), so comparing the epoch and saving the run in one transaction is as safe as a conditional `UPDATE`.
 
@@ -35,7 +37,7 @@
 | Complexity | Low: a field, one line in `start()`, and one predicate in three places |
 | Retry budget | Unchanged |
 | Storage | No column, no migration |
-| Public API | `Run.epoch` and `Run.is_running`; `checkpoint_run` takes `epoch=` for `attempt=` |
+| Public API | `Run.epoch` and `Run.is_running`; `checkpoint_run` takes `epoch=` beside `attempt=` |
 
 **Pros:** the fence and the budget are separate facts, each with one job; the invariant is one sentence.
 **Cons:** two counters on a run, which a reader must tell apart.
@@ -65,6 +67,7 @@ A row version, as optimistic locking uses.
 
 ### Option E: The fence in the SQL `UPDATE`'s `WHERE`
 
+**Pros:** the database itself refuses a stale write, whatever the code around it does.
 **Cons:** nothing to add: the transaction already holds the workspace's lock when it compares the run, and the in-memory storage, which has no `WHERE`, would need the comparison in Python anyway.
 
 ## Trade-off analysis
@@ -73,12 +76,13 @@ The bug is that one counter served two purposes: a budget that must start over, 
 
 ## Consequences
 
-- Easier: no write of a stale attempt, an outcome or a checkpoint, lands, whatever happened to the run since it started; the run lifecycle's state machine test holds it for random sequences of starts, completions, cancels, retries and skips.
+- Easier: no write of a stale attempt, an outcome or a checkpoint, lands, whatever happened to the run since it started. The run lifecycle's state machine test holds the pure part for random sequences of starts, completions, cancels, retries and skips: the epoch's bookkeeping, and that `is_running` passes only the current attempt. Example tests, on every storage, hold the executor's completion, its lease keeper and `checkpoint_run` to it.
 - Easier: an attempt that lost its run to a newer attempt stops its action within a third of the lease's time to live, rather than running to its end.
-- Harder: `Workspace.checkpoint_run` takes `epoch=` where it took `attempt=`. Only `Reaction.checkpoint` calls it in the packages; reflexr has no release yet, so nothing published breaks.
-- Harder: a deployment must not run reactors from before and after this change at once. An older reactor refuses a run with an epoch, as its model forbids unknown fields, and fences on `attempts` still. A run that was `running` across the upgrade has epoch 0, and its next attempt epoch 1, so an attempt from before the upgrade is fenced out once its run starts again.
+- Harder: `Workspace.checkpoint_run` requires `epoch=` beside `attempt=`. Only `Reaction.checkpoint` calls it in the packages; reflexr has no release yet, so nothing published breaks.
+- Harder: reactors from before and after this change must never run side by side, and rolling back is unsafe once the new code has saved runs. `Run` forbids unknown fields, and every body the new code saves carries `epoch`, so an older reactor refuses every run saved after the upgrade: rolled back, it breaks on those workspaces' runs. The model stays strict; loosening it would hide fields that matter, as this one does.
+- The epoch counts starts since it existed: a run stored before it reads as 0, so its epoch undercounts its starts. That is harmless, as it is only a fence: a run `running` across the upgrade has epoch 0, its next start gives it 1, and an attempt from before the upgrade is fenced out once the run starts again.
 
 ## Action items
 
 1. [x] `Run.epoch`, `Run.is_running`, and the fence in the executor's completion, its lease keeper and `checkpoint_run` ([lattice #245](https://github.com/alexnodeland/lattice/issues/245)).
-2. [x] The run lifecycle's state machine completes stale attempts at random, and checks that only the current one may record.
+2. [x] The run lifecycle's state machine completes stale attempts at random, and checks that `is_running` passes only the current one.

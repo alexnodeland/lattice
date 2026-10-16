@@ -625,6 +625,7 @@ async def test_attempts_are_traced_and_linked_to_their_causes(
         2,
         deploy.id,
     )
+    assert attributes[a.EPOCH] == done.epoch == 2
     cause = parse_traceparent(deploy.traceparent)
     assert cause is not None
     assert [link.context for link in succeeded.links] == [cause]
@@ -702,10 +703,10 @@ async def test_a_stale_attempt_cannot_checkpoint(build: Build, storage: Storage)
     await workspace.publish(Deploy(service="auth"))
     await reactor(workspaces, Deps()).evaluate()
     [pending] = await workspace.runs()
-    with pytest.raises(InvalidState, match=f"the attempt of run {pending.id} is no longer current"):
-        await workspace.checkpoint_run(pending.id, epoch=1, step="s", state=None)
+    with pytest.raises(InvalidState, match=f"attempt 1 of run {pending.id} is no longer current"):
+        await workspace.checkpoint_run(pending.id, attempt=1, epoch=1, step="s", state=None)
     with pytest.raises(NotFound, match="run nope"):
-        await workspace.checkpoint_run("nope", epoch=1, step="s", state=None)
+        await workspace.checkpoint_run("nope", attempt=1, epoch=1, step="s", state=None)
 
 
 async def test_a_cancelled_and_retried_attempt_cannot_checkpoint(
@@ -723,8 +724,12 @@ async def test_a_cancelled_and_retried_attempt_cannot_checkpoint(
         await transaction.save_runs([newer])
     assert (first.attempts, newer.attempts) == (1, 1)
     with pytest.raises(InvalidState, match="no longer current"):
-        await workspace.checkpoint_run(pending.id, epoch=first.epoch, step="s", state=None)
-    saved = await workspace.checkpoint_run(pending.id, epoch=newer.epoch, step="s", state=None)
+        await workspace.checkpoint_run(
+            pending.id, attempt=1, epoch=first.epoch, step="s", state=None
+        )
+    saved = await workspace.checkpoint_run(
+        pending.id, attempt=1, epoch=newer.epoch, step="s", state=None
+    )
     assert saved.step == "s"
 
 

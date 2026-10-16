@@ -85,3 +85,7 @@ Restarting abandoned attempts without counting them was rejected: an action that
 3. [x] Due runs that can start, and a `settle()` that waits out contention ([#57](https://github.com/alexnodeland/reflexr/issues/57)).
 4. [x] A graceful stop for `serve()` ([#63](https://github.com/alexnodeland/reflexr/issues/63)).
 5. [x] `OpenTransactions` removed, since storage is cancel-safe ([ADR-0042](0042-cancel-safe-storage.md)).
+
+## Amendment (2026-10-16): an epoch fences each attempt
+
+[ADR-0066](0066-an-epoch-fences-each-attempt.md) replaces the attempt in "A stale attempt is discarded" and in the "Stale completions" table's chosen option. `attempts` is not a fence: a retry of a finished run sets it back to 0, so a cancelled and retried run's first attempt could record over the newer first attempt ([lattice #245](https://github.com/alexnodeland/lattice/issues/245)). An attempt's outcome and checkpoints are recorded only if the run is still `running` at the attempt's `epoch`, which every start adds one to and nothing sets back, and the lease keeper stops an attempt whose run is running another one.

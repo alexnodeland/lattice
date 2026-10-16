@@ -98,10 +98,11 @@ class Run(BaseModel):
     """The trace id of each attempt, so feedback on the run can be attached to its traces."""
 
     epoch: int = 0
-    """How many attempts the run has started, retries included: the fence of its current one.
+    """The fence of the run's current attempt: one more at every start, retries included.
 
     Unlike ``attempts``, which a retry sets back to 0 for a fresh budget, it never goes back, so
-    no two attempts of a run share it.
+    no two attempts of a run share it. It is only a fence, not a count: it counts the starts
+    since this field existed, and a run stored before it began at 0.
     """
 
     def is_running(self, epoch: int) -> bool:

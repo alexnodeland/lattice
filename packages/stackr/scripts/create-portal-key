@@ -42,10 +42,9 @@ def provision(gateway: Gateway, say: Callable[[str], None]) -> str | None:
         gateway.call("GET", f"/user/info?user_id={USER}")
         say(f"create-portal-key: user {USER} exists; kept as it is")
     except urllib.error.HTTPError as error:
+        message = error_message(error)
         if error.code not in {400, 404}:
-            raise SystemExit(
-                f"create-portal-key: reading user {USER}: {error_message(error)}"
-            ) from error
+            raise SystemExit(f"create-portal-key: reading user {USER}: {message}") from error
         try:
             gateway.call(
                 "POST",

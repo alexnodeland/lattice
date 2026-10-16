@@ -48,8 +48,9 @@ class Gateway:
 
 
 def error_message(error: urllib.error.HTTPError) -> str:
-    """The proxy's error message, for an HTTP error."""
-    try:
-        return str(json.loads(error.read())["error"]["message"])
-    except (ValueError, KeyError, TypeError):
-        return f"HTTP {error.code}"
+    """The proxy's error message, for an HTTP error (which it closes)."""
+    with error:
+        try:
+            return str(json.loads(error.read())["error"]["message"])
+        except (ValueError, KeyError, TypeError):
+            return f"HTTP {error.code}"

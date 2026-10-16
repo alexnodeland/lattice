@@ -22,7 +22,7 @@ An application mounts `portalr_router(resolve_actor=, grants=, readers=, invite=
 | `/portalr/app/`, `/portalr/admin/` | The built UIs: hashed assets cached for good, the index for every client-side route, a strict Content-Security-Policy | Nothing |
 | `GET /portalr/config.json` | Supabase's URL and publishable key, the surfaces' paths, and which tools are configured | Nothing |
 | `GET /portalr/v1/traces`, `/traces/{id}` | The tenant's traces, a session's or a run's, and one trace's spans, each once, with only the attributes known to be safe: the rest are named, and given for one span with `content=true&span=`, not kept ([ADR-0030](adr/0030-traces-and-the-trace-view.md)) | `portalr:read_telemetry` |
-| `GET /portalr/v1/logs` | The tenant's logs, a thread's or a run's, from Loki | `portalr:read_telemetry` |
+| `GET /portalr/v1/logs`, `/logs/{record_id}` | The tenant's newest logs in a window of at most 24 hours, a thread's or a run's, without their lines and with only the labels known to be safe; one record's line, `no-store`, when asked for ([ADR-0031](adr/0031-logs-and-health.md)) | `portalr:read_telemetry` |
 | `GET /portalr/v1/metrics` | `turn_latency`, or `failed_turns` counted over each step, over time, from Prometheus through prom-label-proxy | `portalr:read_telemetry` |
 | `GET /portalr/v1/scores` | The tenant's feedback and evaluation scores, newest first, each with its trace's workspace, from Langfuse, and whether they are all there were (ADR-0027) | `portalr:read_telemetry` |
 | `GET /portalr/v1/feedback` | The tenant's feedback and evaluations in a window of at most 91 days, or one workspace's, summed by day in UTC from its scores, within the read's bounds ([ADR-0027](adr/0027-feedback-and-evaluations.md)) | `portalr:read_telemetry` |
@@ -113,6 +113,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `/t/$tenant/audit` | Audit: grantr's log for the tenant, the newest on top, a sentence per change with who made it and when, filtered by type and maker in the address ([ADR-0026](adr/0026-audit.md)) |
 | `/t/$tenant/feedback` | Feedback: people's thumbs per day, each evaluation's mean per day, each workspace's share and thumbs, and what people said, from portalr's summary, in a window and a workspace the address keeps ([ADR-0027](adr/0027-feedback-and-evaluations.md)) |
 | `/t/$tenant/traces`, `/traces/$trace` | Traces: the tenant's newest traces in a window, or a thread's or a run's, and a trace's spans as a tree and a waterfall, with what a span withheld read for that span when asked, from Tempo ([ADR-0030](adr/0030-traces-and-the-trace-view.md)) |
+| `/t/$tenant/logs` | Logs: the newest records in a window, or a thread's or a run's, with a line read for one record when asked, and Health: a turn's latency and failed turns over time, at a step it says ([ADR-0031](adr/0031-logs-and-health.md)) |
 | `/t/$tenant/usage` | Usage: the spend per day, each day against its share of the budget where there is one, and each workspace's part, from portalr's usage read, in a window the address keeps ([ADR-0028](adr/0028-usage-and-spend.md)) |
 | `/deployment` | Every tenant, for operators, with the deployment's areas alone |
 | `/deployment/` | Home: the tenants, and their spend |
@@ -144,6 +145,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `SignIn`, `Account` | Signing in, and the account menu over a session, for both UIs |
 | `BarChart`, `LineChart`, `DonutChart` | Tremor's charts, adapted, on Recharts: the inks as marks, a pattern and a label per series, and the figures as a table ([ADR-0027](adr/0027-feedback-and-evaluations.md)) |
 | `TraceView` | A trace's spans as an ARIA tree with a waterfall, virtualized, and the chosen span's details; what a span withheld is shown when asked for ([ADR-0030](adr/0030-traces-and-the-trace-view.md)) |
+| `LogList`, `AnsiText` | Log records as a virtualized ARIA listbox with the chosen record's details; a line in the eight palette colours and bold, with every other escape stripped ([ADR-0031](adr/0031-logs-and-health.md)) |
 | `Tracker` | Tremor's tracker, adapted: a block per day, each in its level's mark, a pattern past the second, the levels in a legend, and the figures as a table ([ADR-0028](adr/0028-usage-and-spend.md)) |
 | `Moment` | A time in the reader's zone, and how long ago on hover ([ADR-0026](adr/0026-audit.md)) |
 | `Dialog` | A dialog over the page, opened by its caller, with where focus starts and where it returns ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |

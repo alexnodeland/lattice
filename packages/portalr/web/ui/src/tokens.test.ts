@@ -41,6 +41,17 @@ test("the focus ring is violet in this scheme", () => {
   expect(violet).toBeLessThanOrEqual(285);
 });
 
+test("a log line's eight colours read as text on the paper and the surface, in each scheme", () => {
+  for (const colour of Array.from({ length: 8 }, (_, at) => `ansi-${at}`)) {
+    for (const surface of ["paper", "surface"]) {
+      expect(
+        contrast(token(colour), token(surface)),
+        `${colour} on ${surface}`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  }
+});
+
 test("a surface is raised: lighter than the paper, in both schemes", () => {
   expect(luminance(token("surface"))).toBeGreaterThan(luminance(token("paper")));
 });

@@ -31,6 +31,17 @@ def quoted(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
+EPOCH: Final = datetime(1970, 1, 1, tzinfo=UTC)
+
+
+def nanoseconds(at: datetime) -> int:
+    """A moment as nanoseconds since the epoch, in whole numbers: no float to lose a few."""
+    return (at - EPOCH) // timedelta(microseconds=1) * 1000
+
+
+LATEST: Final = datetime(2200, 1, 1, tzinfo=UTC)
+"""The latest a span may end: well within the nanoseconds a signed 64-bit number holds (to 2262)."""
+
 EARLIEST: Final = datetime(2000, 1, 1, tzinfo=UTC)
 """The earliest a span may start: before anything the libraries record, and late enough that a
 reader may look back from it."""
@@ -50,6 +61,8 @@ class Span(BaseModel):
             raise ValueError(f"a span starts in {EARLIEST.year} or later")
         if self.end <= self.start:
             raise ValueError("a span ends after it starts")
+        if self.end > LATEST:
+            raise ValueError(f"a span ends in {LATEST.year - 1} or earlier")
         return self
 
 

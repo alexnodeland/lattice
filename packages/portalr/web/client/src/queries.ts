@@ -114,6 +114,11 @@ export const keys = {
       [...keys.portalr.tenant(tenant), "usage", window, workspaces] as const,
     traces: (tenant: string, window: TimeSpan, filter: TraceFilter) =>
       [...keys.portalr.tenant(tenant), "traces", "list", window, filter] as const,
+    logs: (tenant: string, window: TimeSpan, filter: LogFilter) =>
+      [...keys.portalr.tenant(tenant), "logs", "list", window, filter] as const,
+    /** A log record's line, which is asked for, one record at a time. */
+    logLine: (tenant: string, id: string) =>
+      [...keys.portalr.tenant(tenant), "logs", "line", id] as const,
     /** A trace, and, apart, the same with one span's withheld attributes, which are asked for. */
     trace: (tenant: string, trace: string, span: string | null) =>
       [...keys.portalr.tenant(tenant), "traces", "detail", trace, span] as const,
@@ -184,6 +189,15 @@ export interface TraceFilter {
   readonly session?: string | undefined;
   readonly run?: string | undefined;
 }
+
+/** What narrows a tenant's logs: a thread's, or a run's. */
+export interface LogFilter {
+  readonly thread?: string | undefined;
+  readonly run?: string | undefined;
+}
+
+/** The most log records one read asks for. */
+export const LOGS_LIMIT = 1000;
 
 /** The most traces one read asks for. */
 export const TRACES_LIMIT = 100;
@@ -557,6 +571,50 @@ export function createQueries(api: Api) {
               }),
             ),
           staleTime: 30_000,
+        }),
+      /**
+       * The tenant's newest log records in a window of a day at most, up to `LOGS_LIMIT`, those
+       * of a thread or a run if the filter names one, from Loki, without their lines
+       * (portalr ADR-0031).
+       */
+      logs: (tenant: string, window: TimeSpan, filter: LogFilter = {}) =>
+        queryOptions({
+          queryKey: keys.portalr.logs(tenant, window, filter),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/logs", {
+                ...named(tenant),
+                params: {
+                  query: {
+                    start: window.start,
+                    end: window.end,
+                    limit: LOGS_LIMIT,
+                    ...(filter.thread && { thread: filter.thread }),
+                    ...(filter.run && { run: filter.run }),
+                  },
+                },
+              }),
+            ),
+          staleTime: 30_000,
+        }),
+      /**
+       * One log record by its id, with its line: asked for, read once, and let go: it isn't kept,
+       * nor read again as the window regains focus, nor tried again if refused.
+       */
+      logLine: (tenant: string, id: string) =>
+        queryOptions({
+          queryKey: keys.portalr.logLine(tenant, id),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/logs/{record_id}", {
+                ...named(tenant),
+                params: { path: { record_id: id } },
+              }),
+            ),
+          staleTime: 0,
+          gcTime: 0,
+          retry: false,
+          refetchOnWindowFocus: false,
         }),
       /**
        * A trace by its id, whole however it is written: null if it isn't the tenant's, or isn't

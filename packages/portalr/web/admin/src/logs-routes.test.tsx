@@ -185,7 +185,10 @@ test("other filters are another page: nothing asked carries over", async () => {
 
 test("a window and a run go to portalr and into the address, and clearing puts them back", async () => {
   const { screen, router } = await open("/t/acme/logs");
-  await screen.getByRole("combobox", { name: "Window" }).selectOptions("The last 6 hours");
+  await screen
+    .getByRole("radiogroup", { name: "Window" })
+    .getByRole("radio", { name: "6 hours" })
+    .click();
   await screen.getByRole("textbox", { name: "Run" }).fill("run_9");
   await screen.getByRole("button", { name: "Apply" }).click();
   await expect.poll(() => router.state.location.search).toMatchObject({ hours: 6, run: "run_9" });
@@ -205,10 +208,16 @@ test("a window and a run go to portalr and into the address, and clearing puts t
 
 test("the health window changes the charts' step, which is said", async () => {
   const { screen, router } = await open("/t/acme/logs");
-  await screen.getByRole("combobox", { name: "Health window" }).selectOptions("The last 24 hours");
+  await screen
+    .getByRole("radiogroup", { name: "Health window" })
+    .getByRole("radio", { name: "24 hours" })
+    .click();
   await expect.poll(() => router.state.location.search).toMatchObject({ health: 24 });
   await expect.element(screen.getByText(/Each point is 15 minutes\./)).toBeVisible();
-  await screen.getByRole("combobox", { name: "Health window" }).selectOptions("The last 7 days");
+  await screen
+    .getByRole("radiogroup", { name: "Health window" })
+    .getByRole("radio", { name: "7 days" })
+    .click();
   await expect.element(screen.getByText(/Each point is 2 hours\./)).toBeVisible();
   expect(reads.findLast((read) => read.path === "/portalr/v1/metrics")?.query.get("step")).toBe(
     "7200",

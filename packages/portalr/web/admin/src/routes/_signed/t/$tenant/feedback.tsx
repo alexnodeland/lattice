@@ -1,5 +1,6 @@
 import type { PortalrApi } from "@portalr/client";
 import {
+  Alert,
   BarChart,
   DonutChart,
   EmptyState,
@@ -9,6 +10,7 @@ import {
   MAX_SERIES,
   Moment,
   PageHeader,
+  SegmentedFilter,
   SelectField,
   StatusBadge,
   TextLink,
@@ -108,7 +110,7 @@ function Feedback() {
       <>
         {HEADER}
         <EmptyState title="Langfuse isn't answering">
-          <p role="alert">{reading.reason}</p>
+          <Alert tone="error">{reading.reason}</Alert>
         </EmptyState>
       </>
     );
@@ -119,13 +121,15 @@ function Feedback() {
       {HEADER}
       <Filter tenant={tenant} shown={shown} />
       {!summary.complete && (
-        <p role="status" className="flex flex-wrap items-center gap-2 text-muted text-sm">
-          <StatusBadge tone="stopped">Partial</StatusBadge>
-          The read stopped at one of its bounds: some days, scores and comments may be missing. A
-          shorter window, or one workspace, may read them all.
+        <Alert tone="warn">
+          <StatusBadge tone="stopped" className="mr-2">
+            Partial
+          </StatusBadge>
+          Some days, scores and comments may be missing. A shorter window, or one workspace, may
+          read them all.
           {unknownDays(summary) > 0 &&
             " The shaded days weren't reached: they're unknown, not empty."}
-        </p>
+        </Alert>
       )}
       <Charts summary={summary} everywhere={workspace === undefined} />
       <Comments comments={summary.comments} />
@@ -307,19 +311,18 @@ function Filter({ tenant, shown }: { tenant: string; shown: Required<Shown> }) {
   ];
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <SelectField
+      <SegmentedFilter
         label="Window"
+        showLabel
+        hint="Whole days, in UTC."
+        segments={WINDOWS.map((days) => ({ value: String(days), label: `${days} days` }))}
         value={String(shown.days)}
-        onChange={(event) => go({ days: event.target.value })}
-        options={WINDOWS.map((days) => ({
-          value: String(days),
-          label: `The last ${days} days, in UTC`,
-        }))}
+        onValueChange={(days) => go({ days })}
       />
       <SelectField
         label="Workspace"
         value={shown.workspace ?? ""}
-        onChange={(event) => go({ workspace: event.target.value })}
+        onValueChange={(workspace) => go({ workspace })}
         options={[
           { value: "", label: "Every workspace" },
           ...offered.sort().map((one) => ({ value: one, label: one })),

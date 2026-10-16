@@ -1,5 +1,6 @@
 import type { PortalrApi } from "@portalr/client";
 import {
+  Alert,
   BarChart,
   DonutChart,
   EmptyState,
@@ -7,7 +8,7 @@ import {
   ItemTable,
   Num,
   PageHeader,
-  SelectField,
+  SegmentedFilter,
   StatusBadge,
   Tracker,
 } from "@portalr/ui";
@@ -103,7 +104,7 @@ function UsagePage() {
       <>
         {HEADER}
         <EmptyState title="LiteLLM isn't answering">
-          <p role="alert">{reading.reason}</p>
+          <Alert tone="error">{reading.reason}</Alert>
         </EmptyState>
       </>
     );
@@ -114,12 +115,14 @@ function UsagePage() {
       {HEADER}
       <Filter shown={shown} />
       {!usage.complete && (
-        <p role="status" className="flex flex-wrap items-center gap-2 text-muted text-sm">
-          <StatusBadge tone="stopped">Partial</StatusBadge>
-          The read stopped at one of its bounds. The days it didn't reach, and the last it read,
-          which may be part-read, are left out, not shown as nothing spent, and the sums are of what
-          it read. A shorter window may read it all.
-        </p>
+        <Alert tone="warn">
+          <StatusBadge tone="stopped" className="mr-2">
+            Partial
+          </StatusBadge>
+          The read stopped short, so the days it didn't reach, and the last it read, which may be
+          part-read, are left out, not shown as nothing spent, and the sums are of what it read. A
+          shorter window may read it all.
+        </Alert>
       )}
       <Spent usage={usage} />
       <Workspaces
@@ -204,16 +207,13 @@ function Workspaces({ usage, listed, more }: { usage: Usage; listed: boolean; mo
 function Filter({ shown }: { shown: Required<Shown> }) {
   const navigate = Route.useNavigate();
   return (
-    <div className="sm:max-w-xs">
-      <SelectField
-        label="Window"
-        value={String(shown.days)}
-        onChange={(event) => void navigate({ search: shownOf({ days: event.target.value }) })}
-        options={WINDOWS.map((days) => ({
-          value: String(days),
-          label: `The last ${days} days, in UTC`,
-        }))}
-      />
-    </div>
+    <SegmentedFilter
+      label="Window"
+      showLabel
+      hint="Whole days, in UTC."
+      segments={WINDOWS.map((days) => ({ value: String(days), label: `${days} days` }))}
+      value={String(shown.days)}
+      onValueChange={(days) => void navigate({ search: shownOf({ days }) })}
+    />
   );
 }

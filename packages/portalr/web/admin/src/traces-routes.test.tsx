@@ -136,7 +136,7 @@ test("the newest traces are listed, each a link to its own page", async () => {
 
 test("a window, a thread and a run go to portalr and into the address", async () => {
   const { screen, router } = await open("/t/acme/traces");
-  await screen.getByRole("combobox", { name: "Window" }).selectOptions("The last 24 hours");
+  await screen.getByRole("radio", { name: "24 hours" }).click();
   await screen.getByRole("textbox", { name: "Thread" }).fill("thr_1");
   await screen.getByRole("textbox", { name: "Run" }).fill("run_9");
   await screen.getByRole("button", { name: "Apply" }).click();

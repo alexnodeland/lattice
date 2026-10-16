@@ -1,4 +1,4 @@
-import { failureSaid, Plain, TextLink } from "@portalr/ui";
+import { Alert, failureSaid, Plain, TextLink } from "@portalr/ui";
 import {
   createRootRouteWithContext,
   type ErrorComponentProps,
@@ -24,7 +24,7 @@ export const Route = createRootRouteWithContext<Context>()({
 function Failed({ error }: ErrorComponentProps) {
   return (
     <Plain ui="admin" home={<Link to="/" />} title="Something went wrong">
-      <p role="alert">{failureSaid(error)}</p>
+      <Alert tone="error">{failureSaid(error)}</Alert>
     </Plain>
   );
 }

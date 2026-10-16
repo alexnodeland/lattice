@@ -12,9 +12,11 @@
 import type { LogRecord } from "@portalr/client";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
+import { Alert } from "./alert";
 import { AnsiText } from "./ansi";
 import { Button } from "./button";
 import { cn } from "./cn";
+import { Reading } from "./skeleton";
 import { StatusBadge, type Tone } from "./status-badge";
 import type { Standing } from "./trace-view";
 
@@ -127,10 +129,10 @@ export function LogList({
           {records.length} {records.length === 1 ? "record" : "records"}, newest first
         </h3>
         {!complete && (
-          <p role="status" className="text-muted text-sm">
+          <Alert tone="warn">
             These are the newest: there may be more. A shorter window, or a thread or a run, finds
             the rest.
-          </p>
+          </Alert>
         )}
         <div
           ref={scroller}
@@ -175,7 +177,7 @@ export function LogList({
                   onFocus={() => setChosen(record.id)}
                   style={{ height: ROW, transform: `translateY(${item.start}px)` }}
                   className={cn(
-                    "absolute inset-x-0 top-0 flex cursor-default flex-col justify-center gap-0.5 border-line border-b px-3 text-sm outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-focus",
+                    "absolute inset-x-0 top-0 flex cursor-default flex-col justify-center gap-0.5 border-line border-b px-3 text-(length:--table-text) outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-focus",
                     on ? "bg-wash" : "hover:bg-wash/60",
                   )}
                 >
@@ -282,17 +284,9 @@ function LineNow({ record, reveal }: { record: LogRecord; reveal: LineReveal }) 
         </>
       );
     case "reading":
-      return (
-        <p role="status" className="text-muted text-sm">
-          Reading…
-        </p>
-      );
+      return <Reading>Reading…</Reading>;
     case "failed":
-      return (
-        <p role="alert" className="text-sm">
-          The line couldn't be read.
-        </p>
-      );
+      return <Alert tone="error">The line couldn't be read.</Alert>;
     case "read": {
       const line = reveal.line(record.id);
       return line === null ? (

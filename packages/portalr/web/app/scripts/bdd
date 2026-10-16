@@ -6,10 +6,13 @@
 #
 # Usage, from the app's directory, as its `bdd` task, after the UIs are built: scripts/bdd
 set -euo pipefail
+root=$(cd ../../../.. && pwd)
+# shellcheck source=../../../../../scripts/compose-project.sh
+source "$root/scripts/compose-project.sh"
 # The project's name is this run's own, so concurrent runs, such as ones in other worktrees, don't
 # share a stack, and the only thing removed is what this run started: its containers, volumes and
 # the image it built.
-project=portalr-bdd-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')
+project=$(unique_project portalr-bdd)
 export COMPOSE_FILE=../../compose.yaml COMPOSE_PROFILES=app,bdd COMPOSE_PROJECT_NAME=$project
 
 stop() {

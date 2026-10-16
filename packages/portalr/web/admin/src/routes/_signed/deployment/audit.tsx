@@ -1,4 +1,4 @@
-import { Button, ItemTable, Moment, PageHeader } from "@portalr/ui";
+import { Alert, Button, ItemTable, Moment, PageHeader } from "@portalr/ui";
 import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 import { actor, said } from "../../../audit";
@@ -59,10 +59,10 @@ function Audit() {
         {entries.length === 1 ? "1 change shown" : `${entries.length} changes shown`}
       </p>
       {isFetchNextPageError && (
-        <p role="alert">
+        <Alert tone="error">
           The changes before these couldn't be read:{" "}
           {error instanceof Error ? error.message : String(error)}
-        </p>
+        </Alert>
       )}
       {hasNextPage && (
         <Button

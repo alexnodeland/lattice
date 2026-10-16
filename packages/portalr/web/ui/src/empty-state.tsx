@@ -17,11 +17,11 @@ export function EmptyState({
   return (
     <section
       aria-labelledby={heading}
-      className="flex max-w-xl flex-col items-start gap-3 rounded-lg border border-line bg-surface p-8"
+      className="flex max-w-xl flex-col items-start gap-2 rounded-lg border border-line bg-surface p-6 shadow-raised"
     >
       <SectionTitle id={heading}>{title}</SectionTitle>
-      <div className="text-base text-muted">{children}</div>
-      {action}
+      <div className="text-muted text-sm">{children}</div>
+      {action && <div className="pt-1">{action}</div>}
     </section>
   );
 }

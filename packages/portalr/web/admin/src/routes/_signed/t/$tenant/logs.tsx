@@ -1,5 +1,6 @@
 import { type createQueries, LOGS_LIMIT, type PortalrApi, type TimeSpan } from "@portalr/client";
 import {
+  Alert,
   Button,
   Card,
   EmptyState,
@@ -7,7 +8,7 @@ import {
   LogList,
   PageHeader,
   SectionTitle,
-  SelectField,
+  SegmentedFilter,
   TextField,
 } from "@portalr/ui";
 import { useQueries, useSuspenseQueries } from "@tanstack/react-query";
@@ -177,7 +178,7 @@ function Records({
     case "unavailable":
       return (
         <EmptyState title="Loki isn't answering">
-          <p role="alert">{reading.reason}</p>
+          <Alert tone="error">{reading.reason}</Alert>
         </EmptyState>
       );
     case "ok":
@@ -197,6 +198,7 @@ function Records({
 function Filter({ shown }: { shown: Required<Shown> }) {
   const navigate = Route.useNavigate();
   const heading = useId();
+  const [hours, setHours] = useState(String(shown.hours));
   function apply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = Object.fromEntries(new FormData(event.currentTarget));
@@ -206,11 +208,13 @@ function Filter({ shown }: { shown: Required<Shown> }) {
     <Card render={<section aria-labelledby={heading} />} className="flex flex-col gap-3">
       <SectionTitle id={heading}>Find</SectionTitle>
       <form className="grid gap-3 sm:grid-cols-3" onSubmit={apply}>
-        <SelectField
+        <SegmentedFilter
           label="Window"
+          showLabel
           name="hours"
-          defaultValue={String(shown.hours)}
-          options={LOG_RANGES.map((range) => ({ value: String(range.hours), label: range.label }))}
+          segments={LOG_RANGES.map((range) => ({ value: String(range.hours), label: range.label }))}
+          value={hours}
+          onValueChange={setHours}
         />
         <TextField
           label="Thread"

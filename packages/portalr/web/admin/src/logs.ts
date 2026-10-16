@@ -9,16 +9,16 @@ import { windowOf } from "./traces";
 
 /** The windows Logs offers, in hours, the first its default: a day at most, as portalr takes. */
 export const LOG_RANGES = [
-  { hours: 1, label: "The last hour" },
-  { hours: 6, label: "The last 6 hours" },
-  { hours: 24, label: "The last 24 hours" },
+  { hours: 1, label: "1 hour" },
+  { hours: 6, label: "6 hours" },
+  { hours: 24, label: "24 hours" },
 ] as const;
 
 /** The windows Health offers, in hours, the first its default. */
 export const HEALTH_RANGES = [
-  { hours: 1, label: "The last hour" },
-  { hours: 24, label: "The last 24 hours" },
-  { hours: 168, label: "The last 7 days" },
+  { hours: 1, label: "1 hour" },
+  { hours: 24, label: "24 hours" },
+  { hours: 168, label: "7 days" },
 ] as const;
 
 export type LogHours = (typeof LOG_RANGES)[number]["hours"];

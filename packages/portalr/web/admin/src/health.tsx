@@ -1,11 +1,12 @@
 import type { PortalrApi, TimeSpan } from "@portalr/client";
 import {
+  Alert,
   BarChart,
   EmptyState,
   formatMoment,
   LineChart,
   SectionTitle,
-  SelectField,
+  SegmentedFilter,
 } from "@portalr/ui";
 import type { ReactNode } from "react";
 import { figure } from "./format";
@@ -41,7 +42,7 @@ function Drawn({
     case "unavailable":
       return (
         <EmptyState title="Prometheus isn't answering">
-          <p role="alert">{reading.reason}</p>
+          <Alert tone="error">{reading.reason}</Alert>
         </EmptyState>
       );
     case "ok":
@@ -77,17 +78,17 @@ export function Health({
   return (
     <section aria-labelledby="health" className="flex flex-col gap-4">
       <SectionTitle id="health">Health</SectionTitle>
-      <div className="sm:max-w-xs">
-        <SelectField
-          label="Health window"
-          value={String(hours)}
-          onChange={(event) => onWindow(event.target.value)}
-          options={HEALTH_RANGES.map((range) => ({
-            value: String(range.hours),
-            label: range.label,
-          }))}
-        />
-      </div>
+      <SegmentedFilter
+        label="Health window"
+        showLabel
+        hint="Back from now."
+        segments={HEALTH_RANGES.map((range) => ({
+          value: String(range.hours),
+          label: range.label,
+        }))}
+        value={String(hours)}
+        onValueChange={onWindow}
+      />
       <p className="text-muted text-sm">
         Each point is {stepSaid(step)}. Times are in UTC. A step with no turns is a gap.
       </p>

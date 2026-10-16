@@ -498,6 +498,19 @@ async def test_i4_two_processes_whose_plans_fail_now_and_then_consume_each_messa
     assert sorted(recorder.prompts) == sorted([*(f"m{index}" for index in range(12)), "last"])
 
 
+async def test_i4_a_send_that_fails_before_it_reads_hands_nothing_over(
+    storage: Storage, ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    script = Script(say("ok"))
+    runner = runners(make_agent(script))
+    hold(storage, "save_cursor", raises=RuntimeError("storage is down")).release.set()
+    with pytest.raises(RuntimeError, match="storage is down"):
+        await runner.send(ws, thread.id, "Plan the launch")
+    assert not runner._handovers, "a failure that read nothing hands nothing over"
+    await settled(thread.id, runner)
+    assert not script.requests, "its message waits for the thread's next command, as I4 says"
+
+
 async def test_i4_a_cancelled_error_no_one_asked_for_is_a_failure_and_never_spins(
     storage: Storage,
     ws: Workspace,

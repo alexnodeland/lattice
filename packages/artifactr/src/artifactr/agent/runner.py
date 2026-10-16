@@ -441,18 +441,23 @@ class Runner[AppDepsT]:
         With ``ask``, it first saves that the log up to that ``seq`` asks for a turn. A claimant
         that starts nothing looks again once it has released the thread, since a command it
         refused meanwhile relies on it. Each round starts a turn, finds nothing asked, finds the
-        thread busy, or records what it found as taken, so it ends. One that is cancelled or
-        fails from its ask on hands the thread over as it propagates, as a run does, with what
-        it read: storage may have saved the ask of a call cut short. The turn links to
-        ``caller``, or else to where the message or answer it carries out was committed.
+        thread busy, or records what it found as taken, so it ends. One that is cancelled from
+        its ask on hands the thread over as it propagates, as a run does: storage may have saved
+        the ask of a call cut short. One that fails hands over only once it has read the
+        cursors, with what it read, so a failure that persists never hands over without end. The
+        turn links to ``caller``, or else to where the message or answer it carries out was
+        committed.
         """
-        taken = asked = 0  # what it read of the cursors: nothing yet
+        read: tuple[int, int] | None = None  # the cursors, taken and asked, as it last read them
         try:
             if ask is not None:
                 await workspace.save_cursor(_asked(thread_id), ask)
             while not self._closed:
-                taken = await _taken_seq(workspace, thread_id)
-                asked = await workspace.cursor(_asked(thread_id))
+                read = (
+                    await _taken_seq(workspace, thread_id),
+                    await workspace.cursor(_asked(thread_id)),
+                )
+                taken, asked = read
                 if asked <= taken:
                     return None
                 handle = await self._start(workspace, thread_id, caller)
@@ -466,7 +471,9 @@ class Runner[AppDepsT]:
             claimant = asyncio.current_task()
             assert claimant is not None, "a claimant is a task"
             cancelled = claimant.cancelling() > 0
-            self._hand_over(workspace, thread_id, taken=taken, asked=asked, cancelled=cancelled)
+            if cancelled or read is not None:  # cancelled, it hands over whatever it read
+                taken, asked = read or (0, 0)
+                self._hand_over(workspace, thread_id, taken=taken, asked=asked, cancelled=cancelled)
             raise
         return None
 
@@ -689,9 +696,9 @@ class Runner[AppDepsT]:
         A claimant whose task was cancelled, or a run that was stopped, hands over whatever was
         asked and not taken, since a command it refused may have asked before it read. One that
         failed and took nothing, even with a CancelledError no one asked for, hands over only
-        what was asked after it read, so a failure that persists makes one turn per new command.
-        Neither can spin: only :meth:`aclose` cancels a hand-over, and it closes the runner
-        first.
+        what was asked after it read, so a failure that persists makes one turn per new command;
+        a claimant that failed before it read hands nothing over. Neither can spin: only
+        :meth:`aclose` cancels a hand-over, and it closes the runner first.
         """
         try:
             took = await _taken_seq(workspace, thread_id) > taken

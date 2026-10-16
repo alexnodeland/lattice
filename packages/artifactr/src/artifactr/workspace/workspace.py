@@ -1016,7 +1016,9 @@ class Workspace:
             acquired = await self._storage.acquire_lease(self._scope, key, holder, ttl)
         except BaseException:
             # A call cut short may still have taken the lease (Storage): no task would release it.
-            await self._storage.release_lease(self._scope, key, holder)
+            # A release that fails too leaves it to lapse; the caller hears the first error.
+            with contextlib.suppress(Exception):
+                await self._storage.release_lease(self._scope, key, holder)
             raise
         if not acquired:
             raise ThreadBusy(f"thread {thread_id} is busy with another run")

@@ -595,7 +595,7 @@ class Grants:
         Raises:
             Forbidden: If ``by`` may not (``grantr:remove_member`` on the tenant), or holds less
                 than a role it would revoke.
-            Invalid: If it isn't a member, or is the tenant's last owner.
+            Invalid: If it isn't a member, or is the tenant's last member holding ``owner``.
         """
         async with self._change(tenant) as (tx, record):
             await self._require(tx, tenant, by, "grantr:remove_member", TENANT)
@@ -634,7 +634,8 @@ class Grants:
         Raises:
             Forbidden: If ``by`` may not (``grantr:manage_groups`` on the tenant), or holds less
                 than a role the group is granted.
-            Invalid: If there is no such group, or it holds the tenant's last owner grant.
+            Invalid: If there is no such group, or deleting it would leave the tenant with no
+                member holding ``owner``.
         """
         async with self._change(tenant) as (tx, record):
             await self._require(tx, tenant, by, "grantr:manage_groups", TENANT)
@@ -714,8 +715,8 @@ class Grants:
         Raises:
             Forbidden: If ``by`` may not (``grantr:revoke`` on the resource), or doesn't hold
                 every action the role holds there.
-            Invalid: If there is no such grant, or it is the tenant's last owner. ``member`` is
-                taken by :meth:`remove_member`, and the deployment's roles by
+            Invalid: If there is no such grant, or it leaves no member holding ``owner``.
+                ``member`` is taken by :meth:`remove_member`, and the deployment's roles by
                 :meth:`revoke_operator` and :meth:`bootstrap`.
         """
         grant = self._grant(tenant, role, on, to)
@@ -726,7 +727,8 @@ class Grants:
                 raise Invalid(f"{to} doesn't hold {role} there")
             if to != by:
                 await self._bounded(tx, tenant, by, [grant])
-            await self._keeps_an_owner(tx, tenant, losing=[grant])
+            if (grant.role, grant.on) == ("owner", TENANT):
+                await self._keeps_an_owner(tx, tenant, losing=[grant])
             await tx.remove_grant(grant)
             return await record(tenant, by, Revoked(grant=grant))
 
@@ -959,7 +961,7 @@ class Grants:
                 kept = regrouped[1] if regrouped and regrouped[0] == grant.to else held
             before |= held
             if grant not in lost:
-                after |= kept - frozenset((leaving,))
+                after |= kept if leaving is None else kept - frozenset((leaving,))
         if before and not after:
             owners = ", ".join(sorted(map(str, before)))
             last = "is the last owner" if len(before) == 1 else "are the last owners"

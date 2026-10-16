@@ -370,15 +370,19 @@ Interrupt(p, c) ==
     /\ UNCHANGED <<shared, lease, count, effects, crashes, lapsed, lost, rd, plan, dlv, nxt, snap,
                    askVal, owe>>
 
-\* In _take, from its ask to its claim, a failure or cancellation hands over as it propagates, with
-\* what _take read: nothing, before its reads. Both storages run each call to its end and raise a
-\* cancellation after it, so the ask is saved if the call reached its write, and not if it was
-\* interrupted at the authorization check that Workspace.save_cursor awaits first.
+\* In _take, from its ask to its claim, a cancellation hands over as it propagates, and so does a
+\* failure once _take has read the cursors, with what it read; rd is NoSnap until it has. Both
+\* storages run each call to its end and raise a cancellation after it, so the ask is saved if the
+\* call reached its write, and not if it was interrupted at the authorization check that
+\* Workspace.save_cursor awaits first.
 InterruptTaking(p, c, saved) ==
     /\ pc[p] \in {"asking", "reading"} /\ Cancellable(p, c) /\ Fault(c)
     /\ asked' = IF pc[p] = "asking" /\ saved THEN Max(asked, askVal[p]) ELSE asked
-    /\ snap' = [snap EXCEPT ![p] = [IF pc[p] = "asking" THEN NoSnap ELSE rd[p] EXCEPT !.c = c]]
-    /\ Step(p, "handing") /\ nxt' = [nxt EXCEPT ![p] = "handover"]
+    /\ LET read == IF pc[p] = "asking" THEN NoSnap ELSE rd[p]
+       IN IF c \/ read # NoSnap
+             THEN /\ snap' = [snap EXCEPT ![p] = [read EXCEPT !.c = c]]
+                  /\ Step(p, "handing") /\ nxt' = [nxt EXCEPT ![p] = "handover"]
+             ELSE Step(p, "idle") /\ UNCHANGED <<snap, nxt>>
     /\ UNCHANGED <<log, taken, runs, lease, count, effects, crashes, lapsed, lost, rd, plan, dlv,
                    askVal, owe>>
 

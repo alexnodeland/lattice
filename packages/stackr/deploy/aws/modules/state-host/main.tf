@@ -53,7 +53,7 @@ resource "aws_iam_role_policy" "session_manager" {
   })
 }
 
-# Its two secrets: ClickHouse's passwords, Langfuse's and the admin's.
+# Its three secrets: ClickHouse's passwords, Langfuse's, the admin's and the backup user's.
 resource "aws_iam_role_policy" "secret" {
   role = aws_iam_role.this.id
   policy = jsonencode({
@@ -61,8 +61,47 @@ resource "aws_iam_role_policy" "secret" {
     Statement = [{
       Effect   = "Allow"
       Action   = "secretsmanager:GetSecretValue"
-      Resource = [var.clickhouse_password_secret_arn, var.clickhouse_admin_password_secret_arn]
+      Resource = [var.clickhouse_password_secret_arn, var.clickhouse_admin_password_secret_arn, var.clickhouse_backup_password_secret_arn]
     }]
+  })
+}
+
+# ClickHouse's backups and the restore drill's (ADR-0037), with credentials the host's scripts fetch
+# from IMDS and hand to ClickHouse per run. What holds if the host is compromised:
+# - it can't delete a backup: no DeleteObject but on ClickHouse's own lock files, whose names are
+#   fixed (a timestamp, and the drill's sentinel), and no DeleteObjectVersion at all;
+# - it can overwrite one, but the bucket is versioned and keeps the old version for 7 days (data's
+#   lifecycle rule), so a tampering has a week to be noticed;
+# - it can add objects under the two prefixes, and the drill's check of the latest backup bounds
+#   what a made-up one does (scripts/restore-drill);
+# - it reads only those two prefixes' objects. It lists the whole bucket, since S3 answers a HEAD or
+#   GET for a key that isn't there with 403 unless the caller may list: ClickHouse asks first
+#   whether a backup exists. Nothing else is in the bucket, so that discloses key names of backups.
+# Verified against MinIO enforcing this policy, with BACKUP and RESTORE; the manual apply on AWS
+# checks the same against IAM, missing-key probes included.
+resource "aws_iam_role_policy" "backups" {
+  role = aws_iam_role.this.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:GetObject", "s3:AbortMultipartUpload"]
+        Resource = ["${var.backups_bucket.arn}/clickhouse/*", "${var.backups_bucket.arn}/drill/*"]
+      },
+      {
+        # ClickHouse's lock file, written and removed around each backup: <path>/.lock. "?" is one
+        # character: clickhouse/<UTC time as 2026-10-16T03-00-00Z>/ and drill/drill-<epoch>-<5 digits>/.
+        Effect   = "Allow"
+        Action   = "s3:DeleteObject"
+        Resource = ["${var.backups_bucket.arn}/clickhouse/????-??-??T??-??-??Z/.lock", "${var.backups_bucket.arn}/drill/drill-??????????-?????/.lock"]
+      },
+      {
+        Effect   = "Allow"
+        Action   = "s3:ListBucket"
+        Resource = var.backups_bucket.arn
+      },
+    ]
   })
 }
 
@@ -130,6 +169,8 @@ resource "aws_instance" "this" {
     lattice_commit = var.lattice_commit
     secret_arn     = var.clickhouse_password_secret_arn
     admin_arn      = var.clickhouse_admin_password_secret_arn
+    backup_arn     = var.clickhouse_backup_password_secret_arn
+    backups_bucket = var.backups_bucket.name
     region         = data.aws_region.current.region
     aws_cli_image  = var.aws_cli_image
   })

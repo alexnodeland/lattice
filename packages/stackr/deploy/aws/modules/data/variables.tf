@@ -73,6 +73,22 @@ variable "buckets" {
   default     = ["langfuse", "telemetry", "backups", "access-logs"]
 }
 
+variable "clickhouse_backup_retention_days" {
+  description = <<-EOT
+    How many days the state host's ClickHouse backups (clickhouse/ in the backups bucket) are kept,
+    whole each night (ADR-0037): their size times this is what they cost, and each is kept 7 days
+    more as a noncurrent version once expired. The restore drill's own backups (drill/) are kept 7
+    days. At least 2, so that last night's backup is still there while tonight's is written.
+  EOT
+  type        = number
+  default     = 14
+
+  validation {
+    condition     = var.clickhouse_backup_retention_days == floor(var.clickhouse_backup_retention_days) && var.clickhouse_backup_retention_days >= 2 && var.clickhouse_backup_retention_days <= 365
+    error_message = "ClickHouse's backups are kept a whole number of days, 2 to 365: with fewer, last night's could expire before tonight's is written, and none would be left."
+  }
+}
+
 variable "force_destroy_buckets" {
   description = "Whether a destroy empties the buckets first: only where nothing is kept."
   type        = bool

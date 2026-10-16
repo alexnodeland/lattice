@@ -101,6 +101,21 @@ Given("bob has had a turn fail in acme", async ({ request }) => {
   await posted(request, bearer, thread, "hello");
   await new Promise((resolve) => setTimeout(resolve, 3_000));
   await posted(request, bearer, thread, "fail now");
+  // The turn did fail: the thread's log says its last run ended failed, not that it was only sent.
+  const headers = { Authorization: `Bearer ${bearer}`, "X-Tenant": "acme" };
+  await expect
+    .poll(
+      async () => {
+        const read = await request.get(
+          `${origin()}/artifactr/v1/workspaces/notes/events?thread_id=${thread}&last=50`,
+          { headers },
+        );
+        const events = (await read.json()) as { event?: { type?: string; status?: string } }[];
+        return events.filter((each) => each.event?.type === "run_ended").at(-1)?.event?.status;
+      },
+      { timeout: 20_000, message: "bob's last turn in the thread never ended failed" },
+    )
+    .toBe("failed");
 });
 
 Then("the {string} card eventually counts at least one", async ({ page }, title: string) => {

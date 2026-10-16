@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+# Shared by backup and restore-drill (ADR-0037); sourced, never run. They run on the state host,
+# as systemd's timers start them, and back up ClickHouse, which runs under Compose in the
+# container STATE_CLICKHOUSE_CONTAINER, to the backups bucket.
+#
+# The bucket is the `backups` named collection (clickhouse/backups.xml): its URL alone. The
+# credentials are the instance role's, fetched here and handed to each statement; they never reach
+# a command line (not sed's either: see scrub), a file or the container's environment. ClickHouse
+# 26.9 hides the secret and the session token as [HIDDEN] wherever it records a statement
+# (ADR-0037 lists where it was looked); the access key id, which is no secret, is not hidden.
+# STATE_BACKUP_CREDENTIALS=env takes them from AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and
+# AWS_SESSION_TOKEN instead: tier 2 does, with Floci's static keys.
+# STATE_PROMETHEUS_URL is where the result is reported; STATE_CURL, a prefix for curl, lets tier 2
+# send it from inside the Docker network.
+
+access="" secret="" session="" expires=0
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+container=${STATE_CLICKHOUSE_CONTAINER:-stackr-state-clickhouse-1}
+
+log() { printf '%s\n' "$*" >&2; }
+fail() {
+  log "FAIL: $*"
+  exit 1
+}
+
+# One backup or drill at a time: a manual run can't overlap the timer's, nor the backup the drill
+# (two drills would drop each other's restore_drill). It waits STATE_LOCK_WAIT seconds, an hour by
+# default, for the one holding the lock.
+lock() {
+  if ! command -v flock >/dev/null; then
+    log "warning: no flock here, so a backup and a drill could overlap"
+    return 0
+  fi
+  local wait=${STATE_LOCK_WAIT:-3600}
+  exec 9>"${STATE_LOCK_FILE:-/run/lock/stackr-state-backups.lock}"
+  flock --wait "$wait" 9 || fail "another backup or drill held the lock for $wait seconds"
+}
+
+# Sets the credentials, each checked to be what S3 gives out, since they go into SQL. It fetches
+# them again when fewer than STATE_MIN_CREDENTIAL_SECONDS (30 minutes) remain, which a statement
+# should finish within; if IMDS gives credentials that are about to expire, it waits for them to
+# rotate. Call it before each statement that reaches the bucket. The role's credentials are valid
+# for hours, and a statement that outlasts them fails, as the drill's limits would show.
+credentials() {
+  local floor=${STATE_MIN_CREDENTIAL_SECONDS:-1800} found now
+  now=$(date +%s)
+  if [[ -n $access ]] && { ((expires == 0)) || ((expires - now >= floor)); }; then
+    return 0
+  fi
+  if [[ ${STATE_BACKUP_CREDENTIALS:-imds} == env ]]; then
+    access=${AWS_ACCESS_KEY_ID:?STATE_BACKUP_CREDENTIALS=env needs AWS_ACCESS_KEY_ID}
+    secret=${AWS_SECRET_ACCESS_KEY:?STATE_BACKUP_CREDENTIALS=env needs AWS_SECRET_ACCESS_KEY}
+    session=${AWS_SESSION_TOKEN:-}
+    expires=${STATE_CREDENTIALS_EXPIRE:-0}
+  else
+    local attempt
+    for attempt in 1 2; do
+      found=$("$here/imds-credentials") || fail "the instance role's credentials"
+      { read -r access && read -r secret && read -r session && read -r expires; } <<<"$found"
+      now=$(date +%s)
+      ((expires - now >= floor)) && break
+      # Already expired, or still short after waiting for the rotation: nothing to wait for.
+      if ((attempt == 2 || expires <= now)); then
+        fail "the role's credentials expire in $((expires - now)) seconds, under the $floor a statement may need"
+      fi
+      log "the role's credentials expire in $((expires - now)) seconds: waiting for IMDS to rotate them"
+      sleep $((expires - now + ${STATE_CREDENTIAL_MARGIN:-30}))
+    done
+  fi
+  local shape='^[A-Za-z0-9/+=_-]+$'
+  [[ $access =~ $shape && $secret =~ $shape && ( -z $session || $session =~ $shape ) && $expires =~ ^[0-9]+$ ]] ||
+    fail "the credentials aren't what S3 gives out"
+}
+
+# The credentials as a statement takes them, to follow a path or a table function's filename.
+s3_credentials() {
+  local token=""
+  [[ -z $session ]] || token=", session_token = '$session'"
+  printf "access_key_id = '%s', secret_access_key = '%s'%s" "$access" "$secret" "$token"
+}
+
+# An S3 destination or source in the bucket, at PATH, with the credentials from credentials().
+s3() {
+  printf "S3(backups, '%s', %s)" "$1" "$(s3_credentials)"
+}
+
+# The client's errors with the credentials taken out: it prints the whole query when one fails,
+# and the query carries them. sed lives as long as the statement, so its script comes through a
+# process substitution (printf is a builtin): its command line is `sed -f /dev/fd/N`, and no ps or
+# /proc/<pid>/cmdline shows a credential. They are only characters S3 gives out, which credentials()
+# checks: none is "|", "\", "&" or a newline, so they are literal in sed's pattern and "|" delimits
+# it. With none fetched yet, there is nothing to take out.
+scrub() {
+  if [[ -z $access ]]; then
+    cat
+  else
+    sed -f <(printf 's|%s|***|g\n' "$access" "$secret" ${session:+"$session"})
+  fi
+}
+
+# A query, as the backup user, whose password is in the container's environment: the query goes in
+# on standard input, so credentials in it are in no command line, and the client's errors, which
+# quote it, are scrubbed. The answer is on standard output, the errors on standard error.
+clickhouse() {
+  {
+    printf '%s\n' "$1" | docker exec -i "$container" sh -c \
+      'CLICKHOUSE_USER=backup CLICKHOUSE_PASSWORD="$CLICKHOUSE_BACKUP_PASSWORD" exec clickhouse-client' \
+      2>&1 1>&3 3>&- | scrub >&2
+  } 3>&1
+}
+
+# One gauge to the state host's own Prometheus, over OTLP/HTTP: SERVICE METRIC VALUE.
+report() {
+  local service=$1 metric=$2 value=$3 now curl
+  now=$(date +%s)
+  read -ra curl <<<"${STATE_CURL:-curl}"
+  "${curl[@]}" --silent --show-error --fail --max-time 30 --output /dev/null \
+    --header 'Content-Type: application/json' --data @- \
+    "${STATE_PROMETHEUS_URL:?set STATE_PROMETHEUS_URL}/api/v1/otlp/v1/metrics" <<JSON
+{"resourceMetrics": [{
+  "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "$service"}}]},
+  "scopeMetrics": [{"scope": {"name": "$service"}, "metrics": [{
+    "name": "$metric",
+    "gauge": {"dataPoints": [{"asInt": "$value", "timeUnixNano": "${now}000000000"}]}
+  }]}]
+}]}
+JSON
+}

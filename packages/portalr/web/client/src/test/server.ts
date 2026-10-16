@@ -13,8 +13,8 @@ export interface Hello {
   readonly from_head?: boolean;
 }
 
-/** How the server answers a command: with a result, or by dropping the connection first. */
-export type Answer = { readonly ok: true } | { readonly rejection: string } | "drop";
+/** How the server answers a command: with a result, by dropping the connection first, or not at all. */
+export type Answer = { readonly ok: true } | { readonly rejection: string } | "drop" | "silent";
 
 interface Entry {
   readonly seq: number;
@@ -155,6 +155,9 @@ export class ScriptedServer {
     const commandId = String(frame.command_id);
     this.commands.push(commandId);
     const answer = this.#answers.shift() ?? { ok: true };
+    if (answer === "silent") {
+      return;
+    }
     if (answer === "drop") {
       socket.close(1001, "dropped");
       return;

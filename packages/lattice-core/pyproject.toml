@@ -26,6 +26,21 @@ dependencies = [
 
 [project.optional-dependencies]
 sql = ["sqlalchemy[asyncio]>=2.1"]
+otel = [
+    "opentelemetry-exporter-otlp-proto-http>=1.45",
+    "opentelemetry-instrumentation-asyncpg>=0.66b0",
+    "opentelemetry-instrumentation-fastapi>=0.66b0",
+    "opentelemetry-instrumentation-httpx>=0.66b0",
+    "opentelemetry-instrumentation-logging>=0.66b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.66b0",
+    "opentelemetry-processor-baggage>=0.66b0",
+    "opentelemetry-sdk>=1.45",
+    "pydantic-ai-slim>=2.51",
+]
+# The litellm extra reads Langfuse 4's propagated tags from OpenTelemetry's context by their
+# internal key (lattice ADR-0022); the lockfile's langfuse is the version verified.
+langfuse = ["langfuse>=4.15,<5", "opentelemetry-sdk>=1.45"]
+litellm = ["pydantic-ai-slim[openai]>=2.51", "httpx2>=2.7", "opentelemetry-api>=1.45"]
 
 [project.urls]
 Homepage = "https://lattice.alexnodeland.com/lattice-core/"
@@ -41,6 +56,10 @@ test = [
     "pytest-cov>=7.1",
     "pytest-timeout>=2.4",
     "aiosqlite>=0.22",
+    "asyncpg>=0.31",
+    "sqlalchemy[asyncio]>=2.1",
+    "fastapi>=0.141",
+    "httpx>=0.28",
 ]
 lint = ["ruff>=0.16", "pyright>=1.1.414"]
 dev = [
@@ -77,7 +96,13 @@ timeout = 60
 timeout_method = "thread"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # backoff, which Langfuse uses, calls asyncio.iscoroutinefunction, deprecated in Python 3.14.
+    # As an error, the warning would stop Langfuse's background uploads in the tests; outside
+    # them Python ignores it.
+    "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning:backoff._decorator",
+]
 
 [tool.coverage.run]
 branch = true

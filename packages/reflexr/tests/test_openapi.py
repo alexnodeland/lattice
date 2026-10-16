@@ -11,8 +11,8 @@ from typing import Any
 import httpx
 import pytest
 
+from lattice_core.refusals import Refused
 from reflexr.fastapi.openapi import openapi_app, openapi_document
-from reflexr.fastapi.router import Refused
 
 SCHEMAS = Path(__file__).parent.parent / "schemas"
 DOCUMENT = SCHEMAS / "reflexr.openapi.json"

@@ -4,8 +4,10 @@
 # paths on the host, which scripts/check-config holds them to. Each port binds the instance's
 # private address, STATE_HOST_ADDRESS, which only the groups of the services that use it reach.
 # ClickHouse's users are deploy/clickhouse/users.xml's, as on one machine (ADR-0031): an admin, and
-# Langfuse's, on its own database. The address and both passwords are in /run/stackr/.env, which
-# the stackr-state unit writes from Secrets Manager each time it starts.
+# Langfuse's, on its own database; and the single host's `backup` user, with a `backups` named
+# collection pointed at the backups bucket (ADR-0037). The address, the passwords and the bucket's
+# URL are in /run/stackr/.env, which the stackr-state unit writes from Secrets Manager each time it
+# starts. Prometheus evaluates alerts.yml's rules, which watch the backups and the drill.
 
 name: stackr-state
 
@@ -18,8 +20,12 @@ services:
       CLICKHOUSE_SKIP_USER_SETUP: "1"
       CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD:?stackr-state.service writes it}
       CLICKHOUSE_LANGFUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?stackr-state.service writes it}
+      CLICKHOUSE_BACKUP_PASSWORD: ${CLICKHOUSE_BACKUP_PASSWORD:?stackr-state.service writes it}
+      CLICKHOUSE_BACKUP_URL: ${CLICKHOUSE_BACKUP_URL:?stackr-state.service writes it}
     volumes:
       - ../../clickhouse/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
+      - ../../host/clickhouse/backup-user.xml:/etc/clickhouse-server/users.d/backup-user.xml:ro
+      - ./clickhouse/backups.xml:/etc/clickhouse-server/config.d/backups.xml:ro
       - /data/clickhouse:/var/lib/clickhouse
       - /data/clickhouse-logs:/var/log/clickhouse-server
     ports:
@@ -44,6 +50,7 @@ services:
       - --enable-feature=exemplar-storage
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/rules/alerts.yml:ro
       - /data/prometheus:/prometheus
     ports:
       - ${STATE_HOST_ADDRESS:?stackr-state.service writes it}:9090:9090

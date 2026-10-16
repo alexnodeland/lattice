@@ -27,6 +27,27 @@ test("the switcher says where the reader is", async () => {
     .toHaveAttribute("aria-haspopup", "menu");
 });
 
+test("on the tenant's page of workspaces, the switcher names the tenant alone and marks no workspace", async () => {
+  const screen = await render(
+    <Switcher
+      tenant="acme"
+      tenants={[{ id: "acme" }]}
+      workspaces={[{ id: "notes" }, { id: "plans" }]}
+      onTenant={vi.fn()}
+      onWorkspace={vi.fn()}
+    />,
+  );
+  const trigger = screen.getByRole("button", { name: "Tenant: acme" });
+  await expect.element(trigger).toHaveTextContent("acme");
+  await trigger.click();
+  await expect
+    .element(screen.getByRole("menuitemradio", { name: "notes" }))
+    .toHaveAttribute("aria-checked", "false");
+  await expect
+    .element(screen.getByRole("menuitemradio", { name: "acme" }))
+    .toHaveAttribute("aria-checked", "true");
+});
+
 test("its menu marks the current workspace and tenant, and hands over another", async () => {
   const onWorkspace = vi.fn();
   const onTenant = vi.fn();

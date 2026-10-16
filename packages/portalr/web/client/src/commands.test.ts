@@ -90,6 +90,11 @@ beforeAll(() => {
       const body = (text ? JSON.parse(text) : null) as { command_id: string };
       const url = new URL(request.url);
       sent.push({ method: request.method, url, tenant: request.headers.get("x-tenant"), body });
+      if (url.pathname === "/portalr/v1/deployment/tenants") {
+        return body && (body as unknown as { tenant: string }).tenant === "acme"
+          ? Response.json({ detail: { type: "invalid", message: "acme exists" } }, { status: 422 })
+          : Response.json({ tenant: "initech", owner: "dan" }, { status: 201 });
+      }
       if (url.pathname === "/portalr/v1/invites") {
         return Response.json({ tenant: "acme", user: "newcomer" }, { status: 201 });
       }
@@ -309,6 +314,23 @@ test("an invitation names its tenant, and answers whom it added", async () => {
   });
   expect(sent.at(-1)).toMatchObject({ tenant: "acme", body: { email: "new@acme.test" } });
   expect(sent.at(-1)?.url.pathname).toBe("/portalr/v1/invites");
+});
+
+test("creating a tenant names no tenant to act in, sends the email once, and answers the owner's id", async () => {
+  expect(await commands.portalr.createTenant("initech", "dan@initech.com")).toEqual({
+    outcome: "done",
+    result: { tenant: "initech", owner: "dan" },
+  });
+  expect(sent.at(-1)).toMatchObject({
+    tenant: null,
+    body: { tenant: "initech", owner_email: "dan@initech.com" },
+  });
+  expect(sent.at(-1)?.url.pathname).toBe("/portalr/v1/deployment/tenants");
+  expect(await commands.portalr.createTenant("acme", "dan@initech.com")).toMatchObject({
+    outcome: "refused",
+    status: 422,
+    reasons: ["acme exists"],
+  });
 });
 
 test("orThrow gives a done command's answer, and throws a refusal's words", () => {

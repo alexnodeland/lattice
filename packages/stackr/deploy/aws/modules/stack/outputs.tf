@@ -25,8 +25,13 @@ output "run_task_network" {
   description = "Where the one-off tasks run: the private subnets, and each task's security groups, comma-separated."
   value = {
     subnet_ids      = module.network.private_subnet_ids
-    security_groups = local.one_off_groups
+    security_groups = { for task, environment in local.one_off_environment : task => environment.SECURITY_GROUPS }
   }
+}
+
+output "backups_bucket" {
+  description = "The backups bucket's name, where the state host's ClickHouse backups go (ADR-0037)."
+  value       = module.data.buckets["backups"].name
 }
 
 output "state_host_instance_id" {

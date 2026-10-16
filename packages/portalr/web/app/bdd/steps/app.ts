@@ -30,8 +30,8 @@ When("they choose the tenant {string}", async ({ page }, tenant: string) => {
 
 When("they open the workspace {string}", async ({ page }, workspace: string) => {
   await page
-    .getByRole("navigation", { name: "Workspaces" })
-    .getByRole("link", { name: workspace })
+    .getByRole("list", { name: "Workspaces" })
+    .getByRole("link", { name: workspace, exact: true })
     .click();
 });
 
@@ -58,8 +58,25 @@ Then("they see the page {string}", async ({ page }, title: string) => {
 Then(
   "they see the workspaces {string} and {string}",
   async ({ page }, one: string, other: string) => {
-    const workspaces = page.getByRole("navigation", { name: "Workspaces" }).getByRole("link");
+    const workspaces = page.getByRole("list", { name: "Workspaces" }).getByRole("heading");
     await expect(workspaces).toHaveText([one, other]);
+  },
+);
+
+Then("each links to its areas", async ({ page }) => {
+  for (const workspace of ["notes", "plans"]) {
+    const areas = page.getByRole("list", { name: `${workspace}'s areas` }).getByRole("link");
+    await expect(areas).toHaveText(["Threads", "Artifacts", "Proposals", "Runs", "Rules"]);
+  }
+});
+
+When(
+  "they open the {string} of the workspace {string}",
+  async ({ page }, area: string, workspace: string) => {
+    await page
+      .getByRole("list", { name: `${workspace}'s areas` })
+      .getByRole("link", { name: area })
+      .click();
   },
 );
 

@@ -3,7 +3,7 @@ import type { Server } from "bun";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import type * as v1 from "./generated/artifactr.v1";
 import type * as reflexrV1 from "./generated/reflexr.v1";
-import { AUDIT_PAGE, createQueries, keys, Refused, stale } from "./queries";
+import { AUDIT_PAGE, createQueries, keys, LOGS_LIMIT, Refused, stale } from "./queries";
 import { createApi, readConfig } from "./rest";
 
 interface Seen {
@@ -134,6 +134,25 @@ test("every read has its own path", async () => {
         end: "2026-10-14T00:00:00Z",
       }),
       "/portalr/v1/feedback",
+    ],
+    [
+      queries.portalr.traces("acme", {
+        start: "2026-10-07T00:00:00Z",
+        end: "2026-10-14T00:00:00Z",
+      }),
+      "/portalr/v1/traces",
+    ],
+    [queries.portalr.trace("acme", "c029eec9"), `/portalr/v1/traces/${"0".repeat(24)}c029eec9`],
+    [
+      queries.portalr.logs("acme", {
+        start: "2026-10-14T00:00:00Z",
+        end: "2026-10-14T01:00:00Z",
+      }),
+      "/portalr/v1/logs",
+    ],
+    [
+      queries.portalr.logLine("acme", `1-${"a".repeat(16)}`),
+      `/portalr/v1/logs/1-${"a".repeat(16)}`,
     ],
     [queries.portalr.links("ops", "t1"), "/portalr/v1/deployment/links"],
     [queries.grantr.grants("acme", "ws_1"), "/grantr/v1/tenants/acme/grants"],
@@ -301,14 +320,30 @@ test("portalr's reads name their tenant and window", async () => {
   expect(seen.at(-1)?.url.searchParams.get("step")).toBeNull();
 });
 
-test("a feedback read is kept ten minutes and tried again once, unless refused outright", () => {
-  const feedback = queries.portalr.feedback("acme", { start: DAY.start, end: DAY.end });
-  expect(feedback.staleTime).toBe(10 * 60_000);
-  const retry = feedback.retry as (count: number, error: unknown) => boolean;
-  expect(retry(0, new Refused(503, null))).toBe(true);
-  expect(retry(1, new Refused(503, null))).toBe(false);
-  expect(retry(0, new Refused(422, null))).toBe(false);
-  expect(queries.portalr.scores("acme", { start: DAY.start, end: DAY.end }).staleTime).toBe(60_000);
+test("a feedback or usage read is kept ten minutes and tried again once, unless refused outright", () => {
+  const window = { start: DAY.start, end: DAY.end };
+  for (const read of [
+    queries.portalr.feedback("acme", window),
+    queries.portalr.usage("acme", window),
+  ]) {
+    expect(read.staleTime).toBe(10 * 60_000);
+    const retry = read.retry as (count: number, error: unknown) => boolean;
+    expect(retry(0, new Refused(503, null))).toBe(true);
+    expect(retry(1, new Refused(503, null))).toBe(false);
+    expect(retry(0, new Refused(422, null))).toBe(false);
+  }
+  expect(queries.portalr.scores("acme", window).staleTime).toBe(60_000);
+});
+
+test("a usage read asks after the workspaces it names", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  await client.fetchQuery(
+    queries.portalr.usage("acme", { start: DAY.start, end: DAY.end }, ["notes", "plans"]),
+  );
+  const usage = seen.at(-1);
+  expect(usage?.url.pathname).toBe("/portalr/v1/usage");
+  expect(usage?.url.searchParams.getAll("workspaces")).toEqual(["notes", "plans"]);
+  expect(usage?.headers.get("x-tenant")).toBe("acme");
 });
 
 test("the deployment's tenants are an operator's, and null for anyone else", async () => {
@@ -407,4 +442,89 @@ test("a refusal says why, and never shows its body as it came", () => {
   );
   expect(said(500, null)).toBe("the server refused the read (500): The server answered 500.");
   expect(said(500, undefined)).toBe("the server refused the read (500): The server answered 500.");
+});
+
+test("a traces read names its window, its limit and its filter; a trace read, whether it wants content", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const window = { start: "2026-10-07T00:00:00Z", end: "2026-10-14T00:00:00Z" };
+  await client.fetchQuery(
+    queries.portalr.traces("acme", window, { session: "thr_1", run: "run_2" }),
+  );
+  const list = seen.at(-1);
+  expect(Object.fromEntries(list?.url.searchParams ?? [])).toEqual({
+    start: window.start,
+    end: window.end,
+    limit: "100",
+    session: "thr_1",
+    run: "run_2",
+  });
+  expect(list?.headers.get("x-tenant")).toBe("acme");
+  await client.fetchQuery(queries.portalr.traces("acme", window));
+  expect(seen.at(-1)?.url.searchParams.has("session")).toBe(false);
+  await client.fetchQuery(queries.portalr.trace("acme", "C029EEC9"));
+  const plain = seen.at(-1);
+  expect(plain?.url.pathname).toBe(`/portalr/v1/traces/${"0".repeat(24)}c029eec9`);
+  expect(plain?.url.searchParams.has("content")).toBe(false);
+  await client.fetchQuery(queries.portalr.trace("acme", "c029eec9", "83db6fcbe8c81dba"));
+  const revealed = seen.at(-1);
+  expect(revealed?.url.searchParams.get("content")).toBe("true");
+  expect(revealed?.url.searchParams.get("span")).toBe("83db6fcbe8c81dba");
+  // One trace is one read, however its id is written; a span's withheld attributes are another,
+  // let go as soon as nothing shows them.
+  const whole = "0".repeat(24) + "c029eec9";
+  expect(queries.portalr.trace("acme", "c029eec9").queryKey).toEqual(
+    keys.portalr.trace("acme", whole, null),
+  );
+  expect(keys.portalr.trace("acme", whole, "s1")).not.toEqual(
+    keys.portalr.trace("acme", whole, null),
+  );
+  expect(queries.portalr.trace("acme", whole, "s1").gcTime).toBe(0);
+  // A span's withheld attributes are read once: no retry, and no read again on focus.
+  const asked = queries.portalr.trace("acme", whole, "s1");
+  expect([asked.retry, asked.refetchOnWindowFocus]).toEqual([false, false]);
+  expect(queries.portalr.trace("acme", whole).retry).toBeUndefined();
+  expect(queries.portalr.trace("acme", whole).gcTime).toBeGreaterThan(0);
+});
+
+test("a logs read names its window, its limit and its filter; a line is its own read, kept no longer than it is shown", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const window = { start: "2026-10-14T00:00:00Z", end: "2026-10-14T01:00:00Z" };
+  await client.fetchQuery(queries.portalr.logs("acme", window, { thread: "thr_1", run: "run_2" }));
+  const list = seen.at(-1);
+  expect(Object.fromEntries(list?.url.searchParams ?? [])).toEqual({
+    start: window.start,
+    end: window.end,
+    limit: String(LOGS_LIMIT),
+    thread: "thr_1",
+    run: "run_2",
+  });
+  expect(list?.headers.get("x-tenant")).toBe("acme");
+  await client.fetchQuery(queries.portalr.logs("acme", window));
+  expect(seen.at(-1)?.url.searchParams.has("thread")).toBe(false);
+  expect(keys.portalr.logs("acme", window, { run: "run_2" })).not.toEqual(
+    keys.portalr.logs("acme", window, {}),
+  );
+  // A line is read once, for one record, and let go as soon as nothing shows it.
+  const id = `5-${"b".repeat(16)}`;
+  const line = queries.portalr.logLine("acme", id);
+  expect([line.gcTime, line.staleTime, line.retry, line.refetchOnWindowFocus]).toEqual([
+    0,
+    0,
+    false,
+    false,
+  ]);
+  expect(line.queryKey).toEqual(keys.portalr.logLine("acme", id));
+  expect(keys.portalr.logLine("acme", id)).not.toEqual(keys.portalr.logLine("globex", id));
+});
+
+test("the deployment's audit log is read a page back at a time, naming no tenant", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  await client.fetchInfiniteQuery(queries.grantr.deploymentAudit("ops"));
+  const first = seen.at(-1);
+  expect(first?.url.pathname).toBe("/grantr/v1/audit");
+  expect(first?.url.searchParams.get("last")).toBe(String(AUDIT_PAGE));
+  expect(first?.url.searchParams.has("before_seq")).toBe(false);
+  expect(first?.headers.get("x-tenant")).toBeNull();
+  // One operator's cache entry is not another's.
+  expect(keys.grantr.deploymentAudit("ops")).not.toEqual(keys.grantr.deploymentAudit("ops2"));
 });

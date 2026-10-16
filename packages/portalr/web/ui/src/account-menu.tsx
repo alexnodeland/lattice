@@ -44,7 +44,7 @@ export function AccountMenu({
         >
           {initials(name)}
         </span>
-        <span aria-hidden="true" className="truncate max-lg:hidden">
+        <span aria-hidden="true" className="truncate max-lg:not-in-data-[drawer]:hidden">
           {name}
         </span>
       </Menu.Trigger>

@@ -97,6 +97,15 @@ A deployment's `name` must be unique in the account: it names its resources, and
 
    LiteLLM starts once each provider's key has a value, and GoTrue once its SMTP password does.
 
+## ClickHouse's backups and their drill
+
+The state host backs ClickHouse up to the backups bucket each night at 03:00 UTC, and restores the latest backup beside the live database each Sunday at 05:00 UTC to prove it restores (stackr ADR-0037). Their results are the metrics `stackr_backup_success` and `stackr_restore_drill_success` in the state host's Prometheus, and four alerts watch them: Grafana lists them under Alerting, as the Prometheus data source's rules. No notification is sent; add an Alertmanager if you want one.
+
+- **Cost:** the backups are whole each night, so what they cost is the size of Langfuse's database times `clickhouse_backup_retention_days`, 14 by default. The drill's own backups are kept 7 days, and a version overwritten or deleted stays recoverable for 7 days more, so the bucket can hold about 21 to 22 days' worth of backups at most.
+- **After the first apply:** the first and third alerts, no backup in 36 hours and no drill in eight days, fire until a backup and a drill have run. Start them from a session on the state host (SSM): `sudo systemctl start stackr-state-backup`, then `sudo systemctl start stackr-state-restore-drill`, and read their output with `journalctl -u stackr-state-backup`. A timer's `Persistent=true` only catches up a run on a host that has run it before, so a new host's first backup is otherwise at the next 03:00 UTC.
+- **Upgrading to this:** the apply that adds the timers replaces the state host, as any change of `lattice_commit` does: minutes without traces in Langfuse and without metrics, the data volume attached again. Make it with a `lattice_commit` bump you were making anyway.
+- **Restoring onto a new host:** as ClickHouse's `admin`, over a session, `RESTORE DATABASE default FROM S3(backups, 'clickhouse/<time>', access_key_id = …, secret_access_key = …, session_token = …)`, with the three values from `deploy/aws/state-host/imds-credentials`. A DLM snapshot of the data volume is the faster way back when only the instance is lost.
+
 ## Rotating GoTrue's keys
 
 auth-keys keeps a key set once it is written, since a new one ends every session signed with the old. To rotate it, remove it, and run auth-keys again: it writes a new key set, finds the service role's key no longer verifies, and writes that again too. GoTrue and the application then deploy again, and everyone signs in anew.

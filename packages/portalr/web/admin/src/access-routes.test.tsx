@@ -357,7 +357,7 @@ test("a group made the tenant's admin is named so in the question", async () => 
   await screen.getByRole("combobox", { name: "To" }).selectOptions("ops (group)");
   await screen.getByRole("button", { name: "Grant", exact: true }).click();
   await expect
-    .element(screen.getByRole("alertdialog", { name: "Make ops (group) owner of acme?" }))
+    .element(screen.getByRole("alertdialog", { name: "Make the group ops owner of acme?" }))
     .toBeVisible();
 });
 
@@ -420,7 +420,7 @@ test("granting a role that runs the tenant is confirmed first", async () => {
   expect(placed.width).toBeLessThan((form?.width ?? 0) / 2);
   expect(placed.left).toBeCloseTo(form?.left ?? Number.NaN, 0);
   await trigger.click();
-  const dialog = screen.getByRole("alertdialog", { name: "Make bob (person) owner of acme?" });
+  const dialog = screen.getByRole("alertdialog", { name: "Make bob owner of acme?" });
   expect(sent).toEqual([]);
   await dialog.getByRole("button", { name: "Grant owner" }).click();
   await expect

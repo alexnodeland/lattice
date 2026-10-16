@@ -3,6 +3,7 @@ language: 'typescript'
 layer: 'application'
 dependsOn:
   - 'client'
+  - 'notices'
   - 'ui'
 
 tasks:
@@ -12,6 +13,10 @@ tasks:
       - '**/*'
       - '/packages/portalr/web/client/src/**/*'
       - '/packages/portalr/web/ui/src/**/*'
+      # What the third-party notices are made of, and the policy they are checked against.
+      - '/packages/portalr/web/notices/src/**/*'
+      - '!/packages/portalr/web/notices/src/**/*.test.ts'
+      - '/packages/portalr/web/notices/policy.json'
     outputs:
       - '/packages/portalr/src/portalr/static/admin/**/*'
     options:

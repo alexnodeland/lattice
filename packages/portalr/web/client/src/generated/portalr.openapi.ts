@@ -60,7 +60,16 @@ export interface paths {
          */
         get: operations["deployment_tenants_portalr_v1_deployment_tenants_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Tenant
+         * @description Create a tenant, with its first owner invited, or found, by email, for operators.
+         *
+         *     Only operators, who may create tenants, get past the checks, which come before Supabase is
+         *     asked about anyone: a tenant that exists is refused without an invitation, so a repeated
+         *     request invites no one again and creates nothing twice. The email is never logged or
+         *     answered with: the answer names the tenant and the owner's user id.
+         */
+        post: operations["create_tenant_portalr_v1_deployment_tenants_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -319,6 +328,18 @@ export interface components {
             surfaces: components["schemas"]["Surfaces"];
         };
         /**
+         * CreatedTenant
+         * @description The tenant a creation made, and its owner.
+         *
+         *     The owner is by the user id their tokens carry, never by email.
+         */
+        CreatedTenant: {
+            /** Owner */
+            owner: string;
+            /** Tenant */
+            tenant: string;
+        };
+        /**
          * DaySpend
          * @description What was spent on one day, in UTC: dollars, tokens and requests.
          */
@@ -487,6 +508,15 @@ export interface components {
         NewInvite: {
             /** Email */
             email: string;
+        };
+        /**
+         * NewTenant
+         * @description A tenant to create, and the email of its first owner.
+         */
+        NewTenant: {
+            /** Owner Email */
+            owner_email: string;
+            tenant: components["schemas"]["TenantId"];
         };
         /** Ok[Feedback] */
         Ok_Feedback_: {
@@ -1000,6 +1030,75 @@ export interface operations {
             };
             /** @description Refused */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    create_tenant_portalr_v1_deployment_tenants_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewTenant"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedTenant"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Supabase Auth didn't invite or find the owner: `invite_failed` */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

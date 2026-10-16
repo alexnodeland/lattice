@@ -68,6 +68,25 @@
         "title": "Config",
         "type": "object"
       },
+      "CreatedTenant": {
+        "description": "The tenant a creation made, and its owner.\n\nThe owner is by the user id their tokens carry, never by email.",
+        "properties": {
+          "owner": {
+            "title": "Owner",
+            "type": "string"
+          },
+          "tenant": {
+            "title": "Tenant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "owner"
+        ],
+        "title": "CreatedTenant",
+        "type": "object"
+      },
       "DaySpend": {
         "description": "What was spent on one day, in UTC: dollars, tokens and requests.",
         "properties": {
@@ -544,6 +563,24 @@
           "email"
         ],
         "title": "NewInvite",
+        "type": "object"
+      },
+      "NewTenant": {
+        "description": "A tenant to create, and the email of its first owner.",
+        "properties": {
+          "owner_email": {
+            "title": "Owner Email",
+            "type": "string"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/TenantId"
+          }
+        },
+        "required": [
+          "tenant",
+          "owner_email"
+        ],
+        "title": "NewTenant",
         "type": "object"
       },
       "Ok_Feedback_": {
@@ -1631,6 +1668,83 @@
           }
         },
         "summary": "Deployment Tenants"
+      },
+      "post": {
+        "description": "Create a tenant, with its first owner invited, or found, by email, for operators.\n\nOnly operators, who may create tenants, get past the checks, which come before Supabase is\nasked about anyone: a tenant that exists is refused without an invitation, so a repeated\nrequest invites no one again and creates nothing twice. The email is never logged or\nanswered with: the answer names the tenant and the owner's user id.",
+        "operationId": "create_tenant_portalr_v1_deployment_tenants_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTenant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedTenant"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Supabase Auth didn't invite or find the owner: `invite_failed`"
+          }
+        },
+        "summary": "Create Tenant"
       }
     },
     "/portalr/v1/feedback": {

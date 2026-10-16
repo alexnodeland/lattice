@@ -5,6 +5,7 @@ library's own routes; portalr adds only reading the stack's tools for one tenant
 and, for operators, the deployment's tenants and deep links (lattice RFC-0002).
 """
 
+import re
 from collections.abc import Awaitable, Callable
 from importlib.resources import files
 from pathlib import Path
@@ -101,6 +102,34 @@ class Invited(BaseModel):
 
     tenant: str
     user: str
+
+
+EMAIL: Final = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+"""What an owner's email must look like: checked here by hand, so that a malformed one is refused
+without being echoed back, as a model's validation error would."""
+
+MOST_EMAIL: Final = 254
+
+
+class NewTenant(BaseModel):
+    """A tenant to create, and the email of its first owner."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tenant: TenantId
+    owner_email: str
+
+
+class CreatedTenant(BaseModel):
+    """The tenant a creation made, and its owner.
+
+    The owner is by the user id their tokens carry, never by email.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    tenant: str
+    owner: str
 
 
 class DeploymentTenants(BaseModel):
@@ -372,6 +401,7 @@ def portalr_router(
 
     if invite is not None:
         _invitations(api, grants, invite, current)
+        _tenant_creation(api, grants, invite, operating)
     router.include_router(api)
 
     return router
@@ -379,6 +409,54 @@ def portalr_router(
 
 def _refused(error: GrantrError) -> HTTPException:
     return _refusal("forbidden" if isinstance(error, Forbidden) else "invalid", str(error))
+
+
+def _tenant_creation(router: APIRouter, grants: Grants, invite: Invite, operating: Any) -> None:
+    failed = {
+        "model": Refused,
+        "description": "Supabase Auth didn't invite or find the owner: `invite_failed`",
+    }
+
+    @router.post(
+        "/v1/deployment/tenants",
+        status_code=201,
+        responses={502: failed},
+        response_model=CreatedTenant,
+    )
+    async def create_tenant(
+        body: Annotated[NewTenant, Body()], by: Subject = operating
+    ) -> CreatedTenant:
+        """Create a tenant, with its first owner invited, or found, by email, for operators.
+
+        Only operators, who may create tenants, get past the checks, which come before Supabase is
+        asked about anyone: a tenant that exists is refused without an invitation, so a repeated
+        request invites no one again and creates nothing twice. The email is never logged or
+        answered with: the answer names the tenant and the owner's user id.
+        """
+        # grantr checks this again on every call below, but its refusals come after the email is
+        # read: asking here answers a caller who may not with a plain 403 first, whatever they sent.
+        if not await grants.check(DEPLOYMENT_CHECK, by, "grantr:create_tenant", DEPLOYMENT):
+            raise _refusal("forbidden", "the caller may not create tenants")
+        email = body.owner_email.strip()
+        if len(email) > MOST_EMAIL or not EMAIL.fullmatch(email):
+            raise _refusal("invalid", "the owner's email isn't an email address")
+        if body.tenant in await grants.tenants(by=by):
+            raise _refusal("invalid", f"{body.tenant} exists")
+        try:
+            owner = await invite(email)
+        except InviteFailed as error:
+            detail = {"type": "invite_failed", "message": str(error)}
+            raise HTTPException(status_code=502, detail=detail) from error
+        try:
+            await grants.create_tenant(body.tenant, owner=owner, by=by)
+        except (Forbidden, Invalid) as error:
+            raise _refused(error) from error
+        except Exception as error:
+            # A storage error: the owner was invited, and no tenant was made. What storage said
+            # may name the owner or the tenant, so none of it is answered.
+            detail = {"type": "unavailable", "message": "the tenant couldn't be created"}
+            raise HTTPException(status_code=503, detail=detail) from error
+        return CreatedTenant(tenant=body.tenant, owner=owner)
 
 
 def _invitations(router: APIRouter, grants: Grants, invite: Invite, current: Any) -> None:

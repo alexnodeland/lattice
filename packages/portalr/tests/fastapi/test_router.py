@@ -6,13 +6,13 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
-from grantr.core import AuditEntry, Forbidden, Invalid, Member, Subject, User
+from grantr.core import TENANT, AuditEntry, Forbidden, Invalid, Member, Resource, Subject, User
 from grantr.grants import Grants
 from portalr.fastapi import portalr_router
 from portalr.invites import Invite, InviteFailed
 from portalr.readers import Langfuse, LiteLLM, Readers
 from portalr.readers.loki import _identify
-from tests.fastapi.conftest import ALICE, SITE, Stack, app_for, resolve_actor, seeded
+from tests.fastapi.conftest import ALICE, OPS, SITE, Stack, app_for, resolve_actor, seeded
 from tests.tools import Tool, fails, json
 
 WINDOW = {"start": "2026-10-12T00:00:00Z", "end": "2026-10-12T01:00:00Z"}
@@ -346,6 +346,12 @@ async def test_a_tool_the_application_doesnt_run_is_unconfigured(grants: Grants,
         # Without Supabase's admin API, there is no invitation.
         invite = await client.post("/v1/invites", json={"email": "dan@acme.com"}, headers=alice)
         assert invite.status_code in (404, 405)
+        creating = await client.post(
+            "/v1/deployment/tenants",
+            json={"tenant": "initech", "owner_email": "dan@x.com"},
+            headers=headers("ops", tenant=None),
+        )
+        assert creating.status_code in (404, 405)
         assert (await client.get("/config.json")).json()["readers"] == dict.fromkeys(
             ("tempo", "loki", "prometheus", "langfuse", "litellm", "grafana"), False
         )
@@ -476,6 +482,166 @@ async def test_an_invitation_supabase_refuses_is_a_bad_gateway(
         "type": "invite_failed",
         "message": "supabase answered 500",
     }
+
+
+OPS_ONLY = headers("ops", tenant=None)
+NEW = {"tenant": "initech", "owner_email": "dan@initech.com"}
+
+
+async def test_an_operator_creates_a_tenant_with_its_owner_invited_by_email(
+    client: httpx.AsyncClient, grants: Grants, invited: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level("DEBUG"):
+        response = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    assert response.status_code == 201
+    assert response.json() == {"tenant": "initech", "owner": "dan"}
+    assert invited == ["dan@initech.com"]
+    assert "initech" in await grants.tenants(by=OPS)
+    assert await grants.check("initech", User(id="dan"), "grantr:add_member", TENANT)
+    # The email is neither in the answer nor in any log.
+    assert "@" not in response.text
+    assert "dan@initech.com" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("who", "tenant"), [("alice", "acme"), ("alice", None), ("bob", "acme"), ("carol", "globex")]
+)
+async def test_nobody_but_an_operator_creates_a_tenant_or_invites_anyone(
+    client: httpx.AsyncClient, grants: Grants, invited: list[str], who: str, tenant: str | None
+) -> None:
+    response = await client.post("/v1/deployment/tenants", json=NEW, headers=headers(who, tenant))
+    assert response.status_code == 403
+    assert invited == []
+    assert "initech" not in await grants.tenants(by=OPS)
+
+
+async def test_a_caller_who_may_not_create_tenants_invites_no_one(
+    stack: Stack, invite: Invite, invited: list[str], ui: Path
+) -> None:
+    class Cautious(Grants):
+        """grantr, where no one may create a tenant, though an operator may read the deployment."""
+
+        async def check(self, tenant: str, subject: Subject, action: str, on: Resource) -> bool:
+            return action != "grantr:create_tenant" and await super().check(
+                tenant, subject, action, on
+            )
+
+    transport = httpx.ASGITransport(
+        app=app_for(await seeded(Cautious), stack.readers(), invite, ui)
+    )
+    async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
+        response = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    assert response.status_code == 403
+    assert invited == []
+
+
+async def test_a_tenant_that_exists_is_refused_before_anyone_is_invited(
+    client: httpx.AsyncClient, invited: list[str]
+) -> None:
+    response = await client.post(
+        "/v1/deployment/tenants", json={**NEW, "tenant": "acme"}, headers=OPS_ONLY
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["message"] == "acme exists"
+    assert invited == []
+
+
+async def test_a_repeated_request_creates_nothing_twice_and_invites_no_one_again(
+    client: httpx.AsyncClient, grants: Grants, invited: list[str]
+) -> None:
+    first = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    again = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    assert (first.status_code, again.status_code) == (201, 422)
+    assert invited == ["dan@initech.com"]
+    assert (await grants.tenants(by=OPS)).count("initech") == 1
+
+
+@pytest.mark.parametrize(
+    "email", ["", "dan", "dan@x", "d an@x.com", "a@b@c.com", "x" * 250 + "@y.com"]
+)
+async def test_an_owner_that_is_no_email_is_refused_without_being_echoed(
+    client: httpx.AsyncClient, invited: list[str], email: str
+) -> None:
+    response = await client.post(
+        "/v1/deployment/tenants", json={**NEW, "owner_email": email}, headers=OPS_ONLY
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["message"] == "the owner's email isn't an email address"
+    assert email not in response.text or email == ""
+    assert invited == []
+
+
+async def test_a_tenant_id_grantr_does_not_take_is_refused(
+    client: httpx.AsyncClient, invited: list[str]
+) -> None:
+    for tenant in ("", "a~b"):
+        response = await client.post(
+            "/v1/deployment/tenants", json={**NEW, "tenant": tenant}, headers=OPS_ONLY
+        )
+        assert response.status_code == 422, tenant
+    assert invited == []
+
+
+async def test_an_owner_supabase_cannot_invite_leaves_no_tenant(
+    grants: Grants, stack: Stack, ui: Path
+) -> None:
+    async def refusing(_email: str) -> str:
+        raise InviteFailed("supabase answered 500")
+
+    transport = httpx.ASGITransport(app=app_for(grants, stack.readers(), refusing, ui))
+    async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
+        response = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    assert response.status_code == 502
+    assert response.json()["detail"] == {
+        "type": "invite_failed",
+        "message": "supabase answered 500",
+    }
+    assert "initech" not in await grants.tenants(by=OPS)
+    assert "dan@initech.com" not in response.text
+
+
+@pytest.mark.parametrize(("error", "status"), [(Forbidden("no"), 403), (Invalid("no"), 422)])
+async def test_grantr_refusing_the_creation_refuses_it(
+    stack: Stack, invite: Invite, ui: Path, error: Exception, status: int
+) -> None:
+    class Refusing(Grants):
+        """grantr, refusing to create the tenant after the checks before it."""
+
+        async def create_tenant(self, tenant: str, *, owner: str, by: Subject) -> AuditEntry:
+            if tenant == "initech":
+                raise error
+            return await super().create_tenant(tenant, owner=owner, by=by)
+
+    transport = httpx.ASGITransport(
+        app=app_for(await seeded(Refusing), stack.readers(), invite, ui)
+    )
+    async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
+        response = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    assert response.status_code == status
+
+
+async def test_a_storage_error_after_the_invitation_is_a_clean_503_that_says_nothing_of_it(
+    stack: Stack, invite: Invite, invited: list[str], ui: Path
+) -> None:
+    class Failing(Grants):
+        """grantr, whose storage fails creating the tenant, in words that name the owner."""
+
+        async def create_tenant(self, tenant: str, *, owner: str, by: Subject) -> AuditEntry:
+            if tenant == "initech":
+                raise RuntimeError("insert failed for dan@initech.com")
+            return await super().create_tenant(tenant, owner=owner, by=by)
+
+    transport = httpx.ASGITransport(app=app_for(await seeded(Failing), stack.readers(), invite, ui))
+    async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
+        response = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "type": "unavailable",
+        "message": "the tenant couldn't be created",
+    }
+    assert "dan" not in response.text
+    # The owner was invited before it failed: an invitation can outlive a refused creation.
+    assert invited == ["dan@initech.com"]
 
 
 OPS_LINKS = headers("ops", None)

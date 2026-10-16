@@ -7,7 +7,7 @@
 
 ## Context
 
-reflexr applied `metrics_detail` (keep tenant and workspace, the tenant only, or neither) when it recorded a metric, through `Workspaces(metrics_detail=...)`. artifactr decided to apply the same policy in the SDK instead, with views ([artifactr ADR-0036](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0036-metric-cardinality-through-sdk-views.md)), so a deployment chooses its detail where it configures telemetry, and the libraries record the same attributes everywhere. The siblings should share one policy and one place to set it.
+reflexr applied `metrics_detail` (keep tenant and workspace, the tenant only, or neither) when it recorded a metric, through `Workspaces(metrics_detail=...)`. artifactr decided to apply the same policy in the SDK instead, with views ([artifactr ADR-0036](../../artifactr/adr/0036-metric-cardinality-through-sdk-views.md)), so a deployment chooses its detail where it configures telemetry, and the libraries record the same attributes everywhere. The siblings should share one policy and one place to set it.
 
 ## Decision
 

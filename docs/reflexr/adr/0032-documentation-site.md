@@ -17,7 +17,7 @@ The site needs:
 - both generated JSON Schemas, of rules and of the protocol's frames
 - a strict build that fails on broken links and anchors, so the site cannot rot silently
 
-artifactr answered the same questions in its [ADR-0023](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0023-documentation-site.md): a spike showed that Zensical, the successor that Material for MkDocs' authors are building, renders mkdocstrings' reference, Mermaid and strict link checks well enough to start on, and found two limits (links inside included snippets are not checked, and Sphinx roles render literally). reflexr is artifactr's sibling ([ADR-0003](0003-independent-sibling-of-artifactr.md)), and a reader moving between the two sites should find the same structure and the same tools behind it.
+artifactr answered the same questions in its [ADR-0023](../../artifactr/adr/0023-documentation-site.md): a spike showed that Zensical, the successor that Material for MkDocs' authors are building, renders mkdocstrings' reference, Mermaid and strict link checks well enough to start on, and found two limits (links inside included snippets are not checked, and Sphinx roles render literally). reflexr is artifactr's sibling ([ADR-0003](0003-independent-sibling-of-artifactr.md)), and a reader moving between the two sites should find the same structure and the same tools behind it.
 
 The brand is the other half of the phase. evalr and stackr ([ADR-0020](0020-evalr-shared-eval-kit.md), [ADR-0023](0023-libraries-and-the-stackr-template.md)) will need identities too, so reflexr's is the first chance to turn artifactr's single brand into a system the family shares, rather than four brands that happen to look alike.
 

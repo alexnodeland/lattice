@@ -13,7 +13,7 @@ stackr's template runs artifactr and reflexr in one application, and each librar
 - Subscriptions and feedback mirrors poll storage, and each poll's queries were a trace of their own.
 - A `FeedbackMirror` kept no cursor, so every restart mirrored the whole log again.
 
-reflexr makes the same decision, with the same API, in [reflexr ADR-0040](https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0040-telemetry-that-composes-across-libraries.md).
+reflexr makes the same decision, with the same API, in [reflexr ADR-0040](../../reflexr/adr/0040-telemetry-that-composes-across-libraries.md).
 
 ## Decision
 

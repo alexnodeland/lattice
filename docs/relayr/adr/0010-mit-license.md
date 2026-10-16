@@ -16,5 +16,5 @@ relayr is released under the **MIT License**, with the repository's `LICENSE` fi
 
 - Easier: relayr can be used in any application, beside the libraries, with no license questions.
 
-[a-adr-0016]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0016-mit-license.md
-[r-adr-0014]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0014-mit-license.md
+[a-adr-0016]: ../../artifactr/adr/0016-mit-license.md
+[r-adr-0014]: ../../reflexr/adr/0014-mit-license.md

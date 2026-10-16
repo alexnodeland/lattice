@@ -8,7 +8,7 @@
 
 [ADR-0032](0032-documentation-site.md) builds the documentation site. The maintainer has decided to publish it at `https://reflexr.alexnodeland.com`, beside artifactr's at `https://artifactr.alexnodeland.com`, and has set up the domain and GitHub Pages for the repository.
 
-artifactr first built its site with a manual publishing step, then moved to publishing from `main` ([artifactr ADR-0026](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0026-publishing-the-documentation-site.md)), because documentation that changes in the same pull request as the code should reach readers when that pull request merges. A site that is deployed only when someone remembers to run a workflow falls behind `main`, and readers can't tell that it has.
+artifactr first built its site with a manual publishing step, then moved to publishing from `main` ([artifactr ADR-0026](../../artifactr/adr/0026-publishing-the-documentation-site.md)), because documentation that changes in the same pull request as the code should reach readers when that pull request merges. A site that is deployed only when someone remembers to run a workflow falls behind `main`, and readers can't tell that it has.
 
 ## Decision
 

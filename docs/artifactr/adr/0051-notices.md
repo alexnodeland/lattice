@@ -6,7 +6,7 @@
 
 ## Context
 
-A message committed directly, without `Runner.send`, starts no turn, but a running turn's watcher still passes it in, and nothing tells clients it differs from a person's message ([#63](https://github.com/alexnodeland/artifactr/issues/63)). [stackr RFC-0002](https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md) has reflexr rules post notices by default (its decision D7): information for people that must not wake or steer the thread's agent. relayr, the bridge, will post them from reflexr runs, as an `ExternalAgentActor` per rule, and runs retry. A notice needs:
+A message committed directly, without `Runner.send`, starts no turn, but a running turn's watcher still passes it in, and nothing tells clients it differs from a person's message ([#63](https://github.com/alexnodeland/artifactr/issues/63)). [stackr RFC-0002](../../stackr/rfcs/0002-the-combined-system.md) has reflexr rules post notices by default (its decision D7): information for people that must not wake or steer the thread's agent. relayr, the bridge, will post them from reflexr runs, as an `ExternalAgentActor` per rule, and runs retry. A notice needs:
 
 - to start no turn, to steer none and to answer no paused run
 - a mark that clients can show

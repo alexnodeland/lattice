@@ -6,7 +6,7 @@
 
 ## Context
 
-artifactr and reflexr record typed feedback from people, as Pydantic models. Evaluators should predict the same types, so that they can be trained on people's feedback and measured against it. evalr must not import either library ([artifactr ADR-0029](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0029-evalr-shared-eval-kit.md)).
+artifactr and reflexr record typed feedback from people, as Pydantic models. Evaluators should predict the same types, so that they can be trained on people's feedback and measured against it. evalr must not import either library ([artifactr ADR-0029](../../artifactr/adr/0029-evalr-shared-eval-kit.md)).
 
 ## Decision
 

@@ -48,10 +48,17 @@ test("the keyboard opens it, moves through the choices, chooses one, and Escape 
   await expect.element(role).toHaveFocus();
   await userEvent.keyboard("{Enter}");
   await expect.element(page.getByRole("listbox")).toBeVisible();
-  await userEvent.keyboard("{ArrowDown}{Enter}");
+  // Keys are heard once the list has the focus, and its highlight moves a moment after each.
+  await expect.poll(() => document.activeElement?.getAttribute("role")).toBe("option");
+  await userEvent.keyboard("{ArrowDown}");
+  await expect
+    .element(page.getByRole("option", { name: "Editor" }))
+    .toHaveAttribute("data-highlighted");
+  await userEvent.keyboard("{Enter}");
   await expect.element(role).toHaveTextContent("Editor");
   await userEvent.keyboard("{Enter}");
   await expect.element(page.getByRole("listbox")).toBeVisible();
+  await expect.poll(() => document.activeElement?.getAttribute("role")).toBe("option");
   await userEvent.keyboard("{Escape}");
   await expect.element(page.getByRole("listbox")).not.toBeInTheDocument();
   await expect.element(role).toHaveFocus();

@@ -28,7 +28,7 @@ tasks:
       - 'uv.lock'
 
   # The quality test reads every package's Python and portalr's TypeScript, the edges test every
-  # project's configuration, and the specs' test each formal spec beside the tests it names.
+  # project's configuration, and the specs' tests read each formal spec and run scripts/tlc.
   test:
     description: "Run lattice's tests"
     command: 'uv run pytest'
@@ -42,6 +42,8 @@ tasks:
       - 'packages/portalr/web/*/src/**/*'
       - 'packages/portalr/web/*/*.{json,ts,yml}'
       - 'docs/*/spec/**/*'
+      - 'scripts/tlc'
+      - 'scripts/tlc.sha256'
 
   docs:
     description: 'Build the documentation site in strict mode, and check that its lists rendered'

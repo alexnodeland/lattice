@@ -29,6 +29,21 @@ class TenantCreated(BaseModel):
     owner: UserId
 
 
+class DeploymentTenantCreated(BaseModel):
+    """A tenant was created: the deployment's record of it, beside the tenant's own.
+
+    Its entry is in no tenant's log, the deployment's, and names who created the tenant, so an
+    operator who isn't a member of the tenant it created is seen to have created it. The owner is
+    a user's id, never an email.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["deployment_tenant_created"] = "deployment_tenant_created"
+    tenant: TenantId
+    owner: UserId
+
+
 class TenantDeleted(BaseModel):
     """A tenant was deleted, with everything grantr held for it but its audit log."""
 
@@ -151,6 +166,7 @@ class Unrestricted(BaseModel):
 
 type AuditEvent = Annotated[
     TenantCreated
+    | DeploymentTenantCreated
     | TenantDeleted
     | MemberAdded
     | MemberRemoved
@@ -179,7 +195,7 @@ class AuditEntry(BaseModel):
 
     at: datetime
     tenant: TenantId | None
-    """The tenant it changed; ``None`` for the deployment's operators."""
+    """The tenant it changed; ``None`` for the deployment's operators, and a tenant's creation."""
 
     by: Subject | None
     """Who made the change; ``None`` for the first operator, whom no one granted."""
@@ -189,6 +205,7 @@ class AuditEntry(BaseModel):
 
 type AuditType = Literal[
     "tenant_created",
+    "deployment_tenant_created",
     "tenant_deleted",
     "member_added",
     "member_removed",

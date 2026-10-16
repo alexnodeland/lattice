@@ -21,6 +21,7 @@ type AuditEntry = Grantr["schemas"]["AuditEntry"];
 type Member = Grantr["schemas"]["Member"];
 type IssuedKey = Grantr["schemas"]["IssuedKey"];
 type Invited = Portalr["schemas"]["Invited"];
+type CreatedTenant = Portalr["schemas"]["CreatedTenant"];
 
 /** A command's answer: carried out, with what the server answered, or refused, with each reason. */
 export type Answer<R = Result> = { readonly outcome: "done"; readonly result: R } | Refusal;
@@ -200,6 +201,16 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       /** Invite someone by email to the tenant, through Supabase Auth, and add them to it. */
       invite: (tenant: string, email: string): Promise<Answer<Invited>> =>
         answer(api.portalr.POST("/portalr/v1/invites", { ...named(tenant), body: { email } })),
+      /**
+       * Create a tenant, its first owner invited or found by email, for operators. The answer is
+       * the tenant and the owner's user id: the email is not kept, nor answered with.
+       */
+      createTenant: (tenant: string, ownerEmail: string): Promise<Answer<CreatedTenant>> =>
+        answer(
+          api.portalr.POST("/portalr/v1/deployment/tenants", {
+            body: { tenant, owner_email: ownerEmail },
+          }),
+        ),
     },
   };
 }

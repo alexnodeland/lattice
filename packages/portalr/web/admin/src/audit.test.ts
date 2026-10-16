@@ -22,6 +22,10 @@ test("who made a change: a member, a rule, the agent, or no one", () => {
 test("each type of change reads as a sentence", () => {
   const cases: [Parameters<typeof said>[0], string][] = [
     [{ type: "tenant_created", owner: "alice" }, "created the tenant, owned by alice (person)"],
+    [
+      { type: "deployment_tenant_created", tenant: "acme", owner: "alice" },
+      "created the tenant acme, owned by alice (person)",
+    ],
     [{ type: "tenant_deleted" }, "deleted the tenant"],
     [{ type: "member_added", member: ci }, "added ci (service principal)"],
     [{ type: "member_removed", member: bob }, "removed bob (person)"],
@@ -61,7 +65,7 @@ test("each type of change reads as a sentence", () => {
 });
 
 test("the filter offers every type, and reads one back from the address", () => {
-  expect(TYPES).toHaveLength(14);
+  expect(TYPES).toHaveLength(15);
   expect(TYPES.find((type) => type.value === "tenant_created")?.label).toBe("Tenant created");
   expect(filterOf({ type: "granted" })).toEqual({ type: "granted" });
   expect(filterOf({ type: "nonsense" })).toEqual({});

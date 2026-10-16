@@ -32,6 +32,11 @@ DEPLOYMENT_READS: Final = ("grantr_grants", "grantr_group_members")
 application's grants."""
 
 
+TENANT_CREATION_POLICY: Final = "grantr_audit_tenant_creation"
+"""The policy that lets a tenant's transaction add the deployment log's entry of its creation:
+the only deployment audit row it may add, and it may not read, change or delete one."""
+
+
 async def migrate(engine: AsyncEngine, *, application_role: str | None = None) -> None:
     """Upgrade the database to grantr's latest schema, creating the tables if needed.
 
@@ -83,7 +88,8 @@ def row_level_security() -> list[str]:
     """The DDL of grantr's row-level security policies, as they stand.
 
     Each table keeps its rows to their tenant, and every tenant reads the deployment's grants
-    and its groups' members, which its checks need.
+    and its groups' members, which its checks need. A tenant's transaction may also add one
+    row to the deployment's audit log: the entry of its own creation.
     """
     statements = [
         statement
@@ -95,4 +101,13 @@ def row_level_security() -> list[str]:
         f" USING (tenant_id = '{DEPLOYMENT}' AND {CURRENT} <> '')"
         for table in DEPLOYMENT_READS
     ]
+    statements.append(
+        f"CREATE POLICY {TENANT_CREATION_POLICY} ON grantr_audit FOR INSERT WITH CHECK ("
+        f" tenant_id = '{DEPLOYMENT}'"
+        f" AND {CURRENT} <> ''"
+        " AND event_type = 'deployment_tenant_created'"
+        " AND body #>> '{event,type}' = 'deployment_tenant_created'"
+        f" AND body #>> '{{event,tenant}}' = {CURRENT}"
+        ")"
+    )
     return statements

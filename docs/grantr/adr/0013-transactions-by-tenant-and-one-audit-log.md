@@ -1,6 +1,6 @@
 # ADR-0013: Transactions by tenant, and one audit log
 
-**Status:** Accepted, amended by [ADR-0016](0016-the-sql-adapter.md)
+**Status:** Accepted, amended by [ADR-0016](0016-the-sql-adapter.md) and [ADR-0033](0033-a-tenants-creation-in-the-deployments-log.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

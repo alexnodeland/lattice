@@ -61,6 +61,10 @@ test("the keyboard opens it, moves through the choices, chooses one, and Escape 
   await settled();
   await userEvent.keyboard("{Enter}");
   await expect.element(role).toHaveTextContent("Editor");
+  // The focus comes back to the trigger a moment after the list closes; a key before then is lost.
+  await expect.element(page.getByRole("listbox")).not.toBeInTheDocument();
+  await expect.element(role).toHaveFocus();
+  await settled();
   await userEvent.keyboard("{Enter}");
   await expect.element(page.getByRole("listbox")).toBeVisible();
   await expect.poll(() => document.activeElement?.getAttribute("role")).toBe("option");

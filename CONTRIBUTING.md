@@ -97,10 +97,19 @@ The dev container (`.devcontainer/`) has uv, Bun, moon and Docker, so everything
 1. Branch from the latest `main`. Keep branches short-lived: hours to a day or two, not weeks.
 2. Keep pull requests small and focused on one change. Split large work into a sequence of PRs that each leave `main` green.
 3. CI must pass before merging: its two required checks are `CI`, which passes only when every job does, and `Title`.
-4. Pull requests are squash-merged through the merge queue: once a pull request is reviewed, label it `queue`, and Mergify brings it up to date, waits for the checks and merges it ([lattice ADR-0016][lattice-adr-0016]). The PR title becomes the commit on `main`. Write it as a [Conventional Commit](https://www.conventionalcommits.org/).
+4. Pull requests are squash-merged through the merge queue: once a pull request is reviewed and green, label it `queue` (or comment `@mergifyio queue`), and Mergify tests it with the others waiting and merges it ([lattice ADR-0016][lattice-adr-0016], [ADR-0024][lattice-adr-0024]; see [Merging](#merging)). The PR title becomes the commit on `main`. Write it as a [Conventional Commit](https://www.conventionalcommits.org/).
 5. Delete the branch after merging. Don't stack branches on unmerged branches.
 
 A change that spans packages lands in one pull request, so the packages never disagree on `main`. Unfinished features land behind unexported code paths or not at all; never on a long-lived branch.
+
+### Merging
+
+The queue is Mergify's, configured in `.mergify.yml` ([ADR-0024][lattice-adr-0024]). It tests the pull requests waiting together, in temporary draft pull requests (`mergify/merge-queue/...`) that hold a batch of one or two on top of `main`, two batches at a time, and squash-merges each pull request when its batch passes `CI`.
+
+- **Queue a pull request** when it is reviewed, green and ready: add the `queue` label, or comment `@mergifyio queue`. Take it out with `@mergifyio dequeue`, or by removing the `queue` label, which dequeues it too. The median from the label to the merge was about eleven minutes in the last 40 merges (one `CI` run), and longer behind others.
+- **Behind** (GitHub's "BEHIND") means the branch lacks the latest `main`. GitHub shows it only where the ruleset requires up-to-date branches, which it no longer does; the batch is tested on top of `main`, so you don't need to update the branch. If a pull request shows BEHIND and the queue refuses it, say so: the ruleset's requirement may have been turned back on.
+- **A failed batch is bisected:** split in two and tested again until the pull request that broke it is found. That one is taken out of the queue with a comment from Mergify; fix it, push, and queue it again. The others merge. If yours is removed and its own `CI` was green, the failure was in how it combines with what was ahead of it: read the draft pull request's `CI` run, linked from Mergify's comment. Two pull requests that conflict in one batch are both taken out with a comment, not bisected.
+- **Group related work into one pull request,** with a commit for each step. The queue's cost is per pull request, not per line, and a follow-up that touches the same files as an open pull request belongs in it (a docs cleanup, a rename's fallout, a config change and the docs that describe it). Keep the number of open pull requests low; split only what could be reverted or reviewed on its own.
 
 ### Commit messages
 
@@ -179,5 +188,6 @@ By contributing, you agree that your contributions are licensed under the [MIT L
 [lattice-adr-0011]: docs/adr/0011-codeql-and-scorecard.md
 [lattice-adr-0012]: docs/adr/0012-title-checks-the-breaks-in-the-public-apis.md
 [lattice-adr-0016]: docs/adr/0016-a-merge-queue-on-mergify.md
+[lattice-adr-0024]: docs/adr/0024-a-parallel-batched-merge-queue.md
 [license]: LICENSE
 [security]: SECURITY.md

@@ -472,6 +472,26 @@ async def test_a_write_fenced_by_a_claim_is_refused_once_another_holder_has_the_
             assert await ws.head_seq() == head, "nothing is written"
 
 
+async def test_a_claim_cancelled_as_storage_grants_it_is_released(
+    storage: Storage, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = await Workspaces(storage).open("tenant_a", "ws_1", actor=ALICE)
+    thread = await ws.create_thread()
+    acquire = storage.acquire_lease
+
+    async def granted_then_cancelled(*args: Any) -> bool:
+        await acquire(*args)
+        raise asyncio.CancelledError  # as SQL storage raises once its call has run to its end
+
+    monkeypatch.setattr(storage, "acquire_lease", granted_then_cancelled)
+    with pytest.raises(asyncio.CancelledError):
+        async with ws.claim_thread(thread.id, holder="run_1"):
+            pytest.fail("a cancelled claim is not held")
+    monkeypatch.setattr(storage, "acquire_lease", acquire)
+    async with ws.claim_thread(thread.id, holder="run_2"):
+        pass
+
+
 async def test_a_claim_is_renewed_while_held(
     storage: Storage, monkeypatch: pytest.MonkeyPatch
 ) -> None:

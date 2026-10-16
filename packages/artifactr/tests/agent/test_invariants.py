@@ -732,7 +732,6 @@ async def test_i1_a_reply_whose_claim_another_holder_took_answers_nothing(
     assert not (await ws.run("run_1")).answers, "the request is left to the new holder"
 
 
-@pytest.mark.xfail(strict=True, reason="#250: a claim granted as its call is cancelled is kept")
 async def test_i3_a_claim_granted_as_its_send_is_cancelled_is_released(
     storage: Storage, ws: Workspace, thread: Thread, runners: MakeRunner
 ) -> None:

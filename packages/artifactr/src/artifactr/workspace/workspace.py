@@ -995,7 +995,8 @@ class Workspace:
         """Hold a thread exclusively, renewing the claim until the block exits.
 
         One run is active per thread. The claim is a lease in storage, so it holds across
-        processes and lapses by itself if the holder dies.
+        processes and lapses by itself if the holder dies. A call cancelled, or failing, as it
+        claims releases the lease, which storage may have granted all the same.
 
         Yields:
             An event set once the claim is lost: it lapsed, a whole ``ttl`` after its last
@@ -1011,7 +1012,13 @@ class Workspace:
         await self.check(Access(action="artifactr:claim_thread", thread_id=thread_id))
         key = _thread_key(thread_id)
         lapses = asyncio.get_running_loop().time() + ttl.total_seconds()
-        if not await self._storage.acquire_lease(self._scope, key, holder, ttl):
+        try:
+            acquired = await self._storage.acquire_lease(self._scope, key, holder, ttl)
+        except BaseException:
+            # A call cut short may still have taken the lease (Storage): no task would release it.
+            await self._storage.release_lease(self._scope, key, holder)
+            raise
+        if not acquired:
             raise ThreadBusy(f"thread {thread_id} is busy with another run")
         lost = asyncio.Event()
         renewal = asyncio.create_task(self._renew(key, holder, ttl, lapses, lost))

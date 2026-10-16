@@ -24,7 +24,6 @@ from hypothesis.stateful import (
 )
 
 from reflexr.core import (
-    FINISHED,
     InvalidState,
     Rule,
     Run,
@@ -39,6 +38,7 @@ from reflexr.core import (
     checkpoint,
     fail,
     holds,
+    on,
     retry,
     runnable,
     skip,
@@ -47,8 +47,8 @@ from reflexr.core import (
 )
 from reflexr.core.runs import RunStatus
 from reflexr.workspace import RunPolicy
-from tests.core.test_runs import NOW, fired
-from tests.core.test_runs import rule as retry_rule
+from tests.clock import START
+from tests.workspace.helpers import fired
 
 LEGAL: dict[str, dict[RunStatus, RunStatus | tuple[RunStatus, ...]]] = {
     "start": {"pending": "running", "retrying": "running"},
@@ -82,6 +82,9 @@ FACTS = {
 }
 """The fact each transition appends, except ``fail``'s, which says which way it went."""
 
+FINISHED: frozenset[RunStatus] = frozenset({"succeeded", "dead", "cancelled", "skipped"})
+"""The statuses a retry gives a fresh budget to."""
+
 MAX_RUNS = 4
 
 
@@ -91,17 +94,22 @@ class RunLifecycle(RuleBasedStateMachine):
     def __init__(self) -> None:
         super().__init__()
         self.runs: list[Run] = []
-        self.now = NOW
+        self.now = START
         self.ordering: Literal["scope", "none"] = "scope"
         self.on_dead_letter: Literal["continue", "block"] = "continue"
         self.max_attempts = 1
 
     @property
     def governing(self) -> Rule:
-        return retry_rule(
-            ordering=self.ordering,
-            on_dead_letter=self.on_dead_letter,
-            retry={"max_attempts": self.max_attempts, "backoff": timedelta(seconds=1)},
+        return Rule.model_validate(
+            {
+                "name": "app:r",
+                "when": on("app:service.error"),
+                "then": {"action": "act"},
+                "ordering": self.ordering,
+                "on_dead_letter": self.on_dead_letter,
+                "retry": {"max_attempts": self.max_attempts, "backoff": timedelta(seconds=1)},
+            }
         )
 
     @initialize(
@@ -125,7 +133,8 @@ class RunLifecycle(RuleBasedStateMachine):
     @precondition(lambda self: len(self.runs) < MAX_RUNS)
     @rule()
     def fire(self) -> None:
-        self.runs.append(fired(len(self.runs) + 1))
+        seq = len(self.runs) + 1
+        self.runs.append(fired(f"run_{seq}", rule="app:r", seq=seq))
 
     @rule(seconds=st.sampled_from([0, 1, 60]))
     def tick(self, seconds: int) -> None:
@@ -227,6 +236,7 @@ class RunLifecycle(RuleBasedStateMachine):
 
     @invariant()
     def a_blocking_dead_letter_holds_its_scope(self) -> None:
+        """ADR-0041's words, stated on their own rather than through the model's ``holding``."""
         if (self.ordering, self.on_dead_letter) != ("scope", "block"):
             return
         waiting = [r for r in self.runs if r.status != "succeeded"]

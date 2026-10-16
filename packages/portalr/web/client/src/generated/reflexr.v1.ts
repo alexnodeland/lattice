@@ -255,6 +255,7 @@ export type Checkpoints = number;
 export type CorrelationId3 = string;
 export type CreatedAt = string;
 export type Depth1 = number;
+export type Epoch = number;
 export type Error3 = string | null;
 export type FiredSeq = number;
 export type Matched1 = number[];
@@ -1062,6 +1063,7 @@ export interface Run {
   correlation_id: CorrelationId3;
   created_at: CreatedAt;
   depth?: Depth1;
+  epoch?: Epoch;
   error?: Error3;
   fired_seq: FiredSeq;
   id: RunId;

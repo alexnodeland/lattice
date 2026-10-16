@@ -78,7 +78,7 @@ When("they open its sharing", async ({ page }) => {
 When("they share it with {string} as {word}", async ({ page }, person: string, role: string) => {
   await act(page, "Share…");
   const sharing = dialog(page);
-  await choose(page, sharing.getByRole("combobox", { name: "Person" }), person);
+  await choose(page, sharing.getByRole("combobox", { name: "Person" }), email(person));
   await choose(page, sharing.getByRole("combobox", { name: "Role" }), role);
   await sharing.getByRole("button", { name: "Share", exact: true }).click();
 });

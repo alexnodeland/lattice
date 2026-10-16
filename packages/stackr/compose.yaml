@@ -382,7 +382,7 @@ services:
       retries: 30
 
   clickhouse:
-    image: clickhouse/clickhouse-server:26.9.3.38@sha256:12b16e744f91d8228705e136bd2b0ab14c939c87ff82443090279b65255c50c1
+    image: clickhouse/clickhouse-server:26.9.19.9@sha256:bdb5c911a23d92fd364e246ab20b5a0a485f00112f3663fa626b083fb46c146b
     profiles: [langfuse]
     restart: unless-stopped
     user: "101:101"

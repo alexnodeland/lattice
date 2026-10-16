@@ -22,6 +22,9 @@ concurrency:
 jobs:
   title:
     name: Title
+    # Not on the draft pull requests Mergify's merge queue makes to test a batch (ADR-0024): their
+    # titles are Mergify's, and what is checked is the batched pull requests' own, which were.
+    if: ${{ !startsWith(github.head_ref, 'mergify/merge-queue/') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

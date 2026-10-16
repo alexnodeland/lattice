@@ -1,11 +1,24 @@
-# The merge queue (lattice ADR-0016). A pull request labelled `queue` is
-# brought up to date with main, checked again, and squash-merged; the
-# ruleset's required checks, CI and Title, are Mergify's merge conditions.
-# The ruleset requires branches up to date with main, so the queue checks
-# each pull request in place, one at a time, rather than in draft pull requests.
+# The merge queue (lattice ADR-0016, amended by ADR-0024). A pull request labelled `queue`, or
+# queued with `@mergifyio queue`, is tested together with the others waiting, in temporary draft
+# pull requests that hold the batch, and squash-merged when its batch passes.
+#
+# - Up to two checks run at once (`max_parallel_checks`), and a batch holds one to three pull
+#   requests: one when the queue is short, more as it backs up (`batch_size`), waiting at most two
+#   minutes for a batch to fill (`batch_max_wait_time`).
+# - What a batch must pass is `CI`, on its draft pull request. The ruleset's required checks, `CI`
+#   and `Title`, are still required of the pull request itself to enter the queue; `Title` is
+#   not a merge condition, since the draft pull request's title is Mergify's own.
+# - A batch that fails is split and tested again until the pull request that broke it is found
+#   and taken out of the queue, with a comment saying so; the others go on.
+# - This needs the ruleset not to require branches to be up to date
+#   (`strict_required_status_checks_policy: false`): a pull request's checks are those of the batch
+#   it is in, not of its own head against the `main` of the moment.
 queue_rules:
   - name: default
-    batch_size: 1
+    batch_size:
+      min: 1
+      max: 3
+    batch_max_wait_time: 2 min
     merge_method: squash
     commit_message_format:
       title: pr-title
@@ -14,9 +27,11 @@ queue_rules:
       - base = main
       - label = queue
       - -draft
+    merge_conditions:
+      - check-success = CI
 
 merge_queue:
-  max_parallel_checks: 1
+  max_parallel_checks: 2
 
 merge_protections_settings:
   auto_merge_conditions:

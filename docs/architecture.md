@@ -190,7 +190,7 @@ A change to evalr runs the checks of evalr and of every project above it; a chan
 | `scorecard.yml` | Every week, and by hand | **Scorecard**: OpenSSF Scorecard, published to the OpenSSF and uploaded to code scanning ([ADR-0011](adr/0011-codeql-and-scorecard.md)) |
 
 - **Two checks are required,** `CI` and `Title`, on branches up to date with `main`. The ruleset is the one `main` shares with the siblings' repositories: no deletion, no force push, linear history, and squash-only pull requests ([ADR-0003](adr/0003-ci-on-pull-requests-nightly-on-main-and-a-required-title-check.md)).
-- **Mergify queues the merges.** A reviewed pull request labelled `queue` is brought up to date, checked again and squash-merged, one at a time ([ADR-0016](adr/0016-a-merge-queue-on-mergify.md)).
+- **Mergify queues the merges.** A reviewed pull request labelled `queue` is tested in a batch with the others waiting, in a draft pull request, and squash-merged when the batch passes `CI` ([ADR-0016](adr/0016-a-merge-queue-on-mergify.md), [ADR-0024](adr/0024-a-parallel-batched-merge-queue.md)).
 - **`main` is Nightly's.** CI runs on pull requests only, and `nightly.yml` runs everything on each push to `main`.
 - **Every workflow is hardened the same way:** each action pinned to a commit, with its version beside it; `permissions: {}` at the top, and each job granted what it needs; and no checkout keeps its credentials. actionlint and zizmor check the workflows, in the hooks and in the root's `workflows` task.
 - **Every test and every job has a timeout:** a test fails after a minute, printing every thread's stack, and each job has a limit of a few times its usual length ([ADR-0007](adr/0007-a-timeout-on-every-test-and-every-job.md)).

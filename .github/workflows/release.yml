@@ -1,12 +1,26 @@
 # Releases (stackr's RFC-0003, Releases and versioning). release-please keeps one release pull
 # request open for the packages with unreleased changes. Merging it tags each one
-# <package>-v<version>, updates its CHANGELOG.md and creates its GitHub release. Each released
-# package that ships a wheel is then built alone, as it is published, and its wheel and sdist are
-# attached to its release with a build-provenance attestation. Publishing to PyPI is a later job
-# here. A stackr release also publishes the AWS recipe's thin images to GHCR (stackr ADR-0035):
-# built natively for amd64 and arm64 from the release's commit, then pushed as one multi-arch
-# image per version and attested, by the one job that may write packages; the images' references
-# are then added to the release's notes. CI runs the same scripts, against a registry of its own.
+# <package>-v<version>, updates its CHANGELOG.md and creates its GitHub release. A plan job then
+# decides what to build (scripts/release_plan.py, tested): each released package that ships a
+# wheel is built alone, as it is published, and its wheel and sdist are attached to its release
+# with a build-provenance attestation, and are published to PyPI once the repository turns that on.
+# A stackr release also publishes the AWS recipe's thin images to GHCR (stackr ADR-0035): built
+# natively for amd64 and arm64 from the release's commit, then pushed as one multi-arch image per
+# version and attested, by the one job that may write packages; the images' references are then
+# added to the release's notes. CI runs the same scripts, against a registry of its own.
+#
+# A release is built from the commit it was tagged at, and attested as built there: actions/attest
+# records the workflow's own commit, so when release-please tags a commit other than this run's
+# (a release created on a later push than the one that merged its pull request) the plan refuses
+# before anything is built, and says how to run the workflow again on the tag (#206).
+#
+# PyPI (lattice's RFC-0001 follow-up, the first release): the wheels go to PyPI through trusted
+# publishing, in the order their requirements need (scripts/release_plan.py's STAGES), each stage
+# in a job gated by the `pypi` environment, whose required reviewers are the approval. Nothing is
+# published until the repository variable PYPI_PUBLISH is `true`. The workflow can also be run by
+# hand: on a branch, to rehearse the whole release at its head (every wheel built and checked,
+# nothing attached, attested or published); on a tag, with `tag` the same, to build that release
+# again and, with `mode` publish, to publish it.
 #
 # release-please acts as lattice's GitHub App, with a token minted for each run and narrowed to
 # what it needs, so that its pull request's CI and Title checks run, which they never do for the
@@ -18,6 +32,18 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "A release to build again, such as portalr-v0.1.0: run on that tag. Empty to rehearse at the branch's head."
+        required: false
+        default: ""
+      mode:
+        description: "rehearse (build and check; publish nothing), or publish (a tag's release, to PyPI)"
+        required: false
+        default: rehearse
+        type: choice
+        options: [rehearse, publish]
 
 permissions: {}
 
@@ -28,12 +54,13 @@ concurrency:
 jobs:
   release-please:
     name: Release pull request
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions: {}
     outputs:
-      packages: ${{ steps.wheels.outputs.packages }}
-      releases: ${{ toJSON(steps.release.outputs) }}
+      released: ${{ steps.release.outputs.paths_released || '[]' }}
+      releases: ${{ steps.keep.outputs.releases }}
     steps:
       - id: app
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -48,32 +75,62 @@ jobs:
           token: ${{ steps.app.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-      # Every released package needs a full commit sha in the outputs, which the jobs below check
-      # out: a checkout given no ref uses this push's commit, which they must not build from. So
-      # this fails the workflow without one. The release exists by now, so running the workflow
-      # again finds it made, builds nothing, and leaves a tagged release with no wheels: they
-      # would then be built by hand from the tag.
-      # RELEASES holds every output, each release's notes too, and an environment variable on
-      # Linux is capped near 128 KB: past that this step can't start, and the workflow fails.
-      - name: Require a commit for every released package
+      # Only what the plan reads of release-please's outputs: each release's tag and commit. The
+      # outputs hold every release's notes too, which the jobs after this one must not carry.
+      # RELEASES holds all of them, and an environment variable on Linux is capped near 128 KB:
+      # past that this step can't start, and the workflow fails.
+      - id: keep
         env:
           RELEASES: ${{ toJSON(steps.release.outputs) }}
-          RELEASED: ${{ steps.release.outputs.paths_released || '[]' }}
         run: |
-          jq --exit-status --argjson paths "$RELEASED" \
-            '. as $outputs | [$paths[] | ($outputs[. + "--sha"] // "") | test("^[0-9a-f]{40}$")] | all' \
-            <<<"$RELEASES" >/dev/null ||
-            { echo "release-please gave a released package no commit: $RELEASED" >&2; exit 1; }
-      # The released packages that ship a wheel: all of them but stackr.
-      - id: wheels
+          releases=$(jq --compact-output \
+            'with_entries(select(.key | test("--(tag_name|sha)$")))' <<<"$RELEASES")
+          echo "releases=$releases" >>"$GITHUB_OUTPUT"
+
+  # What to build, from where, and whether to publish, for this run (scripts/release_plan.py): a
+  # release-please release, a release built again on its tag, or a rehearsal. It refuses a release
+  # whose tagged commit is not this run's, a tag whose version is not its pyproject's, and a
+  # released package without a full commit.
+  plan:
+    name: Plan
+    needs: release-please
+    if: ${{ !cancelled() && contains(fromJSON('["success", "skipped"]'), needs.release-please.result) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      packages: ${{ steps.plan.outputs.packages }}
+      releases: ${{ steps.plan.outputs.releases }}
+      stackr: ${{ steps.plan.outputs.stackr }}
+      upload: ${{ steps.plan.outputs.upload }}
+      attest: ${{ steps.plan.outputs.attest }}
+      publish: ${{ steps.plan.outputs.publish }}
+      stage1: ${{ steps.plan.outputs.stage1 }}
+      stage2: ${{ steps.plan.outputs.stage2 }}
+      stage3: ${{ steps.plan.outputs.stage3 }}
+      stage4: ${{ steps.plan.outputs.stage4 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: plan
         env:
-          RELEASED: ${{ steps.release.outputs.paths_released || '[]' }}
-        run: echo "packages=$(jq --compact-output 'map(select(. != "packages/stackr"))' <<<"$RELEASED")" >> "$GITHUB_OUTPUT"
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_MODE: ${{ inputs.mode }}
+          PATHS_RELEASED: ${{ needs.release-please.outputs.released }}
+          RELEASES: ${{ needs.release-please.outputs.releases }}
+          PYPI_PUBLISH: ${{ vars.PYPI_PUBLISH }}
+        run: python3 scripts/release_plan.py
 
   build:
-    name: Build (${{ matrix.path }})
-    needs: release-please
-    if: needs.release-please.outputs.packages != '[]'
+    name: Build (${{ matrix.package.path }})
+    needs: plan
+    if: needs.plan.outputs.packages != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -83,49 +140,285 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        path: ${{ fromJSON(needs.release-please.outputs.packages) }}
+        package: ${{ fromJSON(needs.plan.outputs.packages) }}
     env:
-      TAG: ${{ fromJSON(needs.release-please.outputs.releases)[format('{0}--tag_name', matrix.path)] }}
+      TAG: ${{ fromJSON(needs.plan.outputs.releases)[format('{0}--tag_name', matrix.package.path)] }}
     steps:
-      # The commit release-please tagged for this package, not the push that ran the workflow: they
-      # differ when release-please creates the release on a later push than the one that merged its
-      # pull request. The toolchain action and portalr's check_wheel.py below come from that
-      # commit too. The attestation names the workflow's own commit, the push: see #206.
+      # The commit the release was tagged at. The plan has refused any run whose commit is not
+      # this workflow's own, so the attestation, which names the workflow's commit, names this one
+      # too (#206). The toolchain action and portalr's check_wheel.py below come from it as well.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ fromJSON(needs.release-please.outputs.releases)[format('{0}--sha', matrix.path)] }}
+          ref: ${{ fromJSON(needs.plan.outputs.releases)[format('{0}--sha', matrix.package.path)] }}
           persist-credentials: false
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
         with:
           cache: false # a publishing job restores no cache
       # portalr's wheel carries its two UIs, which Vite builds into its source first.
       - name: Build portalr's UIs
-        if: matrix.path == 'packages/portalr'
+        if: matrix.package.path == 'packages/portalr'
         run: |
           bun install --frozen-lockfile
           moon run app:build admin:build
       - name: Build the package alone, as it is published
-        working-directory: ${{ matrix.path }}
+        working-directory: ${{ matrix.package.path }}
         run: uv build --no-sources --out-dir dist
       - name: Check portalr's wheel carries its UIs
-        if: matrix.path == 'packages/portalr'
-        working-directory: ${{ matrix.path }}
+        if: matrix.package.path == 'packages/portalr'
+        working-directory: ${{ matrix.package.path }}
         run: uv run --no-project python scripts/check_wheel.py
+      # A rehearsal attests nothing and attaches nothing: its wheels are only checked.
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        if: needs.plan.outputs.attest == 'true'
         with:
-          subject-path: ${{ matrix.path }}/dist/*
+          subject-path: ${{ matrix.package.path }}/dist/*
       - name: Attach the wheel and sdist to the release
-        working-directory: ${{ matrix.path }}
+        if: needs.plan.outputs.upload == 'true'
+        working-directory: ${{ matrix.package.path }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" dist/*
+        run: gh release upload --clobber "$TAG" dist/*
+      # The files that were attested are the ones PyPI gets: the publishing jobs take these.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-${{ matrix.package.slug }}
+          path: ${{ matrix.package.path }}/dist/*
+          retention-days: 7
+          if-no-files-found: error
+          overwrite: true
+
+  # What PyPI would be given, checked before anyone is asked to approve it, and in a rehearsal
+  # all there is to a publish: the files are well formed (twine), carry the attestations the build
+  # made, and are named and versioned as their packages say; and which of them PyPI has already.
+  pypi-check:
+    name: PyPI, checked
+    needs: [plan, build]
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      attestations: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - name: The files are well formed
+        run: uvx --from twine==6.2.0 twine check --strict dist/*
+      - name: The files carry the attestations the build made
+        if: needs.plan.outputs.attest == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for file in dist/*; do
+            gh attestation verify "$file" --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml"
+          done
+      - name: What would be published, in what order, and what PyPI already has
+        env:
+          PUBLISH: ${{ needs.plan.outputs.publish }}
+          STAGE1: ${{ needs.plan.outputs.stage1 }}
+          STAGE2: ${{ needs.plan.outputs.stage2 }}
+          STAGE3: ${{ needs.plan.outputs.stage3 }}
+          STAGE4: ${{ needs.plan.outputs.stage4 }}
+        run: |
+          if [[ $PUBLISH == true ]]; then
+            echo "This run publishes, in four stages, each after the one before it."
+          else
+            echo "This run publishes nothing; a release run with PYPI_PUBLISH set would, in four stages:"
+          fi
+          for stage in 1 2 3 4; do
+            var=STAGE$stage
+            echo "stage $stage: $(jq --raw-output 'map(.slug) | join(", ") | if . == "" then "(none)" else . end' <<<"${!var}")"
+          done
+          for file in dist/*.whl; do
+            name=$(basename "$file")
+            distribution=$(cut -d- -f1 <<<"$name" | tr _ -)
+            version=$(cut -d- -f2 <<<"$name")
+            code=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+              "https://pypi.org/pypi/$distribution/$version/json" || true)
+            if [[ $code == 200 ]]; then
+              echo "$distribution $version: on PyPI already, so skipped"
+            else
+              echo "$distribution $version: not on PyPI ($code)"
+            fi
+          done
+
+  pypi-stage-1:
+    name: PyPI, stage 1 (${{ matrix.package.slug }})
+    needs: [plan, pypi-check]
+    if: ${{ !cancelled() && needs.plan.outputs.publish == 'true' && needs.plan.outputs.stage1 != '[]' && needs.pypi-check.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Required reviewers on this environment are the approval to publish; the trusted publisher
+    # on PyPI is registered for it (see the PR that added this job).
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.stage1) }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-${{ matrix.package.slug }}
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: dist
+          skip-existing: true
+      # The next stage's packages require this one's: they are published once PyPI serves it.
+      - name: Wait until PyPI serves it
+        run: |
+          for file in dist/*.whl; do
+            name=$(basename "$file")
+            distribution=$(cut -d- -f1 <<<"$name" | tr _ -)
+            version=$(cut -d- -f2 <<<"$name")
+            for _ in $(seq 60); do
+              code=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+                "https://pypi.org/pypi/$distribution/$version/json" || true)
+              [[ $code == 200 ]] && break
+              sleep 10
+            done
+            [[ $code == 200 ]] || { echo "PyPI doesn't serve $distribution $version after ten minutes" >&2; exit 1; }
+          done
+
+  pypi-stage-2:
+    name: PyPI, stage 2 (${{ matrix.package.slug }})
+    needs: [plan, pypi-check, pypi-stage-1]
+    if: ${{ !cancelled() && needs.plan.outputs.publish == 'true' && needs.plan.outputs.stage2 != '[]' && needs.pypi-check.result == 'success' && needs.pypi-stage-1.result != 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Required reviewers on this environment are the approval to publish; the trusted publisher
+    # on PyPI is registered for it (see the PR that added this job).
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.stage2) }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-${{ matrix.package.slug }}
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: dist
+          skip-existing: true
+      # The next stage's packages require this one's: they are published once PyPI serves it.
+      - name: Wait until PyPI serves it
+        run: |
+          for file in dist/*.whl; do
+            name=$(basename "$file")
+            distribution=$(cut -d- -f1 <<<"$name" | tr _ -)
+            version=$(cut -d- -f2 <<<"$name")
+            for _ in $(seq 60); do
+              code=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+                "https://pypi.org/pypi/$distribution/$version/json" || true)
+              [[ $code == 200 ]] && break
+              sleep 10
+            done
+            [[ $code == 200 ]] || { echo "PyPI doesn't serve $distribution $version after ten minutes" >&2; exit 1; }
+          done
+
+  pypi-stage-3:
+    name: PyPI, stage 3 (${{ matrix.package.slug }})
+    needs: [plan, pypi-check, pypi-stage-2]
+    if: ${{ !cancelled() && needs.plan.outputs.publish == 'true' && needs.plan.outputs.stage3 != '[]' && needs.pypi-check.result == 'success' && needs.pypi-stage-2.result != 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Required reviewers on this environment are the approval to publish; the trusted publisher
+    # on PyPI is registered for it (see the PR that added this job).
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.stage3) }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-${{ matrix.package.slug }}
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: dist
+          skip-existing: true
+      # The next stage's packages require this one's: they are published once PyPI serves it.
+      - name: Wait until PyPI serves it
+        run: |
+          for file in dist/*.whl; do
+            name=$(basename "$file")
+            distribution=$(cut -d- -f1 <<<"$name" | tr _ -)
+            version=$(cut -d- -f2 <<<"$name")
+            for _ in $(seq 60); do
+              code=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+                "https://pypi.org/pypi/$distribution/$version/json" || true)
+              [[ $code == 200 ]] && break
+              sleep 10
+            done
+            [[ $code == 200 ]] || { echo "PyPI doesn't serve $distribution $version after ten minutes" >&2; exit 1; }
+          done
+
+  pypi-stage-4:
+    name: PyPI, stage 4 (${{ matrix.package.slug }})
+    needs: [plan, pypi-check, pypi-stage-3]
+    if: ${{ !cancelled() && needs.plan.outputs.publish == 'true' && needs.plan.outputs.stage4 != '[]' && needs.pypi-check.result == 'success' && needs.pypi-stage-3.result != 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Required reviewers on this environment are the approval to publish; the trusted publisher
+    # on PyPI is registered for it (see the PR that added this job).
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.stage4) }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-${{ matrix.package.slug }}
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: dist
+          skip-existing: true
+      # The next stage's packages require this one's: they are published once PyPI serves it.
+      - name: Wait until PyPI serves it
+        run: |
+          for file in dist/*.whl; do
+            name=$(basename "$file")
+            distribution=$(cut -d- -f1 <<<"$name" | tr _ -)
+            version=$(cut -d- -f2 <<<"$name")
+            for _ in $(seq 60); do
+              code=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+                "https://pypi.org/pypi/$distribution/$version/json" || true)
+              [[ $code == 200 ]] && break
+              sleep 10
+            done
+            [[ $code == 200 ]] || { echo "PyPI doesn't serve $distribution $version after ten minutes" >&2; exit 1; }
+          done
 
   # Each architecture's thin images, on a runner of that architecture, from the release's commit,
   # saved as OCI archives: nothing here can write to the registry.
   image:
     name: Images (${{ matrix.arch }})
-    needs: release-please
-    if: fromJSON(needs.release-please.outputs.releases)['packages/stackr--release_created'] == 'true'
+    needs: plan
+    if: needs.plan.outputs.stackr == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     permissions:
@@ -140,11 +433,11 @@ jobs:
     outputs:
       images: ${{ steps.images.outputs.images }}
     env:
-      VERSION: ${{ fromJSON(needs.release-please.outputs.releases)['packages/stackr--version'] }}
+      STACKR_TAG: ${{ fromJSON(needs.plan.outputs.releases)['packages/stackr--tag_name'] }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ fromJSON(needs.release-please.outputs.releases)['packages/stackr--sha'] }}
+          ref: ${{ fromJSON(needs.plan.outputs.releases)['packages/stackr--sha'] }}
           persist-credentials: false
       - id: images
         run: |
@@ -153,7 +446,7 @@ jobs:
       - name: Build each image as an OCI archive
         env:
           ARCH: ${{ matrix.arch }}
-        run: packages/stackr/deploy/image-archive "$ARCH" "$VERSION" archives
+        run: packages/stackr/deploy/image-archive "$ARCH" "${STACKR_TAG#stackr-v}" archives
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: stackr-images-${{ matrix.arch }}
@@ -167,8 +460,8 @@ jobs:
   # within the archives' seven days publishes the same images again.
   publish-images:
     name: Publish (${{ matrix.image }})
-    needs: [release-please, image]
-    if: fromJSON(needs.release-please.outputs.releases)['packages/stackr--release_created'] == 'true'
+    needs: [plan, image]
+    if: needs.plan.outputs.stackr == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -181,11 +474,11 @@ jobs:
         image: ${{ fromJSON(needs.image.outputs.images) }}
     env:
       REPOSITORY: ghcr.io/alexnodeland/stackr-${{ matrix.image }}
-      VERSION: ${{ fromJSON(needs.release-please.outputs.releases)['packages/stackr--version'] }}
+      STACKR_TAG: ${{ fromJSON(needs.plan.outputs.releases)['packages/stackr--tag_name'] }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ fromJSON(needs.release-please.outputs.releases)['packages/stackr--sha'] }}
+          ref: ${{ fromJSON(needs.plan.outputs.releases)['packages/stackr--sha'] }}
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -201,7 +494,7 @@ jobs:
           ACTOR: ${{ github.actor }}
         run: |
           printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$ACTOR" --password-stdin
-          reference=$(packages/stackr/deploy/publish-image "$IMAGE" "$VERSION" "$REPOSITORY" archives)
+          reference=$(packages/stackr/deploy/publish-image "$IMAGE" "${STACKR_TAG#stackr-v}" "$REPOSITORY" archives)
           echo "digest=${reference##*@}" >>"$GITHUB_OUTPUT"
           echo "- \`$reference\`" | tee "$IMAGE.md" >>"$GITHUB_STEP_SUMMARY"
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -220,8 +513,8 @@ jobs:
   # a job of its own, which may write the release and nothing in the registry.
   release-notes:
     name: Images in the release's notes
-    needs: [release-please, publish-images]
-    if: fromJSON(needs.release-please.outputs.releases)['packages/stackr--release_created'] == 'true'
+    needs: [plan, publish-images]
+    if: needs.plan.outputs.stackr == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -236,7 +529,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ fromJSON(needs.release-please.outputs.releases)['packages/stackr--tag_name'] }}
+          TAG: ${{ fromJSON(needs.plan.outputs.releases)['packages/stackr--tag_name'] }}
         run: |
           # The notes as release-please wrote them, without a section this job added before: run
           # again, it replaces its own. Never edited from an empty read.

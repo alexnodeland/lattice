@@ -649,7 +649,9 @@ NUL_CALLS: dict[str, NulCall] = {
     "retry_run": lambda w, ws: ws.retry_run(NUL),
     "skip_run": lambda w, ws: ws.skip_run("run_1", reason=NUL),
     "cancel_run": lambda w, ws: ws.cancel_run("run_1", reason=NUL),
-    "checkpoint_run": lambda w, ws: ws.checkpoint_run("run_1", attempt=1, step=NUL, state={}),
+    "checkpoint_run": lambda w, ws: ws.checkpoint_run(
+        "run_1", attempt=1, epoch=1, step=NUL, state={}
+    ),
     "replay_rule": lambda w, ws: ws.replay_rule(NUL),
     "install_rule": lambda w, ws: ws.install_rule(DEPLOYS),
     "update_rule": lambda w, ws: ws.update_rule(DEPLOYS),

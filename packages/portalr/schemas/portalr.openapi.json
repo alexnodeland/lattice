@@ -46,6 +46,10 @@
       "Config": {
         "description": "``config.json``: what the UIs need of the deployment they run in.",
         "properties": {
+          "people": {
+            "title": "People",
+            "type": "boolean"
+          },
           "readers": {
             "additionalProperties": {
               "type": "boolean"
@@ -63,7 +67,8 @@
         "required": [
           "supabase",
           "surfaces",
-          "readers"
+          "readers",
+          "people"
         ],
         "title": "Config",
         "type": "object"
@@ -548,6 +553,23 @@
           "failed_turns"
         ],
         "type": "string"
+      },
+      "Names": {
+        "description": "The emails of the people asked after whom the caller may see, by user id.\n\nAn id left out is one the caller may not see, one with no user, or one with no email, and the\nanswer is the same for all three.",
+        "properties": {
+          "people": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "People",
+            "type": "object"
+          }
+        },
+        "required": [
+          "people"
+        ],
+        "title": "Names",
+        "type": "object"
       },
       "NewInvite": {
         "description": "Whom to invite to the tenant ``X-Tenant`` names.",
@@ -2388,6 +2410,97 @@
           }
         },
         "summary": "Metrics"
+      }
+    },
+    "/portalr/v1/people": {
+      "get": {
+        "description": "The emails of people, by user id: of the tenant ``X-Tenant`` names, for its members.\n\nAn operator sees anyone's email, with or without a tenant; a member of the tenant sees\nits other members'. An id the caller may not see, with no user or with no email, is left\nout, alike, and Supabase is asked only about the ids the caller may see. At most 100 ids.\nThe answer is personal data and is not to be kept, so it is ``no-store``.",
+        "operationId": "names_portalr_v1_people_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "items": {
+                "$ref": "#/components/schemas/Id"
+              },
+              "maxItems": 100,
+              "minItems": 1,
+              "title": "Id",
+              "type": "array"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Names"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          }
+        },
+        "summary": "Names"
       }
     },
     "/portalr/v1/scores": {

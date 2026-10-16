@@ -1,6 +1,6 @@
 # ADR-0034: Tenants in admin, created by email, and the deployment's audit log
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0038](0038-people-by-email.md)
 **Date:** 2026-10-16
 **Deciders:** Alex Nodeland
 **Amends:** [RFC-0002](../../rfcs/0002-portalr-the-portal.md), whose operator Tenants row has creating a tenant and its owner without saying how the owner is named, and whose admin areas have no deployment audit log
@@ -40,6 +40,7 @@ The user decided:
   - On success the form is emptied, the list is read again, a status says "`<tenant>` is created, owned by `<user id>`", and focus goes to the form's first field, since the trigger is then disabled.
   - The email is kept nowhere in the browser: not in a query key or the cache, not in the address or storage, and not on the page once the tenant is made. A test checks storage and the page.
 - **The deployment's audit log is `/deployment/audit`.** It lists, newest first and a page back at a time, what grantr's `GET /audit` gives, with the same sentences and names as a tenant's Audit: who was made an operator, who stopped being one, by whom and when. It needs `grantr:grant_operator`, which operators hold; its failure is a way on. A tenant's creation is not in it, for now: grantr keeps `tenant_created` in the new tenant's own log, where its owner reads it. A follow-up change to grantr, its own pull request, makes it also write a deployment-scoped entry (who made which tenant); once that lands, this view shows creations, and not before: it is not changed for it here.
+- **Amended 2026-10-16:** grantr now writes that entry, `deployment_tenant_created`, naming the tenant, its owner and who created it ([grantr ADR-0033](../../grantr/adr/0033-a-tenants-creation-in-the-deployments-log.md)), and this view shows it: "created the tenant acme, owned by ada@acme.test", by the operator who did; its type reads "Tenant created (deployment)" in a type filter. Tenants created before that have no such entry.
 - **`ConfirmDialog`** can be disabled until what it acts on is filled in, and can send focus somewhere else than its trigger once the action is done (`finalFocus`); cancelling, Escape and the backdrop return it to the trigger as ever.
 - **Home's areas are Home, Tenants and Audit.**
 

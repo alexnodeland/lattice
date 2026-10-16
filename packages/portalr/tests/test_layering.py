@@ -17,10 +17,10 @@ def _imports(path: Path) -> set[str]:
     return names
 
 
-def test_only_the_readers_and_invitations_send_http() -> None:
+def test_only_the_readers_invitations_and_people_send_http() -> None:
     for path in SOURCE.rglob("*.py"):
         module = path.relative_to(SOURCE)
-        if module.parts[0] != "readers" and module.name != "invites.py":
+        if module.parts[0] != "readers" and module.name not in {"invites.py", "people.py"}:
             assert "httpx" not in _imports(path), module
 
 

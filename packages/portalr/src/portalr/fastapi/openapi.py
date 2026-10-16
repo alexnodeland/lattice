@@ -6,6 +6,7 @@
 
 import json
 import sys
+from collections.abc import Collection
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +31,10 @@ async def _no_invite(_email: str) -> str:
     raise NotImplementedError
 
 
+async def _no_one(_ids: Collection[str]) -> dict[str, str]:
+    raise NotImplementedError
+
+
 def openapi_app() -> FastAPI:
     """A bare application that mounts only the router, with every tool, and admits no caller."""
     app = FastAPI(title="portalr", version="1")
@@ -46,6 +51,7 @@ def openapi_app() -> FastAPI:
         grants=Grants(InMemoryStorage()),
         readers=readers,
         invite=_no_invite,
+        people=_no_one,
         site=Site(supabase_url="http://supabase", supabase_key="publishable"),
         ui=Path("static"),
     )

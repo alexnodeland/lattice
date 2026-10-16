@@ -40,6 +40,9 @@ export type AuditFilter = {
 
 type Metric = Portalr["schemas"]["Metric"];
 
+/** The most people one request for their emails names, as the server takes them. */
+export const PEOPLE_MAX = 100;
+
 /** How many audit entries a page of the audit log reads. */
 export const AUDIT_PAGE = 50;
 
@@ -124,6 +127,12 @@ export const keys = {
     /** A trace, and, apart, the same with one span's withheld attributes, which are asked for. */
     trace: (tenant: string, trace: string, span: string | null) =>
       [...keys.portalr.tenant(tenant), "traces", "detail", trace, span] as const,
+    /**
+     * The emails of some people, as the reader may see them in a tenant, or an operator anywhere
+     * with none. The ids are sorted and without repeats, so one set is one entry.
+     */
+    people: (tenant: string | null, ids: readonly string[]) =>
+      ["portalr", tenant ?? "~deployment", "people", ids] as const,
     /** The deployment's tenants, as the signed-in person, `user`, reads them: an operator's. */
     tenants: (user: string) => ["portalr", "deployment", "tenants", user] as const,
     /** Deep links into the tools for a trace, which only an operator, `user`, reads. */
@@ -499,6 +508,33 @@ export function createQueries(api: Api) {
         }),
     },
     portalr: {
+      /**
+       * The emails of people by their ids, as far as the server lets the reader see them (portalr
+       * ADR-0038): at most `PEOPLE_MAX` ids to a request, and those the server names, by id. It
+       * is asked in a tenant, or by an operator with none. It is kept five minutes, in memory,
+       * is not tried again, and is not read again as the window regains focus.
+       */
+      people: (tenant: string | null, ids: readonly string[]) =>
+        queryOptions({
+          queryKey: keys.portalr.people(tenant, ids),
+          queryFn: async () => {
+            const emails: Record<string, string> = {};
+            for (let from = 0; from < ids.length; from += PEOPLE_MAX) {
+              const { people } = await body(
+                api.portalr.GET("/portalr/v1/people", {
+                  ...(tenant === null ? {} : named(tenant)),
+                  params: { query: { id: ids.slice(from, from + PEOPLE_MAX) } },
+                }),
+              );
+              Object.assign(emails, people);
+            }
+            return emails;
+          },
+          staleTime: 5 * 60_000,
+          gcTime: 5 * 60_000,
+          retry: false,
+          refetchOnWindowFocus: false,
+        }),
       /** The tenant's spend against its budget, from its LiteLLM team. */
       spend: (tenant: string) =>
         queryOptions({

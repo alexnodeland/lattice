@@ -10,12 +10,13 @@ portalr's design is [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md), and 
 | `portalr.tenant` | `Tenant`, read-only, which only `allowed()` makes; the layering test keeps `allowed()` to the router, which calls it after grantr allows the read |
 | `portalr.readers` | One reader per tool: `Tempo`, `Loki`, `Prometheus` (through prom-label-proxy), `Langfuse` and `LiteLLM`, and `Grafana` for operators' deep links. `Readers` holds those the stack runs. The only code that talks to the tools |
 | `portalr.invites` | `Invite`, and `SupabaseInvite` over Supabase Auth's admin API |
+| `portalr.people` | `People`, the hook that names people by email, and `SupabasePeople` over Supabase Auth's admin API, with a short in-memory cache ([ADR-0038](adr/0038-people-by-email.md)) |
 | `portalr.fastapi` | `portalr_router`, its `Site` settings, the UIs' serving, and its OpenAPI document |
 | `web/` | The Bun workspace: `client`, `ui`, `app` and `admin` ([ADR-0008](adr/0008-the-bun-workspace-runs-in-bun.md)) |
 
 ## The router
 
-An application mounts `portalr_router(resolve_actor=, grants=, readers=, invite=, site=)` at `/portalr` ([ADR-0011](adr/0011-the-router-and-its-readers.md)). `grants` is grantr's `Grants`, with portalr's catalog, `portalr.actions.ACTIONS`, among its catalogs: grantr's roles give a tenant's owners and admins its reads, and operators the deployment's.
+An application mounts `portalr_router(resolve_actor=, grants=, readers=, invite=, site=, people=)` at `/portalr` ([ADR-0011](adr/0011-the-router-and-its-readers.md)). `grants` is grantr's `Grants`, with portalr's catalog, `portalr.actions.ACTIONS`, among its catalogs: grantr's roles give a tenant's owners and admins its reads, and operators the deployment's.
 
 | Route | Answers | Needs |
 |---|---|---|
@@ -31,6 +32,7 @@ An application mounts `portalr_router(resolve_actor=, grants=, readers=, invite=
 | `GET /portalr/v1/deployment/tenants` | Every tenant, and their spend from one LiteLLM team list | `portalr:read_deployment` |
 | `POST /portalr/v1/deployment/tenants` | Creates a tenant, its first owner invited or found by email through Supabase Auth, then made by grantr; the tenant and the owner's user id are answered, never the email ([ADR-0034](adr/0034-tenants-and-the-deployments-audit.md)) | `portalr:read_deployment`, and `grantr:create_tenant` |
 | `GET /portalr/v1/deployment/links` | Deep links into Langfuse and Grafana for a trace, a session, a run or a tenant, each recorded on `portalr.access` with who and the kinds of id, never an id's content ([ADR-0035](adr/0035-tools-and-the-record-of-opening-them.md)) | `portalr:read_deployment` |
+| `GET /portalr/v1/people` | The emails of up to 100 people by user id: a tenant's members see its other members', an operator anyone's, with or without a tenant; an id not allowed, unknown or without an email is left out, alike, and Supabase is asked only about the ids allowed. `no-store` ([ADR-0038](adr/0038-people-by-email.md)) | Membership of `X-Tenant`, or `portalr:read_deployment` |
 | `POST /portalr/v1/invites` | Invites someone through Supabase Auth, and adds them to the tenant in grantr | `grantr:add_member` |
 
 Each read names its tenant with `X-Tenant`. Each answers `ok`, `unavailable` or `unconfigured`, so a tool that is down fails only its own read. A refused request answers 400, 401, 403 or 422 with a `Refused` body, as artifactr's and reflexr's routers do: lattice-core's, from which `refusals` builds the four statuses it documents ([lattice ADR-0021](../adr/0021-the-refusal-schema-needs-no-extra.md)). `schemas/portalr.openapi.json` is the routes' document, and a test holds it to the router.
@@ -120,7 +122,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `/deployment` | Every tenant, for operators, with the deployment's areas alone |
 | `/deployment/` | Home: the tenants, and their spend |
 | `/deployment/tenants` | Tenants: every tenant with its spend and budget, fifty at a time, and a tenant created with its owner by email, once confirmed ([ADR-0034](adr/0034-tenants-and-the-deployments-audit.md)) |
-| `/deployment/audit` | The deployment's audit log: operators made and revoked, newest first ([ADR-0034](adr/0034-tenants-and-the-deployments-audit.md)) |
+| `/deployment/audit` | The deployment's audit log: operators made and revoked, and which tenant each operator created and for whom, newest first ([ADR-0034](adr/0034-tenants-and-the-deployments-audit.md)) |
 | `/deployment/tools` | Tools: links into Langfuse and Grafana for the ids given, a notice that they are outside the gates of Traces and Logs, and only web addresses as links ([ADR-0035](adr/0035-tools-and-the-record-of-opening-them.md)) |
 
 `moon run admin:bdd` runs admin's features against the test application, which sends its telemetry through stackr's Collector to Tempo, Loki and Prometheus, with Langfuse and LiteLLM unconfigured.

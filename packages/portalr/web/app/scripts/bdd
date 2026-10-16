@@ -6,17 +6,20 @@
 #
 # Usage, from the app's directory, as its `bdd` task, after the UIs are built: scripts/bdd
 set -euo pipefail
-export COMPOSE_FILE=../../compose.yaml COMPOSE_PROFILES=app,bdd COMPOSE_PROJECT_NAME=portalr-bdd
+# The project's name is this run's own, so concurrent runs, such as ones in other worktrees, don't
+# share a stack, and the only thing removed is what this run started: its containers, volumes and
+# the image it built.
+project=portalr-bdd-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')
+export COMPOSE_FILE=../../compose.yaml COMPOSE_PROFILES=app,bdd COMPOSE_PROJECT_NAME=$project
 
 stop() {
   local status=$?
   if ((status != 0)); then
-    docker compose logs --no-color --tail=200 app gotrue
+    docker compose logs --no-color --tail=200 app gotrue || true
   fi
-  docker compose down --volumes
+  docker compose down --volumes --rmi local
 }
 trap stop EXIT
-docker compose down --volumes # anything a run that was killed left behind
 docker compose up --detach --build --wait --quiet-pull
 at() { printf 'http://%s' "$(docker compose port "$1" "$2")"; }
 app=$(at app 8000)

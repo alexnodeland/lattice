@@ -779,7 +779,11 @@ async def test_i3_a_send_cancelled_as_its_ask_is_saved_is_handed_over(
     assert script.requests, "handed over, not left for the next command"
 
 
-@pytest.mark.xfail(strict=True, reason="#252: what a dead holder was asked waits for a command")
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="#252: what a dead holder was asked waits for a command",
+)
 async def test_i3_a_message_asked_while_its_holder_dies_is_taken_once_its_claim_lapses(
     runners: MakeRunner,
 ) -> None:
@@ -795,7 +799,8 @@ async def test_i3_a_message_asked_while_its_holder_dies_is_taken_once_its_claim_
     started(await dying.send(ws, thread.id, "Plan the launch"))
     await _entered(dead)
     sent = await living.send(ws.as_actor(BOB), thread.id, "Also book the big room")
-    assert sent.run is None, "refused: the dead process holds the thread"
+    if sent.run is not None:  # not the failure the mark expects
+        pytest.fail("the dead process's claim did not refuse the message")
     clock.now += timedelta(minutes=1)  # the dead claim lapses
     await settled(thread.id, living)
     assert script.requests, "the message is taken once the dead claim lapses"

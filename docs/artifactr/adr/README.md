@@ -58,7 +58,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0052](0052-artifactr-in-lattice.md) | artifactr in lattice | Accepted |
 | [0053](0053-one-site-for-the-family.md) | One site for the family | Accepted |
 | [0054](0054-dashboards-from-the-checkout.md) | Dashboards from the checkout | Accepted |
-| [0055](0055-turns-from-the-log.md) | Turns from the log | Accepted; its batching amended by 0057 |
+| [0055](0055-turns-from-the-log.md) | Turns from the log | Accepted; its batching amended by 0057, its claim by 0069 and an amendment |
 | [0056](0056-access-asked-in-every-workspace-method.md) | Access asked in every workspace method | Accepted, amended by 0058 and 0062 |
 | [0057](0057-a-turn-acts-for-one-author.md) | A turn acts for one author | Accepted |
 | [0058](0058-a-tenants-workspaces-listed-by-what-each-actor-may-open.md) | A tenant's workspaces, listed by what each actor may open | Accepted |

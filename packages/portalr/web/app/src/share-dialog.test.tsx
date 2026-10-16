@@ -1,4 +1,5 @@
 import { type Names, namesOf } from "@portalr/client";
+import { choose, optionsOf } from "@portalr/ui/testing";
 import { useRef, useState } from "react";
 import { expect, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
@@ -47,7 +48,11 @@ test("the dialog lists who holds a role, starts at the person, and returns to th
   const screen = await render(<Opened />);
   await screen.getByRole("button", { name: "Thread actions" }).click();
   const dialog = screen.getByRole("dialog", { name: "Share the thread" });
-  await expect.element(dialog.getByRole("listitem")).toHaveTextContent("erin editorRevoke");
+  await expect
+    .element(dialog.getByRole("listitem"))
+    .toHaveTextContent("erin editorRevoke erin as editor");
+  // A row shows "Revoke", and is named by whom and what it revokes.
+  await expect.element(dialog.getByRole("button", { name: "Revoke erin as editor" })).toBeVisible();
   await expect.element(dialog.getByRole("combobox", { name: "Person" })).toHaveFocus();
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect.element(screen.getByRole("button", { name: "Thread actions" })).toHaveFocus();
@@ -60,8 +65,8 @@ test("sharing sends the person and the role, and a refusal is said for the form"
   const screen = await render(<Opened onGrant={onGrant} />);
   await screen.getByRole("button", { name: "Thread actions" }).click();
   const dialog = screen.getByRole("dialog", { name: "Share the thread" });
-  await dialog.getByRole("combobox", { name: "Person" }).selectOptions("vera");
-  await dialog.getByRole("combobox", { name: "Role" }).selectOptions("editor");
+  await choose(dialog, "Person", "vera");
+  await choose(dialog, "Role", "editor");
   await dialog.getByRole("button", { name: "Share", exact: true }).click();
   expect(onGrant).toHaveBeenCalledExactlyOnceWith("vera", "editor");
   await expect.element(dialog.getByRole("alert")).toHaveTextContent("Not shared: no");
@@ -71,7 +76,7 @@ test("revoking sends the grant as it is", async () => {
   const onRevoke = vi.fn(async () => done);
   const screen = await render(<Opened onRevoke={onRevoke} />);
   await screen.getByRole("button", { name: "Thread actions" }).click();
-  await screen.getByRole("button", { name: "Revoke" }).click();
+  await screen.getByRole("button", { name: "Revoke erin as editor" }).click();
   await screen.getByRole("alertdialog").getByRole("button", { name: "Revoke the role" }).click();
   expect(onRevoke).toHaveBeenCalledExactlyOnceWith(erin);
 });
@@ -94,9 +99,9 @@ const named: Names = namesOf({ [VERA]: "vera@acme.test", erin: "erin@acme.test" 
 test("people are offered and listed by their email, a short id where the server names none", async () => {
   const screen = await render(<Opened people={[VERA, GONE]} names={named} grants={[erin]} />);
   await screen.getByRole("button", { name: "Thread actions" }).click();
-  const people = screen.getByRole("combobox", { name: "Person" });
-  await expect.element(people.getByRole("option", { name: "vera@acme.test" })).toBeInTheDocument();
-  await expect.element(people.getByRole("option", { name: "c0ffee00…" })).toBeInTheDocument();
+  const people = await optionsOf(screen, "Person");
+  expect(people).toContain("vera@acme.test");
+  expect(people).toContain("c0ffee00…");
   const holders = screen.getByRole("list", { name: "People with access" });
   await expect.element(holders).toBeVisible();
   expect(holders.element().textContent).toContain("erin@acme.test editor");
@@ -113,7 +118,7 @@ test("what is sent for a person is their id, not their email", async () => {
 test("the revoke dialog names a person as the list does", async () => {
   const screen = await render(<Opened names={named} />);
   await screen.getByRole("button", { name: "Thread actions" }).click();
-  await screen.getByRole("button", { name: "Revoke" }).click();
+  await screen.getByRole("button", { name: "Revoke erin@acme.test as editor" }).click();
   await expect
     .element(screen.getByRole("alertdialog", { name: "Revoke erin@acme.test's editor role?" }))
     .toBeVisible();
@@ -122,7 +127,7 @@ test("the revoke dialog names a person as the list does", async () => {
 test("a name arriving does not close an open revoke confirmation", async () => {
   const screen = await render(<Opened />);
   await screen.getByRole("button", { name: "Thread actions" }).click();
-  await screen.getByRole("button", { name: "Revoke" }).click();
+  await screen.getByRole("button", { name: "Revoke erin as editor" }).click();
   const confirmation = screen.getByRole("alertdialog", { name: "Revoke erin's editor role?" });
   await expect.element(confirmation).toBeVisible();
   // The email arrives while the confirmation is open: the row is the same row.
@@ -140,8 +145,8 @@ test("people are offered in the order of what is shown", async () => {
     />,
   );
   await screen.getByRole("button", { name: "Thread actions" }).click();
-  const options = screen.getByRole("combobox", { name: "Person" }).getByRole("option");
-  expect(options.elements().map((option) => option.textContent)).toEqual([
+  const options = await optionsOf(screen, "Person");
+  expect(options.filter((option) => option?.includes("@") || option?.endsWith("…"))).toEqual([
     "adam@acme.test",
     "c0ffee00…",
     "zoe@acme.test",

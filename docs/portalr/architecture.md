@@ -137,13 +137,14 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `SideNav`, `NavLink` | The areas, the current one marked, with how many wait for the reader |
 | `Switcher` | The tenant and the workspace, or the tenant alone, and a menu of the others |
 | `AccountMenu` | Who is signed in, their scheme, and signing out |
-| `PageHeader` | A page's way back, its one heading, a line about it, and its actions |
+| `PageHeader` | A page's way back, its one heading, a line about it, and its actions, set in the kit's type scale (`type.ts`: weights stop at 600), under a page width that centres a wide screen's content |
 | `Card`, `EmptyState`, `Table` | What asks something of the reader; nothing yet, and what to do; rows, named by a caption or by a heading beside them, a row's header in the row's own type |
 | `Rows`, `Row`, `RowLink`, `SectionTitle` | A lined list, each row's link stretched over it; a section's heading |
 | `Plain` | A page outside the frame: the lockup as a link home, the account if signed in, and one column |
-| `StatusBadge` | How a thing is going, as a shape and a word; only waiting for you in the working colour; a budget near or over as a word and a shape of its own, with no warning colour |
-| `ConfirmDialog` | A destructive action, asked first: what will be lost, the focus on Cancel, and a name to type where asked; its trigger named in full where its words are short |
-| `SegmentedFilter` | One filter of a few, side by side |
+| `StatusBadge` | How a thing is going, as a shape and a word, the word in the ink: what failed and a budget over edged and marked in the rose red, what is retrying and a budget near in the gold, succeeded neutral; only waiting for you in the working colour ([ADR-0039](adr/0039-elevation-status-colour-states-and-density.md)) |
+| `Alert`, `Reading`, `Skeleton` | A note, a warning or an error in the page, with a shape beside its words and the announcement its tone calls for; what is being read as a status over placeholders in its shape |
+| `ConfirmDialog` | A destructive action, asked first: what will be lost, the focus on its way out (Cancel, or words of its own such as "Keep running"), and a name to type where asked; its trigger shows its words alone in a row and is named in full aloud ([ADR-0037](adr/0037-form-controls-and-row-actions.md)) |
+| `SegmentedFilter` | One filter of a few, such as a window, side by side, with its label and hint written above and under it when asked, and a `name` to submit with its form |
 | `TenantSwitcher` | admin's tenant, or every tenant, and a menu of the others |
 | `StatCard` | One figure, read on its own, or why there's none |
 | `ItemTable` | Items as a table from 640 pixels, each row named by its first cell or a name of its own, and as headed cards below, one in the accessibility tree; an `EmptyState` with none |
@@ -159,7 +160,8 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Moment` | A time in the reader's zone, and how long ago on hover ([ADR-0026](adr/0026-audit.md)) |
 | `Dialog` | A dialog over the page, opened by its caller, with where focus starts and where it returns ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
 | `Menu` | A button and the actions it opens, each of which may be disabled while it's being done |
-| `SelectField` | A labelled choice among a few, as the platform's own select, which submits with its form |
+| `SelectField` | A labelled choice among several, Base UI's Select on the menus' surface with the keyboard of a native select, which submits with its form |
+| `FormField` | A control's label, hint and refusal, and the 28rem its width is capped at, which `TextField` and `SelectField` share |
 | `Icon`, `Mark`, `Lockup` | A Lucide icon beside its word; portalr's marks |
 
 `gallery.screenshot.test.tsx` pins how they sit together, wide and narrow, in each scheme. It runs in CI alone, against Linux baselines.

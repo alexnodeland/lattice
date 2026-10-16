@@ -1,5 +1,5 @@
 import { orThrow } from "@portalr/client";
-import { Button, ConfirmDialog, ItemTable } from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, ItemTable } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -78,15 +78,14 @@ function Roles() {
         keyOf={(role) => role.name}
         actions={(role) => (
           <>
-            <Button
-              variant="secondary"
-              aria-label={WORDS.change(role.name)}
-              onClick={() => void change(role.name)}
-            >
-              Change actions
+            <Button variant="ghost" size="sm" onClick={() => void change(role.name)}>
+              Change<span className="sr-only"> {possessive(role.name)}</span> actions
             </Button>
             <ConfirmDialog
-              label={`Delete ${role.name}`}
+              label="Delete"
+              about={role.name}
+              look="danger-soft"
+              size="sm"
               title={`Delete the role ${role.name}?`}
               confirm="Delete"
               onConfirm={async () =>
@@ -102,7 +101,7 @@ function Roles() {
           body: `A custom role holds some of a workspace admin's actions, granted on ${catalog.custom_kinds.join(", ")}.`,
         }}
       />
-      {said && <p role={said.refused ? "alert" : "status"}>{said.said}</p>}
+      {said && <Alert tone={said.refused ? "error" : "info"}>{said.said}</Alert>}
       <DefineSet
         key={changing?.name ?? "new"}
         words={WORDS}

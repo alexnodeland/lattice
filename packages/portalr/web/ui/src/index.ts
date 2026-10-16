@@ -7,6 +7,7 @@
 
 export { Account } from "./account";
 export { AccountMenu, type Appearance } from "./account-menu";
+export { Alert, type AlertTone } from "./alert";
 export { AnsiText, type Run, runs } from "./ansi";
 export { AppShell } from "./app-shell";
 export { useAppearance } from "./appearance";
@@ -22,7 +23,7 @@ export {
   type Renderers,
   rendererFor,
 } from "./artifacts";
-export { Button } from "./button";
+export { Button, type ButtonSize, type ButtonVariant } from "./button";
 export { Card } from "./card";
 export {
   BarChart,
@@ -68,9 +69,10 @@ export { Row, RowLink, Rows } from "./rows";
 export { RuleRunStatus, RunList, type RunParts } from "./run-list";
 export { SectionTitle } from "./section-title";
 export { type Segment, SegmentedFilter } from "./segmented-filter";
-export { SelectField } from "./select-field";
+export { type Option, SelectField } from "./select-field";
 export { NavLink, SideNav } from "./side-nav";
 export { SignIn } from "./sign-in";
+export { Reading, Skeleton } from "./skeleton";
 export { StatCard } from "./stat-card";
 export { StatusBadge, type Tone } from "./status-badge";
 export { Switch } from "./switch";

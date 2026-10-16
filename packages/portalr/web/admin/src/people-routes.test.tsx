@@ -5,6 +5,7 @@
  * ADR-0038).
  */
 
+import { optionsOf } from "@portalr/ui/testing";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { page } from "vitest/browser";
 import { TENANT_ACTIONS } from "./access";
@@ -220,10 +221,7 @@ test("Grants names whom each is to, and the revoke dialog says it the same way",
     .element(screen.getByRole("rowheader", { name: "ada@acme.test (person)" }))
     .toBeVisible();
   await expect.element(screen.getByRole("rowheader", { name: "c0ffee00… (person)" })).toBeVisible();
-  const choices = screen.getByRole("combobox", { name: "To" });
-  await expect
-    .element(choices.getByRole("option", { name: "ben@acme.test (person)" }))
-    .toBeInTheDocument();
+  expect(await optionsOf(screen, "To")).toContain("ben@acme.test (person)");
 });
 
 test("Audit says who made a change and whom it was about, by email", async () => {

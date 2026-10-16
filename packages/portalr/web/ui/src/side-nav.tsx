@@ -43,7 +43,7 @@ export function NavLink({ render, icon, count, children, ...props }: NavLinkProp
             {count ? (
               <span
                 aria-hidden="true"
-                className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 font-bold text-on-accent text-xs"
+                className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 font-semibold text-on-accent text-xs"
               >
                 {count}
               </span>

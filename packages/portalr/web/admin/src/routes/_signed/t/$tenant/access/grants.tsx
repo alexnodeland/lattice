@@ -1,5 +1,6 @@
 import { type Answer, type GrantrApi, type Names, orThrow, refusal } from "@portalr/client";
 import {
+  Alert,
   Button,
   Card,
   type Column,
@@ -223,7 +224,9 @@ function Granted({
                 !revocable(grant) ? null : (
                   <ConfirmDialog
                     label="Revoke"
-                    name={`Revoke ${said(grant, names)}`}
+                    about={said(grant, names)}
+                    look="danger-soft"
+                    size="sm"
                     title={`Revoke ${grant.role} from ${whomIn(grant.to, names)}?`}
                     confirm="Revoke"
                     onConfirm={async () =>
@@ -355,7 +358,7 @@ function Granting({
           name="role"
           required
           value={fields.role}
-          onChange={(event) => set("role")(event.target.value)}
+          onValueChange={set("role")}
           options={[
             { value: "", label: "Choose a role…" },
             ...roles.map((role) => ({ value: role.name, label: role.name })),
@@ -367,7 +370,7 @@ function Granting({
             name="kind"
             required
             value={kind ?? ""}
-            onChange={(event) => set("kind")(event.target.value)}
+            onValueChange={set("kind")}
             options={[
               { value: "", label: "Choose where…" },
               ...kinds.map((one) => ({ value: one, label: one })),
@@ -430,7 +433,7 @@ function Granting({
             name="to"
             required
             value={fields.to}
-            onChange={(event) => set("to")(event.target.value)}
+            onValueChange={set("to")}
             options={[
               { value: "", label: "Choose whom…" },
               ...listed.map((grantee) => ({
@@ -440,7 +443,7 @@ function Granting({
             ]}
           />
         )}
-        {answered && <p role={answered.refused ? "alert" : "status"}>{answered.said}</p>}
+        {answered && <Alert tone={answered.refused ? "error" : "info"}>{answered.said}</Alert>}
         {confirmed ? (
           <ConfirmDialog
             label="Grant"

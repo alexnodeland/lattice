@@ -1,5 +1,5 @@
 import { allowedIn, keys, Refused, refusal } from "@portalr/client";
-import { Button, ConfirmDialog, PageHeader, TextField, TextLink } from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, PageHeader, TextField, TextLink } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useActionState, useMemo, useState } from "react";
@@ -127,6 +127,7 @@ function RulePage() {
           allowed.has("reflexr:archive_rule") && (
             <ConfirmDialog
               label="Archive"
+              look="danger-soft"
               title={`Archive ${name}?`}
               confirm="Archive the rule"
               onConfirm={archive}
@@ -137,24 +138,26 @@ function RulePage() {
           )
         }
       />
-      {unarchived && <p role="alert">{unarchived}</p>}
+      {unarchived && <Alert tone="error">{unarchived}</Alert>}
       <p>{held.rule.description || "No description."}</p>
       {stored && allowed.has("reflexr:update_rule") ? (
         <form aria-label="Edit the rule" className="flex flex-col gap-2" action={save}>
           {current > base && (
-            <p role="status" className="flex flex-wrap items-center gap-2">
-              Version {current} was saved since you opened this.
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  setText(shown(held.rule));
-                  setBase(current);
-                }}
-              >
-                Load version {current}
-              </Button>
-            </p>
+            <Alert tone="info">
+              <span className="flex flex-wrap items-center gap-2">
+                Version {current} was saved since you opened this.
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setText(shown(held.rule));
+                    setBase(current);
+                  }}
+                >
+                  Load version {current}
+                </Button>
+              </span>
+            </Alert>
           )}
           <TextField
             label="Rule, as reflexr's JSON"

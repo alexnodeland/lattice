@@ -6,6 +6,7 @@
 
 import type { ReflexrV1 } from "@portalr/client";
 import { RUN_EVENTS } from "@portalr/client";
+import { choose } from "@portalr/ui/testing";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { page } from "vitest/browser";
 import { open as opened } from "./test/admin";
@@ -128,7 +129,7 @@ test("every state may be shown, and each offers what its state takes", async () 
     row(screen, run)
       .getByRole("button")
       .elements()
-      .map((button) => button.getAttribute("aria-label"));
+      .map((button) => button.textContent);
   expect(names("run_dead")).toEqual([
     "Retry run run_dead",
     "Skip run run_dead",
@@ -188,7 +189,7 @@ test("a cancel takes a reason too, and a retry takes none", async () => {
   await row(screen, "run_busy").getByRole("button", { name: "Cancel run run_busy" }).click();
   const dialog = screen.getByRole("alertdialog", { name: "Cancel this run?" });
   await dialog.getByRole("textbox", { name: "Reason (optional)" }).fill("not needed");
-  await confirm(screen, "Cancel this run?", "Cancel the run").click();
+  await confirm(screen, "Cancel this run?", "Cancel run").click();
   await expect.element(row(screen, "run_busy").getByRole("status")).toHaveTextContent("Cancelled");
   expect(commands().at(-1)?.command).toEqual({
     type: "cancel_run",
@@ -214,13 +215,13 @@ test("a refusal is said, the dialog stays, and a new try is a new command", asyn
   const { screen } = await open("/t/acme/runs");
   await row(screen, "run_wait").getByRole("button", { name: "Cancel run run_wait" }).click();
   const dialog = screen.getByRole("alertdialog", { name: "Cancel this run?" });
-  await dialog.getByRole("button", { name: "Cancel the run" }).click();
+  await dialog.getByRole("button", { name: "Cancel run" }).click();
   await expect
     .element(dialog.getByRole("alert"))
     .toHaveTextContent(
       "The run has changed, and can't take this now: what it is now is shown above.",
     );
-  await dialog.getByRole("button", { name: "Cancel the run" }).click();
+  await dialog.getByRole("button", { name: "Cancel run" }).click();
   await expect.poll(() => commands().length).toBe(2);
   expect(new Set(commands().map((sent) => sent.id)).size).toBe(2);
 });
@@ -280,7 +281,7 @@ test("one stream is open, for the workspace shown, and it is closed with the pag
   await expect.element(row(screen, "run_dead")).toBeVisible();
   expect(FakeSocket.sockets.filter((each) => each.open)).toHaveLength(1);
   expect(FakeSocket.sockets[0]?.url).toContain("/workspaces/notes/stream");
-  await screen.getByRole("combobox", { name: "Workspace" }).selectOptions("plans");
+  await choose(screen, "Workspace", "plans");
   await expect.poll(() => router.state.location.search).toMatchObject({ workspace: "plans" });
   await expect.poll(() => FakeSocket.sockets.at(-1)?.url).toContain("/workspaces/plans/stream");
   expect(FakeSocket.sockets.filter((each) => each.open)).toHaveLength(1);
@@ -293,7 +294,9 @@ test("a workspace the tenant doesn't have is not found, and opens no stream", as
   const { screen } = await open("/t/acme/runs?workspace=ghost");
   await expect.element(screen.getByText("No such workspace")).toBeVisible();
   expect(FakeSocket.sockets).toEqual([]);
-  await expect.element(screen.getByRole("combobox", { name: "Workspace" })).toHaveValue("");
+  await expect
+    .element(screen.getByRole("combobox", { name: "Workspace" }))
+    .toHaveTextContent("Choose a workspace");
 });
 
 test("the session ending closes the stream, and a refreshed one connects again", async () => {
@@ -333,7 +336,7 @@ test("no run needing attention is said, and every state can be shown", async () 
   script.log = LOG.filter((each) => each.seq >= 6);
   const { screen, router } = await open("/t/acme/runs");
   await expect.element(screen.getByText("No run needs attention")).toBeVisible();
-  await screen.getByRole("combobox", { name: "Show" }).selectOptions("Every state");
+  await screen.getByRole("radio", { name: "Every state" }).click();
   await expect.poll(() => router.state.location.search).toMatchObject({ show: "all" });
   await expect.element(row(screen, "run_done")).toBeVisible();
   await expect.element(screen.getByText("No run needs attention")).not.toBeInTheDocument();

@@ -1,5 +1,6 @@
 import { keys, orThrow } from "@portalr/client";
 import {
+  Alert,
   Button,
   Card,
   ConfirmDialog,
@@ -44,9 +45,9 @@ function Tenants() {
     <div className="flex flex-col gap-8">
       {HEADER}
       {every && every.spend.status !== "ok" && (
-        <p role="status" className="text-muted text-sm">
+        <Alert tone="warn">
           {unread("LiteLLM", every.spend).line} Spend and budgets are not shown.
-        </p>
+        </Alert>
       )}
       <ItemTable
         caption="Tenants"
@@ -141,7 +142,7 @@ function Create() {
           nothing is sent. A tenant can't be deleted from here.
         </p>
       </ConfirmDialog>
-      {made && <p role="status">{made}</p>}
+      {made && <Alert tone="info">{made}</Alert>}
     </Card>
   );
 }

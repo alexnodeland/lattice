@@ -4,8 +4,9 @@
  * operators, Langfuse's page for each comment's trace.
  */
 
+import { choose } from "@portalr/ui/testing";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { open as opened } from "./test/admin";
 
 /** The feedback reads made, by their query. */
@@ -174,8 +175,8 @@ test("the week's thumbs, evaluations and workspaces, from portalr's summary", as
 
 test("a workspace and a window go to portalr and into the address", async () => {
   const { screen, router } = await open("/t/acme/feedback");
-  await screen.getByRole("combobox", { name: "Window" }).selectOptions("The last 30 days, in UTC");
-  await screen.getByRole("combobox", { name: "Workspace" }).selectOptions("notes");
+  await screen.getByRole("radio", { name: "30 days" }).click();
+  await choose(screen, "Workspace", "notes");
   await expect.poll(() => reads.at(-1)?.get("workspace")).toBe("notes");
   expect(router.state.location.search).toMatchObject({ days: 30, workspace: "notes" });
   const start = new Date(reads.at(-1)?.get("start") ?? "");
@@ -214,13 +215,23 @@ test("Langfuse not answering says why", async () => {
 
 test("the workspaces offered are the tenant's, as artifactr lists them", async () => {
   const { screen } = await open("/t/acme/feedback");
-  const workspace = screen.getByRole("combobox", { name: "Workspace" });
+  await screen.getByRole("combobox", { name: "Workspace" }).click();
   await expect
-    .poll(() => [...workspace.element().querySelectorAll("option")].map((o) => o.value))
-    .toEqual(["", "notes", "plans"]);
-  await expect
-    .element(screen.getByRole("combobox", { name: "Window" }))
-    .toHaveTextContent("The last 7 days, in UTCThe last 30 days, in UTCThe last 90 days, in UTC");
+    .poll(() =>
+      page
+        .getByRole("option")
+        .elements()
+        .map((option) => option.textContent),
+    )
+    .toEqual(["Every workspace", "notes", "plans"]);
+  await userEvent.keyboard("{Escape}");
+  const window = screen.getByRole("radiogroup", { name: "Window" });
+  expect(
+    window
+      .getByRole("radio")
+      .elements()
+      .map((radio) => radio.textContent),
+  ).toEqual(["7 days", "30 days", "90 days"]);
 });
 
 test("a partial summary says so, with a badge", async () => {

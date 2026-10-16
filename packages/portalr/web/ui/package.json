@@ -4,7 +4,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./styles.css": "./src/styles.css"
+    "./styles.css": "./src/styles.css",
+    "./testing": "./src/test/select.ts",
+    "./testing/bdd": "./src/test/bdd-select.ts"
   },
   "sideEffects": [
     "*.css"

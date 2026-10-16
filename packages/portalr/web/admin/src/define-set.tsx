@@ -6,7 +6,15 @@
  */
 
 import { type Answer, orThrow, refusal } from "@portalr/client";
-import { Button, Card, CheckboxGroup, ConfirmDialog, SectionTitle, TextField } from "@portalr/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  CheckboxGroup,
+  ConfirmDialog,
+  SectionTitle,
+  TextField,
+} from "@portalr/ui";
 import { type ReactNode, useActionState, useEffect, useId, useRef, useState } from "react";
 import { refused } from "./access";
 
@@ -140,7 +148,7 @@ export function DefineSet({
             onValueChange={(value) => setTyped(String(value))}
           />
         )}
-        {said && <p role="alert">{said}</p>}
+        {said && <Alert tone="error">{said}</Alert>}
         <div className="flex flex-wrap gap-2">
           {lost ? (
             <ConfirmDialog

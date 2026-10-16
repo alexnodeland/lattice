@@ -3,6 +3,7 @@
  * newest on top, a page back at a time, a filter in the address, and each failure a way on.
  */
 
+import { choose } from "@portalr/ui/testing";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { page } from "vitest/browser";
 import { open as opened } from "./test/admin";
@@ -120,8 +121,8 @@ test("a log of exactly one page offers Show more once, and then says it has all"
 
 test("a filter goes to grantr and into the address, trimmed, and Clear takes it away", async () => {
   const { screen, router } = await open("/t/acme/audit");
-  await screen.getByRole("combobox", { name: "Change" }).selectOptions("Members added");
-  await screen.getByRole("combobox", { name: "Made by" }).selectOptions("A person");
+  await choose(screen, "Change", "Members added");
+  await choose(screen, "Made by", "A person");
   await screen.getByRole("textbox", { name: "Their id" }).fill(" bob ");
   await screen.getByRole("button", { name: "Apply" }).click();
   const table = screen.getByRole("table", { name: "Audit log" });
@@ -148,7 +149,9 @@ test("an address naming a maker grantr can't take reads the whole log", async ()
   // The read uses only what grantr takes: here, nothing of the maker.
   expect(audits.every((query) => !query.has("actor") && !query.has("actor_kind"))).toBe(true);
   // The form shows the filter read, not the address.
-  await expect.element(screen.getByRole("combobox", { name: "Made by" })).toHaveValue("");
+  await expect
+    .element(screen.getByRole("combobox", { name: "Made by" }))
+    .toHaveTextContent("Anyone");
 });
 
 test("a filter grantr refuses says why, and clearing it reads the log again", async () => {

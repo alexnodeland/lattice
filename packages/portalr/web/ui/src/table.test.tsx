@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { Button } from "./button";
 import { Table } from "./table";
 import { contrast } from "./test/colours";
 
@@ -105,4 +106,42 @@ test("a column's header stays small and muted", async () => {
   const cell = getComputedStyle(screen.getByRole("cell", { name: "alice" }).element());
   expect(Number.parseFloat(header.fontSize)).toBeLessThan(Number.parseFloat(cell.fontSize));
   expect(header.color).not.toBe(cell.color);
+});
+
+test("every row is the same height, whether its cells hold words, a small action or a tall one", async () => {
+  const screen = await render(
+    <Table caption="Members">
+      <tbody>
+        <tr>
+          <th scope="row">alice</th>
+          <td>owner</td>
+        </tr>
+        <tr>
+          <th scope="row">bob</th>
+          <td>
+            <Button variant="ghost" size="sm">
+              Remove
+            </Button>
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">carol</th>
+          <td>
+            <Button variant="secondary">Remove</Button>
+          </td>
+        </tr>
+      </tbody>
+    </Table>,
+  );
+  const heights = screen
+    .getByRole("table", { name: "Members" })
+    .getByRole("row")
+    .elements()
+    .map((row) => Math.round(row.getBoundingClientRect().height));
+  const least =
+    Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--row-height")) *
+    16;
+  // The rows with words and with a small action match, at the token's height; the taller button makes its own.
+  expect(heights[0]).toBe(heights[1]);
+  expect(heights[0]).toBeGreaterThanOrEqual(least);
 });

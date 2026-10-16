@@ -73,7 +73,10 @@ export function AppShell({
     }
   }
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]">
+    <div
+      data-density={ui === "admin" ? "compact" : undefined}
+      className="min-h-dvh lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]"
+    >
       <a
         href="#main"
         className="fixed top-2 left-2 z-50 -translate-y-16 rounded-md bg-surface px-3 py-2 font-semibold text-sm focus:translate-y-0 focus-visible:outline-2 focus-visible:outline-focus"
@@ -91,7 +94,7 @@ export function AppShell({
             <Dialog.Popup
               aria-modal="true"
               onClick={followed}
-              className="fixed inset-y-0 left-0 z-50 flex w-[min(19rem,85vw)] flex-col gap-4 border-line border-r bg-surface p-3 text-fg outline-none transition-transform duration-200 data-ending-style:-translate-x-full data-starting-style:-translate-x-full motion-reduce:transition-none"
+              className="fixed inset-y-0 left-0 z-50 flex w-[min(19rem,85vw)] flex-col gap-4 border-line border-r bg-surface p-3 text-fg shadow-lg outline-none transition-transform duration-200 data-ending-style:-translate-x-full data-starting-style:-translate-x-full motion-reduce:transition-none"
             >
               <div className="flex items-center justify-between pl-2">
                 <Dialog.Title className="sr-only">Navigation</Dialog.Title>
@@ -130,7 +133,7 @@ export function AppShell({
         tabIndex={-1}
         className="min-w-0 px-4 py-6 outline-none sm:px-6 lg:px-12 lg:py-9"
       >
-        <div className="flex max-w-260 flex-col gap-6">{children}</div>
+        <div className="mx-auto flex w-full max-w-(--page-width) flex-col gap-6">{children}</div>
       </main>
     </div>
   );

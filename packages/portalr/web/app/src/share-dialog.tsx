@@ -6,7 +6,7 @@
  */
 
 import { type Answer, type GrantrApi, type Names, refusal, shortId } from "@portalr/client";
-import { Button, ConfirmDialog, Dialog, SelectField } from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, Dialog, Row, Rows, SelectField } from "@portalr/ui";
 import { type RefObject, useActionState, useRef } from "react";
 
 type Grant = GrantrApi.components["schemas"]["Grant"];
@@ -64,7 +64,7 @@ export function ShareDialog({
   /** Where focus goes when it closes: the menu it was opened from. */
   finalFocus?: RefObject<HTMLElement | null>;
 }) {
-  const person = useRef<HTMLSelectElement>(null);
+  const person = useRef<HTMLButtonElement>(null);
   const [refused, grant, granting] = useActionState(
     async (_last: string | null, form: FormData) => {
       const role = form.get("role");
@@ -90,12 +90,9 @@ export function ShareDialog({
       ) : grants.length === 0 ? (
         <p>No one holds a role on it yet.</p>
       ) : (
-        <ul aria-label="People with access" className="flex flex-col gap-2">
+        <Rows label="People with access">
           {grants.map((each) => (
-            <li
-              key={`${identity(each.to)}:${each.role}`}
-              className="flex flex-wrap items-center justify-between gap-2"
-            >
+            <Row key={`${identity(each.to)}:${each.role}`}>
               <span>
                 {each.to.kind === "user" ? (
                   <span title={each.to.id}>{named(each.to, names)}</span>
@@ -106,7 +103,11 @@ export function ShareDialog({
               </span>
               {canRevoke && (
                 <ConfirmDialog
+                  className="ml-auto"
                   label="Revoke"
+                  about={`${named(each.to, names)} as ${each.role}`}
+                  look="danger-soft"
+                  size="sm"
                   title={`Revoke ${named(each.to, names)}'s ${each.role} role?`}
                   confirm="Revoke the role"
                   onConfirm={async () => {
@@ -120,9 +121,9 @@ export function ShareDialog({
                   restricted, they no longer see it.
                 </ConfirmDialog>
               )}
-            </li>
+            </Row>
           ))}
-        </ul>
+        </Rows>
       )}
       {people.length === 0 ? (
         <p>
@@ -132,7 +133,7 @@ export function ShareDialog({
       ) : (
         <form aria-label="Share with someone" className="flex flex-col gap-2" action={grant}>
           <SelectField
-            ref={person}
+            triggerRef={person}
             label="Person"
             name="person"
             options={[...people]
@@ -144,7 +145,7 @@ export function ShareDialog({
             name="role"
             options={ROLES.map((role) => ({ value: role, label: role }))}
           />
-          {refused && <p role="alert">{refused}</p>}
+          {refused && <Alert tone="error">{refused}</Alert>}
           <Button type="submit" disabled={granting} className="self-start">
             Share
           </Button>

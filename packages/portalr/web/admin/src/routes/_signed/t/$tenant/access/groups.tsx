@@ -1,5 +1,5 @@
 import { type Names, orThrow } from "@portalr/client";
-import { Button, ConfirmDialog, ItemTable } from "@portalr/ui";
+import { Alert, Button, ConfirmDialog, ItemTable } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -131,15 +131,14 @@ function Groups() {
         keyOf={(group) => group.name}
         actions={(group) => (
           <>
-            <Button
-              variant="secondary"
-              aria-label={define.words.change(group.name)}
-              onClick={() => void change(group.name)}
-            >
-              Change members
+            <Button variant="ghost" size="sm" onClick={() => void change(group.name)}>
+              Change<span className="sr-only"> {possessive(group.name)}</span> members
             </Button>
             <ConfirmDialog
-              label={`Delete ${group.name}`}
+              label="Delete"
+              about={group.name}
+              look="danger-soft"
+              size="sm"
               title={`Delete the group ${group.name}?`}
               confirm="Delete"
               onConfirm={async () =>
@@ -158,7 +157,7 @@ function Groups() {
         )}
         empty={{ title: "No groups yet", body: "A group's grants reach each of its members." }}
       />
-      {said && <p role={said.refused ? "alert" : "status"}>{said.said}</p>}
+      {said && <Alert tone={said.refused ? "error" : "info"}>{said.said}</Alert>}
       {allowed.has("grantr:add_member") ? (
         <FromMembers key={changing?.name ?? "new"} tenant={tenant} define={define} />
       ) : (

@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { choose } from "@portalr/ui/testing/bdd";
 import { Then, When } from "./fixtures";
 
 const rail = (page: Page) => page.getByRole("navigation", { name: "Deployment" });
@@ -21,7 +22,7 @@ When(
   "they ask for the links of the trace {string} and the tenant {string}",
   async ({ page }, trace: string, tenant: string) => {
     await page.getByRole("textbox", { name: "Trace id" }).fill(trace);
-    await page.getByRole("combobox", { name: "Tenant" }).selectOption(tenant);
+    await choose(page, page.getByRole("combobox", { name: "Tenant" }), tenant);
     await page.getByRole("button", { name: "Get links" }).click();
   },
 );

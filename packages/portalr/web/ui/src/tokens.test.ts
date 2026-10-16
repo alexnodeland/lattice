@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from "vitest";
-import { contrast, dark, distance, luminance, token } from "./test/colours";
+import { contrast, dark, deltaE2000, distance, luminance, token } from "./test/colours";
 
 test("the working colour is the scheme's violet", () => {
   expect(token("accent")).toBe(dark ? "rgb(226, 204, 245)" : "rgb(107, 47, 160)");
@@ -148,16 +148,36 @@ test("a chart's series are tints of the brand violet and one accent, led by the 
   expect(first).toBeLessThanOrEqual(285);
   expect(second).toBeGreaterThanOrEqual(255);
   expect(second).toBeLessThanOrEqual(285);
-  // The one accent is the brand's magenta, which is past every violet.
-  expect(accent).toBeGreaterThan(300);
+  // The one accent is a teal: well clear of the violets, and of the danger colour's red.
+  expect(accent).toBeGreaterThanOrEqual(150);
+  expect(accent).toBeLessThanOrEqual(200);
   // The tints differ in lightness, not hue alone.
   expect(Math.abs(luminance(token("chart-1")) - luminance(token("chart-2")))).toBeGreaterThan(0.05);
 });
 
+/**
+ * The least CIEDE2000 distance two series may be apart: 20, where 1 is the least a person sees and
+ * a few are plainly different colours. It is the floor ADR-0036 holds, to a reader who sees every
+ * colour and, simulated, to one with protanopia, deuteranopia or tritanopia.
+ */
+const APART = 20;
+
 test("a chart's series are told apart, to a reader who sees every colour and to one who sees some", () => {
-  expect(closest(inks())).toBeGreaterThanOrEqual(18);
+  expect(closest(inks())).toBeGreaterThanOrEqual(APART);
   for (const deficiency of DEFICIENCIES) {
-    expect(closest(inks(), deficiency), deficiency).toBeGreaterThanOrEqual(17);
+    expect(closest(inks(), deficiency), deficiency).toBeGreaterThanOrEqual(APART);
+  }
+});
+
+test("the two violets differ in lightness, and so do not rest on hue", () => {
+  expect(Math.abs(luminance(token("chart-1")) - luminance(token("chart-2")))).toBeGreaterThan(0.05);
+});
+
+test("the accent is clear of the danger colour, the status colours' red, to every reader", () => {
+  const accent = token("chart-3");
+  expect(distance(accent, token("danger"))).toBeGreaterThanOrEqual(APART);
+  for (const deficiency of DEFICIENCIES) {
+    expect(distance(accent, token("danger"), deficiency), deficiency).toBeGreaterThanOrEqual(APART);
   }
 });
 
@@ -177,14 +197,39 @@ test("colour-blind mode swaps the series for others that stand out from the surf
 
 test("colour-blind mode's series are told apart even to a reader with a deficiency", () => {
   const swapped = inks(cvd());
-  expect(closest(swapped)).toBeGreaterThanOrEqual(18);
+  expect(closest(swapped)).toBeGreaterThanOrEqual(APART);
   for (const deficiency of DEFICIENCIES) {
-    expect(closest(swapped, deficiency), deficiency).toBeGreaterThanOrEqual(17);
+    expect(closest(swapped, deficiency), deficiency).toBeGreaterThanOrEqual(APART);
   }
 });
 
+test("CIEDE2000 gives Sharma, Wu and Dalal's published values", () => {
+  expect(deltaE2000([50, 2.6772, -79.7751], [50, 0, -82.7485])).toBeCloseTo(2.0425, 3);
+  expect(deltaE2000([50, 2.5, 0], [73, 25, -18])).toBeCloseTo(27.1492, 3);
+  expect(deltaE2000([60.2574, -34.0099, 36.2677], [60.4626, -34.1751, 39.4387])).toBeCloseTo(
+    1.2644,
+    3,
+  );
+});
+
+test("greys stay grey to every deficiency, which only moves the colours", () => {
+  for (const deficiency of DEFICIENCIES) {
+    expect(distance("rgb(128, 128, 128)", "rgb(128, 128, 128)", deficiency)).toBeCloseTo(0, 1);
+    // A grey and its simulation are the same grey: it sits as far from black as ever.
+    expect(distance("rgb(128, 128, 128)", "rgb(0, 0, 0)", deficiency)).toBeCloseTo(
+      distance("rgb(128, 128, 128)", "rgb(0, 0, 0)"),
+      0,
+    );
+  }
+});
+
+test("a colour that isn't opaque sRGB is refused, not read as if it were", () => {
+  expect(() => distance("lab(50% 40 59)", "rgb(0, 0, 0)")).toThrow(/not opaque sRGB/);
+  expect(() => distance("rgb(0 0 0 / 50%)", "rgb(0, 0, 0)")).toThrow(/not opaque sRGB/);
+});
+
 test("a deficiency is simulated: red and green stay apart on a screen, and merge to a reader without green", () => {
-  expect(distance("rgb(200, 0, 0)", "rgb(0, 160, 0)")).toBeGreaterThan(80);
+  expect(distance("rgb(200, 0, 0)", "rgb(0, 160, 0)")).toBeGreaterThan(50);
   expect(distance("rgb(200, 0, 0)", "rgb(0, 160, 0)", "deuteranopia")).toBeLessThan(
     distance("rgb(200, 0, 0)", "rgb(0, 160, 0)") / 2,
   );

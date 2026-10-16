@@ -155,7 +155,7 @@ test("the week's thumbs, evaluations and workspaces, from portalr's summary", as
     .toBeVisible();
   await expect.element(screen.getByText("accuracy · accuracy").first()).toBeVisible();
   const donut = screen.getByRole("figure", { name: "People's thumbs by workspace" });
-  await expect.element(donut.getByRole("listitem").first()).toHaveTextContent("notes480%");
+  await expect.element(donut.getByRole("listitem").first()).toHaveTextContent("notes, 4, 80%");
   const places = screen.getByRole("table", { name: "By workspace" });
   await expect.element(places.getByRole("rowheader", { name: "In no workspace" })).toBeVisible();
   const said = screen.getByRole("table", { name: "What people said" });

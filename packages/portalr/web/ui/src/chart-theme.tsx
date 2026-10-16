@@ -200,18 +200,25 @@ const DAY = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", t
 /** A number as people read it: grouped, to two places at most, such as `1,250.5`. */
 export const formatNumber = (value: number) => NUMBER.format(value);
 
-/** A day, `2026-10-15`, as an axis writes it: `Oct 15`. */
-export const formatDay = (day: string) => DAY.format(new Date(`${day}T00:00:00Z`));
+/** A day, `2026-10-15`, as an axis writes it: `Oct 15`; anything else, as it came, not a thrown error. */
+export const formatDay = (day: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(day) ? DAY.format(new Date(`${day}T00:00:00Z`)) : day;
 
-/** A moment in UTC, `2026-10-15 04:11`, as an axis writes it: `04:11`, with its day too, `Oct 15 04:11`, when asked. */
-export const formatMoment = (moment: string, withDay: boolean) =>
-  withDay ? `${formatDay(moment.slice(0, 10))} ${moment.slice(11)}` : moment.slice(11);
+/**
+ * A moment in UTC, written `2026-10-15 04:11` (the form admin indexes Health's points by), as an
+ * axis writes it: `04:11`, with its day too, `Oct 15 04:11`, when asked. Anything not in that form
+ * is given as it came.
+ */
+export const formatMoment = (moment: string, withDay: boolean) => {
+  const [, day = "", time = ""] = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})$/.exec(moment) ?? [];
+  return day ? (withDay ? `${formatDay(day)} ${time}` : time) : moment;
+};
 
 /** The most of a chart's width its direct labels may take: a longer name is cut, and given whole as a title. */
 const MOST_OF_WIDTH = 0.3;
 
-/** The gap between a plot and its direct labels, in px. */
-const LABEL_GAP = 8;
+/** The gap between a plot's right edge and its direct labels, in px. */
+export const LABELS_OFFSET = 8;
 
 /** A chart's direct labels: the room they take to its right, and each name as it is written there. */
 export interface Labels {
@@ -229,7 +236,7 @@ export interface Labels {
 export function useLabels(ref: RefObject<HTMLElement | null>, names: readonly string[]): Labels {
   const key = names.join("\n");
   const [labels, setLabels] = useState<Labels>(() => ({
-    room: LABEL_GAP + 7 * Math.max(0, ...names.map((name) => name.length)),
+    room: LABELS_OFFSET + 7 * Math.max(0, ...names.map((name) => name.length)),
     fit: (name) => name,
   }));
   useLayoutEffect(() => {
@@ -238,25 +245,41 @@ export function useLabels(ref: RefObject<HTMLElement | null>, names: readonly st
     if (!element || !context || key === "") {
       return;
     }
+    let live = true;
     const measure = () => {
-      context.font = getComputedStyle(element).font;
+      if (!live) {
+        return;
+      }
+      const style = getComputedStyle(element);
+      // The `font` shorthand is empty in some engines, so it is put together from its parts.
+      context.font =
+        style.font ||
+        `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
       const width = (text: string) => context.measureText(text).width;
       const most = element.clientWidth * MOST_OF_WIDTH;
       const fit = (name: string) => {
-        let kept = name;
-        while (kept.length > 1 && width(kept === name ? kept : `${kept}…`) > most) {
-          kept = kept.slice(0, -1);
+        // By code point, so a character is never cut in two.
+        const letters = Array.from(name);
+        let kept = letters.length;
+        while (
+          kept > 1 &&
+          width(kept === letters.length ? name : `${letters.slice(0, kept).join("")}…`) > most
+        ) {
+          kept -= 1;
         }
-        return kept === name ? name : `${kept}…`;
+        return kept === letters.length ? name : `${letters.slice(0, kept).join("")}…`;
       };
       const widest = Math.max(...key.split("\n").map((name) => width(fit(name))));
-      setLabels({ room: LABEL_GAP + Math.ceil(widest), fit });
+      setLabels({ room: LABELS_OFFSET + Math.ceil(widest), fit });
     };
     measure();
-    void document.fonts.ready.then(measure);
+    void document.fonts?.ready.then(measure);
     const observer = new ResizeObserver(measure);
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      live = false;
+      observer.disconnect();
+    };
   }, [ref, key]);
   return labels;
 }

@@ -38,6 +38,7 @@ import {
   GRID,
   Hatch,
   ink,
+  LABELS_OFFSET,
   type Labels,
   Legend,
   MARGIN,
@@ -256,12 +257,12 @@ function lastValue(data: readonly Datum[], key: string, bar: boolean): number | 
 }
 
 /** How far apart direct labels are kept, in px: a line of the chart's text. */
-const LABEL_GAP = 12;
+const LABELS_APART = 12;
 
 /**
  * Each series' name, in the margin to the plot's right, beside where it is last drawn: a line's
  * last point, or the middle of a bar series' last bar. The places are worked out from the data
- * and the chart's scale, kept inside the plot's height, then nudged apart, `LABEL_GAP` at least,
+ * and the chart's scale, kept inside the plot's height, then nudged apart, `LABELS_APART` at least,
  * before anything is drawn; a name too long for the margin is cut, and given whole as a title.
  */
 function DirectLabels({
@@ -281,14 +282,14 @@ function DirectLabels({
   if (!scale || !plot) {
     return null;
   }
-  const top = plot.y + LABEL_GAP / 2;
-  const bottom = plot.y + plot.height - LABEL_GAP / 2;
+  const top = plot.y + LABELS_APART / 2;
+  const bottom = plot.y + plot.height - LABELS_APART / 2;
   const placed = series
     .flatMap((one) => {
       const value = lastValue(data, one.key, bar);
       const y = value === null ? undefined : scale(bar ? value / 2 : value);
       return typeof y === "number"
-        ? [{ name: one.name, y: Math.min(Math.max(y, top), bottom) }]
+        ? [{ name: one.name, written: fit(one.name), y: Math.min(Math.max(y, top), bottom) }]
         : [];
     })
     .sort((a, b) => a.y - b.y);
@@ -297,17 +298,14 @@ function DirectLabels({
   for (const [at, label] of placed.entries()) {
     const above = placed[at - 1];
     if (above) {
-      placed[at] = { name: label.name, y: Math.max(label.y, above.y + LABEL_GAP) };
+      placed[at] = { ...label, y: Math.max(label.y, above.y + LABELS_APART) };
     }
   }
   for (let at = placed.length - 1; at >= 0; at -= 1) {
     const label = placed[at];
     const below = placed[at + 1];
     if (label) {
-      placed[at] = {
-        name: label.name,
-        y: Math.min(label.y, below ? below.y - LABEL_GAP : bottom),
-      };
+      placed[at] = { ...label, y: Math.min(label.y, below ? below.y - LABELS_APART : bottom) };
     }
   }
   return (
@@ -315,13 +313,13 @@ function DirectLabels({
       {placed.map((label) => (
         <text
           key={label.name}
-          x={plot.x + plot.width + 8}
+          x={plot.x + plot.width + LABELS_OFFSET}
           y={label.y + 4}
           fill="var(--muted)"
           textAnchor="start"
         >
-          {fit(label.name) !== label.name && <title>{label.name}</title>}
-          {fit(label.name)}
+          {label.written !== label.name && <title>{label.name}</title>}
+          {label.written}
         </text>
       ))}
     </g>
@@ -609,7 +607,7 @@ export function DonutChart({
                 <Tooltip
                   content={({ active, payload }) => {
                     const part = payload[0];
-                    const at = shown.findIndex((one) => one.name === part?.name);
+                    const at = shown.findIndex((one) => one.key === part?.payload?.key);
                     return active && part && typeof part.value === "number" ? (
                       <TooltipCard>
                         <TooltipRow
@@ -638,9 +636,11 @@ export function DonutChart({
                 <Swatch at={at} />
                 {part.name}
               </span>
+              <span className="sr-only">, </span>
               <span className="text-right text-fg">
                 <Num>{format(part.value)}</Num>
               </span>
+              <span className="sr-only">, </span>
               <span className="text-right text-muted">
                 <Num>{share(part.value)}</Num>
               </span>

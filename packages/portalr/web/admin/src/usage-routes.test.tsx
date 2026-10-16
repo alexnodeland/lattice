@@ -131,7 +131,7 @@ test("the week's spend, each day against its share, and each workspace's part", 
       .getByRole("listitem")
       .elements()
       .map((item) => item.textContent),
-  ).toEqual(["notes$4.0057%", "No workspace$2.0029%", "plans$1.0014%"]);
+  ).toEqual(["notes, $4.00, 57%", "No workspace, $2.00, 29%", "plans, $1.00, 14%"]);
   await expect.element(screen.getByText(/has no workspace split/)).toBeVisible();
   // The tenant's workspaces, as artifactr lists them, in order.
   expect(reads.at(-1)?.getAll("workspaces")).toEqual(["notes", "plans"]);
@@ -180,7 +180,7 @@ test("a partial read says so, with a badge", async () => {
       .getByRole("listitem")
       .elements()
       .map((item) => item.textContent),
-  ).toEqual(["notes$4.0080%", "plans$1.0020%"]);
+  ).toEqual(["notes, $4.00, 80%", "plans, $1.00, 20%"]);
 });
 
 test("LiteLLM not configured says so", async () => {

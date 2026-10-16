@@ -128,10 +128,22 @@ async function shown(width: number, colourBlind = false) {
     document.fonts.load('1em "Schibsted Grotesk"'),
     document.fonts.load('600 1em "Schibsted Grotesk"'),
   ]);
-  // The drawings measure their labels once the faces are in, and draw again: wait for both.
+  // The drawings measure their labels once the faces are in, and draw again. A direct label is
+  // there, and inside its drawing, only once that is done, so wait for it, and for a frame after.
   await document.fonts.ready;
+  await expect
+    .poll(() => {
+      const label = [...document.querySelectorAll("svg text")].find(
+        (text) => text.textContent === "accuracy",
+      );
+      const drawing = label?.closest("svg")?.getBoundingClientRect();
+      return (
+        label !== undefined &&
+        (label.getBoundingClientRect().right ?? Infinity) <= (drawing?.right ?? 0)
+      );
+    })
+    .toBe(true);
   await new Promise((settled) => requestAnimationFrame(() => requestAnimationFrame(settled)));
-  await expect.poll(() => document.querySelectorAll("svg text").length).toBeGreaterThan(20);
 }
 
 async function matches(name: string) {

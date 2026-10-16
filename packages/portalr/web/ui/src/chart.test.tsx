@@ -6,10 +6,13 @@ import { formatDay } from "./chart-theme";
 
 const days = { key: "day", name: "Day" };
 
-/** What the chart's text says, in the drawing. */
 /** A series name long enough that no chart gives it room whole. */
 const LONG = "an evaluation of the answers with a very long name that no chart has room for";
 
+/** A legend row's cells: its name, value and share, without the separators read aloud only. */
+const cellsOf = (row: Element) => [...row.children].filter((cell) => !cell.matches(".sr-only"));
+
+/** What the chart's text says, in the drawing. */
 const texts = () => [...document.querySelectorAll("svg text")].map((text) => text.textContent);
 
 /** The page asks for colour-blind mode, as it would on its root. */
@@ -233,11 +236,9 @@ test("a donut shows the largest three parts, folds the rest into Other, and give
   );
   const figure = screen.getByRole("figure", { name: "Feedback by workspace" });
   const parts = figure.getByRole("listitem");
-  await expect.element(parts.first()).toHaveTextContent("notes660%");
+  await expect.element(parts.first()).toHaveTextContent("notes, 6, 60%");
   // Each part's name, value and share, in its own row.
-  expect(
-    parts.elements().map((part) => [...part.children].map((cell) => cell.textContent)),
-  ).toEqual([
+  expect(parts.elements().map((part) => cellsOf(part).map((cell) => cell.textContent))).toEqual([
     ["notes", "6", "60%"],
     ["plans", "2", "20%"],
     ["ops", "1", "10%"],
@@ -420,7 +421,7 @@ test("on a phone, a donut's legend keeps each part's value in its row, with its 
   const rows = screen.getByRole("figure").getByRole("listitem").elements();
   expect(rows).toHaveLength(2);
   for (const row of rows) {
-    const [name, value] = [...row.children].map((cell) => cell.getBoundingClientRect());
+    const [name, value] = cellsOf(row).map((cell) => cell.getBoundingClientRect());
     // The value sits on the name's line, not under it, and close to it.
     expect(Math.abs((value?.top ?? 0) - (name?.top ?? 0))).toBeLessThan(8);
     expect((value?.left ?? 0) - (name?.right ?? 0)).toBeLessThan(48);

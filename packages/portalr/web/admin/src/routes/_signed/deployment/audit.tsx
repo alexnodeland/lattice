@@ -1,15 +1,20 @@
+import { usePeople } from "@portalr/client";
 import { Alert, Button, ItemTable, Moment, PageHeader } from "@portalr/ui";
 import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
-import { actor, said } from "../../../audit";
+import { actor, peopleOf, said } from "../../../audit";
 import { ReadFailed } from "../../../read-failed";
 
 const HEADER = (
-  <PageHeader title="Audit" meta="Who was made an operator, and who stopped being one" />
+  <PageHeader
+    title="Audit"
+    meta="Who was made an operator, who stopped being one, and who created which tenant"
+  />
 );
 
 /**
- * The deployment's audit log, for its operators: each change to who may operate the deployment, who
+ * The deployment's audit log, for its operators: each change to who may operate the deployment, and
+ * each tenant created, for whom, who
  * made it, and when, the newest first, a page at a time (grantr's `GET /audit`, which needs
  * `grantr:grant_operator`). A tenant's own changes are in its Audit (portalr ADR-0034).
  */
@@ -32,27 +37,29 @@ export const Route = createFileRoute("/_signed/deployment/audit")({
 });
 
 function Audit() {
-  const { queries, user } = Route.useRouteContext();
+  const { queries, user, config } = Route.useRouteContext();
   const { data, hasNextPage, fetchNextPage, isFetchingNextPage, isFetchNextPageError, error } =
     useSuspenseInfiniteQuery(queries.grantr.deploymentAudit(user));
   // Each page is oldest first, and each is older than the last: the newest are on top.
   const entries = data.pages.flatMap((page) => [...page].reverse());
+  // An operator is shown anyone by email, in no tenant (portalr ADR-0038).
+  const names = usePeople(queries, config.people, null, entries.flatMap(peopleOf));
   return (
     <div className="flex flex-col gap-6">
       {HEADER}
       <ItemTable
         caption="Deployment audit log"
         columns={[
-          { key: "change", label: "Change", cell: (entry) => said(entry.event) },
-          { key: "by", label: "By", cell: (entry) => actor(entry.by) },
+          { key: "change", label: "Change", cell: (entry) => said(entry.event, names) },
+          { key: "by", label: "By", cell: (entry) => actor(entry.by, names) },
           { key: "at", label: "When", cell: (entry) => <Moment at={entry.at} /> },
         ]}
         items={entries}
         keyOf={(entry) => String(entry.seq)}
-        named={(entry) => `${said(entry.event)}, ${new Date(entry.at).toLocaleString()}`}
+        named={(entry) => `${said(entry.event, names)}, ${new Date(entry.at).toLocaleString()}`}
         empty={{
           title: "No changes yet",
-          body: "Each time someone is made an operator, or stops being one, it is kept here.",
+          body: "Each time someone is made an operator, or stops being one, or a tenant is created, it is kept here.",
         }}
       />
       <p role="status" className="sr-only">

@@ -3,10 +3,9 @@
 Creating a tenant is recorded in the deployment's audit log as well as the tenant's, in the same
 transaction, which names the new tenant and so can add only that tenant's rows. One policy lets
 it add one more row, for ``INSERT`` alone: a deployment entry of the type
-``deployment_tenant_created``, whose event names the transaction's own tenant, if it names
-one. No other command
-and no other deployment entry is allowed, and the deployment's audit rows stay unreadable, so the
-application's role cannot read, change or delete them. PostgreSQL only.
+``deployment_tenant_created``, whose event names the transaction's own tenant, which must be
+named. No other command and no other deployment entry is allowed, and the deployment's audit rows
+stay unreadable, so the application's role cannot read, change or delete them. PostgreSQL only.
 
 Revision ID: 0005
 Revises: 0004

@@ -953,9 +953,9 @@ async def test_the_deployments_tools_provision_a_tenant_and_the_admins_it_lacks(
     entries = await grants.provision_tenant("globex", owner=BOB.id, admins=admins)
     assert [(entry.by, type(entry.event)) for entry in entries] == [
         (None, TenantCreated),
-        (None, DeploymentTenantCreated),
         (None, MemberAdded),
         (None, Granted),
+        (None, DeploymentTenantCreated),
     ]
     [recorded] = [entry for entry in entries if isinstance(entry.event, DeploymentTenantCreated)]
     assert (recorded.tenant, recorded.event) == (

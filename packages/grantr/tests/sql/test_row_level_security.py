@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
+from asyncpg.exceptions import FeatureNotSupportedError
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -367,7 +368,7 @@ async def test_copy_from_is_refused_outright_under_row_level_security(
 ) -> None:
     """PostgreSQL does not run ``COPY FROM`` into a table with policies, so it adds nothing."""
     owner, application = engines
-    with pytest.raises(Exception, match="COPY FROM not supported with row-level security"):
+    with pytest.raises(FeatureNotSupportedError, match="COPY FROM not supported"):
         await _copy(application, [_record(_entry(CREATION, tenant="acme"))])
     async with owner.connect() as connection:
         assert len(list(await connection.execute(DEPLOYMENTS_ENTRIES))) == 3

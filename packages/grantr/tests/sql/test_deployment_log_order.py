@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from grantr.core import DeploymentTenantCreated, User
+from grantr.core import DeploymentTenantCreated, Granted, User
 from grantr.grants import Grants
 from grantr.sql import SqlStorage, create_schema
 from tests.catalogs import ARTIFACTR
@@ -38,10 +38,10 @@ async def stores(backend: str, tmp_path: Any) -> AsyncIterator[tuple[Grants, Sql
 
 
 @asynccontextmanager
-async def paused_after_deployment_entry(
-    storage: SqlStorage, monkeypatch: pytest.MonkeyPatch
+async def paused_after_entry(
+    storage: SqlStorage, monkeypatch: pytest.MonkeyPatch, kind: type
 ) -> AsyncIterator[tuple[asyncio.Event, asyncio.Event]]:
-    """Make the next creation stop with its deployment entry added and its transaction open."""
+    """Make the next transaction stop once it has added an entry of ``kind``, still open."""
     reached, release = asyncio.Event(), asyncio.Event()
     transaction = storage.transaction
 
@@ -52,7 +52,7 @@ async def paused_after_deployment_entry(
 
             async def appended(tenant: str | None, by: Any, event: Any) -> Any:
                 entry = await append(tenant, by, event)
-                if isinstance(event, DeploymentTenantCreated):
+                if isinstance(event, kind):
                     reached.set()
                     await release.wait()
                 return entry
@@ -74,7 +74,10 @@ async def test_an_operators_change_waits_for_a_creation_and_is_numbered_after_it
 ) -> None:
     async with stores(backend, tmp_path) as (grants, storage):
         await grants.first_operator(ROOT.id)
-        async with paused_after_deployment_entry(storage, monkeypatch) as (reached, release):
+        async with paused_after_entry(storage, monkeypatch, DeploymentTenantCreated) as (
+            reached,
+            release,
+        ):
             creation = asyncio.create_task(grants.create_tenant("acme", owner="alice", by=ROOT))
             await asyncio.wait_for(reached.wait(), 10)
             monkeypatch.undo()  # the grant below runs as it is
@@ -85,8 +88,6 @@ async def test_an_operators_change_waits_for_a_creation_and_is_numbered_after_it
             assert waiting, "the grant waits for the creation to commit"
             created, granted = await asyncio.wait_for(asyncio.gather(creation, grant), 10)
         deployments = await grants.audit(None, by=ROOT)
-        seqs = [entry.seq for entry in deployments]
-        assert seqs == sorted(seqs)
         assert [entry.event.type for entry in deployments] == [
             "granted",
             "deployment_tenant_created",
@@ -97,9 +98,36 @@ async def test_an_operators_change_waits_for_a_creation_and_is_numbered_after_it
 
 @pytest.mark.postgres
 @pytest.mark.parametrize("backend", BACKENDS)
+async def test_a_creation_waits_for_an_operators_change_and_is_numbered_after_it(
+    backend: str, tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with stores(backend, tmp_path) as (grants, storage):
+        await grants.first_operator(ROOT.id)
+        async with paused_after_entry(storage, monkeypatch, Granted) as (reached, release):
+            grant = asyncio.create_task(grants.grant_operator("bob", by=ROOT))
+            await asyncio.wait_for(reached.wait(), 10)
+            monkeypatch.undo()  # the creation below runs as it is
+            creation = asyncio.create_task(grants.create_tenant("acme", owner="alice", by=ROOT))
+            await asyncio.sleep(0.5)
+            waiting = not creation.done()
+            release.set()
+            assert waiting, "the creation waits for the grant to commit"
+            granted, created = await asyncio.wait_for(asyncio.gather(grant, creation), 10)
+        deployments = await grants.audit(None, by=ROOT)
+        assert [entry.event.type for entry in deployments] == [
+            "granted",
+            "granted",
+            "deployment_tenant_created",
+        ]
+        assert granted.seq < created.seq
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize("backend", BACKENDS)
 async def test_concurrent_creations_and_operator_changes_all_commit_without_a_deadlock(
     backend: str, tmp_path: Any
 ) -> None:
+    """Many at once: none deadlocks, and every entry is there. The order is the test above's."""
     async with stores(backend, tmp_path) as (grants, _):
         await grants.first_operator(ROOT.id)
         work = [grants.create_tenant(f"t{i}", owner=f"owner{i}", by=ROOT) for i in range(6)]
@@ -108,7 +136,6 @@ async def test_concurrent_creations_and_operator_changes_all_commit_without_a_de
         await asyncio.wait_for(asyncio.gather(*work), 30)
         deployments = await grants.audit(None, by=ROOT, limit=100)
         assert len(deployments) == 1 + 6 + 6 + 3
-        assert [e.seq for e in deployments] == sorted(e.seq for e in deployments)
         created = {
             e.event.tenant for e in deployments if isinstance(e.event, DeploymentTenantCreated)
         }

@@ -489,9 +489,11 @@ class _Transaction(_Reads):
 async def _serialize_deployment_log(session: AsyncSession) -> bool:
     """Take the lock every writer of the deployment log's entries holds until it commits.
 
-    It is a transaction-scoped advisory lock, which row-level security does not apply to, on the
-    audit table of the current schema. It is always taken after the tenant's row lock, so two
-    transactions never wait on each other's. Returns whether it was taken: only on PostgreSQL.
+    It is a transaction-scoped advisory lock, which row-level security does not apply to, on a
+    hash of the current schema and the audit table. The key only has to be the same for every
+    connection of a running deployment; a hash that another schema's shared would only serialize
+    the two. It is always taken after the tenant's row lock, so two transactions never wait on
+    each other's. Returns whether it was taken: only on PostgreSQL.
     """
     if (await session.connection()).dialect.name != "postgresql":
         return False

@@ -519,7 +519,9 @@ class Grants:
             await self._require(tx, None, by, "grantr:create_tenant", DEPLOYMENT)
             if await tx.tenant(tenant):
                 raise Invalid(f"{tenant} exists")
-            return (await self._create(tx, record, tenant, owner, by))[0]
+            created = await self._create(tx, record, tenant, owner, by)
+            await self._record_creation(record, tenant, owner, by)
+            return created
 
     async def provision_tenant(
         self, tenant: TenantId, *, owner: UserId, admins: Iterable[UserId] = ()
@@ -533,8 +535,9 @@ class Grants:
         owner, and gains the admins it lacks.
 
         Returns:
-            The audit entries, a tenant's creation as :meth:`create_tenant` records it (the
-            tenant's and the deployment's); none if nothing changed.
+            The audit entries, in order: a new tenant's ``tenant_created``, the admins' entries,
+            and last the deployment's ``deployment_tenant_created`` for a new tenant; none if
+            nothing changed.
 
         Raises:
             Invalid: If the tenant's id is empty or has a ``~``.
@@ -542,8 +545,9 @@ class Grants:
         _tenant_id(tenant)
         async with self._change(tenant) as (tx, record):
             entries: list[AuditEntry] = []
-            if not await tx.tenant(tenant):
-                entries.extend(await self._create(tx, record, tenant, owner, None))
+            new = not await tx.tenant(tenant)
+            if new:
+                entries.append(await self._create(tx, record, tenant, owner, None))
             for admin in dict.fromkeys(admins):
                 user = User(id=admin)
                 if await self._is_member(tx, tenant, user):
@@ -553,6 +557,9 @@ class Grants:
                 grant = Grant(tenant=tenant, role="admin", on=TENANT, to=user)
                 await tx.add_grant(grant)
                 entries.append(await record(tenant, None, Granted(grant=grant)))
+            if new:
+                # Last, so the deployment log's lock is held for as short a time as it can be.
+                entries.append(await self._record_creation(record, tenant, owner, None))
             return entries
 
     async def delete_tenant(self, tenant: TenantId, *, by: Subject) -> AuditEntry:
@@ -884,19 +891,22 @@ class Grants:
         tenant: TenantId,
         owner: UserId,
         by: Subject | None,
-    ) -> list[AuditEntry]:
-        """Create a tenant whose first owner is a member and its owner.
-
-        It records the creation in the tenant's log and in the deployment's, in the transaction that
-        creates it, so neither exists without the other, and returns the tenant's entry and the
-        deployment's.
-        """
+    ) -> AuditEntry:
+        """Create a tenant whose first owner is a member and its owner, as its entry says."""
         await tx.create_tenant(tenant)
         for role in (MEMBER, "owner"):
             await tx.add_grant(Grant(tenant=tenant, role=role, on=TENANT, to=User(id=owner)))
-        created = await record(tenant, by, TenantCreated(owner=owner))
-        deployments = await record(None, by, DeploymentTenantCreated(tenant=tenant, owner=owner))
-        return [created, deployments]
+        return await record(tenant, by, TenantCreated(owner=owner))
+
+    async def _record_creation(
+        self, record: Record, tenant: TenantId, owner: UserId, by: Subject | None
+    ) -> AuditEntry:
+        """Record a tenant's creation in the deployment's log, in the creating transaction.
+
+        Called last, after the tenant's own entry and anything else the transaction does, since
+        the deployment log's lock is held from here to the commit.
+        """
+        return await record(None, by, DeploymentTenantCreated(tenant=tenant, owner=owner))
 
     async def _is_member(self, reads: Reads, tenant: TenantId, member: Member) -> bool:
         return await reads.has(Grant(tenant=tenant, role=MEMBER, on=TENANT, to=member))

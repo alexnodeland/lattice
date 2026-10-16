@@ -134,11 +134,12 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `SideNav`, `NavLink` | The areas, the current one marked, with how many wait for the reader |
 | `Switcher` | The tenant and the workspace, or the tenant alone, and a menu of the others |
 | `AccountMenu` | Who is signed in, their scheme, and signing out |
-| `PageHeader` | A page's way back, its one heading, a line about it, and its actions |
+| `PageHeader` | A page's way back, its one heading, a line about it, and its actions, set in the kit's type scale (`type.ts`: weights stop at 600), under a page width that centres a wide screen's content |
 | `Card`, `EmptyState`, `Table` | What asks something of the reader; nothing yet, and what to do; rows, named by a caption or by a heading beside them, a row's header in the row's own type |
 | `Rows`, `Row`, `RowLink`, `SectionTitle` | A lined list, each row's link stretched over it; a section's heading |
 | `Plain` | A page outside the frame: the lockup as a link home, the account if signed in, and one column |
-| `StatusBadge` | How a thing is going, as a shape and a word; only waiting for you in the working colour; a budget near or over as a word and a shape of its own, with no warning colour |
+| `StatusBadge` | How a thing is going, as a shape and a word, the word in the ink: what failed and a budget over edged and marked in the rose red, what is retrying and a budget near in the gold, succeeded neutral; only waiting for you in the working colour ([ADR-0039](adr/0039-elevation-status-colour-states-and-density.md)) |
+| `Alert`, `Reading`, `Skeleton` | A note, a warning or an error in the page, with a shape beside its words and the announcement its tone calls for; what is being read as a status over placeholders in its shape |
 | `ConfirmDialog` | A destructive action, asked first: what will be lost, the focus on its way out (Cancel, or words of its own such as "Keep running"), and a name to type where asked; its trigger shows its words alone in a row and is named in full aloud ([ADR-0037](adr/0037-form-controls-and-row-actions.md)) |
 | `SegmentedFilter` | One filter of a few, such as a window, side by side, with its label and hint written above and under it when asked, and a `name` to submit with its form |
 | `TenantSwitcher` | admin's tenant, or every tenant, and a menu of the others |

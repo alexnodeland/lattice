@@ -122,13 +122,13 @@ function Feedback() {
       <Filter tenant={tenant} shown={shown} />
       {!summary.complete && (
         <Alert tone="warn">
-          <span className="flex flex-wrap items-center gap-2">
-            <StatusBadge tone="stopped">Partial</StatusBadge>
-            Some days, scores and comments may be missing. A shorter window, or one workspace, may
-            read them all.
-            {unknownDays(summary) > 0 &&
-              " The shaded days weren't reached: they're unknown, not empty."}
-          </span>
+          <StatusBadge tone="stopped" className="mr-2">
+            Partial
+          </StatusBadge>
+          Some days, scores and comments may be missing. A shorter window, or one workspace, may
+          read them all.
+          {unknownDays(summary) > 0 &&
+            " The shaded days weren't reached: they're unknown, not empty."}
         </Alert>
       )}
       <Charts summary={summary} everywhere={workspace === undefined} />

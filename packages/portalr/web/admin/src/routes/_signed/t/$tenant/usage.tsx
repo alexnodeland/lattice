@@ -116,11 +116,11 @@ function UsagePage() {
       <Filter shown={shown} />
       {!usage.complete && (
         <Alert tone="warn">
-          <span className="flex flex-wrap items-center gap-2">
-            <StatusBadge tone="stopped">Partial</StatusBadge>
-            The read stopped short, so the days it didn't reach are left out, not shown as nothing
-            spent, and the sums are of what it read. A shorter window may read it all.
-          </span>
+          <StatusBadge tone="stopped" className="mr-2">
+            Partial
+          </StatusBadge>
+          The read stopped short, so the days it didn't reach are left out, not shown as nothing
+          spent, and the sums are of what it read. A shorter window may read it all.
         </Alert>
       )}
       <Spent usage={usage} />

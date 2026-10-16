@@ -16,7 +16,7 @@ Storage calls are cancelled from many places:
 
 SQLAlchemy takes a statement cancelled part-way for a lost connection. A SQLite engine keeps one pooled connection and takes the database's write lock with `BEGIN IMMEDIATE`, so a cancelled statement could drop the connection still holding the lock, or never return it to the pool, and lock the process out of its own database. PostgreSQL loses the connection too. Cancelling a commit, a read, a lease and a subscription's page 100 times each, in three ways, broke 9 or 10 of the 12 cases on SQLite and 6 of the 12 on PostgreSQL.
 
-reflexr makes the same decision, with the same helper ([reflexr ADR-0042](https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0042-cancel-safe-storage.md)).
+reflexr makes the same decision, with the same helper ([reflexr ADR-0042](../../reflexr/adr/0042-cancel-safe-storage.md)).
 
 ## Decision
 

@@ -42,15 +42,13 @@ test("a step keeps a chart to about ninety-six points, and is said in words", ()
   ]);
 });
 
-test("a point is the time of day, and for a week the day too", () => {
+test("a point is its day and time, in UTC, so no two points of a window share one", () => {
   const seconds = Date.parse("2026-10-15T09:30:00Z") / 1000;
-  expect(pointAt(seconds, 1)).toBe("09:30");
-  expect(pointAt(seconds, 24)).toBe("10-15 09:30");
-  expect(pointAt(seconds, 168)).toBe("10-15 09:30");
+  expect(pointAt(seconds)).toBe("2026-10-15 09:30");
   // A day's window has a point at each end, a day apart: they do not share a label.
-  expect(pointAt(seconds, 24)).not.toBe(pointAt(seconds + 86_400, 24));
+  expect(pointAt(seconds)).not.toBe(pointAt(seconds + 86_400));
   // Where a zone's clock goes back an hour, two points of its are not the same in UTC.
-  expect(pointAt(seconds, 1)).not.toBe(pointAt(seconds + 3600, 1));
+  expect(pointAt(seconds)).not.toBe(pointAt(seconds + 3600));
 });
 
 test("a window's steps without a point are gaps, not joined", () => {

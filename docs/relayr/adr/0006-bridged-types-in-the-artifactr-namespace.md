@@ -34,5 +34,5 @@ reflexr's event registry is process-global. With flat names, its own facts (`run
 - Easier: a bridged type can never collide with reflexr's facts or an application's types, and its name is stable from the first release.
 - Harder: in reflexr's registry, the `artifactr` namespace is relayr's, not artifactr's, and reflexr refuses any other base that declares it in the same process.
 
-[r-adr-0039]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0039-namespaced-event-types.md
-[rfc-0002]: https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md#d6-bridged-event-names-before-reflexr-45
+[r-adr-0039]: ../../reflexr/adr/0039-namespaced-event-types.md
+[rfc-0002]: ../../stackr/rfcs/0002-the-combined-system.md#d6-bridged-event-names-before-reflexr-45

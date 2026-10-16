@@ -63,6 +63,7 @@
       "AuditEvent": {
         "discriminator": {
           "mapping": {
+            "deployment_tenant_created": "#/components/schemas/DeploymentTenantCreated",
             "granted": "#/components/schemas/Granted",
             "group_defined": "#/components/schemas/GroupDefined",
             "group_deleted": "#/components/schemas/GroupDeleted",
@@ -83,6 +84,9 @@
         "oneOf": [
           {
             "$ref": "#/components/schemas/TenantCreated"
+          },
+          {
+            "$ref": "#/components/schemas/DeploymentTenantCreated"
           },
           {
             "$ref": "#/components/schemas/TenantDeleted"
@@ -128,6 +132,7 @@
       "AuditType": {
         "enum": [
           "tenant_created",
+          "deployment_tenant_created",
           "tenant_deleted",
           "member_added",
           "member_removed",
@@ -215,6 +220,29 @@
           "resource"
         ],
         "title": "Check",
+        "type": "object"
+      },
+      "DeploymentTenantCreated": {
+        "description": "A tenant was created: the deployment's record of it, beside the tenant's own.\n\nIts entry is in no tenant's log, the deployment's, and names who created the tenant, so an\noperator who isn't a member of the tenant it created is seen to have created it. The owner is\na user's id, never an email.",
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/TenantId"
+          },
+          "type": {
+            "const": "deployment_tenant_created",
+            "default": "deployment_tenant_created",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "owner"
+        ],
+        "title": "DeploymentTenantCreated",
         "type": "object"
       },
       "Grant": {

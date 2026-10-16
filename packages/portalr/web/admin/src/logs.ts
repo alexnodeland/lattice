@@ -88,14 +88,14 @@ export function stepSaid(step: number): string {
 }
 
 /**
- * A point's time as an axis reads it, in UTC: the time of day for an hour, and the day too for a
- * day or a week. A window of a day at its step has a point at each end, a day apart, so the day is
- * in the label from a day up; UTC is never repeated or skipped, as a zone's clock is where it
- * changes. So no two points of a window share a label.
+ * A point's time as the chart indexes and tabulates it, in UTC: the day and the time, `2026-10-15
+ * 09:30`. A window of a day at its step has a point at each end, a day apart, so the day is in it;
+ * UTC is never repeated or skipped, as a zone's clock is where it changes. So no two points of a
+ * window share one. The axis writes it shorter, by the hours the window spans.
  */
-export function pointAt(seconds: number, hours: HealthHours): string {
+export function pointAt(seconds: number): string {
   const iso = new Date(seconds * 1000).toISOString();
-  return hours >= 24 ? `${iso.slice(5, 10)} ${iso.slice(11, 16)}` : iso.slice(11, 16);
+  return `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;
 }
 
 /**

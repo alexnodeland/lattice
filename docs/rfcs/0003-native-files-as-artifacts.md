@@ -141,7 +141,7 @@ class ArtifactBusy(InvalidState):   # exported beside ThreadBusy
 
 - **In artifactr's `Workspace`, as an addition,** as `claim_thread`'s lease is, since a lease taken straight on `Storage` would skip the access check and ADR-0062's hiding of restricted artifacts.
 - **Its access checks.** `lease_artifact` and `release_artifact` ask `artifactr:edit_artifact` for the artifact. `artifact_lease` is a read, which portalr shows to viewers, so it asks `artifactr:read_artifacts`. A restricted artifact is answered as a missing one. `ACTIONS`, the complete catalog, doesn't grow, so grantr's catalog and its drift tests are unchanged.
-- **Its storage.** The key is `artifact:<id>`, which can't collide with `claim_thread`'s `thread:<id>`. `Storage` gains one read, `lease(scope, key)`, for the holder and expiry, and artifactr's two storages implement it. A storage an application wrote must add it. If `scripts/breaks.py` reports it, the PR is marked breaking.
+- **Its storage.** The key is `artifact:<id>`, which can't collide with `claim_thread`'s `thread:<id>`. `Storage` gains one read, `lease(scope, key)`, for the holder and expiry, and artifactr's two storages implement it. A storage an application wrote must add it; the owner accepted that (D6), and the PR is marked breaking if `scripts/breaks.py` reports it.
 - **Its semantics are `acquire_lease`'s.** The same holder acquiring again renews, and that is how a check-out is extended. Another holder may take a lease once `expires_at <= now`. `now` is each process's clock, as it already is for thread claims, so the seconds-long leases below assume clocks agree to well under a second.
 
 **A check-out is a record in the package**, `artifactr_files_checkouts`: its id, the artifact, the base version and digest, the actor, and the expiry. The lease's holder is `checkout:<id>:<actor id>`, which names that record, so two tabs are two holders, and a refusal can name who has the file. The check-in reads the base from the record, never from the upload, for its `test` and its `provenance.base`.
@@ -240,9 +240,9 @@ The pilot stays at level 1. A later phase may embed WordCraft through a host bri
 
 **Watching upstream.** Today there is no roadmap, spec or shared crate, and requests for pushed events (`photocraft#4939`, `vectorcraft#2188`) have no maintainer reply. What would change this: `gridcraft#1466` (a full control channel over `postMessage`), `photocraft#2263`, or WordCraft's `#405` and `#1655` (host bridges) merging; a shared `craft-embed` or `craft-control` crate; release notes mentioning `host=`, `window.` or `postMessage`.
 
-**Next, a streamed session, evaluated in phase 5.** The unmodified desktop app runs under a virtual display, in a sandboxed container per session, streamed to the browser as noVNC or Kasm do. The agent reaches the live document through the app's control channel, which listens on 127.0.0.1 inside the container, with its key in a file there. The application sends the call to a runner in the session container over the internal network. The runner runs `wordcraft-cli mcp --connect` inside the container, so the channel and its key never leave it. Events come by polling.
+**Next, a streamed session, evaluated in phase 5.** The unmodified desktop app runs under a virtual display, in a fixed pool of sandboxed containers, pre-started, one session at a time each (D7), streamed to the browser as noVNC or Kasm do. The agent reaches the live document through the app's control channel, which listens on 127.0.0.1 inside the container, with its key in a file there. The application sends the call to a runner in the session container over the internal network. The runner runs `wordcraft-cli mcp --connect` inside the container, so the channel and its key never leave it. Events come by polling.
 
-The spike measures the cost per session and how many a host holds; the input-to-pixel delay; the security of the stream (authenticated per session through the portal), the clipboard, and wiping the document at the end; and what stackr needs, since a container per session needs the Docker API, which is root on the host, while a fixed pool needs no socket. Whether the desktop build runs under a virtual display at all is unverified.
+The spike measures the cost per session and how many a host holds; the input-to-pixel delay; the security of the stream (authenticated per session through the portal), the clipboard, and wiping the document at the end; and how large a pool a host holds. Whether the desktop build runs under a virtual display at all is unverified.
 
 ### The log, feedback and telemetry
 
@@ -258,7 +258,7 @@ The spike measures the cost per session and how many a host holds; the input-to-
 ### stackr
 
 - **A recipe, off by default.** The template's `native_files` question adds the worker, its internal network, limits and token, and the editor's host name.
-- **One release, two artifacts, one pin.** The worker's thin image is built from the release tarball's `wordcraft-cli`, and the editor is the same release's `wordcraft-web` archive, served as static files by the stack's edge. Both are checked against `SHA256SUMS.txt`, and the image is built as ADR-0035 has it and pinned by digest. A check, like `check-config`'s, fails CI if the two pins differ. Upstream signs nothing and publishes no SBOM, so the checksum is the whole chain of custody until stackr's own attestation.
+- **One release, two artifacts, one pin.** The worker's thin image is built from the release tarball's `wordcraft-cli`, and the editor is the same release's `wordcraft-web` archive, served as static files by the stack's edge. Both are checked against `SHA256SUMS.txt`, and the image is built as ADR-0035 has it and pinned by digest. A check, like `check-config`'s, fails CI if the two pins differ. Upstream signs nothing and publishes no SBOM. Phase 3 doesn't wait for it (D8): the checksum and digest are verified in CI, and stackr records the provenance itself, until upstream signs.
 - **Notices and marks.** Both carry WordCraft's licence files and `NOTICE`. The marks stay as supplied, in the unmodified build only, and nothing of lattice's uses the ArtCraft name or implies its endorsement, as the brand licence requires.
 
 ### What changes in each package
@@ -302,6 +302,14 @@ Recommended, for the maintainer to decide.
 | D4 | People's editing | Check-out and check-in through the unmodified browser build; a streamed native session evaluated next | Reaching into the browser build's internals from a same-origin page |
 | D5 | Packaging | A separate distribution, `artifactr-files` | An extra of artifactr; a name built on the apps' brand |
 
+Decided by the owner on 2026-10-16:
+
+| # | Question | Decided | Instead of |
+|---|---|---|---|
+| D6 | `Storage.lease()` | Accepted, though it breaks a storage an application wrote; the PR is marked breaking if `scripts/breaks.py` reports it | A lease read kept outside `Storage` |
+| D7 | Streamed sessions | A fixed pool of pre-started containers; no Docker socket reachable from the application | A container per session, on demand |
+| D8 | Upstream's supply chain | Phase 3 doesn't wait for signed releases: pin by checksum and digest, verify in CI, record provenance ourselves; revisit if upstream signs | Waiting for signed releases |
+
 ## Drawbacks
 
 - **A young dependency on the critical path.** WordCraft's repository is nine days old, with six releases in seven days, and calls itself alpha. Its own documents disagree on how many commands it has. Commands, tools and output can change in any release.
@@ -315,6 +323,7 @@ Recommended, for the maintainer to decide.
 - **An embedding API upstream,** or **our own build of the browser editor** over WordCraft's crates. Either would allow an editor inside portalr. The owner's constraint rules both out: no fork, no upstream contribution.
 - **Reaching into the browser build from a same-origin page,** through its WebAssembly memory or its DOM. That depends on internals that change every release, and putting it on portalr's origin would need `wasm-unsafe-eval` in portalr's CSP.
 - **A CRDT, chosen by lattice.** lattice already has what a CRDT exists to do without: a server that orders every write and numbers each workspace's log ([ADR-0005][a-adr-0005]). Its collaboration is turn-based, through revisions and proposals ([ADR-0009][a-adr-0009]). A CRDT guarantees convergence, not a valid file. No craft app uses one, so `.docx` would have to be converted into a generic CRDT, which is lossy. It becomes worth it only for offline editing over hours, or several people typing at once.
+- **A session container started on demand** (D7). It needs the Docker API, or an orchestrator holding it, and that is root on the host, reachable from what the application can reach.
 - **LibreOffice headless.** Mature, but its edits are UNO calls rather than commands, and it is a large process to sandbox per call. It stays the fallback, and the `App` port admits it.
 - **Python format libraries** (`python-docx` and the like): no isolation from hostile files, and an edit model per format in application code.
 
@@ -322,7 +331,6 @@ Recommended, for the maintainer to decide.
 
 - **Large documents:** where the worker's round trip stops being cheap, which phase 2 measures.
 - **Quotas** on blob bytes per workspace or tenant, and where they are enforced.
-- **Upstream's supply chain:** whether to wait for signed releases before phase 3.
 
 ## Tracking
 

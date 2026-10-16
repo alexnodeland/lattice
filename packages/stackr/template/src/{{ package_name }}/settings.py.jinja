@@ -95,8 +95,13 @@ class PortalSettings:
         prometheus_url: prom-label-proxy, in front of Prometheus, for metrics.
         langfuse_project: The Langfuse project's id, for scores and links; with
             ``LANGFUSE_BASE_URL`` and the project's keys.
-        litellm_key: LiteLLM's master key, to read each tenant's spend; with ``LITELLM_BASE_URL``.
+        litellm_key: A key that reads each tenant's spend from LiteLLM, and does nothing else:
+            stackr's ``make portal-key`` makes it, limited to the team routes of a view-only admin.
+            Never the master key, which opens everything; with ``LITELLM_BASE_URL``.
         grafana_url: Grafana, as operators' browsers reach it, for deep links.
+        required: Whether the application must not start without a Supabase project for the UIs
+            to sign in to, rather than leave the portal off: set on a single host, where a
+            portal that is silently off would be an application that looks deployed and isn't.
     """
 
     supabase_url: str | None = None
@@ -109,6 +114,7 @@ class PortalSettings:
     langfuse_project: str | None = None
     litellm_key: str | None = None
     grafana_url: str | None = None
+    required: bool = False
 
     @classmethod
     def from_environ(cls, env: Mapping[str, str]) -> Self:
@@ -124,6 +130,7 @@ class PortalSettings:
             langfuse_project=env.get("PORTAL_LANGFUSE_PROJECT"),
             litellm_key=env.get("PORTAL_LITELLM_KEY"),
             grafana_url=env.get("PORTAL_GRAFANA_URL"),
+            required=env.get("PORTAL_REQUIRED") == "true",
         )
 
 

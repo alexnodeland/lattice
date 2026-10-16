@@ -142,9 +142,27 @@ def run(label: str, command: list[str], cwd: Path, env: dict[str, str] | None = 
     return [f"{label}:\n{done.stdout}{done.stderr}".rstrip()]
 
 
+def check_bun(app: Path) -> list[str]:
+    """Check that the image builds portalr's UIs with the Bun that lattice itself uses."""
+    dockerfile = (app / "Dockerfile").read_text()
+    found = re.search(
+        r"^FROM oven/bun:([0-9.]+)@sha256:[0-9a-f]{64} AS portal-ui$", dockerfile, re.M
+    )
+    if found is None:
+        return ["Dockerfile: the portal-ui stage isn't FROM oven/bun:<version>@sha256:<digest>"]
+    wanted = re.search(r'^bun = "([0-9.]+)"$', (LATTICE / ".prototools").read_text(), re.M)
+    if wanted is None or wanted[1] != found[1]:
+        return [
+            f"Dockerfile: Bun is {found[1]}, and lattice's .prototools says {wanted and wanted[1]}"
+        ]
+    return []
+
+
 def check(app: Path, sources: dict[str, dict[str, str]]) -> list[str]:
     """Check one rendered application, which needs these sources; return the problems found."""
     problems = check_sources(app, sources)
+    if (app / "scripts" / "build-portal-ui.sh").exists():
+        problems += check_bun(app)
     files = [p for p in app.rglob("*") if p.is_file() and ".git" not in p.parts]
     for path in files:
         if path.suffix in TEXT or path.name.startswith("."):

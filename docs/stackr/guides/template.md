@@ -26,8 +26,8 @@ make check          # lint, types and tests, as its CI runs them
 | `evals` | Yes | An `evals/` directory with starter evalr experiments |
 | `bridge` | Yes | With both libraries: relayr's bridge between them, its incident timeline example, and rules from chat |
 | `access` | `grantr` | `grantr`: tenants, members, roles and keys, and every command and read checked; or `none`: the tenant from the token, and every user of a tenant may do anything in it, including, with `bridge`, installing rules from chat, or `chat:` rules directly through reflexr's REST and MCP, with no review |
-| `portal` | Yes | With `access=grantr`: [portalr](../../portalr/index.md)'s app and admin UIs and its router of reads, mounted at `/portalr`, on the same grantr ([ADR-0038](../adr/0038-portalr-in-the-template.md)) |
-| `hosting` | `none` | `none`, or `host`: an overlay, `deploy/host/compose.prod.yaml`, that runs the application's published image behind stackr's edge on a [single host](single-host.md) |
+| `portal` | Yes | With `access=grantr`: [portalr](../../portalr/index.md)'s app and admin UIs and its router of reads, mounted at `/portalr`, on the same grantr ([ADR-0038](../adr/0038-portalr-in-the-template.md)). It signs people in through a Supabase project, named in `PORTAL_SUPABASE_URL` and `PORTAL_SUPABASE_KEY` (the publishable key): without them it is off, and on a single host the application won't start. It adds a Bun build and a network fetch to the image |
+| `hosting` | `none` | `none`, or `host`: an overlay, `deploy/host/compose.prod.yaml`, that runs the application's published image behind stackr's edge on a [single host](single-host.md). With the portal, it makes the portal required (the application doesn't start without `PORTAL_SUPABASE_URL` and `PORTAL_SUPABASE_KEY` in `.env`: on a single host the URL is `https://auth.<your domain>`, which the edge answers at `/auth/v1`), trusts the edge's `X-Forwarded-*` headers (`FORWARDED_ALLOW_IPS`), and leaves invitations off, since GoTrue alone has no gateway behind its private address |
 | `python_version` | 3.12 | 3.12, 3.13 or 3.14 |
 | `app_port` | 8800 | The port the application is published on, on this machine |
 
@@ -115,7 +115,11 @@ The **dev container** is built on `.devcontainer/compose.yaml`. When the stack i
 uvx copier update
 ```
 
-pulls in the template's improvements since the application was generated, keeping your own changes. It asks the questions again, with your previous answers (recorded in `.copier-answers.yml`) as the defaults; `--skip-answered` asks only the new ones. It needs a git repository with no uncommitted changes, and marks conflicts between the template's changes and yours inline, for you to resolve. Review the result like any other change, and run `make check`.
+pulls in the template's improvements since the application was generated, keeping your own changes. An application generated before the portal existed is asked the `portal` question when it updates, and the default is yes: say no to keep the image as it is, since the portal adds a Bun stage to the build and a network fetch of lattice at the pinned commit. It asks the questions again, with your previous answers (recorded in `.copier-answers.yml`) as the defaults; `--skip-answered` asks only the new ones. It needs a git repository with no uncommitted changes, and marks conflicts between the template's changes and yours inline, for you to resolve. Review the result like any other change, and run `make check`.
+
+### The portal's Bun
+
+The portal's image stage builds portalr's UIs with Bun, pinned in the `Dockerfile` by tag and digest (`FROM oven/bun:<tag>@sha256:<digest>`), as lattice itself pins Bun in its `.prototools`; `check-template` holds the two to the same version. The generated application is outside lattice's Renovate, so a new Bun comes with `copier update`, or by changing the tag and the digest together (`docker buildx imagetools inspect oven/bun:<tag>`). The UIs' commit is not pinned a second time: `scripts/build-portal-ui.sh` reads it from `uv.lock`, where portalr's git source says which commit is installed.
 
 ### The libraries' revisions
 

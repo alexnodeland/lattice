@@ -31,6 +31,14 @@ auth.{$STACKR_DOMAIN} {
 	handle /admin/* {
 		respond 404
 	}
+	# supabase-js, in portalr's UIs, reaches Supabase Auth at <url>/auth/v1; GoTrue alone serves at
+	# its root. The same refusal of the admin API holds under the prefix.
+	handle_path /auth/v1/* {
+		handle /admin/* {
+			respond 404
+		}
+		reverse_proxy gotrue:9999
+	}
 	# Caddy replaces X-Forwarded-For from clients with their address, which GoTrue's per-address
 	# rate limits read (GOTRUE_RATE_LIMIT_HEADER).
 	reverse_proxy gotrue:9999

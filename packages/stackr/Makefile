@@ -85,7 +85,7 @@ COMPOSE_ENV = STACKR_TRACES_EXPORTERS='$(TRACES_EXPORTERS)' STACKR_GATEWAY_TELEM
 SMOKE = $(COMPOSE_ENV) STACKR_DATABASE=$(STACKR_DATABASE) STACKR_RECIPE=$(STACKR_RECIPE) \
 	STACKR_COMPOSE_FILES="$(COMPOSE_FILES)" SUPABASE="$(SUPABASE)" scripts/smoke
 
-.PHONY: help env up down reset ps logs tenant backup restore-drill validate smoke smoke-app docs-reference clean
+.PHONY: help env up down reset ps logs tenant portal-key backup restore-drill validate smoke smoke-app docs-reference clean
 
 help: ## List the available commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -136,6 +136,9 @@ logs: ## Follow the logs of the running services
 tenant: ## Create a tenant's team and key on the gateway: make tenant NAME=acme [TENANT_FLAGS="--max-budget 20"]
 	@if [ -z "$(NAME)" ]; then echo "usage: make tenant NAME=<tenant> [TENANT_FLAGS=...]"; exit 2; fi
 	$(UV) run scripts/create-tenant $(NAME) $(TENANT_FLAGS)
+
+portal-key: ## Create the read-only key portalr's admin reads spend with (PORTAL_LITELLM_KEY), not the master key
+	$(UV) run scripts/create-portal-key
 
 backup: ## On a single host: back up PostgreSQL and ClickHouse to the BACKUP_S3_* bucket now
 	$(if $(COMPOSE_FILES),deploy/host/backup,$(error backups are the single host's: set STACKR_RECIPE=host))

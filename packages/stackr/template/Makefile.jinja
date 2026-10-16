@@ -76,8 +76,8 @@ access-matrix: ## Write every role against every action to access.md, to review 
 
 {%- if use_portal %}
 
-portal-ui: ## Build portalr's UIs from the commit pyproject.toml pins into .portal-ui; then set PORTAL_UI_DIR to it
-	scripts/build-portal-ui.sh {{ _copier_conf.vcs_ref_hash }} .portal-ui
+portal-ui: ## Build portalr's UIs, from the commit uv.lock pins it at, into .portal-ui; then set PORTAL_UI_DIR to it
+	scripts/build-portal-ui.sh .portal-ui
 {%- endif %}
 
 up: ## Build and start the application in the app profile, beside stackr's stack

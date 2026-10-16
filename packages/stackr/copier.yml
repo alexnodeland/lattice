@@ -77,7 +77,9 @@ portal:
   type: bool
   help: >-
     Include portalr (an app UI to chat with the agents and see their work, and an admin UI for
-    access, feedback, traces and spend)?
+    access, feedback, traces and spend)? It signs people in through a Supabase project, which the
+    application is told of in PORTAL_SUPABASE_URL and PORTAL_SUPABASE_KEY: without one it is off.
+    It adds a Bun build and a network fetch to the image.
   default: true
   when: "{{ access == 'grantr' }}"
 

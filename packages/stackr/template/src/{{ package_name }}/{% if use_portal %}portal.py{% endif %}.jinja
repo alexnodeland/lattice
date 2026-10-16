@@ -97,10 +97,17 @@ class Portal:
         return self._access.grants
 
     @property
+    def site(self) -> Site | None:
+        """The Supabase project the UIs sign in to, or None where it isn't named."""
+        portal = self._settings.portal
+        if portal.supabase_url and portal.supabase_key:
+            return Site(supabase_url=portal.supabase_url, supabase_key=portal.supabase_key)
+        return None
+
+    @property
     def configured(self) -> bool:
         """Whether the UIs have a Supabase project to sign in to."""
-        portal = self._settings.portal
-        return bool(portal.supabase_url and portal.supabase_key)
+        return self.site is not None
 
     async def migrate(self, database: Database) -> None:
         """The portal keeps nothing of its own in the database."""
@@ -115,9 +122,16 @@ class Portal:
                 await client.aclose()
 
     def mount(self, app: FastAPI) -> None:
-        """Add the router and the UIs, if a Supabase project is named."""
+        """Add the router and the UIs, if a Supabase project is named.
+
+        Raises:
+            ValueError: If none is, and the settings say the application must have the portal.
+        """
         portal = self._settings.portal
-        if not (portal.supabase_url and portal.supabase_key):
+        site = self.site
+        if site is None:
+            if portal.required:
+                raise ValueError(f"{OFF}, and PORTAL_REQUIRED says the application needs it")
             LOGGER.info(OFF)
             return
         router = portalr_router(
@@ -125,7 +139,7 @@ class Portal:
             grants=self.grants,
             readers=readers(self._settings, self._clients),
             invite=invitations(self._settings, self._clients),
-            site=Site(supabase_url=portal.supabase_url, supabase_key=portal.supabase_key),
+            site=site,
             ui=Path(portal.ui_dir) if portal.ui_dir else UI,
         )
         app.include_router(router, prefix=PREFIX)

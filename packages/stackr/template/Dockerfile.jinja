@@ -1,20 +1,22 @@
 # {{ project_name }}'s image, as the app profile runs it: `make up` builds it.
 #
 # lattice's libraries come from GitHub at the revisions uv.lock pins, so the build needs git
-# and the network. The runtime image holds the virtual environment and nothing else.
+# and the network. The runtime image holds only the virtual environment{% if use_portal %} and portalr's UIs{% endif %}.
 
-{%- if use_portal %}
-# portalr's UIs, which its wheel carries and a git install of it does not: built from the same
-# lattice commit as uv.lock pins portalr at. Replace this stage with portalr's wheel once it is
-# on PyPI.
-FROM oven/bun:1.4.3 AS portal-ui
+{% if use_portal -%}
+# portalr's UIs, which its wheel carries and a git install of it does not: built from the lattice
+# commit uv.lock pins portalr at (scripts/build-portal-ui.sh reads it from there). Bun is lattice's
+# own (its .prototools); to bump it, change the tag and the digest together
+# (`docker buildx imagetools inspect oven/bun:<tag>`), or run `copier update`. Replace this stage
+# with portalr's wheel once it is on PyPI.
+FROM oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 AS portal-ui
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
-ARG PORTAL_REV={{ _copier_conf.vcs_ref_hash }}
-COPY scripts/build-portal-ui.sh /usr/local/bin/
-RUN build-portal-ui.sh "$PORTAL_REV" /ui
-
+WORKDIR /app
+COPY uv.lock ./
+COPY scripts/build-portal-ui.sh scripts/
+RUN --mount=type=cache,target=/root/.bun/install/cache scripts/build-portal-ui.sh /ui
 
 {% endif -%}
 FROM ghcr.io/astral-sh/uv:0.12-python{{ python_version }}-trixie-slim AS build

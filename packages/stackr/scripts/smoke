@@ -812,6 +812,10 @@ AUTH_ADMIN_URL=http://gotrue:9999"
 
   app_key=$(uv run scripts/create-tenant stackr-smoke --max-budget 1 --allow-mock-responses \
     --key-alias "$run_id-app" --quiet) || { log "FAIL: app: creating its gateway key"; return 1; }
+  # portalr's admin reads the tenant's spend with a key of its own, which reads nothing else: a
+  # second run finds the key made already and prints none, so the spend isn't checked then.
+  portal_key=$(uv run scripts/create-portal-key --quiet) ||
+    { log "FAIL: app: creating the portal's spend-read key"; return 1; }
   app_password=$(random_hex 16)
   (
     umask 077
@@ -830,6 +834,7 @@ LITELLM_MOCK_RESPONSE="stackr smoke ok"
 APP_IMAGE=$app_name:local
 PORTAL_SUPABASE_URL=$app_url
 PORTAL_SUPABASE_KEY=sb_publishable_smoke
+PORTAL_LITELLM_KEY=$portal_key
 ENV
   )
   if ! docker compose --project-directory "$app_dir" --profile app build >/dev/null; then
@@ -921,6 +926,22 @@ ENV
   else
     log "FAIL: the owner's read of the tenant's spend answered $code, not 200"
     status=1
+  fi
+  if [[ -n $portal_key ]]; then
+    if app_call "/portalr/v1/spend" | jq -e '.status == "ok"' >/dev/null; then
+      log "ok: the spend comes from the gateway, read with the portal's own key"
+    else
+      log "FAIL: the portal could not read the tenant's spend from the gateway with its own key"
+      status=1
+    fi
+    # The key opens the team routes and nothing else: not chat, and not the keys.
+    if [[ $(probe -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $portal_key" \
+      "$gateway/key/list") == 403 ]]; then
+      log "ok: the portal's key is refused the gateway's other routes"
+    else
+      log "FAIL: the portal's key was not refused the gateway's key list"
+      status=1
+    fi
   fi
   code=$(APP_TENANT=stackr-smoke-other app_call "/portalr/v1/spend" -o /dev/null -w '%{http_code}' || true)
   if [[ $code == 403 ]]; then

@@ -3,6 +3,7 @@
 import logging
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -29,7 +30,7 @@ def ui(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def with_portal(**portal: str) -> Settings:
+def with_portal(**portal: Any) -> Settings:
     """The tests' settings, with a Supabase project for the UIs to sign in to, and these more."""
     named = PortalSettings(supabase_url=SUPABASE, supabase_key=KEY, **portal)
     return replace(settings(), portal=named)
@@ -58,6 +59,19 @@ def test_without_a_supabase_project_the_portal_is_off(
     assert "the portal is off" in caplog.text
 
 
+def test_a_portal_that_is_required_and_has_no_project_stops_the_application(script: Script) -> None:
+    required = replace(settings(), portal=PortalSettings(required=True))
+    with pytest.raises(ValueError, match="PORTAL_REQUIRED"):
+        app(script, required)
+
+
+def test_a_portal_that_is_required_and_has_its_project_starts(script: Script, ui: Path) -> None:
+    portal = replace(with_portal(ui_dir=str(ui)).portal, required=True)
+    named = replace(settings(), portal=portal)
+    with TestClient(app(script, named)) as client:
+        assert client.get("/portalr/config.json").status_code == 200
+
+
 def test_a_read_is_asked_of_grantr_for_the_callers_tenant(script: Script, ui: Path) -> None:
     with TestClient(app(script, with_portal(ui_dir=str(ui)))) as client:
         owner = client.get("/portalr/v1/spend", headers=bearer("alice"))
@@ -68,7 +82,7 @@ def test_a_read_is_asked_of_grantr_for_the_callers_tenant(script: Script, ui: Pa
         # Only an operator may list every tenant.
         everyone = client.get("/portalr/v1/deployment/tenants", headers=bearer("alice"))
         assert everyone.status_code == 403
-        assert client.get("/portalr/v1/spend").status_code in {401, 403}
+        assert client.get("/portalr/v1/spend").status_code == 401
 
 
 def test_the_portal_runs_on_a_database_and_stops_cleanly(
@@ -76,7 +90,7 @@ def test_the_portal_runs_on_a_database_and_stops_cleanly(
 ) -> None:
     url = f"sqlite+aiosqlite:///{tmp_path / 'app.db'}"
     config = replace(
-        with_portal(ui_dir=str(ui), tempo_url="http://tempo:3200", litellm_key="sk-master"),
+        with_portal(ui_dir=str(ui), tempo_url="http://tempo:3200", litellm_key="sk-spend-read"),
         database_url=url,
         auth=AuthSettings(jwt_secret=settings().auth.jwt_secret),
     )
@@ -93,7 +107,7 @@ def test_every_tool_with_an_address_is_read(ui: Path) -> None:
             loki_url="http://loki:3100",
             prometheus_url="http://prom-label-proxy:8080",
             langfuse_project="project",
-            litellm_key="sk-master",
+            litellm_key="sk-spend-read",
             grafana_url="http://localhost:3000",
         ),
         langfuse_url="http://langfuse-web:3000",
@@ -149,8 +163,9 @@ def test_the_portal_is_read_from_the_environment() -> None:
             "PORTAL_LOKI_URL": "http://loki:3100",
             "PORTAL_PROMETHEUS_URL": "http://proxy:8080",
             "PORTAL_LANGFUSE_PROJECT": "project",
-            "PORTAL_LITELLM_KEY": "sk-master",
+            "PORTAL_LITELLM_KEY": "sk-spend-read",
             "PORTAL_GRAFANA_URL": "http://localhost:3000",
+            "PORTAL_REQUIRED": "true",
             "LANGFUSE_BASE_URL": "http://langfuse-web:3000",
             "LANGFUSE_PUBLIC_KEY": "pk",
             "LANGFUSE_SECRET_KEY": "sk",
@@ -165,8 +180,9 @@ def test_the_portal_is_read_from_the_environment() -> None:
         loki_url="http://loki:3100",
         prometheus_url="http://proxy:8080",
         langfuse_project="project",
-        litellm_key="sk-master",
+        litellm_key="sk-spend-read",
         grafana_url="http://localhost:3000",
+        required=True,
     )
     assert read.langfuse_url == "http://langfuse-web:3000"
     assert read.langfuse_keys == ("pk", "sk")
@@ -184,4 +200,4 @@ def test_a_token_is_still_needed_to_read(script: Script) -> None:
     with TestClient(app(script, with_portal())) as client:
         forged = token("alice", secret="not-the-secret-at-all-32-characters-long")
         headers = {"Authorization": f"Bearer {forged}", "X-Tenant": TENANT}
-        assert client.get("/portalr/v1/spend", headers=headers).status_code in {401, 403}
+        assert client.get("/portalr/v1/spend", headers=headers).status_code == 401

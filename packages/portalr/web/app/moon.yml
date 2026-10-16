@@ -35,6 +35,7 @@ tasks:
       - 'bdd/**/*'
       - 'src/**/*'
       - 'scripts/bdd'
+      - '/scripts/compose-project.sh'
       - 'playwright.config.ts'
       - '/packages/portalr/compose.yaml'
       - '/packages/portalr/tests/app/**/*'

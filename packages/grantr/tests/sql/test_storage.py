@@ -2,11 +2,13 @@
 
 import asyncio
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
-from sqlalchemy import func, select, text
+from sqlalchemy import Select, func, select, text
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from grantr.core import (
     DEPLOYMENT,
@@ -27,6 +29,8 @@ from grantr.sql import SqlStorage, create_schema
 from grantr.sql.storage import (
     Columns,
     _scope,
+    _Transaction,
+    _utc_now,
     audit_query,
     grantee,
     resource,
@@ -34,6 +38,7 @@ from grantr.sql.storage import (
     subject_columns,
 )
 from grantr.sql.tables import TenantRow
+from lattice_core.sql.tenancy import TENANT_KEY
 from tests.databases import empty_database
 
 
@@ -126,7 +131,8 @@ async def test_a_tenants_concurrent_changes_are_numbered_in_order(engine: AsyncE
         )
     )
     entries = await setup.audit("acme", by=User(id="alice"))
-    assert [entry.seq for entry in entries] == list(range(2, 15))
+    # 1 is the operator's, and 3 the deployment log's record of acme.
+    assert [entry.seq for entry in entries] == [2, *range(4, 16)]
 
 
 async def test_one_of_two_concurrent_creations_of_a_tenant_wins(engine: AsyncEngine) -> None:
@@ -173,3 +179,31 @@ async def test_a_page_back_reads_the_type_or_the_actor_index_on_postgresql(
             await connection.execute(text("ANALYZE grantr_audit"))
             plan = await connection.execute(text(f"EXPLAIN {compiled}"))
             assert index in "\n".join(row[0] for row in plan)
+
+
+class _Postgres:
+    """A session on PostgreSQL that answers the sequence's next number, and records the query."""
+
+    def __init__(self, tenant: str) -> None:
+        self.info = {TENANT_KEY: tenant}
+        self.asked: list[str] = []
+
+    async def connection(self) -> SimpleNamespace:
+        return SimpleNamespace(dialect=postgresql.dialect())
+
+    async def execute(self, statement: Select[Any]) -> None:
+        self.asked.append(str(statement.compile(dialect=postgresql.dialect())))
+
+    async def scalar(self, statement: Select[Any]) -> int:
+        self.asked.append(str(statement.compile(dialect=postgresql.dialect())))
+        return 41
+
+
+async def test_a_row_of_another_scope_takes_its_number_from_the_sequence_on_postgresql() -> None:
+    session = _Postgres("acme")
+    transaction = _Transaction(cast("AsyncSession", session), _utc_now)
+    assert await transaction._next_seq("~deployment") == 41
+    assert "pg_advisory_xact_lock(" in session.asked[0], "the deployment log's lock, first"
+    assert "nextval(pg_get_serial_sequence(" in session.asked[1]
+    assert await transaction._next_seq("acme") is None, "its own rows take the insert's number"
+    assert len(session.asked) == 2, "and take no lock"

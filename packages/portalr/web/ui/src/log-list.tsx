@@ -177,7 +177,7 @@ export function LogList({
                   onFocus={() => setChosen(record.id)}
                   style={{ height: ROW, transform: `translateY(${item.start}px)` }}
                   className={cn(
-                    "absolute inset-x-0 top-0 flex cursor-default flex-col justify-center gap-0.5 border-line border-b px-3 text-sm outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-focus",
+                    "absolute inset-x-0 top-0 flex cursor-default flex-col justify-center gap-0.5 border-line border-b px-3 text-(length:--table-text) outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-focus",
                     on ? "bg-wash" : "hover:bg-wash/60",
                   )}
                 >

@@ -39,7 +39,7 @@ export function Table({
       <table
         aria-labelledby={labelledBy}
         className={cn(
-          "w-full border-collapse text-fg text-sm [&_td]:border-line [&_td]:border-t [&_td]:h-(--row-height) [&_td]:px-3 [&_td]:py-2 [&_td]:align-middle [&_th]:h-(--row-height) [&_th]:whitespace-nowrap [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_thead_th]:font-semibold [&_thead_th]:text-muted [&_thead_th]:text-xs [&_tbody_th]:border-line [&_tbody_th]:border-t [&_tbody_th]:align-middle [&_tbody_th]:font-semibold [&_tbody_th]:text-fg [&_tbody_th]:text-sm [&_tbody_tr:hover]:bg-wash",
+          "w-full border-collapse text-(length:--table-text) text-fg [&_td]:border-line [&_td]:border-t [&_td]:h-(--row-height) [&_td]:px-3 [&_td]:py-(--row-pad) [&_td]:align-middle [&_th]:h-(--row-height) [&_th]:whitespace-nowrap [&_th]:px-3 [&_th]:py-(--row-pad) [&_th]:text-left [&_thead_th]:font-semibold [&_thead_th]:text-muted [&_thead_th]:text-xs [&_tbody_th]:border-line [&_tbody_th]:border-t [&_tbody_th]:align-middle [&_tbody_th]:font-semibold [&_tbody_th]:text-fg [&_tbody_th]:text-(length:--table-text) [&_tbody_tr:hover]:bg-wash",
           className,
         )}
       >

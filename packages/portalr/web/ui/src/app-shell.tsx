@@ -73,7 +73,10 @@ export function AppShell({
     }
   }
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]">
+    <div
+      data-density={ui === "admin" ? "compact" : undefined}
+      className="min-h-dvh lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]"
+    >
       <a
         href="#main"
         className="fixed top-2 left-2 z-50 -translate-y-16 rounded-md bg-surface px-3 py-2 font-semibold text-sm focus:translate-y-0 focus-visible:outline-2 focus-visible:outline-focus"

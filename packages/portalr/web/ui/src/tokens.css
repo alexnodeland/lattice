@@ -91,6 +91,8 @@
    * so a row with a small action matches one without. Admin's compact density changes this alone.
    */
   --row-height: 2.75rem;
+  --row-pad: 0.5rem;
+  --table-text: 0.875rem;
   /* Behind a drawer or a dialog. */
   --scrim: light-dark(rgb(28 29 38 / 45%), rgb(0 0 0 / 60%));
   /*
@@ -99,6 +101,17 @@
    * in light and, to be seen at all on the dark paper, black and heavier in dark.
    */
   --shadow-color: light-dark(rgb(40 20 70 / 16%), rgb(0 0 0 / 65%));
+}
+
+/*
+ * Admin's density: compact, for a screen of tables and logs read down (portalr ADR-0039). The frame
+ * sets `data-density="compact"` for admin and leaves the app comfortable; a table's rows then are 36px
+ * and its words 13px, which a small action still fits.
+ */
+[data-density="compact"] {
+  --row-height: 2.25rem;
+  --row-pad: 0.25rem;
+  --table-text: 0.8125rem;
 }
 
 /*

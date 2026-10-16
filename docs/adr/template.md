@@ -37,8 +37,8 @@ The key trade-offs between the options, and why the decision wins.
 - What becomes easier.
 - What becomes harder.
 - What we will need to revisit.
+- For a protocol with a formal spec (`docs/<package>/spec/`): the properties this keeps, and how the spec changed with it (lattice ADR-0025).
 
 ## Action items
 
 1. [ ] Implementation step.
-2. [ ] If the decision changes a protocol with a formal spec (`docs/<package>/spec/`), the spec changes with it, and this record cites the properties it preserves (lattice ADR-0025).

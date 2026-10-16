@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from typing import Final
 
 from pydantic import TypeAdapter
-from sqlalchemy import ColumnElement, Select, and_, delete, false, or_, select, update
+from sqlalchemy import ColumnElement, Select, and_, delete, false, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
 
@@ -455,6 +455,7 @@ class _Transaction(_Reads):
         }
         actor_kind, actor_workspace, actor_id = actor_columns(by)
         row = AuditRow(
+            seq=await self._named_seq(_scope(tenant)),
             tenant_id=_scope(tenant),
             event_type=event.type,
             actor_kind=actor_kind,
@@ -465,6 +466,22 @@ class _Transaction(_Reads):
         self._session.add(row)
         await self._session.flush()
         return AuditEntry(seq=row.seq, at=at, tenant=tenant, by=by, event=event)
+
+    async def _named_seq(self, scope: str) -> int | None:
+        """The sequence number of a row of another scope than the transaction's, on PostgreSQL.
+
+        A tenant's transaction adds the deployment log's entry of the tenant's creation, which
+        its policy lets it insert but not read back. ``INSERT ... RETURNING`` reads the new row
+        through the read policy, so it names the number itself, from the table's own sequence;
+        any other row takes the number the insert returns.
+        """
+        if scope == self._session.info.get(TENANT_KEY):
+            return None
+        if (await self._session.connection()).dialect.name != "postgresql":
+            return None
+        return await self._session.scalar(
+            select(func.nextval(func.pg_get_serial_sequence(AuditRow.__tablename__, "seq")))
+        )
 
 
 async def _lock(session: AsyncSession, scope: str) -> None:

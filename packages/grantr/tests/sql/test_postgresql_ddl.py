@@ -15,9 +15,9 @@ from sqlalchemy.dialects import postgresql
 
 from grantr.sql.schema import _row_level_security
 
-MIGRATION = (
-    Path(__file__).parents[2] / "src/grantr/sql/migrations/versions/0003_row_level_security.py"
-)
+VERSIONS = Path(__file__).parents[2] / "src/grantr/sql/migrations/versions"
+MIGRATION = VERSIONS / "0003_row_level_security.py"
+CREATION = VERSIONS / "0005_tenant_creation_in_the_deployment_log.py"
 
 POLICIES = 10
 """How many policies the migration creates: one per table it names, frozen in it."""
@@ -26,9 +26,8 @@ POLICIES = 10
 class Recorder:
     """Stands in for a connection to PostgreSQL: it records each statement it is asked."""
 
-    dialect = postgresql.dialect()
-
-    def __init__(self) -> None:
+    def __init__(self, dialect: object | None = None) -> None:
+        self.dialect = dialect or postgresql.dialect()
         self.calls: list[tuple[str, object]] = []
 
     @property
@@ -39,8 +38,10 @@ class Recorder:
         self.calls.append((str(statement), parameters))
 
 
-def _migration(recorder: Recorder, monkeypatch: pytest.MonkeyPatch) -> ModuleType:
-    spec = importlib.util.spec_from_file_location("migration_rls", MIGRATION)
+def _migration(
+    recorder: Recorder, monkeypatch: pytest.MonkeyPatch, path: Path = MIGRATION
+) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(f"migration_{path.stem}", path)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -55,6 +56,7 @@ def test_create_schema_creates_the_policies_the_migration_does(
 ) -> None:
     migrated = Recorder()
     _migration(migrated, monkeypatch).upgrade()
+    _migration(migrated, monkeypatch, CREATION).upgrade()
     created = Recorder()
     _row_level_security(cast("Connection", created))
     assert sorted(created.statements) == sorted(migrated.statements)
@@ -72,3 +74,31 @@ def test_the_migration_creates_and_drops_the_policies(monkeypatch: pytest.Monkey
     dropped = [s for s in recorder.statements if s.startswith("DROP POLICY")]
     disabled = [s for s in recorder.statements if s.endswith("DISABLE ROW LEVEL SECURITY")]
     assert (len(dropped), len(disabled)) == (POLICIES, len(migration.TABLES))
+
+
+def test_the_creation_migration_adds_and_drops_one_insert_only_policy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorder = Recorder()
+    migration = _migration(recorder, monkeypatch, CREATION)
+    migration.upgrade()
+    [policy] = recorder.statements
+    assert policy.startswith(
+        "CREATE POLICY grantr_audit_tenant_creation ON grantr_audit FOR INSERT"
+    )
+    assert "tenant_id = '~deployment'" in policy
+    assert "event_type = 'deployment_tenant_created'" in policy
+    assert "= current_setting('lattice.tenant_id', true)" in policy, "of the transaction's tenant"
+    recorder.calls.clear()
+    migration.downgrade()
+    assert recorder.statements == ["DROP POLICY grantr_audit_tenant_creation ON grantr_audit"]
+
+
+def test_the_creation_migration_does_nothing_off_postgresql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorder = Recorder(SimpleNamespace(name="sqlite"))
+    migration = _migration(recorder, monkeypatch, CREATION)
+    migration.upgrade()
+    migration.downgrade()
+    assert recorder.calls == []

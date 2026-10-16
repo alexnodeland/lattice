@@ -12,13 +12,13 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0004](0004-an-agent-turn-acts-for-its-user.md) | An agent turn acts for its user | Accepted |
 | [0005](0005-a-users-tenants-from-grantrs-memberships.md) | A user's tenants from grantr's memberships | Accepted |
 | [0006](0006-what-v0-1-includes.md) | What v0.1 includes | Accepted |
-| [0007](0007-an-append-only-audit-log.md) | An append-only audit log | Accepted |
+| [0007](0007-an-append-only-audit-log.md) | An append-only audit log | Accepted, amended by 0033 |
 | [0008](0008-grantrs-own-model-with-openfga-shaped-ports.md) | grantr's own model, with OpenFGA-shaped ports | Accepted |
 | [0009](0009-a-deployment-wide-operator-role.md) | A deployment-wide operator role | Accepted, amended by 0014 and 0019 |
 | [0010](0010-commands-bounded-by-what-their-maker-holds.md) | Commands bounded by what their maker holds | Accepted |
 | [0011](0011-built-in-roles-over-the-catalogs.md) | Built-in roles over the catalogs | Accepted, amended by 0019, 0022 and 0023 |
 | [0012](0012-every-item-an-access-names-and-hooks-typed-by-actor.md) | Every item an access names, and hooks typed by their actor | Accepted |
-| [0013](0013-transactions-by-tenant-and-one-audit-log.md) | Transactions by tenant, and one audit log | Accepted, amended by 0016 |
+| [0013](0013-transactions-by-tenant-and-one-audit-log.md) | Transactions by tenant, and one audit log | Accepted, amended by 0016 and 0033 |
 | [0014](0014-an-operator-enters-a-tenant-by-granting-themselves.md) | An operator enters a tenant by granting themselves | Accepted |
 | [0015](0015-a-check-writes-nothing.md) | A check writes nothing | Accepted, amended by 0024 |
 | [0016](0016-the-sql-adapter.md) | The SQL adapter | Accepted, amended by 0024 |
@@ -31,12 +31,13 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0023](0023-portalrs-admin-reads.md) | portalr's admin reads | Accepted |
 | [0024](0024-who-sees-a-restricted-item.md) | Who sees a restricted item | Accepted |
 | [0025](0025-the-application-lists-tenants-and-workspaces-and-writes-for-code-rules.md) | The application lists tenants and workspaces, and writes for its code rules | Accepted, amended by 0027 and 0029 |
-| [0026](0026-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted |
+| [0026](0026-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted, amended by 0033 |
 | [0027](0027-the-application-installs-the-rules-people-accept.md) | The application installs the rules people accept | Accepted |
 | [0028](0028-a-principals-id-cant-pass-for-the-libraries-actors.md) | A principal's id can't pass for the libraries' actors | Accepted |
 | [0029](0029-a-stored-rule-acts-as-itself-in-its-own-workspace.md) | A stored rule acts as itself, in its own workspace | Accepted |
 | [0030](0030-the-audit-log-read-by-type-and-actor.md) | The audit log, read by type and by actor | Accepted |
 | [0031](0031-the-catalog-read.md) | The catalog, read | Accepted |
 | [0032](0032-the-audit-log-read-newest-first.md) | The audit log, read from its end | Accepted |
+| [0033](0033-a-tenants-creation-in-the-deployments-log.md) | A tenant's creation, in the deployment's log | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

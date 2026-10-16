@@ -29,6 +29,7 @@ from grantr.core import (
     AuditFilter,
     Catalog,
     CatalogView,
+    DeploymentTenantCreated,
     Forbidden,
     Grant,
     Granted,
@@ -504,6 +505,11 @@ class Grants:
     async def create_tenant(self, tenant: TenantId, *, owner: UserId, by: Subject) -> AuditEntry:
         """Create a tenant, with a user as its first owner.
 
+        The creation is recorded twice, in the same transaction: ``tenant_created`` in the
+        tenant's log, which this returns, and ``deployment_tenant_created`` in the deployment's,
+        which names the tenant and its owner, and ``by``, so an operator who isn't a member of
+        the tenant is seen to have created it.
+
         Raises:
             Forbidden: If ``by`` may not: ``grantr:create_tenant`` on the deployment.
             Invalid: If the tenant exists, or its id is empty or has a ``~``.
@@ -513,7 +519,8 @@ class Grants:
             await self._require(tx, None, by, "grantr:create_tenant", DEPLOYMENT)
             if await tx.tenant(tenant):
                 raise Invalid(f"{tenant} exists")
-            return await self._create(tx, record, tenant, owner, by)
+            created, _ = await self._create(tx, record, tenant, owner, by)
+            return created
 
     async def provision_tenant(
         self, tenant: TenantId, *, owner: UserId, admins: Iterable[UserId] = ()
@@ -527,7 +534,8 @@ class Grants:
         owner, and gains the admins it lacks.
 
         Returns:
-            The audit entries; none if nothing changed.
+            The audit entries, a tenant's creation as :meth:`create_tenant` records it (the
+            tenant's and the deployment's); none if nothing changed.
 
         Raises:
             Invalid: If the tenant's id is empty or has a ``~``.
@@ -536,7 +544,7 @@ class Grants:
         async with self._change(tenant) as (tx, record):
             entries: list[AuditEntry] = []
             if not await tx.tenant(tenant):
-                entries.append(await self._create(tx, record, tenant, owner, None))
+                entries.extend(await self._create(tx, record, tenant, owner, None))
             for admin in dict.fromkeys(admins):
                 user = User(id=admin)
                 if await self._is_member(tx, tenant, user):
@@ -877,12 +885,18 @@ class Grants:
         tenant: TenantId,
         owner: UserId,
         by: Subject | None,
-    ) -> AuditEntry:
-        """Create a tenant whose first owner is a member and its owner."""
+    ) -> tuple[AuditEntry, AuditEntry]:
+        """Create a tenant whose first owner is a member and its owner.
+
+        It records the creation in the tenant's log and in the deployment's, in the transaction
+        that creates it, so neither exists without the other.
+        """
         await tx.create_tenant(tenant)
         for role in (MEMBER, "owner"):
             await tx.add_grant(Grant(tenant=tenant, role=role, on=TENANT, to=User(id=owner)))
-        return await record(tenant, by, TenantCreated(owner=owner))
+        created = await record(tenant, by, TenantCreated(owner=owner))
+        deployments = await record(None, by, DeploymentTenantCreated(tenant=tenant, owner=owner))
+        return created, deployments
 
     async def _is_member(self, reads: Reads, tenant: TenantId, member: Member) -> bool:
         return await reads.has(Grant(tenant=tenant, role=MEMBER, on=TENANT, to=member))

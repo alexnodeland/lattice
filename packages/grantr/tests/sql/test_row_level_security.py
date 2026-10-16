@@ -7,6 +7,7 @@ nothing in a transaction that names no tenant.
 
 import ast
 import inspect
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -33,6 +34,14 @@ DEPLOYMENTS_KEY = text(
 )
 DELETE_DEPLOYMENTS = text("DELETE FROM grantr_grants WHERE tenant_id = '~deployment'")
 UPDATE_DEPLOYMENTS = text("UPDATE grantr_grants SET role = 'x' WHERE tenant_id = '~deployment'")
+DEPLOYMENT_ENTRY = text(
+    "INSERT INTO grantr_audit (tenant_id, event_type, actor_kind, actor_workspace, actor_id, body)"
+    " VALUES ('~deployment', :event_type, 'user', '', 'root', CAST(:body AS json))"
+)
+DEPLOYMENTS_ENTRIES = text(
+    "SELECT event_type, body #>> '{event,tenant}' FROM grantr_audit"
+    " WHERE tenant_id = '~deployment' ORDER BY seq"
+)
 MOVE_GRANTS = text("UPDATE grantr_grants SET tenant_id = 'globex' WHERE tenant_id = 'acme'")
 ANOTHERS = text("INSERT INTO grantr_roles (tenant_id, name, actions) VALUES ('globex', 'x', '[]')")
 
@@ -154,3 +163,96 @@ def _names_across(node: ast.AST) -> bool:
         and node.func.id in {"getattr", "setattr"}
         and any(isinstance(arg, ast.Constant) and arg.value == "_across" for arg in node.args)
     )
+
+
+def _entry(event_type: str, *, tenant: str, event: str | None = None) -> dict[str, str]:
+    """The parameters of a deployment audit entry of ``event_type``, whose event names a tenant."""
+    body = {
+        "at": "2026-10-16T00:00:00+00:00",
+        "by": None,
+        "event": {"type": event or event_type, "tenant": tenant, "owner": "alice"},
+    }
+    return {"event_type": event_type, "body": json.dumps(body)}
+
+
+CREATION = "deployment_tenant_created"
+
+
+@pytest.mark.postgres
+async def test_a_tenant_adds_the_one_deployment_entry_of_its_own_creation(
+    engines: tuple[AsyncEngine, AsyncEngine],
+) -> None:
+    owner, application = engines
+    async with _session(application, "acme") as session:
+        await session.execute(DEPLOYMENT_ENTRY, _entry(CREATION, tenant="acme"))
+    async with owner.connect() as connection:
+        entries = [tuple(row) for row in await connection.execute(DEPLOYMENTS_ENTRIES)]
+    assert entries == [
+        ("granted", None),
+        (CREATION, "acme"),
+        (CREATION, "globex"),
+        (CREATION, "acme"),
+    ], "the operator's grant, the two creations, and the one added here"
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        pytest.param(_entry("granted", tenant="acme"), id="another type of deployment entry"),
+        pytest.param(_entry("tenant_deleted", tenant="acme"), id="a type that edits a tenant"),
+        pytest.param(_entry(CREATION, tenant="globex"), id="the creation of another tenant"),
+        pytest.param(
+            _entry("granted", tenant="acme", event=CREATION),
+            id="a type that its event contradicts",
+        ),
+        pytest.param(
+            _entry(CREATION, tenant="acme", event="granted"),
+            id="an event that its type contradicts",
+        ),
+    ],
+)
+@pytest.mark.postgres
+async def test_a_tenant_adds_no_other_deployment_entry(
+    engines: tuple[AsyncEngine, AsyncEngine], entry: dict[str, str]
+) -> None:
+    owner, application = engines
+    async with owner.connect() as connection:
+        before = list(await connection.execute(DEPLOYMENTS_ENTRIES))
+    with pytest.raises(ProgrammingError, match="row-level security"):
+        async with _session(application, "acme") as session:
+            await session.execute(DEPLOYMENT_ENTRY, entry)
+    async with owner.connect() as connection:
+        assert list(await connection.execute(DEPLOYMENTS_ENTRIES)) == before
+
+
+@pytest.mark.postgres
+async def test_a_tenant_reads_changes_and_deletes_none_of_the_deployments_entries(
+    engines: tuple[AsyncEngine, AsyncEngine],
+) -> None:
+    owner, application = engines
+    update = text("UPDATE grantr_audit SET actor_id = 'x' WHERE tenant_id = '~deployment'")
+    delete = text("DELETE FROM grantr_audit WHERE tenant_id = '~deployment'")
+    async with _session(application, "acme") as session:
+        await session.execute(DEPLOYMENT_ENTRY, _entry(CREATION, tenant="acme"))
+        assert list(await session.scalars(DEPLOYMENTS_AUDIT)) == [], "not even its own entry"
+        connection = await session.connection()
+        assert (await connection.execute(update)).rowcount == 0
+        assert (await connection.execute(delete)).rowcount == 0
+    async with owner.connect() as connection:
+        assert len(list(await connection.execute(DEPLOYMENTS_ENTRIES))) == 4, "all remain"
+    with pytest.raises(ProgrammingError, match="row-level security"):
+        async with _session(application, "acme") as session:
+            await session.execute(
+                text(f"{DEPLOYMENT_ENTRY.text} RETURNING seq"), _entry(CREATION, tenant="acme")
+            )
+
+
+@pytest.mark.postgres
+async def test_the_policy_is_for_insert_alone(engines: tuple[AsyncEngine, AsyncEngine]) -> None:
+    owner, _ = engines
+    policies = text(
+        "SELECT cmd, qual IS NULL FROM pg_policies"
+        " WHERE policyname = 'grantr_audit_tenant_creation' AND schemaname = current_schema()"
+    )
+    async with owner.connect() as connection:
+        assert [tuple(row) for row in await connection.execute(policies)] == [("INSERT", True)]

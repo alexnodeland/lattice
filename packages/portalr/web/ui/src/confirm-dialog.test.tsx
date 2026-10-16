@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
@@ -119,4 +120,166 @@ test("a trigger with a name shows its words and is named in full", async () => {
   );
   const trigger = screen.getByRole("button", { name: "Revoke viewer from bob on workspace notes" });
   await expect.element(trigger).toHaveTextContent("Revoke");
+});
+
+test("it can ask for a reason, which goes to the action, trimmed, and is asked for again each time", async () => {
+  const onConfirm = vi.fn(async (_reason: string) => undefined);
+  const screen = await render(
+    <ConfirmDialog
+      label="Skip"
+      title="Skip this run?"
+      confirm="Skip the run"
+      asking="Reason (optional)"
+      onConfirm={onConfirm}
+    >
+      The run is given up on.
+    </ConfirmDialog>,
+  );
+  await screen.getByRole("button", { name: "Skip", exact: true }).click();
+  const dialog = screen.getByRole("alertdialog", { name: "Skip this run?" });
+  await dialog.getByRole("textbox", { name: "Reason (optional)" }).fill("  a known outage  ");
+  await dialog.getByRole("button", { name: "Skip the run" }).click();
+  expect(onConfirm).toHaveBeenLastCalledWith("a known outage");
+  // Reopened, it is empty, and a reason may be left out.
+  await screen.getByRole("button", { name: "Skip", exact: true }).click();
+  const again = screen.getByRole("alertdialog", { name: "Skip this run?" });
+  await expect.element(again.getByRole("textbox", { name: "Reason (optional)" })).toHaveValue("");
+  await again.getByRole("button", { name: "Skip the run" }).click();
+  expect(onConfirm).toHaveBeenLastCalledWith("");
+});
+
+test("a reason is asked for only when it is asked for, and a calm action is not in the danger colour", async () => {
+  const screen = await render(
+    <ConfirmDialog
+      label="Retry"
+      title="Retry this run?"
+      confirm="Retry the run"
+      calm
+      onConfirm={vi.fn(async () => undefined)}
+    >
+      It runs again.
+    </ConfirmDialog>,
+  );
+  await screen.getByRole("button", { name: "Retry", exact: true }).click();
+  const dialog = screen.getByRole("alertdialog", { name: "Retry this run?" });
+  expect(dialog.getByRole("textbox").elements()).toEqual([]);
+  const calm = getComputedStyle(
+    dialog.getByRole("button", { name: "Retry the run" }).element(),
+  ).backgroundColor;
+  await screen.unmount();
+  const danger = await render(<Archive />);
+  await danger.getByRole("button", { name: "Archive" }).click();
+  const hot = getComputedStyle(
+    danger.getByRole("alertdialog").getByRole("button", { name: "Archive the rule" }).element(),
+  ).backgroundColor;
+  expect(calm).not.toBe(hot);
+});
+
+test("however often it is submitted while it is under way, the action is sent once", async () => {
+  let finish: () => void = () => undefined;
+  const onConfirm = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const screen = await render(<Archive onConfirm={onConfirm} />);
+  await screen.getByRole("button", { name: "Archive" }).click();
+  const form = screen.getByRole("alertdialog").element().querySelector("form") as HTMLFormElement;
+  form.requestSubmit();
+  form.requestSubmit();
+  form.requestSubmit();
+  expect(onConfirm).toHaveBeenCalledTimes(1);
+  finish();
+  await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();
+  expect(onConfirm).toHaveBeenCalledTimes(1);
+});
+
+test("a reason says how much of its room is used, and the dialog says when it opens and closes", async () => {
+  const onOpenChange = vi.fn();
+  const screen = await render(
+    <ConfirmDialog
+      label="Skip"
+      title="Skip this run?"
+      confirm="Skip the run"
+      asking="Reason (optional)"
+      onOpenChange={onOpenChange}
+      onConfirm={async () => undefined}
+    >
+      The run is given up on.
+    </ConfirmDialog>,
+  );
+  await screen.getByRole("button", { name: "Skip", exact: true }).click();
+  expect(onOpenChange).toHaveBeenLastCalledWith(true);
+  const dialog = screen.getByRole("alertdialog");
+  await expect.element(dialog.getByText("0 of 500 characters")).toBeVisible();
+  await dialog.getByRole("textbox", { name: "Reason (optional)" }).fill("abc");
+  await expect.element(dialog.getByText("3 of 500 characters")).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  expect(onOpenChange).toHaveBeenLastCalledWith(false);
+});
+
+test("a dialog whose action is under way is not dismissed by Escape or Cancel, and is once it is done", async () => {
+  let finish: () => void = () => undefined;
+  const onConfirm = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const onOpenChange = vi.fn();
+  const screen = await render(
+    <ConfirmDialog
+      label="Retry"
+      title="Retry this run?"
+      confirm="Retry the run"
+      calm
+      onOpenChange={onOpenChange}
+      onConfirm={onConfirm}
+    >
+      It runs again.
+    </ConfirmDialog>,
+  );
+  await screen.getByRole("button", { name: "Retry", exact: true }).click();
+  const dialog = screen.getByRole("alertdialog", { name: "Retry this run?" });
+  await dialog.getByRole("button", { name: "Retry the run" }).click();
+  await userEvent.keyboard("{Escape}");
+  await dialog.getByRole("button", { name: "Cancel" }).click({ force: true });
+  await expect.element(dialog).toBeVisible();
+  expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  finish();
+  await expect.element(dialog).not.toBeInTheDocument();
+});
+
+test("a dialog taken away with its trigger while open sends focus where the caller says", async () => {
+  function Row() {
+    const [gone, setGone] = useState(false);
+    const heading = useRef<HTMLHeadingElement>(null);
+    return (
+      <>
+        <h2 ref={heading} tabIndex={-1}>
+          The runs
+        </h2>
+        {!gone && (
+          <ConfirmDialog
+            label="Retry"
+            title="Retry this run?"
+            confirm="Retry the run"
+            calm
+            returnTo={heading}
+            onConfirm={async () => setGone(true)}
+          >
+            It runs again.
+          </ConfirmDialog>
+        )}
+      </>
+    );
+  }
+  const screen = await render(<Row />);
+  await screen.getByRole("button", { name: "Retry", exact: true }).click();
+  await screen
+    .getByRole("alertdialog", { name: "Retry this run?" })
+    .getByRole("button", { name: "Retry the run" })
+    .click();
+  await expect.element(screen.getByRole("heading", { name: "The runs" })).toHaveFocus();
 });

@@ -43,7 +43,7 @@ export {
 } from "./queries";
 export { createQueryClient } from "./query-client";
 export type * as Reflexr from "./reflexr";
-export { type ReflexrStream, reflexr } from "./reflexr";
+export { type ReflexrStream, RUN_EVENTS, reflexr } from "./reflexr";
 export { type Api, type Config, createApi, readConfig, type Surfaces } from "./rest";
 export { type Session, type StreamSession, sessionHeaders, streamUrl } from "./session";
 export { authUrl, type SessionChange, Signed } from "./signed";

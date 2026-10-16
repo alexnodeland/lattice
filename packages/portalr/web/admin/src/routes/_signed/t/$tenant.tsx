@@ -6,6 +6,7 @@ import {
   Coins,
   House,
   KeyRound,
+  ListChecks,
   ScrollText,
   Terminal,
   ThumbsUp,
@@ -97,6 +98,11 @@ function Tenant() {
           {allowed.has("portalr:read_telemetry") && (
             <NavLink icon={Terminal} render={<Link to="/t/$tenant/logs" params={{ tenant }} />}>
               Logs
+            </NavLink>
+          )}
+          {allowed.has("reflexr:read_runs") && (
+            <NavLink icon={ListChecks} render={<Link to="/t/$tenant/runs" params={{ tenant }} />}>
+              Runs
             </NavLink>
           )}
           {allowed.has("portalr:read_spend") && (

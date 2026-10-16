@@ -1,0 +1,11 @@
+# Runs stackr-state-backup.service nightly. A run missed while the host was off runs when it starts.
+[Unit]
+Description=Back up the state host's ClickHouse to the backups' bucket, nightly
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

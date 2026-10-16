@@ -1,0 +1,343 @@
+"""configure_telemetry: the SDK, exporters and instrumentations, and shutting them down."""
+
+import importlib.util
+import logging
+import os
+from typing import Any
+
+import fastapi
+import pytest
+from fastapi import FastAPI, WebSocket
+from fastapi.testclient import TestClient
+from opentelemetry import baggage, metrics, trace
+from opentelemetry import context as otel_context
+from opentelemetry.instrumentation.httpx import HTTPX2ClientInstrumentor, HTTPXClientInstrumentor
+from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from pydantic_ai.capabilities import Instrumentation
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from lattice_core.otel.configure import (
+    INSTRUMENTED,
+    URL_ATTRIBUTES,
+    TelemetryHandle,
+    _redact_request,
+    _signal,
+    configure_telemetry,
+    installed,
+    redact_access_token,
+)
+from tests.otel.conftest import DEMO, KIND, REQUESTS, TENANT, WORKSPACE, Captured
+
+SESSION_ID = "session.id"
+
+
+def test_spans_carry_the_service_and_the_session(
+    handle: TelemetryHandle, captured: Captured
+) -> None:
+    tracer = handle.tracer_provider.get_tracer("test")
+    token = otel_context.attach(
+        baggage.set_baggage("user.id", "alice", baggage.set_baggage(SESSION_ID, "thr_1"))
+    )
+    try:
+        with tracer.start_as_current_span("query"):
+            pass
+    finally:
+        otel_context.detach(token)
+    handle.tracer_provider.force_flush()
+    [span] = captured.spans.get_finished_spans()
+    assert (
+        dict(span.resource.attributes).items()
+        >= {
+            "service.name": "docplan",
+            "service.version": "1.2.3",
+            "deployment.environment.name": "test",
+        }.items()
+    )
+    assert dict(span.attributes or {}) == {SESSION_ID: "thr_1"}, "only the session is copied"
+
+
+def test_more_span_processors_can_be_added(captured: Captured) -> None:
+    extra = InMemorySpanExporter()
+    with configure_telemetry(
+        DEMO,
+        service_name="docplan",
+        instrument=(),
+        span_processors=[SimpleSpanProcessor(extra)],
+        **captured.options(),
+    ) as handle:
+        with handle.tracer_provider.get_tracer("test").start_as_current_span("work"):
+            pass
+        assert [span.name for span in extra.get_finished_spans()] == ["work"]
+
+
+@pytest.mark.parametrize(
+    ("detail", "kept"),
+    [
+        ("workspace", {TENANT, WORKSPACE}),
+        ("tenant", {TENANT}),
+        ("none", set[str]()),
+    ],
+)
+def test_views_apply_the_level_of_detail(detail: Any, kept: set[str], captured: Captured) -> None:
+    with configure_telemetry(
+        DEMO, service_name="docplan", metrics_detail=detail, instrument=(), **captured.options()
+    ) as handle:
+        requests = handle.meter_provider.get_meter("demo").create_counter(REQUESTS)
+        requests.add(1, {TENANT: "t1", WORKSPACE: "w1", KIND: "read"})
+        [point] = captured.points(REQUESTS)
+    assert set(point) == kept | {KIND}
+
+
+def test_logs_are_exported_until_shutdown(captured: Captured) -> None:
+    handle = configure_telemetry(DEMO, service_name="docplan", instrument=(), **captured.options())
+    root = logging.getLogger()
+    before = list(root.handlers)
+    with handle.tracer_provider.get_tracer("test").start_as_current_span("work") as span:
+        logging.getLogger("docplan").warning("the plan is late")
+    assert handle.logger_provider is not None
+    handle.logger_provider.force_flush()
+    [record] = captured.logs.get_finished_logs()
+    assert record.log_record.body == "the plan is late"
+    assert record.log_record.trace_id == span.get_span_context().trace_id, "logged in the trace"
+    handle.shutdown()
+    handle.shutdown()  # idempotent
+    assert len(root.handlers) == len(before) - 1
+
+
+def test_a_record_logged_in_a_tenants_span_carries_its_tenant(captured: Captured) -> None:
+    handle = configure_telemetry(DEMO, service_name="docplan", instrument=(), **captured.options())
+    tracer = handle.tracer_provider.get_tracer("test")
+    log = logging.getLogger("docplan")
+    with tracer.start_as_current_span("work", attributes={TENANT: "acme"}):
+        with tracer.start_as_current_span("query"):
+            log.warning("inside")
+        log.warning("given", extra={TENANT: "its own"})
+    with tracer.start_as_current_span("stream") as stream:
+        stream.set_attribute(TENANT, "globex")  # named once it is known
+        log.warning("named later")
+    log.warning("outside")
+    assert handle.logger_provider is not None
+    handle.logger_provider.force_flush()
+    tenants = {
+        record.log_record.body: (record.log_record.attributes or {}).get(TENANT)
+        for record in captured.logs.get_finished_logs()
+    }
+    assert tenants == {
+        "inside": "acme",
+        "given": "its own",
+        "named later": "globex",
+        "outside": None,
+    }
+    handle.shutdown()
+
+
+def test_without_logs_there_is_no_logger_provider(captured: Captured) -> None:
+    with configure_telemetry(
+        DEMO, service_name="docplan", logs=False, instrument=(), **captured.options()
+    ) as handle:
+        assert handle.logger_provider is None
+
+
+def test_pydantic_ai_instrumentation_uses_the_providers(handle: TelemetryHandle) -> None:
+    capability = handle.capability()
+    assert isinstance(capability, Instrumentation)
+    assert capability.settings is handle.instrumentation
+    assert handle.instrumentation.include_content is False
+
+
+def test_fastapi_apps_are_traced(handle: TelemetryHandle, captured: Captured) -> None:
+    app = FastAPI()
+
+    @app.get("/ping")
+    async def ping() -> str:
+        return "pong"
+
+    handle.instrument_app(app)
+    with TestClient(app) as client:
+        assert client.get("/ping").json() == "pong"
+    handle.tracer_provider.force_flush()
+    assert [span.name for span in captured.spans.get_finished_spans()] == ["GET /ping"]
+
+
+QUERY = "tenant=acme&access_token=s3cret"
+
+
+@pytest.mark.parametrize(
+    ("text", "redacted"),
+    [
+        ("access_token=s3cret&tenant=acme", "access_token=REDACTED&tenant=acme"),
+        (f"/stream?{QUERY}", "/stream?tenant=acme&access_token=REDACTED"),
+        ("ws://host/stream?access_token=s3cret#end", "ws://host/stream?access_token=REDACTED#end"),
+        ("/stream?not_an_access_token=kept", "/stream?not_an_access_token=kept"),
+        ("/s?access%5Ftoken=s3cret&a=%2F", "/s?access%5Ftoken=REDACTED&a=%2F"),
+        ("%61ccess_token=s3cret&b=x+y", "%61ccess_token=REDACTED&b=x+y"),
+        ("/s?access_token=1&access_token=2", "/s?access_token=REDACTED&access_token=REDACTED"),
+        ("/s?tenant=acme&next=%3Faccess_token%3D1", "/s?tenant=acme&next=%3Faccess_token%3D1"),
+        ("/a=b/c", "/a=b/c"),
+    ],
+)
+def test_only_an_access_tokens_value_is_redacted(text: str, redacted: str) -> None:
+    assert redact_access_token(text) == redacted
+
+
+def test_requests_and_websockets_are_traced_without_their_access_tokens(
+    handle: TelemetryHandle, captured: Captured
+) -> None:
+    app = FastAPI()
+
+    @app.get("/items")
+    async def items() -> list[str]:
+        return []
+
+    @app.websocket("/stream")
+    async def stream(websocket: WebSocket) -> None:
+        await websocket.accept()
+        await websocket.close()
+
+    handle.instrument_app(app)
+    with TestClient(app) as client:
+        client.get(f"/items?{QUERY}")
+        with client.websocket_connect(f"/stream?{QUERY}"):
+            pass
+    handle.tracer_provider.force_flush()
+    urls = [
+        str(value)
+        for span in captured.spans.get_finished_spans()
+        for key, value in (span.attributes or {}).items()
+        if key in URL_ATTRIBUTES and "access_token" in str(value)
+    ]
+    assert len(urls) == 2, "the request's and the WebSocket's"
+    assert all("s3cret" not in url and "access_token=REDACTED" in url for url in urls), urls
+
+
+def test_apps_built_after_configuring_are_traced_without_their_access_tokens(
+    captured: Captured,
+) -> None:
+    with configure_telemetry(
+        DEMO, service_name="docplan", instrument=("fastapi",), **captured.options()
+    ) as handle:
+        app = fastapi.FastAPI()  # built after configuring, so the instrumentation patched it
+
+        @app.get("/items")
+        async def items() -> list[str]:
+            return []
+
+        with TestClient(app) as client:
+            client.get(f"/items?{QUERY}")
+        handle.tracer_provider.force_flush()
+    [span] = [s for s in captured.spans.get_finished_spans() if s.name == "GET /items"]
+    assert (span.attributes or {})["url.query"] == "tenant=acme&access_token=REDACTED"
+
+
+def test_the_older_conventions_url_is_redacted_too(handle: TelemetryHandle) -> None:
+    tracer = handle.tracer_provider.get_tracer("test")
+    with tracer.start_as_current_span("GET /items") as span:
+        span.set_attributes({"http.url": f"http://host/items?{QUERY}", "http.target": "/items"})
+        _redact_request(span, {})
+        assert isinstance(span, ReadableSpan)
+        assert dict(span.attributes or {}) == {
+            "http.url": "http://host/items?tenant=acme&access_token=REDACTED",
+            "http.target": "/items",
+        }
+    _redact_request(trace.INVALID_SPAN, {})  # a span that isn't recorded has nothing to hide
+
+
+async def test_sqlalchemy_engines_are_traced(
+    handle: TelemetryHandle, captured: Captured, tmp_path: Any
+) -> None:
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'app.db'}")
+    try:
+        handle.instrument_engine(engine)
+        handle.instrument_engine(engine.sync_engine)
+        async with engine.connect() as connection:
+            await connection.execute(text("select 1"))
+    finally:
+        await engine.dispose()
+    handle.tracer_provider.force_flush()
+    names = [span.name for span in captured.spans.get_finished_spans()]
+    assert any(name.startswith("select") or name == "SELECT" for name in names), names
+
+
+async def test_existing_engines_can_be_passed_in(captured: Captured, tmp_path: Any) -> None:
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'app.db'}")
+    try:
+        with configure_telemetry(
+            DEMO,
+            service_name="docplan",
+            engines=[engine],
+            instrument=("sqlalchemy",),
+            **captured.options(),
+        ) as handle:
+            async with engine.connect() as connection:
+                await connection.execute(text("select 1"))
+            handle.tracer_provider.force_flush()
+    finally:
+        await engine.dispose()
+    assert captured.spans.get_finished_spans()
+
+
+def test_installed_libraries_are_instrumented_until_shutdown(captured: Captured) -> None:
+    with configure_telemetry(DEMO, service_name="docplan", **captured.options()):
+        assert HTTPXClientInstrumentor().is_instrumented_by_opentelemetry
+        assert HTTPX2ClientInstrumentor().is_instrumented_by_opentelemetry
+    assert not HTTPXClientInstrumentor().is_instrumented_by_opentelemetry
+    assert not HTTPX2ClientInstrumentor().is_instrumented_by_opentelemetry
+
+
+def test_only_installed_libraries_are_instrumented_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert installed() == set(INSTRUMENTED)
+    real = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util, "find_spec", lambda name: None if name == "asyncpg" else real(name)
+    )
+    assert installed() == {"fastapi", "sqlalchemy", "httpx"}
+
+
+def test_httpx2_alone_is_instrumented(captured: Captured, monkeypatch: pytest.MonkeyPatch) -> None:
+    real = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util, "find_spec", lambda name: None if name == "httpx" else real(name)
+    )
+    assert "httpx" in installed(), "pydantic-ai's providers use httpx2 without httpx"
+    with configure_telemetry(
+        DEMO, service_name="docplan", instrument=("httpx",), **captured.options()
+    ):
+        assert HTTPX2ClientInstrumentor().is_instrumented_by_opentelemetry
+        assert not HTTPXClientInstrumentor().is_instrumented_by_opentelemetry
+    assert not HTTPX2ClientInstrumentor().is_instrumented_by_opentelemetry
+
+
+def test_stable_http_conventions_are_opted_into(
+    captured: Captured, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("OTEL_SEMCONV_STABILITY_OPT_IN", raising=False)
+    with configure_telemetry(DEMO, service_name="docplan", instrument=(), **captured.options()):
+        assert os.environ["OTEL_SEMCONV_STABILITY_OPT_IN"] == "http"
+
+
+def test_global_providers_are_set(captured: Captured, monkeypatch: pytest.MonkeyPatch) -> None:
+    set_globally: list[object] = []
+    monkeypatch.setattr(trace, "set_tracer_provider", set_globally.append)
+    monkeypatch.setattr(metrics, "set_meter_provider", set_globally.append)
+    options: dict[str, Any] = {**captured.options(), "set_global": True}
+    with configure_telemetry(DEMO, service_name="docplan", instrument=(), **options) as handle:
+        assert set_globally == [handle.tracer_provider, handle.meter_provider]
+
+
+def test_otlp_is_the_default_export(monkeypatch: pytest.MonkeyPatch) -> None:
+    with configure_telemetry(
+        DEMO,
+        service_name="docplan",
+        otlp_endpoint="http://127.0.0.1:9/",
+        otlp_headers={"x-langfuse-ingestion-version": "4"},
+        instrument=(),
+        set_global=False,
+    ) as handle:
+        assert handle.logger_provider is not None
+    assert _signal("http://collector:4318/", "traces") == "http://collector:4318/v1/traces"
+    assert _signal(None, "traces") is None

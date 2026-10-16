@@ -1,13 +1,13 @@
-import { expect, onTestFinished, test } from "vitest";
+import { expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { AppShell } from "./app-shell";
 import type { Ui } from "./marks";
 import { NavLink, SideNav } from "./side-nav";
+import { viewport } from "./test/viewport";
 
-async function shell(width: number, ui: Ui = "app") {
-  await page.viewport(width, 800);
-  onTestFinished(() => page.viewport(414, 896));
+async function shell(width: number, ui: Ui = "app", withNav = true) {
+  await viewport(width);
   return render(
     <AppShell
       ui={ui}
@@ -15,10 +15,12 @@ async function shell(width: number, ui: Ui = "app") {
       switcher={<button type="button">Workspace: acme / notes</button>}
       account={<button type="button">Account: Alex</button>}
       nav={
-        <SideNav label="Workspace">
-          <NavLink href="#threads">Threads</NavLink>
-          <NavLink href="#runs">Runs</NavLink>
-        </SideNav>
+        withNav && (
+          <SideNav label="Workspace">
+            <NavLink href="#threads">Threads</NavLink>
+            <NavLink href="#runs">Runs</NavLink>
+          </SideNav>
+        )
       }
     >
       <h1>Threads</h1>
@@ -54,6 +56,11 @@ test("narrower, the navigation waits behind Menu, in a drawer that keeps the foc
   const drawer = screen.getByRole("dialog", { name: "Navigation" });
   await expect.element(drawer).toHaveAttribute("aria-modal", "true");
   await expect.element(drawer.getByRole("navigation", { name: "Workspace" })).toBeVisible();
+  // The switcher and the account are in the drawer too, not only on the bar behind it.
+  await expect
+    .element(drawer.getByRole("button", { name: "Workspace: acme / notes" }))
+    .toBeVisible();
+  await expect.element(drawer.getByRole("button", { name: "Account: Alex" })).toBeVisible();
   await expect.element(screen.getByRole("main")).not.toBeInTheDocument();
   for (let i = 0; i < 5; i += 1) {
     await userEvent.tab();
@@ -83,13 +90,43 @@ test("widening past the rail's width closes the drawer", async () => {
   await expect.element(screen.getByRole("navigation", { name: "Workspace" })).toBeVisible();
 });
 
-test("the switcher, the navigation and the account are each rendered once", async () => {
+test("with the drawer closed, the switcher, the navigation and the account are each there once", async () => {
   const screen = await shell(1280);
   expect(screen.container.querySelectorAll("nav")).toHaveLength(1);
   expect(screen.getByRole("button", { name: "Workspace: acme / notes" }).elements()).toHaveLength(
     1,
   );
   expect(screen.getByRole("button", { name: "Account: Alex" }).elements()).toHaveLength(1);
+});
+
+test("with the drawer open, the switcher and the account are there twice: behind it, and in it", async () => {
+  const screen = await shell(390);
+  await screen.getByRole("button", { name: "Menu" }).click();
+  // The page behind a modal drawer is hidden from the accessibility tree, so count in the DOM.
+  const accounts = [...document.querySelectorAll("button")].filter(
+    (button) => button.textContent === "Account: Alex",
+  );
+  expect(accounts).toHaveLength(2);
+});
+
+test("a page with no navigation has a rail of the mark, the switcher and the account alone", async () => {
+  const screen = await shell(1280, "app", false);
+  await expect.element(screen.getByRole("navigation")).not.toBeInTheDocument();
+  await expect
+    .element(screen.getByRole("button", { name: "Workspace: acme / notes" }))
+    .toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Account: Alex" })).toBeVisible();
+});
+
+test("a page with no navigation still has its drawer: Menu opens it, with no navigation in it", async () => {
+  const screen = await shell(390, "app", false);
+  const menu = screen.getByRole("button", { name: "Menu" });
+  await expect.element(menu).toBeVisible();
+  await menu.click();
+  const drawer = screen.getByRole("dialog", { name: "Navigation" });
+  await expect.element(drawer).toBeVisible();
+  await expect.element(drawer.getByRole("navigation")).not.toBeInTheDocument();
+  await expect.element(drawer.getByRole("button", { name: "Account: Alex" })).toBeVisible();
 });
 
 test("admin's frame is named for admin, and shows its own mark", async () => {

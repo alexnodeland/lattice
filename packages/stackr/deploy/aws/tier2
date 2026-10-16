@@ -1,0 +1,518 @@
+#!/usr/bin/env bash
+# Tier 2 of the AWS recipe's checks (RFC-0004, stackr ADR-0036): envs/floci applied against Floci,
+# an AWS emulator, with the thin images and an application generated from the template; checkov
+# over the plan; a smoke test through the stack; and a destroy. It never reaches AWS: the AWS CLI
+# and the provider see no configuration of the caller's, every endpoint is Floci's on the
+# loopback, and it stops unless Floci answers as account 000000000000.
+#
+# Usage: deploy/aws/tier2
+#        deploy/aws/tier2 --clean RUN   (what an interrupted run left, by its id)
+#   On an arm64 Docker, as Fargate runs the tasks: CI's ubuntu-24.04-arm. It needs OpenTofu (from
+#   lattice's .prototools), AWS CLI v2, uv, jq, python3, and a clean tree whose commit is pushed:
+#   copier generates the application from HEAD's commit, and the application locks the libraries
+#   at it. TIER2_RUN chooses the run's id (lowercase letters and digits; random by default), and
+#   TIER2_FLOCI_PORT and TIER2_REGISTRY_PORT (14566 and 15000) the loopback's ports, so two runs at
+#   once each need their own.
+#
+# Each run has an id. Floci and a registry for the images Floci pulls run on a Docker network
+# named after it, each published on 127.0.0.1 alone; Floci names what it makes after it too, and
+# labels it. When the run ends, however it ends, it destroys the stack and removes only what it
+# made, saying what: its containers and network by the ids Docker gave them, Floci's containers
+# and volumes by the run's label, the anonymous volumes Docker saw those containers mount, Floci's
+# networks by its owner label, and the image tags it pushed. Then it checks that none is left, and
+# fails if one is. Nothing it creates outlives the run, except the images it pulls. If the run is
+# killed before it can clean up, `--clean RUN` removes the same, from the record it kept in
+# ${TMPDIR:-/tmp}/stackr-tier2-RUN.*.
+
+set -euo pipefail
+cd "$(dirname "$0")"
+root=$(cd ../../../.. && pwd)
+stackr=$root/packages/stackr
+source checkov.env
+
+clean=false
+if [[ ${1:-} == --clean ]]; then
+  clean=true
+  TIER2_RUN=${2:?usage: deploy/aws/tier2 --clean RUN}
+fi
+run=${TIER2_RUN:-t2$(openssl rand -hex 4)}
+[[ $run =~ ^[a-z0-9]+$ ]] || { echo "tier2: the run's id is lowercase letters and digits, not '$run'" >&2; exit 2; }
+label="stackr-tier2=$run"
+network="stackr-tier2-$run"
+floci_port=${TIER2_FLOCI_PORT:-14566}
+registry_port=${TIER2_REGISTRY_PORT:-15000}
+registry=localhost:$registry_port
+tag=tier2-$run
+floci_image=floci/floci:2.2.0@sha256:e97cd0c1dc2aa14e7697fb5ef5018404c4d6345169dbd276315f0bed2c7b0520
+registry_image=registry:3.0.0@sha256:6c5666b861f3505b116bb9aa9b25175e71210414bd010d92035ff64018f9457e
+pinned() { sed -n "s|^ *image: \($1:.*\)$|\1|p" "$stackr/compose.yaml" | head -1; }
+curl_image=$(pinned curlimages/curl)
+postgres_image=$(pinned postgres)
+[[ -n $curl_image && -n $postgres_image ]] || { echo "tier2: compose.yaml pins no curl or postgres" >&2; exit 2; }
+images=()
+while IFS= read -r image; do images+=("$image"); done < <("$stackr/deploy/image-archive" --list | jq --raw-output '.[]')
+[[ ${#images[@]} -gt 0 ]] || { echo "tier2: no thin images listed" >&2; exit 2; }
+app=acme
+
+# Floci's keys and endpoint, for the AWS CLI; the provider names Floci for each service itself.
+# localhost, whose subdomains are the loopback too, since S3 Control puts the account in the
+# host's name. No file, profile or per-service endpoint of the caller's is read.
+export AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null
+while IFS= read -r variable; do
+  [[ $variable == AWS_ENDPOINT_URL_* ]] && unset "$variable"
+done < <(compgen -e)
+unset AWS_PROFILE AWS_DEFAULT_PROFILE AWS_SESSION_TOKEN AWS_IGNORE_CONFIGURED_ENDPOINT_URLS DOCKER_DEFAULT_PLATFORM
+export AWS_ENDPOINT_URL=http://localhost:$floci_port AWS_REGION=us-east-1 AWS_DEFAULT_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test
+export TF_PLUGIN_CACHE_DIR=${TF_PLUGIN_CACHE_DIR:-$HOME/.terraform.d/plugin-cache}
+mkdir -p "$TF_PLUGIN_CACHE_DIR"
+
+# The run's record: its ids, Docker's events and its state, which --clean finds by the run's id.
+if [[ $clean == true ]]; then
+  work=$(find "${TMPDIR:-/tmp}" -maxdepth 1 -type d -name "stackr-tier2-$run.*" | head -1)
+  [[ -n $work ]] || work=$(mktemp -d "${TMPDIR:-/tmp}/stackr-tier2-$run.XXXXXX")
+else
+  work=$(mktemp -d "${TMPDIR:-/tmp}/stackr-tier2-$run.XXXXXX")
+  # Until the preflight passes, only the record goes; then cleanup takes over.
+  trap 'rm -rf "$work"' EXIT
+fi
+state=$work/terraform.tfstate
+variables=$work/tier2.tfvars
+status=0
+destroyed=false
+step() { printf '\n==> %s\n' "$*"; }
+fail() {
+  echo "FAIL: $*" >&2
+  status=1
+}
+tofu_floci() { tofu -chdir=envs/floci "$@" -no-color -input=false; }
+
+# Floci keeps a stopped task's name in Cloud Map, which AWS deregisters, and refuses to delete a
+# service that still has one: deregister them before a destroy, and once more if a task that was
+# still starting registered another before its ECS service went.
+deregister() {
+  local service instance
+  for service in $(aws servicediscovery list-services --query 'Services[].Id' --output text 2>/dev/null); do
+    for instance in $(aws servicediscovery list-instances --service-id "$service" --query 'Instances[].Id' --output text); do
+      aws servicediscovery deregister-instance --service-id "$service" --instance-id "$instance" >/dev/null
+    done
+  done
+}
+
+destroy() {
+  [[ -s $state && $destroyed == false ]] || return 0
+  for _ in 1 2; do
+    deregister || true
+    if tofu_floci destroy -auto-approve -state="$state" -var-file="$variables" >"$work/destroy.log" 2>&1; then
+      destroyed=true
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Removes each id read, saying which and why.
+sweep() {
+  local kind=$1 why=$2 id
+  while read -r id; do
+    [[ -n $id ]] || continue
+    echo "removing $kind $id ($why)"
+    case $kind in
+      container) docker rm --force --volumes "$id" >/dev/null 2>&1 || true ;;
+      volume) docker volume rm --force "$id" >/dev/null 2>&1 || true ;;
+      network) docker network rm "$id" >/dev/null 2>&1 || true ;;
+    esac
+  done
+}
+
+# What of this run is still here: anything with its labels, or an id it recorded.
+left() {
+  local id
+  docker ps --all --quiet --filter "label=$label" | sed 's/^/container /'
+  docker volume ls --quiet --filter "label=$label" | sed 's/^/volume /'
+  docker network ls --quiet --filter "label=$label" | sed 's/^/network /'
+  docker network ls --quiet --filter "label=io.floci.owner=$run/4566" | sed 's/^/network /'
+  for kind in containers volumes network; do
+    [[ -s $work/$kind ]] || continue
+    while read -r id; do
+      [[ -n $id ]] || continue
+      case $kind in
+        containers) docker container inspect "$id" >/dev/null 2>&1 && echo "container $id" ;;
+        volumes) docker volume inspect "$id" >/dev/null 2>&1 && echo "volume $id" ;;
+        network) docker network inspect "$id" >/dev/null 2>&1 && echo "network $id" ;;
+      esac
+    done <"$work/$kind"
+  done
+  return 0
+}
+
+# Removes what this run made, and nothing else: each command names its ids or this run's labels.
+# Then fails if anything of the run's is left.
+cleanup() {
+  trap '' INT
+  step "Cleaning up ($run)"
+  destroy || echo "tier2: the destroy failed; what Floci made goes by the run's label" >&2
+  if [[ -n ${events:-} ]]; then
+    kill "$events" 2>/dev/null || true
+    wait "$events" 2>/dev/null || true
+  fi
+  # The anonymous volumes of this run's containers, which Floci removes without them when the
+  # destroy stops their tasks: those Docker saw mounted by a container with the run's label. Read
+  # line by line, so a line cut short by the kill is skipped, not the whole record.
+  if [[ -s $work/events ]]; then
+    jq --raw-input 'fromjson? // empty' "$work/events" | jq --raw-output --slurp --arg run "$run" '
+      [.[] | select(.Type == "container" and .Action == "create" and .Actor.Attributes["stackr-tier2"] == $run) | .Actor.ID] as $ours
+      | .[] | select(.Type == "volume" and .Action == "mount" and (.Actor.Attributes.container as $c | $ours | index($c)))
+      | .Actor.ID' | sort -u >"$work/volumes"
+  fi
+  # Floci and the registry first, by their ids, so Floci starts nothing more; then what Floci
+  # made, by the run's label; then the volumes and networks.
+  [[ ! -s $work/containers ]] || sweep container "this run's, by id" <"$work/containers"
+  docker ps --all --quiet --filter "label=$label" | sweep container "the run's label"
+  docker volume ls --quiet --filter "label=$label" | sweep volume "the run's label"
+  [[ ! -s $work/volumes ]] || sweep volume "mounted by the run's containers" <"$work/volumes"
+  docker network ls --quiet --filter "label=io.floci.owner=$run/4566" | sweep network "Floci's owner label"
+  [[ ! -s $work/network ]] || sweep network "this run's, by id" <"$work/network"
+  if [[ -s $work/pushed ]]; then
+    echo "removing the image tags this run pushed"
+    xargs docker rmi --force <"$work/pushed" >/dev/null 2>&1 || true
+  fi
+  local remaining
+  remaining=$(left)
+  if [[ -n $remaining ]]; then
+    echo "tier2: left behind, and kept in $work for --clean $run:" >&2
+    echo "$remaining" >&2
+    exit 1
+  fi
+  echo "ok: nothing of $run is left"
+  rm -rf "$work"
+}
+if [[ $clean == true ]]; then
+  destroyed=true
+  trap cleanup EXIT
+  exit 0
+fi
+
+step "Preflight ($run)"
+if [[ $(docker info --format '{{.Architecture}}') != aarch64 ]]; then
+  echo "tier2: Docker here isn't arm64, as Fargate and the task definitions are" >&2
+  exit 2
+fi
+# Nothing may carry this run's labels yet: its cleanup would take it for its own.
+if [[ -n $(left) ]]; then
+  echo "tier2: something already carries run $run's labels; choose another TIER2_RUN" >&2
+  exit 2
+fi
+# localhost, and the account's subdomain of it that S3 Control asks for, are the loopback alone.
+for host in localhost 000000000000.localhost; do
+  python3 -c 'import socket, sys; sys.exit(not {a[4][0] for a in socket.getaddrinfo(sys.argv[1], None)} <= {"127.0.0.1", "::1"})' "$host" ||
+    { echo "tier2: $host isn't the loopback alone here" >&2; exit 2; }
+done
+trap cleanup EXIT
+
+step "Floci, and a registry for its images, on 127.0.0.1"
+# Docker's own record of the containers made and the volumes mounted from just before this, for
+# cleanup; it must be running before anything is made.
+since=$(date +%s)
+docker events --since "$since" --filter type=container --filter type=volume --filter event=create \
+  --filter event=mount --format '{{json .}}' >"$work/events" 2>/dev/null &
+events=$!
+sleep 1
+kill -0 "$events" 2>/dev/null || { echo "tier2: Docker's events can't be recorded" >&2; exit 1; }
+docker network create --label "$label" "$network" >"$work/network"
+docker run --detach --name "$network-registry" --label "$label" --network "$network" \
+  --publish "127.0.0.1:$registry_port:5000" "$registry_image" >>"$work/containers"
+docker run --detach --name "$network-floci" --label "$label" --network "$network" --network-alias floci \
+  --publish "127.0.0.1:$floci_port:4566" --volume /var/run/docker.sock:/var/run/docker.sock \
+  --env FLOCI_HOSTNAME=floci \
+  --env FLOCI_DOCKER_RESOURCE_NAMESPACE="$run" \
+  --env FLOCI_DOCKER_EXTRA_LABELS_0__KEY=stackr-tier2 \
+  --env FLOCI_DOCKER_EXTRA_LABELS_0__VALUE="$run" \
+  --env FLOCI_SERVICES_DOCKER_NETWORK="$network" \
+  --env FLOCI_SERVICES_ECS_DOCKER_NETWORK="$network" \
+  --env FLOCI_SERVICES_ECS_TASK_ROLE_CREDENTIALS_ENABLED=true \
+  --env FLOCI_SERVICES_RDS_DEFAULT_POSTGRES_IMAGE="$postgres_image" \
+  "$floci_image" >>"$work/containers"
+# Floci's own health on the loopback, then the account it answers as, which AWS never does.
+healthy=false
+for _ in $(seq 60); do
+  if curl --silent --fail --max-time 2 "http://127.0.0.1:$floci_port/_floci/health" |
+    jq --exit-status '.version == "2.2.0"' >/dev/null 2>&1; then
+    healthy=true
+    break
+  fi
+  sleep 2
+done
+[[ $healthy == true ]] || { echo "tier2: Floci 2.2.0 never answered on 127.0.0.1:$floci_port" >&2; exit 1; }
+account=$(aws sts get-caller-identity --query Account --output text)
+if [[ $account != 000000000000 ]]; then
+  echo "tier2: the endpoint answers as account $account, not Floci's 000000000000" >&2
+  exit 1
+fi
+echo "ok: Floci 2.2.0, as account $account"
+
+step "The thin images, for arm64"
+for image in "${images[@]}"; do
+  echo "$registry/stackr-$image:$tag" >>"$work/pushed"
+  docker build --quiet --platform linux/arm64 --file "$stackr/deploy/$image/Dockerfile" \
+    --tag "$registry/stackr-$image:$tag" "$root" >/dev/null
+  docker push --quiet "$registry/stackr-$image:$tag" >/dev/null
+  echo "ok: stackr-$image"
+done
+
+step "An application generated from the template, with grantr"
+# copier takes the template from HEAD's commit (--vcs-ref HEAD): uncommitted changes aren't in it.
+(
+  cd "$stackr"
+  uv run copier copy --quiet --defaults --vcs-ref HEAD --data project_name="$app" \
+    --data libraries=both --data evals=false --data access=grantr ../.. "$work/$app"
+  uv lock --quiet --directory "$work/$app"
+)
+echo "$registry/$app:$tag" >>"$work/pushed"
+docker build --quiet --platform linux/arm64 --tag "$registry/$app:$tag" "$work/$app" >/dev/null
+docker push --quiet "$registry/$app:$tag" >/dev/null
+echo "ok: $app"
+
+{
+  echo "endpoint           = \"$AWS_ENDPOINT_URL\""
+  echo 'endpoint_for_tasks = "http://floci:4566"'
+  echo 'images = {'
+  for image in "${images[@]}"; do
+    echo "  ${image//-/_} = \"$registry/stackr-$image:$tag\""
+  done
+  echo '}'
+  echo "application = { name = \"$app\", image = \"$registry/$app:$tag\" }"
+} >"$variables"
+
+step "Plan, and checkov over it"
+tofu_floci init -backend=false -lockfile=readonly >"$work/init.log" 2>&1 || {
+  cat "$work/init.log" >&2
+  exit 1
+}
+tofu_floci plan -state="$state" -var-file="$variables" -out="$work/tier2.tfplan" >"$work/plan.log" 2>&1 || {
+  grep -A12 'Error' "$work/plan.log" >&2
+  exit 1
+}
+tofu -chdir=envs/floci show -json "$work/tier2.tfplan" >"$work/tier2.tfplan.json"
+if uvx --quiet --exclude-newer "$CHECKOV_RESOLVED_BEFORE" "checkov==$CHECKOV_VERSION" \
+  --file "$work/tier2.tfplan.json" --config-file envs/floci/plan.checkov.yaml; then
+  echo "ok: checkov over the plan"
+else
+  fail "checkov over the plan"
+fi
+expected=$(jq '[.resource_changes[] | select(.type == "aws_ecs_service")] | length' "$work/tier2.tfplan.json")
+
+step "Apply"
+# What the tasks wrote, which Floci streams into its own log, for when something fails.
+task_logs() { docker logs "$network-floci" 2>&1 | grep -F '[ecs:' | tail -n "${1:-60}" >&2 || true; }
+
+if ! tofu_floci apply -state="$state" "$work/tier2.tfplan" >"$work/apply.log" 2>&1; then
+  grep -E -A10 'Error|run-task' "$work/apply.log" >&2 || true
+  task_logs
+  echo "tier2: the apply failed" >&2
+  exit 1
+fi
+echo "ok: applied"
+
+# Nothing of the run's is published anywhere but the loopback: what is on its network, and what
+# carries its label, on whichever network Floci put it.
+while IFS=$'\t' read -r name ports; do
+  for port in ${ports//, / }; do
+    [[ $port != *"->"* || $port == 127.0.0.1:* ]] || fail "$name is published on $port, not 127.0.0.1"
+  done
+done < <({
+  docker ps --filter "network=$(cat "$work/network")" --format '{{.Names}}{{"\t"}}{{.Ports}}'
+  docker ps --filter "label=$label" --format '{{.Names}}{{"\t"}}{{.Ports}}'
+} | sort -u)
+[[ $status -eq 0 ]] && echo "ok: published on 127.0.0.1 alone"
+
+step "Every service running"
+cluster=$(tofu -chdir=envs/floci output -no-color -state="$state" -raw cluster_arn)
+# Each service's name, running and desired tasks, ten at a time, as ECS answers.
+counts() {
+  local batch
+  aws ecs list-services --cluster "$cluster" --query 'serviceArns' --output text | xargs -n 10 |
+    while read -r -a batch; do
+      aws ecs describe-services --cluster "$cluster" --services "${batch[@]}" \
+        --query 'services[].[serviceName,runningCount,desiredCount]' --output text
+    done
+}
+for _ in $(seq 90); do
+  answer=$(counts 2>/dev/null || true)
+  if [[ $(grep -c . <<<"$answer") -eq $expected ]] &&
+    awk '$2 != $3 || $3 < 1 { exit 1 }' <<<"$answer"; then
+    break
+  fi
+  sleep 10
+done
+[[ $(grep -c . <<<"$answer") -eq $expected ]] || fail "$(grep -c . <<<"$answer") ECS services, not $expected"
+while read -r name running desired; do
+  if [[ $running == "$desired" && $desired -ge 1 ]]; then
+    echo "ok: $name"
+  else
+    fail "$name runs $running of $desired"
+  fi
+done <<<"$answer"
+if [[ $status -ne 0 ]]; then
+  task_logs 120
+  exit 1
+fi
+
+step "Smoke, from beside the stack"
+# From a container on Floci's network: the load balancer is Floci's, at 443, in plain HTTP
+# (ADR-0025), and the services' names are stackr.internal's, which Floci's DNS answers, as it does
+# for the tasks. A key goes to curl on stdin (--config -), never on a command line.
+floci_dns=$(docker inspect --format "{{(index .NetworkSettings.Networks \"$network\").IPAddress}}" "$network-floci")
+ask() {
+  docker run --rm --interactive --label "$label" --network "$network" --dns "$floci_dns" "$curl_image" \
+    --silent --show-error --max-time 10 "$@"
+}
+bearer() { printf 'header = "Authorization: Bearer %s"\n' "$1"; }
+# Asks, with nothing on curl's standard input, until the answer's status is the one expected, 30
+# times at most.
+answers() {
+  local what=$1 expected=$2 got
+  shift 2
+  for _ in $(seq 30); do
+    got=$(ask --output /dev/null --write-out '%{http_code}' "$@" </dev/null 2>/dev/null || true)
+    [[ $got == "$expected" ]] && break
+    sleep 5
+  done
+  if [[ $got == "$expected" ]]; then
+    echo "ok: $what"
+  else
+    fail "$what: $got, not $expected"
+  fi
+}
+answers "the application, through the load balancer" 200 --header "Host: app.stackr.test" http://floci:443/healthz
+answers "a request without a token, refused" 401 --header "Host: app.stackr.test" \
+  http://floci:443/artifactr/v1/workspaces/tier2/artifacts
+# Not GoTrue through its proxy: Floci 2.2.0 gives a task's containers one localhost only with its
+# security-group enforcement on, which then drops its own load balancer's traffic (ADR-0036).
+echo "skip: GoTrue, through its proxy, which Floci 2.2.0 can't run (ADR-0036)"
+answers "GoTrue's admin API, not routed at the edge (404, as the listener answers what it doesn't route)" 404 \
+  --header "Host: auth.stackr.test" http://floci:443/admin/users
+answers "Langfuse" 200 http://langfuse-web.stackr.internal:3000/api/public/health
+answers "Grafana" 200 http://grafana.stackr.internal:3000/api/health
+
+trace=$(openssl rand -hex 16)
+span=$(openssl rand -hex 8)
+now=$(date +%s)000000000
+answers "a trace, to the Collector" 200 --header 'Content-Type: application/json' --data "{\"resourceSpans\":[{\"resource\":{\"attributes\":[{\"key\":\"service.name\",\"value\":{\"stringValue\":\"tier2\"}}]},\"scopeSpans\":[{\"spans\":[{\"traceId\":\"$trace\",\"spanId\":\"$span\",\"name\":\"tier2\",\"kind\":1,\"startTimeUnixNano\":\"$now\",\"endTimeUnixNano\":\"$now\"}]}]}]}" \
+  http://otel-collector.stackr.internal:4318/v1/traces
+answers "the trace, in Tempo" 200 "http://tempo.stackr.internal:3200/api/v2/traces/$trace"
+
+# LiteLLM answers a mock only for a key whose team allows it, as stackr's smoke's does: a team
+# made for this, with the master key, and the mock's own words back.
+master=$(aws secretsmanager get-secret-value --secret-id stackr/litellm-master-key --query SecretString --output text)
+litellm=http://litellm.stackr.internal:4000
+team=$(bearer "$master" | ask --config - --header 'Content-Type: application/json' \
+  --data '{"team_alias": "tier2", "metadata": {"allow_client_mock_response": true}}' "$litellm/team/new" |
+  jq --raw-output '.team_id // empty' || true)
+key=$(bearer "$master" | ask --config - --header 'Content-Type: application/json' \
+  --data "{\"team_id\": \"$team\"}" "$litellm/key/generate" | jq --raw-output '.key // empty' || true)
+said=""
+if [[ -n $team && -n $key ]]; then
+  for _ in $(seq 30); do
+    said=$(bearer "$key" | ask --config - --fail --header 'Content-Type: application/json' \
+      --data '{"model":"claude-haiku","mock_response":"tier2","messages":[{"role":"user","content":"hello"}]}' \
+      "$litellm/chat/completions" 2>/dev/null | jq --raw-output '.choices[0].message.content // empty' || true)
+    [[ -n $said ]] && break
+    sleep 5
+  done
+fi
+if [[ $said == tier2 ]]; then
+  echo "ok: LiteLLM, answering with its mock"
+else
+  fail "LiteLLM's mock: '$said', not 'tier2'"
+fi
+
+# Through RDS's relay, as each of the application's roles, asking for no search_path, as psql
+# doesn't: each finds the application's schema by itself (ADR-0036).
+for secret in database-app database-app-owner; do
+  value=$(aws secretsmanager get-secret-value --secret-id "stackr/$secret" --query SecretString --output text)
+  url=$(jq --raw-output .url <<<"$value")
+  url=${url#*://}
+  user=${url%%:*}
+  hostport=${url#*@}
+  hostport=${hostport%%/*}
+  database=${url##*/}
+  database=${database%%\?*}
+  path=$(PGPASSWORD=$(jq --raw-output .password <<<"$value") docker run --rm --label "$label" --network "$network" \
+    --dns "$floci_dns" --env PGPASSWORD "$postgres_image" psql --no-psqlrc --tuples-only --no-align \
+    "host=${hostport%:*} port=${hostport##*:} user=$user dbname=$database sslmode=prefer" \
+    --command 'SHOW search_path' 2>/dev/null || true)
+  if [[ $path == "$app" ]]; then
+    echo "ok: $user finds its schema through RDS's relay"
+  else
+    fail "$user's search_path through RDS's relay: '$path', not $app"
+  fi
+done
+
+step "ClickHouse's backups and their drill, as the state host runs them (ADR-0037)"
+# Floci can't run the EC2 state host, so ClickHouse here is a Fargate task without its config
+# files. This starts the state host's own ClickHouse image with its own config files (the users,
+# the `backup` user and the `backups` collection) on the run's network, points the collection at
+# the backups bucket the apply made, in Floci's S3, and runs the state host's own backup and
+# restore-drill. Floci's static keys stand in for the role's credentials, and the metrics go to
+# the Prometheus Floci runs. What this can't run: IMDS, IAM's enforcement, systemd, or the rules
+# that alert on the metrics (tests/test_stackr_state_backups.py and promtool run them).
+state_dir=$stackr/deploy/aws/state-host
+clickhouse_image=$(sed -n 's|^ *image: \(clickhouse/clickhouse-server:.*\)$|\1|p' "$state_dir/compose.yaml" | head -1)
+[[ -n $clickhouse_image ]] || fail "state-host/compose.yaml pins no ClickHouse"
+bucket=$(tofu -chdir=envs/floci output -no-color -state="$state" -raw backups_bucket)
+state_clickhouse=$network-state-clickhouse
+admin_password=$(openssl rand -hex 12)
+backup_password=$(openssl rand -hex 12)
+docker run --detach --name "$state_clickhouse" --label "$label" --network "$network" \
+  --env CLICKHOUSE_SKIP_USER_SETUP=1 --env CLICKHOUSE_ADMIN_PASSWORD="$admin_password" \
+  --env CLICKHOUSE_LANGFUSE_PASSWORD="$(openssl rand -hex 12)" --env CLICKHOUSE_BACKUP_PASSWORD="$backup_password" \
+  --env CLICKHOUSE_BACKUP_URL="http://floci:4566/$bucket/" \
+  --volume "$stackr/deploy/clickhouse/users.xml:/etc/clickhouse-server/users.d/users.xml:ro" \
+  --volume "$stackr/deploy/host/clickhouse/backup-user.xml:/etc/clickhouse-server/users.d/backup-user.xml:ro" \
+  --volume "$state_dir/clickhouse/backups.xml:/etc/clickhouse-server/config.d/backups.xml:ro" \
+  "$clickhouse_image" >>"$work/containers"
+for _ in $(seq 60); do
+  docker exec "$state_clickhouse" clickhouse-client --user admin --password "$admin_password" --query 'SELECT 1' \
+    >/dev/null 2>&1 && break
+  sleep 2
+done
+# Langfuse's tables, as live data for the drill to find again in the restore.
+live=$(printf '%s;\n' "CREATE TABLE default.traces (id UInt32, body String) ENGINE = MergeTree ORDER BY id" \
+  "INSERT INTO default.traces SELECT number, 'tier2' FROM numbers(1000)" |
+  docker exec -i "$state_clickhouse" clickhouse-client --user admin --password "$admin_password" --multiquery 2>&1) ||
+  fail "ClickHouse for the backups: $live"
+read -ra via_network <<<"docker run --rm --interactive --label $label --network $network --dns $floci_dns $curl_image"
+state_scripts=(env STATE_CLICKHOUSE_CONTAINER="$state_clickhouse" STATE_BACKUP_CREDENTIALS=env
+  STATE_PROMETHEUS_URL=http://prometheus.stackr.internal:9090 STATE_CURL="${via_network[*]}")
+for script in backup restore-drill; do
+  if "${state_scripts[@]}" "$state_dir/$script" 2>"$work/$script.log"; then
+    echo "ok: the state host's $script"
+  else
+    cat "$work/$script.log" >&2
+    fail "the state host's $script"
+  fi
+done
+for metric in stackr_backup_success stackr_restore_drill_success; do
+  value=""
+  for _ in $(seq 15); do
+    value=$(ask --get --data-urlencode "query=$metric" http://prometheus.stackr.internal:9090/api/v1/query </dev/null |
+      jq --raw-output '.data.result[0].value[1] // empty' || true)
+    [[ -n $value ]] && break
+    sleep 2
+  done
+  if [[ $value == 1 ]]; then
+    echo "ok: $metric is 1 in Prometheus"
+  else
+    fail "$metric in Prometheus: '${value:-none}', not 1"
+  fi
+done
+
+step "Destroy"
+if destroy; then
+  echo "ok: destroyed"
+else
+  tail -20 "$work/destroy.log" >&2
+  fail "the destroy"
+fi
+exit "$status"

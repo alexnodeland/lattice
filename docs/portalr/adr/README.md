@@ -33,5 +33,12 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0025](0025-access-roles-and-grants.md) | Access: roles and grants, on grantr's catalog | Accepted |
 | [0026](0026-audit.md) | Audit: grantr's log, newest on top, filtered by type and maker | Accepted |
 | [0027](0027-feedback-and-evaluations.md) | Feedback and evaluations, summed by day, and the first charts | Accepted |
+| [0028](0028-usage-and-spend.md) | Usage and spend, per day and per workspace, against the budget's share | Accepted |
+| [0029](0029-ui-polish-from-the-screenshots.md) | UI polish from the screenshots: one width rule, titles, a violet focus ring | Accepted |
+| [0030](0030-traces-and-the-trace-view.md) | Traces, and a trace view written for `ui` | Accepted |
+| [0031](0031-logs-and-health.md) | Logs without their lines, and a Health section | Accepted |
+| [0032](0032-runs-in-admin.md) | Runs in admin, with Retry, Skip and Cancel | Accepted |
+| [0033](0033-third-party-notices-for-the-bundled-javascript.md) | Third-party notices for the JavaScript the UIs bundle | Accepted |
+| [0034](0034-tenants-and-the-deployments-audit.md) | Tenants in admin, created by email, and the deployment's audit log | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

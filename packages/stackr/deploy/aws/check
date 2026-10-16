@@ -11,7 +11,8 @@
 # module's .checkov.yaml; the modules' tests, against a mocked AWS (tests/), which validate each
 # module as they plan it, with the providers the committed lock file names; and the modules'
 # templates, rendered: shellcheck over the state host's user data and Langfuse's worker's wait,
-# and GoTrue's proxy, run in Docker (tests/auth-proxy).
+# and GoTrue's proxy, run in Docker (tests/auth-proxy); and the state host's backup alerts,
+# checked and tested by promtool from the image the state host runs (ADR-0037).
 # The providers download once, into TF_PLUGIN_CACHE_DIR. TFLint fetches its AWS ruleset from
 # GitHub, with GITHUB_TOKEN when it is set.
 
@@ -20,10 +21,8 @@ cd "$(dirname "$0")"
 
 export TF_PLUGIN_CACHE_DIR=${TF_PLUGIN_CACHE_DIR:-$HOME/.terraform.d/plugin-cache}
 mkdir -p "$TF_PLUGIN_CACHE_DIR"
-# checkov, and everything it depends on as it was on this date, so a new release of a dependency
-# changes nothing until both move, by hand, together.
-CHECKOV_VERSION=3.3.27
-CHECKOV_RESOLVED_BEFORE=2026-10-12
+# checkov's version, and the date its dependencies are resolved at.
+source checkov.env
 status=0
 step() { printf '\n==> %s\n' "$*"; }
 fail() {
@@ -84,11 +83,27 @@ if tofu -chdir="$fixture" init -backend=false -input=false >/dev/null &&
   tofu -chdir="$fixture" output -state="$rendered/state" -raw user_data >"$rendered/user-data.sh"
   tofu -chdir="$fixture" output -state="$rendered/state" -raw caddyfile >"$rendered/Caddyfile"
   shellcheck --shell=bash "$rendered/user-data.sh" || fail "shellcheck: the state host's user data"
+  # What the backups need of it: the timers installed and enabled, the bucket's URL for ClickHouse's
+  # collection and the Prometheus the scripts report to, written for Compose and the units to read.
+  for expected in \
+    'systemctl enable --now stackr-state-backup.timer stackr-state-restore-drill.timer' \
+    'https://stackr-backups-0123456789.s3.us-east-1.amazonaws.com/' \
+    'CLICKHOUSE_BACKUP_PASSWORD=%s' 'STATE_PROMETHEUS_URL=http://%s:9090' '/run/stackr/backup.env' \
+    "stackr-state-\$unit"; do
+    grep -qF -- "$expected" "$rendered/user-data.sh" || fail "the state host's user data lacks: $expected"
+  done
   tofu -chdir="$fixture" output -state="$rendered/state" -raw wait_for_langfuse >"$rendered/wait-for-langfuse.sh"
   shellcheck --shell=sh "$rendered/wait-for-langfuse.sh" || fail "shellcheck: Langfuse's worker's wait"
   tests/auth-proxy "$rendered/Caddyfile" || fail "GoTrue's proxy"
 else
   fail "rendering the templates"
 fi
+
+step "The state host's backup alerts"
+prometheus=$(sed -n 's|^ *image: \(prom/prometheus:.*\)$|\1|p' state-host/compose.yaml | head -1)
+[[ -n $prometheus ]] || fail "state-host/compose.yaml pins no Prometheus"
+promtool() { docker run --rm --entrypoint promtool -v "$PWD/state-host:/rules:ro" -w /rules "$prometheus" "$@"; }
+promtool check rules alerts.yml || fail "promtool: the alerts"
+promtool test rules alerts.test.yml || fail "promtool: the alerts' tests"
 
 exit $status

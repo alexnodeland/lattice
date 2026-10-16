@@ -71,10 +71,62 @@ tasks:
       - 'scripts/auth-keys'
       - 'scripts/_auth_keys.py'
       - 'pyproject.toml'
+      - '/pyproject.toml'
       - '/uv.lock'
       - 'compose.yaml'
       - '/packages/artifactr/deploy/grafana/**/*'
       - '/packages/reflexr/deploy/grafana/**/*'
+
+  # On an arm64 Docker; CI runs it when the recipe or an image changes, and nightly.
+  aws-tier2:
+    description: "The AWS recipe's tier 2: envs/floci against Floci, with the thin images and an application, smoked"
+    command: 'deploy/aws/tier2'
+    # The recipe, the images' files, and the application it generates from the template.
+    inputs:
+      - 'deploy/aws/**/*'
+      - 'deploy/host/compose.prod.yaml'
+      - 'deploy/host/clickhouse/backup-user.xml'
+      - 'deploy/clickhouse/users.xml'
+      - 'deploy/image-archive'
+      - 'deploy/otel-collector/**/*'
+      - 'deploy/tempo/**/*'
+      - 'deploy/loki/**/*'
+      - 'deploy/pyroscope/**/*'
+      - 'deploy/grafana/**/*'
+      - 'deploy/litellm/**/*'
+      - 'deploy/db-init/**/*'
+      - 'deploy/auth-keys/**/*'
+      - 'deploy/postgres/init.sql'
+      - 'scripts/auth-keys'
+      - 'scripts/_auth_keys.py'
+      - 'pyproject.toml'
+      - 'compose.yaml'
+      - 'copier.yml'
+      - 'template/**/*'
+      - '/copier.yml'
+      - '/pyproject.toml'
+      - '/uv.lock'
+      - '/.prototools'
+      - '/packages/artifactr/deploy/grafana/**/*'
+      - '/packages/reflexr/deploy/grafana/**/*'
+    options:
+      cache: false
+
+  # Online, so not one of check's dependencies: `make validate` stays offline. CI runs it, on its
+  # own test of the pull request's diff, when versions.env, compose.yaml or locals.tf change
+  # (stackr ADR-0026); these inputs are what moon hashes, and the script and PyYAML are among them.
+  gotrue:
+    description: "Check that GoTrue's image is the one the pinned Supabase CLI runs, reading the CLI's pins from GitHub"
+    command: 'uv run scripts/check-config gotrue'
+    inputs:
+      - 'scripts/check-config'
+      - 'versions.env'
+      - 'compose.yaml'
+      - 'deploy/aws/modules/stack/locals.tf'
+      - '/pyproject.toml'
+      - '/uv.lock'
+    options:
+      cache: false
 
   check:
     description: "Run the project's checks, as CI does"
@@ -107,6 +159,8 @@ tasks:
       - '/packages/portalr/scripts/smoke_readers.py'
     options:
       cache: false
+      # Streamed, not held until the task ends: a stalled run still shows how far it got.
+      outputStyle: 'stream'
 
   smoke-app:
     description: 'Run an application from the template beside the running stack'

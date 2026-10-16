@@ -10,6 +10,7 @@ import {
   where,
   who,
   whom,
+  whomIn,
 } from "./access";
 
 test("each part of Access reads with an action Access asks about", () => {
@@ -39,6 +40,13 @@ test("a grant reads as whom it is to, and where", () => {
     "tickets:triage (rule in ws_1)",
   );
   expect(whom({ kind: "user", id: "bob" })).toBe("bob (person)");
+  // In a sentence, a member is their id, and a group or a rule is named as one.
+  expect(whomIn({ kind: "user", id: "bob" })).toBe("bob");
+  expect(whomIn({ kind: "service_principal", id: "ci" })).toBe("the service principal ci");
+  expect(whomIn({ kind: "group", id: "ops" })).toBe("the group ops");
+  expect(whomIn({ kind: "rule", rule: "tickets:triage", workspace: "ws_1" })).toBe(
+    "the rule tickets:triage in ws_1",
+  );
   expect(where({ kind: "tenant" })).toBe("the tenant");
   expect(where({ kind: "workspace", workspace: "ws_1" })).toBe("workspace ws_1");
   expect(where({ kind: "thread", workspace: "ws_1", id: "t_1" })).toBe("thread t_1 in ws_1");

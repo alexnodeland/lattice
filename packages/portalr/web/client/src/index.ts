@@ -27,18 +27,23 @@ export {
   type Landing,
   landing,
 } from "./landing";
+export type { LogRecord, Logs } from "./logs";
 export { useMe } from "./me";
 export {
   type AuditFilter,
   createQueries,
   keys,
+  LOGS_LIMIT,
+  type LogFilter,
   Refused,
   stale,
   type TimeSpan,
+  TRACES_LIMIT,
+  type TraceFilter,
 } from "./queries";
 export { createQueryClient } from "./query-client";
 export type * as Reflexr from "./reflexr";
-export { type ReflexrStream, reflexr } from "./reflexr";
+export { type ReflexrStream, RUN_EVENTS, reflexr } from "./reflexr";
 export { type Api, type Config, createApi, readConfig, type Surfaces } from "./rest";
 export { type Session, type StreamSession, sessionHeaders, streamUrl } from "./session";
 export { authUrl, type SessionChange, Signed } from "./signed";
@@ -53,3 +58,13 @@ export {
   Stream,
   type StreamOptions,
 } from "./stream";
+export {
+  type Kind,
+  type Outline,
+  outline,
+  type Row,
+  type Said,
+  said,
+  type Trace,
+  wholeTrace,
+} from "./traces";

@@ -165,16 +165,24 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
   close(): void {
     this.#stopped = true;
     this.#detach();
+    this.#settleAll();
+    this.#update({ status: "closed" });
+  }
+
+  /** Settles every unanswered command as `closed`. */
+  #settleAll(): void {
     for (const pending of this.#pending.values()) {
       pending.settle({ outcome: "closed" });
     }
     this.#pending.clear();
-    this.#update({ status: "closed" });
   }
 
-  /** Sends a command, now if connected and otherwise once reconnected, and settles on its end. */
+  /**
+   * Sends a command, now if connected and otherwise once reconnected, and settles on its end: when
+   * it is answered, or when the store is closed, which includes the server refusing it for good.
+   */
   send(command: Command, commandId: string = crypto.randomUUID()): Promise<Settled<R>> {
-    if (this.#stopped) {
+    if (this.#stopped || this.#current.status === "closed") {
       return Promise.resolve({ outcome: "closed" });
     }
     return new Promise((settle) => {
@@ -224,6 +232,8 @@ export class Stream<State, Frame, Command, R extends Result, Hello> {
       }
       this.#socket = null;
       if (this.#stopped || FINAL.has(closed.code)) {
+        // Nothing will answer what is still unanswered: no one waits for it for ever.
+        this.#settleAll();
         this.#update({ status: "closed" });
         return;
       }

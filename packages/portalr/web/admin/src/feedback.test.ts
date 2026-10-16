@@ -1,11 +1,5 @@
 import { expect, test } from "vitest";
-import { shownOf, unknownDays, windowOf } from "./feedback";
-
-test("a window is whole days in UTC, ending today, the same all day", () => {
-  const window = windowOf(7, new Date("2026-10-13T09:30:00Z"));
-  expect(window).toEqual({ start: "2026-10-07T00:00:00.000Z", end: "2026-10-14T00:00:00.000Z" });
-  expect(windowOf(7, new Date("2026-10-13T23:59:00Z"))).toEqual(window);
-});
+import { shownOf, unknownDays } from "./feedback";
 
 test("the address keeps a window Feedback offers, and a workspace", () => {
   expect(shownOf({})).toEqual({ days: 7, workspace: undefined });

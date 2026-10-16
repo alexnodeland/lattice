@@ -9,13 +9,13 @@ given; a score is counted on the day it was given.
 """
 
 from collections import defaultdict
-from datetime import UTC, date, datetime, timedelta
-from typing import Final, Self
+from datetime import date, datetime, timedelta
+from typing import Final
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict
 
 from portalr.readers.langfuse import Langfuse, Score, Scores
-from portalr.readers.query import Id, Span
+from portalr.readers.query import BoundedSpan, Id, Span, day_of, days_in
 from portalr.readers.reading import Ok, Unavailable
 from portalr.tenant import Tenant
 
@@ -25,20 +25,11 @@ COMMENTS: Final = 20
 THUMBS: Final = "thumbs"
 """The feedback type whose yes-or-no scores are thumbs."""
 
-MOST_DAYS: Final = 91
-"""The longest window a summary sums, in days: a quarter, and a day's slack for its edges."""
 
-
-class FeedbackQuery(Span):
+class FeedbackQuery(BoundedSpan):
     """Which feedback to sum: a window of at most ``MOST_DAYS``, and one workspace's, or all."""
 
     workspace: Id | None = None
-
-    @model_validator(mode="after")
-    def _at_most_a_quarter(self) -> Self:
-        if self.end - self.start > timedelta(days=MOST_DAYS):
-            raise ValueError(f"a window is at most {MOST_DAYS} days")
-        return self
 
 
 class Thumbs(BaseModel):
@@ -113,17 +104,6 @@ class Feedback(BaseModel):
     known_from: date | None = None
     """Where a read stopped short of the oldest traces, the first day all of whose traces were
     read: the days before it are unknown, not empty. None when no day is."""
-
-
-def day_of(at: datetime) -> date:
-    """The day a moment is in, in UTC."""
-    return at.astimezone(UTC).date()
-
-
-def days_in(span: Span) -> list[date]:
-    """Each day the span touches, in UTC, the first first."""
-    first, last = day_of(span.start), day_of(span.end - timedelta(microseconds=1))
-    return [first + timedelta(days=n) for n in range((last - first).days + 1)]
 
 
 def peoples(score: Score) -> bool:

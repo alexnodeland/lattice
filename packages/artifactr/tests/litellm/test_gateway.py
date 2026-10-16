@@ -3,12 +3,14 @@
 A fake proxy answers through an httpx2 mock transport, so no test calls the network.
 """
 
+import contextlib
 import json
 from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
 import httpx2
 import pytest
+from langfuse import propagate_attributes
 from pydantic_ai import Agent, ModelMessage, ModelResponse, TextPart
 from pydantic_ai.capabilities import Instrumentation
 from pydantic_ai.exceptions import ModelHTTPError
@@ -95,6 +97,34 @@ async def workspace(tenant_id: str, workspace_id: str, **providers: Any) -> Work
     return await workspaces.open(tenant_id, workspace_id, actor=ALICE)
 
 
+async def test_the_bounded_trace_tags_langfuse_propagates_reach_the_proxy_once_each() -> None:
+    proxy = FakeProxy()
+    gateway = LiteLLMGateway(tags=("docplan",))
+    ws = await workspace("acme", "launch")
+    thread = await ws.create_thread()
+
+    @contextlib.asynccontextmanager
+    async def turn_context(session: Session[Any]) -> AsyncIterator[None]:
+        with propagate_attributes(
+            tags=["workspace:launch", "rule:page", "kind:note", "thread:th_1", "chain:c1"]
+        ):
+            yield
+
+    # A turn runs in a context of its own, so a TurnContext, as relayr's, sets the tags.
+    runner = Runner(agent(proxy.model(), gateway), app=None, turn_context=turn_context)
+    await started(await runner.send(ws, thread.id, "Hello")).wait()
+    [(body, _)] = proxy.requests
+    assert body["metadata"]["tags"] == [
+        "artifactr",
+        "tenant:acme",
+        "workspace:launch",
+        "tenant-workspace:acme/launch",
+        "docplan",
+        "rule:page",
+        "kind:note",
+    ], "thread: and chain: tags stay in Langfuse"
+
+
 async def test_each_request_carries_the_tenant_session_trace_key_and_guardrails(
     recorder: Recorder,
 ) -> None:
@@ -117,7 +147,13 @@ async def test_each_request_carries_the_tenant_session_trace_key_and_guardrails(
         "thread_id": thread.id,
         "run_id": handle.run_id,
         "session_id": thread.id,
-        "tags": ["artifactr", "tenant:acme", "workspace:launch", "docplan"],
+        "tags": [
+            "artifactr",
+            "tenant:acme",
+            "workspace:launch",
+            "tenant-workspace:acme/launch",
+            "docplan",
+        ],
         "trace_user_id": "alice",
         "existing_trace_id": trace_id(turn),
     }

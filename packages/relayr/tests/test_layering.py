@@ -25,7 +25,11 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {*LIBRARIES, "opentelemetry"},
     ),
     "telemetry": ({"relayr.telemetry"}, {"opentelemetry"}),
-    "otel": ({"relayr.telemetry", "relayr.otel"}, {"opentelemetry"}),
+    # Its contribution, on lattice-core's contract (lattice ADR-0020).
+    "otel": (
+        {"relayr.telemetry", "relayr.otel"},
+        {"opentelemetry", "lattice_core.otel.contribution"},
+    ),
     "langfuse": (
         {"relayr.events", "relayr.ledger", "relayr.outbound", "relayr.langfuse"},
         {*LIBRARIES, "langfuse"},

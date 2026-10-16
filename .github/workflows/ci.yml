@@ -110,6 +110,44 @@ jobs:
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv run --no-project python scripts/affected.py image
 
+  # GoTrue's image follows the Supabase CLI's (stackr ADR-0026, issue 132). It reads the CLI's own
+  # pins from GitHub, so it runs only when the pull request's own diff changes versions.env,
+  # compose.yaml or the AWS stack's locals.tf, none other, a change to stackr or a library included.
+  # The job always starts, to compare the diff, and counts as passed when it has nothing to check.
+  # It fails, after one retry, when it can't read the CLI's pins, and a Renovate bump of GoTrue
+  # ahead of the CLI fails it: bump the CLI first. CI runs on pull requests alone, and a push to
+  # main is a merged pull request that ran it, so nothing runs it there.
+  gotrue:
+    name: GoTrue follows the Supabase CLI
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: changed
+        shell: bash
+        run: |
+          # The diff on its own line, so a git failure fails the step: nothing is skipped by it.
+          files=$(git diff --name-only "$MOON_BASE...$MOON_HEAD")
+          echo "Comparing $MOON_HEAD with $MOON_BASE: $(grep -c . <<<"$files" || true) files changed"
+          if grep -qxF -e packages/stackr/versions.env -e packages/stackr/compose.yaml \
+            -e packages/stackr/deploy/aws/modules/stack/locals.tf <<<"$files"; then
+            echo "changed=true" >>"$GITHUB_OUTPUT"
+            echo "the check's files changed"
+          else
+            echo "none of versions.env, compose.yaml or locals.tf changed: nothing to check"
+          fi
+      - if: steps.changed.outputs.changed == 'true'
+        uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - if: steps.changed.outputs.changed == 'true'
+        run: uv sync --locked --all-packages --all-groups
+      - if: steps.changed.outputs.changed == 'true'
+        run: moon run stackr:gotrue
+
   # stackr's thin images (RFC-0004, stackr ADR-0035), built natively for each architecture the AWS
   # recipe runs on, Fargate's arm64 and the runners' amd64, and each checked as it starts.
   # Nothing is published: the release does that.
@@ -168,6 +206,8 @@ jobs:
         run: |
           # moon's answer first, on its own: if moon fails, so does this, rather than skipping.
           affected=$(moon query tasks --affected --id images)
+          # An answer of moon's shape, or fail: a malformed one isn't "not affected".
+          jq --exit-status '.tasks | type == "object"' <<<"$affected" >/dev/null
           if jq --exit-status '.tasks.stackr.images' <<<"$affected" >/dev/null; then
             packages/stackr/deploy/image-archive "$ARCH" 0.0.0-ci archives
             echo "built=true" >>"$GITHUB_OUTPUT"
@@ -200,7 +240,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: stackr-images-*
           path: archives
@@ -286,11 +326,69 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.terraform.d/plugin-cache
-          key: opentofu-providers-${{ runner.os }}-${{ hashFiles('packages/stackr/deploy/aws/**/.terraform.lock.hcl') }}
+          key: opentofu-providers-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/stackr/deploy/aws/**/.terraform.lock.hcl') }}
       # TFLint fetches its AWS ruleset from GitHub's API, which limits requests without a token.
       - run: uv run --no-project python scripts/affected.py aws
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+  # Whether a pull request changes tier 2's inputs: the recipe, the images' files, or the template
+  # it generates the application from. Asked on a small runner, so an unaffected pull request
+  # starts no arm64 one.
+  aws-tier2-affected:
+    name: AWS (tier 2) affected
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      affected: ${{ steps.affected.outputs.affected }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - id: affected
+        shell: bash
+        run: |
+          # moon's answer first, on its own: if moon fails, so does this, rather than skipping.
+          echo "Comparing $MOON_HEAD with $MOON_BASE: $(git diff --name-only "$MOON_BASE...$MOON_HEAD" | wc -l) files changed"
+          affected=$(moon query tasks --affected --id aws-tier2)
+          # An answer of moon's shape, or fail: a malformed one isn't "not affected".
+          jq --exit-status '.tasks | type == "object"' <<<"$affected" >/dev/null
+          if jq --exit-status '.tasks.stackr["aws-tier2"]' <<<"$affected" >/dev/null; then
+            echo "affected=true" >>"$GITHUB_OUTPUT"
+            echo "stackr:aws-tier2 is affected"
+          else
+            echo "stackr:aws-tier2 isn't affected"
+          fi
+
+  # stackr's AWS recipe, tier 2 (stackr RFC-0004, ADR-0036): envs/floci applied against Floci,
+  # with the thin images and an application from the template, smoked and destroyed, when the
+  # job above finds its inputs changed. On arm64, as Fargate runs the tasks. What it starts is
+  # published on the runner's 127.0.0.1 alone, and it never reaches AWS.
+  aws-tier2:
+    name: AWS (tier 2)
+    needs: aws-tier2-affected
+    if: needs.aws-tier2-affected.outputs.affected == 'true'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      # The whole history: moon compares with the pull request's base, as MOON_BASE names it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - run: proto trust .prototools && proto install tofu
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: opentofu-providers-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/stackr/deploy/aws/**/.terraform.lock.hcl') }}
+      - run: moon run stackr:aws-tier2
 
   # Each variant of the application template, generated and checked as its own CI would: lint,
   # strict types, and the tests with 100% coverage. It installs the libraries from the checkout, so
@@ -413,7 +511,9 @@ jobs:
             -subj /CN=backups -addext subjectAltName=DNS:backups \
             -keyout /tmp/stackr-backups/private.key -out /tmp/stackr-backups/public.crt
           chmod 644 /tmp/stackr-backups/private.key
+      # Fails before the job's 30 minutes, so the Logs step below runs and shows where it stood.
       - run: uv run --no-project python scripts/affected.py smoke
+        timeout-minutes: 15
       # An application from the template, beside the whole stack (stackr ADR-0011).
       - if: matrix.app
         run: uv run --no-project python scripts/affected.py smoke-app
@@ -441,6 +541,7 @@ jobs:
           docker ps -a
           files=()
           if [[ $STACKR_RECIPE == host ]]; then files=(-f compose.yaml -f deploy/host/compose.prod.yaml); fi
+          docker compose "${files[@]}" --profile '*' ps --all
           docker compose "${files[@]}" --profile '*' logs --no-color --tail=200
           if docker inspect backups >/dev/null 2>&1; then docker logs --tail=200 backups; fi
       - name: Stop the stack
@@ -480,13 +581,13 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [check, tests, images, thin-images, release-images, release-images-publish, acceptance, aws, template, smoke, dependency-review, osv]
+    needs: [check, tests, images, thin-images, gotrue, release-images, release-images-publish, acceptance, aws, aws-tier2-affected, aws-tier2, template, smoke, dependency-review, osv]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
     steps:
       - uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
-          # It runs only when the images changed.
-          allowed-skips: release-images-publish
+          # Each runs only when its inputs changed.
+          allowed-skips: release-images-publish, aws-tier2
           jobs: ${{ toJSON(needs) }}

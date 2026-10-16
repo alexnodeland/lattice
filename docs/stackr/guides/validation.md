@@ -15,10 +15,18 @@ stackr is configuration, and most of what can go wrong with configuration shows 
 | The gateway's configuration | Every model group a fallback names exists, guardrails use integrations that need no licence and valid modes, every `os.environ/` reference is set on the `litellm` service in `compose.yaml`, and no key is written into the file. LiteLLM has no validator of its own, and starts without a guardrail it can't load |
 | The application template | Every variant rendered, under a 30-character slug whose package sorts before `conftest`, with nothing left unrendered, its libraries from lattice at the commit it was rendered from, and its Python, YAML, shell scripts and Compose file through their linters (`scripts/check-template`) |
 | Service configurations | Each with its own validator, run from the image `compose.yaml` pins, offline: `otelcol-contrib validate` for the Collector, `promtool check config` for Prometheus, `-config.verify` for Tempo and `-verify-config` for Loki |
+| The state host's backup alerts | Prometheus's rules for the backups and the restore drill, checked and unit-tested by `promtool` from the state host's Prometheus image (`deploy/aws/check`): each alert fires on a 0 and on a metric that stopped arriving, and none on a 1 |
 | Shell scripts | shellcheck |
 | Python scripts | ruff's formatter and linter |
 
 The Supabase, gateway and dashboard checks are `scripts/check-config`, which covers what no service's own validator does.
+
+One of its modes is online, so `make validate` doesn't run it: `scripts/check-config gotrue` (`moon run stackr:gotrue`) holds GoTrue's image, in `compose.yaml` and in the AWS stack module, to the version the Supabase CLI pinned in `versions.env` runs. It reads the CLI's own list of images, at the CLI's tag, from GitHub.
+
+- CI runs it, as "GoTrue follows the Supabase CLI", only on a pull request whose own diff changes `versions.env`, `compose.yaml` or `deploy/aws/modules/stack/locals.tf`: a change to anything else in stackr, or to a library, doesn't run it, and the job counts as passed. Nothing runs it on `main`, where each change is a merged pull request that ran it.
+- It tries twice. A file it can't read is a failure, not a pass, so a GitHub outage can fail a pull request that touches those files: run the job again.
+- Renovate keeps proposing GoTrue's updates, and the check fails them until the CLI is bumped to a version that runs the same one. Bump the CLI first, in `versions.env`, then Renovate's pull request passes.
+- If the CLI moves the file, the failure says so, and `CLI_DOCKERFILE` in the script is the place to follow it.
 
 ## The documentation
 

@@ -189,3 +189,60 @@ test("the first rows a read didn't reach are shaded, and named so", async () => 
     "Not read",
   );
 });
+
+test("an axis may write an index shorter than the table does", async () => {
+  await page.viewport(1024, 768);
+  const screen = await render(
+    <BarChart
+      label="Spend"
+      index={days}
+      series={[{ key: "up", name: "Spend" }]}
+      data={[
+        { day: "2025-12-31", up: 1 },
+        { day: "2026-01-01", up: 2 },
+      ]}
+      tick={(index) => index.slice(5)}
+    />,
+  );
+  const figure = screen.getByRole("figure", { name: "Spend" });
+  await expect
+    .poll(() => [...document.querySelectorAll("svg text")].map((text) => text.textContent))
+    .toEqual(expect.arrayContaining(["12-31", "01-01"]));
+  await figure.getByText("Show the figures").click();
+  await expect.element(figure.getByRole("row", { name: "2025-12-31" })).toBeVisible();
+});
+
+test("on a phone, a chart's direct labels are whole, inside its drawing", async () => {
+  await page.viewport(390, 844);
+  const screen = await render(
+    <div style={{ width: 346 }}>
+      <BarChart
+        label="People's thumbs per day"
+        index={days}
+        series={[
+          { key: "up", name: "Thumbs up" },
+          { key: "down", name: "Thumbs down" },
+        ]}
+        data={[
+          { day: "2026-10-12", up: 3, down: 1 },
+          { day: "2026-10-13", up: 2, down: 4 },
+        ]}
+        diverging
+      />
+    </div>,
+  );
+  await expect
+    .element(screen.getByRole("figure", { name: "People's thumbs per day" }))
+    .toBeVisible();
+  await expect
+    .poll(() =>
+      [...document.querySelectorAll("svg text")].some((t) => t.textContent === "Thumbs down"),
+    )
+    .toBe(true);
+  const svg = document.querySelector(".recharts-surface")?.getBoundingClientRect();
+  const label = [...document.querySelectorAll("svg text")].find(
+    (t) => t.textContent === "Thumbs down",
+  );
+  expect(label?.getBoundingClientRect().right).toBeLessThanOrEqual((svg?.right ?? 0) + 0.5);
+  expect(label?.textContent).toBe("Thumbs down");
+});

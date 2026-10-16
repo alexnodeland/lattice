@@ -111,8 +111,8 @@ jobs:
       - run: uv run --no-project python scripts/affected.py image
 
   # TLC over the formal specs (ADR-0025), at the bounds a pull request checks: the `spec` task of
-  # each affected project, so it runs when a spec in docs/<package>/spec/ or its package changes.
-  # Nightly runs them deeper.
+  # each project scripts/affected.py finds affected, by its files or by the task's inputs, which
+  # include its spec in docs/<package>/spec/. Nightly runs them deeper.
   specs:
     name: Specs
     runs-on: ubuntu-latest

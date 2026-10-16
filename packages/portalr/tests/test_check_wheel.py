@@ -2,6 +2,7 @@
 fabricated wheel through ``main``."""
 
 import importlib.util
+import json
 import zipfile
 from pathlib import Path
 from types import ModuleType
@@ -24,6 +25,8 @@ def _script() -> ModuleType:
 check_wheel = _script()
 
 REACT = "## react@19.3.0\nLicence: MIT\n\n--- LICENSE\n\nMIT text"
+TAILWIND = "## tailwindcss@4.3.3\nLicence: MIT\n\n--- LICENSE\n\nMIT text"
+BUNDLED = (REACT, TAILWIND)
 SHIM = "## shim@2.0.0\nLicence: MIT\n\nThis package ships no licence text. Why."
 
 
@@ -32,7 +35,7 @@ def _notices(*entries: str) -> str:
 
 
 def test_notices_with_an_entry_and_text_for_each_package_are_in_order() -> None:
-    assert check_wheel.notices_problems("app", _notices(REACT, SHIM)) == []
+    assert check_wheel.notices_problems("app", _notices(*BUNDLED, SHIM)) == []
 
 
 def test_notices_without_packages_fail() -> None:
@@ -43,14 +46,14 @@ def test_notices_without_packages_fail() -> None:
 
 def test_an_entry_with_neither_text_nor_a_reason_fails() -> None:
     bare = "## bare@1.0.0\nLicence: MIT"
-    assert check_wheel.notices_problems("app", _notices(REACT, bare)) == [
+    assert check_wheel.notices_problems("app", _notices(*BUNDLED, bare)) == [
         "the app UI's notices have no licence text for bare@1.0.0"
     ]
 
 
 def test_an_entry_with_only_a_notice_has_no_licence_text() -> None:
     noticed = "## noticed@1.0.0\nLicence: Apache-2.0\n\n--- NOTICE\n\nCopyright 2026"
-    assert check_wheel.notices_problems("app", _notices(REACT, noticed)) == [
+    assert check_wheel.notices_problems("app", _notices(*BUNDLED, noticed)) == [
         "the app UI's notices have no licence text for noticed@1.0.0"
     ]
 
@@ -58,12 +61,20 @@ def test_an_entry_with_only_a_notice_has_no_licence_text() -> None:
 def test_notices_that_lack_a_package_the_uis_bundle_fail() -> None:
     other = "## other@1.0.0\nLicence: MIT\n\n--- LICENSE\n\nMIT text"
     assert check_wheel.notices_problems("admin", _notices(other)) == [
-        "the admin UI's notices lack react, which it bundles"
+        "the admin UI's notices lack react, which it bundles",
+        "the admin UI's notices lack tailwindcss, which it bundles",
+    ]
+
+
+def test_notices_without_tailwind_fail_though_they_have_react() -> None:
+    # Tailwind is found by reading a stylesheet: if that stops working, this is what shows.
+    assert check_wheel.notices_problems("app", _notices(REACT)) == [
+        "the app UI's notices lack tailwindcss, which it bundles"
     ]
 
 
 def test_a_heading_that_isnt_one_fails() -> None:
-    text = _notices(REACT) + f"\n{SEPARATOR}\n## no version here\nLicence: MIT\n"
+    text = _notices(*BUNDLED) + f"\n{SEPARATOR}\n## no version here\nLicence: MIT\n"
     assert check_wheel.notices_problems("app", text) == [
         "the app UI's notices have an entry headed '## no version here'"
     ]
@@ -71,7 +82,7 @@ def test_a_heading_that_isnt_one_fails() -> None:
 
 def test_a_licence_text_holding_an_equals_line_stays_in_its_entry() -> None:
     tricky = f"## tricky@1.0.0\nLicence: MIT\n\n--- LICENSE\n\nbefore\n{SEPARATOR}\nafter"
-    assert check_wheel.notices_problems("app", _notices(REACT, tricky)) == []
+    assert check_wheel.notices_problems("app", _notices(*BUNDLED, tricky)) == []
 
 
 def _wheel(directory: Path, notices: dict[str, str | None]) -> None:
@@ -93,7 +104,7 @@ def _wheel(directory: Path, notices: dict[str, str | None]) -> None:
 def test_a_wheel_with_both_uis_notices_passes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _wheel(tmp_path, {"app": _notices(REACT), "admin": _notices(REACT)})
+    _wheel(tmp_path, {"app": _notices(*BUNDLED), "admin": _notices(*BUNDLED)})
     monkeypatch.chdir(tmp_path)
     assert check_wheel.main() == 0
     assert "with their typefaces and notices" in capsys.readouterr().out
@@ -102,7 +113,7 @@ def test_a_wheel_with_both_uis_notices_passes(
 def test_a_wheel_without_a_uis_notices_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _wheel(tmp_path, {"app": _notices(REACT), "admin": None})
+    _wheel(tmp_path, {"app": _notices(*BUNDLED), "admin": None})
     monkeypatch.chdir(tmp_path)
     assert check_wheel.main() == 1
     assert "lacks the admin UI's THIRD-PARTY-NOTICES.txt" in capsys.readouterr().err
@@ -112,7 +123,28 @@ def test_a_wheel_with_a_bad_entry_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     bare = "## bare@1.0.0\nLicence: MIT"
-    _wheel(tmp_path, {"app": _notices(REACT), "admin": _notices(REACT, bare)})
+    _wheel(tmp_path, {"app": _notices(*BUNDLED), "admin": _notices(*BUNDLED, bare)})
     monkeypatch.chdir(tmp_path)
     assert check_wheel.main() == 1
     assert "no licence text for bare@1.0.0" in capsys.readouterr().err
+
+
+NAMES = json.loads(
+    (Path(__file__).parent.parent / "web" / "notices" / "file-names.json").read_text()
+)
+"""The file names web/notices's tests read too: both readings of a licence file must agree."""
+
+
+def _has_licence_text(name: str) -> bool:
+    entry = f"## p@1.0.0\nLicence: MIT\n\n--- {name}\n\ntext"
+    return check_wheel.LICENCE_HEADING.search(entry) is not None
+
+
+@pytest.mark.parametrize("name", NAMES["licence"])
+def test_a_licence_file_is_a_licence_text(name: str) -> None:
+    assert _has_licence_text(name)
+
+
+@pytest.mark.parametrize("name", NAMES["notice"])
+def test_a_notice_alone_is_not_a_licence_text(name: str) -> None:
+    assert not _has_licence_text(name)

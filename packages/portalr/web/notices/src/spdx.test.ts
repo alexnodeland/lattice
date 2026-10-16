@@ -2,6 +2,15 @@ import { describe, expect, test } from "vitest";
 import { allows, elect, ids, offersChoice, parse } from "./spdx";
 
 const allowed = new Set(["mit", "isc", "apache-2.0", "bsd-3-clause"]);
+/** The expression a text spells, for a test that means it to be valid. */
+function expressionOf(text: string) {
+  const expression = parse(text);
+  if (expression === undefined) {
+    throw new Error(`${text} isn't an expression`);
+  }
+  return expression;
+}
+
 const ok = (text: string) => {
   const expression = parse(text);
   return expression !== undefined && allows(expression, allowed);
@@ -64,6 +73,6 @@ describe("SPDX expressions", () => {
     const expression = parse("(MIT OR Apache-2.0) AND GPL-2.0+");
     expect(expression && ids(expression)).toEqual(["MIT", "Apache-2.0", "GPL-2.0"]);
     expect(expression && offersChoice(expression)).toBe(true);
-    expect(offersChoice(parse("MIT AND ISC") ?? { kind: "id", id: "x" })).toBe(false);
+    expect(offersChoice(expressionOf("MIT AND ISC"))).toBe(false);
   });
 });

@@ -119,3 +119,6 @@ def test_a_ui_build_is_invalidated_by_the_lockfile(project: str) -> None:
     build = yaml.safe_load((ROOT / WEB[project] / "moon.yml").read_text())["tasks"]["build"]
     assert "mergeInputs" not in build.get("options", {}), "inputs are added to the shared ones"
     assert "/packages/portalr/web/notices/policy.json" in build["inputs"]
+    assert "/packages/portalr/web/notices/src/**/*" in build["inputs"]
+    # Editing a test of the plugin doesn't rebuild the UIs.
+    assert "!/packages/portalr/web/notices/src/**/*.test.ts" in build["inputs"]

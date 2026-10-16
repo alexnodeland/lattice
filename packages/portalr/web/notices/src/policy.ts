@@ -100,7 +100,10 @@ export function check(packages: readonly BundledPackage[], policy: Policy): Prob
       !found.texts.some(({ file }) => isLicenceFile(file)) &&
       !excused(policy, found.name, licence, "text")
     ) {
-      problems.push({ package: name, message: "ships no LICENSE or COPYING file" });
+      problems.push({
+        package: name,
+        message: "ships no licence file (LICENSE, COPYING or the like)",
+      });
     }
   }
   return problems;

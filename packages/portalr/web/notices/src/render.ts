@@ -57,7 +57,7 @@ export interface Entry {
   readonly licence: string;
   /** Where the licence offered a choice: what it is used under. */
   readonly usedUnder: string | undefined;
-  /** Whether the entry holds a LICENSE or COPYING text, not only a NOTICE. */
+  /** Whether the entry holds a licence text (LICENSE, COPYING or the like), not only a NOTICE. */
   readonly hasText: boolean;
 }
 

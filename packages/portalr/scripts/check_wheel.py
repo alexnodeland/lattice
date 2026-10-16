@@ -29,13 +29,15 @@ BETWEEN_ENTRIES = re.compile(r"\n={80}\n(?=## )")
 HEADING = re.compile(r"## .+@[^@\s]+")
 """An entry's heading, name and version."""
 
-LICENCE_HEADING = re.compile(
-    r"^--- (licen[cs]e|copying|copyright|unlicense)", re.IGNORECASE | re.MULTILINE
-)
-"""A licence text in an entry, as opposed to a NOTICE alone."""
+LICENCE_HEADING = re.compile(r"^--- (licen[cs]es?|copying|unlicense)", re.IGNORECASE | re.MULTILINE)
+"""A licence text in an entry (LICENSE, LICENCE, LICENSES, COPYING, UNLICENSE), not a NOTICE or
+COPYRIGHT alone, which can be only a statement. web/notices/src/collect.ts reads it the same way,
+and both are held to web/notices/file-names.json."""
 
-SENTINEL = "react"
-"""A package both UIs bundle, whose entry the notices must have."""
+SENTINELS = ("react", "tailwindcss")
+"""Packages both UIs bundle, whose entries the notices must have. Tailwind reaches them only
+through a stylesheet's @import, which the plugin finds by reading the stylesheet: if that stops
+working, its entry goes first."""
 
 STYLED = ".bg-accent"
 """A class of ui's own components: an app's styles without it lack the kit's (portalr ADR-0018)."""
@@ -44,8 +46,8 @@ STYLED = ".bg-accent"
 def notices_problems(ui: str, text: str) -> list[str]:
     """What is wrong with a UI's notices.
 
-    No entries, a heading that isn't one, an entry with neither a LICENSE or COPYING text nor a
-    reason, or no entry for a package both UIs bundle.
+    No entries, a heading that isn't one, an entry with neither a licence text (LICENSE, COPYING
+    and the like) nor a reason, or no entry for a package both UIs bundle.
     """
     entries = BETWEEN_ENTRIES.split(text)[1:]
     if not entries:
@@ -61,8 +63,11 @@ def notices_problems(ui: str, text: str) -> list[str]:
         names.append(name.rpartition("@")[0])
         if not LICENCE_HEADING.search(entry) and "ships no licence text." not in rest:
             problems.append(f"the {ui} UI's notices have no licence text for {name}")
-    if SENTINEL not in names:
-        problems.append(f"the {ui} UI's notices lack {SENTINEL}, which it bundles")
+    problems.extend(
+        f"the {ui} UI's notices lack {sentinel}, which it bundles"
+        for sentinel in SENTINELS
+        if sentinel not in names
+    )
     return problems
 
 

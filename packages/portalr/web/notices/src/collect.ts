@@ -21,9 +21,30 @@ const IN_PACKAGE = /^(.*\/node_modules\/)((?:@[^/]+\/)?[^/]+)\//;
 const NOTICE_FILE =
   /^(licen[cs]es?|copying|copyright|unlicense|notice)([-_][\w-]+)?(\.(md|markdown|txt|rst))?$/i;
 /** Of those, the ones that are the licence's text: a package with only a NOTICE has not got it. */
-const LICENCE_FILE = /^(licen[cs]es?|copying|copyright|unlicense)/i;
+const LICENCE_FILE = /^(licen[cs]es?|copying|unlicense)/i;
 
 export const isLicenceFile = (file: string) => LICENCE_FILE.test(file);
+
+/** Whether a file of a package's root is one whose text the notices carry. */
+export const isNoticeFile = (file: string) => NOTICE_FILE.test(file);
+
+/** Code units, not the locale's collation (which depends on ICU): the same order everywhere. */
+const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+/** Versions by their numbers where they have them, `1.10.0` after `1.9.0`. */
+function compareVersions(a: string, b: string): number {
+  const left = a.split(/(\d+)/);
+  const right = b.split(/(\d+)/);
+  for (let at = 0; at < Math.max(left.length, right.length); at += 1) {
+    const x = left[at] ?? "";
+    const y = right[at] ?? "";
+    const order = at % 2 === 1 ? Number(x) - Number(y) : compare(x, y);
+    if (order !== 0) {
+      return Math.sign(order);
+    }
+  }
+  return 0;
+}
 
 /**
  * The directory of the package a module id is in, or undefined for a module that isn't in one
@@ -102,7 +123,7 @@ function read(directory: string): BundledPackage {
     throw new Error(`${file} has no name and version: a package it bundles can't be noticed`);
   }
   const files = readdirSync(directory)
-    .filter((entry) => NOTICE_FILE.test(entry) && statSync(join(directory, entry)).isFile())
+    .filter((entry) => isNoticeFile(entry) && statSync(join(directory, entry)).isFile())
     .sort();
   return {
     name: manifest.name,
@@ -135,8 +156,6 @@ export function collect(moduleIds: Iterable<string>): BundledPackage[] {
     unique.set(`${found.name}@${found.version}`, found);
   }
   return [...unique.values()].sort(
-    (a, b) =>
-      a.name.localeCompare(b.name, "en") ||
-      a.version.localeCompare(b.version, "en", { numeric: true }),
+    (a, b) => compare(a.name, b.name) || compareVersions(a.version, b.version),
   );
 }

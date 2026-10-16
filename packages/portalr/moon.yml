@@ -54,6 +54,7 @@ tasks:
     inputs:
       - 'web/notices/policy.json'
       - 'web/notices/src/**/*'
+      - '!web/notices/src/**/*.test.ts'
       - 'web/notices/scripts/*'
       - 'src/portalr/static/*/THIRD-PARTY-NOTICES.txt'
     deps:
@@ -67,6 +68,7 @@ tasks:
     inputs:
       - 'pyproject.toml'
       - 'web/notices/src/**/*'
+      - '!web/notices/src/**/*.test.ts'
       - 'web/notices/scripts/*'
       - 'src/portalr/static/*/THIRD-PARTY-NOTICES.txt'
     deps:

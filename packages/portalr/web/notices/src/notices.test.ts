@@ -107,13 +107,15 @@ describe("the policy", () => {
 
   test("a package that ships no licence text fails, whatever it declares", () => {
     expect(problemsOf([pack("bare", { license: "MIT" }, { "README.md": "hi" })])).toEqual([
-      "bare@1.0.0: ships no LICENSE or COPYING file",
+      "bare@1.0.0: ships no licence file (LICENSE, COPYING or the like)",
     ]);
   });
 
   test("a NOTICE alone isn't a licence text", () => {
     const notice = pack("noticed", { license: "Apache-2.0" }, { NOTICE: "Copyright 2026" });
-    expect(problemsOf([notice])).toEqual(["noticed@1.0.0: ships no LICENSE or COPYING file"]);
+    expect(problemsOf([notice])).toEqual([
+      "noticed@1.0.0: ships no licence file (LICENSE, COPYING or the like)",
+    ]);
   });
 
   test("source files named like a licence aren't collected, and licence file names are", () => {
@@ -196,7 +198,7 @@ describe("the policy", () => {
     };
     const text = { ...licence, kind: "text" as const };
     expect(problemsOf(ids, { ...policy, exceptions: [licence] })).toEqual([
-      "odd2@1.0.0: ships no LICENSE or COPYING file",
+      "odd2@1.0.0: ships no licence file (LICENSE, COPYING or the like)",
     ]);
     expect(problemsOf(ids, { ...policy, exceptions: [text] })).toEqual([
       "odd2@1.0.0: its licence, MPL-2.0, isn't allowed",

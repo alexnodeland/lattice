@@ -7,7 +7,7 @@ import { notices } from "./plugin";
 import type { Policy } from "./policy";
 import { parseNotices } from "./render";
 
-// These run the real `vite build` on a small project, to see what Rollup keeps.
+// These run the real `vite build` on a small project, to see what the bundler keeps.
 
 const policy: Policy = { allowed: ["MIT", "ISC"], exceptions: [] };
 const projects: string[] = [];
@@ -33,7 +33,7 @@ function project(licences: Record<string, string> = {}): string {
     }
   };
   install("used", { "index.js": "export const used = () => 'used';" });
-  // Imported but not used, from a package that says importing it does nothing: Rollup drops it.
+  // Imported but not used, from a package that says importing it does nothing: the bundler drops it.
   install(
     "shaken",
     { "index.js": "export const shaken = () => 'shaken';" },
@@ -80,7 +80,7 @@ async function built(root: string): Promise<string> {
 }
 
 describe("the plugin, in a real build", () => {
-  test("names what Rollup kept: used code, and the stylesheets' packages, not what it dropped", async () => {
+  test("names what the bundler kept: used code, and the stylesheets' packages, not what it dropped", async () => {
     const text = await built(project());
     expect(parseNotices(text).map((entry) => entry.name)).toEqual([
       "css-direct",

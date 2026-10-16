@@ -12,6 +12,9 @@ export function bundledLicences(entries: readonly Entry[]): string[] {
   const found = new Map<string, string>();
   for (const entry of entries) {
     const expression = parse(entry.licence);
+    // Where an OR was elected, the one used. Otherwise every identifier the expression names: for
+    // a package a `licence` exception covers, whose licence isn't allowed, that is every
+    // alternative, since none was elected, and the wheel's expression has to list them all.
     const used =
       entry.usedUnder?.split(" AND ") ?? (expression === undefined ? undefined : ids(expression));
     if (used === undefined) {
@@ -21,7 +24,7 @@ export function bundledLicences(entries: readonly Entry[]): string[] {
       found.set(id.toLowerCase(), id);
     }
   }
-  return [...found.values()].sort((a, b) => a.localeCompare(b, "en"));
+  return [...found.values()].sort();
 }
 
 /**

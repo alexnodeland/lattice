@@ -296,6 +296,32 @@ async def test_a_stale_attempt_cannot_overwrite_a_newer_one(build: Build, storag
     assert (current.status, current.attempts) == ("running", 2)
 
 
+@pytest.mark.xfail(
+    strict=True, reason="https://github.com/alexnodeland/lattice/issues/245", raises=AssertionError
+)
+async def test_a_cancelled_and_retried_attempt_cannot_overwrite_the_newer_one(
+    build: Build, storage: Storage
+) -> None:
+    workspaces = build([rule(then=run("blocked"))])
+    deps = Deps()
+    workspace = await open_(workspaces)
+    await workspace.publish(Deploy(service="auth"))
+    executor = reactor(workspaces, deps)
+    await executor.evaluate()
+    attempt = asyncio.create_task(executor.execute())
+    await deps.started.wait()
+    [first] = await workspace.runs()
+    await workspace.cancel_run(first.id)
+    await workspace.retry_run(first.id)  # a fresh budget: its attempts are 0 again
+    [retried] = await workspace.runs()
+    newer, _ = start(retried, now=START)
+    async with storage.transaction(ACME) as transaction:  # another executor took it
+        await transaction.save_runs([newer])
+    deps.release.set()
+    assert await attempt == 0
+    assert await workspace.runs() == [newer]
+
+
 async def test_cancelling_a_run_stops_its_action(build: Build) -> None:
     workspaces = build([rule(then=run("blocked"))])
     deps = Deps()

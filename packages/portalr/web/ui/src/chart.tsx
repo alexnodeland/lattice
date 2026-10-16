@@ -1,14 +1,15 @@
 /**
  * Charts on Recharts, adapted from Tremor's BarChart, LineChart and DonutChart (Apache-2.0; see
- * NOTICE): only what admin draws, restyled to the kit's tokens. A chart's series take the inks in
- * order, as marks and never as text, three at most, and each has a pattern too, so colour is
- * never its only cue (portalr ADR-0021): solid, then hatched one way, then the other; or a line
- * solid, dashed, then dotted. Each series is named in a legend, and directly at its last mark, and
- * the figures are a table beneath, for those who read them rather than look. Text takes the
- * kit's type: the chart's small size, inherited, in the muted ink.
+ * NOTICE): only what admin draws, restyled to the kit's tokens. Everything the three share, a
+ * palette and the patterns that tell a series apart beyond its hue, margins, axes, the tooltip and
+ * the legend, and how numbers and dates are written, is `chart-theme.tsx`, so no chart writes a
+ * colour, a dash or a pattern of its own (portalr ADR-0036). Each series is named in a legend,
+ * and, where there are several, directly at its last mark; the figures are a table beneath, for
+ * those who read them rather than look. Text takes the kit's type: the chart's small size,
+ * inherited, in the muted ink.
  */
 
-import { type ReactNode, useId } from "react";
+import { type ReactNode, useId, useRef } from "react";
 import {
   Bar,
   CartesianGrid,
@@ -28,7 +29,29 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  ADJACENT,
+  AXIS,
+  cut,
+  dash,
+  fill,
+  formatNumber,
+  GRID,
+  Hatch,
+  ink,
+  Legend,
+  MARGIN,
+  MAX_SERIES,
+  Marker,
+  Swatch,
+  TooltipCard,
+  TooltipRow,
+  useLabelRoom,
+} from "./chart-theme";
 import { type Column, ItemTable } from "./item-table";
+import { Num } from "./num";
+
+export { MAX_SERIES } from "./chart-theme";
 
 /** A row of a chart: its index, such as a day, and each series' value on it, or none. */
 export type Datum = Readonly<Record<string, string | number | null>>;
@@ -45,83 +68,14 @@ interface Index {
   readonly name: string;
 }
 
-/** The most series a chart draws, one per ink. */
-export const MAX_SERIES = 3;
+/** The least number that is at least `most`, is one of 1, 2, 4, 6, 8 or 10 tens, and at least 2: it halves into whole numbers. */
+const evenReach = (most: number) => {
+  const tens = 10 ** Math.floor(Math.log10(Math.max(most, 1)));
+  return Math.max(2, tens * ([1, 2, 4, 6, 8, 10].find((step) => step * tens >= most) ?? 10));
+};
 
-const INKS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)"] as const;
-const DASHES = ["0", "6 3", "2 3"] as const;
-
-/** A series' ink and dash, by its place among the series. */
-const ink = (at: number) => INKS[at] ?? "var(--muted)";
-const dash = (at: number) => DASHES[at] ?? "0";
-
-/** The longest a direct label is, in characters: a longer name is cut, and given whole as a title. */
-const LONGEST_LABEL = 14;
-
-/** A series' name as its direct label: cut to `LONGEST_LABEL`, with an ellipsis. */
-const cut = (name: string) =>
-  name.length > LONGEST_LABEL ? `${name.slice(0, LONGEST_LABEL - 1)}…` : name;
-
-/**
- * The room a chart keeps to its right for its direct labels: enough for the longest, cut. A
- * character of a chart's small type is taken to be 7px wide. That is an inference from "Thumbs
- * down" being cut at 6px a character, not a measurement of the face, so it is the least that was
- * seen to fit; a test holds that the label stays inside the drawing.
- */
-const labelRoom = (series: readonly Series[]) =>
-  14 + 7 * Math.max(0, ...series.map((one) => cut(one.name).length));
-
-/**
- * A series' pattern past the first, which is solid: its ink hatched at 45°, then at 135°; past
- * the inks, for what is folded into "Other", the muted ink, dotted.
- */
-function Hatch({ id, at }: { id: string; at: number }) {
-  if (at >= MAX_SERIES) {
-    return (
-      <pattern id={id} width="4" height="4" patternUnits="userSpaceOnUse">
-        <rect width="4" height="4" fill="var(--muted)" opacity={0.3} />
-        <circle cx="2" cy="2" r="1" fill="var(--muted)" />
-      </pattern>
-    );
-  }
-  return (
-    <pattern
-      id={id}
-      width="6"
-      height="6"
-      patternUnits="userSpaceOnUse"
-      patternTransform={`rotate(${at === 1 ? 45 : 135})`}
-    >
-      <rect width="6" height="6" fill={ink(at)} opacity={0.35} />
-      <line x1="0" y1="0" x2="0" y2="6" stroke={ink(at)} strokeWidth="3" />
-    </pattern>
-  );
-}
-
-/** A series' mark, small, as a legend or a tooltip shows it: its own pattern, under its own id. */
-function Swatch({ at, line = false }: { at: number; line?: boolean }) {
-  const id = useId();
-  return (
-    <svg aria-hidden="true" width="16" height="10" className="shrink-0">
-      {line ? (
-        <line
-          x1="0"
-          y1="5"
-          x2="16"
-          y2="5"
-          stroke={ink(at)}
-          strokeWidth="2"
-          strokeDasharray={dash(at)}
-        />
-      ) : (
-        <>
-          <defs>{at > 0 && <Hatch id={id} at={at} />}</defs>
-          <rect width="16" height="10" rx="2" fill={at === 0 ? ink(0) : `url(#${id})`} />
-        </>
-      )}
-    </svg>
-  );
-}
+/** The room a diverging chart keeps to its left for the names of its two halves, in px. */
+const CAPTION_ROOM = 20;
 
 /** A chart's frame: what it shows, as a figure's caption, its legend, and its figures as a table. */
 function Figure({
@@ -131,6 +85,9 @@ function Figure({
   data,
   shown,
   line = false,
+  adjacent = false,
+  labelled = false,
+  left = MARGIN.left,
   children,
 }: {
   label: string;
@@ -140,9 +97,18 @@ function Figure({
   /** A value as the table shows it. */
   shown: (value: number) => string;
   line?: boolean;
-  children: ReactNode;
+  /** Whether a series' mark touches another's, which a pattern tells apart. */
+  adjacent?: boolean;
+  /** Whether each series is named at its last mark, in a margin to the plot's right. */
+  labelled?: boolean;
+  /** The room to keep to the plot's left, for what is written there. */
+  left?: number;
+  /** The drawing, given the margin to draw it in. */
+  children: (margin: { top: number; right: number; bottom: number; left: number }) => ReactNode;
 }) {
   const caption = useId();
+  const plot = useRef<HTMLDivElement>(null);
+  const right = useLabelRoom(plot, labelled ? series.map((one) => cut(one.name)) : []);
   const columns: [Column<Datum>, ...Column<Datum>[]] = [
     { key: "~index", label: index.name, cell: (row) => row[index.key] },
     ...series.map((one) => ({
@@ -155,20 +121,23 @@ function Figure({
     })),
   ];
   return (
-    <figure aria-labelledby={caption} className="flex flex-col gap-2">
+    <figure
+      aria-labelledby={caption}
+      className="flex flex-col gap-2"
+      {...(adjacent && { style: ADJACENT })}
+    >
       <figcaption id={caption} className="font-semibold text-fg text-sm">
         {label}
       </figcaption>
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-muted text-xs">
-        {series.map((one, at) => (
-          <li key={one.key} className="inline-flex items-center gap-1.5">
-            <Swatch at={at} line={line} />
-            {one.name}
-          </li>
-        ))}
-      </ul>
-      <div className="h-64 w-full text-muted text-xs" aria-hidden="true">
-        {children}
+      <Legend
+        entries={series.map((one, at) => ({
+          key: one.key,
+          name: one.name,
+          mark: <Swatch at={at} line={line} />,
+        }))}
+      />
+      <div ref={plot} className="h-64 w-full text-muted text-xs" aria-hidden="true">
+        {children({ ...MARGIN, left, right: labelled ? right : MARGIN.right })}
       </div>
       <details className="text-sm">
         <summary className="cursor-pointer text-muted">Show the figures</summary>
@@ -184,75 +153,71 @@ function Figure({
   );
 }
 
-/** Tremor's tooltip: the index, then each series' mark, name and value, in the kit's colours. */
+/** A tooltip over a chart: the index, then each series' mark, name and value. */
 function ChartTooltip({
   active,
   payload,
   label,
   series,
   shown,
+  tick,
   line = false,
 }: Pick<TooltipContentProps<number, string>, "active" | "payload" | "label"> & {
   series: readonly Series[];
   shown: (value: number) => string;
+  /** The index as the axis writes it, where the tooltip gives its own. */
+  tick?: ((index: string) => string) | undefined;
   line?: boolean;
 }) {
   if (!active || payload.length === 0) {
     return null;
   }
   return (
-    <div className="rounded-md border border-line bg-surface text-sm shadow-md">
-      <p className="border-line border-b px-3 py-1.5 font-medium text-fg">{label}</p>
-      <ul className="flex flex-col gap-1 px-3 py-1.5">
-        {payload.map((item) => {
-          const at = series.findIndex((one) => one.key === item.dataKey);
-          return (
-            <li key={String(item.dataKey)} className="flex items-center justify-between gap-6">
-              <span className="inline-flex items-center gap-1.5 text-muted">
-                <Swatch at={at} line={line} />
-                {series[at]?.name ?? item.name}
-              </span>
-              <span className="font-medium text-fg tabular-nums">
-                {typeof item.value === "number" ? shown(item.value) : "–"}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+    <TooltipCard title={tick && typeof label === "string" ? tick(label) : label}>
+      {payload.map((item) => {
+        const at = series.findIndex((one) => one.key === item.dataKey);
+        return (
+          <TooltipRow
+            key={String(item.dataKey)}
+            mark={<Swatch at={at} line={line} />}
+            name={series[at]?.name ?? String(item.name)}
+            value={typeof item.value === "number" ? shown(item.value) : "–"}
+          />
+        );
+      })}
+    </TooltipCard>
   );
 }
 
-/** The axes and grid both charts share: recessive, in the muted ink, with no ticks. */
+/** The axes and grid both charts share. */
 function Axes({
   index,
   shown,
   domain,
+  ticks,
   tick,
+  whole,
 }: {
   index: string;
   shown: (value: number) => string;
   domain?: readonly [number, number] | undefined;
+  /** Where the value axis is marked, where it is not Recharts' own choice. */
+  ticks?: readonly number[] | undefined;
   /** An index as the axis writes it, where it is shorter than the table's and the tooltip's. */
   tick?: ((index: string) => string) | undefined;
+  /** Whether the value axis is of whole numbers, such as counts, and so has no tick between them. */
+  whole: boolean;
 }) {
   return (
     <>
-      <CartesianGrid stroke="var(--line)" vertical={false} />
-      <XAxis
-        dataKey={index}
-        tickLine={false}
-        axisLine={false}
-        stroke="var(--muted)"
-        minTickGap={16}
-        {...(tick && { tickFormatter: tick })}
-      />
+      <CartesianGrid {...GRID} />
+      <XAxis dataKey={index} minTickGap={16} {...AXIS} {...(tick && { tickFormatter: tick })} />
       <YAxis
-        tickLine={false}
-        axisLine={false}
-        stroke="var(--muted)"
-        width={40}
+        width="auto"
+        allowDecimals={!whole}
+        {...AXIS}
         {...(domain && { domain: [...domain] })}
+        {...(ticks && { ticks: [...ticks] })}
         tickFormatter={shown}
       />
     </>
@@ -349,7 +314,7 @@ function DirectLabels({
       {placed.map((label) => (
         <text
           key={label.name}
-          x={plot.x + plot.width + 6}
+          x={plot.x + plot.width + 8}
           y={label.y + 4}
           fill="var(--muted)"
           textAnchor="start"
@@ -363,17 +328,49 @@ function DirectLabels({
 }
 
 /**
+ * The names of a diverging chart's two halves, at the plot's left, turned to read along the axis:
+ * the first series above the baseline, and the second below it, whose ticks count up from it.
+ */
+function Halves({ above, below }: { above: string; below: string }) {
+  const scale = useYAxisScale();
+  const plot = usePlotArea();
+  const zero = scale?.(0);
+  if (!plot || typeof zero !== "number") {
+    return null;
+  }
+  const half = (name: string, middle: number) => (
+    <text
+      key={name}
+      transform={`translate(${CAPTION_ROOM / 2} ${middle}) rotate(-90)`}
+      fill="var(--muted)"
+      textAnchor="middle"
+      dominantBaseline="middle"
+    >
+      {name}
+    </text>
+  );
+  return (
+    <g>
+      {half(above, (plot.y + zero) / 2)}
+      {half(below, (zero + plot.y + plot.height) / 2)}
+    </g>
+  );
+}
+
+/**
  * Bars per index, one series beside another, or, with `diverging`, the first series above the
  * baseline and the second below it, such as thumbs up and down, their values counts drawn apart:
- * the axis, the tooltip and the table show each as the count it is.
+ * the axis, the tooltip and the table show each as the count it is, and the halves are named at
+ * the axis. Where the series meet at a baseline, the second is hatched, as marks that touch are.
  */
 export function BarChart({
   label,
   data,
   index,
   series,
-  format = String,
+  format = formatNumber,
   diverging = false,
+  whole = false,
   unknown = 0,
   tick,
 }: {
@@ -383,6 +380,8 @@ export function BarChart({
   series: readonly Series[];
   format?: (value: number) => string;
   diverging?: boolean;
+  /** Whether the values are whole numbers, such as counts, which an axis then marks only at. */
+  whole?: boolean;
   /** How many of the first rows are unknown, rather than empty: shaded, and named so. */
   unknown?: number;
   /** An index as the axis writes it, such as a date without its year; the rows keep it whole. */
@@ -399,42 +398,67 @@ export function BarChart({
     : data;
   // Below the baseline is a count all the same: shown without its sign.
   const shown = diverging ? (value: number) => format(Math.abs(value)) : format;
-  const fill = (at: number) => (at === 0 ? ink(0) : `url(#${id}-${at})`);
+  // Both halves reach as far, to a number that halves evenly, so the baseline is the middle and a
+  // tick's distance from it is a count.
+  const reach = evenReach(
+    Math.max(0, ...rows.flatMap((row) => drawn.map((one) => Math.abs(Number(row[one.key] ?? 0))))),
+  );
   return (
-    <Figure label={label} index={index} series={drawn} data={data} shown={format}>
-      <ResponsiveContainer>
-        <RechartsBarChart
-          data={[...rows]}
-          stackOffset={diverging ? "sign" : "none"}
-          barCategoryGap="20%"
-          margin={{ top: 16, right: labelRoom(drawn), bottom: 0, left: 0 }}
-        >
-          <defs>
-            {drawn.map((one, at) => at > 0 && <Hatch key={one.key} id={`${id}-${at}`} at={at} />)}
-          </defs>
-          <Axes index={index.key} shown={shown} tick={tick} />
-          <Unknown data={rows} index={index.key} rows={unknown} />
-          {diverging && <ReferenceLine y={0} stroke="var(--edge)" />}
-          <Tooltip
-            cursor={{ fill: "var(--wash)" }}
-            content={(props) => <ChartTooltip {...props} series={drawn} shown={shown} />}
-          />
-          {drawn.map((one, at) => (
-            <Bar
-              key={one.key}
-              dataKey={one.key}
-              name={one.name}
-              fill={fill(at)}
-              stroke="var(--surface)"
-              strokeWidth={2}
-              radius={4}
-              isAnimationActive={false}
-              {...(diverging && { stackId: "sign" })}
+    <Figure
+      label={label}
+      index={index}
+      series={drawn}
+      data={data}
+      shown={format}
+      adjacent={diverging}
+      labelled={drawn.length > 1 && !diverging}
+      left={diverging ? CAPTION_ROOM : MARGIN.left}
+    >
+      {(margin) => (
+        <ResponsiveContainer>
+          <RechartsBarChart
+            data={[...rows]}
+            stackOffset={diverging ? "sign" : "none"}
+            barCategoryGap="20%"
+            margin={margin}
+          >
+            <defs>
+              {drawn.map((one, at) => at > 0 && <Hatch key={one.key} id={`${id}-${at}`} at={at} />)}
+            </defs>
+            <Axes
+              index={index.key}
+              shown={shown}
+              tick={tick}
+              whole={whole}
+              {...(diverging && {
+                domain: [-reach, reach] as const,
+                ticks: [-reach, -reach / 2, 0, reach / 2, reach],
+              })}
             />
-          ))}
-          <DirectLabels data={rows} series={drawn} bar />
-        </RechartsBarChart>
-      </ResponsiveContainer>
+            <Unknown data={rows} index={index.key} rows={unknown} />
+            {diverging && <ReferenceLine y={0} stroke="var(--edge)" />}
+            <Tooltip
+              cursor={{ fill: "var(--wash)" }}
+              content={(props) => (
+                <ChartTooltip {...props} series={drawn} shown={shown} tick={tick} />
+              )}
+            />
+            {drawn.map((one, at) => (
+              <Bar
+                key={one.key}
+                dataKey={one.key}
+                name={one.name}
+                fill={fill(id, at)}
+                radius={4}
+                isAnimationActive={false}
+                {...(diverging && { stackId: "sign" })}
+              />
+            ))}
+            {diverging && below && drawn[0] && <Halves above={drawn[0].name} below={below.name} />}
+            {drawn.length > 1 && !diverging && <DirectLabels data={rows} series={drawn} bar />}
+          </RechartsBarChart>
+        </ResponsiveContainer>
+      )}
     </Figure>
   );
 }
@@ -445,9 +469,10 @@ export function LineChart({
   data,
   index,
   series,
-  format = String,
+  format = formatNumber,
   domain,
   unknown = 0,
+  tick,
 }: {
   label: string;
   data: readonly Datum[];
@@ -458,38 +483,55 @@ export function LineChart({
   domain?: readonly [number, number];
   /** How many of the first rows are unknown, rather than empty: shaded, and named so. */
   unknown?: number;
+  /** An index as the axis writes it, such as a date without its year; the rows keep it whole. */
+  tick?: (index: string) => string;
 }) {
   const drawn = series.slice(0, MAX_SERIES);
   return (
-    <Figure label={label} index={index} series={drawn} data={data} shown={format} line>
-      <ResponsiveContainer>
-        <RechartsLineChart
-          data={[...data]}
-          margin={{ top: 16, right: labelRoom(drawn), bottom: 0, left: 0 }}
-        >
-          <Axes index={index.key} shown={format} domain={domain} />
-          <Unknown data={data} index={index.key} rows={unknown} />
-          <Tooltip
-            cursor={{ stroke: "var(--edge)" }}
-            content={(props) => <ChartTooltip {...props} series={drawn} shown={format} line />}
-          />
-          {drawn.map((one, at) => (
-            <Line
-              key={one.key}
-              dataKey={one.key}
-              name={one.name}
-              stroke={ink(at)}
-              strokeWidth={2}
-              strokeDasharray={dash(at)}
-              dot={{ r: 4, fill: ink(at), stroke: "var(--surface)", strokeWidth: 2 }}
-              activeDot={{ r: 5, stroke: "var(--surface)", strokeWidth: 2 }}
-              connectNulls={false}
-              isAnimationActive={false}
+    <Figure
+      label={label}
+      index={index}
+      series={drawn}
+      data={data}
+      shown={format}
+      line
+      labelled={drawn.length > 1}
+    >
+      {(margin) => (
+        <ResponsiveContainer>
+          <RechartsLineChart data={[...data]} margin={margin}>
+            <Axes index={index.key} shown={format} domain={domain} tick={tick} whole={false} />
+            <Unknown data={data} index={index.key} rows={unknown} />
+            <Tooltip
+              cursor={{ stroke: "var(--edge)" }}
+              content={(props) => (
+                <ChartTooltip {...props} series={drawn} shown={format} tick={tick} line />
+              )}
             />
-          ))}
-          <DirectLabels data={data} series={drawn} />
-        </RechartsLineChart>
-      </ResponsiveContainer>
+            {drawn.map((one, at) => (
+              <Line
+                key={one.key}
+                dataKey={one.key}
+                name={one.name}
+                stroke={ink(at)}
+                strokeWidth={2}
+                style={{ strokeDasharray: dash(at) }}
+                dot={({ cx, cy, index: point }) =>
+                  typeof cx === "number" && typeof cy === "number" ? (
+                    <Marker key={point} at={at} x={cx} y={cy} />
+                  ) : (
+                    <g key={point} />
+                  )
+                }
+                activeDot={{ r: 5, stroke: "var(--surface)", strokeWidth: 2 }}
+                connectNulls={false}
+                isAnimationActive={false}
+              />
+            ))}
+            {drawn.length > 1 && <DirectLabels data={data} series={drawn} />}
+          </RechartsLineChart>
+        </ResponsiveContainer>
+      )}
     </Figure>
   );
 }
@@ -505,15 +547,15 @@ export interface Part {
 const OTHER = "~other";
 
 /**
- * A whole in parts, as a donut beside a list of its parts, each with its value and share: the
- * largest three in the inks, solid, hatched one way, then the other, and the rest folded into
- * "Other", dotted in the muted ink. The list names every part in the donut; the figures are a
- * table beneath, as every chart's are.
+ * A whole in parts, as a donut with its total at its centre, beside a list of its parts, each
+ * with its value and share in its own row: the largest three in the inks, and the rest folded
+ * into "Other", dotted in the muted ink. Its slices are set apart by gaps, so they stay solid. The
+ * list names every part in the donut; the figures are a table beneath, as every chart's are.
  */
 export function DonutChart({
   label,
   parts,
-  format = String,
+  format = formatNumber,
 }: {
   label: string;
   parts: readonly Part[];
@@ -529,62 +571,74 @@ export function DonutChart({
   ];
   const total = shown.reduce((sum, part) => sum + part.value, 0);
   const share = (value: number) => `${Math.round((value / total) * 100)}%`;
-  const fill = (at: number) => (at === 0 ? ink(0) : `url(#${id}-${at})`);
   return (
     <figure aria-labelledby={caption} className="flex flex-col gap-2">
       <figcaption id={caption} className="font-semibold text-fg text-sm">
         {label}
       </figcaption>
-      <div className="flex flex-wrap items-center gap-6">
-        <div className="size-40 shrink-0" aria-hidden="true">
-          <ResponsiveContainer>
-            <PieChart>
-              <defs>
-                {shown.map(
-                  (part, at) => at > 0 && <Hatch key={part.key} id={`${id}-${at}`} at={at} />,
-                )}
-              </defs>
-              <Pie
-                data={[...shown]}
-                dataKey="value"
-                nameKey="name"
-                innerRadius="70%"
-                outerRadius="100%"
-                startAngle={90}
-                endAngle={-270}
-                stroke="var(--surface)"
-                strokeWidth={2}
-                isAnimationActive={false}
-              >
-                {shown.map((part, at) => (
-                  <Cell key={part.key} fill={fill(at)} />
-                ))}
-              </Pie>
-              <Tooltip
-                content={({ active, payload }) => {
-                  const part = payload[0];
-                  return active && part && typeof part.value === "number" ? (
-                    <div className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm shadow-md">
-                      <span className="text-muted">{part.name}</span>{" "}
-                      <span className="font-medium text-fg tabular-nums">
-                        {format(part.value)} · {share(part.value)}
-                      </span>
-                    </div>
-                  ) : null;
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+        <div className="relative size-40 shrink-0">
+          <div className="size-full" aria-hidden="true">
+            <ResponsiveContainer>
+              <PieChart>
+                <defs>
+                  {shown.map(
+                    (part, at) => at > 0 && <Hatch key={part.key} id={`${id}-${at}`} at={at} />,
+                  )}
+                </defs>
+                <Pie
+                  data={[...shown]}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius="70%"
+                  outerRadius="100%"
+                  startAngle={90}
+                  endAngle={-270}
+                  stroke="var(--surface)"
+                  strokeWidth={2}
+                  isAnimationActive={false}
+                >
+                  {shown.map((part, at) => (
+                    <Cell key={part.key} fill={fill(id, at)} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  content={({ active, payload }) => {
+                    const part = payload[0];
+                    const at = shown.findIndex((one) => one.name === part?.name);
+                    return active && part && typeof part.value === "number" ? (
+                      <TooltipCard>
+                        <TooltipRow
+                          mark={<Swatch at={at} />}
+                          name={String(part.name)}
+                          value={`${format(part.value)} · ${share(part.value)}`}
+                        />
+                      </TooltipCard>
+                    ) : null;
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="pointer-events-none absolute inset-0 m-auto flex size-24 flex-col items-center justify-center text-center">
+            <span className="text-muted text-xs">Total</span>
+            <span className="font-semibold text-fg text-lg">
+              <Num>{format(total)}</Num>
+            </span>
+          </p>
         </div>
-        <ul className="flex min-w-48 flex-1 flex-col gap-1.5 text-sm">
+        <ul className="grid w-fit grid-cols-[auto_auto_auto] gap-x-5 gap-y-1.5 text-sm">
           {shown.map((part, at) => (
-            <li key={part.key} className="flex items-center justify-between gap-4">
+            <li key={part.key} className="col-span-3 grid grid-cols-subgrid items-center">
               <span className="inline-flex items-center gap-2 text-fg">
                 <Swatch at={at} />
                 {part.name}
               </span>
-              <span className="text-muted tabular-nums">
-                {format(part.value)} · {share(part.value)}
+              <span className="text-right text-fg">
+                <Num>{format(part.value)}</Num>
+              </span>
+              <span className="text-right text-muted">
+                <Num>{share(part.value)}</Num>
               </span>
             </li>
           ))}

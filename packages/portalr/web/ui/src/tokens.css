@@ -32,13 +32,34 @@
   --on-danger: light-dark(#ffffff, #17111f);
   --danger-hover: color-mix(in srgb, var(--danger) 88%, var(--on-danger));
   /*
-   * A chart's series, in this order and no more: the inks as marks, never as text (ADR-0021).
-   * Each pair passes the dataviz palette check in its scheme (lightness, chroma, colour-blind
-   * separation), and is 3:1 or more on the surface; every series is labelled too.
+   * A chart's series, in this order and no more: tints of the brand violet, then one accent, the
+   * brand's magenta, as marks and never as text (ADR-0021, ADR-0036). Each is 3:1 or more on the
+   * paper and the surface in its scheme, which a token test holds, with the pairs told apart
+   * even to a reader who sees no red or no green. A hue is never a series' only cue.
    */
-  --chart-1: light-dark(#0096d6, #1a9fd6);
-  --chart-2: light-dark(#e4007c, #ea3a8c);
-  --chart-3: light-dark(#6b2fa0, #9b6ad2);
+  --chart-1: light-dark(#6b2fa0, #c8aaf2);
+  --chart-2: light-dark(#9a6fd1, #8a63c7);
+  --chart-3: light-dark(#e4007c, #ff8fc4);
+  /* The gridlines: very light, and horizontal only. Not text, and no more than a guide. */
+  --chart-grid: color-mix(in srgb, var(--line) 55%, transparent);
+  /*
+   * How a series is told apart from the next beyond its hue: a hatch laid over its fill, a dash
+   * in its line, and the shape of its markers. A chart reads these and decides nothing of its
+   * own, so they are the one place a mode changes them (see `[data-cvd]` below). By default the
+   * fills are solid and the lines unbroken, and a mark that touches another, a stacked or a
+   * diverging bar, or a day over its budget, takes `--chart-hatched` of its own.
+   */
+  --chart-hatched: 0.55;
+  --chart-hatch: 0;
+  --chart-dash-1: none;
+  --chart-dash-2: none;
+  --chart-dash-3: none;
+  /* A marker's size, and how round it is: its corner is that fraction of its size, so a half is a circle. */
+  --chart-marker-size: 5px;
+  --chart-marker-corner-1: 0.5;
+  --chart-marker-corner-2: 0.5;
+  --chart-marker-corner-3: 0.5;
+  --chart-marker-turn-3: 0deg;
   /*
    * A log line's eight ANSI colours, as text: 4.5:1 or more on the paper and the surface in each
    * scheme, which a token test holds. A line may only choose among these (portalr ADR-0031).
@@ -72,4 +93,24 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+}
+
+/*
+ * Colour-blind mode, which a page asks for as it asks for a scheme: `data-cvd` on the root, with
+ * any value, or on any element to take it there alone. It swaps the series' inks for ones from
+ * Okabe and Ito's set, adjusted to hold 3:1 on the paper and the surface in each scheme, and turns
+ * every pattern on: each series past the first is hatched, dashed in a line, and has a marker of
+ * its own shape, so no series relies on its hue. A control for it comes later (portalr ADR-0036).
+ */
+[data-cvd] {
+  --chart-1: light-dark(#0072b2, #3d9bd6);
+  --chart-2: light-dark(#d55e00, #e8762b);
+  --chart-3: light-dark(#b5578a, #e69fc6);
+  --chart-hatch: var(--chart-hatched);
+  --chart-dash-2: 6 4;
+  --chart-dash-3: 2 3;
+  --chart-marker-size: 8px;
+  --chart-marker-corner-2: 0;
+  --chart-marker-corner-3: 0;
+  --chart-marker-turn-3: 45deg;
 }

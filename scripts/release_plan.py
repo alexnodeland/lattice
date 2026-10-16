@@ -19,8 +19,9 @@ rules below are in one place and are tested (tests/test_release_plan.py):
 - **A rehearsal writes nothing.** Run by hand, the workflow's ``mode`` is ``rehearse`` unless it
   says ``publish``: it builds and checks, and attaches nothing to a release, attests nothing,
   pushes no image, rewrites no release notes and publishes nothing, on a branch (the whole release
-  at its head) and on a tag alike. Attaching, attesting, pushing images and publishing happen
-  only in a release run, or in ``mode=publish`` on a tag.
+  at its head) and on a tag alike. Attaching, attesting and pushing images happen in a release
+  run, or in ``mode=publish`` on a tag. **Publishing to PyPI happens only in ``mode=publish`` on
+  a tag, one package a dispatch**: a release run never publishes. It lists the dispatches to run.
 """
 
 import json
@@ -217,8 +218,8 @@ def plan(run: Run, root: Path = ROOT) -> Plan:
             run.releases,
             STACKR in released,
             True,
-            run.publishing,
-            ["a release: its wheels are attached and attested, and published if that is on"],
+            False,
+            ["a release: its wheels are attached and attested; PyPI is by dispatch on each tag"],
         )
     if run.event != "workflow_dispatch":
         raise Refused(f"the workflow doesn't run on {run.event}")
@@ -294,37 +295,65 @@ def built(
     )
 
 
+def distribution(path: str, root: Path = ROOT) -> str:
+    """A package's distribution, as PyPI names it."""
+    return str(project(path, root)["name"]).lower().replace("_", "-")
+
+
+def requires(path: str, root: Path = ROOT) -> list[str]:
+    """The ``name==version`` of every other package of the repository that a package requires.
+
+    PyPI must serve these before the package is published, whether or not they are in this
+    release: a dispatch on one tag publishes one package, and its requirements were published by
+    the dispatches before it. The version is the one the repository's package has at this commit.
+    """
+    names = {distribution(other, root): other for other in WHEELS}
+    found = requirement_names(path, root) & names.keys() - {distribution(path, root)}
+    return [f"{name}=={project(names[name], root)['version']}" for name in sorted(found)]
+
+
 def entry(path: str, root: Path = ROOT) -> dict[str, Any]:
     """A package as a job matrix names it.
 
-    Its directory, a name for artifacts, its stage, and its distribution and version.
+    Its directory, a name for artifacts, its stage, its distribution and version, and what PyPI
+    must serve before it.
     """
-    table = project(path, root)
     return {
         "path": path,
         "slug": path.rsplit("/", 1)[-1],
         "stage": stage_of(path) + 1,
-        "name": str(table["name"]).lower().replace("_", "-"),
-        "version": str(table["version"]),
+        "name": distribution(path, root),
+        "version": str(project(path, root)["version"]),
+        "requires": requires(path, root),
     }
 
 
 def outputs(made: Plan, root: Path = ROOT) -> dict[str, str]:
     """The plan as the workflow's job outputs.
 
-    ``ordered`` is what the publishing job runs through, one package at a time: each with the
-    ``name==version`` of every package before it in the release, which PyPI must serve first.
+    ``ordered`` is what the publishing job runs through, in the order the packages are published.
     """
     flags = {"stackr": made.stackr, "write": made.write, "publish": made.publish}
-    ordered = [entry(path, root) for path in made.ordered]
-    for at, each in enumerate(ordered):
-        each["earlier"] = [f"{before['name']}=={before['version']}" for before in ordered[:at]]
     return {
         "packages": json.dumps([entry(path, root) for path in made.packages]),
-        "ordered": json.dumps(ordered),
+        "ordered": json.dumps([entry(path, root) for path in made.ordered]),
         "releases": json.dumps(made.releases),
         **{name: str(value).lower() for name, value in flags.items()},
     }
+
+
+def next_steps(made: Plan, run: Run) -> list[str]:
+    """What the owner runs after a release run, in order.
+
+    One dispatch for each package to publish; for stackr, nothing (its images were pushed).
+    """
+    if run.event != "push":
+        return []
+    return [
+        f"gh workflow run release.yml --ref {made.releases[f'{path}--tag_name']} "
+        f"-f tag={made.releases[f'{path}--tag_name']} -f mode=publish"
+        for path in made.ordered
+    ]
 
 
 def environment(env: Mapping[str, str]) -> Run:
@@ -335,7 +364,7 @@ def environment(env: Mapping[str, str]) -> Run:
         ref_type=env.get("REF_TYPE", "branch"),
         ref_name=env.get("REF_NAME", "main"),
         tag=env.get("INPUT_TAG", ""),
-        mode=env.get("INPUT_MODE") or "rehearse",
+        mode=env.get("INPUT_MODE") or "rehearse",  # a push has no inputs: it is a release run
         released=json.loads(env.get("PATHS_RELEASED") or "[]"),
         releases=json.loads(env.get("RELEASES") or "{}"),
         publishing=env.get("PYPI_PUBLISH") == "true",
@@ -345,7 +374,8 @@ def environment(env: Mapping[str, str]) -> Run:
 def main() -> int:
     """Plan the run in the environment, write the outputs, and say what was decided."""
     try:
-        made = plan(environment(os.environ))
+        run = environment(os.environ)
+        made = plan(run)
     except Refused as refusal:
         sys.stderr.write(f"release_plan: {refusal}\n")
         return 1
@@ -356,6 +386,15 @@ def main() -> int:
     else:
         sys.stdout.write(lines)
     sys.stderr.write("".join(f"release_plan: {note}\n" for note in made.notes))
+    steps = next_steps(made, run)
+    if steps and (summary := os.environ.get("GITHUB_STEP_SUMMARY")):
+        with Path(summary).open("a") as handle:
+            handle.write(
+                "### Publish to PyPI\n\nThis run attached and attested the wheels. It published "
+                "nothing. Publish each package by dispatch on its tag, in this order, approving "
+                "the `pypi` environment each time (one approval a package, one at a time):\n\n"
+                + "".join(f"1. `{step}`\n" for step in steps)
+            )
     return 0
 
 

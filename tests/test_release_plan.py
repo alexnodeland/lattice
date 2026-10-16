@@ -87,7 +87,7 @@ def test_a_release_on_its_own_push_is_built_attested_and_ordered(root: Path) -> 
     )
     assert made.packages == ["packages/lattice-core", "packages/portalr"]
     assert made.stackr
-    assert (made.write, made.publish) == (True, True)
+    assert (made.write, made.publish) == (True, False), "a release run never publishes to PyPI"
     assert made.ordered == ["packages/lattice-core", "packages/portalr"]
     assert set(made.releases) == {
         f"{path}--{field}"
@@ -96,9 +96,23 @@ def test_a_release_on_its_own_push_is_built_attested_and_ordered(root: Path) -> 
     }, "only the keys the jobs read: release-please's notes stay out of the outputs"
 
 
-def test_publishing_is_off_until_the_repository_turns_it_on(root: Path) -> None:
-    made = rp.plan(push("packages/evalr"), root)
-    assert (made.write, made.publish) == (True, False)
+def test_a_release_run_never_publishes_whatever_the_pypi_switch(root: Path) -> None:
+    for switch in (False, True):
+        made = rp.plan(push("packages/evalr", publishing=switch), root)
+        assert (made.write, made.publish) == (True, False)
+
+
+def test_a_release_run_lists_the_dispatches_that_publish_in_dependency_order(root: Path) -> None:
+    run = push("packages/portalr", "packages/evalr", "packages/lattice-core", "packages/stackr")
+    made = rp.plan(run, root)
+    command = "gh workflow run release.yml --ref {0}-v0.1.0 -f tag={0}-v0.1.0 -f mode=publish"
+    assert rp.next_steps(made, run) == [
+        command.format("lattice-core"),
+        command.format("evalr"),
+        command.format("portalr"),
+    ], "stackr's images were pushed by the release run: nothing is left to publish"
+    tag = on_tag("evalr-v0.1.0")
+    assert rp.next_steps(rp.plan(tag, root), tag) == []
 
 
 def test_a_release_whose_tag_is_another_commit_is_refused_with_how_to_run_it_on_the_tag(
@@ -270,14 +284,12 @@ def test_the_outputs_are_what_the_workflow_reads(root: Path) -> None:
         "packages/reflexr",
         "packages/relayr",
     ]
-    assert ordered[0]["earlier"] == []
-    assert ordered[2]["earlier"] == ["artifactr-ai==0.1.0", "reflexr-ai==0.1.0"]
     assert {each["slug"] for each in json.loads(out["packages"])} == {
         "artifactr",
         "reflexr",
         "relayr",
     }
-    assert (out["publish"], out["write"], out["stackr"]) == ("true", "true", "false")
+    assert (out["publish"], out["write"], out["stackr"]) == ("false", "true", "false")
 
 
 def test_the_environment_describes_the_run() -> None:
@@ -318,28 +330,45 @@ WORKFLOW = yaml.safe_load(
     (Path(__file__).parent.parent / ".github/workflows/release.yml").read_text()
 )
 JOBS = WORKFLOW["jobs"]
-WRITERS = {"attach", "publish-images", "release-notes", "release-please", "pypi-publish"}
-"""The jobs that may write, or publish, and so run only where the plan says to."""
+
+
+def steps_of(job: str) -> list[str]:
+    """What each step of a job runs or uses, in order."""
+    return [str(step.get("run") or step.get("uses")) for step in JOBS[job]["steps"]]
+
+
+def permissions_of(job: str, level: str) -> set[str]:
+    """The permissions of a job at one level."""
+    granted = JOBS[job].get("permissions") or {}
+    return {name for name, given in granted.items() if given == level}
 
 
 def test_only_the_jobs_that_write_have_write_permissions() -> None:
-    def writes(job: dict[str, object]) -> bool:
-        permissions = job.get("permissions") or {}
-        assert isinstance(permissions, dict)
-        return any(level == "write" for level in permissions.values()) or "environment" in job
-
-    assert {name for name, job in JOBS.items() if writes(job)} == WRITERS - {"release-please"}, (
-        "a rehearsal reaches the build and check jobs and none of these"
+    writers = {name for name in JOBS if permissions_of(name, "write")}
+    assert writers == {"attach", "publish-images", "release-notes", "pypi-publish"}, (
+        "a rehearsal reaches the build and check jobs only"
     )
 
 
-@pytest.mark.parametrize("name", ["attach", "publish-images", "release-notes", "pypi-publish"])
-def test_a_writing_job_runs_only_where_the_plan_writes(name: str) -> None:
-    condition = str(JOBS[name]["if"])
-    assert (
-        "needs.plan.outputs.write == 'true'" in condition
-        or "outputs.publish == 'true'" in condition
-    )
+def test_only_the_jobs_that_attest_or_publish_may_ask_for_an_identity_token() -> None:
+    assert {name for name in JOBS if "id-token" in permissions_of(name, "write")} == {
+        "attach",
+        "publish-images",
+        "pypi-publish",
+    }
+
+
+@pytest.mark.parametrize(
+    ("job", "gate"),
+    [
+        ("attach", "needs.plan.outputs.write == 'true'"),
+        ("publish-images", "needs.plan.outputs.write == 'true'"),
+        ("release-notes", "needs.plan.outputs.write == 'true'"),
+        ("pypi-publish", "needs.plan.outputs.publish == 'true'"),
+    ],
+)
+def test_a_job_that_writes_runs_only_where_the_plan_says_so(job: str, gate: str) -> None:
+    assert gate in str(JOBS[job]["if"])
 
 
 def test_pypi_publishes_one_package_at_a_time_and_stops_at_the_first_failure() -> None:
@@ -348,8 +377,73 @@ def test_pypi_publishes_one_package_at_a_time_and_stops_at_the_first_failure() -
     assert job["strategy"]["fail-fast"] is True
     assert job["environment"] == "pypi"
     assert "needs.plan.outputs.ordered" in job["strategy"]["matrix"]["package"]
-    assert "needs.plan.outputs.publish == 'true'" in job["if"]
+
+
+def test_each_pypi_leg_verifies_then_requires_then_publishes_then_waits() -> None:
+    steps = steps_of("pypi-publish")
+
+    def at(fragment: str) -> int:
+        found = [i for i, step in enumerate(steps) if fragment in step]
+        assert len(found) == 1, f"{fragment} is in exactly one step"
+        return found[0]
+
+    order = [
+        at("scripts/verify-attestation"),
+        at("scripts/pypi.py require"),
+        at("pypa/gh-action-pypi-publish"),
+        at("scripts/pypi.py wait"),
+    ]
+    assert order == sorted(order), "verify, require what comes first, publish, then wait"
 
 
 def test_the_build_job_is_read_only() -> None:
     assert JOBS["build"]["permissions"] == {"contents": "read"}
+
+
+def test_a_dispatch_has_a_concurrency_group_of_its_own() -> None:
+    group = WORKFLOW["concurrency"]["group"]
+    assert "github.event_name" in group
+    assert "github.ref" in group
+
+
+def test_a_release_run_does_not_publish_to_pypi() -> None:
+    assert "needs.plan.outputs.publish == 'true'" in JOBS["pypi-publish"]["if"]
+
+
+def test_a_package_requires_the_repositorys_packages_it_names_released_or_not() -> None:
+    """A dispatch publishes one package: what it needs of the others must already be on PyPI."""
+    versions = {rp.distribution(path): str(rp.project(path)["version"]) for path in rp.WHEELS}
+    assert rp.entry("packages/portalr")["requires"] == [
+        f"grantr=={versions['grantr']}",
+        f"lattice-core-ai=={versions['lattice-core-ai']}",
+    ]
+    assert rp.entry("packages/lattice-core")["requires"] == []
+    assert rp.entry("packages/evalr")["requires"] == [], "its own extras name evalr: not itself"
+    relayr = rp.entry("packages/relayr")["requires"]
+    assert {name.split("==")[0] for name in relayr} >= {"artifactr-ai", "reflexr", "evalr"}
+
+
+def test_a_tag_dispatched_alone_still_carries_its_requirements() -> None:
+    version = rp.project("packages/portalr")["version"]
+    made = rp.plan(on_tag(f"portalr-v{version}", "publish", publishing=True), rp.ROOT)
+    single = json.loads(rp.outputs(made)["ordered"])
+    assert [each["path"] for each in single] == ["packages/portalr"]
+    assert single[0]["requires"], "a one-package release has an ordering check all the same"
+    assert (made.write, made.publish) == (True, True)
+
+
+def test_main_lists_the_dispatches_in_a_release_runs_summary(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    version = rp.project("packages/evalr")["version"]
+    summary = tmp_path / "summary"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    monkeypatch.setenv("EVENT", "push")
+    monkeypatch.setenv("SHA", SHA)
+    monkeypatch.setenv("PATHS_RELEASED", json.dumps(["packages/evalr"]))
+    monkeypatch.setenv("RELEASES", json.dumps(releases("packages/evalr", version=str(version))))
+    monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
+    assert rp.main() == 0
+    text = summary.read_text()
+    assert "published nothing" in text
+    assert f"gh workflow run release.yml --ref evalr-v{version} -f tag=evalr-v{version}" in text

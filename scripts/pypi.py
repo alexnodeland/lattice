@@ -29,8 +29,13 @@ Fetch = Callable[[str], bytes | None]
 """Gets a URL's body, or None where it is not found."""
 
 
-def fetch(url: str) -> bytes | None:
-    """The body of a PyPI simple index page, or None if PyPI has no such project."""
+def raw_fetch(url: str) -> bytes | None:
+    """The body of a PyPI simple index page, or None if PyPI has no such project.
+
+    Raises:
+        OSError: If PyPI could not be reached, or answered with an error other than not found
+            (``urllib.error.HTTPError`` is one).
+    """
     request = urllib.request.Request(url, headers={"Accept": "application/vnd.pypi.simple.v1+json"})
     try:
         with urllib.request.urlopen(request, timeout=30) as answer:
@@ -41,13 +46,37 @@ def fetch(url: str) -> bytes | None:
         raise
 
 
+def retried(get: Fetch, attempts: int = 3, sleep: Callable[[float], None] = time.sleep) -> Fetch:
+    """A fetch that tries again, a little later each time, when PyPI can't be reached or errs."""
+
+    def retrying(url: str) -> bytes | None:
+        for attempt in range(attempts):
+            try:
+                return get(url)
+            except OSError:
+                if attempt + 1 == attempts:
+                    raise
+                sleep(2.0 * (attempt + 1))
+        raise AssertionError("attempts is at least 1")
+
+    return retrying
+
+
+fetch = retried(raw_fetch)
+"""The default: PyPI, with a few tries."""
+
+
 def normalize(name: str) -> str:
     """A distribution's name as PyPI indexes it (PEP 503)."""
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
 def split(filename: str) -> tuple[str, str]:
-    """The distribution and version a wheel or sdist's filename names."""
+    """The distribution and version a wheel or sdist's filename names.
+
+    The version is as written in the name; it is not normalised as PEP 440 would (``0.1.0.dev0``
+    stays so), which is how our own files and PyPI's index spell it.
+    """
     if filename.endswith(".whl"):
         name, version, *_ = filename.split("-")
     else:
@@ -82,12 +111,20 @@ def state(path: Path, get: Fetch = fetch) -> str:
 
 
 def report(directory: Path, get: Fetch = fetch) -> list[str]:
-    """One line for each file in a directory, and an error for any PyPI has with another hash."""
+    """One line for each file in a directory: ``absent``, ``same`` or ``different`` on PyPI."""
     lines: list[str] = []
     for path in sorted(directory.iterdir()):
         found = state(path, get)
         lines.append(f"{path.name}: {found}")
     return lines
+
+
+def unreachable_is_absent(path: Path, get: Fetch) -> str:
+    """A file's state; a PyPI that cannot be reached or errs has not served it yet."""
+    try:
+        return state(path, get)
+    except OSError:
+        return "absent"
 
 
 def wait(
@@ -105,7 +142,7 @@ def wait(
     """
     pending = sorted(directory.iterdir())
     for attempt in range(attempts):
-        states = {path: state(path, get) for path in pending}
+        states = {path: unreachable_is_absent(path, get) for path in pending}
         different = [path.name for path, found in states.items() if found == "different"]
         if different:
             raise ValueError(f"PyPI serves {', '.join(different)} with another hash than built")
@@ -128,11 +165,17 @@ def require(requirements: Sequence[str], get: Fetch = fetch) -> list[str]:
     return missing
 
 
-def main(argv: Sequence[str], get: Fetch = fetch) -> int:
+def main(
+    argv: Sequence[str], get: Fetch = fetch, sleep: Callable[[float], None] = time.sleep
+) -> int:
     """Run a command; the exit status is 1 when the check fails."""
     command, *rest = argv
     if command == "report":
-        lines = report(Path(rest[0]), get)
+        try:
+            lines = report(Path(rest[0]), get)
+        except OSError as error:
+            sys.stderr.write(f"pypi: PyPI could not be read: {error}\n")
+            return 1
         sys.stdout.write("".join(f"{line}\n" for line in lines))
         different = [line for line in lines if line.endswith(": different")]
         if different:
@@ -146,7 +189,11 @@ def main(argv: Sequence[str], get: Fetch = fetch) -> int:
             return 1
         return 0
     if command == "require":
-        missing = require(rest, get)
+        try:
+            missing = require(rest, retried(get, sleep=sleep))
+        except OSError as error:
+            sys.stderr.write(f"pypi: PyPI could not be read: {error}\n")
+            return 1
         if missing:
             sys.stderr.write(f"pypi: PyPI does not serve {', '.join(missing)}, which come first\n")
         return 1 if missing else 0

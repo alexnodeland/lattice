@@ -4,10 +4,10 @@
 #
 # Usage: scripts/verify-attestation FILE...   (in the release workflow: GH_TOKEN, GITHUB_*)
 #
-# `gh attestation verify` finds an attestation by the file's digest; it is also compared here, to
-# the digest in the attestation's statement, so that what is verified is what is published. The
-# workflow, the commit and the ref are all pinned: the build job that made the file ran in this
-# run, so a file from another workflow, commit or ref fails.
+# `gh attestation verify` finds an attestation by the file's digest; the digest in the attestation's
+# statement is compared with the file's here as well, as a second look at the same fact. The
+# workflow, the commit and the ref are pinned: the job that attested the file ran in this run, so
+# a file from another workflow, commit or ref fails.
 
 set -euo pipefail
 

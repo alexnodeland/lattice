@@ -117,3 +117,42 @@ def test_the_commands_exit_with_what_they_found(
     assert pypi.main(["require"], index()) == 0
     assert pypi.main(["wait", str(directory)], index(evalr={name: sha(b"wheel")})) == 0
     assert pypi.main(["nope"], index()) == 2
+
+
+def flaky(failures: int, then: bytes | None = None) -> pypi.Fetch:
+    """A PyPI that can't be reached this many times, and then answers."""
+    calls: list[str] = []
+
+    def get(url: str) -> bytes | None:
+        calls.append(url)
+        if len(calls) <= failures:
+            raise OSError("connection reset")
+        return then
+
+    return get
+
+
+def test_a_fetch_that_fails_is_tried_again_and_then_given_up() -> None:
+    slept: list[float] = []
+    assert pypi.retried(flaky(2, b"ok"), 3, slept.append)("https://x") == b"ok"
+    assert slept == [2.0, 4.0]
+    with pytest.raises(OSError, match="connection reset"):
+        pypi.retried(flaky(5), 3, slept.append)("https://x")
+
+
+def test_wait_counts_a_pypi_that_errs_as_not_serving_yet(tmp_path: Path) -> None:
+    directory = built(tmp_path)
+    name = "evalr-0.1.0-py3-none-any.whl"
+    answers = [flaky(1, index(evalr={name: sha(b"wheel")})(f"{pypi.INDEX}/evalr/"))]
+    slept: list[float] = []
+    pypi.wait(directory, answers[0], attempts=3, sleep=slept.append, interval=1)
+    assert slept == [1]
+
+
+def test_the_commands_report_a_pypi_that_cannot_be_read(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    directory = built(tmp_path)
+    assert pypi.main(["report", str(directory)], flaky(99)) == 1
+    assert pypi.main(["require", "evalr==0.1.0"], flaky(99), lambda _: None) == 1
+    assert "could not be read" in capsys.readouterr().err

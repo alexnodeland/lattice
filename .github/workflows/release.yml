@@ -14,14 +14,18 @@
 # (a release created on a later push than the one that merged its pull request) the plan refuses
 # before anything is built, and says how to run the workflow again on the tag (#206).
 #
-# PyPI (ADR-0023): the wheels go to PyPI through trusted publishing, one package at a time in the
-# order their requirements need, in a job gated by the `pypi` environment, whose required
-# reviewers are the approval. Nothing is published until the repository variable PYPI_PUBLISH is
-# `true`. The workflow can also be run by hand, and by default it WRITES NOTHING: mode `rehearse`
-# builds and checks, on a branch (every wheel at its head) or on a tag (that release, again): it
-# attaches nothing to a release, attests nothing, pushes no image, rewrites no release notes and
-# publishes nothing (the run keeps the built files as artifacts). Mode `publish`, on a tag, does
-# what a release run does, for that tag alone.
+# PyPI (ADR-0023): a release run never publishes. It attests and attaches the wheels, and lists, in
+# its summary, the dispatches that publish them: one `gh workflow run release.yml --ref <tag>
+# -f tag=<tag> -f mode=publish` for each package, in dependency order. Each dispatch publishes
+# that package through trusted publishing, in a job gated by the `pypi` environment, whose required
+# reviewers are the approval (so: one approval a package, one at a time), and only where the
+# repository variable PYPI_PUBLISH is `true`. A dispatch fails unless PyPI serves the packages of
+# this repository that the package requires. The workflow can also be run by hand and by default
+# it WRITES NOTHING: mode `rehearse` builds and checks, on a branch (every wheel at its head) or on
+# a tag (that release, again): it attaches nothing to a release, attests nothing, pushes no image,
+# rewrites no release notes and publishes nothing (the run keeps the built files as artifacts).
+# Mode `publish`, on a tag, attaches, attests and pushes as a release run does, for that tag alone,
+# and publishes it.
 #
 # release-please acts as lattice's GitHub App, with a token minted for each run and narrowed to
 # what it needs, so that its pull request's CI and Title checks run, which they never do for the
@@ -49,7 +53,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: release
+  group: release-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -190,6 +194,9 @@ jobs:
     env:
       TAG: ${{ fromJSON(needs.plan.outputs.releases)[format('{0}--tag_name', matrix.package.path)] }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist-${{ matrix.package.slug }}
@@ -201,7 +208,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release upload --clobber "$TAG" dist/*
+        run: scripts/attach-assets "$TAG" dist/*
 
   # What PyPI would be given, checked before anyone is asked to approve it, and in a rehearsal all
   # there is to a publish: the files are well formed (twine), carry the attestations the attach
@@ -210,7 +217,7 @@ jobs:
   pypi-check:
     name: PyPI, checked
     needs: [plan, build, attach]
-    if: ${{ !cancelled() && needs.build.result == 'success' && !contains(needs.attach.result, 'failure') }}
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.attach.result != 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -283,12 +290,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: scripts/verify-attestation dist/*
-      - name: PyPI serves what this release published before
+      - name: PyPI serves the packages of this repository that this one requires
         env:
-          EARLIER: ${{ join(matrix.package.earlier, ' ') }}
+          REQUIRES: ${{ join(matrix.package.requires, ' ') }}
         run: |
-          read -ra earlier <<<"$EARLIER"
-          python3 scripts/pypi.py require "${earlier[@]}"
+          read -ra requires <<<"$REQUIRES"
+          python3 scripts/pypi.py require "${requires[@]}"
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           packages-dir: dist

@@ -3,7 +3,7 @@
 **Status:** Draft
 **Author:** Alex Nodeland
 **Created:** 2026-10-16
-**Discussion:** the pull request that adds this file
+**Discussion:** [#248](https://github.com/alexnodeland/lattice/pull/248)
 **Siblings:**
 
 - [artifactr ADR-0003][a-adr-0003] fixes the two patch kinds and keeps types from defining their own. This RFC adds none, and leaves ADR-0003 as it is.

@@ -1,6 +1,6 @@
 # ADR-0027: Feedback and evaluations, summed by day, and the first charts
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0036](0036-the-chart-theme-and-colour-blind-mode.md) (the chart rule)
 **Date:** 2026-10-13
 **Deciders:** Alex Nodeland
 

@@ -1,9 +1,27 @@
-import { expect, test } from "vitest";
-import { page } from "vitest/browser";
+import { expect, onTestFinished, test } from "vitest";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { BarChart, DonutChart, LineChart } from "./chart";
+import { formatDay } from "./chart-theme";
 
 const days = { key: "day", name: "Day" };
+
+/** A series name long enough that no chart gives it room whole. */
+const LONG = "an evaluation of the answers with a very long name that no chart has room for";
+
+/** A legend row's cells: its name, value and share, without the separators read aloud only. */
+const cellsOf = (row: Element) => [...row.children].filter((cell) => !cell.matches(".sr-only"));
+
+/** What the chart's text says, in the drawing. */
+const texts = () => [...document.querySelectorAll("svg text")].map((text) => text.textContent);
+
+/** The page asks for colour-blind mode, as it would on its root. */
+function colourBlind() {
+  document.documentElement.dataset.cvd = "";
+  onTestFinished(() => {
+    delete document.documentElement.dataset.cvd;
+  });
+}
 
 test("a diverging bar chart names its series, labels them, and gives its figures as counts", async () => {
   await page.viewport(1024, 768);
@@ -25,21 +43,144 @@ test("a diverging bar chart names its series, labels them, and gives its figures
   const figure = screen.getByRole("figure", { name: "Thumbs per day" });
   await expect.element(figure).toBeVisible();
   await expect.element(figure.getByRole("listitem").first()).toHaveTextContent("Thumbs up");
-  // Each series is named at its last bar, as well as in the legend.
-  await expect.poll(() => document.querySelectorAll("svg text").length).toBeGreaterThan(0);
-  expect([...document.querySelectorAll("svg text")].map((text) => text.textContent)).toEqual(
-    expect.arrayContaining(["Thumbs up", "Thumbs down"]),
-  );
+  // Each half is named at the axis, as well as in the legend.
+  await expect.poll(texts).toEqual(expect.arrayContaining(["Thumbs up", "Thumbs down"]));
+  // Both halves count up from the baseline, in whole numbers, so the lower one reads as counts.
+  await expect
+    .poll(() => document.querySelectorAll(".recharts-yAxis-tick-labels text").length)
+    .toBe(5);
+  const ticks = [...document.querySelectorAll(".recharts-yAxis-tick-labels text")];
+  expect(ticks.map((tick) => tick.textContent)).toEqual(["4", "2", "0", "2", "4"]);
   await figure.getByText("Show the figures").click();
   const table = figure.getByRole("table", { name: "Thumbs per day" });
   await expect
     .element(table.getByRole("row", { name: "2026-10-13" }))
     .toHaveTextContent("2026-10-1324");
-  // The second series is hatched, so it isn't told by its colour alone.
-  expect(document.querySelectorAll("pattern").length).toBeGreaterThan(0);
 });
 
-test("a line chart draws at most three series, each its own dash, with gaps for no value", async () => {
+test("a diverging chart's halves meet at the baseline, so the second is hatched; a lone series is solid", async () => {
+  await page.viewport(1024, 768);
+  await render(
+    <BarChart
+      label="Thumbs"
+      index={days}
+      series={[
+        { key: "up", name: "Thumbs up" },
+        { key: "down", name: "Thumbs down" },
+      ]}
+      data={[{ day: "2026-10-12", up: 3, down: 1 }]}
+      diverging
+    />,
+  );
+  await expect.poll(() => document.querySelectorAll("pattern").length).toBeGreaterThan(0);
+  const stripe = document.querySelector("pattern line");
+  expect(Number(getComputedStyle(stripe as Element).strokeOpacity)).toBeGreaterThan(0);
+});
+
+test("a chart that nothing touches draws solid fills, with no hatch to see", async () => {
+  await page.viewport(1024, 768);
+  await render(
+    <BarChart
+      label="Spend"
+      index={days}
+      series={[
+        { key: "a", name: "A" },
+        { key: "b", name: "B" },
+      ]}
+      data={[{ day: "2026-10-12", a: 3, b: 1 }]}
+    />,
+  );
+  await expect.poll(() => document.querySelectorAll("pattern").length).toBeGreaterThan(0);
+  const stripe = document.querySelector("pattern line");
+  expect(Number(getComputedStyle(stripe as Element).strokeOpacity)).toBe(0);
+  // Colour-blind mode hatches it, wherever it is drawn.
+  colourBlind();
+  await expect
+    .poll(() =>
+      Number(getComputedStyle(document.querySelector("pattern line") as Element).strokeOpacity),
+    )
+    .toBeGreaterThan(0);
+});
+
+test("a series on its own is named by the legend and the caption, not by a label at its end", async () => {
+  await page.viewport(1024, 768);
+  await render(
+    <BarChart
+      label="Spend per day"
+      index={days}
+      series={[{ key: "spend", name: "Spend" }]}
+      data={[{ day: "2026-10-12", spend: 3 }]}
+    />,
+  );
+  await expect.poll(() => document.querySelectorAll(".recharts-bar-rectangle").length).toBe(1);
+  expect(texts()).not.toContain("Spend");
+});
+
+test("a value axis is on one line, as wide as its widest tick, with its unit", async () => {
+  await page.viewport(390, 844);
+  await render(
+    <LineChart
+      label="Latency"
+      index={days}
+      series={[{ key: "p95", name: "95th percentile" }]}
+      data={[
+        { day: "2026-10-12", p95: 0.24 },
+        { day: "2026-10-13", p95: 0.12 },
+      ]}
+      format={(value) => `${value.toFixed(2)} s`}
+    />,
+  );
+  await expect
+    .poll(() => document.querySelectorAll(".recharts-yAxis-tick-labels text").length)
+    .toBeGreaterThan(1);
+  await expect
+    .poll(() => document.querySelectorAll(".recharts-yAxis-tick-labels text").length)
+    .toBe(5);
+  const ticks = [...document.querySelectorAll(".recharts-yAxis-tick-labels text")];
+  for (const tick of ticks) {
+    expect(tick.querySelectorAll("tspan"), tick.textContent ?? "").toHaveLength(1);
+    expect(tick.textContent).toMatch(/^\d\.\d\d s$/);
+  }
+  // Each is whole in the drawing, none clipped by its left edge.
+  const edge = document.querySelector(".recharts-surface")?.getBoundingClientRect().left ?? 0;
+  for (const tick of ticks) {
+    expect(tick.getBoundingClientRect().left).toBeGreaterThanOrEqual(edge);
+  }
+});
+
+test("a tooltip is on the menus' surface, with each series' mark, name and aligned value", async () => {
+  await page.viewport(1024, 768);
+  await render(
+    <BarChart
+      label="Spend"
+      index={days}
+      series={[{ key: "spend", name: "Spend" }]}
+      data={[
+        { day: "2026-10-12", spend: 12.5 },
+        { day: "2026-10-13", spend: 30 },
+      ]}
+      format={(value) => `$${value.toFixed(2)}`}
+      tick={formatDay}
+    />,
+  );
+  await expect.poll(() => document.querySelectorAll(".recharts-bar-rectangle").length).toBe(2);
+  await userEvent.hover(
+    page.elementLocator(document.querySelectorAll(".recharts-bar-rectangle")[1] as Element),
+  );
+  await expect
+    .poll(() => document.querySelector(".recharts-tooltip-wrapper .shadow-lg"))
+    .not.toBeNull();
+  const card = document.querySelector(".recharts-tooltip-wrapper .shadow-lg") as HTMLElement;
+  expect(card.textContent).toBe("2026-10-13Spend$30.00");
+  // The menus' surface: a border, a raised shadow and the surface's colour.
+  expect(getComputedStyle(card).borderTopWidth).toBe("1px");
+  expect(card.querySelector("svg")).not.toBeNull();
+  // Its digits are aligned and its point is not: the figures' digits are tabular, "." is not.
+  const digits = [...card.querySelectorAll(".tabular-nums")].map((span) => span.textContent);
+  expect(digits).toEqual(["30", "00"]);
+});
+
+test("a line chart draws at most three series, unbroken, and dashes each in colour-blind mode", async () => {
   await page.viewport(1024, 768);
   const series = ["a", "b", "c", "d"].map((key) => ({ key, name: `Series ${key}` }));
   const screen = await render(
@@ -59,10 +200,19 @@ test("a line chart draws at most three series, each its own dash, with gaps for 
   await expect.element(figure.getByRole("listitem")).toHaveLength(3);
   await expect.element(figure.getByText("Series d")).not.toBeInTheDocument();
   await expect.poll(() => document.querySelectorAll(".recharts-line-curve").length).toBe(3);
-  const dashes = [...document.querySelectorAll(".recharts-line-curve")].map((line) =>
-    line.getAttribute("stroke-dasharray"),
-  );
-  expect(new Set(dashes).size).toBe(3);
+  const dashes = () =>
+    [...document.querySelectorAll(".recharts-line-curve")].map(
+      (line) => getComputedStyle(line).strokeDasharray,
+    );
+  expect(new Set(dashes())).toEqual(new Set(["none"]));
+  colourBlind();
+  await expect.poll(() => new Set(dashes()).size).toBe(3);
+  // The markers differ too: a circle, then a square, then a diamond.
+  const shapes = [...document.querySelectorAll(".recharts-line-dots")].map((line) => {
+    const marker = getComputedStyle(line.querySelector("rect") as Element);
+    return `${marker.rx} ${marker.transform}`;
+  });
+  expect(new Set(shapes).size).toBe(3);
   await figure.getByText("Show the figures").click();
   await expect
     .element(figure.getByRole("row", { name: "2026-10-12" }))
@@ -86,13 +236,17 @@ test("a donut shows the largest three parts, folds the rest into Other, and give
   );
   const figure = screen.getByRole("figure", { name: "Feedback by workspace" });
   const parts = figure.getByRole("listitem");
-  await expect.element(parts.first()).toHaveTextContent("notes6 · 60%");
-  expect(parts.elements().map((part) => part.textContent)).toEqual([
-    "notes6 · 60%",
-    "plans2 · 20%",
-    "ops1 · 10%",
-    "Other1 · 10%",
+  await expect.element(parts.first()).toHaveTextContent("notes, 6, 60%");
+  // Each part's name, value and share, in its own row.
+  expect(parts.elements().map((part) => cellsOf(part).map((cell) => cell.textContent))).toEqual([
+    ["notes", "6", "60%"],
+    ["plans", "2", "20%"],
+    ["ops", "1", "10%"],
+    ["Other", "1", "10%"],
   ]);
+  // The whole is at the centre of the ring.
+  await expect.element(figure.getByText("Total")).toBeVisible();
+  expect(figure.getByText("Total").element().parentElement?.textContent).toBe("Total10");
   await figure.getByText("Show the figures").click();
   await expect.element(figure.getByRole("row", { name: "infra" })).toHaveTextContent("infra110%");
   await expect.element(figure.getByRole("row", { name: "Other" })).not.toBeInTheDocument();
@@ -129,19 +283,20 @@ test("a line keeps its sign, a line ending at 0 is named, and labels don't overl
   const [top = 0, middle = 0, bottom = 0] = labels
     .map((text) => Number(text.getAttribute("y")))
     .sort((a, b) => a - b);
-  expect(middle - top).toBeGreaterThanOrEqual(12);
-  expect(bottom - middle).toBeGreaterThanOrEqual(12);
+  // A line of the chart's text, within a hair of rounding.
+  expect(middle - top).toBeGreaterThanOrEqual(11.99);
+  expect(bottom - middle).toBeGreaterThanOrEqual(11.99);
 });
 
-test("labels stay inside the plot, and a long name is cut, and given whole as a title", async () => {
+test("labels stay inside the plot, a name that fits is whole, and one too long is cut, and given whole as a title", async () => {
   await page.viewport(1024, 768);
   const screen = await render(
     <LineChart
       label="All at the floor"
       index={days}
       series={[
-        { key: "a", name: "an evaluation with a long name" },
-        { key: "b", name: "b" },
+        { key: "a", name: LONG },
+        { key: "b", name: "accuracy · accuracy" },
         { key: "c", name: "c" },
       ]}
       data={[{ day: "2026-10-12", a: 0, b: 0, c: 0 }]}
@@ -150,11 +305,19 @@ test("labels stay inside the plot, and a long name is cut, and given whole as a 
   );
   await expect.element(screen.getByRole("figure", { name: "All at the floor" })).toBeVisible();
   await expect.poll(() => document.querySelectorAll("svg text title").length).toBe(1);
-  expect(document.querySelector("svg text title")?.textContent).toBe(
-    "an evaluation with a long name",
+  expect(document.querySelector("svg text title")?.textContent).toBe(LONG);
+  const written = [...document.querySelectorAll("svg text")].map(
+    (text) => text.lastChild?.textContent,
   );
-  const labels = [...document.querySelectorAll("svg text")].filter((text) =>
-    ["an evaluation…", "b", "c"].includes(text.lastChild?.textContent ?? ""),
+  // A name of 19 characters has room to spare at this width, so it is whole; the long one is cut.
+  expect(written).toContain("accuracy · accuracy");
+  expect(written.some((text) => text?.endsWith("…") && LONG.startsWith(text.slice(0, 8)))).toBe(
+    true,
+  );
+  const labels = [...document.querySelectorAll("svg text")].filter(
+    (text) =>
+      ["accuracy · accuracy", "c"].includes(text.lastChild?.textContent ?? "") ||
+      text.lastChild?.textContent?.endsWith("…"),
   );
   expect(labels).toHaveLength(3);
   const floor = Math.max(
@@ -201,48 +364,92 @@ test("an axis may write an index shorter than the table does", async () => {
         { day: "2025-12-31", up: 1 },
         { day: "2026-01-01", up: 2 },
       ]}
-      tick={(index) => index.slice(5)}
+      tick={formatDay}
     />,
   );
   const figure = screen.getByRole("figure", { name: "Spend" });
-  await expect
-    .poll(() => [...document.querySelectorAll("svg text")].map((text) => text.textContent))
-    .toEqual(expect.arrayContaining(["12-31", "01-01"]));
+  await expect.poll(texts).toEqual(expect.arrayContaining(["Dec 31", "Jan 1"]));
   await figure.getByText("Show the figures").click();
   await expect.element(figure.getByRole("row", { name: "2025-12-31" })).toBeVisible();
 });
 
-test("on a phone, a chart's direct labels are whole, inside its drawing", async () => {
+test("on a phone, each direct label is whole and inside the drawing", async () => {
   await page.viewport(390, 844);
-  const screen = await render(
+  await render(
     <div style={{ width: 346 }}>
-      <BarChart
-        label="People's thumbs per day"
+      <LineChart
+        label="Means"
         index={days}
         series={[
-          { key: "up", name: "Thumbs up" },
-          { key: "down", name: "Thumbs down" },
+          { key: "a", name: "Thumbs down" },
+          { key: "b", name: "95th percentile" },
+          { key: "c", name: "Spend" },
         ]}
         data={[
-          { day: "2026-10-12", up: 3, down: 1 },
-          { day: "2026-10-13", up: 2, down: 4 },
+          { day: "2026-10-12", a: 0.2, b: 0.5, c: 0.9 },
+          { day: "2026-10-13", a: 0.3, b: 0.6, c: 0.8 },
         ]}
-        diverging
+        domain={[0, 1]}
       />
     </div>,
   );
-  await expect
-    .element(screen.getByRole("figure", { name: "People's thumbs per day" }))
-    .toBeVisible();
-  await expect
-    .poll(() =>
-      [...document.querySelectorAll("svg text")].some((t) => t.textContent === "Thumbs down"),
-    )
-    .toBe(true);
+  await expect.poll(() => texts().includes("Thumbs down")).toBe(true);
   const svg = document.querySelector(".recharts-surface")?.getBoundingClientRect();
-  const label = [...document.querySelectorAll("svg text")].find(
-    (t) => t.textContent === "Thumbs down",
+  const labels = [...document.querySelectorAll("svg text")].filter((text) =>
+    ["Thumbs down", "95th percentile", "Spend"].includes(text.lastChild?.textContent ?? ""),
   );
-  expect(label?.getBoundingClientRect().right).toBeLessThanOrEqual((svg?.right ?? 0) + 0.5);
-  expect(label?.textContent).toBe("Thumbs down");
+  expect(labels).toHaveLength(3);
+  for (const label of labels) {
+    expect(label.getBoundingClientRect().right).toBeLessThanOrEqual((svg?.right ?? 0) + 0.5);
+  }
+});
+
+test("on a phone, a donut's legend keeps each part's value in its row, with its name", async () => {
+  await page.viewport(390, 844);
+  const screen = await render(
+    <div style={{ width: 346 }}>
+      <DonutChart
+        label="Spend by workspace"
+        parts={[
+          { key: "a", name: "a long workspace name", value: 38.19 },
+          { key: "b", name: "notes", value: 6.4 },
+        ]}
+        format={(value) => `$${value.toFixed(2)}`}
+      />
+    </div>,
+  );
+  const rows = screen.getByRole("figure").getByRole("listitem").elements();
+  expect(rows).toHaveLength(2);
+  for (const row of rows) {
+    const [name, value] = cellsOf(row).map((cell) => cell.getBoundingClientRect());
+    // The value sits on the name's line, not under it, and close to it.
+    expect(Math.abs((value?.top ?? 0) - (name?.top ?? 0))).toBeLessThan(8);
+    expect((value?.left ?? 0) - (name?.right ?? 0)).toBeLessThan(48);
+  }
+});
+
+test("labels of the widest letters still fit the drawing, as measured, not as guessed", async () => {
+  await page.viewport(390, 844);
+  const name = "WWWWWWWWWWWWWW";
+  await render(
+    <div style={{ width: 346 }}>
+      <LineChart
+        label="Wide"
+        index={days}
+        series={[
+          { key: "a", name },
+          { key: "b", name: `${name}M` },
+        ]}
+        data={[{ day: "2026-10-12", a: 0.2, b: 0.8 }]}
+        domain={[0, 1]}
+      />
+    </div>,
+  );
+  await expect.poll(() => texts().filter((text) => text?.startsWith("WWWW")).length).toBe(2);
+  const svg = document.querySelector(".recharts-surface")?.getBoundingClientRect();
+  for (const label of [...document.querySelectorAll("svg text")].filter((text) =>
+    text.textContent?.startsWith("WWWW"),
+  )) {
+    expect(label.getBoundingClientRect().right).toBeLessThanOrEqual((svg?.right ?? 0) + 0.5);
+  }
 });

@@ -7,7 +7,7 @@
 
 ## Context
 
-reflexr's workflows need to be observable end to end: publishing, rule evaluation, every run attempt, agent and graph steps, model and tool calls, and the database and HTTP work around them, so a slow, failing or runaway workflow can be explained. artifactr made the same decision ([artifactr ADR-0027](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0027-opentelemetry-observability-with-langfuse.md)); reflexr adopts it with the same conventions. The tooling should be open. Pydantic's Logfire traces all of this in one place, and is the model to borrow from, but it is a paid platform. Langfuse is open source and self-hostable, is built on OpenTelemetry, and understands sessions, scores, datasets and experiments.
+reflexr's workflows need to be observable end to end: publishing, rule evaluation, every run attempt, agent and graph steps, model and tool calls, and the database and HTTP work around them, so a slow, failing or runaway workflow can be explained. artifactr made the same decision ([artifactr ADR-0027](../../artifactr/adr/0027-opentelemetry-observability-with-langfuse.md)); reflexr adopts it with the same conventions. The tooling should be open. Pydantic's Logfire traces all of this in one place, and is the model to borrow from, but it is a paid platform. Langfuse is open source and self-hostable, is built on OpenTelemetry, and understands sessions, scores, datasets and experiments.
 
 A research spike (2026-09-28) against the installed packages found:
 

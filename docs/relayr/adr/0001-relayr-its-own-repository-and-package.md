@@ -32,6 +32,6 @@ artifactr and reflexr are independent siblings: neither imports the other, and t
 - Easier: the invariants are written, tested and fixed once, and the libraries stay independent.
 - Harder: one more package to release and pin, and relayr moves with both libraries' public APIs.
 
-[a-adr-0032]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0032-libraries-and-the-stackr-template.md
-[r-adr-0003]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0003-independent-sibling-of-artifactr.md
-[rfc-0002]: https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md#d1-where-the-bridge-lives-and-its-name
+[a-adr-0032]: ../../artifactr/adr/0032-libraries-and-the-stackr-template.md
+[r-adr-0003]: ../../reflexr/adr/0003-independent-sibling-of-artifactr.md
+[rfc-0002]: ../../stackr/rfcs/0002-the-combined-system.md#d1-where-the-bridge-lives-and-its-name

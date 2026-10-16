@@ -129,7 +129,7 @@ People are added, given roles and issued keys through grantr's API at `/grantr/v
 {%- if hosting == 'host' %}
 - **On a single host the portal is required:** the application doesn't start without `PORTAL_SUPABASE_KEY` in `.env`, or with a project that isn't at an https address. The overlay sets the project to `https://app.<STACKR_DOMAIN>`, this application's own address, where stackr's edge serves the sign-in calls, so a browser stays on one origin. Invitations are off ([the template's guide](https://lattice.alexnodeland.com/stackr/guides/template/)).
 {%- endif %}
-- **Its audit records** (`portalr.access` and `grantr.audit`) are logged at INFO and reach Loki through the Collector.
+- **Its audit records** (`portalr.access` and `grantr.audit`) reach Loki through the Collector: `LOG_CONFIG` puts both loggers at INFO in every application this template generates, whether or not it has the portal.
 {%- endif %}
 
 {% endif -%}

@@ -117,6 +117,8 @@ uvx copier update
 
 pulls in the template's improvements since the application was generated, keeping your own changes. An application generated before the portal existed is asked the `portal` question when it updates, and the default is yes: say no to keep the image as it is, since the portal adds a Bun stage to the build and a network fetch of lattice at the pinned commit. It asks the questions again, with your previous answers (recorded in `.copier-answers.yml`) as the defaults; `--skip-answered` asks only the new ones. It needs a git repository with no uncommitted changes, and marks conflicts between the template's changes and yours inline, for you to resolve. Review the result like any other change, and run `make check`.
 
+Updating also changes something for every application, with the portal or without it: `LOG_CONFIG` puts `grantr.audit` and `portalr.access` at INFO, so grantr's audit entries, which the root's WARNING dropped, now reach Loki through the Collector ([portalr ADR-0035](../../portalr/adr/0035-tools-and-the-record-of-opening-them.md)).
+
 ### The portal's Bun
 
 The portal's image stage builds portalr's UIs with Bun, pinned in the `Dockerfile` by tag and digest (`FROM oven/bun:<tag>@sha256:<digest>`), as lattice itself pins Bun in its `.prototools`; `check-template` holds the two to the same version. The generated application is outside lattice's Renovate, so a new Bun comes with `copier update`, or by changing the tag and the digest together (`docker buildx imagetools inspect oven/bun:<tag>`). The UIs' commit is not pinned a second time: `scripts/build-portal-ui.sh` reads it from `uv.lock`, where portalr's git source says which commit is installed.

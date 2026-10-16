@@ -1,9 +1,16 @@
-"""Access tokens kept out of uvicorn's logs.
+"""Access tokens kept out of uvicorn's logs, and the audit records let into them.
 
 A browser can't set headers as it opens a WebSocket, so a WebSocket carries its token in the
 ``access_token`` query parameter (``auth.py``). uvicorn writes each request's path, query and all,
 in its access log, and each WebSocket's in its own log, so ``LOG_CONFIG`` redacts the token
 there. The libraries' telemetry redacts it from the spans' URLs.
+
+It also lets two records through that would otherwise be dropped: root's level is WARNING, and a
+record is dropped at its logger's effective level before any handler, the telemetry's included,
+sees it. grantr's audit entries (``grantr.audit``) and portalr's record of an operator's making
+links into the tools (``portalr.access``) are INFO, so each of the two loggers is set to INFO, and
+still propagates to root's handlers, which is where the application's logs are exported. A library
+doesn't configure logging itself: the application does.
 """
 
 import copy
@@ -29,13 +36,9 @@ class RedactedLogs(logging.Filter):
 
 LOGGERS: Final = ("uvicorn.error", "uvicorn.access")
 """The loggers uvicorn logs requests' and WebSockets' paths to."""
-{%- if use_portal %}
 
-RECORDS: Final = ("portalr.access", "grantr.audit")
-"""The loggers whose INFO records are the audit trail: a tenant's, and a read of a tool that a
-person asked for. At the root's WARNING they would be dropped, and never reach Loki
-(portalr ADR-0035)."""
-{%- endif %}
+RECORDS: Final = ("grantr.audit", "portalr.access")
+"""The loggers of the records that are kept: an audit entry, and an operator's links."""
 
 
 def _log_config() -> dict[str, Any]:
@@ -47,15 +50,12 @@ def _log_config() -> dict[str, Any]:
         config["loggers"][name]["filters"] = ["redacted"]
     for handler in config["handlers"].values():
         handler["filters"] = ["redacted"]
-{%- if use_portal %}
+    # Their own level, so INFO is let through; they have no handler, and propagate to root's.
     for name in RECORDS:
-        # No handler of their own: the records propagate to the root's, which exports them.
         config["loggers"][name] = {"level": "INFO"}
-{%- endif %}
     return config
 
 
 LOG_CONFIG: Final = _log_config()
-"""uvicorn's logging, with its access log, and its log of WebSockets, redacted{% if use_portal %}.
-
-The audit trail's loggers are at INFO.{% endif %}"""
+"""uvicorn's logging, with its access log, and its log of WebSockets, redacted, and the records
+that are kept let through at INFO."""

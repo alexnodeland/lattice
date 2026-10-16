@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 from portalr.invites import InviteFailed, SupabaseInvite
 
 from {{ package_name }}.portal import invitations, readers
-from {{ package_name }}.redaction import LOG_CONFIG, RECORDS
 from {{ package_name }}.settings import AuthSettings, PortalSettings, Settings
 
 from conftest import TENANT, Script, app, bearer, settings, token
@@ -197,12 +196,6 @@ def test_the_portal_is_read_from_the_environment() -> None:
     assert read.langfuse_keys == ("pk", "sk")
     assert Settings.from_environ({}).portal == PortalSettings()
     assert Settings.from_environ({"LANGFUSE_PUBLIC_KEY": "pk"}).langfuse_keys is None
-
-
-def test_the_audit_trails_loggers_are_at_info() -> None:
-    assert RECORDS == ("portalr.access", "grantr.audit")
-    for name in RECORDS:
-        assert LOG_CONFIG["loggers"][name] == {"level": "INFO"}
 
 
 def test_a_token_is_still_needed_to_read(script: Script) -> None:

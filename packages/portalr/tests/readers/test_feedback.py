@@ -9,9 +9,9 @@ import pytest
 from pydantic import ValidationError
 
 from portalr.readers import FeedbackQuery, Langfuse, Ok, Score, Unavailable, read_feedback
-from portalr.readers.feedback import COMMENTS, days_in, summarize
+from portalr.readers.feedback import COMMENTS, summarize
 from portalr.readers.langfuse import Scores, trace_parameters
-from portalr.readers.query import Span
+from portalr.readers.query import Span, days_in
 from portalr.tenant import allowed
 from tests.tools import Tool, json
 

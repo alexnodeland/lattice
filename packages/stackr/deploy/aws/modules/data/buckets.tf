@@ -12,6 +12,11 @@ locals {
   account = data.aws_caller_identity.current.account_id
   # ELB writes its logs with S3's own keys (SSE-S3), the only encryption it supports.
   access_logs_prefix = "alb"
+  # The backups bucket's prefixes the state host writes, and the days each is kept.
+  clickhouse_backup_prefixes = {
+    clickhouse = var.clickhouse_backup_retention_days
+    drill      = 7
+  }
 }
 
 # Bucket names are global: each gets a unique suffix after <name>-<role>-.
@@ -69,6 +74,42 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
     }
     noncurrent_version_expiration {
       noncurrent_days = 30
+    }
+  }
+
+  # The state host's ClickHouse backups and the drill's (ADR-0037), which the host writes and
+  # never deletes: a rule per prefix expires them, and their old versions after 7 days. That is
+  # how long an overwrite by a compromised host can be undone from the old version, and how long
+  # an expired backup is kept beyond its retention: versioning would otherwise keep it 30.
+  dynamic "rule" {
+    for_each = each.key == "backups" ? local.clickhouse_backup_prefixes : {}
+    content {
+      id     = "expire-${rule.key}"
+      status = "Enabled"
+      filter {
+        prefix = "${rule.key}/"
+      }
+      expiration {
+        days = rule.value
+      }
+      noncurrent_version_expiration {
+        noncurrent_days = 7
+      }
+    }
+  }
+
+  # What ClickHouse's lock files leave: a delete marker after each backup.
+  dynamic "rule" {
+    for_each = each.key == "backups" ? local.clickhouse_backup_prefixes : {}
+    content {
+      id     = "markers-${rule.key}"
+      status = "Enabled"
+      filter {
+        prefix = "${rule.key}/"
+      }
+      expiration {
+        expired_object_delete_marker = true
+      }
     }
   }
 }

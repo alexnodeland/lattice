@@ -20,6 +20,19 @@ export type Known = v1.LoggedEvent extends infer E
     : never
   : never;
 
+/** What a person did to a run: made it runnable again, skipped it, or cancelled it. */
+export interface Intervention {
+  readonly kind: "retried" | "skipped" | "cancelled";
+  /** Where the log recorded it: no two steps share one. */
+  readonly seq: number;
+  /** Who did it, as the log recorded. */
+  readonly actor: v1.EventFrame["actor"];
+  /** When, as the log recorded: an ISO time. */
+  readonly at: string;
+  /** Why, if they said. */
+  readonly reason: string | null;
+}
+
 export interface Run {
   readonly id: string;
   readonly rule: string;
@@ -37,6 +50,10 @@ export interface Run {
   readonly retries: number;
   /** The `seq` it started at: the later, the newer. */
   readonly started: number;
+  /** A stable code for why the last attempt failed, such as `guardrail_blocked`; never the error. */
+  readonly reason: string | null;
+  /** What people did to it, oldest first. */
+  readonly history: readonly Intervention[];
   /** The feedback given on it, oldest first. */
   readonly feedback: readonly Feedback<v1.EventFrame["actor"]>[];
 }
@@ -69,6 +86,8 @@ function withRun(state: Workspace, id: string, change: Partial<Run>): Workspace 
     attempt: 1,
     retries: 0,
     started: 0,
+    reason: null,
+    history: [],
     feedback: [],
   };
   return { ...state, runs: { ...state.runs, [id]: { ...run, ...change } } };
@@ -79,9 +98,31 @@ function withRule(state: Workspace, name: string, change: Partial<Rule>): Worksp
   return { ...state, rules: { ...state.rules, [name]: { ...rule, ...change } } };
 }
 
-function ended(status: Run["status"]) {
-  return (state: Workspace, event: { readonly run_id: string }): Workspace =>
-    withRun(state, event.run_id, { status });
+/** A run a person changed: its new status, if any, and what they did, with who and when. */
+function intervened(
+  kind: Intervention["kind"],
+  status: Run["status"],
+  extra: (state: Workspace, id: string) => Partial<Run> = () => ({}),
+) {
+  return (
+    state: Workspace,
+    event: { readonly run_id: string; readonly reason?: string | null },
+    envelope: v1.EventFrame,
+  ): Workspace => {
+    const history = state.runs[event.run_id]?.history ?? [];
+    const step: Intervention = {
+      kind,
+      seq: envelope.seq,
+      actor: envelope.actor,
+      at: envelope.ts,
+      reason: event.reason ?? null,
+    };
+    return withRun(state, event.run_id, {
+      status,
+      history: [...history, step],
+      ...extra(state, event.run_id),
+    });
+  };
 }
 
 function ignore(state: Workspace): Workspace {
@@ -104,16 +145,22 @@ const handlers: Handlers = {
       started: state.runs[event.run_id]?.started || envelope.seq,
     }),
   "reflexr:run_retrying": (state, event) =>
-    withRun(state, event.run_id, { status: "retrying", attempt: event.attempt }),
-  "reflexr:run_requeued": (state, event) =>
     withRun(state, event.run_id, {
-      status: "pending",
-      retries: (state.runs[event.run_id]?.retries ?? 0) + 1,
+      status: "retrying",
+      attempt: event.attempt,
+      reason: event.reason ?? null,
     }),
-  "reflexr:run_succeeded": ended("succeeded"),
-  "reflexr:run_dead_lettered": ended("dead_lettered"),
-  "reflexr:run_cancelled": ended("cancelled"),
-  "reflexr:run_skipped": ended("skipped"),
+  "reflexr:run_requeued": intervened("retried", "pending", (state, id) => ({
+    retries: (state.runs[id]?.retries ?? 0) + 1,
+    // A new set of attempts: why the last failed is no longer the news.
+    reason: null,
+  })),
+  "reflexr:run_succeeded": (state, event) =>
+    withRun(state, event.run_id, { status: "succeeded", reason: null }),
+  "reflexr:run_dead_lettered": (state, event) =>
+    withRun(state, event.run_id, { status: "dead_lettered", reason: event.reason ?? null }),
+  "reflexr:run_cancelled": intervened("cancelled", "cancelled"),
+  "reflexr:run_skipped": intervened("skipped", "skipped"),
   // Facts the store doesn't show: a rule's errors, resets and progress, and ticks.
   "reflexr:rule_errored": ignore,
   "reflexr:rule_reset": ignore,
@@ -129,6 +176,21 @@ const handlers: Handlers = {
     return withRun(state, run.id, { feedback: [...run.feedback, feedback] });
   },
 };
+
+/**
+ * The events a run is built from, which a stream asks for in its hello and no others: a screen
+ * that shows runs alone then gets none of the bodies of the application's events, which may hold
+ * what people said (portalr ADR-0032).
+ */
+export const RUN_EVENTS: readonly Known["type"][] = [
+  "reflexr:run_started",
+  "reflexr:run_retrying",
+  "reflexr:run_requeued",
+  "reflexr:run_succeeded",
+  "reflexr:run_dead_lettered",
+  "reflexr:run_cancelled",
+  "reflexr:run_skipped",
+];
 
 /** Whether the event is one of reflexr's own that this version knows. */
 export function isKnown(event: v1.LoggedEvent): event is Known {

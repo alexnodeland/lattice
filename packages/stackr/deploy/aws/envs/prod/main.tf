@@ -24,5 +24,7 @@ module "stack" {
   auth_smtp            = var.auth_smtp
   secret_versions      = var.secret_versions
   langfuse_admin_email = var.langfuse_admin_email
-  run_task_environment = var.profile == null ? {} : { AWS_PROFILE = var.profile }
+
+  clickhouse_backup_retention_days = var.clickhouse_backup_retention_days
+  run_task_environment             = var.profile == null ? {} : { AWS_PROFILE = var.profile }
 }

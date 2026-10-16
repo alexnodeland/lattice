@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from artifactr.fastapi.router import Refused, RejectionDetail
+from lattice_core.refusals import Refused, RejectionDetail
 from tests.agent.conftest import Script, call, say
 from tests.fastapi.conftest import build, command, wait_for
 

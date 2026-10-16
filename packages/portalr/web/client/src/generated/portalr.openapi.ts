@@ -55,7 +55,16 @@ export interface paths {
          */
         get: operations["deployment_tenants_portalr_v1_deployment_tenants_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Tenant
+         * @description Create a tenant, with its first owner invited, or found, by email, for operators.
+         *
+         *     Only operators, who may create tenants, get past the checks, which come before Supabase is
+         *     asked about anyone: a tenant that exists is refused without an invitation, so a repeated
+         *     request invites no one again and creates nothing twice. The email is never logged or
+         *     answered with: the answer names the tenant and the owner's user id.
+         */
+        post: operations["create_tenant_portalr_v1_deployment_tenants_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -117,9 +126,32 @@ export interface paths {
         };
         /**
          * Logs
-         * @description The tenant's logs, a thread's or a run's, from Loki.
+         * @description The tenant's logs, a thread's or a run's, from Loki, without their lines.
+         *
+         *     A record has its time, level, service, thread, run and its line's length, and the labels
+         *     known to be safe; the line and the other labels are withheld, and named.
          */
         get: operations["logs_portalr_v1_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portalr/v1/logs/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Log Line
+         * @description One of the tenant's log records by its id, with its line: asked for, and not kept.
+         */
+        get: operations["log_line_portalr_v1_logs__record_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -218,8 +250,35 @@ export interface paths {
         /**
          * Trace
          * @description A trace, if it is the tenant's: its spans, for its waterfall.
+         *
+         *     Only the attributes known to be safe are shown. ``content=true`` and ``span`` ask for one
+         *     span's others, its prompt and completion among them, and nothing of any other span's; the
+         *     answer is not to be kept.
          */
         get: operations["trace_portalr_v1_traces__trace_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portalr/v1/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Usage
+         * @description The tenant's spend per day from LiteLLM, and each named workspace's, with its budget.
+         *
+         *     The window is at most 91 days, and the read is bounded: ``complete`` is false where it
+         *     stopped at a bound. Only the named workspaces' tags are asked after.
+         */
+        get: operations["usage_portalr_v1_usage_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -262,6 +321,35 @@ export interface components {
             };
             supabase: components["schemas"]["Supabase"];
             surfaces: components["schemas"]["Surfaces"];
+        };
+        /**
+         * CreatedTenant
+         * @description The tenant a creation made, and its owner.
+         *
+         *     The owner is by the user id their tokens carry, never by email.
+         */
+        CreatedTenant: {
+            /** Owner */
+            owner: string;
+            /** Tenant */
+            tenant: string;
+        };
+        /**
+         * DaySpend
+         * @description What was spent on one day, in UTC: dollars, tokens and requests.
+         */
+        DaySpend: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Requests */
+            requests: number;
+            /** Spend */
+            spend: number;
+            /** Tokens */
+            tokens: number;
         };
         /**
          * DeploymentTenants
@@ -345,18 +433,45 @@ export interface components {
             langfuse_trace?: string | null;
         };
         /**
-         * LogLine
-         * @description One log record.
+         * LogRecord
+         * @description One log record, without its line unless that was asked for.
          */
-        LogLine: {
+        LogRecord: {
+            /** Id */
+            id: string;
             /** Labels */
             labels: {
                 [key: string]: string;
             };
+            /** Length */
+            length: number;
+            /** Level */
+            level: string | null;
             /** Line */
-            line: string;
+            line?: string | null;
+            /** Run */
+            run: string | null;
+            /** Service */
+            service: string | null;
+            /** Thread */
+            thread: string | null;
             /** Time Ns */
             time_ns: number;
+            /**
+             * Withheld
+             * @default []
+             */
+            withheld: string[];
+        };
+        /**
+         * Logs
+         * @description A window's records, newest first, and whether they are all of them.
+         */
+        Logs: {
+            /** Complete */
+            complete: boolean;
+            /** Records */
+            records: components["schemas"]["LogRecord"][];
         };
         /**
          * Mean
@@ -383,6 +498,15 @@ export interface components {
             /** Email */
             email: string;
         };
+        /**
+         * NewTenant
+         * @description A tenant to create, and the email of its first owner.
+         */
+        NewTenant: {
+            /** Owner Email */
+            owner_email: string;
+            tenant: components["schemas"]["TenantId"];
+        };
         /** Ok[Feedback] */
         Ok_Feedback_: {
             data: components["schemas"]["Feedback"];
@@ -392,9 +516,27 @@ export interface components {
              */
             status: "ok";
         };
+        /** Ok[Logs] */
+        Ok_Logs_: {
+            data: components["schemas"]["Logs"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+        };
         /** Ok[Scores] */
         Ok_Scores_: {
             data: components["schemas"]["Scores"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+        };
+        /** Ok[Union[LogRecord, NoneType]] */
+        Ok_Union_LogRecord__NoneType__: {
+            data: components["schemas"]["LogRecord"] | null;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -419,10 +561,9 @@ export interface components {
              */
             status: "ok";
         };
-        /** Ok[list[LogLine]] */
-        Ok_list_LogLine__: {
-            /** Data */
-            data: components["schemas"]["LogLine"][];
+        /** Ok[Usage] */
+        Ok_Usage_: {
+            data: components["schemas"]["Usage"];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -471,10 +612,10 @@ export interface components {
         };
         /**
          * Refused
-         * @description The body of a refused request, in the shape artifactr's and reflexr's routers document.
+         * @description The body of a refused request.
          *
-         *     ``detail`` is the refusal, the message of one FastAPI gives, or the problems it found with the
-         *     request's parameters or body.
+         *     ``detail`` is the rejection, the message of a resolver's refusal, or the problems FastAPI
+         *     found with the request.
          */
         Refused: {
             /** Detail */
@@ -482,7 +623,7 @@ export interface components {
         };
         /**
          * RejectionDetail
-         * @description A refusal portalr or grantr gives: its ``type`` and its ``message``.
+         * @description A rejection, as REST sends it: its ``type``, its ``message`` and its typed details.
          */
         RejectionDetail: {
             /** Message */
@@ -559,6 +700,11 @@ export interface components {
             span_id: string;
             /** Start Ns */
             start_ns: number;
+            /**
+             * Withheld
+             * @default []
+             */
+            withheld: string[];
         };
         /**
          * Spend
@@ -643,11 +789,16 @@ export interface components {
          * @description A trace and its spans.
          */
         Trace: {
+            /**
+             * Complete
+             * @default true
+             */
+            complete: boolean;
             /** Spans */
             spans: components["schemas"]["Span"][];
-            /** Trace Id */
-            trace_id: string;
+            trace_id: components["schemas"]["TraceId"];
         };
+        TraceId: string;
         /**
          * TraceSummary
          * @description A trace Tempo found: its id, start and duration.
@@ -663,8 +814,7 @@ export interface components {
             root_service?: string | null;
             /** Start Ns */
             start_ns: number;
-            /** Trace Id */
-            trace_id: string;
+            trace_id: components["schemas"]["TraceId"];
         };
         /**
          * Unavailable
@@ -689,6 +839,34 @@ export interface components {
              * @enum {string}
              */
             status: "unconfigured";
+        };
+        /**
+         * Usage
+         * @description The window's spend per day, each workspace's, the team's budget, and whether all was read.
+         */
+        Usage: {
+            budget: components["schemas"]["Spend"] | null;
+            /** Complete */
+            complete: boolean;
+            /** Daily Budget */
+            daily_budget: number | null;
+            /** Days */
+            days: components["schemas"]["DaySpend"][];
+            /** Workspaces */
+            workspaces: components["schemas"]["WorkspaceSpend"][];
+        };
+        WorkspaceName: string;
+        /**
+         * WorkspaceSpend
+         * @description One workspace's spend over the window.
+         */
+        WorkspaceSpend: {
+            /** Spend */
+            spend: number;
+            /** Tokens */
+            tokens: number;
+            /** Workspace */
+            workspace: string;
         };
         /**
          * WorkspaceTotals
@@ -840,6 +1018,75 @@ export interface operations {
             };
             /** @description Refused */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    create_tenant_portalr_v1_deployment_tenants_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewTenant"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedTenant"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Supabase Auth didn't invite or find the owner: `invite_failed` */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1005,7 +1252,67 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Ok_list_LogLine__"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
+                    "application/json": components["schemas"]["Ok_Logs_"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    log_line_portalr_v1_logs__record_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Tenant"?: components["schemas"]["TenantId"] | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok_Union_LogRecord__NoneType__"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
                 };
             };
             /** @description Refused */
@@ -1296,7 +1603,10 @@ export interface operations {
     };
     trace_portalr_v1_traces__trace_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                content?: boolean;
+                span?: components["schemas"]["Id"] | null;
+            };
             header?: {
                 "X-Tenant"?: components["schemas"]["TenantId"] | null;
             };
@@ -1314,6 +1624,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Ok_Union_Trace__NoneType__"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    usage_portalr_v1_usage_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+                workspaces?: components["schemas"]["WorkspaceName"][];
+            };
+            header?: {
+                "X-Tenant"?: components["schemas"]["TenantId"] | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok_Usage_"] | components["schemas"]["Unavailable"] | components["schemas"]["Unconfigured"];
                 };
             };
             /** @description Refused */

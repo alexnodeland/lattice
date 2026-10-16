@@ -139,10 +139,10 @@ run "stack_gotrue_listens_on_loopback_behind_its_proxy" {
   }
   assert {
     condition = (
-      { for setting in module.gotrue.containers[0].environment : setting.name => setting.value }["GOTRUE_API_HOST"] == "127.0.0.1"
-      && { for setting in module.gotrue.containers[0].environment : setting.name => setting.value }["PORT"] == "9998"
-      && { for setting in module.gotrue.containers[0].environment : setting.name => setting.value }["GOTRUE_RATE_LIMIT_HEADER"] == "X-Forwarded-For"
-      && { for setting in module.gotrue.containers[0].environment : setting.name => setting.value }["API_EXTERNAL_URL"] == "https://auth.example.com"
+      module.gotrue.environment["GOTRUE_API_HOST"] == "127.0.0.1"
+      && module.gotrue.environment["PORT"] == "9998"
+      && module.gotrue.environment["GOTRUE_RATE_LIMIT_HEADER"] == "X-Forwarded-For"
+      && module.gotrue.environment["API_EXTERNAL_URL"] == "https://auth.example.com"
     )
     error_message = "GoTrue listens on the task's loopback, at auth.<domain>, and rate-limits by the address its proxy passes it."
   }
@@ -160,23 +160,23 @@ run "stack_services_find_each_other_and_their_storage" {
 
   assert {
     condition = (
-      { for setting in module.otel_collector.containers[0].environment : setting.name => setting.value }["TEMPO_ADDRESS"] == "tempo.stackr.internal"
-      && { for setting in module.otel_collector.containers[0].environment : setting.name => setting.value }["LANGFUSE_ADDRESS"] == "langfuse-web.stackr.internal"
+      module.otel_collector.environment["TEMPO_ADDRESS"] == "tempo.stackr.internal"
+      && module.otel_collector.environment["LANGFUSE_ADDRESS"] == "langfuse-web.stackr.internal"
     )
     error_message = "The Collector finds its peers at their names in stackr.internal."
   }
   assert {
     condition = (
-      { for setting in module.telemetry["tempo"].containers[0].environment : setting.name => setting.value }["S3_PREFIX"] == "tempo"
-      && { for setting in module.telemetry["tempo"].containers[0].environment : setting.name => setting.value }["TEMPO_BACKEND"] == "s3"
-      && { for setting in module.telemetry["loki"].containers[0].environment : setting.name => setting.value }["LOKI_OBJECT_STORE"] == "aws"
-      && { for setting in module.telemetry["pyroscope"].containers[0].environment : setting.name => setting.value }["PYROSCOPE_BACKEND"] == "s3"
-      && { for setting in module.telemetry["loki"].containers[0].environment : setting.name => setting.value }["S3_ENDPOINT"] == "s3.us-east-1.amazonaws.com"
-      && { for setting in module.telemetry["loki"].containers[0].environment : setting.name => setting.value }["S3_INSECURE"] == "false"
-      && { for setting in module.telemetry["loki"].containers[0].environment : setting.name => setting.value }["S3_PATH_STYLE"] == "false"
-      && { for setting in module.telemetry["pyroscope"].containers[0].environment : setting.name => setting.value }["S3_BUCKET_LOOKUP_TYPE"] == "virtual-hosted-style"
-      && !contains([for setting in module.telemetry["tempo"].containers[0].environment : setting.name], "AWS_ENDPOINT_URL")
-      && { for setting in module.telemetry["loki"].containers[0].environment : setting.name => setting.value }["S3_BUCKET"] == "stackr-mocked"
+      module.telemetry["tempo"].environment["S3_PREFIX"] == "tempo"
+      && module.telemetry["tempo"].environment["TEMPO_BACKEND"] == "s3"
+      && module.telemetry["loki"].environment["LOKI_OBJECT_STORE"] == "aws"
+      && module.telemetry["pyroscope"].environment["PYROSCOPE_BACKEND"] == "s3"
+      && module.telemetry["loki"].environment["S3_ENDPOINT"] == "s3.us-east-1.amazonaws.com"
+      && module.telemetry["loki"].environment["S3_INSECURE"] == "false"
+      && module.telemetry["loki"].environment["S3_PATH_STYLE"] == "false"
+      && module.telemetry["pyroscope"].environment["S3_BUCKET_LOOKUP_TYPE"] == "virtual-hosted-style"
+      && !contains(keys(module.telemetry["tempo"].environment), "AWS_ENDPOINT_URL")
+      && module.telemetry["loki"].environment["S3_BUCKET"] == "stackr-mocked"
     )
     error_message = "Tempo, Loki and Pyroscope keep their blocks in S3, in the telemetry bucket, each under its own prefix, over TLS."
   }
@@ -188,7 +188,7 @@ run "stack_services_find_each_other_and_their_storage" {
     error_message = "LiteLLM and Langfuse each read their own connection string from Valkey's secret."
   }
   assert {
-    condition     = { for setting in module.db_init.containers[0].environment : setting.name => setting.value }["PGSSLMODE"] == "require"
+    condition     = module.db_init.environment["PGSSLMODE"] == "require"
     error_message = "db-init requires TLS to RDS."
   }
 }
@@ -204,7 +204,7 @@ run "stack_the_application_with_grantr" {
     error_message = "With grantr, the application works as one role and migrates as the owner, with GoTrue's service role key."
   }
   assert {
-    condition     = { for setting in module.app.containers[0].environment : setting.name => setting.value }["AUTH_ADMIN_URL"] == "http://gotrue.stackr.internal:9999"
+    condition     = module.app.environment["AUTH_ADMIN_URL"] == "http://gotrue.stackr.internal:9999"
     error_message = "The application reaches GoTrue's admin API at its private address."
   }
   assert {
@@ -215,8 +215,12 @@ run "stack_the_application_with_grantr" {
     error_message = "db-init, auth-keys and db-roles are one-off tasks; db-roles is the application's admin command."
   }
   assert {
-    condition     = { for setting in module.db_init.containers[0].environment : setting.name => setting.value }["APP_DB_CREATES_ROLES"] == "true"
+    condition     = module.db_init.environment["APP_DB_CREATES_ROLES"] == "true"
     error_message = "With grantr, the application's owner may create the role db-roles makes."
+  }
+  assert {
+    condition     = module.db_init.environment["APP_DB_SCHEMA"] == "acme"
+    error_message = "db-init gives the application's owner the template's schema, its package's name, by default."
   }
 }
 
@@ -252,7 +256,7 @@ run "stack_the_application_without_access" {
     error_message = "Without grantr, db-roles has no group and no rule."
   }
   assert {
-    condition     = !contains([for setting in module.db_init.containers[0].environment : setting.name], "APP_DB_CREATES_ROLES")
+    condition     = !contains(keys(module.db_init.environment), "APP_DB_CREATES_ROLES")
     error_message = "Without grantr, the application's owner may not create roles."
   }
 }
@@ -289,18 +293,18 @@ run "stack_the_state_host_on_fargate_for_floci" {
   }
   assert {
     condition = (
-      { for setting in module.db_init.containers[0].environment : setting.name => setting.value }["PGSSLMODE"] == "prefer"
-      && { for setting in module.grafana.containers[0].environment : setting.name => setting.value }["GF_DATABASE_SSL_MODE"] == "disable"
-      && { for setting in module.langfuse_web.containers[0].environment : setting.name => setting.value }["LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT"] == "http://floci:4566"
+      module.db_init.environment["PGSSLMODE"] == "prefer"
+      && module.grafana.environment["GF_DATABASE_SSL_MODE"] == "disable"
+      && module.langfuse_web.environment["LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT"] == "http://floci:4566"
     )
     error_message = "Without TLS to the data stores, and with S3 at Floci's address."
   }
   assert {
     condition = (
-      { for setting in module.telemetry["tempo"].containers[0].environment : setting.name => setting.value }["S3_ENDPOINT"] == "floci:4566"
-      && { for setting in module.telemetry["tempo"].containers[0].environment : setting.name => setting.value }["S3_INSECURE"] == "true"
-      && { for setting in module.telemetry["tempo"].containers[0].environment : setting.name => setting.value }["S3_PATH_STYLE"] == "true"
-      && { for setting in module.telemetry["pyroscope"].containers[0].environment : setting.name => setting.value }["S3_BUCKET_LOOKUP_TYPE"] == "path-style"
+      module.telemetry["tempo"].environment["S3_ENDPOINT"] == "floci:4566"
+      && module.telemetry["tempo"].environment["S3_INSECURE"] == "true"
+      && module.telemetry["tempo"].environment["S3_PATH_STYLE"] == "true"
+      && module.telemetry["pyroscope"].environment["S3_BUCKET_LOOKUP_TYPE"] == "path-style"
     )
     error_message = "On Floci, the telemetry stores reach its S3 by host and port, over HTTP, with buckets as paths."
   }
@@ -311,9 +315,10 @@ run "stack_the_state_host_on_fargate_for_floci" {
   assert {
     condition = (
       !contains(keys(module.secrets.arns), "clickhouse-admin-password")
+      && !contains(keys(module.secrets.arns), "clickhouse-backup-password")
       && module.state_services["clickhouse"].containers[0].environment == [{ name = "CLICKHOUSE_USER", value = "langfuse" }]
     )
-    error_message = "Floci's ClickHouse has Langfuse's user alone, and no admin, so no admin's password."
+    error_message = "Floci's ClickHouse has Langfuse's user alone, and no admin or backup user, so neither's password."
   }
 }
 
@@ -348,18 +353,19 @@ run "stack_each_secret_reaches_the_services_that_read_it" {
     target = module.secrets
     outputs = {
       arns = {
-        langfuse-salt             = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-salt-AAAAAA"
-        langfuse-encryption-key   = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-encryption-key-AAAAAA"
-        langfuse-nextauth-secret  = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-nextauth-secret-AAAAAA"
-        langfuse-admin-password   = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-admin-password-AAAAAA"
-        litellm-master-key        = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/litellm-master-key-AAAAAA"
-        litellm-salt-key          = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/litellm-salt-key-AAAAAA"
-        grafana-admin-password    = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/grafana-admin-password-AAAAAA"
-        gotrue-jwt-secret         = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/gotrue-jwt-secret-AAAAAA"
-        clickhouse-password       = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-password-AAAAAA"
-        clickhouse-admin-password = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-password-AAAAAA"
-        auth-jwt-keys             = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-jwt-keys-AAAAAA"
-        auth-service-role-key     = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-service-role-key-AAAAAA"
+        langfuse-salt              = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-salt-AAAAAA"
+        langfuse-encryption-key    = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-encryption-key-AAAAAA"
+        langfuse-nextauth-secret   = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-nextauth-secret-AAAAAA"
+        langfuse-admin-password    = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-admin-password-AAAAAA"
+        litellm-master-key         = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/litellm-master-key-AAAAAA"
+        litellm-salt-key           = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/litellm-salt-key-AAAAAA"
+        grafana-admin-password     = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/grafana-admin-password-AAAAAA"
+        gotrue-jwt-secret          = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/gotrue-jwt-secret-AAAAAA"
+        clickhouse-password        = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-password-AAAAAA"
+        clickhouse-admin-password  = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-password-AAAAAA"
+        clickhouse-backup-password = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-backup-password-AAAAAA"
+        auth-jwt-keys              = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-jwt-keys-AAAAAA"
+        auth-service-role-key      = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-service-role-key-AAAAAA"
       }
     }
   }
@@ -399,17 +405,18 @@ run "stack_each_secret_reaches_the_services_that_read_it" {
           "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-service-role-key-AAAAAA",
         ]
       }]
-      && { for setting in module.auth_keys.containers[0].environment : setting.name => setting.value }["AUTH_JWT_KEYS_ARN"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-jwt-keys-AAAAAA"
-      && { for setting in module.auth_keys.containers[0].environment : setting.name => setting.value }["AUTH_SERVICE_ROLE_KEY_ARN"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-service-role-key-AAAAAA"
+      && module.auth_keys.environment["AUTH_JWT_KEYS_ARN"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-jwt-keys-AAAAAA"
+      && module.auth_keys.environment["AUTH_SERVICE_ROLE_KEY_ARN"] == "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-service-role-key-AAAAAA"
     )
     error_message = "auth-keys reads and writes its two secrets, named in its settings, and no other."
   }
   assert {
     condition = module.state_host[0].secret_arns == {
-      clickhouse_password       = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-password-AAAAAA"
-      clickhouse_admin_password = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-password-AAAAAA"
+      clickhouse_password        = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-password-AAAAAA"
+      clickhouse_admin_password  = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-password-AAAAAA"
+      clickhouse_backup_password = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-backup-password-AAAAAA"
     }
-    error_message = "The state host reads ClickHouse's two passwords."
+    error_message = "The state host reads ClickHouse's three passwords: Langfuse's, the admin's and the backup user's."
   }
   assert {
     condition = (
@@ -720,6 +727,43 @@ run "stack_refuses_an_application_named_as_rds_own" {
     application = {
       name  = "rds-tools"
       image = "ghcr.io/example/acme@sha256:0000000000000000000000000000000000000000000000000000000000000009"
+    }
+  }
+  expect_failures = [var.application]
+}
+
+run "stack_the_owner_takes_the_applications_own_schema" {
+  command = plan
+  module {
+    source = "./modules/stack"
+  }
+  variables {
+    application = {
+      name        = "acme-co"
+      image       = "ghcr.io/example/acme@sha256:0000000000000000000000000000000000000000000000000000000000000009"
+      environment = { DATABASE_SCHEMA = "tables" }
+    }
+  }
+
+  assert {
+    condition = (
+      module.db_init.environment["APP_DB_SCHEMA"] == "tables"
+      && module.db_init.environment["APP_DB_NAME"] == "acme_co"
+    )
+    error_message = "db-init gives the application's owner the schema DATABASE_SCHEMA names, in the database named after it."
+  }
+}
+
+run "stack_refuses_a_schema_the_template_refuses" {
+  command = plan
+  module {
+    source = "./modules/stack"
+  }
+  variables {
+    application = {
+      name        = "acme"
+      image       = "ghcr.io/example/acme@sha256:0000000000000000000000000000000000000000000000000000000000000009"
+      environment = { DATABASE_SCHEMA = "Tables; DROP" }
     }
   }
   expect_failures = [var.application]

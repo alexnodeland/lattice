@@ -11,11 +11,12 @@ from portalr.readers.feedback import Feedback, FeedbackQuery, read_feedback
 from portalr.readers.grafana import Grafana
 from portalr.readers.langfuse import Langfuse, Score, Scores
 from portalr.readers.litellm import LiteLLM, Spend, TenantSpend
-from portalr.readers.loki import LogLine, LogQuery, Loki
+from portalr.readers.loki import LogQuery, LogRecord, Logs, Loki
 from portalr.readers.prometheus import Metric, MetricQuery, Point, Prometheus
 from portalr.readers.query import Window
 from portalr.readers.reading import Ok, Unavailable, Unconfigured, reading
 from portalr.readers.tempo import Span, Tempo, Trace, TraceQuery, TraceSummary
+from portalr.readers.usage import Usage, UsageQuery, read_usage
 
 
 @dataclass(frozen=True)
@@ -48,8 +49,9 @@ __all__ = [
     "Grafana",
     "Langfuse",
     "LiteLLM",
-    "LogLine",
     "LogQuery",
+    "LogRecord",
+    "Logs",
     "Loki",
     "Metric",
     "MetricQuery",
@@ -68,7 +70,10 @@ __all__ = [
     "TraceSummary",
     "Unavailable",
     "Unconfigured",
+    "Usage",
+    "UsageQuery",
     "Window",
     "read_feedback",
+    "read_usage",
     "reading",
 ]

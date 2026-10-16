@@ -68,6 +68,55 @@
         "title": "Config",
         "type": "object"
       },
+      "CreatedTenant": {
+        "description": "The tenant a creation made, and its owner.\n\nThe owner is by the user id their tokens carry, never by email.",
+        "properties": {
+          "owner": {
+            "title": "Owner",
+            "type": "string"
+          },
+          "tenant": {
+            "title": "Tenant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "owner"
+        ],
+        "title": "CreatedTenant",
+        "type": "object"
+      },
+      "DaySpend": {
+        "description": "What was spent on one day, in UTC: dollars, tokens and requests.",
+        "properties": {
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "requests": {
+            "title": "Requests",
+            "type": "integer"
+          },
+          "spend": {
+            "title": "Spend",
+            "type": "number"
+          },
+          "tokens": {
+            "title": "Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day",
+          "spend",
+          "tokens",
+          "requests"
+        ],
+        "title": "DaySpend",
+        "type": "object"
+      },
       "DeploymentTenants": {
         "description": "Every tenant, and their spend, as one LiteLLM team list reads it.",
         "properties": {
@@ -307,9 +356,13 @@
         "title": "Links",
         "type": "object"
       },
-      "LogLine": {
-        "description": "One log record.",
+      "LogRecord": {
+        "description": "One log record, without its line unless that was asked for.",
         "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
           "labels": {
             "additionalProperties": {
               "type": "string"
@@ -317,21 +370,111 @@
             "title": "Labels",
             "type": "object"
           },
+          "length": {
+            "title": "Length",
+            "type": "integer"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
           "line": {
-            "title": "Line",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service"
+          },
+          "thread": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread"
           },
           "time_ns": {
             "title": "Time Ns",
             "type": "integer"
+          },
+          "withheld": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Withheld",
+            "type": "array"
           }
         },
         "required": [
+          "id",
           "time_ns",
-          "line",
+          "level",
+          "service",
+          "thread",
+          "run",
+          "length",
           "labels"
         ],
-        "title": "LogLine",
+        "title": "LogRecord",
+        "type": "object"
+      },
+      "Logs": {
+        "description": "A window's records, newest first, and whether they are all of them.",
+        "properties": {
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/LogRecord"
+            },
+            "title": "Records",
+            "type": "array"
+          }
+        },
+        "required": [
+          "records",
+          "complete"
+        ],
+        "title": "Logs",
         "type": "object"
       },
       "Mean": {
@@ -389,6 +532,24 @@
         "title": "NewInvite",
         "type": "object"
       },
+      "NewTenant": {
+        "description": "A tenant to create, and the email of its first owner.",
+        "properties": {
+          "owner_email": {
+            "title": "Owner Email",
+            "type": "string"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/TenantId"
+          }
+        },
+        "required": [
+          "tenant",
+          "owner_email"
+        ],
+        "title": "NewTenant",
+        "type": "object"
+      },
       "Ok_Feedback_": {
         "properties": {
           "data": {
@@ -407,6 +568,24 @@
         "title": "Ok[Feedback]",
         "type": "object"
       },
+      "Ok_Logs_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Logs"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[Logs]",
+        "type": "object"
+      },
       "Ok_Scores_": {
         "properties": {
           "data": {
@@ -423,6 +602,31 @@
           "data"
         ],
         "title": "Ok[Scores]",
+        "type": "object"
+      },
+      "Ok_Union_LogRecord__NoneType__": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LogRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "Ok[Union[LogRecord, NoneType]]",
         "type": "object"
       },
       "Ok_Union_Spend__NoneType__": {
@@ -475,14 +679,10 @@
         "title": "Ok[Union[Trace, NoneType]]",
         "type": "object"
       },
-      "Ok_list_LogLine__": {
+      "Ok_Usage_": {
         "properties": {
           "data": {
-            "items": {
-              "$ref": "#/components/schemas/LogLine"
-            },
-            "title": "Data",
-            "type": "array"
+            "$ref": "#/components/schemas/Usage"
           },
           "status": {
             "const": "ok",
@@ -494,7 +694,7 @@
         "required": [
           "data"
         ],
-        "title": "Ok[list[LogLine]]",
+        "title": "Ok[Usage]",
         "type": "object"
       },
       "Ok_list_Point__": {
@@ -583,7 +783,7 @@
         "type": "object"
       },
       "Refused": {
-        "description": "The body of a refused request, in the shape artifactr's and reflexr's routers document.\n\n``detail`` is the refusal, the message of one FastAPI gives, or the problems it found with the\nrequest's parameters or body.",
+        "description": "The body of a refused request.\n\n``detail`` is the rejection, the message of a resolver's refusal, or the problems FastAPI\nfound with the request.",
         "properties": {
           "detail": {
             "anyOf": [
@@ -611,7 +811,7 @@
       },
       "RejectionDetail": {
         "additionalProperties": true,
-        "description": "A refusal portalr or grantr gives: its ``type`` and its ``message``.",
+        "description": "A rejection, as REST sends it: its ``type``, its ``message`` and its typed details.",
         "properties": {
           "message": {
             "title": "Message",
@@ -822,6 +1022,14 @@
           "start_ns": {
             "title": "Start Ns",
             "type": "integer"
+          },
+          "withheld": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Withheld",
+            "type": "array"
           }
         },
         "required": [
@@ -991,6 +1199,11 @@
       "Trace": {
         "description": "A trace and its spans.",
         "properties": {
+          "complete": {
+            "default": true,
+            "title": "Complete",
+            "type": "boolean"
+          },
           "spans": {
             "items": {
               "$ref": "#/components/schemas/Span"
@@ -999,8 +1212,7 @@
             "type": "array"
           },
           "trace_id": {
-            "title": "Trace Id",
-            "type": "string"
+            "$ref": "#/components/schemas/TraceId"
           }
         },
         "required": [
@@ -1009,6 +1221,9 @@
         ],
         "title": "Trace",
         "type": "object"
+      },
+      "TraceId": {
+        "type": "string"
       },
       "TraceSummary": {
         "description": "A trace Tempo found: its id, start and duration.\n\nIts root's service and name are left out, since the root may be another tenant's span.",
@@ -1051,8 +1266,7 @@
             "type": "integer"
           },
           "trace_id": {
-            "title": "Trace Id",
-            "type": "string"
+            "$ref": "#/components/schemas/TraceId"
           }
         },
         "required": [
@@ -1093,6 +1307,87 @@
           }
         },
         "title": "Unconfigured",
+        "type": "object"
+      },
+      "Usage": {
+        "description": "The window's spend per day, each workspace's, the team's budget, and whether all was read.",
+        "properties": {
+          "budget": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Spend"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "daily_budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Budget"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/DaySpend"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "workspaces": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceSpend"
+            },
+            "title": "Workspaces",
+            "type": "array"
+          }
+        },
+        "required": [
+          "days",
+          "workspaces",
+          "budget",
+          "daily_budget",
+          "complete"
+        ],
+        "title": "Usage",
+        "type": "object"
+      },
+      "WorkspaceName": {
+        "pattern": "^[^\\x00]{1,256}$",
+        "type": "string"
+      },
+      "WorkspaceSpend": {
+        "description": "One workspace's spend over the window.",
+        "properties": {
+          "spend": {
+            "title": "Spend",
+            "type": "number"
+          },
+          "tokens": {
+            "title": "Tokens",
+            "type": "integer"
+          },
+          "workspace": {
+            "title": "Workspace",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace",
+          "spend",
+          "tokens"
+        ],
+        "title": "WorkspaceSpend",
         "type": "object"
       },
       "WorkspaceTotals": {
@@ -1324,6 +1619,83 @@
           }
         },
         "summary": "Deployment Tenants"
+      },
+      "post": {
+        "description": "Create a tenant, with its first owner invited, or found, by email, for operators.\n\nOnly operators, who may create tenants, get past the checks, which come before Supabase is\nasked about anyone: a tenant that exists is refused without an invitation, so a repeated\nrequest invites no one again and creates nothing twice. The email is never logged or\nanswered with: the answer names the tenant and the owner's user id.",
+        "operationId": "create_tenant_portalr_v1_deployment_tenants_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTenant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedTenant"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Supabase Auth didn't invite or find the owner: `invite_failed`"
+          }
+        },
+        "summary": "Create Tenant"
       }
     },
     "/portalr/v1/feedback": {
@@ -1557,7 +1929,7 @@
     },
     "/portalr/v1/logs": {
       "get": {
-        "description": "The tenant's logs, a thread's or a run's, from Loki.",
+        "description": "The tenant's logs, a thread's or a run's, from Loki, without their lines.\n\nA record has its time, level, service, thread, run and its line's length, and the labels\nknown to be safe; the line and the other labels are withheld, and named.",
         "operationId": "logs_portalr_v1_logs_get",
         "parameters": [
           {
@@ -1648,7 +2020,7 @@
                 "schema": {
                   "discriminator": {
                     "mapping": {
-                      "ok": "#/components/schemas/Ok_list_LogLine__",
+                      "ok": "#/components/schemas/Ok_Logs_",
                       "unavailable": "#/components/schemas/Unavailable",
                       "unconfigured": "#/components/schemas/Unconfigured"
                     },
@@ -1656,7 +2028,7 @@
                   },
                   "oneOf": [
                     {
-                      "$ref": "#/components/schemas/Ok_list_LogLine__"
+                      "$ref": "#/components/schemas/Ok_Logs_"
                     },
                     {
                       "$ref": "#/components/schemas/Unavailable"
@@ -1713,6 +2085,112 @@
           }
         },
         "summary": "Logs"
+      }
+    },
+    "/portalr/v1/logs/{record_id}": {
+      "get": {
+        "description": "One of the tenant's log records by its id, with its line: asked for, and not kept.",
+        "operationId": "log_line_portalr_v1_logs__record_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9]{1,19}-[0-9a-f]{16}-[0-9]{1,3}$",
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "ok": "#/components/schemas/Ok_Union_LogRecord__NoneType__",
+                      "unavailable": "#/components/schemas/Unavailable",
+                      "unconfigured": "#/components/schemas/Unconfigured"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Ok_Union_LogRecord__NoneType__"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unavailable"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unconfigured"
+                    }
+                  ],
+                  "title": "Response Log Line Portalr V1 Logs  Record Id  Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          }
+        },
+        "summary": "Log Line"
       }
     },
     "/portalr/v1/metrics": {
@@ -2249,7 +2727,7 @@
     },
     "/portalr/v1/traces/{trace_id}": {
       "get": {
-        "description": "A trace, if it is the tenant's: its spans, for its waterfall.",
+        "description": "A trace, if it is the tenant's: its spans, for its waterfall.\n\nOnly the attributes known to be safe are shown. ``content=true`` and ``span`` ask for one\nspan's others, its prompt and completion among them, and nothing of any other span's; the\nanswer is not to be kept.",
         "operationId": "trace_portalr_v1_traces__trace_id__get",
         "parameters": [
           {
@@ -2260,6 +2738,32 @@
               "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$",
               "title": "Trace Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "content",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Content",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "span",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Span"
             }
           },
           {
@@ -2351,6 +2855,135 @@
           }
         },
         "summary": "Trace"
+      }
+    },
+    "/portalr/v1/usage": {
+      "get": {
+        "description": "The tenant's spend per day from LiteLLM, and each named workspace's, with its budget.\n\nThe window is at most 91 days, and the read is bounded: ``complete`` is false where it\nstopped at a bound. Only the named workspaces' tags are asked after.",
+        "operationId": "usage_portalr_v1_usage_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspaces",
+            "required": false,
+            "schema": {
+              "items": {
+                "$ref": "#/components/schemas/WorkspaceName"
+              },
+              "maxItems": 50,
+              "title": "Workspaces",
+              "type": "array"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TenantId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "ok": "#/components/schemas/Ok_Usage_",
+                      "unavailable": "#/components/schemas/Unavailable",
+                      "unconfigured": "#/components/schemas/Unconfigured"
+                    },
+                    "propertyName": "status"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Ok_Usage_"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unavailable"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unconfigured"
+                    }
+                  ],
+                  "title": "Response Usage Portalr V1 Usage Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          }
+        },
+        "summary": "Usage"
       }
     }
   }

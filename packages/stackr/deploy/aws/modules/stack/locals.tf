@@ -61,6 +61,8 @@ locals {
 
   # The application's database: its owner, which migrates, and with grantr the role it works as.
   app_database = replace(var.application.name, "-", "_")
+  # The application's schema: its DATABASE_SCHEMA, or the template's default, its package's name.
+  app_schema = lookup(var.application.environment, "DATABASE_SCHEMA", local.app_database)
   hosts = {
     app  = "app.${var.domain}"
     auth = "auth.${var.domain}"

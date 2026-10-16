@@ -1,15 +1,17 @@
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
 from fastapi import FastAPI
 
-from grantr.core import AuditEntry, Forbidden, Invalid, Member, Subject, User
+from grantr.core import TENANT, AuditEntry, Forbidden, Invalid, Member, Resource, Subject, User
 from grantr.grants import Grants
 from portalr.fastapi import portalr_router
 from portalr.invites import Invite, InviteFailed
 from portalr.readers import Readers
-from tests.fastapi.conftest import ALICE, SITE, Stack, app_for, resolve_actor, seeded
+from portalr.readers.loki import _identify
+from tests.fastapi.conftest import ALICE, OPS, SITE, Stack, app_for, resolve_actor, seeded
 from tests.tools import fails, json
 
 WINDOW = {"start": "2026-10-12T00:00:00Z", "end": "2026-10-12T01:00:00Z"}
@@ -44,11 +46,166 @@ async def test_a_tenant_admin_reads_their_tenants_traces(
     assert stack.tempo.last.url.params["q"].startswith('{ span.tenant.id = "acme"')
 
 
+def _trace(*spans: tuple[str, str, dict[str, str]]) -> dict[str, Any]:
+    """A trace as Tempo gives it: each span with its tenant and some content."""
+    return {
+        "trace": {
+            "resourceSpans": [
+                {
+                    "scopeSpans": [
+                        {
+                            "spans": [
+                                {
+                                    "spanId": span_id,
+                                    "name": span_id,
+                                    "startTimeUnixNano": "1",
+                                    "endTimeUnixNano": "2",
+                                    "attributes": [
+                                        {"key": "tenant.id", "value": {"stringValue": tenant}},
+                                        *(
+                                            {"key": key, "value": {"stringValue": value}}
+                                            for key, value in content.items()
+                                        ),
+                                    ],
+                                }
+                                for span_id, tenant, content in spans
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+
+
+async def test_what_a_span_withheld_is_given_for_that_span_alone_and_never_kept(
+    client: httpx.AsyncClient, stack: Stack
+) -> None:
+    said = {"gen_ai.input.messages": "[secret prompt]"}
+    stack.tempo.paths["/api/v2/traces/f1"] = json(
+        _trace(("1", "acme", said), ("2", "acme", {"gen_ai.output.messages": "[other]"}))
+    )
+    alice = headers("alice")
+    plain = await client.get("/v1/traces/f1", headers=alice)
+    assert "[secret prompt]" not in plain.text
+    assert "cache-control" not in plain.headers
+    first, second = plain.json()["data"]["spans"]
+    assert first["withheld"] == ["gen_ai.input.messages"]
+    assert second["withheld"] == ["gen_ai.output.messages"]
+    # A span named without `content` reveals nothing.
+    named = await client.get("/v1/traces/f1", params={"span": "1"}, headers=alice)
+    assert "[secret prompt]" not in named.text
+    revealed = await client.get(
+        "/v1/traces/f1", params={"content": "true", "span": "1"}, headers=alice
+    )
+    assert revealed.headers["cache-control"] == "no-store"
+    one, two = revealed.json()["data"]["spans"]
+    assert one["attributes"]["gen_ai.input.messages"] == "[secret prompt]"
+    assert (two["attributes"].get("gen_ai.output.messages"), two["withheld"]) == (
+        None,
+        ["gen_ai.output.messages"],
+    )
+    assert "[other]" not in revealed.text
+    # Content is asked for a span.
+    unnamed = await client.get("/v1/traces/f1", params={"content": "true"}, headers=alice)
+    assert unnamed.status_code == 422
+
+
+async def test_what_a_span_withheld_needs_the_grant_and_the_tenants_own_trace(
+    client: httpx.AsyncClient, stack: Stack
+) -> None:
+    said = {"gen_ai.input.messages": "[secret prompt]"}
+    stack.tempo.paths["/api/v2/traces/f1"] = json(_trace(("1", "acme", said)))
+    stack.tempo.paths["/api/v2/traces/f2"] = json(
+        _trace(("1", "acme", said), ("2", "globex", said))
+    )
+    asked = {"content": "true", "span": "1"}
+    for who, tenant in (("bob", "acme"), ("carol", "acme"), ("alice", "globex")):
+        refused = await client.get("/v1/traces/f1", params=asked, headers=headers(who, tenant))
+        assert refused.status_code == 403, (who, tenant)
+    assert not stack.tempo.requests
+    # A trace with a span of another tenant's, or none of this one's, is none, content or not.
+    mixed = await client.get("/v1/traces/f2", params=asked, headers=headers("alice"))
+    assert mixed.json() == {"status": "ok", "data": None}
+    stack.tempo.paths["/api/v2/traces/f3"] = json(_trace(("1", "globex", said)))
+    other = await client.get("/v1/traces/f3", params=asked, headers=headers("alice"))
+    assert other.json() == {"status": "ok", "data": None}
+    assert "[secret prompt]" not in mixed.text + other.text
+
+
+PHRASE = "alice@example.com said launch on Tuesday"
+
+
+def _loki(*records: tuple[str, str, dict[str, str]]) -> dict[str, Any]:
+    """Loki's answer: each record's time, line and labels."""
+    return {
+        "data": {
+            "result": [
+                {"stream": {"service_name": "docplan", **labels}, "values": [[time, line]]}
+                for time, line, labels in records
+            ]
+        }
+    }
+
+
+async def test_a_logs_read_has_no_lines_and_one_records_line_is_asked_for_by_its_id(
+    client: httpx.AsyncClient, stack: Stack
+) -> None:
+    mine = {"tenant_id": "acme", "email": "a@b.c", "artifactr_run_id": "run_1"}
+    stack.loki.paths["/loki/api/v1/query_range"] = json(_loki(("5", PHRASE, mine)))
+    alice = headers("alice")
+    listed = await client.get("/v1/logs", params=WINDOW, headers=alice)
+    assert PHRASE not in listed.text
+    assert "cache-control" not in listed.headers
+    (record,) = listed.json()["data"]["records"]
+    assert (record["length"], record["run"], record["withheld"], record["line"]) == (
+        len(PHRASE),
+        "run_1",
+        ["email"],
+        None,
+    )
+    line = await client.get(f"/v1/logs/{record['id']}", headers=alice)
+    assert line.headers["cache-control"] == "no-store"
+    assert line.json()["data"]["line"] == PHRASE
+    # An id that names no record, or none at all, is none; the same is said of both.
+    answer = await client.get(f"/v1/logs/5-{'0' * 16}-0", headers=alice)
+    assert answer.json() == {"status": "ok", "data": None}
+    # One past the largest time Loki takes names nothing, and isn't looked for.
+    past = await client.get(f"/v1/logs/{2**63}-{'0' * 16}-0", headers=alice)
+    assert past.json() == {"status": "ok", "data": None}
+    # An id that isn't one is refused, and is not looked for.
+    for wrong in ("nonsense", "5-0-0", f"\u0661-{'0' * 16}-0"):
+        assert (await client.get(f"/v1/logs/{wrong}", headers=alice)).status_code == 422, wrong
+    # A window of more than a day is refused.
+    wide = {"start": "2026-10-12T00:00:00Z", "end": "2026-10-13T00:00:01Z"}
+    assert (await client.get("/v1/logs", params=wide, headers=alice)).status_code == 422
+
+
+async def test_a_logs_line_needs_the_grant_and_the_tenants_own_record(
+    client: httpx.AsyncClient, stack: Stack
+) -> None:
+    theirs = {"tenant_id": "globex"}
+    stack.loki.paths["/loki/api/v1/query_range"] = json(_loki(("5", PHRASE, theirs)))
+    for who, tenant in (("bob", "acme"), ("carol", "acme"), ("alice", "globex")):
+        refused = await client.get(f"/v1/logs/5-{'a' * 16}-0", headers=headers(who, tenant))
+        assert refused.status_code == 403, (who, tenant)
+    assert not stack.loki.requests
+    # A record of another tenant's that Loki gives all the same isn't shown, by list or by id.
+    listed = await client.get("/v1/logs", params=WINDOW, headers=headers("alice"))
+    assert listed.json()["data"]["records"] == []
+    globex_id = _identify([(5, PHRASE, {"service_name": "docplan", "tenant_id": "globex"})])[0][
+        0
+    ].id
+    asked = await client.get(f"/v1/logs/{globex_id}", headers=headers("alice"))
+    assert asked.json() == {"status": "ok", "data": None}
+    assert PHRASE not in listed.text + asked.text
+
+
 async def test_every_read_is_refused_without_the_tenants_grant(
     client: httpx.AsyncClient, stack: Stack
 ) -> None:
-    reads = ["/v1/traces", "/v1/traces/t1", "/v1/logs", "/v1/scores", "/v1/feedback", "/v1/spend"]
-    for path in reads:
+    reads = ["/v1/traces", "/v1/traces/t1", "/v1/logs", "/v1/scores", "/v1/feedback"]
+    for path in [*reads, "/v1/spend", "/v1/usage", f"/v1/logs/5-{'a' * 16}-0"]:
         for who, tenant in (("bob", "acme"), ("carol", "acme"), ("alice", "globex")):
             response = await client.get(
                 path, params={**WINDOW, "metric": "failed_turns"}, headers=headers(who, tenant)
@@ -90,7 +247,7 @@ async def test_each_tools_read(client: httpx.AsyncClient, stack: Stack) -> None:
     }
     assert (await client.get("/v1/logs", params=WINDOW, headers=alice)).json() == {
         "status": "ok",
-        "data": [],
+        "data": {"records": [], "complete": True},
     }
     metrics = await client.get(
         "/v1/metrics", params={**WINDOW, "metric": "turn_latency"}, headers=alice
@@ -111,10 +268,11 @@ async def test_each_tools_read(client: httpx.AsyncClient, stack: Stack) -> None:
     assert (await client.get("/v1/feedback", params=too_long, headers=alice)).status_code == 422
     backwards = {"start": WINDOW["end"], "end": WINDOW["start"]}
     assert (await client.get("/v1/feedback", params=backwards, headers=alice)).status_code == 422
-    # A moment without its zone, or a span from before 2000, is refused, not read.
+    # A moment without its zone, a span from before 2000, or past 2200, is refused, not read.
     for wrong in (
         {"start": "2026-10-12T00:00:00", "end": WINDOW["end"]},
         {"start": "0001-01-01T00:00:00Z", "end": WINDOW["end"]},
+        {"start": WINDOW["start"], "end": "9999-12-31T00:00:00Z"},
     ):
         for path in ("/v1/feedback", "/v1/traces", "/v1/logs", "/v1/scores", "/v1/metrics"):
             asked = {**wrong, "metric": "failed_turns"}
@@ -123,6 +281,17 @@ async def test_each_tools_read(client: httpx.AsyncClient, stack: Stack) -> None:
         "status": "ok",
         "data": {"spend": 2.0, "max_budget": None, "budget_duration": None},
     }
+    stack.litellm.paths["/team/daily/activity"] = json({"results": []})
+    stack.litellm.paths["/tag/daily/activity"] = json({"results": []})
+    usage = await client.get(
+        "/v1/usage", params={**WINDOW, "workspaces": ["notes", "plans"]}, headers=alice
+    )
+    assert usage.json()["status"] == "ok"
+    assert usage.json()["data"]["complete"] is True
+    tagged = [r for r in stack.litellm.requests if r.url.path == "/tag/daily/activity"]
+    assert [r.url.params["tags"] for r in tagged] == [
+        "tenant-workspace:acme/notes,tenant-workspace:acme/plans"
+    ]
 
 
 async def test_a_tool_that_is_down_fails_only_its_own_read(
@@ -149,6 +318,8 @@ async def test_a_tool_the_application_doesnt_run_is_unconfigured(grants: Grants,
             "/v1/scores",
             "/v1/feedback",
             "/v1/spend",
+            "/v1/usage",
+            f"/v1/logs/5-{'a' * 16}-0",
         ):
             response = await client.get(
                 path, params={**WINDOW, "metric": "failed_turns"}, headers=alice
@@ -171,6 +342,12 @@ async def test_a_tool_the_application_doesnt_run_is_unconfigured(grants: Grants,
         # Without Supabase's admin API, there is no invitation.
         invite = await client.post("/v1/invites", json={"email": "dan@acme.com"}, headers=alice)
         assert invite.status_code in (404, 405)
+        creating = await client.post(
+            "/v1/deployment/tenants",
+            json={"tenant": "initech", "owner_email": "dan@x.com"},
+            headers=headers("ops", tenant=None),
+        )
+        assert creating.status_code in (404, 405)
         assert (await client.get("/config.json")).json()["readers"] == dict.fromkeys(
             ("tempo", "loki", "prometheus", "langfuse", "litellm", "grafana"), False
         )
@@ -301,3 +478,163 @@ async def test_an_invitation_supabase_refuses_is_a_bad_gateway(
         "type": "invite_failed",
         "message": "supabase answered 500",
     }
+
+
+OPS_ONLY = headers("ops", tenant=None)
+NEW = {"tenant": "initech", "owner_email": "dan@initech.com"}
+
+
+async def test_an_operator_creates_a_tenant_with_its_owner_invited_by_email(
+    client: httpx.AsyncClient, grants: Grants, invited: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level("DEBUG"):
+        response = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    assert response.status_code == 201
+    assert response.json() == {"tenant": "initech", "owner": "dan"}
+    assert invited == ["dan@initech.com"]
+    assert "initech" in await grants.tenants(by=OPS)
+    assert await grants.check("initech", User(id="dan"), "grantr:add_member", TENANT)
+    # The email is neither in the answer nor in any log.
+    assert "@" not in response.text
+    assert "dan@initech.com" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("who", "tenant"), [("alice", "acme"), ("alice", None), ("bob", "acme"), ("carol", "globex")]
+)
+async def test_nobody_but_an_operator_creates_a_tenant_or_invites_anyone(
+    client: httpx.AsyncClient, grants: Grants, invited: list[str], who: str, tenant: str | None
+) -> None:
+    response = await client.post("/v1/deployment/tenants", json=NEW, headers=headers(who, tenant))
+    assert response.status_code == 403
+    assert invited == []
+    assert "initech" not in await grants.tenants(by=OPS)
+
+
+async def test_a_caller_who_may_not_create_tenants_invites_no_one(
+    stack: Stack, invite: Invite, invited: list[str], ui: Path
+) -> None:
+    class Cautious(Grants):
+        """grantr, where no one may create a tenant, though an operator may read the deployment."""
+
+        async def check(self, tenant: str, subject: Subject, action: str, on: Resource) -> bool:
+            return action != "grantr:create_tenant" and await super().check(
+                tenant, subject, action, on
+            )
+
+    transport = httpx.ASGITransport(
+        app=app_for(await seeded(Cautious), stack.readers(), invite, ui)
+    )
+    async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
+        response = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    assert response.status_code == 403
+    assert invited == []
+
+
+async def test_a_tenant_that_exists_is_refused_before_anyone_is_invited(
+    client: httpx.AsyncClient, invited: list[str]
+) -> None:
+    response = await client.post(
+        "/v1/deployment/tenants", json={**NEW, "tenant": "acme"}, headers=OPS_ONLY
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["message"] == "acme exists"
+    assert invited == []
+
+
+async def test_a_repeated_request_creates_nothing_twice_and_invites_no_one_again(
+    client: httpx.AsyncClient, grants: Grants, invited: list[str]
+) -> None:
+    first = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    again = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    assert (first.status_code, again.status_code) == (201, 422)
+    assert invited == ["dan@initech.com"]
+    assert (await grants.tenants(by=OPS)).count("initech") == 1
+
+
+@pytest.mark.parametrize(
+    "email", ["", "dan", "dan@x", "d an@x.com", "a@b@c.com", "x" * 250 + "@y.com"]
+)
+async def test_an_owner_that_is_no_email_is_refused_without_being_echoed(
+    client: httpx.AsyncClient, invited: list[str], email: str
+) -> None:
+    response = await client.post(
+        "/v1/deployment/tenants", json={**NEW, "owner_email": email}, headers=OPS_ONLY
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["message"] == "the owner's email isn't an email address"
+    assert email not in response.text or email == ""
+    assert invited == []
+
+
+async def test_a_tenant_id_grantr_does_not_take_is_refused(
+    client: httpx.AsyncClient, invited: list[str]
+) -> None:
+    for tenant in ("", "a~b"):
+        response = await client.post(
+            "/v1/deployment/tenants", json={**NEW, "tenant": tenant}, headers=OPS_ONLY
+        )
+        assert response.status_code == 422, tenant
+    assert invited == []
+
+
+async def test_an_owner_supabase_cannot_invite_leaves_no_tenant(
+    grants: Grants, stack: Stack, ui: Path
+) -> None:
+    async def refusing(_email: str) -> str:
+        raise InviteFailed("supabase answered 500")
+
+    transport = httpx.ASGITransport(app=app_for(grants, stack.readers(), refusing, ui))
+    async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
+        response = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    assert response.status_code == 502
+    assert response.json()["detail"] == {
+        "type": "invite_failed",
+        "message": "supabase answered 500",
+    }
+    assert "initech" not in await grants.tenants(by=OPS)
+    assert "dan@initech.com" not in response.text
+
+
+@pytest.mark.parametrize(("error", "status"), [(Forbidden("no"), 403), (Invalid("no"), 422)])
+async def test_grantr_refusing_the_creation_refuses_it(
+    stack: Stack, invite: Invite, ui: Path, error: Exception, status: int
+) -> None:
+    class Refusing(Grants):
+        """grantr, refusing to create the tenant after the checks before it."""
+
+        async def create_tenant(self, tenant: str, *, owner: str, by: Subject) -> AuditEntry:
+            if tenant == "initech":
+                raise error
+            return await super().create_tenant(tenant, owner=owner, by=by)
+
+    transport = httpx.ASGITransport(
+        app=app_for(await seeded(Refusing), stack.readers(), invite, ui)
+    )
+    async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
+        response = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    assert response.status_code == status
+
+
+async def test_a_storage_error_after_the_invitation_is_a_clean_503_that_says_nothing_of_it(
+    stack: Stack, invite: Invite, invited: list[str], ui: Path
+) -> None:
+    class Failing(Grants):
+        """grantr, whose storage fails creating the tenant, in words that name the owner."""
+
+        async def create_tenant(self, tenant: str, *, owner: str, by: Subject) -> AuditEntry:
+            if tenant == "initech":
+                raise RuntimeError("insert failed for dan@initech.com")
+            return await super().create_tenant(tenant, owner=owner, by=by)
+
+    transport = httpx.ASGITransport(app=app_for(await seeded(Failing), stack.readers(), invite, ui))
+    async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
+        response = await client.post("/v1/deployment/tenants", json=NEW, headers=OPS_ONLY)
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "type": "unavailable",
+        "message": "the tenant couldn't be created",
+    }
+    assert "dan" not in response.text
+    # The owner was invited before it failed: an invitation can outlive a refused creation.
+    assert invited == ["dan@initech.com"]

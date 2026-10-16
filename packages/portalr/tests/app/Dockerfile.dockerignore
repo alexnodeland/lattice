@@ -1,6 +1,7 @@
 # What portalr's test application's image is built from, out of lattice's root: the workspace's
 # manifests, which `uv sync --locked` checks the lock against, and the packages it installs, with
-# the README and licences their metadata names, portalr's built UIs among its sources.
+# the README and licences their metadata names, portalr's built UIs among its sources, each with
+# its THIRD-PARTY-NOTICES.txt.
 *
 !pyproject.toml
 !uv.lock

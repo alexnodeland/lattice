@@ -1,0 +1,8 @@
+# @portalr/notices: collects the licences of the JavaScript the two UIs bundle, from the real
+# bundle, into a third-party notices file shipped beside each UI, and fails the build on a
+# package whose licence is missing, unknown or not allowed (portalr ADR-0033).
+language: 'typescript'
+layer: 'library'
+workspace:
+  inheritedTasks:
+    exclude: ['build'] # its source is built into app and admin

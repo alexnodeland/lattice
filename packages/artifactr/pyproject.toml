@@ -36,26 +36,16 @@ sqlite = ["artifactr-ai[sql]", "aiosqlite>=0.22"]
 postgres = ["artifactr-ai[sql]", "asyncpg>=0.31"]
 fastapi = ["fastapi>=0.141", "starlette>=0.46.0"]
 mcp = ["mcp>=2.2", "starlette>=0.27"]
-otel = [
-    "opentelemetry-exporter-otlp-proto-http>=1.45",
-    "opentelemetry-instrumentation-asyncpg>=0.66b0",
-    "opentelemetry-instrumentation-fastapi>=0.66b0",
-    "opentelemetry-instrumentation-httpx>=0.66b0",
-    "opentelemetry-instrumentation-logging>=0.66b0",
-    "opentelemetry-instrumentation-sqlalchemy>=0.66b0",
-    "opentelemetry-processor-baggage>=0.66b0",
-    "opentelemetry-sdk>=1.45",
-]
+# The SDK's setup is lattice-core's; this package imports the SDK for its own views.
+otel = ["lattice-core-ai[otel]>=0.1.0.dev0", "opentelemetry-sdk>=1.45"]
 langfuse = [
+    "lattice-core-ai[langfuse]>=0.1.0.dev0",
     "langfuse>=4.15,<5",
     # The score mapping and ports that artifactr.scores' mirror builds on, and evalr.langfuse's
     # score adapters, which send the mirror's scores to Langfuse.
     "evalr[langfuse]>=0.1.0.dev0",
 ]
-litellm = [
-    "pydantic-ai-slim[openai]>=2.51",
-    "httpx2>=2.7",
-]
+litellm = ["lattice-core-ai[litellm]>=0.1.0.dev0"]
 evals = ["evalr>=0.1.0.dev0"]
 
 [project.urls]

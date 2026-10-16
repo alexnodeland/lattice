@@ -1,18 +1,17 @@
-import { allowedIn, type Reflexr, thumbs, useMe, workspaceOf } from "@portalr/client";
+import { allowedIn, thumbs, useMe, workspaceOf } from "@portalr/client";
 import {
   CommandButton,
   PageHeader,
+  RuleRunStatus,
+  RunList,
+  type RunParts,
   RunStatus,
   SectionTitle,
-  StatusBadge,
-  Table,
   TextLink,
   Thumbs,
-  type Tone,
 } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
 import { useMemo } from "react";
 import {
   Connection,
@@ -51,101 +50,6 @@ export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/runs")({
 const newest = <R extends { started: number }>(runs: Readonly<Record<string, R>>) =>
   Object.values(runs).sort((a, b) => b.started - a.started);
 
-/** A rule run's status, as ui's badge shows it: a tone and a word. */
-const RULE_RUN: Record<Reflexr.Run["status"], readonly [Tone, string]> = {
-  pending: ["queued", "Queued"],
-  running: ["working", "Running"],
-  retrying: ["queued", "Retrying"],
-  succeeded: ["done", "Succeeded"],
-  dead_lettered: ["failed", "Dead-lettered"],
-  cancelled: ["stopped", "Cancelled"],
-  skipped: ["stopped", "Skipped"],
-};
-
-/** A run's parts, as the table's cells and a phone's card both show them. */
-interface Parts {
-  readonly key: string;
-  /** The row's or card's name. */
-  readonly name: string;
-  readonly status: ReactNode;
-  readonly title: ReactNode;
-  readonly attempts?: number;
-  readonly feedback: ReactNode;
-  readonly actions: ReactNode;
-}
-
-/**
- * Runs as a table, named by its caption, from the small breakpoint; below it, a card for each, its
- * status and title on top, then its attempts and feedback, and its actions in reach.
- */
-function RunList({
-  caption,
-  title,
-  runs,
-  attempts,
-  feedback,
-}: {
-  caption: string;
-  title: string;
-  runs: readonly Parts[];
-  attempts: boolean;
-  feedback: boolean;
-}) {
-  return (
-    <>
-      <div className="max-sm:hidden">
-        <Table caption={caption}>
-          <thead>
-            <tr>
-              <th scope="col">Status</th>
-              <th scope="col">{title}</th>
-              {attempts && <th scope="col">Attempts</th>}
-              {feedback && <th scope="col">Feedback</th>}
-              <th scope="col">
-                <span className="sr-only">Actions</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {runs.map((run) => (
-              <tr key={run.key} aria-label={run.name}>
-                <td>{run.status}</td>
-                <td>{run.title}</td>
-                {attempts && <td className="text-muted tabular-nums">{run.attempts}</td>}
-                {feedback && <td>{run.feedback}</td>}
-                <td>
-                  <span className="flex flex-wrap justify-end gap-2">{run.actions}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      </div>
-      <ul aria-label={caption} className="flex flex-col gap-3 sm:hidden">
-        {runs.map((run) => (
-          <li
-            key={run.key}
-            aria-label={run.name}
-            className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4"
-          >
-            <span className="flex flex-wrap items-center gap-2">
-              {run.status}
-              {run.title}
-            </span>
-            {(attempts || feedback) && (
-              <span className="flex flex-wrap items-center gap-3 text-sm">
-                {attempts && <span className="text-muted">Attempt {run.attempts}</span>}
-                {feedback && run.feedback}
-              </span>
-            )}
-            {run.actions && <span className="flex flex-wrap gap-2">{run.actions}</span>}
-          </li>
-        ))}
-      </ul>
-    </>
-  );
-}
-
 function Runs() {
   const { tenant, workspace } = Route.useParams();
   const { queries, user } = Route.useRouteContext();
@@ -164,7 +68,7 @@ function Runs() {
   const turnFeedback = allowed.has("artifactr:give_feedback");
   const runFeedback = allowed.has("reflexr:give_feedback");
 
-  const turnParts: Parts[] = turnRuns.map((run) => ({
+  const turnParts: RunParts[] = turnRuns.map((run) => ({
     key: run.id,
     name: `Turn ${run.id}`,
     status: <RunStatus status={run.status} />,
@@ -200,8 +104,7 @@ function Runs() {
     ),
   }));
 
-  const ruleParts: Parts[] = ruleRuns.map((run) => {
-    const [tone, words] = RULE_RUN[run.status];
+  const ruleParts: RunParts[] = ruleRuns.map((run) => {
     const retry = run.status === "dead_lettered" && allowed.has("reflexr:retry_run");
     const skip =
       (run.status === "dead_lettered" || run.status === "retrying") &&
@@ -212,11 +115,7 @@ function Runs() {
     return {
       key: run.id,
       name: `Run ${run.id}`,
-      status: (
-        <StatusBadge tone={tone} live>
-          {words}
-        </StatusBadge>
-      ),
+      status: <RuleRunStatus status={run.status} />,
       title: (
         <span className="flex flex-col">
           <code className="font-mono">{run.rule}</code>

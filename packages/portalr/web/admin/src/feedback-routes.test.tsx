@@ -162,8 +162,11 @@ test("the week's thumbs, evaluations and workspaces, from portalr's summary", as
   await expect
     .element(said.getByRole("rowheader", { name: "It missed the deadline" }))
     .toBeVisible();
-  // Not an operator: the trace's id, with no link out.
-  await expect.element(said.getByRole("link")).not.toBeInTheDocument();
+  // Not an operator: the trace's id opens here, and there is no link out to Langfuse.
+  await expect
+    .element(said.getByRole("link", { name: "t_1" }))
+    .toHaveAttribute("href", "/t/acme/traces/t_1");
+  await expect.element(said.getByRole("link", { name: "Langfuse" })).not.toBeInTheDocument();
   const asked = reads.at(-1);
   expect(asked?.has("workspace")).toBe(false);
   expect(new Date(asked?.get("start") ?? "").getUTCHours()).toBe(0);
@@ -184,13 +187,16 @@ test("a workspace and a window go to portalr and into the address", async () => 
     .not.toBeInTheDocument();
 });
 
-test("for an operator, each comment's trace opens in Langfuse", async () => {
+test("for an operator, each comment's trace opens in Langfuse too, beside the one here", async () => {
   operator = true;
   const { screen } = await open("/t/acme/feedback");
-  const link = screen
-    .getByRole("table", { name: "What people said" })
-    .getByRole("link", { name: "t_1" });
-  await expect.element(link).toHaveAttribute("href", "http://langfuse.test/traces/t_1");
+  const said = screen.getByRole("table", { name: "What people said" });
+  await expect
+    .element(said.getByRole("link", { name: "t_1" }))
+    .toHaveAttribute("href", "/t/acme/traces/t_1");
+  await expect
+    .element(said.getByRole("link", { name: "Langfuse" }))
+    .toHaveAttribute("href", "http://langfuse.test/traces/t_1");
   expect(links).toBe(1);
 });
 

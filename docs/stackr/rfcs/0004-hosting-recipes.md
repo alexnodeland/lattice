@@ -214,7 +214,7 @@ Fargate can't mount a checkout, so each service on Fargate whose configuration s
 
 - **Updates.** On the host: check out the new stackr tag, `docker compose pull`, then `up`. On AWS: merge Renovate's digests in `envs/prod`, then `tofu apply`. ECS rolls each service, with its deployment circuit breaker rolling back a deployment whose tasks fail. Langfuse, LiteLLM and the application migrate their databases when they start, as they do now.
 - **Backups on the host.** pgBackRest takes full and incremental backups of PostgreSQL to an S3 bucket, with its WAL archived, so it can restore to a point in time. ClickHouse's native `BACKUP ... TO S3` copies ClickHouse to the same bucket, run nightly by a systemd timer like pgBackRest's. Its bucket and credentials come from `.env` into a named collection in ClickHouse's configuration, so no key is written in the `BACKUP` statement. The bucket is any S3-compatible store off the host. Prometheus's data is not backed up: it is 15 days of metrics.
-- **Backups on AWS.** RDS takes automated backups with point-in-time restore. DLM snapshots the state host's volume daily, which covers ClickHouse and Prometheus.
+- **Backups on AWS.** RDS takes automated backups with point-in-time restore. DLM snapshots the state host's volume daily, which covers ClickHouse and Prometheus. Amended by [ADR-0037](../adr/0037-the-state-hosts-clickhouse-backups.md): ClickHouse is also backed up with `BACKUP ... TO S3` each night, and the backup is restored in a weekly drill.
 - **The restore drill.** On the host, a weekly systemd timer runs `deploy/host/restore-drill`: it restores the latest backups into new containers beside the stack, checks that the application's tables and Langfuse's traces are there, and sends the result as a metric to the Collector. A Grafana alert fires when the drill hasn't passed in eight days. On AWS, an operator runs the drill by hand at each upgrade: a point-in-time RDS restore and a volume from the latest snapshot, with the same checks.
 - **The hosted stack observes itself.** The Collector's health dashboard already shows whether each service is up. On AWS, container logs also go to CloudWatch Logs, with a short retention, for when the Collector itself is down.
 
@@ -225,7 +225,7 @@ Floci emulates AWS's APIs locally. Some services only record what they are given
 | Service | Emulated | Tested how |
 |---|---|---|
 | VPC, subnets, route tables | Yes. Each VPC is a Docker network | Applied in tier 2 |
-| Security groups | Yes, filtered when `FLOCI_NETWORK_SECURITY_GROUP_ENFORCEMENT_ENABLED` is set | Tier 2 sets it, so the smoke only passes through the rules |
+| Security groups | Yes, filtered when `FLOCI_NETWORK_SECURITY_GROUP_ENFORCEMENT_ENABLED` is set | Not in tier 2, which leaves enforcement off ([ADR-0025](../adr/0025-what-the-floci-spike-found.md), [ADR-0036](../adr/0036-tier-2-against-floci.md)): tier 1's tests and checkov check the rules, and the manual apply checks them on AWS |
 | NAT gateway | A record only | Applied, not used |
 | ALB, target groups, host-header rules | Yes, real HTTP listeners | Tier 2's smoke, over HTTP, with each host's Host header |
 | ACM | Issued at once | The HTTPS listener names its ARN, which Floci checks exists |
@@ -256,10 +256,10 @@ Floci emulates AWS's APIs locally. Some services only record what they are given
    - `FLOCI_SERVICES_ECS_DOCKER_NETWORK`, a network the job creates;
    - `FLOCI_SERVICES_ECS_TASK_ROLE_CREDENTIALS_ENABLED`, which needs that user-defined network and Floci's network-helper image, so tasks get their roles' credentials;
    - `FLOCI_SERVICES_RDS_DEFAULT_POSTGRES_IMAGE`, PostgreSQL 17, since Floci's default is 16;
-   - `FLOCI_NETWORK_SECURITY_GROUP_ENFORCEMENT_ENABLED`.
+   - `FLOCI_NETWORK_SECURITY_GROUP_ENFORCEMENT_ENABLED`, which [ADR-0025](../adr/0025-what-the-floci-spike-found.md) and [ADR-0036](../adr/0036-tier-2-against-floci.md) amend: tier 2 leaves it off.
 2. `tofu test` applies `envs/floci`.
-3. The smoke runs through the ALB: HTTP, with the application's Host header and `auth.<host>`'s. A user signs in through GoTrue, a request without a token is refused, and an agent's turn completes.
-4. `psql` through RDS's relay finds the application's schema, its role that owns nothing, and the row-level security policies.
+3. The smoke runs through the ALB: HTTP, with the application's Host header and `auth.<host>`'s. A user signs in through GoTrue, a request without a token is refused, and an agent's turn completes. Amended by [ADR-0036](../adr/0036-tier-2-against-floci.md): a request without a token is refused, and a trace sent to the Collector is found in Tempo; GoTrue through its proxy, the sign-in and the agent's turn wait on what ADR-0036 lists.
+4. `psql` through RDS's relay finds the application's schema, its role that owns nothing, and the row-level security policies. Amended by [ADR-0036](../adr/0036-tier-2-against-floci.md): it finds the schema as each of the application's roles; the role that owns nothing and the policies come next.
 5. The turn's trace is found in Tempo.
 6. `tofu test` destroys everything, and the job ends with Floci's containers removed.
 
@@ -320,7 +320,7 @@ The maintainer decided H1 to H5, H12 and H15 on 2026-10-12, and H13's state buck
 | H9 | Configuration on Fargate | Thin per-service images, built in CI's Images job; the hosts mount their checkout | Files in S3 or SSM, copied by an init container |
 | H10 | Where the thin images live | GHCR, public, published at each stackr release, with digests moved by Renovate | ECR, a private registry to manage per account |
 | H11 | Secrets | Ephemeral `random_password` written to Secrets Manager with write-only arguments; RDS's own master password. Deletion guarded by variables, not `prevent_destroy` | SSM SecureString parameters; secrets in an encrypted state |
-| H12 | Backups | On the host, pgBackRest, and ClickHouse's native `BACKUP ... TO S3`, with a restore drill. On AWS, RDS's own backups and DLM snapshots | WAL-G; clickhouse-backup |
+| H12 | Backups | On the host, pgBackRest, and ClickHouse's native `BACKUP ... TO S3`, with a restore drill. On AWS, RDS's own backups and DLM snapshots, and, by [ADR-0037](../adr/0037-the-state-hosts-clickhouse-backups.md), ClickHouse's native backups and drill on the state host | WAL-G; clickhouse-backup |
 | H13 | Tooling and layout | OpenTofu 1.13 and tflint in `.prototools`, the AWS provider at `~> 6.68`, the S3 backend with `use_lockfile`, one bucket per account and one key per deployment; the modules `network`, `edge`, `data`, `secrets`, `ecs-service`, `state-host` and `stack`, shared by `envs/prod` and `envs/floci` | Terraform, under its business source licence; one root per environment with no shared modules |
 | H14 | Floci's version | `floci/floci:2.2.0`, by digest | A tag |
 | H15 | Where GoTrue is served | Its own subdomain, `auth.<host>`, at its root | `/auth/v1` on the application's host, with the prefix stripped or rewritten at the edge |
@@ -335,7 +335,7 @@ The maintainer decided H1 to H5, H12 and H15 on 2026-10-12, and H13's state buck
 | 1. Spike | A throwaway root against Floci, for each item in [the spike](#the-first-phase-spike) | Every item has an answer, recorded in an ADR |
 | 2. Single host | The `auth` profile, `scripts/auth-keys`, `AUTH_ADMIN_URL`, `deploy/host/` with the overlay, the Caddyfile, PostgreSQL's image with pgBackRest, the backups and `restore-drill`, the CI job, and the template's `hosting: host` | CI brings the stack up with the overlay behind Caddy on a local CA, and `make smoke` and `make smoke-app` pass through it on the `postgres` adapter. The restore drill passes in the same job, against MinIO. An application generated with `hosting: host` passes its CI |
 | 3. AWS modules and tier 1 | The thin images and the Images job, the seven modules, `envs/prod` and `envs/floci`, OpenTofu and tflint in `.prototools`, and tier 1 | Tier 1 passes on a pull request that touches `deploy/aws/**`, and each of checkov's findings is fixed, or skipped with its reason in checkov's configuration |
-| 4. Tier 2 | The Docker-mode apply, the smoke through the ALB, `psql` through the relay, the trace in Tempo, destroy, and the template's `hosting: aws` | Tier 2 passes on a pull request that changes the recipe, and leaves nothing behind. An application generated with `hosting: aws` passes its CI |
+| 4. Tier 2 | The Docker-mode apply, the smoke through the ALB, `psql` through the relay, the trace in Tempo, destroy, and the template's `hosting: aws` | Tier 2 passes on a pull request that changes the recipe, and leaves nothing behind. An application generated with `hosting: aws` passes its CI. Amended by [ADR-0036](../adr/0036-tier-2-against-floci.md), which records what Floci 2.2.0 can't smoke |
 | 5. Docs, ADRs and the gate | The hosting guides, ADRs that record the decisions grouped by area (the hosts, AWS's layout, secrets, backups, CI), beside the spike's ADRs, the release step that publishes the thin images, and the manual apply on real AWS | A real AWS apply passes the smoke over HTTPS, then destroys, before stackr's v0.1 is tagged |
 
 Phase 2 and phase 3 are independent after the spike. Phase 4 needs 3.
@@ -372,5 +372,5 @@ Tracked in [#103](https://github.com/alexnodeland/lattice/issues/103).
 - [ ] Phase 1: spike
 - [ ] Phase 2: single host
 - [ ] Phase 3: AWS modules and tier 1
-- [ ] Phase 4: tier 2
+- [ ] Phase 4: tier 2. Partly met: tier 2 passes in CI and leaves nothing behind ([ADR-0036](../adr/0036-tier-2-against-floci.md)); the template's `hosting: aws` is still to come
 - [ ] Phase 5: docs, ADRs and the gate

@@ -25,6 +25,8 @@ module "data" {
   # The same token as Valkey's secret, from the same ephemeral password (secrets.tf).
   valkey_auth_token     = ephemeral.random_password.valkey.result
   force_destroy_buckets = var.destroyable
+
+  clickhouse_backup_retention_days = var.clickhouse_backup_retention_days
 }
 
 module "edge" {
@@ -59,17 +61,19 @@ resource "aws_service_discovery_private_dns_namespace" "this" {
 }
 
 module "state_host" {
-  source                               = "../state-host"
-  count                                = var.state_host == "ec2" ? 1 : 0
-  name                                 = var.name
-  subnet_id                            = module.network.private_subnet_ids[0]
-  private_ip                           = cidrhost(module.network.private_subnet_cidrs[0], 10)
-  vpc_id                               = module.network.vpc_id
-  namespace_id                         = aws_service_discovery_private_dns_namespace.this.id
-  clickhouse_password_secret_arn       = module.secrets.arns["clickhouse-password"]
-  clickhouse_admin_password_secret_arn = module.secrets.arns["clickhouse-admin-password"]
-  lattice_commit                       = var.lattice_commit
-  ami_id                               = var.ami_id
-  instance_type                        = var.state_host_instance_type
-  final_snapshot                       = !var.destroyable
+  source                                = "../state-host"
+  count                                 = var.state_host == "ec2" ? 1 : 0
+  name                                  = var.name
+  subnet_id                             = module.network.private_subnet_ids[0]
+  private_ip                            = cidrhost(module.network.private_subnet_cidrs[0], 10)
+  vpc_id                                = module.network.vpc_id
+  namespace_id                          = aws_service_discovery_private_dns_namespace.this.id
+  clickhouse_password_secret_arn        = module.secrets.arns["clickhouse-password"]
+  clickhouse_admin_password_secret_arn  = module.secrets.arns["clickhouse-admin-password"]
+  clickhouse_backup_password_secret_arn = module.secrets.arns["clickhouse-backup-password"]
+  backups_bucket                        = module.data.buckets["backups"]
+  lattice_commit                        = var.lattice_commit
+  ami_id                                = var.ami_id
+  instance_type                         = var.state_host_instance_type
+  final_snapshot                        = !var.destroyable
 }

@@ -315,9 +315,10 @@ run "stack_the_state_host_on_fargate_for_floci" {
   assert {
     condition = (
       !contains(keys(module.secrets.arns), "clickhouse-admin-password")
+      && !contains(keys(module.secrets.arns), "clickhouse-backup-password")
       && module.state_services["clickhouse"].containers[0].environment == [{ name = "CLICKHOUSE_USER", value = "langfuse" }]
     )
-    error_message = "Floci's ClickHouse has Langfuse's user alone, and no admin, so no admin's password."
+    error_message = "Floci's ClickHouse has Langfuse's user alone, and no admin or backup user, so neither's password."
   }
 }
 
@@ -352,18 +353,19 @@ run "stack_each_secret_reaches_the_services_that_read_it" {
     target = module.secrets
     outputs = {
       arns = {
-        langfuse-salt             = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-salt-AAAAAA"
-        langfuse-encryption-key   = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-encryption-key-AAAAAA"
-        langfuse-nextauth-secret  = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-nextauth-secret-AAAAAA"
-        langfuse-admin-password   = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-admin-password-AAAAAA"
-        litellm-master-key        = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/litellm-master-key-AAAAAA"
-        litellm-salt-key          = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/litellm-salt-key-AAAAAA"
-        grafana-admin-password    = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/grafana-admin-password-AAAAAA"
-        gotrue-jwt-secret         = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/gotrue-jwt-secret-AAAAAA"
-        clickhouse-password       = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-password-AAAAAA"
-        clickhouse-admin-password = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-password-AAAAAA"
-        auth-jwt-keys             = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-jwt-keys-AAAAAA"
-        auth-service-role-key     = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-service-role-key-AAAAAA"
+        langfuse-salt              = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-salt-AAAAAA"
+        langfuse-encryption-key    = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-encryption-key-AAAAAA"
+        langfuse-nextauth-secret   = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-nextauth-secret-AAAAAA"
+        langfuse-admin-password    = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/langfuse-admin-password-AAAAAA"
+        litellm-master-key         = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/litellm-master-key-AAAAAA"
+        litellm-salt-key           = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/litellm-salt-key-AAAAAA"
+        grafana-admin-password     = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/grafana-admin-password-AAAAAA"
+        gotrue-jwt-secret          = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/gotrue-jwt-secret-AAAAAA"
+        clickhouse-password        = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-password-AAAAAA"
+        clickhouse-admin-password  = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-password-AAAAAA"
+        clickhouse-backup-password = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-backup-password-AAAAAA"
+        auth-jwt-keys              = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-jwt-keys-AAAAAA"
+        auth-service-role-key      = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/auth-service-role-key-AAAAAA"
       }
     }
   }
@@ -410,10 +412,11 @@ run "stack_each_secret_reaches_the_services_that_read_it" {
   }
   assert {
     condition = module.state_host[0].secret_arns == {
-      clickhouse_password       = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-password-AAAAAA"
-      clickhouse_admin_password = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-password-AAAAAA"
+      clickhouse_password        = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-password-AAAAAA"
+      clickhouse_admin_password  = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-password-AAAAAA"
+      clickhouse_backup_password = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-backup-password-AAAAAA"
     }
-    error_message = "The state host reads ClickHouse's two passwords."
+    error_message = "The state host reads ClickHouse's three passwords: Langfuse's, the admin's and the backup user's."
   }
   assert {
     condition = (

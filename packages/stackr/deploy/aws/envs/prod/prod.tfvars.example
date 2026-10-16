@@ -41,3 +41,7 @@ application = {
 
 gateway_providers = ["anthropic"]
 # langfuse_admin_email = "ops@example.com"
+
+# How many days ClickHouse's nightly backups are kept in the backups bucket (14 by default): whole
+# each night, so their size times this is what they cost. The restore drill's own are kept 7.
+# clickhouse_backup_retention_days = 14

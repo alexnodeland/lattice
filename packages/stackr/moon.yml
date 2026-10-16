@@ -85,6 +85,8 @@ tasks:
     inputs:
       - 'deploy/aws/**/*'
       - 'deploy/host/compose.prod.yaml'
+      - 'deploy/host/clickhouse/backup-user.xml'
+      - 'deploy/clickhouse/users.xml'
       - 'deploy/image-archive'
       - 'deploy/otel-collector/**/*'
       - 'deploy/tempo/**/*'

@@ -449,6 +449,65 @@ for secret in database-app database-app-owner; do
   fi
 done
 
+step "ClickHouse's backups and their drill, as the state host runs them (ADR-0037)"
+# Floci can't run the EC2 state host, so ClickHouse here is a Fargate task without its config
+# files. This starts the state host's own ClickHouse image with its own config files (the users,
+# the `backup` user and the `backups` collection) on the run's network, points the collection at
+# the backups bucket the apply made, in Floci's S3, and runs the state host's own backup and
+# restore-drill. Floci's static keys stand in for the role's credentials, and the metrics go to
+# the Prometheus Floci runs. What this can't run: IMDS, IAM's enforcement, systemd, or the rules
+# that alert on the metrics (tests/test_stackr_state_backups.py and promtool run them).
+state_dir=$stackr/deploy/aws/state-host
+clickhouse_image=$(sed -n 's|^ *image: \(clickhouse/clickhouse-server:.*\)$|\1|p' "$state_dir/compose.yaml" | head -1)
+[[ -n $clickhouse_image ]] || fail "state-host/compose.yaml pins no ClickHouse"
+bucket=$(tofu -chdir=envs/floci output -no-color -state="$state" -raw backups_bucket)
+state_clickhouse=$network-state-clickhouse
+admin_password=$(openssl rand -hex 12)
+backup_password=$(openssl rand -hex 12)
+docker run --detach --name "$state_clickhouse" --label "$label" --network "$network" \
+  --env CLICKHOUSE_SKIP_USER_SETUP=1 --env CLICKHOUSE_ADMIN_PASSWORD="$admin_password" \
+  --env CLICKHOUSE_LANGFUSE_PASSWORD="$(openssl rand -hex 12)" --env CLICKHOUSE_BACKUP_PASSWORD="$backup_password" \
+  --env CLICKHOUSE_BACKUP_URL="http://floci:4566/$bucket/" \
+  --volume "$stackr/deploy/clickhouse/users.xml:/etc/clickhouse-server/users.d/users.xml:ro" \
+  --volume "$stackr/deploy/host/clickhouse/backup-user.xml:/etc/clickhouse-server/users.d/backup-user.xml:ro" \
+  --volume "$state_dir/clickhouse/backups.xml:/etc/clickhouse-server/config.d/backups.xml:ro" \
+  "$clickhouse_image" >>"$work/containers"
+for _ in $(seq 60); do
+  docker exec "$state_clickhouse" clickhouse-client --user admin --password "$admin_password" --query 'SELECT 1' \
+    >/dev/null 2>&1 && break
+  sleep 2
+done
+# Langfuse's tables, as live data for the drill to find again in the restore.
+live=$(printf '%s;\n' "CREATE TABLE default.traces (id UInt32, body String) ENGINE = MergeTree ORDER BY id" \
+  "INSERT INTO default.traces SELECT number, 'tier2' FROM numbers(1000)" |
+  docker exec -i "$state_clickhouse" clickhouse-client --user admin --password "$admin_password" --multiquery 2>&1) ||
+  fail "ClickHouse for the backups: $live"
+read -ra via_network <<<"docker run --rm --interactive --label $label --network $network --dns $floci_dns $curl_image"
+state_scripts=(env STATE_CLICKHOUSE_CONTAINER="$state_clickhouse" STATE_BACKUP_CREDENTIALS=env
+  STATE_PROMETHEUS_URL=http://prometheus.stackr.internal:9090 STATE_CURL="${via_network[*]}")
+for script in backup restore-drill; do
+  if "${state_scripts[@]}" "$state_dir/$script" 2>"$work/$script.log"; then
+    echo "ok: the state host's $script"
+  else
+    cat "$work/$script.log" >&2
+    fail "the state host's $script"
+  fi
+done
+for metric in stackr_backup_success stackr_restore_drill_success; do
+  value=""
+  for _ in $(seq 15); do
+    value=$(ask --get --data-urlencode "query=$metric" http://prometheus.stackr.internal:9090/api/v1/query </dev/null |
+      jq --raw-output '.data.result[0].value[1] // empty' || true)
+    [[ -n $value ]] && break
+    sleep 2
+  done
+  if [[ $value == 1 ]]; then
+    echo "ok: $metric is 1 in Prometheus"
+  else
+    fail "$metric in Prometheus: '${value:-none}', not 1"
+  fi
+done
+
 step "Destroy"
 if destroy; then
   echo "ok: destroyed"

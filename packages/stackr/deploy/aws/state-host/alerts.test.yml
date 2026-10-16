@@ -1,0 +1,153 @@
+# promtool's tests of alerts.yml (deploy/aws/check runs them): each alert fires on a 0 and on a
+# metric that is missing for its window, and none fires on a metric that is 1.
+rule_files:
+  - alerts.yml
+evaluation_interval: 5m
+
+tests:
+  - name: healthy
+    interval: 1h
+    input_series:
+      - series: 'stackr_backup_success{job="stackr-state-backup"}'
+        values: "1x100"
+      - series: 'stackr_restore_drill_success{job="stackr-state-restore-drill"}'
+        values: "1x200"
+    alert_rule_test:
+      - eval_time: 100h
+        alertname: stackr-backup-missing
+        exp_alerts: []
+      - eval_time: 100h
+        alertname: stackr-backup-failed
+        exp_alerts: []
+      - eval_time: 100h
+        alertname: stackr-restore-drill
+        exp_alerts: []
+      - eval_time: 100h
+        alertname: stackr-restore-drill-failed
+        exp_alerts: []
+
+  - name: a failed backup and a failed drill, the latest of each
+    interval: 1h
+    input_series:
+      # Succeeded for a day, then failed: the latest failed, and one succeeded within 36 hours.
+      - series: 'stackr_backup_success{job="stackr-state-backup"}'
+        values: "1x24 0x6"
+      - series: 'stackr_restore_drill_success{job="stackr-state-restore-drill"}'
+        values: "1x24 0x6"
+    alert_rule_test:
+      - eval_time: 30h
+        alertname: stackr-backup-failed
+        exp_alerts:
+          - exp_labels: {job: stackr-state-backup}
+            exp_annotations:
+              summary: >-
+                The latest backup failed. Run `sudo systemctl start stackr-state-backup`, and read its
+                output with `journalctl -u stackr-state-backup`.
+      - eval_time: 30h
+        alertname: stackr-backup-missing
+        exp_alerts: []
+      - eval_time: 30h
+        alertname: stackr-restore-drill-failed
+        exp_alerts:
+          - exp_labels: {job: stackr-state-restore-drill}
+            exp_annotations:
+              summary: >-
+                The latest restore drill failed. Run `sudo systemctl start stackr-state-restore-drill`,
+                and read its output with `journalctl -u stackr-state-restore-drill`.
+      - eval_time: 30h
+        alertname: stackr-restore-drill
+        exp_alerts: []
+
+  - name: nothing has succeeded in the window
+    interval: 1h
+    input_series:
+      - series: 'stackr_backup_success{job="stackr-state-backup"}'
+        values: "0x100"
+      - series: 'stackr_restore_drill_success{job="stackr-state-restore-drill"}'
+        values: "0x250"
+    alert_rule_test:
+      - eval_time: 100h
+        alertname: stackr-backup-missing
+        exp_alerts:
+          - exp_labels: {job: stackr-state-backup}
+            exp_annotations:
+              summary: >-
+                No backup has succeeded in 36 hours. Run `sudo systemctl start stackr-state-backup`,
+                and read its output with `journalctl -u stackr-state-backup`.
+      - eval_time: 240h
+        alertname: stackr-restore-drill
+        exp_alerts:
+          - exp_labels: {job: stackr-state-restore-drill}
+            exp_annotations:
+              summary: >-
+                The restore drill hasn't passed in eight days. Run
+                `sudo systemctl start stackr-state-restore-drill`, and read its output with
+                `journalctl -u stackr-state-restore-drill`.
+
+  - name: a backup that stopped arriving
+    interval: 1h
+    input_series:
+      # A backup every night for two days, then silence: after 36 hours with no sample of any
+      # kind, "missing" fires, though the last value was a 1.
+      - series: 'stackr_backup_success{job="stackr-state-backup"}'
+        values: "1x48 _x60"
+    alert_rule_test:
+      - eval_time: 80h
+        alertname: stackr-backup-missing
+        exp_alerts: []
+      - eval_time: 100h
+        alertname: stackr-backup-missing
+        exp_alerts:
+          - exp_labels: {}
+            exp_annotations:
+              summary: >-
+                No backup has succeeded in 36 hours. Run `sudo systemctl start stackr-state-backup`,
+                and read its output with `journalctl -u stackr-state-backup`.
+
+  - name: a weekly drill that is not yet due, and then one that is overdue
+    interval: 1h
+    input_series:
+      # The drill passed once, and reports only weekly: four days later it is not overdue, and
+      # after eight days with no sample, it is.
+      - series: 'stackr_restore_drill_success{job="stackr-state-restore-drill"}'
+        values: "1 _x250"
+    alert_rule_test:
+      - eval_time: 100h
+        alertname: stackr-restore-drill
+        exp_alerts: []
+      - eval_time: 200h
+        alertname: stackr-restore-drill
+        exp_alerts:
+          - exp_labels: {}
+            exp_annotations:
+              summary: >-
+                The restore drill hasn't passed in eight days. Run
+                `sudo systemctl start stackr-state-restore-drill`, and read its output with
+                `journalctl -u stackr-state-restore-drill`.
+
+  - name: a new state host, which has reported nothing yet
+    interval: 1h
+    input_series:
+      - series: 'up{job="prometheus"}'
+        values: "1x10"
+    alert_rule_test:
+      - eval_time: 5h
+        alertname: stackr-backup-missing
+        exp_alerts:
+          - exp_labels: {}
+            exp_annotations:
+              summary: >-
+                No backup has succeeded in 36 hours. Run `sudo systemctl start stackr-state-backup`,
+                and read its output with `journalctl -u stackr-state-backup`.
+      - eval_time: 5h
+        alertname: stackr-restore-drill
+        exp_alerts:
+          - exp_labels: {}
+            exp_annotations:
+              summary: >-
+                The restore drill hasn't passed in eight days. Run
+                `sudo systemctl start stackr-state-restore-drill`, and read its output with
+                `journalctl -u stackr-state-restore-drill`.
+      - eval_time: 5h
+        alertname: stackr-backup-failed
+        exp_alerts: []

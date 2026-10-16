@@ -117,3 +117,41 @@ test("a chart's series stand out from the surface, and from the paper, where pag
     }
   }
 });
+
+test("the danger colour is the status red: one red for a failed run and a destructive action", () => {
+  expect(token("danger")).toBe(token("status-failed"));
+});
+
+test("the status colours stand out from the surface and the paper, as marks", () => {
+  for (const status of ["status-failed", "status-warn"]) {
+    for (const ground of GROUNDS) {
+      expect(contrast(token(status), token(ground)), `${status} on ${ground}`).toBeGreaterThanOrEqual(3);
+    }
+  }
+});
+
+test("red and gold differ in lightness, and not in hue alone", () => {
+  expect(luminance(token("status-warn")) - luminance(token("status-failed"))).toBeGreaterThan(0.1);
+});
+
+test("the status colours are told apart from each other and from the chart accent, to every reader", () => {
+  const colours = [token("status-failed"), token("status-warn"), token("chart-3")];
+  expect(closest(colours)).toBeGreaterThanOrEqual(APART);
+  for (const deficiency of DEFICIENCIES) {
+    expect(closest(colours, deficiency), deficiency).toBeGreaterThanOrEqual(APART);
+  }
+});
+
+test("colour-blind mode leaves the status colours holding their floors, with its own chart inks", () => {
+  const screen = cvd();
+  const status = [token("status-failed", screen), token("status-warn", screen)];
+  for (const colour of status) {
+    for (const ground of GROUNDS) {
+      expect(contrast(colour, token(ground))).toBeGreaterThanOrEqual(3);
+    }
+  }
+  expect(closest(status)).toBeGreaterThanOrEqual(APART);
+  for (const deficiency of DEFICIENCIES) {
+    expect(closest(status, deficiency), deficiency).toBeGreaterThanOrEqual(APART);
+  }
+});

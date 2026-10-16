@@ -27,8 +27,18 @@
   --focus: light-dark(#6b2fa0, #a77bdf);
   /* A control's boundary: 3:1 or more on every surface, as WCAG asks of one. */
   --edge: light-dark(#857a97, #7d7091);
-  /* What a destructive action is in, and nothing else: deleting, removing, revoking, archiving. */
-  --danger: light-dark(#9b1c3c, #ff9fb2);
+  /*
+   * Status, as marks and never as text: a rose red for what failed, was dead-lettered or is an
+   * error, and a gold for what is retrying or a warning; what succeeded stays neutral (--muted).
+   * Each is 3:1 or more on the paper and the surface, the pair differ in lightness as well as hue,
+   * and each is 20 or more, to CIEDE2000, from the other and from the chart accent, to a reader who
+   * sees every colour and to one who does not (a token test holds all of it). A status is always
+   * a shape and a word as well (portalr ADR-0039).
+   */
+  --status-failed: light-dark(#8a0f2c, #f391b1);
+  --status-warn: light-dark(#9c821c, #f9e890);
+  /* What a destructive action is in: the same red, so a failed run and a delete read as one thing. */
+  --danger: var(--status-failed);
   --on-danger: light-dark(#ffffff, #17111f);
   --danger-hover: color-mix(in srgb, var(--danger) 88%, var(--on-danger));
   /*
@@ -85,4 +95,14 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+}
+
+/*
+ * Colour-blind mode (`data-cvd`, portalr ADR-0036) keeps the status hues, which already hold their
+ * floors to every reader; these are here so a mode that must change them changes them in one
+ * place, as it changes the chart's inks.
+ */
+[data-cvd] {
+  --status-failed: light-dark(#8a0f2c, #f391b1);
+  --status-warn: light-dark(#9c821c, #f9e890);
 }

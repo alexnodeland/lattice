@@ -14,7 +14,7 @@ import { Table } from "./table";
 const RULE_RUN: Record<Reflexr.Run["status"], readonly [Tone, string]> = {
   pending: ["queued", "Queued"],
   running: ["working", "Running"],
-  retrying: ["queued", "Retrying"],
+  retrying: ["retrying", "Retrying"],
   succeeded: ["done", "Succeeded"],
   dead_lettered: ["failed", "Dead-lettered"],
   cancelled: ["stopped", "Cancelled"],

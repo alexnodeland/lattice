@@ -33,6 +33,8 @@
   --color-edge: var(--edge);
   --color-scrim: var(--scrim);
   --color-danger: var(--danger);
+  --color-status-failed: var(--status-failed);
+  --color-status-warn: var(--status-warn);
   --color-on-danger: var(--on-danger);
   --color-danger-hover: var(--danger-hover);
   --color-wash: var(--wash);

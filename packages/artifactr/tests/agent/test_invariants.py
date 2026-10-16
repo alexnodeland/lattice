@@ -748,7 +748,6 @@ async def test_i3_a_claim_granted_as_its_send_is_cancelled_is_released(
     assert script.requests, "its hand-over took the message"
 
 
-@pytest.mark.xfail(strict=True, reason="#251: a send cancelled before it claims hands nothing over")
 async def test_i3_a_send_cancelled_between_its_ask_and_its_claim_is_handed_over(
     storage: Storage, ws: Workspace, thread: Thread, runners: MakeRunner
 ) -> None:
@@ -757,6 +756,22 @@ async def test_i3_a_send_cancelled_between_its_ask_and_its_claim_is_handed_over(
     reading = hold(storage, "cursor")  # _take's first read, once the ask is saved
     sending = asyncio.create_task(runner.send(ws, thread.id, "Plan the launch"))
     await _entered(reading)
+    sending.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await sending
+    await settled(thread.id, runner)
+    assert script.requests, "handed over, not left for the next command"
+
+
+async def test_i3_a_send_cancelled_as_its_ask_is_saved_is_handed_over(
+    storage: Storage, ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    script = Script(*[say("ok")] * 2)
+    runner = runners(make_agent(script))
+    # The ask is saved, and the call cancelled after, as storage runs its calls to the end.
+    asking = hold(storage, "save_cursor", after=True)
+    sending = asyncio.create_task(runner.send(ws, thread.id, "Plan the launch"))
+    await _entered(asking)
     sending.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await sending

@@ -425,40 +425,49 @@ class Runner[AppDepsT]:
         refuses this claim sees it when it releases the thread, and hands the thread over.
         ``runner`` is a handle acting as the Runner, as every handle from here on is.
         """
-        await runner.save_cursor(_asked(thread_id), seq or 0)
-        return await self._take(runner, thread_id, trace.get_current_span().get_span_context())
+        caller = trace.get_current_span().get_span_context()
+        return await self._take(runner, thread_id, caller, ask=seq or 0)
 
     async def _take(
-        self, workspace: Workspace, thread_id: ThreadId, caller: SpanContext | None
+        self,
+        workspace: Workspace,
+        thread_id: ThreadId,
+        caller: SpanContext | None,
+        *,
+        ask: int | None = None,
     ) -> RunHandle | None:
         """Start the turn the thread was asked for and no run has taken, if it is free.
 
-        A claimant that starts nothing looks again once it has released the thread, since a
-        command it refused meanwhile relies on it. Each round starts a turn, finds nothing
-        asked, finds the thread busy, or records what it found as taken, so it ends. One that
-        is cancelled or fails holding the thread hands it over as it propagates, as a run does.
-        The turn links to ``caller``, or else to where the message or answer it carries out
-        was committed.
+        With ``ask``, it first saves that the log up to that ``seq`` asks for a turn. A claimant
+        that starts nothing looks again once it has released the thread, since a command it
+        refused meanwhile relies on it. Each round starts a turn, finds nothing asked, finds the
+        thread busy, or records what it found as taken, so it ends. One that is cancelled or
+        fails from its ask on hands the thread over as it propagates, as a run does, with what
+        it read: storage may have saved the ask of a call cut short. The turn links to
+        ``caller``, or else to where the message or answer it carries out was committed.
         """
-        while not self._closed:
-            taken = await _taken_seq(workspace, thread_id)
-            asked = await workspace.cursor(_asked(thread_id))
-            if asked <= taken:
-                return None
-            try:
+        taken = asked = 0  # what it read of the cursors: nothing yet
+        try:
+            if ask is not None:
+                await workspace.save_cursor(_asked(thread_id), ask)
+            while not self._closed:
+                taken = await _taken_seq(workspace, thread_id)
+                asked = await workspace.cursor(_asked(thread_id))
+                if asked <= taken:
+                    return None
                 handle = await self._start(workspace, thread_id, caller)
-            except ThreadBusy:
-                return None  # its holder hands the thread over as it releases it
-            except (asyncio.CancelledError, Exception):  # the claim is released
-                # A CancelledError raised while no one cancels the claimant, as a storage call's
-                # own cancellation can be, is a failure like any other.
-                claimant = asyncio.current_task()
-                assert claimant is not None, "a claimant is a task"
-                cancelled = claimant.cancelling() > 0
-                self._hand_over(workspace, thread_id, taken=taken, asked=asked, cancelled=cancelled)
-                raise
-            if handle is not None:
-                return handle
+                if handle is not None:
+                    return handle
+        except ThreadBusy:
+            return None  # its holder hands the thread over as it releases it
+        except (asyncio.CancelledError, Exception):  # any claim is released
+            # A CancelledError raised while no one cancels the claimant, as a storage call's
+            # own cancellation can be, is a failure like any other.
+            claimant = asyncio.current_task()
+            assert claimant is not None, "a claimant is a task"
+            cancelled = claimant.cancelling() > 0
+            self._hand_over(workspace, thread_id, taken=taken, asked=asked, cancelled=cancelled)
+            raise
         return None
 
     async def _start(

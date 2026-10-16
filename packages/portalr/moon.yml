@@ -42,12 +42,27 @@ tasks:
     options:
       mergeInputs: 'replace'
 
+  # The licence policy's exceptions (web/notices/policy.json), each still needed by a package in
+  # one of the two bundles: read from the notices their builds wrote (portalr ADR-0033).
+  licence-exceptions:
+    description: "Fail on an exception to the licence policy that no bundled package needs"
+    command: 'bun run --bun web/notices/scripts/exceptions.ts'
+    inputs:
+      - 'web/notices/policy.json'
+      - 'web/notices/src/**/*'
+      - 'web/notices/scripts/*'
+      - 'src/portalr/static/*/THIRD-PARTY-NOTICES.txt'
+    deps:
+      - 'app:build'
+      - 'admin:build'
+
   ui-in-wheel:
-    description: "Check that the built wheel carries both UIs"
+    description: "Check that the built wheel carries both UIs, and their third-party notices"
     command: 'uv run --no-project python scripts/check_wheel.py'
     inputs: ['scripts/check_wheel.py']
     deps:
       - 'build'
+      - 'licence-exceptions'
   standalone:
     inputs: ['@group(python)', '/scripts/standalone.py']
     options:

@@ -688,7 +688,7 @@ export function createQueries(api: Api) {
       /**
        * An operator's links into Langfuse and Grafana for the ids given. Each read is one that the
        * server records, so it is never kept: not fresh, not cached once nothing shows it, and not
-       * read again on focus or by a retry.
+       * read again on focus, on reconnecting, or by a retry.
        */
       toolLinks: (user: string, ids: ToolIds) =>
         queryOptions({
@@ -710,6 +710,7 @@ export function createQueries(api: Api) {
           gcTime: 0,
           retry: false,
           refetchOnWindowFocus: false,
+          refetchOnReconnect: false,
         }),
       /**
        * Every tenant, with their spend, for an operator; null for anyone else, whom it's refused,

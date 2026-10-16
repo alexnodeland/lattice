@@ -535,3 +535,50 @@ def test_a_tenants_links_name_the_tenant_as_each_tool_reads_it() -> None:
     assert jsonlib.loads(logs)["queries"][0]["expr"] == '{service_name=~".+"} | tenant_id = "a\\"b"'
     traces = parse_qs(urlparse(grafana.tenant_traces_link("acme")).query)["left"][0]
     assert jsonlib.loads(traces)["queries"][0]["query"] == '{ span.tenant.id = "acme" }'
+
+
+def _langfuse_decoded(link: str) -> list[dict[str, str | list[str]]]:
+    """A Langfuse traces link's ``filter``, decoded as Langfuse 4.46.0's ``filterQueryEncoding.ts``
+    does: split on commas, then semicolons, percent-decode each part, then split an array's value
+    on the pipes that aren't escaped and unescape each."""
+    from urllib.parse import unquote
+
+    (query,) = parse_qs(urlparse(link).query)["filter"]
+    filters: list[dict[str, str | list[str]]] = []
+    for each in query.split(","):
+        column, kind, key, operator, value = each.split(";")
+        parts: list[str] = []
+        current = ""
+        chars = iter(unquote(value))
+        for char in chars:
+            if char == "\\":
+                current += next(chars, "")
+            elif char == "|":
+                parts.append(current)
+                current = ""
+            else:
+                current += char
+        parts.append(current)
+        filters.append(
+            {
+                "column": column,
+                "type": kind,
+                "key": unquote(key),
+                "operator": unquote(operator),
+                "value": parts,
+            }
+        )
+    return filters
+
+
+def test_a_tenant_whatever_its_id_is_one_tag_to_langfuse() -> None:
+    langfuse = Langfuse("http://langfuse", project="p1")
+    for tenant in ("acme", "a,b", "a;b", "a|b", "a\\b", "a b", "é", "a=b&c"):
+        (found,) = _langfuse_decoded(langfuse.tenant_traces_link(tenant))
+        assert found == {
+            "column": "traceTags",
+            "type": "arrayOptions",
+            "key": "",
+            "operator": "any of",
+            "value": [f"tenant:{tenant}"],
+        }, tenant

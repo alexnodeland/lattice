@@ -65,7 +65,7 @@ test("the notice that these tools are outside the gates is on the page, with or 
     name: "These tools are outside portalr's gates",
   });
   await expect.element(notice).toBeVisible();
-  await expect.element(notice.getByText(/is recorded/)).toBeVisible();
+  await expect.element(notice.getByText(/Links made here are recorded/)).toBeVisible();
   await bare.screen.unmount();
   const asked = await open("/deployment/tools?trace=t1");
   await expect
@@ -83,7 +83,6 @@ test("with no id nothing is asked for, and the page says to enter one", async ()
 
 test("the ids in the address make the links they give, each opened in a new tab without an opener", async () => {
   const { screen } = await open("/deployment/tools?trace=t1&session=thr_1&run=run_1&tenant=acme");
-  const list = screen.getByRole("list").first();
   await expect.element(screen.getByRole("link", { name: "The trace in Langfuse" })).toBeVisible();
   expect(asks).toHaveLength(1);
   expect(Object.fromEntries(asks[0] ?? [])).toEqual({
@@ -107,7 +106,6 @@ test("the ids in the address make the links they give, each opened in a new tab 
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
     expect(link.getAttribute("href")).toMatch(/^http:\/\//);
   }
-  expect(list).toBeDefined();
 });
 
 test("only the links an id gives are shown", async () => {
@@ -171,9 +169,22 @@ test("asking for others is another page, and each ask is a read of its own", asy
   expect(Object.fromEntries(asks[2] ?? [])).toEqual({ trace_id: "t1" });
 });
 
-test("an id that isn't one is dropped from the address, not sent", async () => {
-  const { screen } = await open("/deployment/tools?trace=not%20an%20id");
+test("an id that isn't one is not sent, and the page says it was ignored", async () => {
+  const { screen } = await open("/deployment/tools?trace=not%20an%20id&run=run_1");
+  await expect
+    .element(
+      screen.getByText(/“not an id” isn't an id portalr takes, so it was ignored \(Trace id\)\./),
+    )
+    .toBeVisible();
+  // What was good is still asked for, alone.
+  await expect.poll(() => asks.length).toBe(1);
+  expect(Object.fromEntries(asks[0] ?? [])).toEqual({ run_id: "run_1" });
+});
+
+test("an address with only an id that isn't one asks for nothing", async () => {
+  const { screen } = await open("/deployment/tools?tenant=a~b");
   await expect.element(screen.getByText("Enter an id")).toBeVisible();
+  await expect.element(screen.getByText(/isn't a tenant id portalr takes/)).toBeVisible();
   expect(asks).toEqual([]);
 });
 

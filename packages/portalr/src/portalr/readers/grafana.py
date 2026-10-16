@@ -19,6 +19,11 @@ LOKI: Final = "loki"
 """The Loki data source's uid, as stackr provisions it."""
 
 
+RECENT: Final = {"from": "now-24h", "to": "now"}
+"""The time range a link for a tenant's or a run's records opens at: the last day, where Explore's
+own default is the last hour, which would show nothing of a run from yesterday."""
+
+
 @dataclass(frozen=True)
 class Grafana:
     """Links into Grafana's Explore.
@@ -29,22 +34,21 @@ class Grafana:
 
     url: str
 
-    def _explore(self, datasource: str, query: dict[str, str]) -> str:
-        pane = {"datasource": datasource, "queries": [{"refId": "A", **query}]}
+    def _explore(self, datasource: str, query: dict[str, str], *, recent: bool = False) -> str:
+        pane: dict[str, object] = {"datasource": datasource, "queries": [{"refId": "A", **query}]}
+        if recent:
+            pane["range"] = RECENT
         return f"{self.url}/explore?{urlencode({'left': json.dumps(pane)})}"
 
     def tenant_logs_link(self, tenant: str) -> str:
         """Explore, on a tenant's logs in Loki."""
-        return self._explore(
-            LOKI, {"expr": f"{EVERY_STREAM} | {TENANT_METADATA} = {quoted(tenant)}"}
-        )
+        expr = f"{EVERY_STREAM} | {TENANT_METADATA} = {quoted(tenant)}"
+        return self._explore(LOKI, {"expr": expr}, recent=True)
 
     def tenant_traces_link(self, tenant: str) -> str:
         """Explore, on a tenant's traces in Tempo."""
-        return self._explore(
-            TEMPO,
-            {"queryType": "traceql", "query": f"{{ span.{TENANT_ATTRIBUTE} = {quoted(tenant)} }}"},
-        )
+        query = f"{{ span.{TENANT_ATTRIBUTE} = {quoted(tenant)} }}"
+        return self._explore(TEMPO, {"queryType": "traceql", "query": query}, recent=True)
 
     def trace_link(self, trace_id: str) -> str:
         """Explore, on a trace in Tempo."""
@@ -53,4 +57,4 @@ class Grafana:
     def run_logs_link(self, run_id: str) -> str:
         """Explore, on a run's logs in Loki, across tenants."""
         runs = " or ".join(f"{name} = {quoted(run_id)}" for name in RUN_METADATA)
-        return self._explore(LOKI, {"expr": f"{EVERY_STREAM} | {runs}"})
+        return self._explore(LOKI, {"expr": f"{EVERY_STREAM} | {runs}"}, recent=True)

@@ -372,9 +372,9 @@ def portalr_router(
             grafana_tenant_logs=grafana.tenant_logs_link(tenant_id)
             if grafana and tenant_id
             else None,
-            grafana_tenant_traces=(
-                grafana.tenant_traces_link(tenant_id) if grafana and tenant_id else None
-            ),
+            grafana_tenant_traces=grafana.tenant_traces_link(tenant_id)
+            if grafana and tenant_id
+            else None,
         )
         kinds = [
             kind
@@ -386,17 +386,11 @@ def portalr_router(
             )
             if given is not None
         ]
-        if kinds:
-            record_links(
-                by,
-                kinds=kinds,
-                tenant=tenant_id,
-                tools=[
-                    tool
-                    for tool, prefix in (("langfuse", "langfuse_"), ("grafana", "grafana_"))
-                    if any(value is not None for name, value in made if name.startswith(prefix))
-                ],
-            )
+        # A record is of links made: of the tools that have one; with none, nothing is recorded.
+        linked = {name.partition("_")[0] for name, value in made if value is not None}
+        tools = [tool for tool in ("langfuse", "grafana") if tool in linked]
+        if kinds and tools:
+            record_links(by, kinds=kinds, tenant=tenant_id, tools=tools)
         return made
 
     if invite is not None:

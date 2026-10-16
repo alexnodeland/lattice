@@ -1,6 +1,16 @@
 import type { PortalrApi } from "@portalr/client";
 import { expect, test } from "vitest";
-import { asked, DOORS, NOTICE, safeHref, shownOf, tenantsOf } from "./tools";
+import {
+  asked,
+  DOORS,
+  ignoredOf,
+  NOTICE,
+  safeHref,
+  shownOf,
+  TOOL_NAME,
+  TOOLS,
+  tenantsOf,
+} from "./tools";
 
 test("the address keeps the ids portalr takes and a tenant's name, and drops the rest", () => {
   expect(shownOf({})).toEqual({
@@ -22,6 +32,7 @@ test("the address keeps the ids portalr takes and a tenant's name, and drops the
     tenant: undefined,
   });
   expect(shownOf({ tenant: "  " }).tenant).toBeUndefined();
+  expect(shownOf({ tenant: " acme " }).tenant).toBe("acme");
   expect(shownOf({ tenant: 7 }).tenant).toBeUndefined();
 });
 
@@ -45,6 +56,9 @@ test("a link is an href only if it is an http or https address", () => {
     "vbscript:x",
     "file:///etc/passwd",
     "//evil.example/x",
+    "http:foo",
+    "https:/foo",
+    "HTTP:example.com",
     "/relative/path",
     "not a url",
     "",
@@ -72,10 +86,40 @@ test("every link the server makes has a door, and each door is made by one kind 
 test("the notice says what the tools are outside of, and that opening them is recorded", () => {
   expect(NOTICE).toMatch(/aren't scoped to a tenant/);
   expect(NOTICE).toMatch(/outside the gates that Traces and Logs/);
-  expect(NOTICE).toMatch(/is recorded/);
+  expect(NOTICE).toMatch(/Links made here are recorded/);
+  expect(NOTICE).toMatch(/A visit to either tool that doesn't start here/);
 });
 
 test("the tenants to ask for are by name, and none for someone who isn't an operator", () => {
   expect(tenantsOf({ tenants: ["b", "a"] })).toEqual(["a", "b"]);
   expect(tenantsOf(null)).toEqual([]);
+});
+
+test("what the address gave that isn't taken is named, and what is taken is not", () => {
+  expect(
+    ignoredOf({ trace: "not an id", session: "thr_1", run: "", tenant: "a~b", extra: "x" }),
+  ).toEqual([
+    { label: "Trace id", value: "not an id" },
+    { label: "Tenant", value: "a~b" },
+  ]);
+  expect(ignoredOf({})).toEqual([]);
+  expect(ignoredOf({ run: 7, tenant: " acme " })).toEqual([]);
+  // What an address already says was ignored is kept, if it is well formed, and nothing else.
+  expect(
+    ignoredOf({
+      trace: "t1",
+      ignored: [
+        { label: "Trace id", value: "x".repeat(200) },
+        { label: "Nonsense", value: "y" },
+        { label: "Run id", value: 7 },
+        null,
+      ],
+    }),
+  ).toEqual([{ label: "Trace id", value: "x".repeat(80) }]);
+  expect(ignoredOf({ ignored: "not a list" })).toEqual([]);
+});
+
+test("each door's tool is one of the tools, which have names", () => {
+  expect(DOORS.every((door) => TOOLS.includes(door.tool))).toBe(true);
+  expect(TOOL_NAME).toEqual({ langfuse: "Langfuse", grafana: "Grafana" });
 });

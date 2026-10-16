@@ -1,6 +1,7 @@
 import json as jsonlib
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
@@ -725,7 +726,7 @@ async def test_no_key_of_a_tool_is_in_a_link_the_config_or_an_error(
 ) -> None:
     keyed = Stack(Tool(), Tool(), Tool(), Tool(), Tool())
     readers = keyed.readers()
-    secret = httpx.AsyncClient(auth=("pk-lf-visible-secret", "sk-lf-hidden-secret"))
+    secret = httpx.AsyncClient(auth=("visible-key-7f3a", "hidden-key-9c1e"))
     readers = Readers(
         tempo=readers.tempo,
         loki=readers.loki,
@@ -733,7 +734,7 @@ async def test_no_key_of_a_tool_is_in_a_link_the_config_or_an_error(
         langfuse=Langfuse("http://langfuse", project="p1", client=secret),
         litellm=LiteLLM(
             "http://litellm",
-            httpx.AsyncClient(headers={"authorization": "Bearer sk-master-secret"}),
+            httpx.AsyncClient(headers={"authorization": "Bearer master-key-4b2d"}),
         ),
         grafana=readers.grafana,
     )
@@ -750,5 +751,52 @@ async def test_no_key_of_a_tool_is_in_a_link_the_config_or_an_error(
         seen.append((await client.get("/config.json")).text)
         seen.append((await client.get("/v1/deployment/links", headers=headers("alice"))).text)
     for text in seen:
-        for secret_value in ("secret", "sk-", "pk-lf"):
-            assert secret_value not in text.lower().replace("trace-secret", ""), text
+        for secret_value in ("visible-key-7f3a", "hidden-key-9c1e", "master-key-4b2d"):
+            assert secret_value not in text.lower(), text
+
+
+async def test_the_links_for_a_tenant_and_a_run_open_at_the_last_day(
+    client: httpx.AsyncClient,
+) -> None:
+    params = {"run_id": "run_1", "tenant_id": "acme", "trace_id": "t1"}
+    links = (await client.get("/v1/deployment/links", params=params, headers=OPS_LINKS)).json()
+    ranges = {
+        name: jsonlib.loads(parse_qs(urlparse(links[name]).query)["left"][0]).get("range")
+        for name in (
+            "grafana_logs",
+            "grafana_tenant_logs",
+            "grafana_tenant_traces",
+            "grafana_trace",
+        )
+    }
+    last_day = {"from": "now-24h", "to": "now"}
+    assert ranges == {
+        "grafana_logs": last_day,
+        "grafana_tenant_logs": last_day,
+        "grafana_tenant_traces": last_day,
+        "grafana_trace": None,
+    }
+
+
+async def test_no_record_is_made_where_no_link_was(
+    grants: Grants, invite: Invite, ui: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    bare = Readers(
+        tempo=None, loki=None, prometheus=None, langfuse=None, litellm=None, grafana=None
+    )
+    transport = httpx.ASGITransport(app=app_for(grants, bare, invite, ui))
+    async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
+        with caplog.at_level("INFO", logger="portalr.access"):
+            made = await client.get(
+                "/v1/deployment/links", params={"trace_id": "t1"}, headers=OPS_LINKS
+            )
+    assert made.status_code == 200
+    assert _recorded(caplog) == []
+
+
+async def test_a_session_link_is_recorded_for_langfuse_alone(
+    client: httpx.AsyncClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level("INFO", logger="portalr.access"):
+        await client.get("/v1/deployment/links", params={"session_id": "thr_1"}, headers=OPS_LINKS)
+    assert [record["tools"] for record in _recorded(caplog)] == [["langfuse"]]

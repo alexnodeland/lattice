@@ -12,7 +12,18 @@ import {
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type SearchSchemaInput } from "@tanstack/react-router";
 import { type FormEvent, useId } from "react";
-import { asked, DOORS, NOTICE, safeHref, shownOf, tenantsOf } from "../../../tools";
+import {
+  asked,
+  DOORS,
+  type Ignored,
+  ignoredOf,
+  NOTICE,
+  safeHref,
+  shownOf,
+  TOOL_NAME,
+  TOOLS,
+  tenantsOf,
+} from "../../../tools";
 import { ID_PATTERN } from "../../../traces";
 
 const HEADER = (
@@ -27,22 +38,30 @@ const HEADER = (
  */
 export const Route = createFileRoute("/_signed/deployment/tools")({
   head: () => ({ meta: [{ title: "Tools · portalr admin" }] }),
-  validateSearch: (search: Record<string, unknown> & SearchSchemaInput): Required<ToolIds> =>
-    shownOf(search),
+  validateSearch: (search: Record<string, unknown> & SearchSchemaInput) => ({
+    ...shownOf(search),
+    ignored: ignoredOf(search),
+  }),
   component: ToolsPage,
 });
 
 /** The page, for the ids the address names: other ids are another page, with nothing carried over. */
 function ToolsPage() {
-  const ids = Route.useSearch();
-  return <Body key={JSON.stringify(ids)} ids={ids} />;
+  const { ignored, ...ids } = Route.useSearch();
+  return <Body key={JSON.stringify({ ids, ignored })} ids={ids} ignored={ignored} />;
 }
 
-function Body({ ids }: { ids: Required<ToolIds> }) {
+function Body({ ids, ignored }: { ids: Required<ToolIds>; ignored: Ignored[] }) {
   return (
     <div className="flex flex-col gap-6">
       {HEADER}
       <Notice />
+      {ignored.map((each) => (
+        <p key={each.label} role="status" className="text-muted text-sm">
+          “{each.value}” isn't {each.label === "Tenant" ? "a tenant id" : "an id"} portalr takes, so
+          it was ignored ({each.label}).
+        </p>
+      ))}
       <Ask ids={ids} />
       {asked(ids) ? (
         <Links ids={ids} />
@@ -149,7 +168,7 @@ function Links({ ids }: { ids: Required<ToolIds> }) {
   const readers = config.readers;
   const doors = DOORS.filter((door) => ids[door.kind] !== undefined);
   const made = doors.filter((door) => safeHref(links.data[door.field]) !== null);
-  const missing = ["langfuse", "grafana"].filter(
+  const missing = TOOLS.filter(
     (tool) => doors.some((door) => door.tool === tool) && readers[tool] === false,
   );
   return (
@@ -176,7 +195,7 @@ function Links({ ids }: { ids: Required<ToolIds> }) {
       )}
       {missing.map((tool) => (
         <p key={tool} className="text-muted text-sm">
-          {tool === "langfuse" ? "Langfuse" : "Grafana"} isn't configured here, so it has no links.
+          {TOOL_NAME[tool]} isn't configured here, so it has no links.
         </p>
       ))}
       {made.length === 0 && missing.length === 0 && (

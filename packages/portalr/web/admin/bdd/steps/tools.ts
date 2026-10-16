@@ -14,7 +14,7 @@ Then("they are told the tools are outside portalr's gates", async ({ page }) => 
   });
   await expect(notice).toBeVisible();
   await expect(notice).toContainText("outside the gates that Traces and Logs");
-  await expect(notice).toContainText("Opening them is recorded");
+  await expect(notice).toContainText("Links made here are recorded");
 });
 
 When(

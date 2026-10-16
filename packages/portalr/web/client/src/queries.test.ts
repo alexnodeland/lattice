@@ -528,12 +528,13 @@ test("an operator's links for ids are asked for once each, and never kept", asyn
     tenant_id: "acme",
   });
   const options = queries.portalr.toolLinks("ops", ids);
-  expect([options.staleTime, options.gcTime, options.retry, options.refetchOnWindowFocus]).toEqual([
-    0,
-    0,
-    false,
-    false,
-  ]);
+  expect([
+    options.staleTime,
+    options.gcTime,
+    options.retry,
+    options.refetchOnWindowFocus,
+    options.refetchOnReconnect,
+  ]).toEqual([0, 0, false, false, false]);
   expect(keys.portalr.toolLinks("ops", ids)).not.toEqual(keys.portalr.toolLinks("ops2", ids));
   expect(keys.portalr.toolLinks("ops", ids)).not.toEqual(
     keys.portalr.toolLinks("ops", { ...ids, run: "r1" }),

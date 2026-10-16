@@ -14,15 +14,66 @@ export function shownOf(search: Record<string, unknown>): Required<ToolIds> {
     const read = typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
     return isId(read) ? read : undefined;
   };
-  const tenant = typeof search.tenant === "string" ? search.tenant : "";
+  const tenant = typeof search.tenant === "string" ? search.tenant.trim() : "";
   return {
     trace: id(search.trace),
     session: id(search.session),
     run: id(search.run),
     // A tenant's id is any text but empty and with no `~`, as grantr takes one.
-    tenant: tenant.trim() !== "" && !tenant.includes("~") ? tenant : undefined,
+    tenant: tenant !== "" && !tenant.includes("~") ? tenant : undefined,
   };
 }
+
+/** What an address or a form gave that is not taken, as a tool's page says: which, and what. */
+export interface Ignored {
+  readonly label: string;
+  readonly value: string;
+}
+
+const LABELS = {
+  trace: "Trace id",
+  session: "Session id",
+  run: "Run id",
+  tenant: "Tenant",
+} as const;
+
+/** The most of an ignored id the address keeps, so it can't be made to hold a page of text. */
+const MOST_IGNORED = 80;
+
+/**
+ * The ids in a search that `shownOf` leaves out, so the page can say it did. The router rewrites
+ * an address to what was taken, and would lose them, so they stay in the address, as `ignored`,
+ * until the next ask: what a search already says was ignored is kept, if it is well formed.
+ */
+export function ignoredOf(search: Record<string, unknown>): Ignored[] {
+  const taken = shownOf(search);
+  const found = (Object.keys(LABELS) as (keyof typeof LABELS)[]).flatMap((kind) => {
+    const given = search[kind];
+    const text = typeof given === "string" || typeof given === "number" ? String(given).trim() : "";
+    return text !== "" && taken[kind] === undefined
+      ? [{ label: LABELS[kind], value: text.slice(0, MOST_IGNORED) }]
+      : [];
+  });
+  if (found.length > 0 || !Array.isArray(search.ignored)) {
+    return found;
+  }
+  const labels = new Set<string>(Object.values(LABELS));
+  return search.ignored.flatMap((each: unknown) => {
+    const one = each as Partial<Ignored> | null;
+    return one &&
+      typeof one.label === "string" &&
+      labels.has(one.label) &&
+      typeof one.value === "string"
+      ? [{ label: one.label, value: one.value.slice(0, MOST_IGNORED) }]
+      : [];
+  });
+}
+
+/** The tools a link can be into, in the order their links are listed. */
+export const TOOLS: readonly Door["tool"][] = ["langfuse", "grafana"];
+
+/** A tool's name as people read it. */
+export const TOOL_NAME: Record<Door["tool"], string> = { langfuse: "Langfuse", grafana: "Grafana" };
 
 /** The tenants an operator may ask for, by name: none for someone who isn't an operator. */
 export const tenantsOf = (every: { readonly tenants: readonly string[] } | null): string[] =>
@@ -86,7 +137,9 @@ export const DOORS: readonly Door[] = [
  * a way to run what a server, or a tool's setting, put in it.
  */
 export function safeHref(link: string | null | undefined): string | null {
-  if (!link) {
+  // Written as an authority, `http://`: a browser reads `http:foo` as `http://foo/`, and a link
+  // that isn't written so is not one a server of ours makes.
+  if (!link || !/^https?:\/\//.test(link)) {
     return null;
   }
   try {
@@ -100,5 +153,6 @@ export function safeHref(link: string | null | undefined): string | null {
 /** What the notice beside the links says, always: these tools are outside portalr's gates. */
 export const NOTICE =
   "Langfuse and Grafana aren't scoped to a tenant, and they show what people and models said, " +
-  "across every tenant: they are outside the gates that Traces and Logs keep that behind. Opening " +
-  "them is recorded: who you are, which kinds of id you asked for, and, for a tenant, which.";
+  "across every tenant: they are outside the gates that Traces and Logs keep that behind. Links " +
+  "made here are recorded: who you are, which kinds of id you asked for and, for a tenant, which. " +
+  "A visit to either tool that doesn't start here, or from a link already copied, is not.";

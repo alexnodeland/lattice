@@ -11,11 +11,11 @@
 \* Property                 | ADR-0055 | Test
 \* I1_ConsumedAtMostOnce    | I1       | test_i1_messages_sent_at_once_from_two_processes_are_each_consumed_once
 \* I1_NoneSkipped           | I1       | test_i1_a_message_sent_as_a_run_releases_its_thread_is_consumed_once
-\* I1_GivenOnce             | I1       | test_i2_steering_is_consumed_with_the_runs_end
+\* I1_GivenOnce             | I1, I2   | test_i2_steering_is_consumed_with_the_runs_end
 \* I2_ConsumedWithItsWrite  | I2       | test_i2_a_prompt_is_consumed_with_its_runs_start
 \* I3_ClaimHasATask         | I3       | test_i3_a_claim_is_released_when_its_run_cannot_be_set_up
 \* I3_NoStrandedAsk         | I3       | test_i3_a_command_that_asked_before_its_holder_read_is_handed_over
-\* I3_OneActiveRun          | I3       | test_a_thread_is_claimed_by_one_run_at_a_time
+\* I3_OneActiveRun          | I3       | test_i3_a_claim_that_lapses_as_its_run_starts_leaves_one_run
 \* I4_NothingTakenUnstarted | I4       | test_i4_a_turn_that_keeps_failing_before_it_starts_consumes_nothing
 \* I5_DirectAsksNothing     | I5       | test_i5_a_message_committed_directly_starts_no_turn_and_the_next_consumes_it
 \* I6_OldestIsTheReply      | I6       | test_i6_a_message_committed_directly_in_a_paused_thread_is_its_reply
@@ -24,8 +24,9 @@
 \*
 \* Not modelled: I7, the upgrade point, a migration's property that test_upgrade.py holds. Also
 \* left out: authorization and one author per turn (ADR-0057), so every message is one author's;
-\* the agent's own messages; Runner.aclose; and a process's concurrent tasks: each process here
-\* does one thing at a time, and a crash ends it.
+\* the agent's own messages; Runner.aclose; a hand-over that raises, which _take_over logs and
+\* drops, leaving what was asked to the next command; and a process's concurrent tasks: each
+\* process here is one task at a time, and a crash ends it.
 EXTENDS Naturals, Sequences, FiniteSets
 
 CONSTANTS
@@ -117,6 +118,10 @@ Init ==
 \* A cancellation (c) or a failure, within the behaviour's budget.
 Fault(c) == /\ faults < MaxFaults /\ faults' = faults + 1 /\ failed' = (failed \/ ~c)
 
+\* Only a caller's call is cancelled before it starts a run: a hand-over is cancelled by
+\* Runner.aclose alone, which leaves the thread to its next claimant, as a crash does.
+Cancellable(p, c) == c => owe[p] = "call"
+
 \* The caller's call returns: a hand-over's steps return to no caller.
 Returned(p) == owe' = [owe EXCEPT ![p] = IF @ = "call" THEN "no" ELSE @]
 
@@ -201,8 +206,10 @@ Abandon(p) ==
     /\ Step(p, "planning")
     /\ UNCHANGED <<log, asked, taken, lease, audit, lost, rd, plan, dlv, nxt, snap, askVal, owe>>
 
-\* _plan: decide, holding the thread, which turn takes the oldest message not taken. Its reads
-\* (the cursors, the head, the paused runs and the log) are one step here.
+\* _plan: decide, holding the thread, which turn takes the oldest message not taken. Assumed
+\* atomic: _plan reads the cursors, the head, the paused runs and the log in separate awaits,
+\* while Runner.answer and direct commits write without the claim; the spec takes the reads as
+\* one step.
 Plan(p) ==
     /\ pc[p] = "planning"
     /\ LET head == Len(log)
@@ -257,8 +264,10 @@ Reply(p) ==
 \* A run: Capability.wrap_run's start, its watcher, and its end.
 
 \* Record run_started with the taken cursor, in one write. Core refuses a resume unless its run
-\* is paused. Nothing here waits on the claim: once it is lost, the run is cancelled at its next
-\* await, and a write in flight may still commit.
+\* is paused. Nothing in the write checks the claim. Once the claim is found lost, the run is
+\* cancelled at its next await, so a write not yet begun never happens; this step stays enabled
+\* after Lapse, which stands for a write already in flight, run to its end. A lapse in storage
+\* needs no Lapse step at all: another process's clock may run ahead.
 RunStart(p) ==
     /\ pc[p] = "starting"
     /\ LET t == plan[p]
@@ -327,16 +336,18 @@ Fail(p) == pc[p] = "running" /\ Fault(FALSE) /\ End(p, "failed")
 -----------------------------------------------------------------------------
 \* Failures and cancellations at the other awaits, and crashes.
 
-\* Before a call holds anything, nothing is handed over. The ask may have been saved as the call
-\* was interrupted (the Storage protocol: a cancelled call may still have taken effect).
+\* Before a call holds anything, nothing is handed over. Both storages run each call to its end
+\* and raise a cancellation after it, so the ask is saved if the call reached its write...
 Interrupt(p, c) ==
-    /\ pc[p] \in {"head", "asking", "reading"} /\ Fault(c)
+    /\ pc[p] \in {"head", "asking", "reading"} /\ Cancellable(p, c) /\ Fault(c)
     /\ asked' = IF pc[p] = "asking" THEN Max(asked, askVal[p]) ELSE asked
     /\ Step(p, "idle")
     /\ UNCHANGED <<log, taken, runs, lease, count, effects, crashes, lapsed, lost, rd, plan, dlv,
                    nxt, snap, askVal, owe>>
+\* ...and not if it was interrupted before: at the commit's own end, or at the authorization
+\* check that Workspace.save_cursor awaits first.
 InterruptUnsaved(p, c) ==
-    /\ pc[p] = "asking" /\ Fault(c)
+    /\ pc[p] = "asking" /\ Cancellable(p, c) /\ Fault(c)
     /\ Step(p, "idle")
     /\ UNCHANGED <<shared, lease, count, effects, crashes, lapsed, lost, rd, plan, dlv, nxt, snap,
                    askVal, owe>>
@@ -344,17 +355,19 @@ InterruptUnsaved(p, c) ==
 \* A claimant fails, or is cancelled, at its claim or holding it: _take hands over as the error
 \* propagates, with what it read.
 FailClaimant(p, c) ==
-    /\ pc[p] \in {"claiming", "abandoning", "planning", "replying"} /\ Fault(c)
+    /\ pc[p] \in {"claiming", "abandoning", "planning", "replying"} /\ Cancellable(p, c)
+    /\ Fault(c)
     /\ snap' = [snap EXCEPT ![p] = [t |-> rd[p].t, a |-> rd[p].a, c |-> c]]
     /\ IF pc[p] = "claiming" THEN Step(p, "handing") ELSE Step(p, "releasing")
     /\ nxt' = [nxt EXCEPT ![p] = "handover"]
     /\ UNCHANGED <<shared, lease, count, effects, crashes, lapsed, lost, rd, plan, dlv, askVal,
                    owe>>
 
-\* The same at the claim, after the storage granted it: claim_thread releases only a claim it
-\* returned, so this one is left to lapse.
+\* The same at the claim, once the storage granted it. SQL storage runs acquire_lease to its end
+\* and raises the cancellation after it, which claim_thread raises before its `try`: no task holds
+\* the claim, and it is left to lapse. (In-memory storage's acquire_lease never awaits.)
 ClaimedAsInterrupted(p, c) ==
-    /\ pc[p] = "claiming" /\ Acquirable /\ Fault(c)
+    /\ pc[p] = "claiming" /\ Acquirable /\ Cancellable(p, c) /\ Fault(c)
     /\ lease' = [owner |-> p, ttl |-> TTL]
     /\ snap' = [snap EXCEPT ![p] = [t |-> rd[p].t, a |-> rd[p].a, c |-> c]]
     /\ Step(p, "handing") /\ nxt' = [nxt EXCEPT ![p] = "handover"]
@@ -370,15 +383,16 @@ FailStart(p, c) ==
     /\ UNCHANGED <<shared, lease, count, effects, crashes, lapsed, lost, rd, plan, dlv, askVal,
                    owe>>
 
-\* A cancellation at the release, which may not have taken effect: the claim is left to lapse.
+\* A cancellation at the release: the release takes effect, both storages running it to its end,
+\* and the cancellation is raised after it, so the hand-over proceeds.
 ReleaseInterrupted(p) ==
-    /\ pc[p] = "releasing" /\ Fault(TRUE)
+    /\ pc[p] = "releasing" /\ (nxt[p] = "loop" => Cancellable(p, TRUE)) /\ Fault(TRUE)
+    /\ lease' = IF Mine(p) THEN Free ELSE lease
     /\ snap' = [snap EXCEPT ![p] = IF nxt[p] = "loop"
                                       THEN [t |-> rd[p].t, a |-> rd[p].a, c |-> TRUE]
                                       ELSE [@ EXCEPT !.c = TRUE]]
     /\ Step(p, "handing") /\ nxt' = [nxt EXCEPT ![p] = "handover"]
-    /\ UNCHANGED <<shared, lease, count, effects, crashes, lapsed, lost, rd, plan, dlv, askVal,
-                   owe>>
+    /\ UNCHANGED <<shared, count, effects, crashes, lapsed, lost, rd, plan, dlv, askVal, owe>>
 
 \* The process dies: its claim stays in storage until it lapses, and nothing is handed over.
 Crash(p) ==
@@ -468,10 +482,18 @@ Fairness ==
 Spec == Init /\ [][Next]_vars /\ Fairness
 
 -----------------------------------------------------------------------------
+\* A run starts with a message as its prompt; once claims lapse, each process may start one.
+MaxRuns == MaxLog * Cardinality(Procs)
+
 TypeOK ==
     /\ log \in Seq({"sent", "direct", "notice", "answer"}) /\ Len(log) <= MaxSeq
     /\ asked \in 0..MaxSeq /\ taken \in 0..MaxSeq
-    /\ \A r \in DOMAIN runs : runs[r].st \in {"running", "paused", "completed", "failed", "stopped"}
+    /\ runs \in Seq([st : {"running", "paused", "completed", "failed", "stopped"},
+                     open : 0..MaxReq, pause : 0..MaxPauses])
+    /\ Len(runs) <= MaxRuns
+    /\ plan \in [Procs -> [kind : {"none", "new", "reply", "resume"}, run : 0..MaxRuns,
+                           lo : 0..MaxSeq, hi : 0..MaxSeq, msg : 0..MaxSeq, pause : 0..MaxPauses,
+                           tt : 0..MaxSeq, ta : 0..MaxSeq, done : BOOLEAN]]
     /\ lease.owner \in Procs \cup {"none"} /\ lease.ttl \in 0..TTL
     /\ pc \in [Procs -> Holding \cup {"idle", "head", "asking", "reading", "claiming", "handing",
                                       "dead"}]
@@ -525,6 +547,17 @@ I6_OldestIsTheReply ==
           (Reply(p) /\ ~plan[p].done /\ plan'[p].done) =>
               /\ Msg(plan[p].msg)
               /\ \A i \in 1..plan[p].msg - 1 : Msg(i) => count[i] >= 1]_vars
+
+\* Witnesses, none a property of the protocol: each is violated once TLC reaches what it names,
+\* which shows the behaviours the properties above are checked over are there. README.md records
+\* the runs.
+NeverPaused == \A r \in DOMAIN runs : runs[r].st # "paused"
+NeverReplied == \A p \in Procs : ~plan[p].done
+NeverResumed == \A r \in DOMAIN runs : runs[r].pause = 0 \/ runs[r].st # "running"
+NeverRefused == \A p \in Procs : ~(pc[p] = "claiming" /\ ~Acquirable)
+NeverHandedOver ==
+    \A p \in Procs : ~(pc[p] = "handing" /\ (snap[p].c \/ taken > snap[p].t \/ asked > snap[p].a))
+NeverSteered == \A p \in Procs : ~(pc[p] = "running" /\ dlv[p] > plan[p].hi /\ Msg(dlv[p]))
 
 \* Every message asked for is taken, while nothing fails: cancellations and crashes may happen.
 AskedIsTaken ==

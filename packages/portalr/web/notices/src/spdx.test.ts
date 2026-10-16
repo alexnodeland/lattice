@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { allows, parse } from "./spdx";
+import { allows, elect, ids, offersChoice, parse } from "./spdx";
 
 const allowed = new Set(["mit", "isc", "apache-2.0", "bsd-3-clause"]);
 const ok = (text: string) => {
@@ -41,9 +41,29 @@ describe("SPDX expressions", () => {
   });
 
   test("AND binds tighter than OR", () => {
-    // MIT OR (GPL AND ISC): allowed by the MIT side alone.
+    // Read as MIT OR (GPL-3.0-only AND ISC): the MIT side alone allows it.
     expect(ok("MIT OR GPL-3.0-only AND ISC")).toBe(true);
-    // (MIT OR GPL) AND ISC would be allowed too; GPL AND ISC OR GPL is not.
+    // Read as (GPL-3.0-only AND ISC) OR GPL-2.0-only: neither side is allowed.
     expect(ok("GPL-3.0-only AND ISC OR GPL-2.0-only")).toBe(false);
+  });
+
+  test("an OR is elected to its first allowed alternative", () => {
+    const elected = (text: string) => {
+      const expression = parse(text);
+      return expression === undefined ? undefined : elect(expression, allowed);
+    };
+    expect(elected("MIT OR GPL-3.0-only")).toEqual(["MIT"]);
+    expect(elected("GPL-3.0-only OR ISC")).toEqual(["ISC"]);
+    expect(elected("(GPL-3.0-only OR MIT) AND Apache-2.0")).toEqual(["MIT", "Apache-2.0"]);
+    expect(elected("MIT AND ISC")).toEqual(["MIT", "ISC"]);
+    expect(elected("MIT AND GPL-3.0-only")).toBeUndefined();
+    expect(elected("GPL-2.0-only OR GPL-3.0-only")).toBeUndefined();
+  });
+
+  test("the identifiers, and whether there is a choice", () => {
+    const expression = parse("(MIT OR Apache-2.0) AND GPL-2.0+");
+    expect(expression && ids(expression)).toEqual(["MIT", "Apache-2.0", "GPL-2.0"]);
+    expect(expression && offersChoice(expression)).toBe(true);
+    expect(offersChoice(parse("MIT AND ISC") ?? { kind: "id", id: "x" })).toBe(false);
   });
 });

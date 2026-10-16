@@ -108,3 +108,14 @@ def test_siblings_come_from_the_workspace(project: str) -> None:
     assert {
         _normalize(name) for name, source in sources.items() if source == {"workspace": True}
     } == distributions
+
+
+@pytest.mark.parametrize("project", ["app", "admin"])
+def test_a_ui_build_is_invalidated_by_the_lockfile(project: str) -> None:
+    # A transitive bump changes only bun.lock, and the UIs' third-party notices (portalr ADR-0033)
+    # are made by the build: its cache must not outlive the lockfile.
+    shared = yaml.safe_load((ROOT / ".moon" / "tasks" / "typescript.yml").read_text())
+    assert "/bun.lock" in shared["implicitInputs"]
+    build = yaml.safe_load((ROOT / WEB[project] / "moon.yml").read_text())["tasks"]["build"]
+    assert "mergeInputs" not in build.get("options", {}), "inputs are added to the shared ones"
+    assert "/packages/portalr/web/notices/policy.json" in build["inputs"]

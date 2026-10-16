@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
-import type { BundledPackage } from "./collect";
-import { allows, parse } from "./spdx";
+import { type BundledPackage, isLicenceFile } from "./collect";
+import type { Expression } from "./spdx";
+import { allows, elect, offersChoice, parse } from "./spdx";
 
 /**
  * A package that is fine though it breaks the policy, for a reason, as long as it declares the
@@ -37,21 +38,39 @@ export function readPolicy(file: URL | string): Policy {
         typeof e?.package === "string" &&
         typeof e.licence === "string" &&
         (e.kind === "licence" || e.kind === "text") &&
-        e.reason?.trim(),
+        typeof e.reason === "string" &&
+        e.reason.trim() !== "",
     )
   ) {
     throw new Error(
       `${String(file)}: each exception names a package, its licence and a kind, with a reason`,
     );
   }
+  const keys = exceptions.map((e) => `${e.kind} ${e.package} ${e.licence}`);
+  const repeated = keys.find((key, at) => keys.indexOf(key) !== at);
+  if (repeated !== undefined) {
+    throw new Error(`${String(file)}: the exception "${repeated}" is there twice`);
+  }
   return { allowed, exceptions };
 }
+
+const allowedIds = (policy: Policy) => new Set(policy.allowed.map((id) => id.toLowerCase()));
 
 /** Whether the declared licence is within the allowlist, apart from exceptions. */
 function permitted(licence: string, policy: Policy): boolean {
   const expression = parse(licence);
-  const allowed = new Set(policy.allowed.map((id) => id.toLowerCase()));
-  return expression !== undefined && allows(expression, allowed);
+  return expression !== undefined && allows(expression, allowedIds(policy));
+}
+
+/**
+ * Where the declared licence offers a choice (`MIT OR GPL-3.0-only`), the licences it is used
+ * under: its first allowed alternative. Undefined where there is no choice, or none is allowed.
+ */
+export function usedUnder(licence: string, policy: Policy): string[] | undefined {
+  const expression: Expression | undefined = parse(licence);
+  return expression !== undefined && offersChoice(expression)
+    ? elect(expression, allowedIds(policy))
+    : undefined;
 }
 
 const excused = (
@@ -77,8 +96,11 @@ export function check(packages: readonly BundledPackage[], policy: Policy): Prob
       const kind = parse(licence) === undefined ? "isn't an SPDX expression" : "isn't allowed";
       problems.push({ package: name, message: `its licence, ${licence}, ${kind}` });
     }
-    if (found.texts.length === 0 && !excused(policy, found.name, licence, "text")) {
-      problems.push({ package: name, message: "ships no LICENSE, COPYING or NOTICE file" });
+    if (
+      !found.texts.some(({ file }) => isLicenceFile(file)) &&
+      !excused(policy, found.name, licence, "text")
+    ) {
+      problems.push({ package: name, message: "ships no LICENSE or COPYING file" });
     }
   }
   return problems;

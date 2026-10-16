@@ -3,13 +3,16 @@ name = "portalr"
 version = "0.1.0.dev0"
 description = "The portal into an application built on lattice: an app UI to chat with its agents and see their work, and an admin UI to manage access and see feedback, evaluations, usage and spend."
 readme = "README.md"
-license = "MIT AND OFL-1.1 AND Apache-2.0"
+license = "MIT AND OFL-1.1 AND Apache-2.0 AND ISC AND BSD-2-Clause AND BSD-3-Clause AND 0BSD"
+# The licences of lattice, the typefaces and Tremor's charts, and those the bundled JavaScript is
+# used under (web/notices). `portalr:licence-expression` keeps the expression to what the UIs'
+# generated notices say is bundled.
 # The UIs carry lattice's two typefaces, under the SIL Open Font License, and charts adapted
 # from Tremor's, under the Apache License (web/ui/NOTICE). They bundle third-party JavaScript,
 # whose licences each UI's build collects into THIRD-PARTY-NOTICES.txt beside its files
 # (web/notices). That file is generated and not committed, so it isn't listed here (a glob that
 # matches nothing is invalid metadata, for every install that hasn't built the UIs): the wheel
-# carries it with the UIs, and `ui-in-wheel` checks it.
+# carries it with the UIs, not in dist-info/licenses, and `ui-in-wheel` checks it.
 license-files = [
   "LICENSE",
   "web/ui/src/fonts/OFL-*.txt",

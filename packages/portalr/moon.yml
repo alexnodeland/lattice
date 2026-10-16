@@ -42,6 +42,10 @@ tasks:
     options:
       mergeInputs: 'replace'
 
+  # The two tasks below read what app's and admin's builds wrote, so they depend on those builds.
+  # They are portalr's and not web/notices's: app and admin depend on notices (their package.json
+  # names it), and a notices task that depended on their builds would make a project cycle.
+  #
   # The licence policy's exceptions (web/notices/policy.json), each still needed by a package in
   # one of the two bundles: read from the notices their builds wrote (portalr ADR-0033).
   licence-exceptions:
@@ -56,6 +60,19 @@ tasks:
       - 'app:build'
       - 'admin:build'
 
+  # The wheel's `license` expression, to list the licences of what the bundles hold.
+  licence-expression:
+    description: "Fail unless the license expression covers the bundled packages' licences"
+    command: 'bun run --bun web/notices/scripts/licence-expression.ts'
+    inputs:
+      - 'pyproject.toml'
+      - 'web/notices/src/**/*'
+      - 'web/notices/scripts/*'
+      - 'src/portalr/static/*/THIRD-PARTY-NOTICES.txt'
+    deps:
+      - 'app:build'
+      - 'admin:build'
+
   ui-in-wheel:
     description: "Check that the built wheel carries both UIs, and their third-party notices"
     command: 'uv run --no-project python scripts/check_wheel.py'
@@ -63,6 +80,7 @@ tasks:
     deps:
       - 'build'
       - 'licence-exceptions'
+      - 'licence-expression'
   standalone:
     inputs: ['@group(python)', '/scripts/standalone.py']
     options:

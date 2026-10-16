@@ -10,6 +10,7 @@ An application installs the wheel to serve the UIs.
 Usage: scripts/check_wheel.py   (from portalr's directory, after its `build` task)
 """
 
+import re
 import sys
 import tomllib
 import zipfile
@@ -22,30 +23,46 @@ LICENCES = ("OFL-schibsted-grotesk.txt", "OFL-fragment-mono.txt", "tremor.txt", 
 NOTICES = "THIRD-PARTY-NOTICES.txt"
 """Written beside each UI's index.html by its build, from the bundle; never by hand."""
 
-SEPARATOR = "=" * 80
-"""What precedes each package's entry in the notices (web/notices/src/render.ts)."""
+BETWEEN_ENTRIES = re.compile(r"\n={80}\n(?=## )")
+"""Where one package's entry ends (web/notices/src/render.ts): the separator, and a heading."""
 
-BUNDLED = {"app": "@tanstack/react-router", "admin": "recharts"}
-"""A package each UI certainly bundles, whose entry the notices must have."""
+HEADING = re.compile(r"## .+@[^@\s]+")
+"""An entry's heading, name and version."""
+
+LICENCE_HEADING = re.compile(
+    r"^--- (licen[cs]e|copying|copyright|unlicense)", re.IGNORECASE | re.MULTILINE
+)
+"""A licence text in an entry, as opposed to a NOTICE alone."""
+
+SENTINEL = "react"
+"""A package both UIs bundle, whose entry the notices must have."""
 
 STYLED = ".bg-accent"
 """A class of ui's own components: an app's styles without it lack the kit's (portalr ADR-0018)."""
 
 
 def notices_problems(ui: str, text: str) -> list[str]:
-    """What is wrong with a UI's notices: no entries, an entry with neither text nor a reason."""
-    entries = text.split(f"\n{SEPARATOR}\n")[1:]
+    """What is wrong with a UI's notices.
+
+    No entries, a heading that isn't one, an entry with neither a LICENSE or COPYING text nor a
+    reason, or no entry for a package both UIs bundle.
+    """
+    entries = BETWEEN_ENTRIES.split(text)[1:]
     if not entries:
         return [f"the {ui} UI's {NOTICES} has no packages"]
     problems: list[str] = []
     names: list[str] = []
     for entry in entries:
         heading, _, rest = entry.partition("\n")
-        names.append(heading.removeprefix("## ").rpartition("@")[0])
-        if "\n--- " not in entry and "ships no licence text." not in rest:
-            problems.append(f"the {ui} UI's notices have no licence text for {heading[3:]}")
-    if BUNDLED[ui] not in names:
-        problems.append(f"the {ui} UI's notices lack {BUNDLED[ui]}, which it bundles")
+        if not HEADING.fullmatch(heading):
+            problems.append(f"the {ui} UI's notices have an entry headed {heading!r}")
+            continue
+        name = heading.removeprefix("## ")
+        names.append(name.rpartition("@")[0])
+        if not LICENCE_HEADING.search(entry) and "ships no licence text." not in rest:
+            problems.append(f"the {ui} UI's notices have no licence text for {name}")
+    if SENTINEL not in names:
+        problems.append(f"the {ui} UI's notices lack {SENTINEL}, which it bundles")
     return problems
 
 
@@ -63,6 +80,11 @@ def main() -> int:
             for name in names
             if name.startswith("portalr/static/app/assets/") and name.endswith(".css")
         )
+        notices = {
+            ui: built.read(name).decode()
+            for ui in UIS
+            if (name := f"portalr/static/{ui}/{NOTICES}") in names
+        }
     if missing := [ui for ui in UIS if f"portalr/static/{ui}/index.html" not in names]:
         sys.stderr.write(f"check_wheel: {wheel.name} lacks the {', '.join(missing)} UI\n")
         return 1
@@ -83,12 +105,10 @@ def main() -> int:
         sys.stderr.write(f"check_wheel: {wheel.name} lacks {', '.join(unlicensed)}\n")
         return 1
     for ui in UIS:
-        name = f"portalr/static/{ui}/{NOTICES}"
-        if name not in names:
+        if ui not in notices:
             sys.stderr.write(f"check_wheel: {wheel.name} lacks the {ui} UI's {NOTICES}\n")
             return 1
-        with zipfile.ZipFile(wheel) as built:
-            problems = notices_problems(ui, built.read(name).decode())
+        problems = notices_problems(ui, notices[ui])
         if problems:
             sys.stderr.write("".join(f"check_wheel: {problem}\n" for problem in problems))
             return 1

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
 import { collect, declaredLicence, packageDirectory } from "./collect";
-import { check, type Policy, readPolicy, staleExceptions } from "./policy";
+import { check, type Policy, readPolicy, staleExceptions, usedUnder } from "./policy";
 import { parseNotices, render } from "./render";
 
 const root = mkdtempSync(join(tmpdir(), "notices-"));
@@ -107,25 +107,67 @@ describe("the policy", () => {
 
   test("a package that ships no licence text fails, whatever it declares", () => {
     expect(problemsOf([pack("bare", { license: "MIT" }, { "README.md": "hi" })])).toEqual([
-      "bare@1.0.0: ships no LICENSE, COPYING or NOTICE file",
+      "bare@1.0.0: ships no LICENSE or COPYING file",
     ]);
   });
 
-  test("a vendored package's licence, beside the modules bundled from it, is the text it ships", () => {
-    const vendor = pack("vendor", { license: "MIT AND ISC" }, { "README.md": "no licence here" });
-    const nested = join(root, "node_modules", "vendor", "lib-vendor", "d3-thing");
-    mkdirSync(nested, { recursive: true });
-    writeFileSync(join(nested, "LICENSE"), "ISC licence of d3-thing");
-    writeFileSync(join(nested, "index.js"), "");
-    writeFileSync(join(root, "node_modules", "vendor", "lib-vendor", "unused.js"), "");
-    expect(problemsOf([vendor])).toEqual([
-      "vendor@1.0.0: ships no LICENSE, COPYING or NOTICE file",
+  test("a NOTICE alone isn't a licence text", () => {
+    const notice = pack("noticed", { license: "Apache-2.0" }, { NOTICE: "Copyright 2026" });
+    expect(problemsOf([notice])).toEqual(["noticed@1.0.0: ships no LICENSE or COPYING file"]);
+  });
+
+  test("source files named like a licence aren't collected, and licence file names are", () => {
+    const files = {
+      LICENSE: "kept",
+      "LICENSE-MIT": "kept too",
+      "LICENCE.md": "licence",
+      UNLICENSE: "free",
+      LICENSES: "several",
+      COPYRIGHT: "copyright",
+      "license.js": "export {}",
+      "notice.ts": "export {}",
+      "license.d.ts": "export {}",
+      "license.js.map": "{}",
+      "license-checker.js": "export {}",
+    };
+    const found = collect([pack("named", { license: "MIT" }, files)]);
+    expect(found[0]?.texts.map((t) => t.file)).toEqual([
+      "COPYRIGHT",
+      "LICENCE.md",
+      "LICENSE",
+      "LICENSE-MIT",
+      "LICENSES",
+      "UNLICENSE",
     ]);
-    const found = collect([join(nested, "index.js")]);
-    expect(found[0]?.texts).toEqual([
-      { file: join("lib-vendor", "d3-thing", "LICENSE"), text: "ISC licence of d3-thing" },
+  });
+
+  test("code from a package that can't be named fails, rather than going unnoticed", () => {
+    const orphan = join(root, "node_modules", "orphan");
+    mkdirSync(orphan, { recursive: true });
+    writeFileSync(join(orphan, "index.js"), "");
+    expect(() => collect([join(orphan, "index.js")])).toThrow("has no package.json");
+    const nameless = join(root, "node_modules", "nameless");
+    mkdirSync(nameless, { recursive: true });
+    writeFileSync(join(nameless, "package.json"), JSON.stringify({ license: "MIT" }));
+    expect(() => collect([join(nameless, "index.js")])).toThrow("no name and version");
+  });
+
+  test("OR is used under its first allowed alternative, said in the notices", () => {
+    const dual = pack("dual", { license: "(GPL-3.0-only OR MIT)" });
+    const either = pack("either", { license: "MIT OR Apache-2.0" });
+    const both = pack("both-needed", { license: "(GPL-3.0-only OR ISC) AND MIT" });
+    expect(problemsOf([dual, either, both])).toEqual([]);
+    expect(usedUnder("(GPL-3.0-only OR MIT)", policy)).toEqual(["MIT"]);
+    expect(usedUnder("MIT", policy)).toBeUndefined();
+    expect(usedUnder("(GPL-3.0-only OR LGPL-3.0-only)", policy)).toBeUndefined();
+    const notes = new Map([["dual@1.0.0", { usedUnder: "MIT" }]]);
+    const text = render("app", collect([dual, either, both]), notes);
+    expect(text).toContain("Licence: (GPL-3.0-only OR MIT)\nUsed under: MIT\n");
+    expect(parseNotices(text).map((e) => [e.name, e.usedUnder])).toEqual([
+      ["both-needed", undefined],
+      ["dual", "MIT"],
+      ["either", undefined],
     ]);
-    expect(check(found, policy)).toEqual([]);
   });
 
   test("an exception covers a package and exactly the licence it names", () => {
@@ -154,7 +196,7 @@ describe("the policy", () => {
     };
     const text = { ...licence, kind: "text" as const };
     expect(problemsOf(ids, { ...policy, exceptions: [licence] })).toEqual([
-      "odd2@1.0.0: ships no LICENSE, COPYING or NOTICE file",
+      "odd2@1.0.0: ships no LICENSE or COPYING file",
     ]);
     expect(problemsOf(ids, { ...policy, exceptions: [text] })).toEqual([
       "odd2@1.0.0: its licence, MPL-2.0, isn't allowed",
@@ -172,10 +214,10 @@ describe("the policy", () => {
     };
     const found = collect(ids);
     expect(check(found, { ...policy, exceptions: [text] })).toEqual([]);
-    const notices = render("app", found, new Map([["shim@1.0.0", text.reason]]));
+    const notices = render("app", found, new Map([["shim@1.0.0", { reason: text.reason }]]));
     expect(notices).toContain("This package ships no licence text. A shim over d3.");
     expect(parseNotices(notices)).toEqual([
-      { name: "shim", version: "1.0.0", licence: "MIT", hasText: false },
+      { name: "shim", version: "1.0.0", licence: "MIT", usedUnder: undefined, hasText: false },
     ]);
   });
 
@@ -228,6 +270,15 @@ describe("the policy", () => {
       }),
     );
     expect(() => readPolicy(bad)).toThrow("with a reason");
+    const exception = { package: "x", licence: "GPL-3.0-only", kind: "licence" };
+    writeFileSync(
+      bad,
+      JSON.stringify({ allowed: ["MIT"], exceptions: [{ ...exception, reason: 7 }] }),
+    );
+    expect(() => readPolicy(bad)).toThrow("with a reason");
+    const twice = { ...exception, reason: "reviewed" };
+    writeFileSync(bad, JSON.stringify({ allowed: ["MIT"], exceptions: [twice, twice] }));
+    expect(() => readPolicy(bad)).toThrow("there twice");
     writeFileSync(bad, JSON.stringify({ allowed: "MIT", exceptions: [] }));
     expect(() => readPolicy(bad)).toThrow("list of SPDX identifiers");
   });
@@ -251,9 +302,21 @@ describe("the notices file", () => {
   test("names each package once, sorted, with its licence and every notice text", () => {
     const text = render("app", collect(ids));
     expect(parseNotices(text)).toEqual([
-      { name: "@s/mid", version: "1.0.0", licence: "ISC", hasText: true },
-      { name: "alpha", version: "1.0.0", licence: "MIT AND ISC", hasText: true },
-      { name: "zeta", version: "1.0.0", licence: "Apache-2.0", hasText: true },
+      { name: "@s/mid", version: "1.0.0", licence: "ISC", usedUnder: undefined, hasText: true },
+      {
+        name: "alpha",
+        version: "1.0.0",
+        licence: "MIT AND ISC",
+        usedUnder: undefined,
+        hasText: true,
+      },
+      {
+        name: "zeta",
+        version: "1.0.0",
+        licence: "Apache-2.0",
+        usedUnder: undefined,
+        hasText: true,
+      },
     ]);
     expect(text).toContain("Source: https://example.com/zeta.git");
     expect(text).toContain("Source: https://example.com/alpha");
@@ -262,6 +325,22 @@ describe("the notices file", () => {
     expect(text).not.toContain("\r");
     expect(text).not.toContain("not a notice");
     expect(text).toContain("--- COPYING-extra");
+  });
+
+  test("a licence text with the separator in it fails loudly, and a lookalike parses", () => {
+    const sep = "=".repeat(80);
+    const lookalike = collect([
+      pack("lookalike", { license: "MIT" }, { LICENSE: `before\n${sep}\nafter` }),
+    ]);
+    const text = render("app", lookalike);
+    expect(parseNotices(text).map((e) => e.name)).toEqual(["lookalike"]);
+    const trap = collect([
+      pack("trap", { license: "MIT" }, { LICENSE: `before\n${sep}\n## fake@1.0.0\nx` }),
+    ]);
+    expect(() => render("app", trap)).toThrow("separates the notices' entries");
+    expect(() => parseNotices(`head\n${sep}\n## nobody\nLicence: MIT\n`)).toThrow(
+      "no heading of the form",
+    );
   });
 
   test("is the same however the bundle lists its modules, with no date in it", () => {

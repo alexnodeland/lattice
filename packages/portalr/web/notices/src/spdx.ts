@@ -88,6 +88,38 @@ export function parse(text: string): Expression | undefined {
   return position === words.length ? expression : undefined;
 }
 
+/** The identifiers in the expression, as written (`GPL-2.0+` is `GPL-2.0`), in order. */
+export function ids(expression: Expression): string[] {
+  return expression.kind === "id"
+    ? [expression.id.replace(/\+$/, "")]
+    : [...ids(expression.left), ...ids(expression.right)];
+}
+
+/** Whether the expression offers a choice: it has an OR in it. */
+export function offersChoice(expression: Expression): boolean {
+  return (
+    expression.kind === "or" ||
+    (expression.kind === "and" && (offersChoice(expression.left) || offersChoice(expression.right)))
+  );
+}
+
+/**
+ * The licences the package is used under, where it is allowed: an `AND` needs both sides, and an
+ * `OR` is elected to its first allowed alternative, as SPDX has the one who uses it choose.
+ * Undefined where no way of satisfying it is allowed.
+ */
+export function elect(expression: Expression, allowed: ReadonlySet<string>): string[] | undefined {
+  if (expression.kind === "id") {
+    return allows(expression, allowed) ? [expression.id.replace(/\+$/, "")] : undefined;
+  }
+  const left = elect(expression.left, allowed);
+  if (expression.kind === "or") {
+    return left ?? elect(expression.right, allowed);
+  }
+  const right = elect(expression.right, allowed);
+  return left === undefined || right === undefined ? undefined : [...left, ...right];
+}
+
 /** Whether every way of satisfying the expression is within `allowed` (compared without case). */
 export function allows(expression: Expression, allowed: ReadonlySet<string>): boolean {
   if (expression.kind === "id") {

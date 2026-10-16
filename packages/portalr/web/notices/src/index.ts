@@ -1,4 +1,5 @@
 export { type BundledPackage, collect, declaredLicence, packageDirectory } from "./collect";
+export { bundledLicences, expressionProblems, OWN_LICENCES } from "./expression";
 export { NOTICES_FILE, notices } from "./plugin";
 export {
   check,
@@ -7,6 +8,7 @@ export {
   type Problem,
   readPolicy,
   staleExceptions,
+  usedUnder,
 } from "./policy";
-export { parseNotices, render, SEPARATOR } from "./render";
-export { allows, type Expression, parse } from "./spdx";
+export { type Entry, type Note, parseNotices, render, SEPARATOR } from "./render";
+export { allows, type Expression, elect, ids, parse } from "./spdx";

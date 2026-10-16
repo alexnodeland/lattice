@@ -34,6 +34,7 @@ nav:
   - Protocol JSON Schema: reference/schema.md
 - Design:
   - Architecture: architecture.md
+  - "The thread claim, in TLA+": spec/README.md
   - Decisions:
     - adr/README.md
     - adr/0001-python-library-with-sans-io-core.md

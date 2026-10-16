@@ -12,13 +12,15 @@
   however it was committed.
 - I7, the upgrade point, is in ``test_upgrade.py``.
 
-Each test holds one storage call at a :class:`Gate`, patched onto the storage it runs on.
+Each test holds one storage call at a :class:`Gate`, patched onto the storage it runs on. The
+last section is what the TLA+ spec in docs/artifactr/spec found: each test there fails, a strict
+``xfail``, until its issue is fixed.
 """
 
 import asyncio
 import contextlib
 from collections.abc import AsyncGenerator, AsyncIterator
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
@@ -615,3 +617,136 @@ async def test_i6_a_reply_that_an_answer_beat_is_the_resumed_runs_prompt(
     assert (await ws.run(paused.run_id)).status == "completed"
     assert script.answers() == ["Monday"]
     assert script.conversation()[-1] == "Tuesday, and book the room"
+
+
+# ─── found by the TLA+ spec (docs/artifactr/spec), not yet fixed ─────────────
+#
+# Each test is the spec's trace for one issue, against the code, and fails until the issue is
+# fixed: strict, so a fix that makes it pass removes its mark.
+
+
+class _Clock:
+    """The storage's clock, which a test moves on, as another process's clock may be."""
+
+    def __init__(self) -> None:
+        self.now = datetime(2026, 10, 16, tzinfo=UTC)
+
+    def __call__(self) -> datetime:
+        return self.now
+
+
+def _held_at_its_start(gate: Gate) -> Any:
+    """A turn context that holds each turn at ``gate`` as it begins, before run_started."""
+
+    @contextlib.asynccontextmanager
+    async def begins(session: Session[Any]) -> AsyncGenerator[None]:
+        await gate.wait()
+        yield
+
+    return begins
+
+
+async def _two_holders_after_a_lapse(runners: MakeRunner) -> tuple[list[str], int]:
+    """The prompts two processes' runs were given, and the runs started, after a lapse (#249).
+
+    The first process plans a run for the message, and is held before its run records its
+    start. The storage's clock passes the claim's TTL, as across a stall or a skewed clock, so
+    the second process's claim is granted, and it plans from the same `taken`.
+    """
+    clock = _Clock()
+    storage = InMemoryStorage(clock=clock)
+    ws = await Workspaces(storage).open(SCOPE.tenant_id, SCOPE.workspace_id, actor=ALICE)
+    thread = await ws.create_thread("Launch")
+    recorder = Recorder()
+
+    def agent() -> Agent[Session[Any], str]:
+        return Agent(
+            function_model(recorder.respond),
+            deps_type=Session[Any],
+            capabilities=[ArtifactWorkspace(types=[Note, Checklist])],
+        )
+
+    starting = Gate()
+    here = runners(agent(), turn_context=_held_at_its_start(starting))
+    there = runners(agent())
+    first = started(await here.send(ws, thread.id, "Plan the launch"))
+    await _entered(starting)
+    clock.now += timedelta(minutes=1)
+    second = await there.ask(ws, thread.id)
+    assert second is not None, "the lapsed claim was granted again"
+    await second.wait()
+    starting.release.set()
+    await first.wait()
+    await settled(thread.id, here, there)
+    return recorder.prompts, len(await ws.runs(thread_id=thread.id))
+
+
+@pytest.mark.xfail(strict=True, reason="#249: a lapsed claim lets a second run take the prompt")
+async def test_i1_a_claim_that_lapses_as_its_run_starts_lets_no_second_run_take_its_prompt(
+    runners: MakeRunner,
+) -> None:
+    prompts, _ = await _two_holders_after_a_lapse(runners)
+    assert prompts == ["Plan the launch"]
+
+
+@pytest.mark.xfail(strict=True, reason="#249: a lapsed claim lets a second run start")
+async def test_i3_a_claim_that_lapses_as_its_run_starts_leaves_one_run(
+    runners: MakeRunner,
+) -> None:
+    _, runs = await _two_holders_after_a_lapse(runners)
+    assert runs == 1
+
+
+@pytest.mark.xfail(strict=True, reason="#250: a claim granted as its call is cancelled is kept")
+async def test_i3_a_claim_granted_as_its_send_is_cancelled_is_released(
+    storage: Storage, ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    script = Script(*[say("ok")] * 2)
+    runner = runners(make_agent(script))
+    # The lease is taken, and the call cancelled after, as SQL storage runs its calls to the end.
+    claiming = hold(storage, "acquire_lease", after=True)
+    sending = asyncio.create_task(runner.send(ws, thread.id, "Plan the launch"))
+    await _entered(claiming)
+    sending.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await sending
+    await settled(thread.id, runner)
+    assert script.requests, "its hand-over took the message"
+
+
+@pytest.mark.xfail(strict=True, reason="#251: a send cancelled before it claims hands nothing over")
+async def test_i3_a_send_cancelled_between_its_ask_and_its_claim_is_handed_over(
+    storage: Storage, ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    script = Script(*[say("ok")] * 2)
+    runner = runners(make_agent(script))
+    reading = hold(storage, "cursor")  # _take's first read, once the ask is saved
+    sending = asyncio.create_task(runner.send(ws, thread.id, "Plan the launch"))
+    await _entered(reading)
+    sending.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await sending
+    await settled(thread.id, runner)
+    assert script.requests, "handed over, not left for the next command"
+
+
+@pytest.mark.xfail(strict=True, reason="#252: what a dead holder was asked waits for a command")
+async def test_i3_a_message_asked_while_its_holder_dies_is_taken_once_its_claim_lapses(
+    runners: MakeRunner,
+) -> None:
+    clock = _Clock()
+    storage = InMemoryStorage(clock=clock)
+    ws = await Workspaces(storage).open(SCOPE.tenant_id, SCOPE.workspace_id, actor=ALICE)
+    thread = await ws.create_thread("Launch")
+    script = Script(*[say("ok")] * 3)
+    # The first process holds the thread, and stops for good: it stands for one that died.
+    dead = Gate()
+    dying = runners(make_agent(script), turn_context=_held_at_its_start(dead))
+    living = runners(make_agent(script))
+    started(await dying.send(ws, thread.id, "Plan the launch"))
+    await _entered(dead)
+    sent = await living.send(ws.as_actor(BOB), thread.id, "Also book the big room")
+    assert sent.run is None, "refused: the dead process holds the thread"
+    clock.now += timedelta(minutes=1)  # the dead claim lapses
+    await settled(thread.id, living)
+    assert script.requests, "the message is taken once the dead claim lapses"

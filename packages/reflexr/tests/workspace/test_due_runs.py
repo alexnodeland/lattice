@@ -1,12 +1,14 @@
 """What storage finds due and what the claim accepts are one predicate, on every storage.
 
 ``Storage.due_runs`` selects the runs to attempt in one query, and the executor's claim checks
-each again in its transaction with :func:`~reflexr.core.runnable`. ADR-0041 has the claim
-remain the authority, so storage may return too much but must never leave out a run the claim
-would start, and it returns nothing the claim would refuse for the policy's reasons. This
-property generates scopes of runs in every status, with leases and rules of every ordering, and
-holds storage's answer to the claim's. The examples share one database, each in a workspace of
-its own, since a new database for each would cost PostgreSQL its migrations every time.
+each again in its transaction with :func:`~reflexr.core.runnable`, which ADR-0041 keeps the
+authority. This property generates scopes of runs in every status, with leases and rules of
+every ordering, and holds storage's set of due runs to exactly the set the claim would accept.
+It does not test the order of the due runs, or their limit.
+
+The examples share one database, each in a workspace of its own, since a new database for each
+would cost PostgreSQL its migrations every time. Each finishes its runs once it is compared, so
+the next finds only its own due.
 """
 
 import asyncio
@@ -22,13 +24,12 @@ import pytest
 from hypothesis import HealthCheck, example, given, settings
 from hypothesis import strategies as st
 
-from reflexr import Rule
-from reflexr.core import FINISHED, WAITING, Run, runnable
+from reflexr import Rule, on
+from reflexr.core import Run, runnable
 from reflexr.core.runs import RunStatus
 from reflexr.sql import SqlStorage, create_schema
 from reflexr.workspace import InMemoryStorage, RunPolicy, Storage, WorkspaceRef, run_lease
 from tests.clock import START, FakeClock
-from tests.core.test_runs import rule as make_rule
 from tests.databases import SQL_BACKENDS, empty_database
 from tests.workspace.helpers import fired
 
@@ -47,6 +48,18 @@ class Spec:
     ordering: Literal["scope", "none"]
     on_dead_letter: Literal["continue", "block"]
     enabled: bool
+
+    def rule(self, name: str) -> Rule:
+        return Rule.model_validate(
+            {
+                "name": name,
+                "when": on("app:service.error"),
+                "then": {"action": "act"},
+                "ordering": self.ordering,
+                "on_dead_letter": self.on_dead_letter,
+                "enabled": self.enabled,
+            }
+        )
 
 
 @dataclass(frozen=True)
@@ -103,12 +116,12 @@ async def claimable(
     async with storage.transaction(ref) as transaction:
         for run, draw in zip(runs, draws, strict=True):
             rule = rules[draw.rule]
-            if not rule.enabled or run.status in FINISHED:
+            if not rule.enabled or run.status in ("succeeded", "dead", "cancelled", "skipped"):
                 continue
             if run.status == "running":
                 if draw.lease is None or START + draw.lease <= NOW:
                     found.add(run.id)  # abandoned: its claim fails the attempt
-            elif run.status in WAITING and run.next_attempt_at <= NOW:
+            elif run.next_attempt_at <= NOW:  # pending or retrying
                 scope = await transaction.scope_runs(run.rule, run.scope_key)
                 if run.id in {r.id for r in runnable(scope, rule, now=NOW)}:
                     found.add(run.id)
@@ -151,25 +164,23 @@ def shared(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Shared]:
 
 
 async def agree(storage: Storage, ref: WorkspaceRef, specs: list[Spec], draws: list[Draw]) -> None:
-    rules = [
-        make_rule(
-            name=f"app:r{i}",
-            ordering=spec.ordering,
-            on_dead_letter=spec.on_dead_letter,
-            enabled=spec.enabled,
-        )
-        for i, spec in enumerate(specs)
-    ]
+    rules = [spec.rule(f"app:r{i}") for i, spec in enumerate(specs)]
     runs = build(rules, draws)
     async with storage.transaction(ref) as transaction:
         await transaction.save_runs(runs)
-    for run, draw in zip(runs, draws, strict=True):
-        if draw.lease is not None:
-            assert await storage.acquire_lease(ref, run_lease(run.id), "executor", draw.lease)
-    # Every workspace's due runs, of which this example's are compared.
-    due = await storage.due_runs(now=NOW, limit=10_000, policy=RunPolicy.of(rules))
-    found = {run.id for at, run in due if at == ref}
-    assert found == await claimable(storage, ref, rules, runs, draws)
+    try:
+        for run, draw in zip(runs, draws, strict=True):
+            if draw.lease is not None:
+                assert await storage.acquire_lease(ref, run_lease(run.id), "executor", draw.lease)
+        # One more than there are, so that a run of another workspace would show.
+        due = await storage.due_runs(now=NOW, limit=len(runs) + 1, policy=RunPolicy.of(rules))
+        assert {at for at, _ in due} <= {ref}
+        assert {run.id for _, run in due} == await claimable(storage, ref, rules, runs, draws)
+    finally:  # nothing is left due for the examples after this one
+        async with storage.transaction(ref) as transaction:
+            await transaction.save_runs(
+                [r.model_copy(update={"status": "succeeded"}) for r in runs]
+            )
 
 
 @settings(

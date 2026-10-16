@@ -10,6 +10,7 @@ import { Route as SignedDeploymentRouteImport } from './routes/_signed/deploymen
 import { Route as SignedDeploymentIndexRouteImport } from './routes/_signed/deployment/index'
 import { Route as SignedDeploymentAuditRouteImport } from './routes/_signed/deployment/audit'
 import { Route as SignedDeploymentTenantsRouteImport } from './routes/_signed/deployment/tenants'
+import { Route as SignedDeploymentToolsRouteImport } from './routes/_signed/deployment/tools'
 import { Route as SignedTTenantRouteImport } from './routes/_signed/t/$tenant'
 import { Route as SignedTTenantIndexRouteImport } from './routes/_signed/t/$tenant/index'
 import { Route as SignedTTenantAccessRouteImport } from './routes/_signed/t/$tenant/access'
@@ -59,6 +60,11 @@ const SignedDeploymentAuditRoute = SignedDeploymentAuditRouteImport.update({
 const SignedDeploymentTenantsRoute = SignedDeploymentTenantsRouteImport.update({
   id: '/tenants',
   path: '/tenants',
+  getParentRoute: () => SignedDeploymentRoute,
+} as any)
+const SignedDeploymentToolsRoute = SignedDeploymentToolsRouteImport.update({
+  id: '/tools',
+  path: '/tools',
   getParentRoute: () => SignedDeploymentRoute,
 } as any)
 const SignedTTenantRoute = SignedTTenantRouteImport.update({
@@ -155,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/deployment': typeof SignedDeploymentRouteWithChildren
   '/deployment/audit': typeof SignedDeploymentAuditRoute
   '/deployment/tenants': typeof SignedDeploymentTenantsRoute
+  '/deployment/tools': typeof SignedDeploymentToolsRoute
   '/t/$tenant': typeof SignedTTenantRouteWithChildren
   '/deployment/': typeof SignedDeploymentIndexRoute
   '/t/$tenant/access': typeof SignedTTenantAccessRouteWithChildren
@@ -178,6 +185,7 @@ export interface FileRoutesByTo {
   '/': typeof SignedIndexRoute
   '/deployment/audit': typeof SignedDeploymentAuditRoute
   '/deployment/tenants': typeof SignedDeploymentTenantsRoute
+  '/deployment/tools': typeof SignedDeploymentToolsRoute
   '/deployment': typeof SignedDeploymentIndexRoute
   '/t/$tenant/audit': typeof SignedTTenantAuditRoute
   '/t/$tenant/feedback': typeof SignedTTenantFeedbackRoute
@@ -202,6 +210,7 @@ export interface FileRoutesById {
   '/_signed/': typeof SignedIndexRoute
   '/_signed/deployment/audit': typeof SignedDeploymentAuditRoute
   '/_signed/deployment/tenants': typeof SignedDeploymentTenantsRoute
+  '/_signed/deployment/tools': typeof SignedDeploymentToolsRoute
   '/_signed/t/$tenant': typeof SignedTTenantRouteWithChildren
   '/_signed/deployment/': typeof SignedDeploymentIndexRoute
   '/_signed/t/$tenant/access': typeof SignedTTenantAccessRouteWithChildren
@@ -228,6 +237,7 @@ export interface FileRouteTypes {
     | '/deployment'
     | '/deployment/audit'
     | '/deployment/tenants'
+    | '/deployment/tools'
     | '/t/$tenant'
     | '/deployment/'
     | '/t/$tenant/access'
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/'
     | '/deployment/audit'
     | '/deployment/tenants'
+    | '/deployment/tools'
     | '/deployment'
     | '/t/$tenant/audit'
     | '/t/$tenant/feedback'
@@ -274,6 +285,7 @@ export interface FileRouteTypes {
     | '/_signed/'
     | '/_signed/deployment/audit'
     | '/_signed/deployment/tenants'
+    | '/_signed/deployment/tools'
     | '/_signed/t/$tenant'
     | '/_signed/deployment/'
     | '/_signed/t/$tenant/access'
@@ -347,6 +359,13 @@ declare module '@tanstack/react-router' {
       path: '/tenants'
       fullPath: '/deployment/tenants'
       preLoaderRoute: typeof SignedDeploymentTenantsRouteImport
+      parentRoute: typeof SignedDeploymentRoute
+    }
+    '/_signed/deployment/tools': {
+      id: '/_signed/deployment/tools'
+      path: '/tools'
+      fullPath: '/deployment/tools'
+      preLoaderRoute: typeof SignedDeploymentToolsRouteImport
       parentRoute: typeof SignedDeploymentRoute
     }
     '/_signed/t/$tenant': {
@@ -467,12 +486,14 @@ declare module '@tanstack/react-router' {
 interface SignedDeploymentRouteChildren {
   SignedDeploymentAuditRoute: typeof SignedDeploymentAuditRoute
   SignedDeploymentTenantsRoute: typeof SignedDeploymentTenantsRoute
+  SignedDeploymentToolsRoute: typeof SignedDeploymentToolsRoute
   SignedDeploymentIndexRoute: typeof SignedDeploymentIndexRoute
 }
 
 const SignedDeploymentRouteChildren: SignedDeploymentRouteChildren = {
   SignedDeploymentAuditRoute: SignedDeploymentAuditRoute,
   SignedDeploymentTenantsRoute: SignedDeploymentTenantsRoute,
+  SignedDeploymentToolsRoute: SignedDeploymentToolsRoute,
   SignedDeploymentIndexRoute: SignedDeploymentIndexRoute,
 }
 

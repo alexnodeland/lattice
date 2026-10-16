@@ -7,7 +7,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from {{ package_name }}.redaction import LOG_CONFIG, LOGGERS, RedactedLogs
+from {{ package_name }}.redaction import LOG_CONFIG, LOGGERS, RECORDS, RedactedLogs
 
 QUERY = "tenant=acme&access_token=s3cret"
 
@@ -61,3 +61,45 @@ def test_a_record_with_named_arguments_passes_as_it_is() -> None:
     )
     assert RedactedLogs().filter(named)
     assert named.getMessage() == QUERY
+
+
+@pytest.fixture
+def at_root() -> Iterator[list[logging.LogRecord]]:
+    """What a handler on the root logger sees, as the application configures its logging: where the
+    application's logs are exported from."""
+    logging.config.dictConfig(LOG_CONFIG)
+    seen: list[logging.LogRecord] = []
+
+    class Root(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            seen.append(record)
+
+    handler = Root()
+    root = logging.getLogger()
+    before = root.level
+    root.addHandler(handler)
+    yield seen
+    root.removeHandler(handler)
+    root.setLevel(before)
+    for name in RECORDS:
+        logging.getLogger(name).setLevel(logging.NOTSET)
+
+
+def test_the_records_that_are_kept_reach_the_root_handlers_at_info(
+    at_root: list[logging.LogRecord],
+) -> None:
+    """With root at WARNING, an INFO record is dropped at its logger unless that is INFO."""
+    assert logging.getLogger().getEffectiveLevel() >= logging.WARNING
+    logging.getLogger("grantr.audit").info("%s", "an audit entry")
+    logging.getLogger("portalr.access").info("%s", "an operator's links")
+    assert [(record.name, record.getMessage()) for record in at_root] == [
+        ("grantr.audit", "an audit entry"),
+        ("portalr.access", "an operator's links"),
+    ]
+
+
+def test_no_other_logger_is_let_through_at_info(at_root: list[logging.LogRecord]) -> None:
+    logging.getLogger("grantr.other").info("not kept")
+    logging.getLogger("some.library").info("not kept")
+    logging.getLogger("portalr.access.extra").info("kept: a child of the access logger")
+    assert [record.name for record in at_root] == ["portalr.access.extra"]

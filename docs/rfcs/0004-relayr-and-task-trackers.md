@@ -3,7 +3,7 @@
 **Status:** Draft
 **Author:** Alex Nodeland
 **Created:** 2026-10-16
-**Discussion:** to be linked from the pull request
+**Discussion:** [#260](https://github.com/alexnodeland/lattice/pull/260)
 **Siblings:**
 
 - [stackr RFC-0002][s-rfc-0002] is the bridge this extends: followers with leases and cursors, runs that act once, and chains that continue across it.

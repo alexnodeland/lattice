@@ -2,7 +2,16 @@ import { administered } from "@portalr/client";
 import { Account, NavLink, Plain, SideNav, TextLink } from "@portalr/ui";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, Outlet } from "@tanstack/react-router";
-import { House, KeyRound, ScrollText, ThumbsUp } from "lucide-react";
+import {
+  Coins,
+  House,
+  KeyRound,
+  ListChecks,
+  ScrollText,
+  Terminal,
+  ThumbsUp,
+  Route as TracesIcon,
+} from "lucide-react";
 import { allowedNow, anyPart, useAccess } from "../../../access";
 import { Frame } from "../../../frame";
 import { remember } from "../../../last";
@@ -79,6 +88,26 @@ function Tenant() {
           {allowed.has("portalr:read_telemetry") && (
             <NavLink icon={ThumbsUp} render={<Link to="/t/$tenant/feedback" params={{ tenant }} />}>
               Feedback
+            </NavLink>
+          )}
+          {allowed.has("portalr:read_telemetry") && (
+            <NavLink icon={TracesIcon} render={<Link to="/t/$tenant/traces" params={{ tenant }} />}>
+              Traces
+            </NavLink>
+          )}
+          {allowed.has("portalr:read_telemetry") && (
+            <NavLink icon={Terminal} render={<Link to="/t/$tenant/logs" params={{ tenant }} />}>
+              Logs
+            </NavLink>
+          )}
+          {allowed.has("reflexr:read_runs") && (
+            <NavLink icon={ListChecks} render={<Link to="/t/$tenant/runs" params={{ tenant }} />}>
+              Runs
+            </NavLink>
+          )}
+          {allowed.has("portalr:read_spend") && (
+            <NavLink icon={Coins} render={<Link to="/t/$tenant/usage" params={{ tenant }} />}>
+              Usage
             </NavLink>
           )}
         </SideNav>

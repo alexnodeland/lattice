@@ -7,7 +7,7 @@ Feature: Home
     Given alice has signed in to admin
     Then they're in "acme"
     And they see the page "acme"
-    And the areas are "Home, Access, Audit, Feedback"
+    And the areas are "Home, Access, Audit, Feedback, Traces, Logs, Runs, Usage"
     And the tenant switch offers "acme"
     And the "Members" card shows a figure
     And the "Workspaces" card shows a figure
@@ -35,7 +35,7 @@ Feature: Home
     Given ops has signed in to admin
     Then they're in "All tenants"
     And they see the page "All tenants"
-    And the areas are "Home"
+    And the areas are "Home, Tenants, Audit"
     And the "Tenants" card shows a figure
     And the "Spend" card says "LiteLLM isn't configured."
 

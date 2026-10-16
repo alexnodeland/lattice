@@ -14,8 +14,17 @@ from typing import Any
 import httpx
 import pytest
 
-from portalr.readers import LogQuery, Loki, MetricQuery, Ok, Prometheus, Tempo, TraceQuery
-from portalr.tenant import allowed
+from portalr.readers import (
+    LogQuery,
+    LogRecord,
+    Loki,
+    MetricQuery,
+    Ok,
+    Prometheus,
+    Tempo,
+    TraceQuery,
+)
+from portalr.tenant import Tenant, allowed
 from tests.acceptance.seed import RUN, seed
 
 pytestmark = [pytest.mark.acceptance, pytest.mark.timeout(180)]
@@ -93,17 +102,31 @@ async def test_loki_reads_a_tenants_logs_only(client: httpx.AsyncClient) -> None
     loki = Loki(url("PORTALR_LOKI_URL"), client)
     query = LogQuery(start=START, end=END, limit=1000)
 
-    def lines(answer: object) -> list[str]:
-        return (
-            [line.line for line in answer.data if RUN in line.line]
-            if isinstance(answer, Ok)
-            else []
-        )
+    def ours(tenant: str):
+        """The records of the seeded run: those with the line's length, which isn't its text."""
+        length = len(f"{tenant}'s record {RUN}")
 
-    acme = await eventually(lambda: loki.logs(ACME, query), lambda a: bool(lines(a)))
-    assert lines(acme) == [f"acme's record {RUN}"]
-    globex = await eventually(lambda: loki.logs(GLOBEX, query), lambda a: bool(lines(a)))
-    assert lines(globex) == [f"globex's record {RUN}"]
+        def found(answer: object) -> list[LogRecord]:
+            if not isinstance(answer, Ok):
+                return []
+            return [record for record in answer.data.records if record.length == length]
+
+        return found
+
+    async def lines(tenant: Tenant, found: list[LogRecord]) -> list[str]:
+        """Each record's line, asked for by its id: a read of the window has none."""
+        asked = [await loki.record(tenant, record.id) for record in found]
+        return [each.data.line or "" for each in asked if isinstance(each, Ok) and each.data]
+
+    acme = await eventually(lambda: loki.logs(ACME, query), lambda a: bool(ours("acme")(a)))
+    assert isinstance(acme, Ok)
+    assert all(record.line is None for record in acme.data.records)
+    assert await lines(ACME, ours("acme")(acme)) == [f"acme's record {RUN}"]
+    globex = await eventually(lambda: loki.logs(GLOBEX, query), lambda a: bool(ours("globex")(a)))
+    assert await lines(GLOBEX, ours("globex")(globex)) == [f"globex's record {RUN}"]
+    # A record of globex's, by its id, isn't acme's to read.
+    (theirs,) = ours("globex")(globex)
+    assert await loki.record(ACME, theirs.id) == Ok(data=None)
 
 
 @pytest.mark.usefixtures("ids")

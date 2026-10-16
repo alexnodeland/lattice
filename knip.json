@@ -4,6 +4,9 @@
   "ignoreBinaries": ["noop", "uv"],
   "ignoreDependencies": ["@usebruno/cli"],
   "workspaces": {
+    "packages/portalr/web/notices": {
+      "entry": ["scripts/*.ts"]
+    },
     "packages/portalr/web/app": {
       "entry": ["bdd/steps/*.ts"]
     },

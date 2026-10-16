@@ -21,19 +21,38 @@ When("they keep the note the assistant proposed an edit to", async ({ page, scen
 
 When("they open the workspace's {word}", async ({ page }, area: string) => {
   const name = area.charAt(0).toUpperCase() + area.slice(1);
-  await page.getByRole("navigation", { name: "Workspace" }).getByRole("link", { name }).click();
+  await page
+    .getByRole("navigation", { name: "Workspace", exact: true })
+    .getByRole("link", { name })
+    .click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(name);
 });
 
+/** The artifact's page: the region its heading names, which holds its content and its actions. */
+const artifactPage = (page: Page) =>
+  page.getByRole("region").filter({ has: page.getByRole("heading", { level: 1 }) });
+
 When("they open the note", async ({ page, scenario }) => {
   const note = kept(scenario.note);
-  await page.getByRole("list", { name: "Artifacts" }).getByRole("link", { name: note }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(note);
+  // The list names a note by its title, and gives its id beside it.
+  const row = page
+    .getByRole("list", { name: "Artifacts" })
+    .getByRole("listitem")
+    .filter({ hasText: note });
+  const link = row.getByRole("link");
+  const title = (await link.innerText()).trim();
+  expect(title).not.toBe(note);
+  await link.click();
+  await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+  // The id stays in view, beside the kind and the version.
+  await expect(artifactPage(page).getByText(note)).toBeVisible();
 });
 
-Then("the note reads {string}", async ({ page, scenario }, text: string) => {
-  const note = page.getByRole("region", { name: kept(scenario.note) });
-  await expect(note.getByText(text, { exact: true })).toBeVisible();
+Then("the note reads {string}", async ({ page }, text: string) => {
+  // The note's own paragraph: its title, in the heading, may say the same.
+  await expect(
+    artifactPage(page).getByText(text, { exact: true }).and(page.locator("p")),
+  ).toBeVisible();
 });
 
 Then(
@@ -68,15 +87,12 @@ Then("they are told it isn't found", async ({ page }) => {
   });
 });
 
-When("they find the note helpful", async ({ page, scenario }) => {
-  const note = page.getByRole("region", { name: kept(scenario.note) });
-  await note.getByRole("button", { name: "Helpful", exact: true }).click();
+When("they find the note helpful", async ({ page }) => {
+  await artifactPage(page).getByRole("button", { name: "Helpful", exact: true }).click();
 });
 
-Then("the note shows them finding it helpful", async ({ page, scenario }) => {
-  const note = page.getByRole("region", { name: kept(scenario.note) });
-  await expect(note.getByRole("button", { name: "Helpful", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+Then("the note shows them finding it helpful", async ({ page }) => {
+  await expect(
+    artifactPage(page).getByRole("button", { name: "Helpful", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
 });

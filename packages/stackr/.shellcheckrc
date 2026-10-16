@@ -1,3 +1,6 @@
 # SC2329: scripts/smoke calls its checks through `eventually` and its cleanup through `trap`,
 # which shellcheck can't follow, so it reports those functions as never invoked.
 disable=SC2329
+# deploy/aws/check and tier2 source checkov.env, beside them: follow it.
+external-sources=true
+source-path=SCRIPTDIR

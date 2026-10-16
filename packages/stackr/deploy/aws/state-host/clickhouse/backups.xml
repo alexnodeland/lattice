@@ -1,0 +1,13 @@
+<!-- ClickHouse's backups on the AWS recipe's state host (ADR-0037): the bucket, as the `backups`
+     named collection, from CLICKHOUSE_BACKUP_URL in the environment, so no URL is written in a
+     BACKUP statement. It holds no key: the instance role's temporary credentials are handed to
+     each statement by backup and restore-drill, which ClickHouse masks in its logs, so none rests
+     in a file or in the container's environment. The `backup` user (deploy/host/clickhouse/
+     backup-user.xml, as the single host's) uses it. -->
+<clickhouse>
+  <named_collections>
+    <backups>
+      <url from_env="CLICKHOUSE_BACKUP_URL"/>
+    </backups>
+  </named_collections>
+</clickhouse>

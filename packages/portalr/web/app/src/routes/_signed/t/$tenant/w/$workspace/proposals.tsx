@@ -16,15 +16,19 @@ function Proposals() {
     (a, b) => Number(b.status === "open") - Number(a.status === "open"),
   );
   return (
-    <>
-      <PageHeader title="Proposals" meta={`Every proposal in ${workspace}, the open ones first`} />
+    <section aria-labelledby="proposals" className="flex max-w-190 flex-col gap-6">
+      <PageHeader
+        id="proposals"
+        title="Proposals"
+        meta={`Every proposal in ${workspace}, the open ones first`}
+      />
       <Connection snapshot={snapshot} waiting="the workspace" />
       {snapshot.status === "live" && listed.length === 0 && (
         <EmptyState title="No proposals yet">
           The agent proposes a change to an artifact here when it may not make the change itself.
         </EmptyState>
       )}
-      <div className="flex max-w-190 flex-col gap-3">
+      <div className="flex flex-col gap-3">
         {listed.map((proposal) => {
           const artifact = proposedOn(proposal);
           return (
@@ -51,6 +55,6 @@ function Proposals() {
           );
         })}
       </div>
-    </>
+    </section>
   );
 }

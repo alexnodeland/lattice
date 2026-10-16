@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The state host's first boot (RFC-0004): Docker, with its logs rotated, and Compose; the data volume
-# at /data; lattice at commit ${lattice_commit}; and a systemd unit that runs deploy/aws/state-host's
-# Compose at every boot. Each time the unit starts, it reads ClickHouse's passwords from Secrets
+# at /data; lattice at commit ${lattice_commit}; a systemd unit that runs deploy/aws/state-host's
+# Compose at every boot; and the timers that back ClickHouse up to the backups bucket and run the
+# restore drill (ADR-0037). Each time the unit starts, it reads ClickHouse's passwords from Secrets
 # Manager into /run/stackr/.env, on tmpfs and private: nothing rests on disk, and a rotated secret
 # reaches the host with `systemctl restart stackr-state`.
 set -euo pipefail
@@ -11,7 +12,7 @@ exec >/var/log/stackr-state-host.log 2>&1
 mkdir -p /etc/docker
 echo '{"log-driver": "json-file", "log-opts": {"max-size": "10m", "max-file": "3"}}' >/etc/docker/daemon.json
 apt-get update -q
-DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker.io docker-compose-v2 git
+DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker.io docker-compose-v2 git jq curl
 
 # The data volume, by its id: formatted only when it has no filesystem (blkid's 2), mounted at /data
 # at every boot.
@@ -47,9 +48,13 @@ secret() {
 }
 password=$(secret '${secret_arn}')
 admin=$(secret '${admin_arn}')
+backup=$(secret '${backup_arn}')
 umask 077
-printf 'STATE_HOST_ADDRESS=%s\nCLICKHOUSE_PASSWORD=%s\nCLICKHOUSE_ADMIN_PASSWORD=%s\n' \
-  '${address}' "$password" "$admin" >/run/stackr/.env
+# The bucket is ClickHouse's `backups` collection, read when it starts.
+printf 'STATE_HOST_ADDRESS=%s\nCLICKHOUSE_PASSWORD=%s\nCLICKHOUSE_ADMIN_PASSWORD=%s\nCLICKHOUSE_BACKUP_PASSWORD=%s\nCLICKHOUSE_BACKUP_URL=%s\n' \
+  '${address}' "$password" "$admin" "$backup" 'https://${backups_bucket}.s3.${region}.amazonaws.com/' >/run/stackr/.env
+# What the backup units read, which is not the passwords.
+printf 'STATE_PROMETHEUS_URL=http://%s:9090\n' '${address}' >/run/stackr/backup.env
 SCRIPT
 chmod 0700 /usr/local/sbin/stackr-state-env
 
@@ -74,5 +79,12 @@ TimeoutStartSec=15min
 [Install]
 WantedBy=multi-user.target
 UNIT
+# The nightly backup and the weekly restore drill, from the checkout, with its path in the units.
+for unit in backup.service backup.timer restore-drill.service restore-drill.timer; do
+  sed 's|@STACKR_DIR@|/opt/lattice/packages/stackr|g' \
+    "/opt/lattice/packages/stackr/deploy/aws/state-host/systemd/stackr-state-$unit" \
+    >"/etc/systemd/system/stackr-state-$unit"
+done
 systemctl daemon-reload
 systemctl enable --now stackr-state.service
+systemctl enable --now stackr-state-backup.timer stackr-state-restore-drill.timer

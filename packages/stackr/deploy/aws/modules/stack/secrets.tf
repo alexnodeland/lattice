@@ -20,8 +20,8 @@ module "secrets" {
       gotrue-jwt-secret        = {}
       clickhouse-password      = {}
     },
-    # ClickHouse's admin is the state host's users.xml's: Floci's ClickHouse has none.
-    { for key, secret in { clickhouse-admin-password = {} } : key => secret if var.state_host == "ec2" },
+    # ClickHouse's admin and backup users are the state host's: Floci's ClickHouse has neither.
+    { for key, secret in { clickhouse-admin-password = {}, clickhouse-backup-password = {} } : key => secret if var.state_host == "ec2" },
   ) : key => merge(secret, { version = lookup(var.secret_versions, key, 1) }) }
   # GoTrue's key set and the service role's key, which the auth-keys task writes, each a secret of
   # its own, as GoTrue and the application read them whole; and the

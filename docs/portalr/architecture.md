@@ -21,17 +21,19 @@ An application mounts `portalr_router(resolve_actor=, grants=, readers=, invite=
 |---|---|---|
 | `/portalr/app/`, `/portalr/admin/` | The built UIs: hashed assets cached for good, the index for every client-side route, a strict Content-Security-Policy | Nothing |
 | `GET /portalr/config.json` | Supabase's URL and publishable key, the surfaces' paths, and which tools are configured | Nothing |
-| `GET /portalr/v1/traces`, `/traces/{id}` | The tenant's traces, a session's or a run's, and one trace's spans, from Tempo | `portalr:read_telemetry` |
-| `GET /portalr/v1/logs` | The tenant's logs, a thread's or a run's, from Loki | `portalr:read_telemetry` |
+| `GET /portalr/v1/traces`, `/traces/{id}` | The tenant's traces, a session's or a run's, and one trace's spans, each once, with only the attributes known to be safe: the rest are named, and given for one span with `content=true&span=`, not kept ([ADR-0030](adr/0030-traces-and-the-trace-view.md)) | `portalr:read_telemetry` |
+| `GET /portalr/v1/logs`, `/logs/{record_id}` | The tenant's newest logs in a window of at most 24 hours, a thread's or a run's, without their lines and with only the labels known to be safe; one record's line, `no-store`, when asked for ([ADR-0031](adr/0031-logs-and-health.md)) | `portalr:read_telemetry` |
 | `GET /portalr/v1/metrics` | `turn_latency`, or `failed_turns` counted over each step, over time, from Prometheus through prom-label-proxy | `portalr:read_telemetry` |
 | `GET /portalr/v1/scores` | The tenant's feedback and evaluation scores, newest first, each with its trace's workspace, from Langfuse, and whether they are all there were (ADR-0027) | `portalr:read_telemetry` |
 | `GET /portalr/v1/feedback` | The tenant's feedback and evaluations in a window of at most 91 days, or one workspace's, summed by day in UTC from its scores, within the read's bounds ([ADR-0027](adr/0027-feedback-and-evaluations.md)) | `portalr:read_telemetry` |
 | `GET /portalr/v1/spend` | The tenant's spend against its budget, from its LiteLLM team | `portalr:read_spend` |
+| `GET /portalr/v1/usage` | The tenant's spend per day in a window of at most 91 days, from its LiteLLM team, each named workspace's from its `tenant-workspace:` tag, and a day's share of its budget, within the read's bounds ([ADR-0028](adr/0028-usage-and-spend.md)) | `portalr:read_spend` |
 | `GET /portalr/v1/deployment/tenants` | Every tenant, and their spend from one LiteLLM team list | `portalr:read_deployment` |
+| `POST /portalr/v1/deployment/tenants` | Creates a tenant, its first owner invited or found by email through Supabase Auth, then made by grantr; the tenant and the owner's user id are answered, never the email ([ADR-0034](adr/0034-tenants-and-the-deployments-audit.md)) | `portalr:read_deployment`, and `grantr:create_tenant` |
 | `GET /portalr/v1/deployment/links` | Deep links into Langfuse and Grafana | `portalr:read_deployment` |
 | `POST /portalr/v1/invites` | Invites someone through Supabase Auth, and adds them to the tenant in grantr | `grantr:add_member` |
 
-Each read names its tenant with `X-Tenant`. Each answers `ok`, `unavailable` or `unconfigured`, so a tool that is down fails only its own read. A refused request answers 400, 401, 403 or 422 with a `Refused` body, as artifactr's and reflexr's routers do. `schemas/portalr.openapi.json` is the routes' document, and a test holds it to the router.
+Each read names its tenant with `X-Tenant`. Each answers `ok`, `unavailable` or `unconfigured`, so a tool that is down fails only its own read. A refused request answers 400, 401, 403 or 422 with a `Refused` body, as artifactr's and reflexr's routers do: lattice-core's, from which `refusals` builds the four statuses it documents ([lattice ADR-0021](../adr/0021-the-refusal-schema-needs-no-extra.md)). `schemas/portalr.openapi.json` is the routes' document, and a test holds it to the router.
 
 ## The readers
 
@@ -90,7 +92,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `Request` | What a paused run waits on: a call to approve, or a question | An approval, a denial or an answer |
 | `ProposalCard` | A proposed change, its rationale and how it was resolved | Accept or reject |
 | `RunStatus` | How a run is going | Nothing |
-| `ArtifactContent`, `rendererFor`, `markdown`, `json` | An artifact, through the renderer its kind is registered with, or as JSON | Nothing |
+| `ArtifactContent`, `rendererFor`, `markdown`, `json` | An artifact, through the renderer its kind is registered with, or as JSON; a renderer also gives its title ([ADR-0029](adr/0029-ui-polish-from-the-screenshots.md)) | Nothing |
 | `Diff` | What a revision changed, as `client`'s `changes` cut it | Nothing |
 | `Thumbs` | The reader's thumbs on a message, an artifact or a run, and why | Thumbs, then a comment ([ADR-0018](adr/0018-the-runs-area-and-feedback.md)) |
 | `CommandButton` | One action, waiting while its command is in flight | The command |
@@ -111,8 +113,14 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `/t/$tenant/access/members`, `/groups`, `/keys`, `/roles`, `/grants` | Access: members, invited or made as service principals, and removed; groups; keys, a secret shown once, and revoked; roles, built in and custom; and grants, given and revoked. Each part where grantr allows its read, as a table or, on a phone, cards ([ADR-0024](adr/0024-access-members-groups-and-keys.md), [ADR-0025](adr/0025-access-roles-and-grants.md)) |
 | `/t/$tenant/audit` | Audit: grantr's log for the tenant, the newest on top, a sentence per change with who made it and when, filtered by type and maker in the address ([ADR-0026](adr/0026-audit.md)) |
 | `/t/$tenant/feedback` | Feedback: people's thumbs per day, each evaluation's mean per day, each workspace's share and thumbs, and what people said, from portalr's summary, in a window and a workspace the address keeps ([ADR-0027](adr/0027-feedback-and-evaluations.md)) |
+| `/t/$tenant/traces`, `/traces/$trace` | Traces: the tenant's newest traces in a window, or a thread's or a run's, and a trace's spans as a tree and a waterfall, with what a span withheld read for that span when asked, from Tempo ([ADR-0030](adr/0030-traces-and-the-trace-view.md)) |
+| `/t/$tenant/logs` | Logs: the newest records in a window, or a thread's or a run's, with a line read for one record when asked, and Health: a turn's latency and failed turns over time, at a step it says ([ADR-0031](adr/0031-logs-and-health.md)) |
+| `/t/$tenant/runs` | Runs: a workspace's rule runs live from reflexr's stream, those needing attention or every one, each retried, skipped or cancelled after a confirmation, once, with what people did to it; beyond the RFC's read-only row ([ADR-0032](adr/0032-runs-in-admin.md)) |
+| `/t/$tenant/usage` | Usage: the spend per day, each day against its share of the budget where there is one, and each workspace's part, from portalr's usage read, in a window the address keeps ([ADR-0028](adr/0028-usage-and-spend.md)) |
 | `/deployment` | Every tenant, for operators, with the deployment's areas alone |
 | `/deployment/` | Home: the tenants, and their spend |
+| `/deployment/tenants` | Tenants: every tenant with its spend and budget, fifty at a time, and a tenant created with its owner by email, once confirmed ([ADR-0034](adr/0034-tenants-and-the-deployments-audit.md)) |
+| `/deployment/audit` | The deployment's audit log: operators made and revoked, newest first ([ADR-0034](adr/0034-tenants-and-the-deployments-audit.md)) |
 
 `moon run admin:bdd` runs admin's features against the test application, which sends its telemetry through stackr's Collector to Tempo, Loki and Prometheus, with Langfuse and LiteLLM unconfigured.
 
@@ -124,7 +132,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 |---|---|
 | `AppShell` | The frame: a rail from 1024 pixels, a bar and a drawer below, and the mark of `app` or `admin` |
 | `SideNav`, `NavLink` | The areas, the current one marked, with how many wait for the reader |
-| `Switcher` | The tenant and the workspace, and a menu of the others |
+| `Switcher` | The tenant and the workspace, or the tenant alone, and a menu of the others |
 | `AccountMenu` | Who is signed in, their scheme, and signing out |
 | `PageHeader` | A page's way back, its one heading, a line about it, and its actions |
 | `Card`, `EmptyState`, `Table` | What asks something of the reader; nothing yet, and what to do; rows, named by a caption or by a heading beside them, a row's header in the row's own type |
@@ -136,10 +144,14 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `TenantSwitcher` | admin's tenant, or every tenant, and a menu of the others |
 | `StatCard` | One figure, read on its own, or why there's none |
 | `ItemTable` | Items as a table from 640 pixels, each row named by its first cell or a name of its own, and as headed cards below, one in the accessibility tree; an `EmptyState` with none |
-| `TabNav`, `TabLink` | An area's parts as tabs of links, the current one marked with `aria-current` |
+| `TabNav`, `TabLink` | An area's parts as tabs of links, the current one marked with `aria-current`, on one row that scrolls on a phone |
 | `CheckboxGroup` | Several choices, any of them checked, named by a legend |
 | `SignIn`, `Account` | Signing in, and the account menu over a session, for both UIs |
 | `BarChart`, `LineChart`, `DonutChart` | Tremor's charts, adapted, on Recharts: the inks as marks, a pattern and a label per series, and the figures as a table ([ADR-0027](adr/0027-feedback-and-evaluations.md)) |
+| `TraceView` | A trace's spans as an ARIA tree with a waterfall, virtualized, and the chosen span's details; what a span withheld is shown when asked for ([ADR-0030](adr/0030-traces-and-the-trace-view.md)) |
+| `LogList`, `AnsiText` | Log records as a virtualized ARIA listbox with the chosen record's details; a line in the eight palette colours and bold, with every other escape stripped ([ADR-0031](adr/0031-logs-and-health.md)) |
+| `RunList`, `RuleRunStatus` | Rule runs as a table, or cards on a phone, with each row's actions, and a run's status as a word and a shape ([ADR-0032](adr/0032-runs-in-admin.md)) |
+| `Tracker` | Tremor's tracker, adapted: a block per day, each in its level's mark, a pattern past the second, the levels in a legend, and the figures as a table ([ADR-0028](adr/0028-usage-and-spend.md)) |
 | `Moment` | A time in the reader's zone, and how long ago on hover ([ADR-0026](adr/0026-audit.md)) |
 | `Dialog` | A dialog over the page, opened by its caller, with where focus starts and where it returns ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |
 | `Menu` | A button and the actions it opens, each of which may be disabled while it's being done |
@@ -152,4 +164,4 @@ Every area of a workspace renders in `AppShell`. The screens outside one are ui'
 
 ## The wheel
 
-Vite builds `app` and `admin` into `src/portalr/static/`, which git ignores and the wheel carries. portalr's `build` depends on theirs, and `ui-in-wheel`, in `check` and the release workflow, fails unless this version's wheel holds both, each with its typefaces, and the typefaces' licences.
+Vite builds `app` and `admin` into `src/portalr/static/`, which git ignores and the wheel carries. portalr's `build` depends on theirs, and `ui-in-wheel`, in `check` and the release workflow, fails unless this version's wheel holds both, each with its typefaces, and the typefaces' licences, and each UI's third-party notices ([ADR-0033](adr/0033-third-party-notices-for-the-bundled-javascript.md)): the licences of the packages its bundle holds, written by its build, which fails on one the policy in `web/notices/policy.json` doesn't allow.

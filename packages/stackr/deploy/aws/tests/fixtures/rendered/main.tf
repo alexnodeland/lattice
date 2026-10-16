@@ -18,6 +18,8 @@ output "user_data" {
     lattice_commit = "0123456789abcdef0123456789abcdef01234567"
     secret_arn     = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-password-AbCdEf"
     admin_arn      = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-admin-password-AbCdEf"
+    backup_arn     = "arn:aws:secretsmanager:us-east-1:000000000000:secret:stackr/clickhouse-backup-password-AbCdEf"
+    backups_bucket = "stackr-backups-0123456789"
     region         = "us-east-1"
     aws_cli_image  = "amazon/aws-cli"
   })

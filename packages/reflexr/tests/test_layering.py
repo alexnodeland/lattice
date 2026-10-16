@@ -16,18 +16,22 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (reflexr packages it may import, third-party packages it may import)
     # lattice-core's helpers, shared with artifactr (lattice ADR-0018).
     "core": ({"reflexr.core"}, {"pydantic", "pydantic_core", "lattice_core.schema"}),
-    "telemetry": ({"reflexr.core", "reflexr.telemetry"}, {"opentelemetry"}),
+    # The telemetry contract's MetricsDetail, which needs no extra (lattice ADR-0020).
+    "telemetry": (
+        {"reflexr.core", "reflexr.telemetry"},
+        {"opentelemetry", "lattice_core.otel.contribution"},
+    ),
     "workspace": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace"},
         {"pydantic", "opentelemetry", "cronsim", "lattice_core.text"},
     ),
     "fastapi": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.fastapi"},
-        {"pydantic", "opentelemetry", "fastapi", "starlette"},
+        {"pydantic", "opentelemetry", "fastapi", "starlette", "lattice_core.refusals"},
     ),
     "mcp": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.mcp"},
-        {"pydantic", "opentelemetry", "mcp", "starlette"},
+        {"pydantic", "opentelemetry", "mcp", "starlette", "lattice_core.logs"},
     ),
     # The feedback mirror, on evalr's score mapping and ports (ADR-0045).
     "scores": (
@@ -39,17 +43,19 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.evals"},
         {"pydantic", "evalr"},
     ),
+    # The OpenTelemetry SDK adapter, on lattice-core's; it names SQLAlchemy's engines only in
+    # its annotations.
     "otel": (
-        {"reflexr.telemetry", "reflexr.otel", "reflexr.langfuse"},
-        {"opentelemetry", "pydantic_ai", "fastapi", "sqlalchemy", "langfuse"},
+        {"reflexr.telemetry", "reflexr.otel"},
+        {"opentelemetry", "sqlalchemy", "lattice_core.otel"},
     ),
     "langfuse": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.langfuse"},
-        {"langfuse", "opentelemetry"},
+        {"langfuse", "opentelemetry", "lattice_core.langfuse"},
     ),
     "litellm": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.litellm"},
-        {"pydantic_ai", "opentelemetry", "httpx2"},
+        {"pydantic_ai", "opentelemetry", "lattice_core.litellm", "lattice_core.tags"},
     ),
     "agent": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.agent"},

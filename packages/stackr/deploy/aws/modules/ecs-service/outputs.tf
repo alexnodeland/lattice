@@ -43,3 +43,16 @@ output "security_group_ids" {
   description = "Its tasks' security groups."
   value       = var.security_group_ids
 }
+
+output "log_group_name" {
+  description = "The CloudWatch Logs group its containers write to, each stream named <name>/<container>/<task>."
+  value       = aws_cloudwatch_log_group.this.name
+}
+
+output "environment" {
+  description = "Its main container's settings, by name: what ECS gives it besides its secrets."
+  value = {
+    for setting in lookup(one([for container in jsondecode(aws_ecs_task_definition.this.container_definitions) : container if container.name == var.name]), "environment", []) :
+    setting.name => setting.value
+  }
+}

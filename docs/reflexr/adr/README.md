@@ -42,7 +42,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0038](0038-dashboards-generated-tested-and-released.md) | Dashboards generated, tested and released | Accepted; its release assets superseded by 0050 |
 | [0039](0039-namespaced-event-types.md) | Namespaced event types | Accepted; its reserved publishers amended by 0057 |
 | [0040](0040-telemetry-that-composes-across-libraries.md) | Telemetry that composes across libraries, untraced polling and mirror cursors | Accepted |
-| [0041](0041-executing-runs.md) | Executing runs | Accepted |
+| [0041](0041-executing-runs.md) | Executing runs | Accepted, amended by 0066 |
 | [0042](0042-cancel-safe-storage.md) | Cancel-safe storage | Accepted |
 | [0043](0043-graph-checkpoints.md) | Graph checkpoints | Accepted |
 | [0044](0044-surfaces.md) | Surfaces | Accepted; partly superseded by 0047, its authorization amended by 0056 |
@@ -67,5 +67,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0063](0063-a-stored-rules-history.md) | A stored rule's history, read by its name | Accepted |
 | [0064](0064-the-protocol-schema-names-reflexrs-own-events.md) | The protocol schema names reflexr's own events | Accepted |
 | [0065](0065-an-access-token-redacted-from-span-urls.md) | An access token redacted from the spans' URLs | Accepted, amended by [lattice ADR-0018](../../adr/0018-lattice-core-what-the-libraries-share.md) |
+| [0066](0066-an-epoch-fences-each-attempt.md) | An epoch fences each attempt | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

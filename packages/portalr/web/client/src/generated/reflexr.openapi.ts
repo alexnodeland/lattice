@@ -1194,6 +1194,11 @@ export interface components {
              * @default 0
              */
             depth: number;
+            /**
+             * Epoch
+             * @default 0
+             */
+            epoch: number;
             /** Error */
             error?: string | null;
             /** Fired Seq */

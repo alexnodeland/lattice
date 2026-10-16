@@ -10,7 +10,7 @@ Amends [ADR-0032](0032-documentation-site.md), where the site is built, and [ADR
 
 The build's steps were written three times, in `make docs`, CI's Docs job and `docs.yml`, and it ran in two places: CI's Docs job on every pull request and push, and `docs.yml` on every push to `main`, so each push to `main` built the site twice. `make docs` left out the changelog, so it built a different site from either workflow. And `docs.yml` queued every run in one `pages` concurrency group: if pull requests ran it too, their builds would wait in the same queue as `main`'s deployments, where a waiting run is cancelled by the next one to arrive.
 
-evalr and stackr had the same arrangement, and changed it in [evalr's ADR-0013](https://github.com/alexnodeland/evalr/blob/main/docs/adr/0013-docstrings-in-markdown-and-one-docs-build.md) and [stackr's ADR-0014](https://github.com/alexnodeland/stackr/blob/main/docs/adr/0014-one-docs-build.md). reflexr follows them, as artifactr does in [its ADR-0050](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0050-one-docs-build.md), so the family's sites are built the same way.
+evalr and stackr had the same arrangement, and changed it in [evalr's ADR-0013](../../evalr/adr/0013-docstrings-in-markdown-and-one-docs-build.md) and [stackr's ADR-0014](../../stackr/adr/0014-one-docs-build.md). reflexr follows them, as artifactr does in [its ADR-0050](../../artifactr/adr/0050-one-docs-build.md), so the family's sites are built the same way.
 
 ## Decision
 

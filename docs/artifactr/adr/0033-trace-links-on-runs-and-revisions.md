@@ -20,7 +20,7 @@
 
 ### Amendment (2026-09-29): envelopes carry the trace context
 
-[stackr RFC-0002](https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md) bridges artifactr's events into reflexr, and a run a bridged event starts should link back to the turn or request that caused it ([#60](https://github.com/alexnodeland/artifactr/issues/60)). reflexr's envelopes carry `traceparent` for this; artifactr's did not.
+[stackr RFC-0002](../../stackr/rfcs/0002-the-combined-system.md) bridges artifactr's events into reflexr, and a run a bridged event starts should link back to the turn or request that caused it ([#60](https://github.com/alexnodeland/artifactr/issues/60)). reflexr's envelopes carry `traceparent` for this; artifactr's did not.
 
 - **`Envelope.traceparent`** is the W3C trace context of the span that committed the event, or `None`. It has the name, format and meaning of reflexr's field, and `current_traceparent()` is reflexr's function. A trace id alone would not do: a link needs the span.
 - **The workspace sets it** from the current span as it saves: a command's `artifactr.commit` span, or whatever span is current for a recorded fact. `Transaction.save` takes it beside the actor, as reflexr's `Entry` does, so a `Storage` implemented elsewhere must store it too.

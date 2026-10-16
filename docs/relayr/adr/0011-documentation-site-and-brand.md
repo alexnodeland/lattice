@@ -45,7 +45,7 @@ artifactr and reflexr keep their extension because their docstrings already use 
 - Harder: magenta is the ink artifactr and reflexr share and the colour that marks interaction on their sites, so relayr's mark is the family's closest to its neighbours in colour, and its working colour is the nearest to reflexr's red. Its shape carries the difference.
 - Harder: the family pages in the siblings' repositories (reflexr's brand page and its family sheet) list four marks, and need relayr added there.
 
-[a-adr-0050]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0050-one-docs-build.md
-[e-adr-0013]: https://github.com/alexnodeland/evalr/blob/main/docs/adr/0013-docstrings-in-markdown-and-one-docs-build.md
-[r-adr-0046]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0046-one-docs-build.md
+[a-adr-0050]: ../../artifactr/adr/0050-one-docs-build.md
+[e-adr-0013]: ../../evalr/adr/0013-docstrings-in-markdown-and-one-docs-build.md
+[r-adr-0046]: ../../reflexr/adr/0046-one-docs-build.md
 [r-brand]: https://github.com/alexnodeland/reflexr/blob/main/docs/assets/brand/README.md#the-family

@@ -519,3 +519,19 @@ def test_an_id_holds_nothing_of_a_withheld_value_of_a_safe_label() -> None:
     )
     assert [each.id.rsplit("-", 1)[1] for each, _ in placed] == ["0", "1"]
     assert [line for _, line in placed] == ["a", "b"]
+
+
+def test_a_tenants_links_name_the_tenant_as_each_tool_reads_it() -> None:
+    langfuse = Langfuse("http://langfuse", project="p1")
+    assert langfuse.tenant_traces_link("acme") == (
+        "http://langfuse/project/p1/traces?filter="
+        "traceTags%3BarrayOptions%3B%3Bany%20of%3Btenant%253Aacme"
+    )
+    # Langfuse escapes a pipe and a backslash in a value before it percent-encodes it.
+    odd = langfuse.tenant_traces_link("a|b\\c d")
+    assert odd.endswith("tenant%253Aa%255C%257Cb%255C%255Cc%2520d")
+    grafana = Grafana("http://grafana")
+    logs = parse_qs(urlparse(grafana.tenant_logs_link('a"b')).query)["left"][0]
+    assert jsonlib.loads(logs)["queries"][0]["expr"] == '{service_name=~".+"} | tenant_id = "a\\"b"'
+    traces = parse_qs(urlparse(grafana.tenant_traces_link("acme")).query)["left"][0]
+    assert jsonlib.loads(traces)["queries"][0]["query"] == '{ span.tenant.id = "acme" }'

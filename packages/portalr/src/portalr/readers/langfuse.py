@@ -17,6 +17,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Annotated, Final, Literal
+from urllib.parse import quote, urlencode
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
@@ -52,9 +53,14 @@ LOOKBACK: Final = timedelta(days=7)
 evaluator's verdict on yesterday's turn, is counted on the day it was given."""
 
 
+def tenant_tag_of(tenant: str) -> str:
+    """The trace tag that names a tenant by its id: ``tenant:<id>``."""
+    return f"tenant:{tenant}"
+
+
 def tenant_tag(tenant: Tenant) -> str:
     """The trace tag that names the tenant: ``tenant:<id>``."""
-    return f"tenant:{tenant.id}"
+    return tenant_tag_of(tenant.id)
 
 
 WORKSPACE_TAG: Final = "workspace:"
@@ -401,6 +407,20 @@ class Langfuse:
                 return False
             seen.add(cursor)
         return False
+
+    def tenant_traces_link(self, tenant: str) -> str:
+        """Langfuse's traces page, filtered to the tenant's tag.
+
+        The page reads a ``filter`` query: ``column;type;key;operator;value``, the value
+        percent-encoded, here the traces' ``traceTags`` ``any of`` the tenant's tag. That is the
+        format of Langfuse 4.46.0's source, which this was checked against; it was not driven in a
+        live UI.
+        """
+        # A value has its backslashes and pipes escaped, as Langfuse does before it joins several.
+        tag = tenant_tag_of(tenant).replace("\\", "\\\\").replace("|", "\\|")
+        inner = f"traceTags;arrayOptions;;any of;{quote(tag, safe='')}"
+        query = urlencode({"filter": inner}, quote_via=quote)
+        return f"{self.url}/project/{self.project}/traces?{query}"
 
     def trace_link(self, trace_id: str) -> str:
         """Langfuse's page for a trace."""

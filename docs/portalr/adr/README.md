@@ -38,5 +38,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0030](0030-traces-and-the-trace-view.md) | Traces, and a trace view written for `ui` | Accepted |
 | [0031](0031-logs-and-health.md) | Logs without their lines, and a Health section | Accepted |
 | [0032](0032-runs-in-admin.md) | Runs in admin, with Retry, Skip and Cancel | Accepted |
+| [0035](0035-tools-and-the-record-of-opening-them.md) | Tools, links into Langfuse and Grafana, and the record of making them | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

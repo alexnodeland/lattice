@@ -1,3 +1,4 @@
+import json as jsonlib
 from pathlib import Path
 from typing import Any
 
@@ -9,10 +10,10 @@ from grantr.core import AuditEntry, Forbidden, Invalid, Member, Subject, User
 from grantr.grants import Grants
 from portalr.fastapi import portalr_router
 from portalr.invites import Invite, InviteFailed
-from portalr.readers import Readers
+from portalr.readers import Langfuse, LiteLLM, Readers
 from portalr.readers.loki import _identify
 from tests.fastapi.conftest import ALICE, SITE, Stack, app_for, resolve_actor, seeded
-from tests.tools import fails, json
+from tests.tools import Tool, fails, json
 
 WINDOW = {"start": "2026-10-12T00:00:00Z", "end": "2026-10-12T01:00:00Z"}
 
@@ -336,8 +337,11 @@ async def test_a_tool_the_application_doesnt_run_is_unconfigured(grants: Grants,
         ).json() == {
             "langfuse_trace": None,
             "langfuse_session": None,
+            "langfuse_tenant": None,
             "grafana_trace": None,
             "grafana_logs": None,
+            "grafana_tenant_logs": None,
+            "grafana_tenant_traces": None,
         }
         # Without Supabase's admin API, there is no invitation.
         invite = await client.post("/v1/invites", json={"email": "dan@acme.com"}, headers=alice)
@@ -472,3 +476,113 @@ async def test_an_invitation_supabase_refuses_is_a_bad_gateway(
         "type": "invite_failed",
         "message": "supabase answered 500",
     }
+
+
+OPS_LINKS = headers("ops", None)
+
+
+def _recorded(caplog: pytest.LogCaptureFixture) -> list[dict[str, Any]]:
+    """The records of an operator's links, as the access log wrote them."""
+    return [
+        jsonlib.loads(each.getMessage()) for each in caplog.records if each.name == "portalr.access"
+    ]
+
+
+async def test_an_operator_gets_a_tenants_links_and_it_is_recorded_with_the_tenant(
+    client: httpx.AsyncClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level("INFO", logger="portalr.access"):
+        links = (
+            await client.get(
+                "/v1/deployment/links", params={"tenant_id": "acme"}, headers=OPS_LINKS
+            )
+        ).json()
+    assert links["langfuse_tenant"] == (
+        "http://langfuse/project/p1/traces?filter="
+        "traceTags%3BarrayOptions%3B%3Bany%20of%3Btenant%253Aacme"
+    )
+    loki = links["grafana_tenant_logs"]
+    tempo = links["grafana_tenant_traces"]
+    assert loki.startswith("http://grafana/explore?left=")
+    assert "tenant_id+%3D+%5C%22acme%5C%22" in loki
+    assert "span.tenant.id+%3D+%5C%22acme%5C%22" in tempo
+    assert _recorded(caplog) == [
+        {
+            "event": "deployment_links",
+            "by": {"kind": "user", "id": "ops"},
+            "kinds": ["tenant"],
+            "tenant": "acme",
+            "tools": ["langfuse", "grafana"],
+        }
+    ]
+
+
+async def test_the_record_holds_the_kinds_of_id_and_never_the_ids_or_a_url(
+    client: httpx.AsyncClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    params = {"trace_id": "trace-secret-1", "session_id": "thr_secret", "run_id": "run_secret"}
+    with caplog.at_level("INFO", logger="portalr.access"):
+        await client.get("/v1/deployment/links", params=params, headers=OPS_LINKS)
+    (record,) = _recorded(caplog)
+    assert record["kinds"] == ["trace", "session", "run"]
+    assert record["tenant"] is None
+    logged = " ".join(each.getMessage() for each in caplog.records)
+    for secret in ("trace-secret-1", "thr_secret", "run_secret", "http://"):
+        assert secret not in logged
+
+
+async def test_nothing_is_recorded_for_a_refusal_or_for_no_ids(
+    client: httpx.AsyncClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level("INFO", logger="portalr.access"):
+        for who, tenant in (("alice", "acme"), ("bob", "acme"), ("carol", "globex")):
+            refused = await client.get(
+                "/v1/deployment/links", params={"trace_id": "t1"}, headers=headers(who, tenant)
+            )
+            assert refused.status_code == 403
+        unknown = await client.get(
+            "/v1/deployment/links", params={"tenant_id": "nowhere"}, headers=OPS_LINKS
+        )
+        assert unknown.status_code == 422
+        assert unknown.json()["detail"]["message"] == "no tenant nowhere"
+        none = await client.get("/v1/deployment/links", headers=OPS_LINKS)
+        assert none.status_code == 200
+        bad = await client.get(
+            "/v1/deployment/links", params={"trace_id": "a b"}, headers=OPS_LINKS
+        )
+        assert bad.status_code == 422
+    assert _recorded(caplog) == []
+
+
+async def test_no_key_of_a_tool_is_in_a_link_the_config_or_an_error(
+    grants: Grants, invite: Invite, ui: Path
+) -> None:
+    keyed = Stack(Tool(), Tool(), Tool(), Tool(), Tool())
+    readers = keyed.readers()
+    secret = httpx.AsyncClient(auth=("pk-lf-visible-secret", "sk-lf-hidden-secret"))
+    readers = Readers(
+        tempo=readers.tempo,
+        loki=readers.loki,
+        prometheus=readers.prometheus,
+        langfuse=Langfuse("http://langfuse", project="p1", client=secret),
+        litellm=LiteLLM(
+            "http://litellm",
+            httpx.AsyncClient(headers={"authorization": "Bearer sk-master-secret"}),
+        ),
+        grafana=readers.grafana,
+    )
+    transport = httpx.ASGITransport(app=app_for(grants, readers, invite, ui))
+    async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
+        seen = [
+            (await client.get("/v1/deployment/links", params=params, headers=OPS_LINKS)).text
+            for params in (
+                {"trace_id": "t1", "session_id": "s1", "run_id": "r1", "tenant_id": "acme"},
+                {"tenant_id": "nowhere"},
+                {"trace_id": "a b"},
+            )
+        ]
+        seen.append((await client.get("/config.json")).text)
+        seen.append((await client.get("/v1/deployment/links", headers=headers("alice"))).text)
+    for text in seen:
+        for secret_value in ("secret", "sk-", "pk-lf"):
+            assert secret_value not in text.lower().replace("trace-secret", ""), text

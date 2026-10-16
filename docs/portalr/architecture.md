@@ -29,7 +29,7 @@ An application mounts `portalr_router(resolve_actor=, grants=, readers=, invite=
 | `GET /portalr/v1/spend` | The tenant's spend against its budget, from its LiteLLM team | `portalr:read_spend` |
 | `GET /portalr/v1/usage` | The tenant's spend per day in a window of at most 91 days, from its LiteLLM team, each named workspace's from its `tenant-workspace:` tag, and a day's share of its budget, within the read's bounds ([ADR-0028](adr/0028-usage-and-spend.md)) | `portalr:read_spend` |
 | `GET /portalr/v1/deployment/tenants` | Every tenant, and their spend from one LiteLLM team list | `portalr:read_deployment` |
-| `GET /portalr/v1/deployment/links` | Deep links into Langfuse and Grafana | `portalr:read_deployment` |
+| `GET /portalr/v1/deployment/links` | Deep links into Langfuse and Grafana for a trace, a session, a run or a tenant, each recorded on `portalr.access` with who and the kinds of id, never an id's content ([ADR-0035](adr/0035-tools-and-the-record-of-opening-them.md)) | `portalr:read_deployment` |
 | `POST /portalr/v1/invites` | Invites someone through Supabase Auth, and adds them to the tenant in grantr | `grantr:add_member` |
 
 Each read names its tenant with `X-Tenant`. Each answers `ok`, `unavailable` or `unconfigured`, so a tool that is down fails only its own read. A refused request answers 400, 401, 403 or 422 with a `Refused` body, as artifactr's and reflexr's routers do: lattice-core's, from which `refusals` builds the four statuses it documents ([lattice ADR-0021](../adr/0021-the-refusal-schema-needs-no-extra.md)). `schemas/portalr.openapi.json` is the routes' document, and a test holds it to the router.
@@ -118,6 +118,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `/t/$tenant/usage` | Usage: the spend per day, each day against its share of the budget where there is one, and each workspace's part, from portalr's usage read, in a window the address keeps ([ADR-0028](adr/0028-usage-and-spend.md)) |
 | `/deployment` | Every tenant, for operators, with the deployment's areas alone |
 | `/deployment/` | Home: the tenants, and their spend |
+| `/deployment/tools` | Tools: links into Langfuse and Grafana for the ids given, a notice that they are outside the gates of Traces and Logs, and only web addresses as links ([ADR-0035](adr/0035-tools-and-the-record-of-opening-them.md)) |
 
 `moon run admin:bdd` runs admin's features against the test application, which sends its telemetry through stackr's Collector to Tempo, Loki and Prometheus, with Langfuse and LiteLLM unconfigured.
 

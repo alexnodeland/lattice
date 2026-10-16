@@ -27,6 +27,7 @@ from grantr.core import (
 from grantr.fastapi import STATUS_CODES, Caller, ResolveActor, Unauthorized
 from grantr.grants import Grants
 from lattice_core.refusals import Refused, refusals
+from portalr.access import record_links
 from portalr.actions import READ_DEPLOYMENT, READ_SPEND, READ_TELEMETRY
 from portalr.fastapi.site import Site, Surfaces
 from portalr.fastapi.ui import ui_router
@@ -120,8 +121,11 @@ class Links(BaseModel):
 
     langfuse_trace: str | None = None
     langfuse_session: str | None = None
+    langfuse_tenant: str | None = None
     grafana_trace: str | None = None
     grafana_logs: str | None = None
+    grafana_tenant_logs: str | None = None
+    grafana_tenant_traces: str | None = None
 
 
 REFUSALS: Final = refusals(400, 401, 403, 422)
@@ -315,16 +319,56 @@ def portalr_router(
         trace_id: Id | None = None,
         session_id: Id | None = None,
         run_id: Id | None = None,
-        _by: Subject = operating,
+        tenant_id: TenantId | None = None,
+        by: Subject = operating,
     ) -> Links:
-        """Deep links into Langfuse and Grafana, which aren't tenant-scoped, for operators."""
+        """Deep links into Langfuse and Grafana, which aren't tenant-scoped, for operators.
+
+        What those tools show isn't behind portalr's gates, so each call that makes a link is
+        recorded: who, the kinds of id, and the tenant's id if one was asked for, never a trace's,
+        a session's or a run's, nor a URL. A tenant that doesn't exist is refused, and nothing is
+        recorded for a refusal.
+        """
+        if tenant_id is not None and tenant_id not in await grants.tenants(by=by):
+            raise _refusal("invalid", f"no tenant {tenant_id}")
         langfuse, grafana = readers.langfuse, readers.grafana
-        return Links(
+        made = Links(
             langfuse_trace=langfuse.trace_link(trace_id) if langfuse and trace_id else None,
             langfuse_session=langfuse.session_link(session_id) if langfuse and session_id else None,
+            langfuse_tenant=langfuse.tenant_traces_link(tenant_id)
+            if langfuse and tenant_id
+            else None,
             grafana_trace=grafana.trace_link(trace_id) if grafana and trace_id else None,
             grafana_logs=grafana.run_logs_link(run_id) if grafana and run_id else None,
+            grafana_tenant_logs=grafana.tenant_logs_link(tenant_id)
+            if grafana and tenant_id
+            else None,
+            grafana_tenant_traces=(
+                grafana.tenant_traces_link(tenant_id) if grafana and tenant_id else None
+            ),
         )
+        kinds = [
+            kind
+            for kind, given in (
+                ("trace", trace_id),
+                ("session", session_id),
+                ("run", run_id),
+                ("tenant", tenant_id),
+            )
+            if given is not None
+        ]
+        if kinds:
+            record_links(
+                by,
+                kinds=kinds,
+                tenant=tenant_id,
+                tools=[
+                    tool
+                    for tool, prefix in (("langfuse", "langfuse_"), ("grafana", "grafana_"))
+                    if any(value is not None for name, value in made if name.startswith(prefix))
+                ],
+            )
+        return made
 
     if invite is not None:
         _invitations(api, grants, invite, current)

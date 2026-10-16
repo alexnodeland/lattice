@@ -2,7 +2,7 @@ import { administered } from "@portalr/client";
 import { NavLink, SideNav } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
-import { House } from "lucide-react";
+import { House, Wrench } from "lucide-react";
 import { Frame } from "../../frame";
 import { remember } from "../../last";
 
@@ -39,6 +39,9 @@ function Deployment() {
         <SideNav label="Deployment">
           <NavLink icon={House} render={<Link to="/deployment" activeOptions={{ exact: true }} />}>
             Home
+          </NavLink>
+          <NavLink icon={Wrench} render={<Link to="/deployment/tools" />}>
+            Tools
           </NavLink>
         </SideNav>
       }

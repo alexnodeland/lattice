@@ -1,0 +1,179 @@
+# Getting started
+
+This page gets portalr's two UIs, `app` and `admin`, running inside an application you already have: install the wheel, mount the router, give the UIs your Supabase project, and sign in. portalr is a Python router your application mounts beside the libraries'; the UIs are static files it carries and serves ([ADR-0001](adr/0001-a-router-the-application-mounts.md)).
+
+!!! note "What is built"
+
+    Every area of both UIs described in these guides is built and tested. Not built yet: the application template's question for portalr (phase 7 of the [plan](rfcs/0001-v0.1-implementation-plan.md)), so a generated application doesn't mount it for you; magic links and other sign-in providers (a password signs in); showing people by email ([issue #169](https://github.com/alexnodeland/lattice/issues/169)); and a colour-blind palette toggle. portalr is not on PyPI.
+
+## What you need
+
+portalr reads and writes through the packages you already run, so it needs their surfaces:
+
+| Needs | For |
+|---|---|
+| [grantr](../grantr/index.md) | Who may see and do what. Every read and command is checked by it, and the UIs ask it what to show |
+| [artifactr](../artifactr/index.md)'s router | The app's workspaces, threads, artifacts and proposals |
+| [reflexr](../reflexr/index.md)'s router | The app's rules and runs, and admin's Runs |
+| [Supabase Auth](../stackr/guides/supabase.md) | Signing in, and inviting people |
+| Any of Tempo, Loki, Prometheus, Langfuse, LiteLLM and Grafana | Admin's traces, logs and health, feedback, spend, and the operators' links. Each is optional: a tool you don't run is "not configured", and only its own area says so |
+
+[stackr](../stackr/index.md)'s stack runs all of them, and its template generates an application that mounts the libraries.
+
+## Install
+
+portalr needs Python 3.12 or newer. Its wheel carries the two built UIs, which Vite builds into it, so install the wheel, not the source: a release attaches it, and you can build it from a checkout of [lattice](https://github.com/alexnodeland/lattice).
+
+=== "A release's wheel"
+
+    ```bash
+    gh release download portalr-v<version> --repo alexnodeland/lattice --pattern '*.whl'
+    uv add ./portalr-<version>-py3-none-any.whl
+    ```
+
+=== "From a checkout"
+
+    ```bash
+    git clone https://github.com/alexnodeland/lattice && cd lattice
+    bun install --frozen-lockfile
+    moon run portalr:build    # builds both UIs, then the wheel, into packages/portalr/dist/
+    uv add packages/portalr/dist/portalr-*.whl
+    ```
+
+!!! warning "A git install has no UIs"
+
+    `pip install "portalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/portalr"` installs the Python, but the UIs are not in git: they are built into the wheel. The router would have nothing to serve at `/portalr/app/` and `/portalr/admin/`.
+
+## Mount the router
+
+`portalr_router` takes what it needs from your application and returns a FastAPI router to mount at `/portalr`:
+
+| Argument | Is |
+|---|---|
+| `resolve_actor` | Authenticates a request, as grantr's router does: it returns a `Caller`, or raises `Unauthorized` |
+| `grants` | grantr's `Grants`, with portalr's catalog, `portalr.actions.ACTIONS`, among its catalogs |
+| `readers` | The tools your stack runs, each optional |
+| `invite` | Supabase Auth's admin API, as a function from an email to a user id. Without it, there is no invitation route and no way to create a tenant from admin |
+| `site` | Your Supabase project's URL and *publishable* key, and where you mounted each router |
+
+```python
+from fastapi import FastAPI
+from starlette.requests import HTTPConnection
+
+from grantr import Grants, InMemoryStorage, User
+from grantr.fastapi import Caller, Unauthorized
+from portalr.actions import ACTIONS
+from portalr.fastapi import Site, portalr_router
+from portalr.readers import Readers
+
+grants = Grants(InMemoryStorage(), catalogs=[ACTIONS])
+
+
+async def resolve_actor(connection: HTTPConnection) -> Caller:
+    """Who the request is from. A stand-in: see below for a real one."""
+    if user := connection.headers.get("x-user"):
+        return Caller(User(id=user))
+    raise Unauthorized("sign in")
+
+
+async def invite(email: str) -> str:
+    """A stand-in for Supabase Auth's admin API: the user's id is the email's local part."""
+    return email.partition("@")[0]
+
+
+app = FastAPI()
+app.include_router(
+    portalr_router(
+        resolve_actor=resolve_actor,
+        grants=grants,
+        readers=Readers(),
+        invite=invite,
+        site=Site(supabase_url="https://project.supabase.co", supabase_key="sb_publishable_x"),
+    ),
+    prefix="/portalr",
+)
+```
+
+`resolve_actor` here trusts an `x-user` header, which is fine for a test and for nothing else. A real one verifies the access token Supabase Auth issued, from the `Authorization: Bearer` header, or from the `access_token` query on a WebSocket, which a browser opens without headers:
+
+```python title="Illustrative"
+import jwt
+
+async def resolve_actor(connection: HTTPConnection) -> Caller:
+    scheme, _, token = connection.headers.get("authorization", "").partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise Unauthorized("sign in")
+    try:
+        claims = jwt.decode(
+            token, SUPABASE_JWT_SECRET, algorithms=["HS256"],
+            audience="authenticated", options={"require": ["exp", "sub", "aud"]},
+        )
+    except jwt.InvalidTokenError as error:
+        raise Unauthorized("the access token is not valid") from error
+    return Caller(User(id=claims["sub"]))
+```
+
+A person's grantr id is their Supabase user's `sub`, an opaque UUID. grantr holds no names, so admin shows people by that id ([issue #169](https://github.com/alexnodeland/lattice/issues/169) is the plan to show emails).
+
+`Site` refuses a secret key: `config.json` is public, and a secret (`sb_secret_…` or a `service_role` JWT) bypasses row security. The `invite` function is the one place the secret key lives, in your application.
+
+## What the router serves
+
+| Route | Answers |
+|---|---|
+| `/portalr/app/` and `/portalr/admin/` | The built UIs: hashed assets cached for good, the index for every client-side route, with a strict Content-Security-Policy |
+| `GET /portalr/config.json` | What the UIs need to know about your deployment, below |
+| `/portalr/v1/…` | portalr's own reads and its two commands: [the admin guide](guides/admin.md) and [the operators' runbook](guides/operators.md) say what each is for |
+
+The UIs call the other routers directly, on the same origin and with the same token: a chat goes to artifactr's WebSocket, a rule to reflexr's REST, a grant to grantr's API. Nothing proxies them.
+
+### `config.json`
+
+The UIs read this first. It is public, so it holds no secret:
+
+| Key | Is |
+|---|---|
+| `supabase.url` | Your Supabase project's URL, or a path on your own origin that leads to it |
+| `supabase.key` | Its publishable key |
+| `surfaces` | Where you mounted each router: `artifactr` (default `/artifactr/v1`), `reflexr` (`/reflexr/v1`), `grantr` (`""`: its paths carry `/grantr/v1` themselves) and `portalr` (`/portalr/v1`). Pass `Surfaces(...)` in `Site` if you mounted them elsewhere |
+| `readers` | Which tools are configured, by name: `tempo`, `loki`, `prometheus`, `langfuse`, `litellm` and `grafana`, each true or false |
+
+```python
+from httpx import ASGITransport, AsyncClient
+
+async with AsyncClient(transport=ASGITransport(app=app), base_url="http://app") as client:
+    config = (await client.get("/portalr/config.json")).json()
+    assert sorted(config) == ["readers", "supabase", "surfaces"]
+    assert config["readers"]["tempo"] is False
+```
+
+## Name portalr's actions to grantr
+
+portalr's catalog has three actions, which grantr's roles give out:
+
+| Action | Held by | For |
+|---|---|---|
+| `portalr:read_telemetry` | A tenant's `owner` and `admin` | Feedback, traces, logs, health |
+| `portalr:read_spend` | A tenant's `owner` and `admin` | Spend and usage |
+| `portalr:read_deployment` | `operator` | The tenant list, creating a tenant, and the tools' links |
+
+Pass `catalogs=[ACTIONS, ...]` to `Grants`, as above, along with artifactr's and reflexr's. A viewer or an editor of a workspace is not shown admin: it opens for a tenant's owners and admins, and for operators.
+
+```python
+from grantr.core import TENANT
+
+await grants.first_operator("root")
+await grants.create_tenant("acme", owner="alice", by=User(id="root"))
+
+assert await grants.check("acme", User(id="alice"), "portalr:read_telemetry", TENANT)
+assert not await grants.check("acme", User(id="alice"), "portalr:read_deployment", TENANT)
+```
+
+## Sign in
+
+Open `/portalr/app/` for the people's UI, or `/portalr/admin/` for the admin UI. Both sign in through Supabase Auth with an email and a password, keep the session in the browser's `localStorage`, refresh the token, and send it with every request. Signing out ends the session in that browser alone. A request the server refuses as unsigned ends the session too, and the UI goes back to the sign-in page.
+
+- **The app** lists the tenants someone belongs to: none is "no access", one goes straight to it. Then it lists the workspaces they can open.
+- **Admin** opens on the tenant someone last used, or their only one; operators open on "All tenants"; someone with no tenant to administer is told there is no access.
+
+Next: [the app](guides/app.md), [the admin UI](guides/admin.md), and, for operators, [the runbook](guides/operators.md). Read [what portalr keeps from view](guides/privacy.md) before you give anyone admin.

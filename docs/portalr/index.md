@@ -1,6 +1,6 @@
 ---
 title: portalr
-description: The planned portal into an application built on lattice, with an app UI to chat with its agents and see their work, and an admin UI to manage access and see feedback, evaluations, usage and spend.
+description: The portal into an application built on lattice, with an app UI to chat with its agents and see their work, and an admin UI to manage access and see feedback, evaluations, usage and spend.
 hide:
   - navigation
 ---
@@ -12,13 +12,15 @@ hide:
 ![portalr](assets/brand/lockup-light.svg#gh-light-mode-only)
 ![portalr](assets/brand/lockup-dark.svg#gh-dark-mode-only)
 
-The planned portal into an application built on lattice: an `app` UI for the people who use it, to chat with its agents and see their artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and see feedback, evaluations, usage and spend.
+The portal into an application built on lattice: an `app` UI for the people who use it, to chat with its agents and see their artifacts, proposals, rules and runs, and an `admin` UI for those who run it, to manage access and see feedback, evaluations, usage and spend.
 
 </div>
 
-!!! note "In progress, not yet usable"
+!!! note "Built, and not yet released"
 
-    Built so far: its decisions and [v0.1 plan](rfcs/0001-v0.1-implementation-plan.md), the Bun workspace, its brand with `ui`'s tokens and first primitives, the typed `client`, and the router with its readers, tested against the stack's tools for two tenants, and the app's sign-in and its tenant and workspace pickers, as its [architecture](architecture.md) describes. The app's areas and the admin UI come with the plan's later phases.
+    Built and tested: the router and its readers, the app's areas (threads and chat, artifacts, proposals, runs, rules, restricting and sharing a thread), and the admin UI (home, access, audit, feedback, usage, traces, logs and health, runs, and the operators' tenants, deployment audit and tools). Each has a scenario in a browser against a test application. The [guides](getting-started.md) describe what is built, and [the architecture](architecture.md) how.
+
+    Not built yet: the application template's question for portalr, and its acceptance tests, in phase 7 of the [plan](rfcs/0001-v0.1-implementation-plan.md), so a generated application doesn't mount it for you; magic links and other sign-in providers; showing people by email, not their Supabase id ([issue #169](https://github.com/alexnodeland/lattice/issues/169)); and a colour-blind palette toggle. It is not on PyPI: install its wheel ([Getting started](getting-started.md#install)).
 
 ## Why: lattice has no face
 
@@ -26,7 +28,7 @@ Every surface in lattice is an API, a WebSocket or an MCP server, so an applicat
 
 [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md) designs that UI once, and portalr is where it is built.
 
-## What it will do
+## What it does
 
 - **The browser calls each package's own routes.** A chat goes to artifactr's WebSocket, a rule to reflexr's REST, a grant to grantr's API, on one origin with one token. portalr's router serves the UIs and adds only what no package has ([ADR-0001](adr/0001-a-router-the-application-mounts.md)).
 - **Two static apps on Vite, in React 19 and TanStack,** sharing a typed `client`, whose types are generated from each package's committed documents, and a `ui` kit ([ADR-0002](adr/0002-react-and-tanstack-as-two-static-single-page-apps.md)).
@@ -35,12 +37,17 @@ Every surface in lattice is an API, a WebSocket or an MCP server, so an applicat
 - **Every read filtered by tenant,** in one module, over the stack's shared stores ([ADR-0006](adr/0006-shared-stores-every-read-filtered.md)).
 - **Permissions asked, never guessed.** The UIs ask grantr what the user may do, and the server checks each command again.
 
-[RFC-0001](rfcs/0001-v0.1-implementation-plan.md#phases) builds these in eight phases after the foundation, and says what each waits on in grantr and the other packages. Its guides and reference come with the phases that build what they describe.
+[RFC-0001](rfcs/0001-v0.1-implementation-plan.md#phases) built these in eight phases after the foundation, and says what each waited on in grantr and the other packages.
 
 ## Where to go next
 
 | If you want to | Read |
 |---|---|
+| Mount it and sign in | [Getting started](getting-started.md) |
+| Use the app | [The app](guides/app.md) |
+| Run a tenant | [The admin UI](guides/admin.md) |
+| Run the deployment | [An operator's runbook](guides/operators.md) |
+| Know what is withheld and why | [What portalr keeps from view](guides/privacy.md) |
 | See how it is built | The [architecture](architecture.md) |
 | Understand why each part will be the way it is | The [decision records](adr/README.md) |
 | See the plan, its phases and what each waits on | [RFC-0001](rfcs/0001-v0.1-implementation-plan.md), and the [RFCs](rfcs/README.md) |

@@ -1,6 +1,12 @@
 # portalr's section of the site, in order. Paths are from docs/portalr/.
 nav:
 - Home: index.md
+- Getting started: getting-started.md
+- Guides:
+  - The app: guides/app.md
+  - The admin UI: guides/admin.md
+  - An operator's runbook: guides/operators.md
+  - What portalr keeps from view: guides/privacy.md
 - Architecture: architecture.md
 - Decisions:
   - adr/README.md
@@ -22,6 +28,23 @@ nav:
   - adr/0016-the-threads-area.md
   - adr/0017-the-artifacts-and-proposals-areas.md
   - adr/0018-the-runs-area-and-feedback.md
+  - adr/0019-the-kits-look.md
+  - adr/0020-the-rules-area.md
+  - adr/0021-the-areas-on-the-frame-and-what-admin-needs.md
+  - adr/0022-restricting-and-sharing-a-thread.md
+  - adr/0023-admins-shell-and-home.md
+  - adr/0024-access-members-groups-and-keys.md
+  - adr/0025-access-roles-and-grants.md
+  - adr/0026-audit.md
+  - adr/0027-feedback-and-evaluations.md
+  - adr/0028-usage-and-spend.md
+  - adr/0029-ui-polish-from-the-screenshots.md
+  - adr/0030-traces-and-the-trace-view.md
+  - adr/0031-logs-and-health.md
+  - adr/0032-runs-in-admin.md
+  - adr/0033-third-party-notices-for-the-bundled-javascript.md
+  - adr/0034-tenants-and-the-deployments-audit.md
+  - adr/0035-tools-and-the-record-of-opening-them.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

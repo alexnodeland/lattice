@@ -17,7 +17,7 @@ EXTRAS = {
     "sql": {"sqlalchemy"},
     "otel": {"opentelemetry", "pydantic_ai"},
     "langfuse": {"langfuse", "opentelemetry"},
-    "litellm": {"pydantic_ai", "httpx2"},
+    "litellm": {"pydantic_ai", "httpx2", "opentelemetry"},
 }
 """What each extra's module or subpackage may import beyond the standard library and pydantic."""
 

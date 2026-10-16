@@ -29,7 +29,7 @@ ADR-0001 to ADR-0007 record the decisions D1 to D7 of [stackr RFC-0002](../../st
 | [0021](0021-chains-continue-across-the-bridge.md) | Chains continue across the bridge | Accepted, amended by 0025 and 0026 |
 | [0022](0022-what-a-rules-actor-needs-in-artifactr.md) | What a rule's actor needs in artifactr | Accepted |
 | [0023](0023-traces-linked-across-the-bridge.md) | Traces linked across the bridge | Accepted |
-| [0024](0024-langfuse-sessions-tagged-with-each-other.md) | Langfuse sessions tagged with each other | Accepted, amended by 0026 |
+| [0024](0024-langfuse-sessions-tagged-with-each-other.md) | Langfuse sessions tagged with each other | Accepted, amended by 0026 and lattice ADR-0022 |
 | [0025](0025-counters-and-how-long-causes-are-kept.md) | Counters, and how long causes are kept | Accepted |
 | [0026](0026-a-retried-send-asks-again-and-turns-traced-by-their-messages.md) | A retried send asks again, and turns are traced by their messages | Accepted |
 | [0027](0027-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted |

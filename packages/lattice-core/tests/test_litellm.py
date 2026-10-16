@@ -3,9 +3,12 @@
 import json
 
 import httpx2
+import pytest
+from langfuse import propagate_attributes
+from opentelemetry import context as otel_context
 from pydantic_ai import Agent
 
-from lattice_core.litellm import litellm_model
+from lattice_core.litellm import PROPAGATED_TAG_PREFIXES, add_propagated_tags, litellm_model
 
 
 def test_a_model_names_the_proxys_group() -> None:
@@ -43,3 +46,37 @@ async def test_a_model_calls_the_proxy_through_its_http_client_with_its_settings
     assert result.output == "Done."
     [body] = bodies
     assert (body["model"], body["temperature"]) == ("claude-sonnet", 0.0)
+
+
+def test_only_the_bounded_trace_tags_follow_a_requests_own_each_once() -> None:
+    own = ["lib", "tenant:acme", "rule:page"]
+    assert add_propagated_tags(own) == own, "outside a propagate_attributes block"
+    tags = ["tenant:acme", "rule:page", "kind:note", "thread:th_1", "chain:c1", "other"]
+    with propagate_attributes(tags=tags):
+        with propagate_attributes(tags=["kind:note", "rule:review"]):
+            assert add_propagated_tags(own) == [*own, "kind:note", "rule:review"]
+        assert add_propagated_tags(own) == [*own, "kind:note"]
+    assert add_propagated_tags(own) == own, "and after it"
+
+
+def test_thread_and_chain_tags_stay_in_langfuse() -> None:
+    assert PROPAGATED_TAG_PREFIXES == ("rule:", "kind:")
+    with propagate_attributes(tags=["thread:th_1", "chain:c1", "tenant:acme", "workspace:launch"]):
+        assert add_propagated_tags(["lib"]) == ["lib"]
+
+
+@pytest.mark.parametrize("held", ["not a list", None, 7])
+def test_something_other_than_a_list_of_tags_is_ignored(held: object) -> None:
+    token = otel_context.attach(otel_context.set_value("langfuse.propagated.tags", held))
+    try:
+        assert add_propagated_tags(["lib"]) == ["lib"]
+    finally:
+        otel_context.detach(token)
+
+
+def test_a_tag_that_is_not_text_is_dropped() -> None:
+    token = otel_context.attach(otel_context.set_value("langfuse.propagated.tags", ["rule:a", 1]))
+    try:
+        assert add_propagated_tags([]) == ["rule:a"]
+    finally:
+        otel_context.detach(token)

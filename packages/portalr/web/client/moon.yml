@@ -32,6 +32,7 @@ tasks:
       - 'api/**/*'
       - 'src/**/*'
       - 'scripts/api'
+      - '/scripts/compose-project.sh'
       - '/examples/docplan/**/*'
       - '/examples/oncall/**/*'
       - '/packages/artifactr/src/**/*'

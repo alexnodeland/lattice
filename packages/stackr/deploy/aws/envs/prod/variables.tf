@@ -101,6 +101,12 @@ variable "secret_versions" {
   default     = {}
 }
 
+variable "clickhouse_backup_retention_days" {
+  description = "How many days the state host's ClickHouse backups are kept in the backups bucket: whole each night, so their size times this is what they cost, and an expired one is kept 7 days more as an old version. The restore drill's own are kept 7 (stackr ADR-0037)."
+  type        = number
+  default     = 14
+}
+
 variable "langfuse_admin_email" {
   description = "The email of Langfuse's first user, its admin; admin@<domain> when null."
   type        = string

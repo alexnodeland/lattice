@@ -1,6 +1,6 @@
 # ADR-0036: Tier 2, against Floci
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0037](0037-the-state-hosts-clickhouse-backups.md)
 **Date:** 2026-10-13
 **Deciders:** Alex Nodeland
 
@@ -82,6 +82,7 @@ Tier 1 ([ADR-0029](0029-the-aws-modules-and-tier-1.md)) plans the recipe against
 | Tempo's, Loki's and Langfuse's writes to S3 | Nothing in Floci: a check that waits for Tempo to flush a block, then lists its prefix in Floci's S3 |
 | Loki answering a query | Nothing in Floci: a log line pushed, then asked for |
 | The tasks' logs arriving in CloudWatch Logs | Nothing in Floci: a service's log stream read with `aws logs`, as `run-task` reads a one-off's |
+| The state host's EC2 pieces: its user data, systemd timers, IMDS credentials, instance role and alert rules | Floci running the state host (ADR-0025). [ADR-0037](0037-the-state-hosts-clickhouse-backups.md) has tier 2 run its ClickHouse backups and drill against Floci's S3 in a ClickHouse of its own; the rest is tier 1's tests and the manual apply on AWS |
 
 The single host's smoke covers the first two on Compose, and the manual apply on real AWS covers all of them on AWS.
 

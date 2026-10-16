@@ -29,6 +29,11 @@ output "run_task_network" {
   }
 }
 
+output "backups_bucket" {
+  description = "The backups bucket's name, where the state host's ClickHouse backups go (ADR-0037)."
+  value       = module.data.buckets["backups"].name
+}
+
 output "state_host_instance_id" {
   description = "The state host, which SSM port forwarding names as its target; none on Fargate."
   value       = one(module.state_host[*].instance_id)

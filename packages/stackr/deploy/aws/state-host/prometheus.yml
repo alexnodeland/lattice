@@ -9,6 +9,10 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# The backups' alerts, on the state host alone (ADR-0037): deploy/aws/state-host/alerts.yml.
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
 otlp:
   # Resource attributes that become labels on every series, beyond `job` and
   # `instance` (from service.name, service.namespace and service.instance.id).

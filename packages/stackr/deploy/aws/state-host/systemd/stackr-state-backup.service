@@ -1,0 +1,19 @@
+# The state host's nightly ClickHouse backup (ADR-0037): deploy/aws/state-host/backup.
+# The user data installs it, with the checkout's path in place of @STACKR_DIR@. It wants the state
+# services rather than requires them, so restarting stackr-state, as rotating a secret does, doesn't
+# stop a backup that is running.
+[Unit]
+Description=Back up the state host's ClickHouse to the backups' bucket
+Wants=stackr-state.service
+After=stackr-state.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=3h
+WorkingDirectory=@STACKR_DIR@/deploy/aws/state-host
+# Only the Prometheus URL, not ClickHouse's passwords.
+EnvironmentFile=/run/stackr/backup.env
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ExecStart=@STACKR_DIR@/deploy/aws/state-host/backup

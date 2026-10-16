@@ -157,6 +157,22 @@ variable "state_host_instance_type" {
   default     = "t4g.large"
 }
 
+variable "clickhouse_backup_retention_days" {
+  description = <<-EOT
+    How many days the state host's ClickHouse backups are kept in the backups bucket, whole each
+    night (ADR-0037): their size times this is what they cost, and an expired one is kept 7 days
+    more as an old version. The restore drill's own are kept 7.
+    Floci's state services are Fargate tasks, which have none.
+  EOT
+  type        = number
+  default     = 14
+
+  validation {
+    condition     = var.clickhouse_backup_retention_days == floor(var.clickhouse_backup_retention_days) && var.clickhouse_backup_retention_days >= 2 && var.clickhouse_backup_retention_days <= 365
+    error_message = "ClickHouse's backups are kept a whole number of days, 2 to 365: with fewer, last night's could expire before tonight's is written, and none would be left."
+  }
+}
+
 variable "destroyable" {
   description = <<-EOT
     Whether a destroy may take everything: RDS without a final snapshot, the buckets emptied, the

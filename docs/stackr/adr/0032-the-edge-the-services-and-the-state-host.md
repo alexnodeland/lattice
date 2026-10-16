@@ -1,6 +1,6 @@
 # ADR-0032: The edge, the services, and the state host
 
-**Status:** Accepted, amended by [ADR-0034](0034-the-stack-on-aws.md)
+**Status:** Accepted, amended by [ADR-0034](0034-the-stack-on-aws.md) and [ADR-0037](0037-the-state-hosts-clickhouse-backups.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 
@@ -70,7 +70,7 @@ Building it found three things the RFC didn't say:
   3. checks out lattice at a commit, by its SHA, which can't move as a tag can;
   4. starts a systemd unit that runs `deploy/aws/state-host`'s Compose at every boot.
 - **Each time the unit starts,** it reads ClickHouse's passwords, Langfuse's and its admin's, from Secrets Manager into `/run/stackr/.env`, on tmpfs and private, through the AWS CLI's pinned image. Nothing rests on disk, and a rotated secret reaches the host with `systemctl restart stackr-state`.
-- **Its backups are DLM's snapshots,** as RFC-0004's H12 chose. They are crash-consistent: ClickHouse recovers from one as from a power cut. [ADR-0027](0027-the-single-hosts-backups.md)'s `BACKUP ... TO S3`, its `backup` user and its drill aren't carried over yet ([#149](https://github.com/alexnodeland/lattice/issues/149)). Until then, an operator restores a volume from a snapshot at each upgrade, as [RFC-0004's restore drill](../rfcs/0004-hosting-recipes.md#operations) says.
+- **Its volume is snapshotted by DLM,** as RFC-0004's H12 chose. They are crash-consistent: ClickHouse recovers from one as from a power cut. [ADR-0037](0037-the-state-hosts-clickhouse-backups.md) adds [ADR-0027](0027-the-single-hosts-backups.md)'s ClickHouse backups to S3, its `backup` user and its restore drill, so ClickHouse's data has backups that are tried; Prometheus's stays on the snapshots.
 
 ### Where this departs from RFC-0004
 

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Back up the state host's ClickHouse (ADR-0037) to the backups bucket with its own BACKUP, as the
+# `backup` user: Langfuse's database and the drill's, whole, as clickhouse/<UTC time>. The
+# bucket's lifecycle rule expires them after clickhouse_backup_retention_days, 14 by default.
+# DLM's daily snapshots of the data volume remain, as crash-consistent copies of it all.
+#
+# Whatever happens, it sends stackr.backup.success, 1 or 0, to the state host's Prometheus, where
+# alerts.yml reads it. stackr-state-backup.timer runs it nightly; run it by hand with
+# `sudo systemctl start stackr-state-backup`, which also keeps it from overlapping the timer's.
+
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib"
+
+status=1
+finish() { report stackr-state-backup stackr.backup.success $((status == 0)) || true; }
+trap finish EXIT
+
+lock
+clickhouse "CREATE DATABASE IF NOT EXISTS stackr_drill"
+clickhouse "CREATE TABLE IF NOT EXISTS stackr_drill.sentinel (id String, at DateTime DEFAULT now())
+  ENGINE = MergeTree ORDER BY id"
+credentials
+name=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+clickhouse "BACKUP DATABASE default, DATABASE stackr_drill TO $(s3 "clickhouse/$name") FORMAT Null"
+log "backup: ClickHouse, as clickhouse/$name"
+status=0

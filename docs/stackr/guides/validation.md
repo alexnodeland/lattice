@@ -15,6 +15,7 @@ stackr is configuration, and most of what can go wrong with configuration shows 
 | The gateway's configuration | Every model group a fallback names exists, guardrails use integrations that need no licence and valid modes, every `os.environ/` reference is set on the `litellm` service in `compose.yaml`, and no key is written into the file. LiteLLM has no validator of its own, and starts without a guardrail it can't load |
 | The application template | Every variant rendered, under a 30-character slug whose package sorts before `conftest`, with nothing left unrendered, its libraries from lattice at the commit it was rendered from, and its Python, YAML, shell scripts and Compose file through their linters (`scripts/check-template`) |
 | Service configurations | Each with its own validator, run from the image `compose.yaml` pins, offline: `otelcol-contrib validate` for the Collector, `promtool check config` for Prometheus, `-config.verify` for Tempo and `-verify-config` for Loki |
+| The state host's backup alerts | Prometheus's rules for the backups and the restore drill, checked and unit-tested by `promtool` from the state host's Prometheus image (`deploy/aws/check`): each alert fires on a 0 and on a metric that stopped arriving, and none on a 1 |
 | Shell scripts | shellcheck |
 | Python scripts | ruff's formatter and linter |
 

@@ -9,10 +9,11 @@ output "instance_id" {
 }
 
 output "secret_arns" {
-  description = "The two secrets it reads: ClickHouse's passwords for Langfuse and for the admin."
+  description = "The three secrets it reads: ClickHouse's passwords for Langfuse, for the admin and for the backup user."
   value = {
-    clickhouse_password       = var.clickhouse_password_secret_arn
-    clickhouse_admin_password = var.clickhouse_admin_password_secret_arn
+    clickhouse_password        = var.clickhouse_password_secret_arn
+    clickhouse_admin_password  = var.clickhouse_admin_password_secret_arn
+    clickhouse_backup_password = var.clickhouse_backup_password_secret_arn
   }
 }
 

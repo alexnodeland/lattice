@@ -254,6 +254,21 @@ NAMESPACE = "stackr.internal"
 # What the state host's services must keep from compose.yaml's: only their ports and their data's
 # paths on the host differ.
 STATE_HOST_KEYS = ("image", "user", "command", "entrypoint", "healthcheck")
+STATE_HOST_EXTRA = {
+    "clickhouse": {
+        "environment": {"CLICKHOUSE_BACKUP_PASSWORD", "CLICKHOUSE_BACKUP_URL"},
+        "mounts": {
+            "/etc/clickhouse-server/users.d/backup-user.xml",
+            "/etc/clickhouse-server/config.d/backups.xml",
+        },
+    },
+    "prometheus": {"environment": set(), "mounts": {"/etc/prometheus/rules/alerts.yml"}},
+}
+"""What the state host adds to a service of compose.yaml's, and nothing more (ADR-0037): the
+`backup` user and the `backups` named collection for ClickHouse, and the backups' alert rules for
+Prometheus."""
+STATE_HOST_RULE_FILES = ["/etc/prometheus/rules/*.yml"]
+"""The rule files the state host's Prometheus reads, which the single host's doesn't."""
 EDGE = ROOT / "deploy" / "aws" / "modules" / "edge" / "variables.tf"
 STACK = ROOT / "deploy" / "aws" / "modules" / "stack" / "locals.tf"
 HOST_OVERLAY = ROOT / "deploy" / "host" / "compose.prod.yaml"
@@ -277,11 +292,23 @@ def check_aws() -> list[str]:
         for key in STATE_HOST_KEYS:
             if service.get(key) != stack[name].get(key):
                 problems.append(f"{where}: its {key} isn't compose.yaml's")
-        if set(service.get("environment", {})) != set(stack[name].get("environment", {})):
-            problems.append(f"{where}: its environment's settings aren't compose.yaml's")
-        if volume_targets(service) != volume_targets(stack[name]):
-            problems.append(f"{where}: its volumes aren't mounted where compose.yaml's are")
+        extra = STATE_HOST_EXTRA.get(name, {"environment": set(), "mounts": set()})
+        added = {key: sorted(values) or "nothing" for key, values in extra.items()}
+        if (
+            set(service.get("environment", {}))
+            != set(stack[name].get("environment", {})) | extra["environment"]
+        ):
+            problems.append(
+                f"{where}: its environment's settings aren't compose.yaml's,"
+                f" with {added['environment']} more"
+            )
+        if volume_targets(service) != volume_targets(stack[name]) | extra["mounts"]:
+            problems.append(
+                f"{where}: its volumes aren't mounted where compose.yaml's are,"
+                f" with {added['mounts']} more"
+            )
     expected = yaml.safe_load((ROOT / "deploy" / "prometheus" / "prometheus.yml").read_text())
+    expected["rule_files"] = STATE_HOST_RULE_FILES
     for job in expected["scrape_configs"]:
         for static in job.get("static_configs", []):
             static["targets"] = [
@@ -293,7 +320,7 @@ def check_aws() -> list[str]:
     if yaml.safe_load((STATE_HOST / "prometheus.yml").read_text()) != expected:
         problems.append(
             "deploy/aws/state-host/prometheus.yml isn't deploy/prometheus/prometheus.yml, "
-            f"with the services named in {NAMESPACE}"
+            f"with the services named in {NAMESPACE}, and the rule files {STATE_HOST_RULE_FILES}"
         )
     # The overlay's Compose tags (!override, !reset) aren't YAML that PyYAML reads.
     found = re.search(r"image: (caddy:\S+)", HOST_OVERLAY.read_text())

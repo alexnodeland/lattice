@@ -1,0 +1,44 @@
+# The state host's backup alerts (ADR-0037), Prometheus's own rules, evaluated where the metrics
+# are: from what backup and restore-drill send to this Prometheus, stackr.backup.success and
+# stackr.restore_drill.success, 1 or 0, each run. They are the single host's four alerts
+# (deploy/host/grafana/alerting/backups.yaml), by name and wording, and exist only where a state
+# host does, so nothing on Floci, which has none, fires. Each also fires when its metric is
+# missing for its whole window: a backup that never ran is a failed backup. A new state host fires
+# the first and third until its first backup and drill have run, as the single host's do.
+#
+# No notification is sent: Prometheus lists firing alerts under /alerts, and as the ALERTS series,
+# which Grafana's Explore queries, and an operator adds an Alertmanager. Not a Grafana-managed
+# rule, which would live in the thin image every deployment runs.
+groups:
+  - name: backups
+    interval: 5m
+    rules:
+      - alert: stackr-backup-missing
+        expr: >-
+          max_over_time(stackr_backup_success[36h]) < 1
+          or absent_over_time(stackr_backup_success[36h])
+        annotations:
+          summary: >-
+            No backup has succeeded in 36 hours. Run `sudo systemctl start stackr-state-backup`,
+            and read its output with `journalctl -u stackr-state-backup`.
+      - alert: stackr-backup-failed
+        expr: last_over_time(stackr_backup_success[2d]) < 1
+        annotations:
+          summary: >-
+            The latest backup failed. Run `sudo systemctl start stackr-state-backup`, and read its
+            output with `journalctl -u stackr-state-backup`.
+      - alert: stackr-restore-drill
+        expr: >-
+          max_over_time(stackr_restore_drill_success[8d]) < 1
+          or absent_over_time(stackr_restore_drill_success[8d])
+        annotations:
+          summary: >-
+            The restore drill hasn't passed in eight days. Run
+            `sudo systemctl start stackr-state-restore-drill`, and read its output with
+            `journalctl -u stackr-state-restore-drill`.
+      - alert: stackr-restore-drill-failed
+        expr: last_over_time(stackr_restore_drill_success[8d]) < 1
+        annotations:
+          summary: >-
+            The latest restore drill failed. Run `sudo systemctl start stackr-state-restore-drill`,
+            and read its output with `journalctl -u stackr-state-restore-drill`.

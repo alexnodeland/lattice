@@ -113,6 +113,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `/t/$tenant/audit` | Audit: grantr's log for the tenant, the newest on top, a sentence per change with who made it and when, filtered by type and maker in the address ([ADR-0026](adr/0026-audit.md)) |
 | `/t/$tenant/feedback` | Feedback: people's thumbs per day, each evaluation's mean per day, each workspace's share and thumbs, and what people said, from portalr's summary, in a window and a workspace the address keeps ([ADR-0027](adr/0027-feedback-and-evaluations.md)) |
 | `/t/$tenant/traces`, `/traces/$trace` | Traces: the tenant's newest traces in a window, or a thread's or a run's, and a trace's spans as a tree and a waterfall, with what a span withheld read for that span when asked, from Tempo ([ADR-0030](adr/0030-traces-and-the-trace-view.md)) |
+| `/t/$tenant/runs` | Runs: a workspace's rule runs live from reflexr's stream, those needing attention or every one, each retried, skipped or cancelled after a confirmation, once, with what people did to it; beyond the RFC's read-only row ([ADR-0032](adr/0032-runs-in-admin.md)) |
 | `/t/$tenant/usage` | Usage: the spend per day, each day against its share of the budget where there is one, and each workspace's part, from portalr's usage read, in a window the address keeps ([ADR-0028](adr/0028-usage-and-spend.md)) |
 | `/deployment` | Every tenant, for operators, with the deployment's areas alone |
 | `/deployment/` | Home: the tenants, and their spend |
@@ -144,6 +145,7 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `SignIn`, `Account` | Signing in, and the account menu over a session, for both UIs |
 | `BarChart`, `LineChart`, `DonutChart` | Tremor's charts, adapted, on Recharts: the inks as marks, a pattern and a label per series, and the figures as a table ([ADR-0027](adr/0027-feedback-and-evaluations.md)) |
 | `TraceView` | A trace's spans as an ARIA tree with a waterfall, virtualized, and the chosen span's details; what a span withheld is shown when asked for ([ADR-0030](adr/0030-traces-and-the-trace-view.md)) |
+| `RunList`, `RuleRunStatus` | Rule runs as a table, or cards on a phone, with each row's actions, and a run's status as a word and a shape ([ADR-0032](adr/0032-runs-in-admin.md)) |
 | `Tracker` | Tremor's tracker, adapted: a block per day, each in its level's mark, a pattern past the second, the levels in a legend, and the figures as a table ([ADR-0028](adr/0028-usage-and-spend.md)) |
 | `Moment` | A time in the reader's zone, and how long ago on hover ([ADR-0026](adr/0026-audit.md)) |
 | `Dialog` | A dialog over the page, opened by its caller, with where focus starts and where it returns ([ADR-0022](adr/0022-restricting-and-sharing-a-thread.md)) |

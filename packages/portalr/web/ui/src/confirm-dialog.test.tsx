@@ -120,3 +120,56 @@ test("a trigger with a name shows its words and is named in full", async () => {
   const trigger = screen.getByRole("button", { name: "Revoke viewer from bob on workspace notes" });
   await expect.element(trigger).toHaveTextContent("Revoke");
 });
+
+test("it can ask for a reason, which goes to the action, trimmed, and is asked for again each time", async () => {
+  const onConfirm = vi.fn(async (_reason: string) => undefined);
+  const screen = await render(
+    <ConfirmDialog
+      label="Skip"
+      title="Skip this run?"
+      confirm="Skip the run"
+      asking="Reason (optional)"
+      onConfirm={onConfirm}
+    >
+      The run is given up on.
+    </ConfirmDialog>,
+  );
+  await screen.getByRole("button", { name: "Skip", exact: true }).click();
+  const dialog = screen.getByRole("alertdialog", { name: "Skip this run?" });
+  await dialog.getByRole("textbox", { name: "Reason (optional)" }).fill("  a known outage  ");
+  await dialog.getByRole("button", { name: "Skip the run" }).click();
+  expect(onConfirm).toHaveBeenLastCalledWith("a known outage");
+  // Reopened, it is empty, and a reason may be left out.
+  await screen.getByRole("button", { name: "Skip", exact: true }).click();
+  const again = screen.getByRole("alertdialog", { name: "Skip this run?" });
+  await expect.element(again.getByRole("textbox", { name: "Reason (optional)" })).toHaveValue("");
+  await again.getByRole("button", { name: "Skip the run" }).click();
+  expect(onConfirm).toHaveBeenLastCalledWith("");
+});
+
+test("a reason is asked for only when it is asked for, and a calm action is not in the danger colour", async () => {
+  const screen = await render(
+    <ConfirmDialog
+      label="Retry"
+      title="Retry this run?"
+      confirm="Retry the run"
+      calm
+      onConfirm={vi.fn(async () => undefined)}
+    >
+      It runs again.
+    </ConfirmDialog>,
+  );
+  await screen.getByRole("button", { name: "Retry", exact: true }).click();
+  const dialog = screen.getByRole("alertdialog", { name: "Retry this run?" });
+  expect(dialog.getByRole("textbox").elements()).toEqual([]);
+  const calm = getComputedStyle(
+    dialog.getByRole("button", { name: "Retry the run" }).element(),
+  ).backgroundColor;
+  await screen.unmount();
+  const danger = await render(<Archive />);
+  await danger.getByRole("button", { name: "Archive" }).click();
+  const hot = getComputedStyle(
+    danger.getByRole("alertdialog").getByRole("button", { name: "Archive the rule" }).element(),
+  ).backgroundColor;
+  expect(calm).not.toBe(hot);
+});

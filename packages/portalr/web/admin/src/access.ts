@@ -21,7 +21,8 @@ type Resource = GrantrApi.components["schemas"]["Resource"];
 
 /**
  * Every action a tenant's screens in admin ask grantr about, on the tenant, in one read per
- * screen: Access's, and reading the audit log, which puts Audit on the rail.
+ * screen: Access's, reading the audit log, which puts Audit on the rail, and reading rule runs,
+ * which puts Runs there.
  */
 export const TENANT_ACTIONS = [
   "grantr:add_member",
@@ -36,6 +37,7 @@ export const TENANT_ACTIONS = [
   "grantr:read_audit",
   "portalr:read_telemetry",
   "portalr:read_spend",
+  "reflexr:read_runs",
 ] as const;
 
 /** Each part of Access, and the action its read takes. */

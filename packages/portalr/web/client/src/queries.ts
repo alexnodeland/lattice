@@ -97,6 +97,8 @@ export const keys = {
      */
     catalog: () => ["grantr", "~catalog"] as const,
     keyring: (tenant: string) => [...keys.grantr.access(tenant), "keys"] as const,
+    /** The deployment's audit log, as the signed-in operator, `user`, reads it. */
+    deploymentAudit: (user: string) => ["grantr", "deployment", "audit", user] as const,
     /** A tenant's audit log, as a filter keeps it: a change to access there adds to it. */
     audit: (tenant: string, filter: AuditFilter) =>
       [...keys.grantr.tenant(tenant), "audit", filter] as const,
@@ -452,6 +454,22 @@ export function createQueries(api: Api) {
                     workspace: filter.workspace ?? null,
                   },
                 },
+              }),
+            ),
+          getNextPageParam: (page) => (page.length < AUDIT_PAGE ? undefined : page[0]?.seq),
+        }),
+      /**
+       * The deployment's audit log, from its end back, a page at a time, for an operator, `user`
+       * (`grantr:grant_operator`): who was made an operator, and who stopped being one.
+       */
+      deploymentAudit: (user: string) =>
+        infiniteQueryOptions({
+          queryKey: keys.grantr.deploymentAudit(user),
+          initialPageParam: null as number | null,
+          queryFn: ({ pageParam }) =>
+            body(
+              api.grantr.GET("/grantr/v1/audit", {
+                params: { query: { last: AUDIT_PAGE, before_seq: pageParam } },
               }),
             ),
           getNextPageParam: (page) => (page.length < AUDIT_PAGE ? undefined : page[0]?.seq),

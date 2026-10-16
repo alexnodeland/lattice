@@ -178,7 +178,7 @@ test("Tempo not configured, or not answering, says so", async () => {
 /** The reads that asked for what a span withheld. */
 const content = () => reads.filter((read) => read.query.get("content") === "true");
 
-test("a trace is a tree of its spans, and nothing is withheld-read until a span asks", async () => {
+test("a trace is a tree of its spans, and what its spans withheld isn't read until one asks", async () => {
   const { screen } = await open(`/t/acme/traces/${A}`);
   const tree = screen.getByRole("tree", { name: "Spans" });
   await expect.element(tree.getByRole("treeitem", { name: /^turn,/ })).toBeVisible();

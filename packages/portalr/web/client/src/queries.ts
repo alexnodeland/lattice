@@ -581,6 +581,9 @@ export function createQueries(api: Api) {
           // span withheld is read when asked, shown, and let go: it isn't kept in the page's cache.
           staleTime: span === null ? 5 * 60_000 : 0,
           gcTime: span === null ? 5 * 60_000 : 0,
+          // A span's withheld attributes are read once, when it asks: not again as the window
+          // regains focus, and, if refused, not tried three times before it says so.
+          ...(span !== null && { retry: false, refetchOnWindowFocus: false }),
         });
       },
       /** An operator's deep links into Langfuse and Grafana for a trace. */

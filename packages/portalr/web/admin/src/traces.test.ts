@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { ID_PATTERN, shownOf, startedAt, windowOf } from "./traces";
+import { isId, shownOf, startedAt, windowOf } from "./traces";
 
 test("a window ends at the next whole minute, so a read holds a minute", () => {
   const first = windowOf(1, new Date("2026-10-15T09:30:10.500Z"));
@@ -27,7 +27,9 @@ test("the address keeps a window Traces offers, and the ids portalr takes", () =
     thread: "run_1:a@b-c.d",
     run: undefined,
   });
-  expect(ID_PATTERN).toContain("A-Za-z0-9");
+  // An id is what portalr's reads take: no spaces, nothing but letters, digits and _.:@-.
+  expect(["thr_1", "a.b:c@d-e", "0"].every(isId)).toBe(true);
+  expect(["", " ", "a b", "-a", "a/b", "a,b", "é"].some(isId)).toBe(false);
 });
 
 test("a trace's start is the moment its nanoseconds say", () => {

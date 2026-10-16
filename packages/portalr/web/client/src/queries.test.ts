@@ -468,5 +468,9 @@ test("a traces read names its window, its limit and its filter; a trace read, wh
     keys.portalr.trace("acme", whole, null),
   );
   expect(queries.portalr.trace("acme", whole, "s1").gcTime).toBe(0);
+  // A span's withheld attributes are read once: no retry, and no read again on focus.
+  const asked = queries.portalr.trace("acme", whole, "s1");
+  expect([asked.retry, asked.refetchOnWindowFocus]).toEqual([false, false]);
+  expect(queries.portalr.trace("acme", whole).retry).toBeUndefined();
   expect(queries.portalr.trace("acme", whole).gcTime).toBeGreaterThan(0);
 });

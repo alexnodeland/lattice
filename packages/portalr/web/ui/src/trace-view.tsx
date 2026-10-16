@@ -134,7 +134,7 @@ export function TraceView({ outline, reveal }: { outline: Outline; reveal: Revea
     if (next) {
       pending.current = next.row.id;
       setChosen(next.row.id);
-      virtual.scrollToIndex(index, { align: "auto" });
+      virtual.scrollToIndex(shown.indexOf(next), { align: "auto" });
     }
   }
 
@@ -223,7 +223,12 @@ export function TraceView({ outline, reveal }: { outline: Outline; reveal: Revea
           // can always get in: it then draws the row, and moves focus to it.
           tabIndex={windowed ? -1 : 0}
           onFocus={(event) => {
-            if (event.target === event.currentTarget) {
+            // The keyboard comes in by the tree, and goes on to the chosen row; a click on its
+            // blank area isn't asked to move focus.
+            if (
+              event.target === event.currentTarget &&
+              event.currentTarget.matches(":focus-visible")
+            ) {
               choose(at);
             }
           }}
@@ -425,7 +430,7 @@ function WithheldNow({ row, reveal }: { row: Row; reveal: Reveal }) {
     case "read": {
       const parts = reveal.parts(row);
       return parts.length === 0 ? (
-        <p className="text-muted text-sm">Nothing of it was recorded.</p>
+        <p className="text-muted text-sm">The read returned none of these attributes.</p>
       ) : (
         parts.map((part) => (
           <div key={part.label} className="flex flex-col gap-1">

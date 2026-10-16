@@ -70,8 +70,16 @@ Then("they see its spans as a tree", async ({ page }) => {
 /** What a scenario's trace says: a phrase in its prompt, which must not reach the page unasked. */
 const PROMPT = "Launch on Tuesday, said the user";
 
-/** The bodies of every answer to a trace read, as the page got them. */
-const answers = new WeakMap<Page, string[]>();
+/** Every answer to a trace read, as the page got it: its address, and its body if it could be read. */
+interface Answer {
+  readonly url: URL;
+  readonly body: string;
+}
+const answers = new WeakMap<Page, Promise<Answer | null>[]>();
+
+/** The answers read so far, each awaited: a body a navigation discarded is none. */
+const answered = async (page: Page) =>
+  (await Promise.all(answers.get(page) ?? [])).filter((each): each is Answer => each !== null);
 
 Given("a trace with a prompt has been sent for acme", async ({ request, page, made }) => {
   const thread = `thr_bdd_${crypto.randomUUID().replaceAll("-", "")}`;
@@ -131,11 +139,16 @@ Given("a trace with a prompt has been sent for acme", async ({ request, page, ma
   });
   expect(sent.ok()).toBe(true);
   // Every answer to a trace read, to see what reached the page before it was asked for.
-  const seen: string[] = [];
+  const seen: Promise<Answer | null>[] = [];
   answers.set(page, seen);
-  page.on("response", async (response) => {
+  page.on("response", (response) => {
     if (response.url().includes("/portalr/v1/traces/")) {
-      seen.push(`${response.url()}\n${await response.text()}`);
+      seen.push(
+        response.text().then(
+          (body) => ({ url: new URL(response.url()), body }),
+          () => null,
+        ),
+      );
     }
   });
 });
@@ -160,9 +173,9 @@ When("they choose the span {string}", async ({ page }, name: string) => {
 
 Then("its prompt is not in the page, nor was it sent to it", async ({ page }) => {
   await expect(page.getByText(PROMPT)).toHaveCount(0);
-  const bodies = answers.get(page) ?? [];
-  expect(bodies.length).toBeGreaterThan(0);
-  expect(bodies.filter((body) => body.includes(PROMPT))).toEqual([]);
+  const read = await answered(page);
+  expect(read.length).toBeGreaterThan(0);
+  expect(read.filter((each) => each.body.includes(PROMPT))).toEqual([]);
 });
 
 Then("it names what it withheld", async ({ page }) => {
@@ -180,10 +193,10 @@ Then("its prompt is in the page", async ({ page }) => {
     page.getByRole("region", { name: "Withheld" }).getByText(PROMPT).first(),
   ).toBeVisible();
   // It came in a read for that span, named, and not kept.
-  const bodies = answers.get(page) ?? [];
-  expect(
-    bodies.filter((body) => body.includes(PROMPT) && /content=true&span=/.test(body)),
-  ).not.toEqual([]);
+  const read = (await answered(page)).filter((each) => each.body.includes(PROMPT));
+  expect(read).not.toEqual([]);
+  expect(read.every((each) => each.url.searchParams.get("content") === "true")).toBe(true);
+  expect(read.every((each) => (each.url.searchParams.get("span") ?? "") !== "")).toBe(true);
 });
 
 Then("no other span shows a prompt", async ({ page }) => {

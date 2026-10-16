@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 
 from portalr.readers import Ok, Tempo, TraceQuery, Unavailable
-from portalr.readers.tempo import _padded
+from portalr.readers.tempo import Span, _padded, _without_repeats
 from portalr.tenant import allowed
 from tests.tools import Tool, fails, json
 
@@ -21,7 +21,7 @@ def span(
         {"key": "artifactr.run.id", "value": {"stringValue": "run_1"}},
         # The values a span may hold, under a name known to be safe: a family of counts.
         {"key": "gen_ai.usage.retries", "value": {"intValue": "2"}},
-        {"key": "gen_ai.usage.cached", "value": {"boolValue": True}},
+        {"key": "gen_ai.usage.cached", "value": {"intValue": "3"}},
         {"key": "gen_ai.usage.score", "value": {"doubleValue": 0.5}},
         {"key": "gen_ai.usage.empty", "value": {}},
     ]
@@ -89,7 +89,7 @@ async def test_a_trace_is_shown_when_a_span_names_the_tenant_and_none_names_anot
     assert root.attributes == {
         "artifactr.run.id": "run_1",
         "gen_ai.usage.retries": 2,
-        "gen_ai.usage.cached": True,
+        "gen_ai.usage.cached": 3,
         "gen_ai.usage.score": 0.5,
         "gen_ai.usage.empty": 0,
         "tenant.id": "acme",
@@ -131,17 +131,22 @@ CONTENT = {
 
 
 async def test_a_trace_shows_only_what_is_known_to_be_safe_and_names_the_rest() -> None:
-    chat = said("1", "acme", CONTENT | {"gen_ai.usage.input_tokens": "5"})
+    chat = said("1", "acme", CONTENT | {"gen_ai.usage.prompt": "text, not a count"})
+    chat["attributes"].append({"key": "gen_ai.usage.input_tokens", "value": {"intValue": "5"}})
+    chat["attributes"].append({"key": "gen_ai.usage.flag", "value": {"boolValue": True}})
+    chat["attributes"].append({"key": "gen_ai.usage.cost", "value": {"doubleValue": 0.25}})
     tool = Tool({"/api/v2/traces/f1": json(document(chat))})
     answer = await Tempo("http://tempo", tool.client()).trace(ACME, "f1")
     assert isinstance(answer, Ok)
     assert answer.data is not None
     (shown,) = answer.data.spans
-    assert shown.withheld == tuple(sorted(CONTENT))
+    # A family of counts shows numbers alone: a crafted name carrying text, or a flag, doesn't.
+    assert shown.withheld == tuple(sorted([*CONTENT, "gen_ai.usage.flag", "gen_ai.usage.prompt"]))
     for name in CONTENT:
         assert name not in shown.attributes, name
     # What is known to be safe is shown: ids, counts, and a family of usage counts.
-    assert shown.attributes["gen_ai.usage.input_tokens"] == "5"
+    assert shown.attributes["gen_ai.usage.input_tokens"] == 5
+    assert shown.attributes["gen_ai.usage.cost"] == 0.25
     assert shown.attributes["artifactr.run.id"] == "run_1"
     assert shown.attributes["tenant.id"] == "acme"
     # Nothing of what was withheld is anywhere in the answer.
@@ -174,6 +179,9 @@ async def test_a_span_asked_for_in_another_tenants_trace_is_still_none() -> None
     for spans in [
         (said("1", "acme", CONTENT), span("2", "globex")),
         (said("1", "globex", CONTENT),),
+        # Another tenant's span that reuses an id isn't a repeat to be dropped before it is seen.
+        (span("1", "acme"), span("1", "globex")),
+        (span("1", "globex"), span("1", "acme")),
     ]:
         tool = Tool({"/api/v2/traces/f1": json(document(*spans))})
         assert await Tempo("http://tempo", tool.client()).trace(ACME, "f1", reveal="1") == Ok(
@@ -259,3 +267,61 @@ async def test_tempo_down_is_unavailable() -> None:
     assert await Tempo("http://tempo", Tool().client()).search(ACME, QUERY) == Unavailable(
         reason="tempo has no search API at that address"
     )
+
+
+async def test_a_span_that_reuses_an_id_in_another_form_is_still_another_tenants() -> None:
+    # The same 8 bytes, as hex and as base64: one id, two spans, two tenants.
+    spans = (
+        {**span("x", "acme"), "spanId": "83db6fcbe8c81dba"},
+        {**span("x", "globex"), "spanId": "g9tvy+jIHbo="},
+    )
+    tool = Tool({"/api/v2/traces/f1": json(document(*spans))})
+    assert await Tempo("http://tempo", tool.client()).trace(ACME, "f1") == Ok(data=None)
+
+
+def test_a_span_is_kept_once_the_first() -> None:
+    first = Span(
+        span_id="1", parent_id=None, name="first", start_ns=1, end_ns=2, attributes={}, error=False
+    )
+    again = first.model_copy(update={"name": "again"})
+    other = first.model_copy(update={"span_id": "2"})
+    assert _without_repeats([first, other, again]) == [first, other]
+    assert _without_repeats([]) == []
+
+
+async def test_a_name_is_cut_arrays_are_rendered_and_a_span_asked_in_capitals_is_found() -> None:
+    long = span("1", "acme")
+    long["name"] = "select " + "x" * 400
+    long["attributes"] += [
+        {
+            "key": "gen_ai.response.finish_reasons",
+            "value": {"arrayValue": {"values": [{"stringValue": "stop"}, {"intValue": "2"}]}},
+        },
+        {
+            "key": "gen_ai.tool.call.arguments",
+            "value": {"kvlistValue": {"values": [{"key": "a", "value": {"boolValue": True}}]}},
+        },
+    ]
+    tool = Tool({"/api/v2/traces/f1": json(document(long))})
+    tempo = Tempo("http://tempo", tool.client())
+    plain = await tempo.trace(ACME, "f1")
+    assert isinstance(plain, Ok)
+    assert plain.data is not None
+    (shown,) = plain.data.spans
+    assert len(shown.name) == 200
+    assert shown.attributes["gen_ai.response.finish_reasons"] == '["stop", 2]'
+    assert shown.withheld == ("gen_ai.tool.call.arguments",)
+    whole = await tempo.trace(ACME, "f1", reveal="1")
+    assert isinstance(whole, Ok)
+    assert whole.data is not None
+    assert whole.data.spans[0].attributes["gen_ai.tool.call.arguments"] == '{"a": true}'
+    # A span's id asked for in capitals is the same span.
+    hex_span = {**span("x", "acme"), "spanId": "83DB6FCBE8C81DBA"}
+    hex_span["attributes"] += [{"key": "gen_ai.input.messages", "value": {"stringValue": "[x]"}}]
+    tool = Tool({"/api/v2/traces/f2": json(document(hex_span))})
+    revealed = await Tempo("http://tempo", tool.client()).trace(
+        ACME, "f2", reveal="83DB6FCBE8C81DBA"
+    )
+    assert isinstance(revealed, Ok)
+    assert revealed.data is not None
+    assert revealed.data.spans[0].withheld == ()

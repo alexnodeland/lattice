@@ -168,7 +168,7 @@ const LABELS: Readonly<Record<string, string>> = {
 export function said(attributes: Span["attributes"], names: readonly string[]): Said[] {
   const labelled = (name: string) => Object.hasOwn(LABELS, name);
   return [...names]
-    .filter((name) => name in attributes)
+    .filter((name) => Object.hasOwn(attributes, name))
     .sort((a, b) => Number(!labelled(a)) - Number(!labelled(b)) || a.localeCompare(b))
     .map((name) => {
       const value = String(attributes[name]);

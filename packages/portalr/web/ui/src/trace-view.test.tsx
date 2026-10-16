@@ -269,7 +269,7 @@ test("a span's withheld attributes are being read, read, nothing, or couldn't be
   const cases: [Standing, Said[], string][] = [
     ["reading", [], "Reading…"],
     ["failed", [], "What this span withheld couldn't be read."],
-    ["read", [], "Nothing of it was recorded."],
+    ["read", [], "The read returned none of these attributes."],
   ];
   for (const [standing, parts, said] of cases) {
     const { reveal } = revealing({ "2": standing }, { "2": parts });

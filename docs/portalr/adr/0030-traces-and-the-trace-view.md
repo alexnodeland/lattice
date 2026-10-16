@@ -51,8 +51,14 @@ The user decided four things:
   - The window and the filters are in the address, as Feedback's are. An id that isn't one portalr takes is none.
   - A list at its limit says it is the newest, not all.
   - The trace id in Feedback's comments opens its trace here, for every tenant admin. For operators, Langfuse's page is beside it.
+- **A trace's tenant is decided over every span as Tempo gave it,** before any is dropped for repeating an id, in hex or in base64: a span of another tenant's that reuses an id is still another tenant's, and the trace isn't served.
+- **A family of counts shows numbers alone:** `gen_ai.usage.*` shows an attribute only if its value is a number, so a name made up under it that holds text is withheld.
+- **A span's name is shown as it is, cut to 200 characters.** This is an accepted residual: instrumentation sometimes puts a query, a URL or a message in a name, and a name is how a span is told from another in the tree. The libraries' own names are commands and operations. It is cut, not withheld; a deployment that puts content in names has the same exposure in Tempo's own UI.
+- **Events aren't read.** A span's events, where an older or a different instrumentation puts a prompt, aren't in the trace read, so they are neither shown nor withheld, and a span's reveal can't show them. The panel says only that the read returned none of the attributes it asked for.
 - **The list says nothing of a trace's root:** portalr leaves its service and name out, since a root may be another tenant's span, and a trace that isn't the tenant's is not shown.
-- **The scenario:** a failed turn is made, and Traces is read until its trace is there, as Tempo takes a moment. Opening it shows its spans as a tree, and, as the application records no content, nothing to reveal.
+- **The scenarios:**
+  - A failed turn is made, and checked to have failed. Traces is read until its trace is there, as Tempo takes a moment, and it opens as a tree.
+  - A trace with a prompt, under `gen_ai.input.messages` and `pydantic_ai.all_messages`, is sent to Tempo's OTLP receiver. The prompt is in neither the page nor any answer the page got, until that span is asked for.
 - **Feedback's thumbs chart keeps its labels whole on a phone:** a direct label's room is 7px a character, not 6.
 
 ## Options considered
@@ -74,3 +80,4 @@ The user decided four things:
 - Harder: the applications that record content do so for every tenant's traces, which is theirs to decide, as `include_content` is.
 - Harder: our adapter follows the GenAI conventions as pydantic-ai writes them. A later version that records content in span events, not attributes, would show none, and nothing says that it was recorded: the trace read gives span attributes alone.
 - Harder: a span with an attribute that isn't on the list, harmless or not, offers to show it, until it is added to the list.
+- Harder: a trace read of a span is a read of the whole trace, and Tempo's answer is as large for one span's reveal as for the page.

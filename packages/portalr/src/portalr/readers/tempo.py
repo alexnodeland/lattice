@@ -7,6 +7,7 @@ shown only if one of its spans names the tenant and none names another.
 import asyncio
 import base64
 import binascii
+import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -136,6 +137,9 @@ a version adds later. The gate fails closed."""
 SAFE_PREFIXES: Final = ("gen_ai.usage.",)
 """Whole families of attributes known to be counts and costs: token usage."""
 
+MOST_NAME: Final = 200
+"""The longest a span's name is shown: instrumentation sometimes puts a query or a URL in one."""
+
 MOST_SPANS: Final = 5_000
 """The most spans a trace read gives: past it, the read says it isn't complete."""
 
@@ -143,8 +147,16 @@ DEADLINE: Final = 10.0
 """How long a trace read may take, in seconds, before Tempo is said not to have answered."""
 
 
-def _safe(name: str) -> bool:
-    return name in SAFE_ATTRIBUTES or name.startswith(SAFE_PREFIXES)
+def _safe(name: str, value: str | int | float | bool) -> bool:
+    """Whether an attribute is known not to hold what was said.
+
+    A name on the list is; one of a family of counts is only if its value is a number, so a
+    crafted ``gen_ai.usage.prompt`` carrying text isn't.
+    """
+    if name in SAFE_ATTRIBUTES:
+        return True
+    counted = isinstance(value, int | float) and not isinstance(value, bool)
+    return name.startswith(SAFE_PREFIXES) and counted
 
 
 _TRACE_ID: Final = re.compile(r"[0-9a-fA-F]{1,31}")
@@ -244,18 +256,32 @@ def search_query(tenant: Tenant, query: TraceQuery) -> str:
     return "{ " + " && ".join(conditions) + " }"
 
 
-def _value(value: Mapping[str, Any]) -> str | int | float | bool:
+def _plain(value: Mapping[str, Any]) -> Any:
+    """An OTLP value as JSON holds it: a list or a map of them, or a scalar."""
+    if "arrayValue" in value:
+        return [_plain(each) for each in value["arrayValue"].get("values", [])]
+    if "kvlistValue" in value:
+        return {
+            pair["key"]: _plain(pair.get("value", {}))
+            for pair in value["kvlistValue"].get("values", [])
+        }
     for key in ("stringValue", "boolValue", "doubleValue"):
         if key in value:
             return value[key]
     return int(value.get("intValue", 0))
 
 
+def _value(value: Mapping[str, Any]) -> str | int | float | bool:
+    """An attribute's value: a scalar as it is, and a list or a map as its JSON."""
+    plain = _plain(value)
+    return json.dumps(plain) if isinstance(plain, list | dict) else plain
+
+
 def _span(span: Mapping[str, Any]) -> Span:
     return Span(
         span_id=_hex(span["spanId"]),
         parent_id=_hex(span["parentSpanId"]) if span.get("parentSpanId") else None,
-        name=span.get("name", ""),
+        name=span.get("name", "")[:MOST_NAME],
         start_ns=int(span.get("startTimeUnixNano", 0)),
         end_ns=int(span.get("endTimeUnixNano", 0)),
         attributes={
@@ -292,13 +318,17 @@ def _withholding(spans: list[Span], reveal: str | None) -> list[Span]:
     """
     return [
         span
-        if span.span_id == reveal
+        if reveal is not None and span.span_id == reveal.lower()
         else span.model_copy(
             update={
                 "attributes": {
-                    name: value for name, value in span.attributes.items() if _safe(name)
+                    name: value for name, value in span.attributes.items() if _safe(name, value)
                 },
-                "withheld": tuple(sorted(name for name in span.attributes if not _safe(name))),
+                "withheld": tuple(
+                    sorted(
+                        name for name, value in span.attributes.items() if not _safe(name, value)
+                    )
+                ),
             }
         )
         for span in spans
@@ -373,10 +403,12 @@ class Tempo:
             return document
         if document is None:
             return Ok(data=None)  # Tempo has no such trace
-        spans = _without_repeats(_spans(document))
-        # Whose it is is settled over every span, before any is left out.
+        spans = _spans(document)
+        # Whose it is is settled over every span as Tempo gave it, before any is left out, even for
+        # being a repeat: a span of another tenant's that reuses an id is still one.
         if not belongs(tenant, spans):
             return Ok(data=None)
+        spans = _without_repeats(spans)
         shown = _withholding(spans[:MOST_SPANS], reveal)
         return Ok(
             data=Trace(trace_id=trace_id, spans=tuple(shown), complete=len(spans) <= MOST_SPANS)

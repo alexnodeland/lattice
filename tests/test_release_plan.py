@@ -2,6 +2,7 @@
 it refuses."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -173,6 +174,22 @@ def test_a_released_package_with_no_sha_at_all_is_refused(root: Path) -> None:
         rp.plan(run, root)
 
 
+@pytest.mark.parametrize("path", ["packages/evalr", "packages/stackr"])
+def test_a_released_package_without_a_tag_is_refused_not_a_key_error(
+    path: str, root: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    given = {f"{path}--sha": SHA}
+    run = rp.Run(event="push", sha=SHA, released=[path], releases=given)
+    with pytest.raises(rp.Refused, match=f"gave {path} no tag"):
+        rp.plan(run, root)
+    monkeypatch.setenv("EVENT", "push")
+    monkeypatch.setenv("SHA", SHA)
+    monkeypatch.setenv("PATHS_RELEASED", json.dumps([path]))
+    monkeypatch.setenv("RELEASES", json.dumps(given))
+    assert rp.main() == 1
+    assert "no tag" in capsys.readouterr().err
+
+
 def test_a_tag_whose_version_is_not_the_pyprojects_is_refused(root: Path) -> None:
     run = rp.Run(
         event="push",
@@ -233,6 +250,23 @@ def test_stackrs_tag_rehearses_its_images_without_pushing_and_publishes_them_on_
     published = rp.plan(on_tag("stackr-v0.1.0", "publish"), root)
     assert published.stackr
     assert (published.write, published.publish) == (True, False), "images, and never PyPI"
+    switched = rp.plan(on_tag("stackr-v0.1.0", "publish", publishing=True), root)
+    assert (switched.write, switched.publish) == (True, False), "the switch is not stackr's"
+    assert json.loads(rp.outputs(switched, root)["ordered"]) == []
+
+
+def test_a_rehearsal_on_a_tags_ref_with_no_tag_named_is_a_branch_rehearsal(root: Path) -> None:
+    run = rp.Run(
+        event="workflow_dispatch",
+        sha=SHA,
+        ref_type="tag",
+        ref_name="evalr-v0.1.0",
+        tag="",
+        publishing=True,
+    )
+    made = rp.plan(run, root)
+    assert made.packages == list(rp.WHEELS)
+    assert (made.write, made.publish, made.stackr) == (False, False, False)
 
 
 @pytest.mark.parametrize(
@@ -447,3 +481,17 @@ def test_main_lists_the_dispatches_in_a_release_runs_summary(
     text = summary.read_text()
     assert "published nothing" in text
     assert f"gh workflow run release.yml --ref evalr-v{version} -f tag=evalr-v{version}" in text
+
+
+def test_every_plan_output_a_job_reads_is_declared_by_the_plan_job() -> None:
+    declared = set(JOBS["plan"]["outputs"])
+    text = (Path(__file__).parent.parent / ".github/workflows/release.yml").read_text()
+    read = set(re.findall(r"needs\.plan\.outputs\.([a-z_]+)", text))
+    assert read <= declared, f"read but not declared: {sorted(read - declared)}"
+    assert declared == set(rp.outputs(rp.plan(rp.Run(event="workflow_dispatch", sha=SHA))))
+
+
+def test_the_pypi_check_waits_for_an_attach_that_succeeded_wherever_the_run_writes() -> None:
+    gate = JOBS["pypi-check"]["if"]
+    assert "needs.attach.result == 'success'" in gate, "a cancelled attach must not pass"
+    assert "needs.plan.outputs.write != 'true'" in gate, "a rehearsal has no attach to wait for"

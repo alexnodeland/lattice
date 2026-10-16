@@ -217,7 +217,8 @@ jobs:
   pypi-check:
     name: PyPI, checked
     needs: [plan, build, attach]
-    if: ${{ !cancelled() && needs.build.result == 'success' && needs.attach.result != 'failure' }}
+    # Where the run writes, the files were attached and attested first: a cancelled attach is not that.
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.plan.outputs.write != 'true' && needs.attach.result != 'failure' || needs.attach.result == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

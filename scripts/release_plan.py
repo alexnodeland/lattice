@@ -209,6 +209,8 @@ def plan(run: Run, root: Path = ROOT) -> Plan:
         for path in released:
             if not SHA.fullmatch(run.releases.get(f"{path}--sha", "")):
                 raise Refused(f"release-please gave {path} no commit: {released}")
+            if not run.releases.get(f"{path}--tag_name"):
+                raise Refused(f"release-please gave {path} no tag: {released}")
         refuse_other_commit(run, released)
         packages = [path for path in WHEELS if path in released]
         refuse_wrong_version(packages, run.releases, root)
@@ -263,7 +265,7 @@ def plan(run: Run, root: Path = ROOT) -> Plan:
         releases,
         path == STACKR,
         writes,
-        writes and run.publishing,
+        writes and run.publishing and bool(packages),
         [note],
     )
 

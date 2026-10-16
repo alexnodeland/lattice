@@ -13,13 +13,25 @@ set -euo pipefail
 
 tag=${1:?usage: attach-assets TAG FILE...}
 shift
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
 for file in "$@"; do
   name=$(basename "$file")
   sum=$(sha256sum "$file" | cut -d' ' -f1)
-  attached=$(gh release view "$tag" --json assets --jq ".assets[] | select(.name == \"$name\") | .digest")
+  # An asset's digest is GitHub's own, for assets uploaded since mid-2025; an older one has none
+  # (null, or absent), and then its bytes are fetched and summed here.
+  attached=$(gh release view "$tag" --json assets |
+    jq -r --arg name "$name" '.assets[] | select(.name == $name) | .digest // "none"')
   if [[ -z $attached ]]; then
     gh release upload "$tag" "$file"
-  elif [[ $attached == "sha256:$sum" ]]; then
+    continue
+  fi
+  if [[ $attached == none ]]; then
+    gh release download "$tag" --pattern "$name" --dir "$work" --clobber
+    attached=sha256:$(sha256sum "$work/$name" | cut -d' ' -f1)
+  fi
+  if [[ $attached == "sha256:$sum" ]]; then
     echo "attach-assets: $name is attached already, with these bytes"
   else
     echo "attach-assets: $name is attached to $tag with other bytes than this build's ($attached, not sha256:$sum); delete the asset to replace it" >&2

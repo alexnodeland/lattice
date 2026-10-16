@@ -509,8 +509,6 @@ export function createQueries(api: Api) {
                 },
               }),
             ),
-          // A series is read as a page opens, and again after a minute, not on every render.
-          staleTime: 60_000,
         }),
       /**
        * The tenant's feedback and evaluations over a window, or one workspace's, summed by day

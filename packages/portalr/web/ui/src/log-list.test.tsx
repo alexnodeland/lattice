@@ -176,3 +176,19 @@ test("on a phone, the details sit under the list and nothing scrolls the page si
     expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);
   }
 });
+
+test("a level that is a property of every object is not a level", async () => {
+  await viewport(1280, 900);
+  const odd = ["constructor", "__proto__", "toString", "hasOwnProperty"].map((level, at) =>
+    record(at + 1, { level }),
+  );
+  const screen = await render(<LogList records={odd} complete reveal={revealing().reveal} />);
+  await expect.element(screen.getByRole("listbox")).toBeVisible();
+  expect(screen.getByRole("option").elements()).toHaveLength(4);
+  // Each is shown as the word it is, in the badge for a level that isn't known.
+  for (const word of ["constructor", "__proto__", "toString", "hasOwnProperty"]) {
+    await expect
+      .element(screen.getByRole("listbox").getByText(word, { exact: true }))
+      .toBeVisible();
+  }
+});

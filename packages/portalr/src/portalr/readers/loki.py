@@ -13,13 +13,13 @@ import hashlib
 import re
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Final, Self
+from typing import Annotated, Final, Self
 
 import httpx
-from pydantic import BaseModel, ConfigDict, TypeAdapter, model_validator
+from pydantic import BaseModel, ConfigDict, StringConstraints, TypeAdapter, model_validator
 
 from portalr.readers.http import read
-from portalr.readers.query import Id, Window, quoted
+from portalr.readers.query import ID, Id, Window, nanoseconds, quoted
 from portalr.readers.reading import Ok, Unavailable
 from portalr.tenant import Tenant
 
@@ -67,17 +67,44 @@ SAFE_LABELS: Final = frozenset(
 severity. Every other label, such as an attribute a library or an application added to a record,
 is withheld and named in the record's ``withheld``: the gate fails closed (portalr ADR-0031)."""
 
+IDS: Final = frozenset(name for name in SAFE_LABELS if name.endswith("_id"))
+"""The safe labels that hold an id: their values must be one, as a query takes ids (``ID``)."""
+
+NUMBERS: Final = frozenset({"severity_number"})
+"""The safe labels that hold a number."""
+
+LEVELS: Final = frozenset(
+    {"trace", "debug", "info", "warn", "warning", "error", "fatal", "critical"}
+)
+"""The levels a record may be shown at; Loki derives ``detected_level`` from a line's own words,
+and a level it gives that isn't one of these is withheld (portalr ADR-0031)."""
+
+LEVEL_LABELS: Final = frozenset({"detected_level", "severity_text"})
+"""The safe labels that hold a level."""
+
+NAME: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.:@/+-]{0,127}$")
+"""What a service's, a scope's or a library's name or version may be: short, and plain."""
+
 MOST_HOURS: Final = 24
 """The longest window a log read takes, in hours."""
 
 DEADLINE: Final = 10.0
 """How long a log read may take, in seconds, before Loki is said not to have answered."""
 
-MOST_SAME_INSTANT: Final = 100
+MOST_SAME_INSTANT: Final = 1000
 """The most records a read for one nanosecond looks through, to find the one asked for."""
 
-RECORD_ID: Final = re.compile(r"^(\d{1,20})-([0-9a-f]{16})$")
-"""A record's id: its time in nanoseconds, then a digest of its stream and its line."""
+RECORD_ID: Final = r"^[0-9]{1,19}-[0-9a-f]{16}-[0-9]{1,3}$"
+"""A record's id: its time in nanoseconds, a digest of its stream's safe labels, and its place
+among the records of that stream at that instant. Nothing in it comes from the line."""
+
+_RECORD_ID: Final = re.compile(r"^([0-9]{1,19})-([0-9a-f]{16})-([0-9]{1,3})$")
+
+INT64_MAX: Final = 2**63 - 1
+"""The largest time Loki takes, in nanoseconds."""
+
+type RecordId = Annotated[str, StringConstraints(pattern=RECORD_ID)]
+"""A record's id, as :func:`_identify` makes it."""
 
 
 class LogQuery(Window):
@@ -140,16 +167,19 @@ class _Answer(BaseModel):
 _ANSWER: Final = TypeAdapter(_Answer)
 
 
-def logs_query(tenant: Tenant, query: LogQuery | None) -> str:
-    """The LogQL that reads a tenant's logs: always ``tenant_id``, then the filters, if any."""
-    stages = [f"{TENANT_METADATA} = {quoted(tenant.id)}"]
-    if query is None:
-        return EVERY_STREAM + f" | {stages[0]}"
+def tenant_records_query(tenant: Tenant) -> str:
+    """The LogQL that reads a tenant's records: always ``tenant_id``."""
+    return f"{EVERY_STREAM} | {TENANT_METADATA} = {quoted(tenant.id)}"
+
+
+def logs_query(tenant: Tenant, query: LogQuery) -> str:
+    """The LogQL that reads a tenant's logs: ``tenant_id`` first, then the filters, if any."""
+    stages: list[str] = []
     if query.thread is not None:
         stages.append(f"{THREAD_METADATA} = {quoted(query.thread)}")
     if query.run is not None:
         stages.append(" or ".join(f"{name} = {quoted(query.run)}" for name in RUN_METADATA))
-    return EVERY_STREAM + "".join(f" | {stage}" for stage in stages)
+    return tenant_records_query(tenant) + "".join(f" | {stage}" for stage in stages)
 
 
 @dataclass(frozen=True)
@@ -208,16 +238,16 @@ class Loki:
         found = await self._query(
             tenant,
             logs_query(tenant, query),
-            int(query.start.timestamp() * 1_000_000_000),
-            int(query.end.timestamp() * 1_000_000_000),
+            nanoseconds(query.start),
+            nanoseconds(query.end),
             query.limit,
         )
         if isinstance(found, Unavailable):
             return found
-        newest = sorted(found, key=lambda record: record[0], reverse=True)
+        newest = sorted(_identify(found), key=lambda each: each[0].time_ns, reverse=True)
         return Ok(
             data=Logs(
-                records=[_record(*each) for each in newest[: query.limit]],
+                records=[each for each, _ in newest[: query.limit]],
                 complete=len(found) < query.limit,
             )
         )
@@ -227,39 +257,79 @@ class Loki:
 
         ``None`` if it isn't the tenant's, isn't there, or the id isn't one.
         """
-        named = RECORD_ID.fullmatch(record_id)
-        if named is None:
+        named = _RECORD_ID.fullmatch(record_id)
+        if named is None or int(named[1]) >= INT64_MAX:
             return Ok(data=None)
         at = int(named[1])
-        found = await self._query(tenant, logs_query(tenant, None), at, at + 1, MOST_SAME_INSTANT)
+        found = await self._query(
+            tenant, tenant_records_query(tenant), at, at + 1, MOST_SAME_INSTANT
+        )
         if isinstance(found, Unavailable):
             return found
-        asked = [_record(time, line, labels, line_too=True) for time, line, labels in found]
-        return Ok(data=next((each for each in asked if each.id == record_id), None))
+        asked = next((each for each in _identify(found) if each[0].id == record_id), None)
+        return Ok(data=asked and asked[0].model_copy(update={"line": asked[1]}))
 
 
-def _digest(time_ns: int, line: str, labels: dict[str, str]) -> str:
-    stream = "\x1f".join(f"{name}={labels[name]}" for name in sorted(labels))
-    return hashlib.sha256(f"{time_ns}\x1e{stream}\x1e{line}".encode()).hexdigest()[:16]
+def _stream(labels: dict[str, str]) -> str:
+    """A stream's identity for an id: a digest of its safe labels, which a read shows anyway."""
+    safe = "\x1f".join(f"{name}={labels[name]}" for name in sorted(labels) if name in SAFE_LABELS)
+    return hashlib.sha256(safe.encode()).hexdigest()[:16]
 
 
-def _record(
-    time_ns: int, line: str, labels: dict[str, str], *, line_too: bool = False
-) -> LogRecord:
+def _identify(
+    found: list[tuple[int, str, dict[str, str]]],
+) -> list[tuple[LogRecord, str]]:
+    """Each record, with its id, and its line.
+
+    An id is made of what a read shows, and nothing of the line, so that holding an id and
+    guessing a line can't confirm the guess: the time, the digest of the stream's safe labels, and
+    the record's place among those of that stream at that instant. Places are counted in the order
+    Loki gave the records, after ordering them by their labels, so they hold while Loki gives a
+    window's records in the same order, and a read of one nanosecond is a window of its own.
+    """
+    places: dict[tuple[int, str], int] = {}
+    made: list[tuple[LogRecord, str]] = []
+    for time_ns, line, labels in sorted(found, key=lambda each: (each[0], sorted(each[2].items()))):
+        stream = _stream(labels)
+        place = places.get((time_ns, stream), 0)
+        places[time_ns, stream] = place + 1
+        made.append((_record(f"{time_ns}-{stream}-{place}", time_ns, line, labels), line))
+    return made
+
+
+def _safe(name: str, value: str) -> str | None:
+    """A label's value as a read may show it, or ``None`` if it isn't plain enough to be."""
+    if name in LEVEL_LABELS:
+        return value.lower() if value.lower() in LEVELS else None
+    if name in NUMBERS:
+        return value if value.isascii() and value.isdigit() and len(value) <= 3 else None
+    if name in IDS:
+        return value if re.fullmatch(ID, value) else None
+    return value if NAME.fullmatch(value) else None
+
+
+def _record(record_id: str, time_ns: int, line: str, labels: dict[str, str]) -> LogRecord:
     """A record as a read shows it: its safe labels, the names of the rest, its line's length.
 
-    The one asked for has its line too.
+    A label is safe if its name is, and its value is short and plain: an id, a known level, a
+    name. One that isn't is withheld with the rest. The line is added apart, for one record.
     """
-    safe = {name: value for name, value in labels.items() if name in SAFE_LABELS}
+    shown = {
+        name: value
+        for name, raw in labels.items()
+        if name in SAFE_LABELS and (value := _safe(name, raw)) is not None
+    }
+    level = next(
+        (shown[name] for name in ("detected_level", "severity_text") if name in shown), None
+    )
     return LogRecord(
-        id=f"{time_ns}-{_digest(time_ns, line, labels)}",
+        id=record_id,
         time_ns=time_ns,
-        level=labels.get("detected_level") or (labels.get("severity_text") or "").lower() or None,
-        service=safe.get("service_name"),
-        thread=safe.get(THREAD_METADATA),
-        run=safe.get("artifactr_run_id") or safe.get("reflexr_run_id"),
+        level=level,
+        service=shown.get("service_name"),
+        thread=shown.get(THREAD_METADATA),
+        run=shown.get("artifactr_run_id") or shown.get("reflexr_run_id"),
         length=len(line),
-        labels=safe,
-        withheld=tuple(sorted(set(labels) - SAFE_LABELS)),
-        line=line if line_too else None,
+        labels=shown,
+        withheld=tuple(sorted(set(labels) - set(shown))),
     )

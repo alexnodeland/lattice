@@ -87,11 +87,30 @@ export function stepSaid(step: number): string {
   return `${hours} ${hours === 1 ? "hour" : "hours"}`;
 }
 
-/** A point's time as an axis reads it, in the reader's zone: the time of day, or the day too. */
+/**
+ * A point's time as an axis reads it, in UTC: the time of day, or the day too. UTC is never
+ * repeated or skipped, as a zone's clock is where it changes, so no two points share a label.
+ */
 export function pointAt(seconds: number, hours: HealthHours): string {
-  const at = new Date(seconds * 1000);
-  const clock = at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-  return hours > 24
-    ? `${at.toLocaleDateString([], { month: "2-digit", day: "2-digit" })} ${clock}`
-    : clock;
+  const iso = new Date(seconds * 1000).toISOString();
+  return hours > 24 ? `${iso.slice(5, 10)} ${iso.slice(11, 16)}` : iso.slice(11, 16);
+}
+
+/**
+ * A chart's points on the grid of its window, a step apart from its start: a step without a point
+ * is `null`, which a line breaks at and a bar leaves empty, so a gap is shown as one.
+ */
+export function onGrid(
+  window: TimeSpan,
+  points: readonly { time: number; value: number }[],
+): { time: number; value: number | null }[] {
+  const step = window.step ?? 0;
+  const found = new Map(points.map((point) => [Math.round(point.time), point.value]));
+  const first = Math.round(Date.parse(window.start) / 1000);
+  const last = Math.round(Date.parse(window.end) / 1000);
+  const grid: { time: number; value: number | null }[] = [];
+  for (let time = first; step > 0 && time <= last; time += step) {
+    grid.push({ time, value: found.get(time) ?? null });
+  }
+  return grid;
 }

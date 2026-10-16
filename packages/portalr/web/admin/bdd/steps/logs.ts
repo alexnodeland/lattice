@@ -54,11 +54,11 @@ Given("a log record with a phrase has been sent for acme", async ({ request, pag
     },
   });
   expect(sent.ok()).toBe(true);
-  // Every answer to a log read, to see what reached the page before it was asked for.
+  // Every answer portalr gave the page, to see what reached it before it was asked for.
   const seen: Promise<Answer | null>[] = [];
   answers.set(page, seen);
   page.on("response", (response) => {
-    if (response.url().includes("/portalr/v1/logs")) {
+    if (new URL(response.url()).pathname.startsWith("/portalr/")) {
       seen.push(
         response.text().then(
           (body) => ({ url: new URL(response.url()), body }),
@@ -111,7 +111,7 @@ Then("its phrase is in the page", async ({ page }) => {
 Then("the phrase came in a read for that record alone", async ({ page }) => {
   const read = (await answered(page)).filter((each) => each.body.includes(PHRASE));
   expect(read).toHaveLength(1);
-  expect(read[0]?.url.pathname).toMatch(/\/portalr\/v1\/logs\/\d+-[0-9a-f]{16}$/);
+  expect(read[0]?.url.pathname).toMatch(/\/portalr\/v1\/logs\/\d+-[0-9a-f]{16}-\d+$/);
 });
 
 Then("they see the health charts, or why there are none", async ({ page }) => {

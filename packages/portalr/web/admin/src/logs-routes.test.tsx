@@ -9,15 +9,15 @@ import { page } from "vitest/browser";
 import { open as opened } from "./test/admin";
 
 /** The reads made: their path and their query. */
-const reads: { path: string; query: URLSearchParams }[] = [];
+const reads: { path: string; query: URLSearchParams; tenant: string | null }[] = [];
 
 let loki: "ok" | "unconfigured" | "unavailable" | "empty" = "ok";
 let prometheus: "ok" | "unconfigured" | "unavailable" | "empty" = "ok";
 let incomplete = false;
 
 const ESC = "\u001b";
-const A = `1792113515633147000-${"a".repeat(16)}`;
-const B = `1792113515633146000-${"b".repeat(16)}`;
+const A = `1792113515633147000-${"a".repeat(16)}-0`;
+const B = `1792113515633146000-${"b".repeat(16)}-0`;
 const LINE = `${ESC}[31mboom${ESC}[0m launch on Tuesday ${ESC}[2J`;
 
 const record = (id: string, rest: Record<string, unknown> = {}) => ({
@@ -40,7 +40,7 @@ async function portalr(request: Request, path: string): Promise<Response | undef
   }
   const query = new URL(request.url).searchParams;
   if (path === "/portalr/v1/metrics") {
-    reads.push({ path, query });
+    reads.push({ path, query, tenant: request.headers.get("x-tenant") });
     if (prometheus === "unconfigured") {
       return Response.json({ status: "unconfigured" });
     }
@@ -58,7 +58,7 @@ async function portalr(request: Request, path: string): Promise<Response | undef
     return Response.json({ status: "ok", data });
   }
   if (path.startsWith("/portalr/v1/logs")) {
-    reads.push({ path, query });
+    reads.push({ path, query, tenant: request.headers.get("x-tenant") });
     if (loki === "unconfigured") {
       return Response.json({ status: "unconfigured" });
     }
@@ -81,13 +81,17 @@ async function portalr(request: Request, path: string): Promise<Response | undef
   return undefined;
 }
 
-const open = (path: string, allowed: readonly string[] = ["portalr:read_telemetry"]) =>
-  opened(path, allowed, portalr);
+const open = (
+  path: string,
+  allowed: readonly string[] = ["portalr:read_telemetry"],
+  tenants?: readonly string[],
+) => opened(path, allowed, portalr, tenants);
 
 /** The reads of records' lines. */
 const lines = () => reads.filter((read) => /\/logs\/[^/]+$/.test(read.path));
 
 beforeEach(async () => {
+  reads.length = 0;
   await page.viewport(1280, 900);
 });
 
@@ -116,7 +120,7 @@ test("the newest records are listed without their lines, and the charts are draw
     .element(screen.getByRole("listbox", { name: "2 records, newest first" }))
     .toBeVisible();
   await expect.element(screen.getByText(/Launch on Tuesday/i)).not.toBeInTheDocument();
-  await expect.element(screen.getByText("Each point is 1 minute.")).toBeVisible();
+  await expect.element(screen.getByText(/Each point is 1 minute\./)).toBeVisible();
   await expect
     .element(screen.getByRole("figure", { name: "How long a turn takes, at the 95th percentile" }))
     .toBeVisible();
@@ -169,10 +173,9 @@ test("other filters are another page: nothing asked carries over", async () => {
   await expect.element(screen.getByText(/launch on Tuesday/)).not.toBeInTheDocument();
   await expect.element(screen.getByRole("button", { name: "Show this line" })).toBeVisible();
   expect(lines()).toHaveLength(1);
-  expect(
-    reads.at(-1)?.query.get("thread") ??
-      reads.findLast((r) => r.path === "/portalr/v1/logs")?.query.get("thread"),
-  ).toBe("thr_1");
+  expect(reads.findLast((read) => read.path === "/portalr/v1/logs")?.query.get("thread")).toBe(
+    "thr_1",
+  );
 });
 
 test("a window and a run go to portalr and into the address, and clearing puts them back", async () => {
@@ -199,57 +202,95 @@ test("the health window changes the charts' step, which is said", async () => {
   const { screen, router } = await open("/t/acme/logs");
   await screen.getByRole("combobox", { name: "Health window" }).selectOptions("The last 24 hours");
   await expect.poll(() => router.state.location.search).toMatchObject({ health: 24 });
-  await expect.element(screen.getByText("Each point is 15 minutes.")).toBeVisible();
+  await expect.element(screen.getByText(/Each point is 15 minutes\./)).toBeVisible();
   await screen.getByRole("combobox", { name: "Health window" }).selectOptions("The last 7 days");
-  await expect.element(screen.getByText("Each point is 2 hours.")).toBeVisible();
+  await expect.element(screen.getByText(/Each point is 2 hours\./)).toBeVisible();
   expect(reads.findLast((read) => read.path === "/portalr/v1/metrics")?.query.get("step")).toBe(
     "7200",
   );
 });
 
-test("a list that isn't all of them says so, and no records, and a filter with none, say so", async () => {
+test("a list that isn't all of them says so", async () => {
   incomplete = true;
-  const first = await open("/t/acme/logs");
+  const { screen } = await open("/t/acme/logs");
   await expect
-    .element(first.screen.getByRole("status"))
+    .element(screen.getByRole("status"))
     .toHaveTextContent(
       "These are the newest: there may be more. A shorter window, or a thread or a run, finds the rest.",
     );
-  await first.screen.unmount();
-  loki = "empty";
-  const empty = await open("/t/acme/logs");
-  await expect.element(empty.screen.getByText("No log records in this window")).toBeVisible();
-  await empty.screen.unmount();
-  const filtered = await open("/t/acme/logs?run=run_9");
-  await expect.element(filtered.screen.getByText("No records match")).toBeVisible();
 });
 
-test("Loki not there or not answering leaves the charts, and Prometheus not there leaves the logs", async () => {
+test("a window with no records says so", async () => {
+  loki = "empty";
+  const { screen } = await open("/t/acme/logs");
+  await expect.element(screen.getByText("No log records in this window")).toBeVisible();
+});
+
+test("a filter with no records says no records match", async () => {
+  loki = "empty";
+  const { screen } = await open("/t/acme/logs?run=run_9");
+  await expect.element(screen.getByText("No records match")).toBeVisible();
+});
+
+test("Loki not configured leaves the charts", async () => {
   loki = "unconfigured";
-  const none = await open("/t/acme/logs");
-  await expect.element(none.screen.getByText("Loki isn't configured")).toBeVisible();
+  const { screen } = await open("/t/acme/logs");
+  await expect.element(screen.getByText("Loki isn't configured")).toBeVisible();
   await expect
-    .element(none.screen.getByRole("figure", { name: "Failed turns in each step" }))
+    .element(screen.getByRole("figure", { name: "Failed turns in each step" }))
     .toBeVisible();
-  await none.screen.unmount();
+});
+
+test("Loki not answering leaves the charts", async () => {
   loki = "unavailable";
-  const down = await open("/t/acme/logs");
-  await expect.element(down.screen.getByRole("alert")).toHaveTextContent("loki answered 502");
-  await down.screen.unmount();
-  loki = "ok";
-  prometheus = "unavailable";
-  const slow = await open("/t/acme/logs");
-  await expect.element(slow.screen.getByRole("listbox")).toBeVisible();
-  await expect.element(slow.screen.getByText("Prometheus isn't answering").first()).toBeVisible();
-  await slow.screen.unmount();
-  prometheus = "unconfigured";
-  const absent = await open("/t/acme/logs");
+  const { screen } = await open("/t/acme/logs");
+  await expect.element(screen.getByRole("alert")).toHaveTextContent("loki answered 502");
   await expect
-    .element(absent.screen.getByText("Prometheus isn't configured").first())
+    .element(screen.getByRole("figure", { name: "Failed turns in each step" }))
     .toBeVisible();
-  await absent.screen.unmount();
+});
+
+test("Prometheus not answering leaves the logs", async () => {
+  prometheus = "unavailable";
+  const { screen } = await open("/t/acme/logs");
+  await expect.element(screen.getByRole("listbox")).toBeVisible();
+  await expect.element(screen.getByText("Prometheus isn't answering").first()).toBeVisible();
+});
+
+test("Prometheus not configured leaves the logs", async () => {
+  prometheus = "unconfigured";
+  const { screen } = await open("/t/acme/logs");
+  await expect.element(screen.getByRole("listbox")).toBeVisible();
+  await expect.element(screen.getByText("Prometheus isn't configured").first()).toBeVisible();
+});
+
+test("no turns in the window is said for each chart", async () => {
   prometheus = "empty";
-  const quiet = await open("/t/acme/logs");
-  await expect.element(quiet.screen.getByText("No turns in this window")).toBeVisible();
-  await expect.element(quiet.screen.getByText("No failed turns in this window")).toBeVisible();
+  const { screen } = await open("/t/acme/logs");
+  await expect.element(screen.getByText("No turns in this window")).toBeVisible();
+  await expect.element(screen.getByText("No failed turns in this window")).toBeVisible();
+});
+
+test("the times are said to be UTC, and a step with no turn is said to be a gap", async () => {
+  const { screen } = await open("/t/acme/logs");
+  await expect.element(screen.getByText(/Times are in UTC\./)).toBeVisible();
+  await expect.element(screen.getByText(/A step with no turns is a gap\./)).toBeVisible();
+});
+
+test("another tenant's page starts with nothing asked, and reads no record of the first's", async () => {
+  const { screen, router } = await open(
+    "/t/acme/logs",
+    ["portalr:read_telemetry"],
+    ["acme", "globex"],
+  );
+  await screen.getByRole("button", { name: "Show this line" }).click();
+  await expect.element(screen.getByText(/launch on Tuesday/)).toBeVisible();
+  expect(lines().map((read) => [read.tenant, read.path])).toEqual([
+    ["acme", `/portalr/v1/logs/${A}`],
+  ]);
+  await router.navigate({ to: "/t/$tenant/logs", params: { tenant: "globex" }, search: {} });
+  await expect.element(screen.getByRole("button", { name: "Show this line" })).toBeVisible();
+  await expect.element(screen.getByText(/launch on Tuesday/)).not.toBeInTheDocument();
+  // No read was made for globex of a record that acme's page asked for.
+  expect(lines().filter((read) => read.tenant === "globex")).toEqual([]);
 });

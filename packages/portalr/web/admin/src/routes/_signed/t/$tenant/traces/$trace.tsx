@@ -47,9 +47,9 @@ export const Route = createFileRoute("/_signed/t/$tenant/traces/$trace")({
   ),
 });
 
-/** The page, for the trace the address names: another trace is another page, with its own state. */
+/** The page, for the tenant and the trace the address names: another of either is another page. */
 function TracePage() {
-  const { trace } = Route.useParams();
+  const { tenant, trace } = Route.useParams();
   if (!isId(trace)) {
     return (
       <>
@@ -58,7 +58,7 @@ function TracePage() {
       </>
     );
   }
-  return <Body key={wholeTrace(trace)} trace={trace} />;
+  return <Body key={`${tenant}:${wholeTrace(trace)}`} trace={trace} />;
 }
 
 const NoSuch = () => (

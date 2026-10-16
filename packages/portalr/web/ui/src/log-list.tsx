@@ -11,7 +11,7 @@
 
 import type { LogRecord } from "@portalr/client";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { type KeyboardEvent, type ReactNode, useId, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
 import { AnsiText } from "./ansi";
 import { Button } from "./button";
 import { cn } from "./cn";
@@ -25,16 +25,16 @@ const ROW = 52;
 const PAGE = 10;
 
 /** What a level is shown as: a shape and a word, never a colour alone. */
-const LEVELS: Record<string, Tone> = {
-  critical: "failed",
-  fatal: "failed",
-  error: "failed",
-  warn: "near",
-  warning: "near",
-  info: "done",
-  debug: "queued",
-  trace: "queued",
-};
+const LEVELS: ReadonlyMap<string, Tone> = new Map<string, Tone>([
+  ["critical", "failed"],
+  ["fatal", "failed"],
+  ["error", "failed"],
+  ["warn", "near"],
+  ["warning", "near"],
+  ["info", "done"],
+  ["debug", "queued"],
+  ["trace", "queued"],
+]);
 
 /** What the caller does about a record's line: it reads it, for a record, when one asks. */
 export interface LineReveal {
@@ -46,11 +46,14 @@ export interface LineReveal {
   ask(id: string): void;
 }
 
-/** A moment in the reader's zone, to the millisecond: `10/15/2026, 9:12:03.512 AM`. */
-const moment = (ns: number) => {
+/** A record's time of day, to the millisecond, in the reader's zone, as a row shows it. */
+const time = (ns: number) => {
   const at = new Date(ns / 1_000_000);
-  return `${at.toLocaleDateString()}, ${at.toLocaleTimeString()}.${String(at.getMilliseconds()).padStart(3, "0")}`;
+  return `${at.toLocaleTimeString(undefined, { hourCycle: "h23" })}.${String(at.getMilliseconds()).padStart(3, "0")}`;
 };
+
+/** A record's day and time: `10/15/2026, 09:12:03.512`. */
+const moment = (ns: number) => `${new Date(ns / 1_000_000).toLocaleDateString()}, ${time(ns)}`;
 
 /** Log records as a list and a record's details; `complete` says whether these are all. */
 export function LogList({
@@ -81,7 +84,6 @@ export function LogList({
   const current = records[at] ?? null;
   const items = virtual.getVirtualItems();
   const windowed = items.some((item) => item.index === at);
-  const byId = useMemo(() => new Map(records.map((each) => [each.id, each])), [records]);
 
   function choose(index: number) {
     const clamped = Math.min(Math.max(index, 0), records.length - 1);
@@ -176,7 +178,7 @@ export function LogList({
                       {time(record.time_ns)}
                     </span>
                     {record.level && (
-                      <StatusBadge tone={LEVELS[record.level] ?? "stopped"}>
+                      <StatusBadge tone={LEVELS.get(record.level) ?? "stopped"}>
                         {record.level}
                       </StatusBadge>
                     )}
@@ -193,18 +195,10 @@ export function LogList({
           </div>
         </div>
       </section>
-      {current && byId.has(current.id) && (
-        <Details key={current.id} record={current} reveal={reveal} />
-      )}
+      {current && <Details key={current.id} record={current} reveal={reveal} />}
     </div>
   );
 }
-
-/** A record's time of day, to the millisecond, as a row shows it. */
-const time = (ns: number) => {
-  const at = new Date(ns / 1_000_000);
-  return `${at.toLocaleTimeString(undefined, { hourCycle: "h23" })}.${String(at.getMilliseconds()).padStart(3, "0")}`;
-};
 
 /** A record's name for assistive technology: when, how bad, whose, and how long. */
 const label = (record: LogRecord) =>

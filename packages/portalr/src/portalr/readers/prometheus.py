@@ -8,10 +8,10 @@ names the tenant itself too, so a reader pointed at Prometheus directly is still
 
 import math
 from dataclasses import dataclass, field
-from typing import Annotated, Final, Literal
+from typing import Annotated, Final, Literal, Self
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
 from portalr.readers.http import read
 from portalr.readers.query import Window, quoted
@@ -28,7 +28,7 @@ type Metric = Literal["turn_latency", "failed_turns"]
 QUERIES: Final[dict[Metric, str]] = {
     "turn_latency": (
         "histogram_quantile(0.95, sum by (le) "
-        "(rate(artifactr_turn_duration_seconds_bucket{{{tenant}}}[5m])))"
+        "(rate(artifactr_turn_duration_seconds_bucket{{{tenant}}}[{rate}s])))"
     ),
     # artifactr records each failed series at zero as a turn starts, so a failure is an increase
     # even when it is the series' first: each point counts the failures in the step before it.
@@ -36,13 +36,22 @@ QUERIES: Final[dict[Metric, str]] = {
         'sum(increase(artifactr_turns_total{{artifactr_turn_outcome="failed",{tenant}}}[{step}s]))'
     ),
 }
-"""Each metric's PromQL, with ``{tenant}`` where its selector names the tenant, and ``{step}``
-where it counts over each step."""
+"""Each metric's PromQL, with ``{tenant}`` where its selector names the tenant, ``{step}`` where it
+counts over each step, and ``{rate}`` where a rate looks back: at least ``LEAST_RATE``, and a step
+if that is longer, so a point is of the step it is drawn at."""
+
+LEAST_RATE: Final = 300
+"""The shortest a rate looks back, in seconds: a few of Prometheus's scrapes."""
+
+MOST_POINTS: Final = 11_000
+"""The most points Prometheus gives for a query range; more is its error, so more is refused."""
 
 
 def promql(tenant: Tenant, metric: Metric, step: int = 300) -> str:
     """A metric's PromQL, its selector naming the tenant, as the proxy will make sure it does."""
-    return QUERIES[metric].format(tenant=f"{TENANT_LABEL}={quoted(tenant.id)}", step=step)
+    return QUERIES[metric].format(
+        tenant=f"{TENANT_LABEL}={quoted(tenant.id)}", step=step, rate=max(step, LEAST_RATE)
+    )
 
 
 class MetricQuery(Window):
@@ -51,6 +60,12 @@ class MetricQuery(Window):
     metric: Metric
     step: Annotated[int, Field(ge=15, le=86_400)] = 300
     """Seconds between points: from 15 to a day."""
+
+    @model_validator(mode="after")
+    def _within_most_points(self) -> Self:
+        if (self.end - self.start).total_seconds() / self.step > MOST_POINTS:
+            raise ValueError(f"a window is at most {MOST_POINTS} steps: use a longer step")
+        return self
 
 
 class Point(BaseModel):

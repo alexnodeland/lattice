@@ -25,7 +25,9 @@ from portalr.readers import (
     Window,
 )
 from portalr.readers.langfuse import Scores, workspace_of
-from portalr.readers.loki import _record
+from portalr.readers.loki import _identify
+from portalr.readers.prometheus import promql
+from portalr.readers.query import nanoseconds
 from portalr.tenant import allowed
 from tests.tools import Tool, fails, json
 
@@ -143,7 +145,7 @@ async def test_a_record_is_read_by_its_id_with_its_line_and_by_no_other() -> Non
     assert isinstance(listed, Ok)
     first, second = sorted(listed.data.records, key=lambda record: record.service or "")
     assert first.id != second.id
-    assert re.fullmatch(r"5-[0-9a-f]{16}", first.id)
+    assert re.fullmatch(r"5-[0-9a-f]{16}-0", first.id)
     # `first` is docplan's, which has the email label to withhold.
     one = await loki.record(ACME, first.id)
     assert isinstance(one, Ok)
@@ -154,7 +156,18 @@ async def test_a_record_is_read_by_its_id_with_its_line_and_by_no_other() -> Non
     assert (params["start"], params["end"]) == ("5", "6")
     assert params["query"] == '{service_name=~".+"} | tenant_id = "acme"'
     # An id that names no record, another's digest, or no id at all, is none.
-    for record_id in (f"5-{'0' * 16}", f"6-{first.id.split('-')[1]}", "5", "x-y", "", "5-ABC"):
+    stream_digest = first.id.split("-")[1]
+    for record_id in (
+        f"5-{'0' * 16}-0",
+        f"5-{stream_digest}-1",
+        f"6-{stream_digest}-0",
+        f"{2**63}-{stream_digest}-0",
+        "5",
+        "x-y",
+        "",
+        "5-ABC",
+        f"\u0665-{stream_digest}-0",
+    ):
         assert await loki.record(ACME, record_id) == Ok(data=None), record_id
 
 
@@ -166,7 +179,7 @@ async def test_another_tenants_record_is_not_found_by_its_id() -> None:
         "http://loki", Tool({"/loki/api/v1/query_range": json({"data": {"result": []}})}).client()
     )
     # The id a record of globex's has, asked for as acme: Loki, here wrong, answers it anyway.
-    globex_id = _record(5, "theirs", {"tenant_id": "globex", "service_name": "b"}).id
+    globex_id = _identify([(5, "theirs", {"tenant_id": "globex", "service_name": "b"})])[0][0].id
     assert await loki.record(ACME, globex_id) == Ok(data=None)
     assert await mine.record(ACME, globex_id) == Ok(data=None)
 
@@ -175,7 +188,9 @@ async def test_loki_down_slow_or_absent_is_unavailable(monkeypatch: pytest.Monke
     query = LogQuery(start=START, end=END)
     down = Loki("http://loki", Tool({"/loki/api/v1/query_range": json({}, status=503)}).client())
     assert await down.logs(ACME, query) == Unavailable(reason="loki answered 503")
-    assert await down.record(ACME, "5-" + "a" * 16) == Unavailable(reason="loki answered 503")
+    assert await down.record(ACME, "5-" + "a" * 16 + "-0") == Unavailable(
+        reason="loki answered 503"
+    )
     absent = Loki("http://loki", Tool().client())
     assert await absent.logs(ACME, query) == Unavailable(
         reason="loki has no query API at that address"
@@ -417,3 +432,74 @@ async def test_a_quantile_of_nothing_is_a_gap_not_a_number() -> None:
     )
     assert isinstance(read, Ok)
     assert [(point.time, point.value) for point in read.data] == [(2, 0.5), (4, 2.0)]
+
+
+def test_an_id_holds_nothing_of_the_line() -> None:
+    """Changing only the line leaves the id as it was: no guess at a line can be confirmed by it."""
+    labels = {"service_name": "docplan", "artifactr_run_id": "run_1", "email": "a@b.c"}
+    ids = {
+        _identify([(5, line, labels)])[0][0].id
+        for line in ("alice@example.com said launch on Tuesday", "something else", "")
+    }
+    assert len(ids) == 1
+    # Nor does a label that isn't shown, such as an email: it is in neither id nor read.
+    assert _identify([(5, "x", {**labels, "email": "other"})])[0][0].id in ids
+    # Records of one stream at one instant are told apart by their place, in the order given.
+    same = _identify([(5, "a", labels), (5, "b", labels), (6, "a", labels)])
+    assert [each.id.rsplit("-", 1)[1] for each, _ in same] == ["0", "1", "0"]
+    assert [line for _, line in same] == ["a", "b", "a"]
+
+
+def test_a_label_value_that_is_not_plain_is_withheld_not_shown() -> None:
+    labels = {
+        "service_name": "x" * 129,
+        "scope_name": "ok scope",
+        "artifactr_thread_id": "has spaces and, perhaps, an email a@b.c",
+        "artifactr_run_id": "run_1",
+        "severity_text": "WARN",
+        "detected_level": "launch on tuesday",
+        "severity_number": "13",
+        "span_id": "\u0663",
+        "trace_id": "abc123",
+    }
+    ((record, _),) = _identify([(1, "line", labels)])
+    assert (record.service, record.thread, record.run) == (None, None, "run_1")
+    assert record.level == "warn"
+    assert record.labels == {
+        "scope_name": "ok scope",
+        "artifactr_run_id": "run_1",
+        "severity_text": "warn",
+        "severity_number": "13",
+        "trace_id": "abc123",
+    }
+    assert record.withheld == ("artifactr_thread_id", "detected_level", "service_name", "span_id")
+    # A level that is not a known one is none.
+    ((odd, _),) = _identify([(1, "line", {"severity_text": "weird"})])
+    assert odd.level is None
+    # A name that is a property of a plain object is not a level.
+    ((proto, _),) = _identify([(1, "line", {"detected_level": "constructor"})])
+    assert proto.level is None
+
+
+def test_a_rate_looks_back_a_step_at_least() -> None:
+    assert "[300s]" in promql(ACME, "turn_latency", 60)
+    assert "[300s]" in promql(ACME, "turn_latency", 300)
+    assert "[900s]" in promql(ACME, "turn_latency", 900)
+    assert "[7200s]" in promql(ACME, "turn_latency", 7200)
+    assert "[7200s]" in promql(ACME, "failed_turns", 7200)
+
+
+def test_a_metric_window_is_at_most_as_many_steps_as_prometheus_gives() -> None:
+    assert MetricQuery(
+        start=START, end=START + timedelta(seconds=15 * 11_000), metric="turn_latency"
+    )
+    with pytest.raises(ValidationError, match="at most 11000 steps"):
+        MetricQuery(start=START, end=START + timedelta(days=30), metric="turn_latency", step=15)
+
+
+def test_a_time_is_whole_nanoseconds_without_a_float() -> None:
+    moment = datetime(2026, 10, 12, 0, 0, 0, 123456, tzinfo=UTC)
+    assert nanoseconds(moment) == 1_791_763_200_123_456_000
+    assert nanoseconds(START) == 1_791_763_200_000_000_000
+    with pytest.raises(ValidationError, match="2199 or earlier"):
+        Window(start=START, end=datetime(2262, 4, 12, tzinfo=UTC))

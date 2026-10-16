@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Annotated, Any, Final
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response
+from fastapi import Path as PathParam
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from grantr.core import (
@@ -55,6 +56,7 @@ from portalr.readers import (
     read_usage,
     reading,
 )
+from portalr.readers.loki import RECORD_ID
 from portalr.readers.query import Id
 from portalr.tenant import Tenant, allowed
 
@@ -244,7 +246,9 @@ def portalr_router(
 
     @api.get("/v1/logs/{record_id}", response_model=reading(LogRecord | None))
     async def log_line(
-        record_id: str, response: Response, tenant: Tenant = telemetry
+        record_id: Annotated[str, PathParam(pattern=RECORD_ID)],
+        response: Response,
+        tenant: Tenant = telemetry,
     ) -> Ok[LogRecord | None] | Unavailable | Unconfigured:
         """One of the tenant's log records by its id, with its line: asked for, and not kept."""
         if not readers.loki:

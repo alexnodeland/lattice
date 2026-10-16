@@ -1,4 +1,4 @@
-import { LOGS_LIMIT, type PortalrApi } from "@portalr/client";
+import { type createQueries, LOGS_LIMIT, type PortalrApi, type TimeSpan } from "@portalr/client";
 import {
   Button,
   Card,
@@ -37,24 +37,23 @@ export const Route = createFileRoute("/_signed/t/$tenant/logs")({
   validateSearch: (search: Shown & SearchSchemaInput): Required<Shown> => shownOf(search),
   beforeLoad: ({ context, params }) => opening(context, params.tenant, "portalr:read_telemetry"),
   // The windows, worked out once, to the minute it is: the same for a minute.
-  loaderDeps: ({ search }: { search: Required<Shown> }) => ({
-    logs: logWindow(search.hours, new Date()),
-    health: healthWindow(search.health, new Date()),
-    thread: search.thread,
-    run: search.run,
-  }),
+  loaderDeps: ({ search }: { search: Required<Shown> }) => {
+    const now = new Date();
+    return {
+      logs: logWindow(search.hours, now),
+      health: healthWindow(search.health, now),
+      thread: search.thread,
+      run: search.run,
+    };
+  },
   loader: async ({ context, params, deps }) => {
     const { queries, queryClient } = context;
     await Promise.all([
       queryClient.ensureQueryData(
         queries.portalr.logs(params.tenant, deps.logs, { thread: deps.thread, run: deps.run }),
       ),
-      queryClient.ensureQueryData(
-        queries.portalr.metrics(params.tenant, "turn_latency", deps.health),
-      ),
-      queryClient.ensureQueryData(
-        queries.portalr.metrics(params.tenant, "failed_turns", deps.health),
-      ),
+      queryClient.ensureQueryData(health(queries, params.tenant, "turn_latency", deps.health)),
+      queryClient.ensureQueryData(health(queries, params.tenant, "failed_turns", deps.health)),
     ]);
   },
   component: LogsPage,
@@ -72,10 +71,24 @@ export const Route = createFileRoute("/_signed/t/$tenant/logs")({
   ),
 });
 
-/** The page, for the windows and filters the address names: another is another page. */
+type Queries = ReturnType<typeof createQueries>;
+
+/** A health chart's read: kept for a minute, the step of the finest window, not read on each render. */
+const health = (
+  queries: Queries,
+  tenant: string,
+  metric: "turn_latency" | "failed_turns",
+  window: TimeSpan,
+) => ({ ...queries.portalr.metrics(tenant, metric, window), staleTime: 60_000 });
+
+/**
+ * The page, for the tenant and the windows and filters the address names: another of either is
+ * another page, with nothing asked, so one tenant's record ids are never read as another's.
+ */
 function LogsPage() {
+  const { tenant } = Route.useParams();
   const shown = Route.useSearch();
-  return <Body key={JSON.stringify(shown)} shown={shown} />;
+  return <Body key={`${tenant}:${JSON.stringify(shown)}`} shown={shown} />;
 }
 
 function Body({ shown }: { shown: Required<Shown> }) {
@@ -86,8 +99,8 @@ function Body({ shown }: { shown: Required<Shown> }) {
   const [logs, latency, failures] = useSuspenseQueries({
     queries: [
       queries.portalr.logs(tenant, deps.logs, { thread: deps.thread, run: deps.run }),
-      queries.portalr.metrics(tenant, "turn_latency", deps.health),
-      queries.portalr.metrics(tenant, "failed_turns", deps.health),
+      health(queries, tenant, "turn_latency", deps.health),
+      health(queries, tenant, "failed_turns", deps.health),
     ],
   });
   // The records that asked to see their line, each read for itself, and let go with the page.

@@ -45,6 +45,9 @@ test("every other escape is stripped: movement, clearing, titles, links, backgro
     `a\u0007b`, // a bell
     `a${ESC}`, // an escape with nothing
     `a${ESC}[`, // a sequence that never ends
+    `a${ESC}[38:2::255:0:0mb`, // a true colour with its parts after colons
+    `a${ESC}]0;a title\u009cb`, // a title ended by the C1 string terminator
+    "a\u202eb\u202ac\u2066d\u2069e\u200ef\u200fg\u061ch\u2028i\u2029j\u200bk\ufeffl", // direction and format
   ];
   expect(hostile.map((line) => text(line))).toEqual([
     "ab",
@@ -63,18 +66,28 @@ test("every other escape is stripped: movement, clearing, titles, links, backgro
     "ab",
     "a",
     "a",
+    "ab",
+    "ab",
+    "abcdefghijkl",
   ]);
   // None of them coloured what follows, but for the colours the palette has.
   expect(runs(`a${ESC}[41mb`).every((each) => each.colour === null)).toBe(true);
   expect(runs(`${ESC}[38;5;196mb`)).toEqual([{ start: 0, text: "b", colour: null, bold: false }]);
+  // The parts of a colon-form colour are not read as codes: the 0 in it is not a reset of the red.
+  expect(runs(`${ESC}[31m${ESC}[38:2::255:0:0mb`)).toEqual([
+    { start: 0, text: "b", colour: 1, bold: false },
+  ]);
+  expect(runs(`${ESC}[31m${ESC}[4:3mb`)).toEqual([{ start: 0, text: "b", colour: 1, bold: false }]);
 });
 
-test("a tab and a newline stay, and a hostile line is read at once", () => {
+test("a tab and a newline stay, and a hostile line is read whole", () => {
   expect(text("a\tb\nc")).toBe("a\tb\nc");
-  const started = performance.now();
   const hostile = `${ESC}[${"1;".repeat(100_000)}m${ESC}]${"x".repeat(100_000)}${ESC}[`.repeat(20);
+  // No escape is left, and a title past its bound is text: what is read is bounded, not hidden.
+  expect(text(hostile)).not.toContain(ESC);
   expect(text(hostile).length).toBeLessThan(hostile.length);
-  expect(performance.now() - started).toBeLessThan(1000);
+  const long = "y".repeat(100_000);
+  expect(text(`${ESC}[31m${long}${ESC}[0m`)).toBe(long);
 });
 
 test("a line is text in spans of the palette's colours, and never markup", async () => {

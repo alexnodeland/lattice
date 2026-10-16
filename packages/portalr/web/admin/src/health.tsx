@@ -2,7 +2,7 @@ import type { PortalrApi, TimeSpan } from "@portalr/client";
 import { BarChart, EmptyState, LineChart, SectionTitle, SelectField } from "@portalr/ui";
 import type { ReactNode } from "react";
 import { figure } from "./format";
-import { HEALTH_RANGES, type HealthHours, pointAt, stepSaid } from "./logs";
+import { HEALTH_RANGES, type HealthHours, onGrid, pointAt, stepSaid } from "./logs";
 
 type Points = PortalrApi.components["schemas"]["Ok_list_Point__"];
 export type Reading =
@@ -79,7 +79,9 @@ export function Health({
           }))}
         />
       </div>
-      <p className="text-muted text-sm">Each point is {stepSaid(step)}.</p>
+      <p className="text-muted text-sm">
+        Each point is {stepSaid(step)}. Times are in UTC. A step with no turns is a gap.
+      </p>
       <Drawn
         reading={latency}
         none={{
@@ -91,7 +93,10 @@ export function Health({
             label="How long a turn takes, at the 95th percentile"
             index={TIME}
             series={[{ key: "p95", name: "95th percentile" }]}
-            data={points.map((point) => ({ time: pointAt(point.time, hours), p95: point.value }))}
+            data={onGrid(window, points).map((point) => ({
+              time: pointAt(point.time, hours),
+              p95: point.value,
+            }))}
             format={(value) => `${value.toFixed(2)} s`}
           />
         )}
@@ -107,9 +112,9 @@ export function Health({
             label="Failed turns in each step"
             index={TIME}
             series={[{ key: "failed", name: "Failed turns" }]}
-            data={points.map((point) => ({
+            data={onGrid(window, points).map((point) => ({
               time: pointAt(point.time, hours),
-              failed: Math.round(point.value),
+              failed: point.value === null ? null : Math.round(point.value),
             }))}
             format={(value) => figure(Math.round(value))}
           />

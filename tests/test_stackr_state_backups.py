@@ -12,6 +12,7 @@ import http.server
 import json
 import os
 import re
+import secrets
 import shutil
 import stat
 import subprocess
@@ -26,9 +27,13 @@ from typing import Any, ClassVar
 import pytest
 
 STATE_HOST = Path(__file__).parent.parent / "packages" / "stackr" / "deploy" / "aws" / "state-host"
-ACCESS = "ASIAEXAMPLEACCESSKEY"
-SECRET = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-TOKEN = "IQoJb3JpZ2luX2VjEXAMPLE/+token=="
+# These have the shape the scripts accept from S3, and none of any provider's key, so no secret
+# scanner mistakes them for one. A suffix new to each run keeps another run's processes, on a
+# machine that has several going, out of the test that searches `ps` for them.
+_RUN = secrets.token_hex(6)
+ACCESS = f"fixture-access-key-id-{_RUN}"
+SECRET = f"fixture/secret+access-key={_RUN}"
+TOKEN = f"fixture-session-token-{_RUN}/+=="
 STAMP = "2026-10-15T03-00-00Z"
 METRICS = {"backup": "stackr.backup.success", "restore-drill": "stackr.restore_drill.success"}
 

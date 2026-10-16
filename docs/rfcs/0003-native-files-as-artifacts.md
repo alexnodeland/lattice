@@ -8,9 +8,7 @@
 
 - [artifactr ADR-0003][a-adr-0003] fixes the two patch kinds. This RFC adds none.
 - [artifactr ADR-0004][a-adr-0004] makes every edit name its base version, and rejects pessimistic locks. This RFC keeps the first and narrows the second, for native files only.
-- [artifactr ADR-0034][a-adr-0034] is ports and adapters. The new package's ports follow it, and its packaging departs from it, for the reasons below.
 - [lattice RFC-0002](0002-portalr-the-portal.md) is portalr, which gains a renderer, previews and check-out for native files.
-- [stackr ADR-0035][s-adr-0035] builds the thin images; the worker's is built the same way.
 
 ## Summary
 
@@ -21,9 +19,7 @@ A new package, `artifactr-files`, gives artifactr artifact types for files in na
 - **Every revision** is an ordinary JSON Patch on the manifest that first tests the content digest it was made from.
 - **A check-out is a lease.** While someone holds it, an agent's edit is refused as busy, and the agent plans again after the check-in.
 
-artifactr gains a lease on an artifact, an addition to its workspace API; its patch kinds and its core rules don't change, and lattice-core doesn't change. The pilot is WordCraft and `.docx` only.
-
-This changes artifactr, portalr and stackr as well as adding a package, so it is in lattice's series.
+artifactr gains a lease on an artifact, an addition to its workspace API; its patch kinds and its core rules don't change, and lattice-core doesn't change. The pilot is WordCraft and `.docx` only. This changes artifactr, portalr and stackr as well as adding a package, so it is in lattice's series.
 
 ## Motivation
 
@@ -53,7 +49,7 @@ An agent's edit and a person's check-in end the same way: the package puts the b
 
 `packages/artifactr-files/` holds the types, the `Blobs` port with in-memory and SQL adapters, the `App` port with `FakeApp` and the WordCraft adapter, `NativeFileTools` (a pydantic-ai toolset), `files_router` (behind a `fastapi` extra), and the worker's job runner, with drift-tested schemas for the manifest and the router.
 
-- **A separate distribution, as a deliberate departure from ADR-0034.** ADR-0034 puts each adapter in an extra of the package whose port it implements. This is not an adapter of an artifactr port. It is a domain extension with its own tables and migrations, a worker program, a router, and a dependency on an external application in alpha. Keeping it out of artifactr leaves artifactr's dependencies and migration chain untouched for every application that doesn't edit native files. relayr is the precedent for a package that builds on artifactr from outside.
+- **A separate distribution, as a deliberate departure from [ADR-0034][a-adr-0034].** ADR-0034 puts each adapter in an extra of the package whose port it implements. This is not an adapter of an artifactr port. It is a domain extension with its own tables and migrations, a worker program, a router, and a dependency on an external application in alpha. Keeping it out of artifactr leaves artifactr's dependencies and migration chain untouched for every application that doesn't edit native files. relayr is the precedent for a package that builds on artifactr from outside.
 - **It depends inward only.** It imports only names in `__all__` of `artifactr`, `artifactr.core` and `artifactr.workspace`, plus `lattice_core.sql.tenancy`; artifactr imports nothing of it. Its `tests/test_layering.py` holds it there, as relayr's does.
 - **It lives in the monorepo,** so CI runs its tests on every change to artifactr (lattice ADR-0002). Its `artifactr-ai` requirement is a lower bound, raised by hand.
 - **Its PyPI name is `artifactr-files-ai`,** with the suffix artifactr's own distribution has; it is imported as `artifactr_files`. Both `artifactr-files` and `artifactr-files-ai` were free on PyPI on 2026-10-16.
@@ -258,7 +254,7 @@ The spike measures the cost per session and how many a host holds; the input-to-
 ### stackr
 
 - **A recipe, off by default.** The template's `native_files` question adds the worker, its internal network, limits and token, and the editor's host name.
-- **One release, two artifacts, one pin.** The worker's thin image is built from the release tarball's `wordcraft-cli`, and the editor is the same release's `wordcraft-web` archive, served as static files by the stack's edge. Both are checked against `SHA256SUMS.txt`, and the image is built as ADR-0035 has it and pinned by digest. A check, like `check-config`'s, fails CI if the two pins differ. Upstream signs nothing and publishes no SBOM. Phase 3 doesn't wait for it (D8): the checksum and digest are verified in CI, and stackr records the provenance itself, until upstream signs.
+- **One release, two artifacts, one pin.** The worker's thin image is built from the release tarball's `wordcraft-cli`, and the editor is the same release's `wordcraft-web` archive, served as static files by the stack's edge. Both are checked against `SHA256SUMS.txt`, and the image is built as [stackr ADR-0035][s-adr-0035] has it and pinned by digest. A check, like `check-config`'s, fails CI if the two pins differ. Upstream signs nothing and publishes no SBOM. Phase 3 doesn't wait for it (D8): the checksum and digest are verified in CI, and stackr records the provenance itself, until upstream signs.
 - **Notices and marks.** Both carry WordCraft's licence files and `NOTICE`. The marks stay as supplied, in the unmodified build only, and nothing of lattice's uses the ArtCraft name or implies its endorsement, as the brand licence requires.
 
 ### What changes in each package
@@ -281,9 +277,7 @@ The spike measures the cost per session and how many a host holds; the input-to-
 | 4. Check-out pilot | The hosted editor, portalr's renderer, previews, diffs, check-out and check-in | `bdd` scenarios for a check-in, a stale check-in, an idempotent retry and a busy agent; the editor's origin serves nothing that calls out |
 | 5. Streamed session spike | The evaluation above | A person types in the streamed document while an agent inserts a paragraph, and both see both; a save becomes one revision; p95 input delay under 150 ms on a LAN; a session starts in under five seconds from a pool; no egress, nothing left behind; no Docker socket reachable from any container the application can reach. Then a written recommendation |
 
-`FakeApp` runs on every pull request; the real worker image runs nightly and in the Acceptance job.
-
-**Before a second app,** WordCraft's matrix has held for two releases, no hostile file has escaped, the second app's licence is read, and its adapter needs no change to `App`, `Blobs` or `NativeFile`.
+`FakeApp` runs on every pull request; the real worker image runs nightly and in the Acceptance job. **Before a second app,** WordCraft's matrix has held for two releases, no hostile file has escaped, the second app's licence is read, and its adapter needs no change to `App`, `Blobs` or `NativeFile`.
 
 ### Future work
 

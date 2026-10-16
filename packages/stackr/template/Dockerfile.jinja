@@ -3,6 +3,20 @@
 # lattice's libraries come from GitHub at the revisions uv.lock pins, so the build needs git
 # and the network. The runtime image holds the virtual environment and nothing else.
 
+{%- if use_portal %}
+# portalr's UIs, which its wheel carries and a git install of it does not: built from the same
+# lattice commit as uv.lock pins portalr at. Replace this stage with portalr's wheel once it is
+# on PyPI.
+FROM oven/bun:1.4.3 AS portal-ui
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates git \
+    && rm -rf /var/lib/apt/lists/*
+ARG PORTAL_REV={{ _copier_conf.vcs_ref_hash }}
+COPY scripts/build-portal-ui.sh /usr/local/bin/
+RUN build-portal-ui.sh "$PORTAL_REV" /ui
+
+
+{% endif -%}
 FROM ghcr.io/astral-sh/uv:0.12-python{{ python_version }}-trixie-slim AS build
 
 RUN apt-get update \
@@ -27,12 +41,16 @@ FROM python:{{ python_version }}-slim-trixie
 
 RUN useradd --create-home --uid 10001 app
 COPY --from=build --chown=app:app /app/.venv /app/.venv
+{%- if use_portal %}
+COPY --from=portal-ui --chown=app:app /ui /ui
+{%- endif %}
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     APP_HOST=0.0.0.0 \
     APP_PORT=8000 \
-    OTEL_PYTHON_FASTAPI_EXCLUDED_URLS=healthz
+    OTEL_PYTHON_FASTAPI_EXCLUDED_URLS=healthz{% if use_portal %} \
+    PORTAL_UI_DIR=/ui{% endif %}
 
 USER app
 EXPOSE 8000

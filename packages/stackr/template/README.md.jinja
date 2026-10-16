@@ -39,6 +39,10 @@ Every surface needs a Supabase access token: in the `Authorization: Bearer` head
 {%- if access == 'grantr' %}
 | `/grantr/v1` | grantr's admin API: tenants, members, groups, roles, grants, keys and the audit log; `/me` and `/checks` for UIs |
 {%- endif %}
+{%- if use_portal %}
+| `/portalr/app/`, `/portalr/admin/` | [portalr](https://lattice.alexnodeland.com/portalr/)'s UIs: the app, to chat with the agents and see their work, and the admin, for access, feedback, traces, logs and spend; on when `PORTAL_SUPABASE_URL` and `PORTAL_SUPABASE_KEY` name the Supabase project they sign in to |
+| `/portalr/v1` | The reads behind them, each asked of grantr first and made for the caller's tenant |
+{%- endif %}
 | `/healthz` | Whether it is up, without a token |
 
 The examples to replace with your own:
@@ -113,6 +117,17 @@ The agent's trace, through the gateway to the model, is in Grafana (Tempo) and L
 | `make migrate-tenants` | Move each user's tenant from their token's `app_metadata.tenant_id` into grantr: a new tenant's earliest user becomes its owner, and the rest its admins; a tenant grantr holds gains its claimed users who aren't members, as admins. It prints who got what, and can run again |
 
 People are added, given roles and issued keys through grantr's API at `/grantr/v1`.
+{%- if use_portal %}
+
+## The portal
+
+[portalr](https://lattice.alexnodeland.com/portalr/) ([`portal.py`](src/{{ package_name }}/portal.py)) is the app and admin UIs and the router of reads behind them, on the same grantr. Its settings are `PORTAL_*` in `.env`: the Supabase project the UIs sign in to, the tools the admin reads (Tempo, Loki, Prometheus through prom-label-proxy, Langfuse, LiteLLM, Grafana), and where the built UIs are.
+
+- **The UIs aren't in a repository install of portalr.** The image builds them from the commit `pyproject.toml` pins (`PORTAL_UI_DIR=/ui`). To run them with `make serve`, `make portal-ui` builds them into `.portal-ui` (it needs git and Bun) and `PORTAL_UI_DIR=.portal-ui` serves them.
+- **The first sign-in** needs a user, and a tenant they own: `make operator EMAIL=...`, then `make tenant NAME=... OWNER=...`. An owner invites people from the admin.
+- **A tool without an address, or whose project isn't named, is left out**: its card says so.
+- **Its audit records** (`portalr.access` and `grantr.audit`) are logged at INFO and reach Loki through the Collector.
+{%- endif %}
 
 {% endif -%}
 ## How it is wired

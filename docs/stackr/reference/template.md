@@ -15,6 +15,7 @@ The application template's questions are in stackr's `copier.yml`, which the `co
 | `evals` | bool | yes |  | always | Include evaluation with evalr (an evals/ directory and a starter experiment)? |
 | `bridge` | bool | yes |  | `libraries == 'both'` | Bridge them with relayr (chats and artifacts become events for rules, and rules' runs act back as proposals and notices; with an incident timeline example)? |
 | `access` | str | `grantr` | `grantr`, `none` | always | Who may do what |
+| `portal` | bool | yes |  | `access == 'grantr'` | Include portalr (an app UI to chat with the agents and see their work, and an admin UI for access, feedback, traces and spend)? |
 | `hosting` | str | `none` | `none`, `host` | always | Where it is hosted, beside stackr's recipe for it (stackr RFC-0004) |
 | `python_version` | str | `3.12` | `3.12`, `3.13`, `3.14` | always | The Python version it runs on |
 | `app_port` | int | `8800` |  | always | The port it is published on, on this machine |
@@ -36,6 +37,7 @@ These are computed from the answers, apart from `libraries_path`, which `scripts
 | `use_artifactr` | bool | `{{ libraries in ['artifactr', 'both'] }}` |
 | `use_reflexr` | bool | `{{ libraries in ['reflexr', 'both'] }}` |
 | `use_relayr` | bool | `{{ libraries == 'both' and bridge }}` |
+| `use_portal` | bool | `{{ access == 'grantr' and portal }}` |
 
 | Copier setting | Value |
 |---|---|
@@ -85,6 +87,7 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `src/<package>/admin.py` | `access == 'grantr'` | rendered |
 | `src/<package>/collaboration.py` | `use_artifactr` | rendered |
 | `src/<package>/notes.py` | `use_artifactr` | rendered |
+| `src/<package>/portal.py` | `use_portal` | rendered |
 | `src/<package>/automation.py` | `use_reflexr` | rendered |
 | `src/<package>/tickets.py` | `use_reflexr` | rendered |
 | `src/<package>/bridge.py` | `use_relayr` | rendered |
@@ -101,6 +104,7 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `tests/test_admin.py` | `access == 'grantr'` | rendered |
 | `tests/test_evals.py` | `evals` | rendered |
 | `tests/test_collaboration.py` | `use_artifactr` | rendered |
+| `tests/test_portal.py` | `use_portal` | rendered |
 | `tests/test_automation.py` | `use_reflexr` | rendered |
 | `tests/test_bridge.py` | `use_relayr` | rendered |
 | `tests/test_chat_rules.py` | `use_relayr` | rendered |
@@ -109,6 +113,7 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `evals/__main__.py` | `evals` | copied |
 | `evals/experiments.py` | `evals` | rendered |
 | `deploy/host/compose.prod.yaml` | `hosting == 'host'` | rendered |
+| `scripts/build-portal-ui.sh` | `use_portal` | copied |
 
 <!-- end generated -->
 

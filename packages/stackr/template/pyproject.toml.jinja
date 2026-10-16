@@ -20,6 +20,9 @@ dependencies = [
 {%- if use_relayr %}
     "relayr-ai[sql,postgres,otel,langfuse,evals]",
 {%- endif %}
+{%- if use_portal %}
+    "portalr",
+{%- endif %}
     "pyjwt[crypto]>=2.10",
     "uvicorn[standard]>=0.54",
 ]
@@ -58,7 +61,10 @@ build-backend = "uv_build"
 
 # The libraries are not on PyPI: each comes from lattice, at the commit the template was rendered
 # from, so `copier update` moves them with the template's code. To try another commit, change
-# every rev here to it, then `uv lock`.
+# every rev here to it, then `uv lock`.{% if use_portal %}
+#
+# portalr's wheel carries its two UIs, which Vite builds; its source has none. The Dockerfile
+# builds them from the same commit (PORTAL_UI_DIR); a checkout's `make portal-ui` does too.{% endif %}
 [tool.uv.sources]
 {%- for distribution, package, used in [
     ("artifactr-ai", "artifactr", use_artifactr),
@@ -66,6 +72,7 @@ build-backend = "uv_build"
     ("evalr", "evalr", evals),
     ("grantr", "grantr", access == 'grantr'),
     ("relayr-ai", "relayr", use_relayr),
+    ("portalr", "portalr", use_portal),
 ] if used %}
 {%- if libraries_path %}
 {{ distribution }} = { path = "{{ libraries_path }}/{{ package }}", editable = true }
@@ -108,7 +115,7 @@ known-third-party = ["fastapi", "mcp", "langfuse"]
 section-order = ["future", "standard-library", "third-party", "family", "first-party", "local-folder"]
 
 [tool.ruff.lint.isort.sections]
-family = [{% if use_artifactr %}"artifactr", {% endif %}{% if use_reflexr %}"reflexr", {% endif %}"evalr"{% if access == 'grantr' %}, "grantr"{% endif %}{% if use_relayr %}, "relayr"{% endif %}]
+family = [{% if use_artifactr %}"artifactr", {% endif %}{% if use_reflexr %}"reflexr", {% endif %}"evalr"{% if access == 'grantr' %}, "grantr"{% endif %}{% if use_relayr %}, "relayr"{% endif %}{% if use_portal %}, "portalr"{% endif %}]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D", "ARG"]

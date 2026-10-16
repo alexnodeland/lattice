@@ -115,6 +115,7 @@ sequenceDiagram
 stackr's [Copier](https://copier.readthedocs.io) template generates an application on artifactr, reflexr or both. It comes with:
 - FastAPI, serving each library's REST, WebSocket and MCP surfaces;
 - sign-in and access through grantr;
+- portalr's app and admin UIs and the reads behind them, with grantr;
 - PostgreSQL with row-level security;
 - agents on the LiteLLM gateway;
 - OpenTelemetry;

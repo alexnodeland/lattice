@@ -29,6 +29,13 @@ class RedactedLogs(logging.Filter):
 
 LOGGERS: Final = ("uvicorn.error", "uvicorn.access")
 """The loggers uvicorn logs requests' and WebSockets' paths to."""
+{%- if use_portal %}
+
+RECORDS: Final = ("portalr.access", "grantr.audit")
+"""The loggers whose INFO records are the audit trail: a tenant's, and a read of a tool that a
+person asked for. At the root's WARNING they would be dropped, and never reach Loki
+(portalr ADR-0035)."""
+{%- endif %}
 
 
 def _log_config() -> dict[str, Any]:
@@ -40,8 +47,15 @@ def _log_config() -> dict[str, Any]:
         config["loggers"][name]["filters"] = ["redacted"]
     for handler in config["handlers"].values():
         handler["filters"] = ["redacted"]
+{%- if use_portal %}
+    for name in RECORDS:
+        # No handler of their own: the records propagate to the root's, which exports them.
+        config["loggers"][name] = {"level": "INFO"}
+{%- endif %}
     return config
 
 
 LOG_CONFIG: Final = _log_config()
-"""uvicorn's logging, with its access log, and its log of WebSockets, redacted."""
+"""uvicorn's logging, with its access log, and its log of WebSockets, redacted{% if use_portal %}.
+
+The audit trail's loggers are at INFO.{% endif %}"""

@@ -828,6 +828,8 @@ $admin
 LITELLM_API_KEY=$app_key
 LITELLM_MOCK_RESPONSE="stackr smoke ok"
 APP_IMAGE=$app_name:local
+PORTAL_SUPABASE_URL=$app_url
+PORTAL_SUPABASE_KEY=sb_publishable_smoke
 ENV
   )
   if ! docker compose --project-directory "$app_dir" --profile app build >/dev/null; then
@@ -893,6 +895,38 @@ ENV
     log "ok: the user is refused the tenant they aren't in"
   else
     log "FAIL: the tenant the user isn't in answered $code, not 403"
+    status=1
+  fi
+
+  log "app: the portal serves its UIs, and asks grantr before a read"
+  local ui
+  for ui in app admin; do
+    code=$(probe -s -o /dev/null -w '%{http_code}' "$app_url/portalr/$ui/")
+    if [[ $code == 200 ]]; then
+      log "ok: the portal serves its $ui UI"
+    else
+      log "FAIL: the portal's $ui UI answered $code, not 200"
+      status=1
+    fi
+  done
+  if probe -s "$app_url/portalr/config.json" | jq -e --arg url "$app_url" '.supabase.url == $url' >/dev/null; then
+    log "ok: the portal's config.json names the Supabase project"
+  else
+    log "FAIL: the portal's config.json doesn't name the Supabase project"
+    status=1
+  fi
+  code=$(app_call "/portalr/v1/spend" -o /dev/null -w '%{http_code}' || true)
+  if [[ $code == 200 ]]; then
+    log "ok: the tenant's owner reads its spend"
+  else
+    log "FAIL: the owner's read of the tenant's spend answered $code, not 200"
+    status=1
+  fi
+  code=$(APP_TENANT=stackr-smoke-other app_call "/portalr/v1/spend" -o /dev/null -w '%{http_code}' || true)
+  if [[ $code == 403 ]]; then
+    log "ok: the portal refuses a read in the tenant the user isn't in"
+  else
+    log "FAIL: the portal's read in the tenant the user isn't in answered $code, not 403"
     status=1
   fi
 

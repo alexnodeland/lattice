@@ -48,10 +48,14 @@ jobs:
           token: ${{ steps.app.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-      # Each released package's commit, which the jobs below check out: a full sha for every one,
-      # or this fails the workflow. A checkout given no ref uses this push's commit, which is what
-      # they must not build from.
-      - name: The released commits
+      # Every released package needs a full commit sha in the outputs, which the jobs below check
+      # out: a checkout given no ref uses this push's commit, which they must not build from. So
+      # this fails the workflow without one. The release exists by now, so running the workflow
+      # again finds it made, builds nothing, and leaves a tagged release with no wheels: they
+      # would then be built by hand from the tag.
+      # RELEASES holds every output, each release's notes too, and an environment variable on
+      # Linux is capped near 128 KB: past that this step can't start, and the workflow fails.
+      - name: Require a commit for every released package
         env:
           RELEASES: ${{ toJSON(steps.release.outputs) }}
           RELEASED: ${{ steps.release.outputs.paths_released || '[]' }}
@@ -83,8 +87,10 @@ jobs:
     env:
       TAG: ${{ fromJSON(needs.release-please.outputs.releases)[format('{0}--tag_name', matrix.path)] }}
     steps:
-      # The commit release-please tagged for this package, not the push that ran the workflow: the
-      # two differ when a release is created on a later push, or the workflow is run again.
+      # The commit release-please tagged for this package, not the push that ran the workflow: they
+      # differ when release-please creates the release on a later push than the one that merged its
+      # pull request. The toolchain action and portalr's check_wheel.py below come from that
+      # commit too. The attestation names the workflow's own commit, the push: see #206.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ fromJSON(needs.release-please.outputs.releases)[format('{0}--sha', matrix.path)] }}

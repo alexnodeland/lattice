@@ -8,6 +8,7 @@
 # Usage, from admin's directory, as its `bdd` task, after the UIs are built: scripts/bdd
 set -euo pipefail
 root=$(cd ../../../.. && pwd)
+# shellcheck source=../../../../../scripts/compose-project.sh
 source "$root/scripts/compose-project.sh"
 # The project's name is this run's own, so concurrent runs, such as ones in other worktrees, don't
 # share a stack, and the only thing removed is what this run started: its containers, volumes and
@@ -15,7 +16,7 @@ source "$root/scripts/compose-project.sh"
 project=$(unique_project portalr-admin-bdd)
 export COMPOSE_FILE=../../compose.yaml COMPOSE_PROFILES=app,bdd COMPOSE_PROJECT_NAME=$project
 # Langfuse and LiteLLM aren't in the compose: the application runs without them, as one may.
-export PORTALR_LANGFUSE_URL= PORTALR_LITELLM_URL=
+export PORTALR_LANGFUSE_URL='' PORTALR_LITELLM_URL=''
 
 stop() {
   local status=$?

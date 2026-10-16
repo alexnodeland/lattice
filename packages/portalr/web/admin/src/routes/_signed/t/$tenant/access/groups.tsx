@@ -128,13 +128,8 @@ function Groups() {
         keyOf={(group) => group.name}
         actions={(group) => (
           <>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={define.words.change(group.name)}
-              onClick={() => void change(group.name)}
-            >
-              Change members
+            <Button variant="ghost" size="sm" onClick={() => void change(group.name)}>
+              Change<span className="sr-only"> {possessive(group.name)}</span> members
             </Button>
             <ConfirmDialog
               label="Delete"

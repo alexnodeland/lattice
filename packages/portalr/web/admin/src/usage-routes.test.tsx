@@ -5,7 +5,7 @@
  */
 
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { open as opened } from "./test/admin";
 
 /** The usage reads made, by their query. */
@@ -153,6 +153,23 @@ test("a window goes to portalr and into the address", async () => {
   const start = new Date(reads.at(-1)?.get("start") ?? "");
   const end = new Date(reads.at(-1)?.get("end") ?? "");
   expect((end.getTime() - start.getTime()) / 86_400_000).toBe(30);
+});
+
+test("the arrow keys move the window, one step and one read each, and the focus stays on the window", async () => {
+  const { screen, router } = await open("/t/acme/usage");
+  await screen.getByRole("radio", { name: "7 days" }).click();
+  const group = screen.getByRole("radiogroup", { name: "Window" });
+  const navigated = vi.fn();
+  router.subscribe("onResolved", navigated);
+  await userEvent.keyboard("{ArrowRight}");
+  await expect.poll(() => router.state.location.search).toMatchObject({ days: 30 });
+  await expect.element(screen.getByRole("figure", { name: "Spend per day" })).toBeVisible();
+  expect(group.element().contains(document.activeElement)).toBe(true);
+  await userEvent.keyboard("{ArrowRight}");
+  await expect.poll(() => router.state.location.search).toMatchObject({ days: 90 });
+  expect(group.element().contains(document.activeElement)).toBe(true);
+  // Two presses, two navigations, none stacked on another.
+  expect(navigated.mock.calls.length).toBeLessThanOrEqual(2);
 });
 
 test("without artifactr's list, the spend is read whole, and says so", async () => {

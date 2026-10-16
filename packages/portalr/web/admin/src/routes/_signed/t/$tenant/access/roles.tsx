@@ -78,13 +78,8 @@ function Roles() {
         keyOf={(role) => role.name}
         actions={(role) => (
           <>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={WORDS.change(role.name)}
-              onClick={() => void change(role.name)}
-            >
-              Change actions
+            <Button variant="ghost" size="sm" onClick={() => void change(role.name)}>
+              Change<span className="sr-only"> {possessive(role.name)}</span> actions
             </Button>
             <ConfirmDialog
               label="Delete"

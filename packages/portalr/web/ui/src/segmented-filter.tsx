@@ -18,25 +18,33 @@ export type Segment<V extends string> = {
  */
 export function SegmentedFilter<V extends string>({
   label,
-  hint,
-  showLabel = false,
   name,
   segments,
   value,
   onValueChange,
+  ...written
 }: {
   label: string;
-  hint?: ReactNode;
-  showLabel?: boolean;
   name?: string;
   segments: readonly Segment<V>[];
   value: V;
   onValueChange: (value: V) => void;
-}) {
+} & (
+  | {
+      /** Write the group's name above it, as a field's, with a hint beneath. */
+      showLabel: true;
+      hint?: ReactNode;
+    }
+  | { showLabel?: false; hint?: never }
+)) {
   const labelId = useId();
+  const hintId = useId();
+  const showLabel = written.showLabel === true;
+  const hint = written.showLabel ? written.hint : undefined;
   const group = (
     <RadioGroup<V>
       {...(showLabel ? { "aria-labelledby": labelId } : { "aria-label": label })}
+      {...(hint !== undefined && { "aria-describedby": hintId })}
       {...(name !== undefined && { name })}
       value={value}
       onValueChange={(chosen) => onValueChange(chosen)}
@@ -70,7 +78,11 @@ export function SegmentedFilter<V extends string>({
         {label}
       </span>
       {group}
-      {hint !== undefined && <p className="text-muted text-xs">{hint}</p>}
+      {hint !== undefined && (
+        <p id={hintId} className="text-muted text-xs">
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

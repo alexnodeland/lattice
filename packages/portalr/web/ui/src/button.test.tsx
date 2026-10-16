@@ -147,3 +147,40 @@ test("a button changes colour at once when motion is reduced", async () => {
   await commands.reduceMotion(true);
   expect(getComputedStyle(button).transitionProperty).toBe("none");
 });
+
+/** A colour laid over a ground, as the screen shows it: `alpha` of `over` on `ground`, as `rgb()` colours. */
+function laid(over: string, alpha: number, ground: string): string {
+  const [a, b] = [over, ground].map((colour) => (colour.match(/[\d.]+/g) ?? []).map(Number));
+  const mixed = [0, 1, 2].map((at) =>
+    Math.round((a?.[at] ?? 0) * alpha + (b?.[at] ?? 0) * (1 - alpha)),
+  );
+  return `rgb(${mixed.join(", ")})`;
+}
+
+test("a soft danger button's hover tint is the danger colour at 12%, and its words read on it, on every ground", async () => {
+  const screen = await render(<Button variant="danger-soft">Remove</Button>);
+  const button = screen.getByRole("button", { name: "Remove" });
+  await button.hover();
+  await expect
+    .poll(() => getComputedStyle(button.element()).backgroundColor)
+    .not.toBe("rgba(0, 0, 0, 0)");
+  const style = getComputedStyle(button.element());
+  // A tint with alpha: as `color(srgb r g b / a)`, whose alpha is the 12% the variant mixes in.
+  expect(style.backgroundColor).toMatch(/\/ 0\.12\)|0\.12\)/);
+  for (const ground of ["paper", "surface"]) {
+    const tinted = laid(token("danger"), 0.12, token(ground));
+    expect(contrast(token("danger"), tinted), ground).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
+test("colour-blind mode leaves the danger colour and its tint as they are", async () => {
+  const screen = await render(<Button variant="danger-soft">Remove</Button>);
+  const before = getComputedStyle(screen.getByRole("button", { name: "Remove" }).element()).color;
+  document.documentElement.dataset.cvd = "";
+  onTestFinished(() => {
+    delete document.documentElement.dataset.cvd;
+  });
+  expect(getComputedStyle(screen.getByRole("button", { name: "Remove" }).element()).color).toBe(
+    before,
+  );
+});

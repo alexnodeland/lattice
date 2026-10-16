@@ -17,7 +17,7 @@ const MOST_REASON = 500;
 
 /**
  * An action that can't be taken back, or does something outside, confirmed: its trigger opens a Base UI alert dialog that says what will
- * be lost, with the action in the danger colour. The focus starts on its way out, Cancel; with `typed`, it starts
+ * be lost, with the action in the danger colour. The focus starts on its way out, which is Cancel unless `dismiss` words it otherwise; with `typed`, it starts
  * in the field, and the action waits until that name is typed, as deleting a tenant does, which
  * Enter then sends. With `asking`, it also asks for a reason, which is optional and goes to
  * `onConfirm`; with `calm`, the action is in the primary colour, for one that loses nothing but is

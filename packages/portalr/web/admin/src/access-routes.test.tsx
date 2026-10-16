@@ -351,6 +351,15 @@ test("on a phone, each place's grants are a list named by its heading", async ()
     .not.toBeInTheDocument();
 });
 
+test("a form left on its empty choices sends nothing", async () => {
+  const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
+  await expect
+    .element(screen.getByRole("combobox", { name: "Role" }))
+    .toHaveTextContent("Choose a role…");
+  await screen.getByRole("button", { name: "Grant", exact: true }).click();
+  expect(sent).toEqual([]);
+});
+
 test("a group made the tenant's admin is named so in the question", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
   await choose(screen, "Role", "owner");
@@ -447,6 +456,8 @@ test("a refused grant says why, and keeps what was entered", async () => {
   await expect
     .element(screen.getByRole("alert"))
     .toHaveTextContent("Not granted: bob holds editor there already");
+  // What was chosen is what was sent: bob, as a user.
+  expect(JSON.parse(String(sent.at(-1)?.body)).to).toEqual({ kind: "user", id: "bob" });
   await expect.element(screen.getByRole("combobox", { name: "Workspace" })).toHaveValue("ws_1");
   await expect
     .element(screen.getByRole("combobox", { name: "To" }))
@@ -502,10 +513,10 @@ test("revoking a grant is confirmed, and sends the grant", async () => {
   const revoke = screen.getByRole("button", {
     name: "Revoke ops (group) as viewer on thread t_1 in ws_1",
   });
-  // A row's action shows "Revoke", and says what it revokes only aloud.
-  await expect.element(revoke).toBeVisible();
-  expect(revoke.element().firstChild?.textContent).toBe("Revoke");
-  expect(revoke.element().querySelector(".sr-only")).not.toBeNull();
+  // A row's action is named by what it revokes, and the dialog's own "Revoke" is another button.
+  await expect
+    .element(revoke)
+    .toHaveAccessibleName("Revoke ops (group) as viewer on thread t_1 in ws_1");
   await revoke.click();
   await screen.getByRole("alertdialog").getByRole("button", { name: "Revoke" }).click();
   await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();

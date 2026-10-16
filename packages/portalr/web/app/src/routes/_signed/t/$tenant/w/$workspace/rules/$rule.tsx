@@ -127,6 +127,7 @@ function RulePage() {
           allowed.has("reflexr:archive_rule") && (
             <ConfirmDialog
               label="Archive"
+              look="danger-soft"
               title={`Archive ${name}?`}
               confirm="Archive the rule"
               onConfirm={archive}

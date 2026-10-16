@@ -1,6 +1,6 @@
 import { Select } from "@base-ui/react/select";
 import { Check, ChevronDown } from "lucide-react";
-import type { ReactNode, Ref } from "react";
+import { type ReactNode, type Ref, useMemo, useState } from "react";
 import { FormField } from "./form-field";
 import { Icon } from "./icon";
 import { item, popover } from "./menu";
@@ -17,7 +17,8 @@ export interface Option {
  * label, and keeps the platform's select's keyboard: arrow keys move through the choices, typing
  * finds one by its first letters, Enter chooses it, Escape closes the list and gives the focus
  * back. With a `name` it submits with its form, as a native select does. Uncontrolled, it starts
- * on its first choice, as a native select does.
+ * on `defaultValue` or its first choice, as a native select does, and follows its first choice as
+ * the choices change until one is chosen.
  */
 export function SelectField({
   label,
@@ -50,14 +51,21 @@ export function SelectField({
   /** The trigger, for focus to be put on it. */
   triggerRef?: Ref<HTMLButtonElement>;
 }) {
+  const items = useMemo(() => [...options], [options]);
+  // Until one is chosen, an uncontrolled select is on `defaultValue`, or on whatever its first choice
+  // is now: the choices may arrive after it is shown, as the people a thread is shared with do.
+  const [chosen, setChosen] = useState<string | null>(null);
+  const shown = value ?? chosen ?? defaultValue ?? options[0]?.value ?? "";
   return (
     <FormField label={label} hint={hint} error={error} className={className}>
       <Select.Root
-        items={[...options]}
-        {...(value === undefined
-          ? { defaultValue: defaultValue ?? options[0]?.value ?? "" }
-          : { value })}
-        onValueChange={(chosen) => onValueChange?.(String(chosen ?? ""))}
+        items={items}
+        value={shown}
+        onValueChange={(next) => {
+          const picked = String(next ?? "");
+          setChosen(picked);
+          onValueChange?.(picked);
+        }}
         {...(name !== undefined && { name })}
         {...(required !== undefined && { required })}
         {...(disabled !== undefined && { disabled })}
@@ -74,7 +82,7 @@ export function SelectField({
         <Select.Portal>
           <Select.Positioner sideOffset={4} alignItemWithTrigger={false} className="z-50">
             <Select.Popup
-              className={`${popover} max-h-72 min-w-(--anchor-width) overflow-y-auto p-1.5 outline-none`}
+              className={`${popover} max-h-[min(18rem,var(--available-height))] min-w-(--anchor-width) overflow-y-auto p-1.5 outline-none`}
             >
               <Select.List>
                 {options.map((option) => (

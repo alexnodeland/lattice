@@ -44,7 +44,11 @@ test("the dialog lists who holds a role, starts at the person, and returns to th
   const screen = await render(<Opened />);
   await screen.getByRole("button", { name: "Thread actions" }).click();
   const dialog = screen.getByRole("dialog", { name: "Share the thread" });
-  await expect.element(dialog.getByRole("listitem")).toHaveTextContent("erin editorRevoke");
+  await expect
+    .element(dialog.getByRole("listitem"))
+    .toHaveTextContent("erin editorRevoke erin as editor");
+  // A row shows "Revoke", and is named by whom and what it revokes.
+  await expect.element(dialog.getByRole("button", { name: "Revoke erin as editor" })).toBeVisible();
   await expect.element(dialog.getByRole("combobox", { name: "Person" })).toHaveFocus();
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect.element(screen.getByRole("button", { name: "Thread actions" })).toHaveFocus();
@@ -68,7 +72,7 @@ test("revoking sends the grant as it is", async () => {
   const onRevoke = vi.fn(async () => done);
   const screen = await render(<Opened onRevoke={onRevoke} />);
   await screen.getByRole("button", { name: "Thread actions" }).click();
-  await screen.getByRole("button", { name: "Revoke" }).click();
+  await screen.getByRole("button", { name: "Revoke erin as editor" }).click();
   await screen.getByRole("alertdialog").getByRole("button", { name: "Revoke the role" }).click();
   expect(onRevoke).toHaveBeenCalledExactlyOnceWith(erin);
 });

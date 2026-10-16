@@ -12,9 +12,11 @@ set -euo pipefail
 service=${1:?usage: scripts/api SERVICE}
 package=$(basename "$PWD")
 root=$(cd ../.. && pwd)
+# shellcheck source=compose-project.sh
 source "$root/scripts/compose-project.sh"
 report="$root/.api-reports/$package"
-export COMPOSE_PROFILES=app COMPOSE_PROJECT_NAME=$(unique_project "$package-api")
+project=$(unique_project "$package-api")
+export COMPOSE_PROFILES=app COMPOSE_PROJECT_NAME=$project
 
 stop() {
   local status=$?

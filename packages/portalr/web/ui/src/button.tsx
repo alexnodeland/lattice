@@ -8,7 +8,7 @@ const look = {
   ghost: "border-transparent bg-transparent text-fg hover:not-data-disabled:bg-wash",
   /** A destructive action's confirmation: the danger colour, solid. */
   danger: "border-transparent bg-danger text-on-danger hover:not-data-disabled:bg-danger-hover",
-  /** A destructive action offered, not yet confirmed: the danger colour as words, on a wash of it. */
+  /** A destructive action offered, not yet confirmed: the danger colour as words, bare until hovered, then tinted with it. */
   "danger-soft":
     "border-transparent bg-transparent text-danger hover:not-data-disabled:bg-[color-mix(in_srgb,var(--danger)_12%,transparent)]",
 } as const;

@@ -92,6 +92,7 @@ export function ShareDialog({
               {canRevoke && (
                 <ConfirmDialog
                   label="Revoke"
+                  about={`${named(each.to)} as ${each.role}`}
                   look="danger-soft"
                   size="sm"
                   title={`Revoke ${named(each.to)}'s ${each.role} role?`}

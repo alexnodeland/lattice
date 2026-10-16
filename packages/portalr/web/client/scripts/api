@@ -6,11 +6,14 @@
 # Usage, from the client's directory, as its `api` task: scripts/api
 set -euo pipefail
 root=$(cd ../../../.. && pwd)
+# shellcheck source=../../../../../scripts/compose-project.sh
 source "$root/scripts/compose-project.sh"
 export COMPOSE_PROFILES=app DOCPLAN_PORT=0 ARTIFACTR_PG_PORT=0 ONCALL_PORT=0 REFLEXR_PG_PORT=0
 
-docplan=(docker compose --project-directory "$root/packages/artifactr" --project-name "$(unique_project portalr-docplan)")
-oncall=(docker compose --project-directory "$root/packages/reflexr" --project-name "$(unique_project portalr-oncall)")
+docplan_project=$(unique_project portalr-docplan)
+oncall_project=$(unique_project portalr-oncall)
+docplan=(docker compose --project-directory "$root/packages/artifactr" --project-name "$docplan_project")
+oncall=(docker compose --project-directory "$root/packages/reflexr" --project-name "$oncall_project")
 
 stop() {
   local status=$?

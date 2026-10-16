@@ -57,12 +57,124 @@ test("the keyboard opens it, moves through the choices, chooses one, and Escape 
   await expect.element(role).toHaveFocus();
 });
 
-test("typing the first letter of a choice finds it", async () => {
+test("typing the first letters of a choice finds it: the highlight follows the letters, and Enter takes it", async () => {
+  const screen = await render(
+    <SelectField label="Role" options={[...OPTIONS, { value: "oxide", label: "Oxide" }]} />,
+  );
+  await screen.getByRole("combobox", { name: "Role" }).click();
+  await expect.element(page.getByRole("listbox")).toBeVisible();
+  await userEvent.keyboard("ox");
+  // The highlight moves a moment after the letters, not with them, so Enter waits for it.
+  await expect
+    .element(page.getByRole("option", { name: "Oxide" }))
+    .toHaveAttribute("data-highlighted");
+  await userEvent.keyboard("{Enter}");
+  await expect.element(screen.getByRole("combobox", { name: "Role" })).toHaveTextContent("Oxide");
+});
+
+test("the trigger says it opens a list, and whether it is open", async () => {
+  const screen = await render(<SelectField label="Role" options={OPTIONS} />);
+  const role = screen.getByRole("combobox", { name: "Role" });
+  await expect.element(role).toHaveAttribute("aria-expanded", "false");
+  await role.click();
+  await expect.element(role).toHaveAttribute("aria-expanded", "true");
+  const list = page.getByRole("listbox").element();
+  expect(role.element().getAttribute("aria-controls")).toBe(list.id);
+});
+
+test("Home and End go to the first and last choice", async () => {
   const screen = await render(<SelectField label="Role" options={OPTIONS} />);
   await screen.getByRole("combobox", { name: "Role" }).click();
-  await userEvent.keyboard("o");
-  await userEvent.keyboard("{Enter}");
-  await expect.element(screen.getByRole("combobox", { name: "Role" })).toHaveTextContent("Owner");
+  // Keys are heard once the list has the focus, which is a moment after it is seen.
+  await expect.poll(() => document.activeElement?.getAttribute("role")).toBe("option");
+  const highlighted = () =>
+    [...document.querySelectorAll('[role="option"][data-highlighted]')].map((o) => o.textContent);
+  await userEvent.keyboard("{End}");
+  await expect.poll(highlighted).toEqual(["Owner"]);
+  await userEvent.keyboard("{Home}");
+  await expect.poll(highlighted).toEqual(["Viewer"]);
+});
+
+test("Tab while it is open closes it, choosing nothing, and moves on", async () => {
+  const screen = await render(
+    <>
+      <SelectField label="Role" options={OPTIONS} />
+      <button type="button">Next</button>
+    </>,
+  );
+  const role = screen.getByRole("combobox", { name: "Role" });
+  await role.click();
+  await expect.element(page.getByRole("listbox")).toBeVisible();
+  await userEvent.keyboard("{ArrowDown}");
+  await userEvent.tab();
+  await expect.element(page.getByRole("listbox")).not.toBeInTheDocument();
+  await expect.element(role).toHaveTextContent("Viewer");
+});
+
+test("a required select left on its empty choice makes its form invalid, and one chosen makes it valid", async () => {
+  const submitted = vi.fn();
+  const screen = await render(
+    <form
+      aria-label="Grant"
+      onSubmit={(event) => {
+        event.preventDefault();
+        submitted(new FormData(event.currentTarget).get("role"));
+      }}
+    >
+      <SelectField
+        label="Role"
+        name="role"
+        required
+        options={[{ value: "", label: "Choose a role…" }, ...OPTIONS]}
+      />
+      <button type="submit">Grant</button>
+    </form>,
+  );
+  const form = screen.getByRole("form", { name: "Grant" }).element() as HTMLFormElement;
+  expect(form.checkValidity()).toBe(false);
+  await choose(screen, "Role", "Editor");
+  expect(form.checkValidity()).toBe(true);
+  await screen.getByRole("button", { name: "Grant" }).click();
+  expect(submitted).toHaveBeenCalledWith("editor");
+});
+
+test("an empty choice submits as an empty value, not as nothing", async () => {
+  const submitted = vi.fn();
+  const screen = await render(
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        submitted(new FormData(event.currentTarget).get("role"));
+      }}
+    >
+      <SelectField
+        label="Role"
+        name="role"
+        options={[{ value: "", label: "Anyone" }, ...OPTIONS]}
+      />
+      <button type="submit">Find</button>
+    </form>,
+  );
+  await screen.getByRole("button", { name: "Find" }).click();
+  expect(submitted).toHaveBeenCalledWith("");
+});
+
+test("an uncontrolled select follows its first choice as the choices arrive, until one is chosen", async () => {
+  const screen = await render(<SelectField label="Person" options={[]} />);
+  await screen.rerender(
+    <SelectField label="Person" options={[{ value: "vera", label: "vera" }]} />,
+  );
+  await expect.element(screen.getByRole("combobox", { name: "Person" })).toHaveTextContent("vera");
+  await screen.rerender(
+    <SelectField
+      label="Person"
+      options={[
+        { value: "bob", label: "bob" },
+        { value: "vera", label: "vera" },
+      ]}
+    />,
+  );
+  await expect.element(screen.getByRole("combobox", { name: "Person" })).toHaveTextContent("bob");
 });
 
 test("a hint is said with it, and a refusal marks it invalid", async () => {

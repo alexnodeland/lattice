@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { choose } from "./choose";
+import { choose } from "@portalr/ui/testing/bdd";
 import { madeAs, Then, When } from "./fixtures";
 
 /** A name made afresh for this run, so a scenario runs again against the same application. */

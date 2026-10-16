@@ -12,9 +12,11 @@
 # Usage, from portalr's directory, as its `api` task, after the UIs are built: scripts/api
 set -euo pipefail
 root=$(cd ../.. && pwd)
+# shellcheck source=../../../scripts/compose-project.sh
 source "$root/scripts/compose-project.sh"
 report="$root/.api-reports/portalr"
-export COMPOSE_PROFILES=app COMPOSE_PROJECT_NAME=$(unique_project portalr-api)
+project=$(unique_project portalr-api)
+export COMPOSE_PROFILES=app COMPOSE_PROJECT_NAME=$project
 
 stop() {
   local status=$?

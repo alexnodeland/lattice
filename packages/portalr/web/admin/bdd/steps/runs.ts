@@ -1,6 +1,6 @@
 import { type APIRequestContext, expect, type Page } from "@playwright/test";
+import { choose } from "@portalr/ui/testing/bdd";
 import { email, password } from "../../../app/bdd/steps/people";
-import { choose } from "./choose";
 import { Given, Then, When } from "./fixtures";
 
 const origin = () => new URL(process.env.PORTALR_APP_URL ?? "http://localhost:8000").origin;

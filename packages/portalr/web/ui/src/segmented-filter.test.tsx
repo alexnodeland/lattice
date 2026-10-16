@@ -92,3 +92,34 @@ test("with a name it submits the choice with its form", async () => {
   await screen.getByRole("button", { name: "Apply" }).click();
   expect(submitted).toBe("you");
 });
+
+test("the hint describes the group, so it is said with it", async () => {
+  const screen = await render(
+    <SegmentedFilter<Shown>
+      label="Window"
+      showLabel
+      hint="Whole days, in UTC."
+      segments={SEGMENTS}
+      value="all"
+      onValueChange={vi.fn()}
+    />,
+  );
+  await expect
+    .element(screen.getByRole("radiogroup", { name: "Window" }))
+    .toHaveAccessibleDescription("Whole days, in UTC.");
+});
+
+test("the arrow keys move the choice, once each, and the focus stays in the group", async () => {
+  const chosen = vi.fn();
+  const screen = await render(
+    <SegmentedFilter<Shown> label="Show" segments={SEGMENTS} value="all" onValueChange={chosen} />,
+  );
+  await screen.getByRole("radio", { name: "All, 7" }).click();
+  chosen.mockClear();
+  await userEvent.keyboard("{ArrowRight}");
+  expect(chosen).toHaveBeenCalledTimes(1);
+  expect(chosen).toHaveBeenLastCalledWith("you");
+  expect(
+    screen.getByRole("radiogroup", { name: "Show" }).element().contains(document.activeElement),
+  ).toBe(true);
+});

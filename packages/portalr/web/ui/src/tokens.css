@@ -51,6 +51,11 @@
   --ansi-5: light-dark(#a3187a, #f08ad0);
   --ansi-6: light-dark(#0b6a7a, #5fd3e6);
   --ansi-7: light-dark(#5e5470, #f1eef6);
+  /*
+   * A table row's least height: every row of every table is this tall, whatever its cells hold,
+   * so a row with a small action matches one without. Admin's compact density changes this alone.
+   */
+  --row-height: 2.75rem;
   /* Behind a drawer or a dialog. */
   --scrim: light-dark(rgb(28 29 38 / 45%), rgb(0 0 0 / 60%));
 }

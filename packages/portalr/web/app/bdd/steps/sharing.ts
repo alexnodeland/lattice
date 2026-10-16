@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
+import { choose, optionsOf } from "@portalr/ui/testing/bdd";
 import { account } from "./app";
-import { choose } from "./choose";
 import { started, Then, When } from "./fixtures";
 import { password, signIn } from "./people";
 
@@ -90,10 +90,9 @@ Then("{string} holds {word} on it", async ({ page }, person: string, role: strin
 Then(
   "they're offered {string}, and not {string}",
   async ({ page }, offered: string, not: string) => {
-    await dialog(page).getByRole("combobox", { name: "Person" }).click();
-    await expect(page.getByRole("option", { name: offered, exact: true })).toHaveCount(1);
-    await expect(page.getByRole("option", { name: not, exact: true })).toHaveCount(0);
-    await page.keyboard.press("Escape");
+    const people = await optionsOf(page, dialog(page).getByRole("combobox", { name: "Person" }));
+    expect(people).toContain(offered);
+    expect(people).not.toContain(not);
   },
 );
 

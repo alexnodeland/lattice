@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { choose } from "./choose";
+import { choose } from "@portalr/ui/testing/bdd";
 import { madeAs, Then, When } from "./fixtures";
 
 When("they open the audit log, filtered to members added", async ({ page }) => {

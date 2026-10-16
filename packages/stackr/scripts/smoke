@@ -652,6 +652,8 @@ cleanup_app() {
   if [[ -n ${portal_key_made:-} ]]; then
     gateway_call "$(master_key)" /key/delete -o /dev/null -H 'Content-Type: application/json' \
       --data '{"key_aliases": ["portal-spend-read"]}' || true
+  fi
+  if [[ -n ${portal_user_made:-} ]]; then
     gateway_call "$(master_key)" /user/delete -o /dev/null -H 'Content-Type: application/json' \
       --data '{"user_ids": ["portalr"]}' || true
   fi
@@ -786,9 +788,12 @@ app_trace_in_tempo() { tempo_trace_has_service "$app_name" && tempo_trace_has_se
 # browser has): the call supabase-js makes reaches GoTrue and signs the smoke user in, and
 # GoTrue's admin API, signup and the rest are refused there, however a path is spelled.
 smoke_portal_sign_in() {
+  # USER is the user's JSON, open at the end (as auth_sign_in has it): the closing brace is added
+  # here. The password goes to curl on stdin, never in an argument.
   local user=$1 path code failed=0
-  if probe -fsS -H 'Content-Type: application/json' -H 'apikey: sb_publishable_smoke' --data "$user}" \
-    "$app_url/auth/v1/token?grant_type=password" | jq -e '.access_token | length > 0' >/dev/null; then
+  if printf '%s}' "$user" |
+    probe -fsS -H 'Content-Type: application/json' -H 'apikey: sb_publishable_smoke' --data @- \
+      "$app_url/auth/v1/token?grant_type=password" | jq -e '.access_token | length > 0' >/dev/null; then
     log "ok: the portal's sign-in reaches GoTrue through the edge, at the application's address"
   else
     log "FAIL: the smoke user could not sign in at $app_url/auth/v1/token"
@@ -797,6 +802,7 @@ smoke_portal_sign_in() {
   for path in /auth/v1/admin/users /auth/v1/ADMIN/users /auth/v1/admin /auth/v1/../admin/users \
     /auth/v1/%2e%2e/admin/users /auth/v1/admin%00/users /auth/v1/admin./users /auth/v1/admin%2fusers \
     /auth/v1/signup /auth/v1/invite /auth/v1/settings /auth/v1/ /admin /admin/users; do
+    # 404 from the edge's rules; 400 from Caddy itself, for a path it won't parse (the NUL).
     code=$(probe -s --path-as-is -o /dev/null -w '%{http_code}' "$app_url$path" || true)
     if [[ $code == 404 || $code == 400 ]]; then
       log "ok: the edge refuses $app_url$path ($code)"
@@ -849,6 +855,9 @@ AUTH_ADMIN_URL=http://gotrue:9999"
   # is the stack's own `portal-spend-read`, so one that is there already (an operator's, or a run
   # that died) stops the run rather than being replaced, or skipped: a key's value can't be read
   # back. The key and its user are removed at the end, as they were made here.
+  # The user is removed only if this run makes it: an operator's `portalr` is left alone. The flag
+  # is set before the key is made, so a run that fails there doesn't leak the user.
+  gateway_call "$(master_key)" "/user/info?user_id=portalr" -o /dev/null 2>/dev/null || portal_user_made=1
   if ! portal_key=$(uv run scripts/create-portal-key --quiet) || [[ -z $portal_key ]]; then
     log "FAIL: app: no portal spend-read key was made; if one exists, \`scripts/create-portal-key --rotate\` replaces it"
     return 1
@@ -959,14 +968,16 @@ ENV
     log "FAIL: the portal's config.json doesn't name the Supabase project"
     status=1
   fi
-  code=$(app_call "/portalr/v1/spend" -o /dev/null -w '%{http_code}' || true)
+  local spend
+  spend=$(app_call "/portalr/v1/spend" -w '\n%{http_code}' || true)
+  code=${spend##*$'\n'}
   if [[ $code == 200 ]]; then
     log "ok: the tenant's owner reads its spend"
   else
     log "FAIL: the owner's read of the tenant's spend answered $code, not 200"
     status=1
   fi
-  if app_call "/portalr/v1/spend" | jq -e '.status == "ok"' >/dev/null; then
+  if jq -e '.status == "ok"' <<<"${spend%$'\n'*}" >/dev/null 2>&1; then
     log "ok: the spend comes from the gateway, read with the portal's own key"
   else
     log "FAIL: the portal could not read the tenant's spend from the gateway with its own key"

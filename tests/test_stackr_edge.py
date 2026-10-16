@@ -185,6 +185,23 @@ def test_every_other_call_under_the_prefix_and_every_admin_path_is_refused(
     assert status in {400, 404}, (status, body)
 
 
+@pytest.mark.parametrize(
+    ("method", "target"),
+    [
+        ("GET", "/auth/v1/token"),
+        ("PUT", "/auth/v1/token"),
+        ("PUT", "/auth/v1/user"),
+        ("POST", "/auth/v1/user"),
+        ("DELETE", "/auth/v1/user"),
+        ("GET", "/auth/v1/logout"),
+        ("PATCH", "/auth/v1/logout"),
+    ],
+)
+def test_the_three_calls_are_allowed_by_method_too(edge: Edge, method: str, target: str) -> None:
+    status, body = edge(APP, target, method)
+    assert (status, "gotrue" in body) == (404, False)
+
+
 def test_the_application_and_its_admin_ui_are_still_served(edge: Edge) -> None:
     assert edge(APP, "/portalr/admin/") == (200, "app /portalr/admin/")
     assert edge(APP, "/portalr/app/") == (200, "app /portalr/app/")

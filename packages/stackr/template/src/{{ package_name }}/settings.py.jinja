@@ -96,7 +96,8 @@ class PortalSettings:
         langfuse_project: The Langfuse project's id, for scores and links; with
             ``LANGFUSE_BASE_URL`` and the project's keys.
         litellm_key: A key that reads each tenant's spend from LiteLLM, and does nothing else:
-            stackr's ``make portal-key`` makes it, limited to the team routes of a view-only admin.
+            stackr's ``make portal-key`` makes it, a view-only admin's, limited to the four routes
+            the admin reads.
             Never the master key, which opens everything; with ``LITELLM_BASE_URL``.
         grafana_url: Grafana, as operators' browsers reach it, for deep links.
         required: Whether the application must not start without a Supabase project for the UIs

@@ -2,7 +2,8 @@ import type { Signed } from "@portalr/client";
 import { Component, type ReactNode } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
-import { RunStreams, useRuns } from "./run-streams";
+import { RunStreams, useAct, useRuns } from "./run-streams";
+import { refusedAs } from "./runs";
 import { FakeSocket, frame, stubSockets } from "./test/socket";
 
 const SURFACES = { artifactr: "/artifactr/v1", reflexr: "/reflexr/v1", grantr: "", portalr: "" };
@@ -77,4 +78,43 @@ test("runs are read inside a stream, and nowhere else", async () => {
   await expect
     .element(screen.getByText("rule runs are read inside a workspace's stream"))
     .toBeVisible();
+});
+
+type Act = ReturnType<typeof useAct>;
+
+function Harness({ into }: { into: { act?: Act } }) {
+  into.act = useAct(refusedAs);
+  return null;
+}
+
+test("a command's id is not let go while it is unanswered, and goes with its answer", async () => {
+  const into: { act?: Act } = {};
+  await render(
+    <RunStreams surfaces={SURFACES} signed={SIGNED} tenant="acme" workspace="notes">
+      <Harness into={into} />
+    </RunStreams>,
+  );
+  await expect.poll(() => FakeSocket.sockets.length).toBe(1);
+  const command = { type: "retry_run", run_id: "r1" } as const;
+  const answered = into.act?.send(command);
+  await expect.poll(() => FakeSocket.sent.length).toBe(1);
+  const first = FakeSocket.sent[0]?.id ?? "";
+  // A release while it is on its way, as a dismissed dialog would make, lets nothing go.
+  into.act?.release(command);
+  // The connection drops and comes back: what was unanswered is sent again, under its own id.
+  FakeSocket.sockets[0]?.end(1006);
+  await expect.poll(() => FakeSocket.sent.length, { timeout: 5000 }).toBe(2);
+  expect(FakeSocket.sent[1]?.id).toBe(first);
+  // Its answer ends that id, and only that one.
+  FakeSocket.sockets.at(-1)?.raw({ type: "command_result", command_id: first, ok: true });
+  await answered;
+  const next = into.act?.send(command);
+  await expect.poll(() => FakeSocket.sent.length).toBe(3);
+  expect(FakeSocket.sent[2]?.id).not.toBe(first);
+  FakeSocket.sockets.at(-1)?.raw({
+    type: "command_result",
+    command_id: FakeSocket.sent[2]?.id,
+    ok: true,
+  });
+  await next;
 });

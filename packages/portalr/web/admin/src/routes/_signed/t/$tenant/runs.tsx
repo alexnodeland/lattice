@@ -189,27 +189,35 @@ function Runs({ tenant, workspace, show }: { tenant: string; workspace: string; 
 
 /**
  * Where the stream is, until it is live; that it can't get through, if it has been connecting for
- * a while, as it does while reflexr is down; or that it ended. Never what the server said: that
- * can echo what was sent.
+ * a while, as it does while reflexr is down; or that it ended. A replay, which can take as long as
+ * the log is long, is reading, not a failure. Never what the server said: that can echo what was
+ * sent.
  */
 function Connection({ status }: { status: Snapshot<unknown>["status"] }) {
+  switch (status) {
+    case "live":
+      return null;
+    case "closed":
+      return (
+        <p role="alert">
+          The connection to this workspace ended. Reload the page to connect again.
+        </p>
+      );
+    case "replaying":
+      return <p role="status">Reading the workspace's runs…</p>;
+    case "connecting":
+      // Mounted for as long as it connects, so its wait starts over with each connecting.
+      return <Connecting />;
+  }
+}
+
+/** Connecting: reading, and, past `PATIENCE` without an answer, that it can't be reached. */
+function Connecting() {
   const [slow, setSlow] = useState(false);
   useEffect(() => {
-    setSlow(false);
-    if (status === "live" || status === "closed") {
-      return;
-    }
     const timer = setTimeout(() => setSlow(true), PATIENCE);
     return () => clearTimeout(timer);
-  }, [status]);
-  if (status === "closed") {
-    return (
-      <p role="alert">The connection to this workspace ended. Reload the page to connect again.</p>
-    );
-  }
-  if (status === "live") {
-    return null;
-  }
+  }, []);
   return slow ? (
     <p role="alert">
       The workspace's runs can't be reached: reflexr may be down. It keeps trying, and they appear
@@ -233,7 +241,12 @@ function Title({ run }: { run: Reflexr.Run }) {
       )}
       {run.history.length > 0 && (
         <details className="text-xs">
-          <summary className="cursor-pointer text-muted">History ({run.history.length})</summary>
+          <summary
+            aria-label={`History of run ${run.id}, ${run.history.length}`}
+            className="cursor-pointer text-muted"
+          >
+            History ({run.history.length})
+          </summary>
           <ul className="mt-1 flex flex-col gap-1">
             {run.history.map((step) => (
               <li key={step.seq}>
@@ -270,9 +283,10 @@ const WORDS: Record<Action, { label: string; title: string; confirm: string; bod
 };
 
 /**
- * A run's actions, each confirmed, and sent once. A retry makes the run something no list of
- * those needing attention holds, and a skip takes it from that list, so the button that opened the
- * dialog may be gone when it closes: focus then goes to the list's heading, and not to the page.
+ * A run's actions, each confirmed, and sent once. A retry makes the run something the list of
+ * those needing attention doesn't hold, and a skip takes it from that list, so the button that
+ * opened the dialog goes, and the dialog with it: focus then goes to the list's heading, and not
+ * to the page.
  */
 function Actions({
   run,
@@ -295,20 +309,13 @@ function Actions({
         confirm={WORDS[action].confirm}
         calm={action === "retry"}
         {...(action === "retry" ? {} : { asking: "Reason (optional)" })}
+        returnTo={heading}
         onOpenChange={(open) => {
           if (!open) {
             act.release(command(""));
           }
         }}
-        onConfirm={async (reason) => {
-          await act.send(command(reason));
-          // After the dialog has closed, and focus has gone back where it can: if it can't, here.
-          setTimeout(() => {
-            if (!document.activeElement || document.activeElement === document.body) {
-              heading.current?.focus();
-            }
-          }, FOCUS_AFTER);
-        }}
+        onConfirm={(reason) => act.send(command(reason))}
       >
         <p>
           <code className="font-mono">{run.rule}</code>, {run.id}: attempt {run.attempt}
@@ -319,6 +326,3 @@ function Actions({
     );
   });
 }
-
-/** How long after an action to look for where focus is: past the dialog's closing, in ms. */
-const FOCUS_AFTER = 400;

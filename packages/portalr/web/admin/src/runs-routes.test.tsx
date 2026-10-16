@@ -318,7 +318,7 @@ test("the connection ending for good is said, in words of the page's own", async
     .toHaveTextContent("The connection to this workspace ended. Reload the page to connect again.");
 });
 
-test("what the server says in an error frame is not put on the page", async () => {
+test("regression guard: what the server says in an error frame is not put on the page", async () => {
   const { screen } = await open("/t/acme/runs");
   await expect.element(row(screen, "run_dead")).toBeVisible();
   FakeSocket.sockets[0]?.raw({

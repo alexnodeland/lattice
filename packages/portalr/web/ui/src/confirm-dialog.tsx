@@ -1,5 +1,13 @@
 import { AlertDialog } from "@base-ui/react/alert-dialog";
-import { type FormEvent, type ReactNode, useRef, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "./button";
 import { actions, backdrop, description, title as heading, popup } from "./dialog";
 import { TextField } from "./text-field";
@@ -8,7 +16,7 @@ import { TextField } from "./text-field";
 const MOST_REASON = 500;
 
 /**
- * An action that can't be taken back, or that does something outside, confirmed: its trigger opens a Base UI alert dialog that says what will
+ * An action that can't be taken back, or does something outside, confirmed: its trigger opens a Base UI alert dialog that says what will
  * be lost, with the action in the danger colour. The focus starts on Cancel; with `typed`, it starts
  * in the field, and the action waits until that name is typed, as deleting a tenant does, which
  * Enter then sends. With `asking`, it also asks for a reason, which is optional and goes to
@@ -27,6 +35,7 @@ export function ConfirmDialog({
   typed,
   asking,
   calm = false,
+  returnTo,
   onOpenChange,
   onConfirm,
 }: {
@@ -48,6 +57,11 @@ export function ConfirmDialog({
   asking?: string;
   /** Whether the action is one that loses nothing, so it isn't in the danger colour. */
   calm?: boolean;
+  /**
+   * Where focus goes if the dialog is taken away while it is open, along with its trigger, as when
+   * what it acts on changes so that it no longer applies. Otherwise focus returns to the trigger.
+   */
+  returnTo?: RefObject<HTMLElement | null>;
   /** Called when the dialog opens or closes, however it closes. */
   onOpenChange?: (open: boolean) => void;
   /** What to do, with the reason given, if it was asked for; it ends the dialog if it doesn't throw. */
@@ -59,6 +73,18 @@ export function ConfirmDialog({
   const [pending, setPending] = useState(false);
   // Whether the action is under way: read at once, where a state would be a render behind.
   const busy = useRef(false);
+  const counter = useId();
+  const shown = useRef(false);
+  shown.current = open;
+  useEffect(
+    () => () => {
+      // Gone while open, with its trigger: focus goes where the caller says, not to the page.
+      if (shown.current) {
+        returnTo?.current?.focus();
+      }
+    },
+    [returnTo],
+  );
   const [failed, setFailed] = useState<string | null>(null);
   const cancel = useRef<HTMLButtonElement>(null);
   const ready = !pending && (typed === undefined || entered === typed);
@@ -84,6 +110,10 @@ export function ConfirmDialog({
     <AlertDialog.Root
       open={open}
       onOpenChange={(next) => {
+        // A dialog whose action is under way is not dismissed: Escape, the backdrop and Cancel wait.
+        if (!next && busy.current) {
+          return;
+        }
         setOpen(next);
         onOpenChange?.(next);
         setEntered("");
@@ -115,6 +145,7 @@ export function ConfirmDialog({
             {asking !== undefined && (
               <TextField
                 label={asking}
+                aria-describedby={counter}
                 value={reason}
                 onValueChange={(value) => setReason(String(value))}
                 maxLength={MOST_REASON}
@@ -122,7 +153,7 @@ export function ConfirmDialog({
               />
             )}
             {asking !== undefined && (
-              <p className="text-muted text-xs">
+              <p id={counter} className="text-muted text-xs">
                 {reason.length} of {MOST_REASON} characters
               </p>
             )}

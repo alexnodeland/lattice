@@ -92,7 +92,7 @@ type Command = Parameters<ReflexrStream["send"]>[0];
  * Carries out commands on the stream, once each, as a person confirmed them.
  *
  * A command is sent with an id of its own, which lasts as long as the dialog that asked for it is
- * open: if the connection ends before the server answers, the same id is sent when the person
+ * open, and, if the dialog is closed while the command is still unanswered, until it is answered: if the connection ends before the server answers, the same id is sent when the person
  * tries again in that dialog, and the server carries it out once. Any answer ends the id, and so
  * does `release`, which is called when the dialog closes, however it closes: a later intention is
  * a new command under a new id, never one the server may answer from an earlier time. `send`
@@ -103,6 +103,8 @@ export function useAct(
 ) {
   const stream = useRunStream();
   const [ids] = useState(() => new Map<string, string>());
+  // The keys whose command is on its way and unanswered: their ids are not let go.
+  const [inFlight] = useState(() => new Set<string>());
   const keyOf = (command: Command) =>
     `${command.type}:${"run_id" in command ? command.run_id : ""}`;
   return {
@@ -110,20 +112,30 @@ export function useAct(
       const key = keyOf(command);
       const id = ids.get(key) ?? crypto.randomUUID();
       ids.set(key, id);
-      const settled = await stream.send(command, id);
+      inFlight.add(key);
+      const settled = await stream.send(command, id).finally(() => inFlight.delete(key));
       if (settled.outcome === "closed") {
         throw new Error(
           "The connection ended before the server answered. Try again: it is carried out once.",
         );
       }
-      ids.delete(key);
+      // Its own id alone: another try's, under the same key, is not this answer's to end.
+      if (ids.get(key) === id) {
+        ids.delete(key);
+      }
       if (settled.outcome === "refused") {
         throw new Error(refused(settled.result.rejection));
       }
     },
-    /** The dialog for this command closed: its id is of that intention alone. */
+    /**
+     * The dialog for this command closed: its id is of that intention alone, and goes, unless the
+     * command is still on its way, whose id is the one to resend if the connection drops.
+     */
     release(command: Command) {
-      ids.delete(keyOf(command));
+      const key = keyOf(command);
+      if (!inFlight.has(key)) {
+        ids.delete(key);
+      }
     },
   };
 }

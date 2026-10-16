@@ -37,6 +37,8 @@ export interface Sent {
 export interface Script {
   /** Whether the server says nothing to a hello: a workspace that can't be reached. */
   mute?: boolean;
+  /** Whether the server says the replay is complete: not, for a log that takes long to read. */
+  holdReplay?: boolean;
   /** The events a new connection replays. */
   log: ReflexrV1.EventFrame[];
   /** What the server says of a command: a result, and the events that follow it, if any. */
@@ -111,7 +113,9 @@ export class FakeSocket {
       for (const each of log) {
         this.#emit(each);
       }
-      this.#emit({ type: "replay_complete" });
+      if (!FakeSocket.script.holdReplay) {
+        this.#emit({ type: "replay_complete" });
+      }
       return;
     }
     const sent: Sent = {

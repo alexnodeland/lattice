@@ -114,6 +114,8 @@ When("they cancel the run, saying {string}", async ({ page, made }, reason: stri
 });
 
 Then("the run is no longer among those that need someone", async ({ page, made }) => {
+  // The stream has delivered the runs: that none is this one is a finding, not a page still reading.
+  await expect(page.getByRole("status").filter({ hasText: "Reading" })).toHaveCount(0);
   await expect(runOf(page, made)).toHaveCount(0);
 });
 

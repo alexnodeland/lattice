@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { choose, optionsOf } from "@portalr/ui/testing/bdd";
 import { account } from "./app";
 import { started, Then, When } from "./fixtures";
-import { password, signIn } from "./people";
+import { email, password, signIn } from "./people";
 
 /** The workspace's threads, once its log has been read: Start is enabled only then. */
 async function threads(page: Page) {
@@ -12,12 +12,12 @@ async function threads(page: Page) {
 
 const dialog = (page: Page) => page.getByRole("dialog", { name: "Share the thread" });
 
-/** Who holds a role on the thread, in its sharing dialog, by what the item says. */
+/** Who holds a role on the thread, in its sharing dialog, by what the item says: their email. */
 const holder = (page: Page, person: string, role: string) =>
   dialog(page)
     .getByRole("list", { name: "People with access" })
     .getByRole("listitem")
-    .filter({ hasText: `${person} ${role}` });
+    .filter({ hasText: `${email(person)} ${role}` });
 
 async function act(page: Page, item: string) {
   await page.getByRole("button", { name: "Thread actions" }).click();
@@ -78,7 +78,7 @@ When("they open its sharing", async ({ page }) => {
 When("they share it with {string} as {word}", async ({ page }, person: string, role: string) => {
   await act(page, "Share…");
   const sharing = dialog(page);
-  await choose(page, sharing.getByRole("combobox", { name: "Person" }), person);
+  await choose(page, sharing.getByRole("combobox", { name: "Person" }), email(person));
   await choose(page, sharing.getByRole("combobox", { name: "Role" }), role);
   await sharing.getByRole("button", { name: "Share", exact: true }).click();
 });
@@ -91,8 +91,9 @@ Then(
   "they're offered {string}, and not {string}",
   async ({ page }, offered: string, not: string) => {
     const people = await optionsOf(page, dialog(page).getByRole("combobox", { name: "Person" }));
-    expect(people).toContain(offered);
-    expect(people).not.toContain(not);
+    // The dialog shows a person by their email, which the test application gives everyone.
+    expect(people).toContain(email(offered));
+    expect(people).not.toContain(email(not));
   },
 );
 

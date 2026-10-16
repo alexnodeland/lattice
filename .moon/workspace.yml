@@ -13,6 +13,7 @@ projects:
   stackr: 'packages/stackr'
   portalr: 'packages/portalr'
   client: 'packages/portalr/web/client'
+  notices: 'packages/portalr/web/notices'
   ui: 'packages/portalr/web/ui'
   app: 'packages/portalr/web/app'
   admin: 'packages/portalr/web/admin'

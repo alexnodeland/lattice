@@ -16,9 +16,11 @@ rules below are in one place and are tested (tests/test_release_plan.py):
 - **Packages are published in dependency order,** in the stages ``STAGES`` names: a package after
   everything it requires, so that at every moment what is on PyPI installs. A test holds the
   stages to the packages' own requirements.
-- **A rehearsal builds and checks everything and publishes nothing.** The workflow can be run by
-  hand on a branch, to rehearse the whole release at its head; it can be run on a tag to build
-  that release's wheels again, and to publish them if asked to.
+- **A rehearsal writes nothing.** Run by hand, the workflow's ``mode`` is ``rehearse`` unless it
+  says ``publish``: it builds and checks, and attaches nothing to a release, attests nothing,
+  pushes no image, rewrites no release notes and publishes nothing, on a branch (the whole release
+  at its head) and on a tag alike. Attaching, attesting, pushing images and publishing happen
+  only in a release run, or in ``mode=publish`` on a tag.
 """
 
 import json
@@ -85,22 +87,21 @@ class Plan:
     Attributes:
         packages: The packages to build a wheel of, by directory.
         releases: Each one's ``<path>--tag_name`` and ``<path>--sha``, as release-please gives
-            them, and stackr's, if its images are to be built.
-        stackr: Whether stackr's thin images are built and published.
-        upload: Whether the wheels are attached to their release.
-        attest: Whether they are attested.
-        publish: Whether they go to PyPI.
-        stages: ``packages``, by publication stage; a stage may be empty.
+            them, and stackr's, if its images are built.
+        stackr: Whether stackr's thin images are built.
+        write: Whether the run writes anywhere: wheels attached to their release and attested,
+            images pushed and added to the release's notes. A rehearsal never does.
+        publish: Whether the wheels go to PyPI.
+        ordered: ``packages``, in the order they are published (``STAGES``).
         notes: What the run decided, in words.
     """
 
     packages: list[str]
     releases: dict[str, str]
     stackr: bool
-    upload: bool
-    attest: bool
+    write: bool
     publish: bool
-    stages: list[list[str]]
+    ordered: list[str]
     notes: list[str]
 
 
@@ -147,6 +148,21 @@ def tag_path(tag: str, root: Path = ROOT) -> str:
     raise Refused(f"{tag} is not the tag of a package's release")
 
 
+def again(tag: str, path: str) -> str:
+    """How to run the workflow again on a tag, and what that does."""
+    command = f"gh workflow run release.yml --ref {tag} -f tag={tag} -f mode=publish"
+    if path == STACKR:
+        return (
+            f"  {command}\n    (it builds the images again, pushes them and adds them to the "
+            "release's notes; stackr has no wheel and is never on PyPI)"
+        )
+    return (
+        f"  {command}\n    (it attaches and attests the wheels; it publishes to PyPI as well "
+        "only if the PYPI_PUBLISH variable is true, and then after the `pypi` environment's "
+        "approval of each package)"
+    )
+
+
 def refuse_other_commit(run: Run, paths: Sequence[str]) -> None:
     """Refuse a release whose tagged commit is not the one this run is at (#206)."""
     other = {
@@ -156,20 +172,16 @@ def refuse_other_commit(run: Run, paths: Sequence[str]) -> None:
     }
     if not other:
         return
-    again = "\n".join(
-        f"  gh workflow run release.yml --ref {run.releases[f'{path}--tag_name']} "
-        f"-f tag={run.releases[f'{path}--tag_name']} -f mode=publish"
-        for path in other
-    )
+    commands = "\n".join(again(run.releases[f"{path}--tag_name"], path) for path in other)
     tagged = ", ".join(
         f"{run.releases[f'{path}--tag_name']} at {sha[:12]}" for path, sha in other.items()
     )
     raise Refused(
-        f"release-please tagged {tagged}, and this run is at {run.sha[:12]}. Wheels built here "
-        f"would be attested as built at {run.sha[:12]}, not at the tag (#206), so none are built "
+        f"release-please tagged {tagged}, and this run is at {run.sha[:12]}. What is built here "
+        f"would be attested as built at {run.sha[:12]}, not at the tag (#206), so none is built "
         "and nothing is published. The release exists with no wheels. Run the workflow again on "
-        f"the tag, where the two are the same:\n{again}\n(drop `-f mode=publish` to rehearse "
-        "first)"
+        f"the tag, where the two are the same:\n{commands}\nTo build and check it first, "
+        "without writing anything, drop `-f mode=publish`."
     )
 
 
@@ -204,9 +216,9 @@ def plan(run: Run, root: Path = ROOT) -> Plan:
             packages,
             run.releases,
             STACKR in released,
-            False,
+            True,
             run.publishing,
-            ["a release: its wheels are attached, attested and, if publishing is on, published"],
+            ["a release: its wheels are attached and attested, and published if that is on"],
         )
     if run.event != "workflow_dispatch":
         raise Refused(f"the workflow doesn't run on {run.event}")
@@ -224,11 +236,11 @@ def plan(run: Run, root: Path = ROOT) -> Plan:
                 for field, value in (("tag_name", "rehearsal"), ("sha", run.sha))
             },
             False,
-            True,
+            False,
             False,
             [
                 f"a rehearsal at {run.sha[:12]}: every wheel is built and checked, and nothing is "
-                "attached, attested or published"
+                "attached, attested, pushed or published"
             ],
         )
     if run.ref_type != "tag" or run.ref_name != run.tag:
@@ -237,19 +249,21 @@ def plan(run: Run, root: Path = ROOT) -> Plan:
     releases = {f"{path}--tag_name": run.tag, f"{path}--sha": run.sha}
     packages = [] if path == STACKR else [path]
     refuse_wrong_version(packages, releases, root)
-    if run.mode == "publish" and not run.publishing:
-        raise Refused("mode=publish needs the PYPI_PUBLISH repository variable set to true")
+    writes = run.mode == "publish"
+    if not writes:
+        note = f"{run.tag} rebuilt and checked, writing nothing (mode rehearse)"
+    elif path == STACKR:
+        note = f"{run.tag} again: its images are built, pushed and added to the release's notes"
+    else:
+        note = f"{run.tag} again: its wheels replace the release's, and go to PyPI if that is on"
     return built(
         run,
         packages,
         releases,
         path == STACKR,
-        False,
-        run.mode == "publish",
-        [
-            f"{run.tag} again, from its own commit: its wheels are replaced on the release, "
-            "attested and, in mode publish, published"
-        ],
+        writes,
+        writes and run.publishing,
+        [note],
     )
 
 
@@ -258,13 +272,13 @@ def built(
     packages: list[str],
     releases: Mapping[str, str],
     stackr: bool,
-    rehearsal: bool,
+    write: bool,
     publish: bool,
     notes: list[str],
 ) -> Plan:
     """The plan for these packages."""
     wheels = set(packages)
-    stages = [[path for path in stage if path in wheels] for stage in STAGES]
+    ordered = [path for stage in STAGES for path in stage if path in wheels]
     released = [*packages, *([STACKR] if stackr else [])]
     keys = [f"{path}--{field}" for path in released for field in ("tag_name", "sha")]
     if stackr and run.event != "push":
@@ -273,35 +287,43 @@ def built(
         packages=packages,
         releases={key: releases[key] for key in keys},
         stackr=stackr,
-        upload=not rehearsal,
-        attest=not rehearsal,
-        publish=publish and not rehearsal,
-        stages=stages,
+        write=write,
+        publish=publish and write,
+        ordered=ordered,
         notes=notes,
     )
 
 
-def entry(path: str) -> dict[str, str]:
-    """A package as a job matrix names it: its directory, and a name for its artifacts."""
-    return {"path": path, "slug": path.rsplit("/", 1)[-1]}
+def entry(path: str, root: Path = ROOT) -> dict[str, Any]:
+    """A package as a job matrix names it.
 
-
-def outputs(made: Plan) -> dict[str, str]:
-    """The plan as the workflow's job outputs."""
-    flags = {
-        "stackr": made.stackr,
-        "upload": made.upload,
-        "attest": made.attest,
-        "publish": made.publish,
-    }
+    Its directory, a name for artifacts, its stage, and its distribution and version.
+    """
+    table = project(path, root)
     return {
-        "packages": json.dumps([entry(path) for path in made.packages]),
+        "path": path,
+        "slug": path.rsplit("/", 1)[-1],
+        "stage": stage_of(path) + 1,
+        "name": str(table["name"]).lower().replace("_", "-"),
+        "version": str(table["version"]),
+    }
+
+
+def outputs(made: Plan, root: Path = ROOT) -> dict[str, str]:
+    """The plan as the workflow's job outputs.
+
+    ``ordered`` is what the publishing job runs through, one package at a time: each with the
+    ``name==version`` of every package before it in the release, which PyPI must serve first.
+    """
+    flags = {"stackr": made.stackr, "write": made.write, "publish": made.publish}
+    ordered = [entry(path, root) for path in made.ordered]
+    for at, each in enumerate(ordered):
+        each["earlier"] = [f"{before['name']}=={before['version']}" for before in ordered[:at]]
+    return {
+        "packages": json.dumps([entry(path, root) for path in made.packages]),
+        "ordered": json.dumps(ordered),
         "releases": json.dumps(made.releases),
         **{name: str(value).lower() for name, value in flags.items()},
-        **{
-            f"stage{i}": json.dumps([entry(path) for path in stage])
-            for i, stage in enumerate(made.stages, 1)
-        },
     }
 
 

@@ -35,4 +35,4 @@
 - Easier: a release pull request lists the changes a package's users see, and a package whose only changes are documentation, tests or builds doesn't release.
 - Easier: each changelog reads from the package's first commit, across the move.
 - Harder: a change must be typed `feat`, `fix`, `perf` or `revert` to release. A `build:` change to a package's dependency ranges releases nothing on its own; if users need it, it is a `fix`.
-- Revisit: publishing to PyPI ([#7](https://github.com/alexnodeland/lattice/issues/7)) adds a job to `release.yml`; nothing here changes. [ADR-0023](0023-publishing-to-pypi-from-the-release-workflow.md) adds it.
+- Publishing to PyPI ([#7](https://github.com/alexnodeland/lattice/issues/7)) is a job of `release.yml` that [ADR-0023](0023-publishing-to-pypi-from-the-release-workflow.md) adds; what releases, and the versions, are unchanged.

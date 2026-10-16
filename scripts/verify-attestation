@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Verifies that each file was attested by this repository's release workflow, as built at this
+# run's commit and ref, and that the attestation is of the file's own bytes.
+#
+# Usage: scripts/verify-attestation FILE...   (in the release workflow: GH_TOKEN, GITHUB_*)
+#
+# `gh attestation verify` finds an attestation by the file's digest; it is also compared here, to
+# the digest in the attestation's statement, so that what is verified is what is published. The
+# workflow, the commit and the ref are all pinned: the build job that made the file ran in this
+# run, so a file from another workflow, commit or ref fails.
+
+set -euo pipefail
+
+repo=${GITHUB_REPOSITORY:?}
+for file in "$@"; do
+  sum=$(sha256sum "$file" | cut -d' ' -f1)
+  verified=$(gh attestation verify "$file" --repo "$repo" \
+    --signer-workflow "$repo/.github/workflows/release.yml" \
+    --source-digest "${GITHUB_SHA:?}" --source-ref "${GITHUB_REF:?}" --format json)
+  if ! jq --exit-status --arg sum "$sum" '[.. | objects | .sha256? // empty] | index($sum) != null' \
+    <<<"$verified" >/dev/null; then
+    echo "verify-attestation: $file ($sum) is not the digest its attestation is of" >&2
+    exit 1
+  fi
+  echo "verified: $(basename "$file") $sum"
+done

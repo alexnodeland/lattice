@@ -14,13 +14,14 @@
 # (a release created on a later push than the one that merged its pull request) the plan refuses
 # before anything is built, and says how to run the workflow again on the tag (#206).
 #
-# PyPI (lattice's RFC-0001 follow-up, the first release): the wheels go to PyPI through trusted
-# publishing, in the order their requirements need (scripts/release_plan.py's STAGES), each stage
-# in a job gated by the `pypi` environment, whose required reviewers are the approval. Nothing is
-# published until the repository variable PYPI_PUBLISH is `true`. The workflow can also be run by
-# hand: on a branch, to rehearse the whole release at its head (every wheel built and checked,
-# nothing attached, attested or published); on a tag, with `tag` the same, to build that release
-# again and, with `mode` publish, to publish it.
+# PyPI (ADR-0023): the wheels go to PyPI through trusted publishing, one package at a time in the
+# order their requirements need, in a job gated by the `pypi` environment, whose required
+# reviewers are the approval. Nothing is published until the repository variable PYPI_PUBLISH is
+# `true`. The workflow can also be run by hand, and by default it WRITES NOTHING: mode `rehearse`
+# builds and checks, on a branch (every wheel at its head) or on a tag (that release, again): it
+# attaches nothing to a release, attests nothing, pushes no image, rewrites no release notes and
+# publishes nothing (the run keeps the built files as artifacts). Mode `publish`, on a tag, does
+# what a release run does, for that tag alone.
 #
 # release-please acts as lattice's GitHub App, with a token minted for each run and narrowed to
 # what it needs, so that its pull request's CI and Title checks run, which they never do for the
@@ -101,15 +102,11 @@ jobs:
       contents: read
     outputs:
       packages: ${{ steps.plan.outputs.packages }}
+      ordered: ${{ steps.plan.outputs.ordered }}
       releases: ${{ steps.plan.outputs.releases }}
       stackr: ${{ steps.plan.outputs.stackr }}
-      upload: ${{ steps.plan.outputs.upload }}
-      attest: ${{ steps.plan.outputs.attest }}
+      write: ${{ steps.plan.outputs.write }}
       publish: ${{ steps.plan.outputs.publish }}
-      stage1: ${{ steps.plan.outputs.stage1 }}
-      stage2: ${{ steps.plan.outputs.stage2 }}
-      stage3: ${{ steps.plan.outputs.stage3 }}
-      stage4: ${{ steps.plan.outputs.stage4 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -127,6 +124,9 @@ jobs:
           PYPI_PUBLISH: ${{ vars.PYPI_PUBLISH }}
         run: python3 scripts/release_plan.py
 
+  # Builds and checks each wheel, and writes nothing: its permissions are read-only, so a
+  # rehearsal, which never reaches the jobs below, cannot write whatever else changes. It uploads
+  # the files to the run (not to a release) for the jobs after it.
   build:
     name: Build (${{ matrix.package.path }})
     needs: plan
@@ -134,15 +134,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      attestations: write
-      contents: write
-      id-token: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         package: ${{ fromJSON(needs.plan.outputs.packages) }}
-    env:
-      TAG: ${{ fromJSON(needs.plan.outputs.releases)[format('{0}--tag_name', matrix.package.path)] }}
     steps:
       # The commit the release was tagged at. The plan has refused any run whose commit is not
       # this workflow's own, so the attestation, which names the workflow's commit, names this one
@@ -167,18 +163,6 @@ jobs:
         if: matrix.package.path == 'packages/portalr'
         working-directory: ${{ matrix.package.path }}
         run: uv run --no-project python scripts/check_wheel.py
-      # A rehearsal attests nothing and attaches nothing: its wheels are only checked.
-      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        if: needs.plan.outputs.attest == 'true'
-        with:
-          subject-path: ${{ matrix.package.path }}/dist/*
-      - name: Attach the wheel and sdist to the release
-        if: needs.plan.outputs.upload == 'true'
-        working-directory: ${{ matrix.package.path }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload --clobber "$TAG" dist/*
-      # The files that were attested are the ones PyPI gets: the publishing jobs take these.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist-${{ matrix.package.slug }}
@@ -187,13 +171,46 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
-  # What PyPI would be given, checked before anyone is asked to approve it, and in a rehearsal
-  # all there is to a publish: the files are well formed (twine), carry the attestations the build
-  # made, and are named and versioned as their packages say; and which of them PyPI has already.
+  # Attests each wheel and sdist, and attaches them to their release: only in a run that writes
+  # (a release, or mode publish on a tag). The files are the build job's, byte for byte.
+  attach:
+    name: Attest and attach (${{ matrix.package.path }})
+    needs: [plan, build]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.plan.outputs.write == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.packages) }}
+    env:
+      TAG: ${{ fromJSON(needs.plan.outputs.releases)[format('{0}--tag_name', matrix.package.path)] }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-${{ matrix.package.slug }}
+          path: dist
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/*
+      - name: Attach the wheel and sdist to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release upload --clobber "$TAG" dist/*
+
+  # What PyPI would be given, checked before anyone is asked to approve it, and in a rehearsal all
+  # there is to a publish: the files are well formed (twine), carry the attestations the attach
+  # job made, and are named and versioned as their packages say; PyPI's own copy of any of them is
+  # the same file; and the order they would be published in.
   pypi-check:
     name: PyPI, checked
-    needs: [plan, build]
-    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    needs: [plan, build, attach]
+    if: ${{ !cancelled() && needs.build.result == 'success' && !contains(needs.attach.result, 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -203,215 +220,82 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+        with:
+          cache: false # a publishing job restores no cache
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: dist-*
           path: dist
           merge-multiple: true
+      # twine's dependencies are those of the day this was written, not the day it runs.
       - name: The files are well formed
-        run: uvx --from twine==6.2.0 twine check --strict dist/*
+        run: uvx --exclude-newer 2026-10-01 --from twine==6.2.0 twine check --strict dist/*
       - name: The files carry the attestations the build made
-        if: needs.plan.outputs.attest == 'true'
+        if: needs.plan.outputs.write == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          for file in dist/*; do
-            gh attestation verify "$file" --repo "$GITHUB_REPOSITORY" \
-              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml"
-          done
-      - name: What would be published, in what order, and what PyPI already has
+        run: scripts/verify-attestation dist/*
+      - name: The order, and what PyPI has
         env:
           PUBLISH: ${{ needs.plan.outputs.publish }}
-          STAGE1: ${{ needs.plan.outputs.stage1 }}
-          STAGE2: ${{ needs.plan.outputs.stage2 }}
-          STAGE3: ${{ needs.plan.outputs.stage3 }}
-          STAGE4: ${{ needs.plan.outputs.stage4 }}
+          ORDERED: ${{ needs.plan.outputs.ordered }}
         run: |
           if [[ $PUBLISH == true ]]; then
-            echo "This run publishes, in four stages, each after the one before it."
+            echo "This run publishes these, one at a time, each after the ones before it:"
           else
-            echo "This run publishes nothing; a release run with PYPI_PUBLISH set would, in four stages:"
+            echo "This run publishes nothing. A release run with PYPI_PUBLISH set would, in this order:"
           fi
-          for stage in 1 2 3 4; do
-            var=STAGE$stage
-            echo "stage $stage: $(jq --raw-output 'map(.slug) | join(", ") | if . == "" then "(none)" else . end' <<<"${!var}")"
-          done
-          for file in dist/*.whl; do
-            name=$(basename "$file")
-            distribution=$(cut -d- -f1 <<<"$name" | tr _ -)
-            version=$(cut -d- -f2 <<<"$name")
-            code=$(curl --silent --output /dev/null --write-out '%{http_code}' \
-              "https://pypi.org/pypi/$distribution/$version/json" || true)
-            if [[ $code == 200 ]]; then
-              echo "$distribution $version: on PyPI already, so skipped"
-            else
-              echo "$distribution $version: not on PyPI ($code)"
-            fi
-          done
+          jq --raw-output 'to_entries[] | "  \(.key + 1). \(.value.name) \(.value.version) (stage \(.value.stage))"' <<<"$ORDERED"
+          python3 scripts/pypi.py report dist
 
-  pypi-stage-1:
-    name: PyPI, stage 1 (${{ matrix.package.slug }})
+  # Publishes the wheels, one package at a time, in the order their requirements need: a matrix
+  # that runs one leg at once, in plan order, and stops at the first failure (fail-fast), so a
+  # later package never goes out after an earlier one failed. Each leg also checks that PyPI serves
+  # every package before it in this release, before it publishes its own. The `pypi` environment's
+  # required reviewers approve each leg. The environment should allow deployments from tags only
+  # (`*-v*`), and only maintainers may create such tags: see ADR-0023.
+  pypi-publish:
+    name: PyPI, ${{ matrix.package.name }}
     needs: [plan, pypi-check]
-    if: ${{ !cancelled() && needs.plan.outputs.publish == 'true' && needs.plan.outputs.stage1 != '[]' && needs.pypi-check.result == 'success' }}
+    if: ${{ !cancelled() && needs.pypi-check.result == 'success' && needs.plan.outputs.publish == 'true' && needs.plan.outputs.ordered != '[]' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # Required reviewers on this environment are the approval to publish; the trusted publisher
-    # on PyPI is registered for it (see the PR that added this job).
+    timeout-minutes: 30
     environment: pypi
     permissions:
+      attestations: read
       contents: read
       id-token: write
     strategy:
-      fail-fast: false
+      max-parallel: 1
+      fail-fast: true
       matrix:
-        package: ${{ fromJSON(needs.plan.outputs.stage1) }}
+        package: ${{ fromJSON(needs.plan.outputs.ordered) }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist-${{ matrix.package.slug }}
           path: dist
+      - name: The files are the attested ones
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/verify-attestation dist/*
+      - name: PyPI serves what this release published before
+        env:
+          EARLIER: ${{ join(matrix.package.earlier, ' ') }}
+        run: |
+          read -ra earlier <<<"$EARLIER"
+          python3 scripts/pypi.py require "${earlier[@]}"
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           packages-dir: dist
           skip-existing: true
-      # The next stage's packages require this one's: they are published once PyPI serves it.
-      - name: Wait until PyPI serves it
-        run: |
-          for file in dist/*.whl; do
-            name=$(basename "$file")
-            distribution=$(cut -d- -f1 <<<"$name" | tr _ -)
-            version=$(cut -d- -f2 <<<"$name")
-            for _ in $(seq 60); do
-              code=$(curl --silent --output /dev/null --write-out '%{http_code}' \
-                "https://pypi.org/pypi/$distribution/$version/json" || true)
-              [[ $code == 200 ]] && break
-              sleep 10
-            done
-            [[ $code == 200 ]] || { echo "PyPI doesn't serve $distribution $version after ten minutes" >&2; exit 1; }
-          done
-
-  pypi-stage-2:
-    name: PyPI, stage 2 (${{ matrix.package.slug }})
-    needs: [plan, pypi-check, pypi-stage-1]
-    if: ${{ !cancelled() && needs.plan.outputs.publish == 'true' && needs.plan.outputs.stage2 != '[]' && needs.pypi-check.result == 'success' && needs.pypi-stage-1.result != 'failure' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # Required reviewers on this environment are the approval to publish; the trusted publisher
-    # on PyPI is registered for it (see the PR that added this job).
-    environment: pypi
-    permissions:
-      contents: read
-      id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        package: ${{ fromJSON(needs.plan.outputs.stage2) }}
-    steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: dist-${{ matrix.package.slug }}
-          path: dist
-      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
-        with:
-          packages-dir: dist
-          skip-existing: true
-      # The next stage's packages require this one's: they are published once PyPI serves it.
-      - name: Wait until PyPI serves it
-        run: |
-          for file in dist/*.whl; do
-            name=$(basename "$file")
-            distribution=$(cut -d- -f1 <<<"$name" | tr _ -)
-            version=$(cut -d- -f2 <<<"$name")
-            for _ in $(seq 60); do
-              code=$(curl --silent --output /dev/null --write-out '%{http_code}' \
-                "https://pypi.org/pypi/$distribution/$version/json" || true)
-              [[ $code == 200 ]] && break
-              sleep 10
-            done
-            [[ $code == 200 ]] || { echo "PyPI doesn't serve $distribution $version after ten minutes" >&2; exit 1; }
-          done
-
-  pypi-stage-3:
-    name: PyPI, stage 3 (${{ matrix.package.slug }})
-    needs: [plan, pypi-check, pypi-stage-2]
-    if: ${{ !cancelled() && needs.plan.outputs.publish == 'true' && needs.plan.outputs.stage3 != '[]' && needs.pypi-check.result == 'success' && needs.pypi-stage-2.result != 'failure' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # Required reviewers on this environment are the approval to publish; the trusted publisher
-    # on PyPI is registered for it (see the PR that added this job).
-    environment: pypi
-    permissions:
-      contents: read
-      id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        package: ${{ fromJSON(needs.plan.outputs.stage3) }}
-    steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: dist-${{ matrix.package.slug }}
-          path: dist
-      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
-        with:
-          packages-dir: dist
-          skip-existing: true
-      # The next stage's packages require this one's: they are published once PyPI serves it.
-      - name: Wait until PyPI serves it
-        run: |
-          for file in dist/*.whl; do
-            name=$(basename "$file")
-            distribution=$(cut -d- -f1 <<<"$name" | tr _ -)
-            version=$(cut -d- -f2 <<<"$name")
-            for _ in $(seq 60); do
-              code=$(curl --silent --output /dev/null --write-out '%{http_code}' \
-                "https://pypi.org/pypi/$distribution/$version/json" || true)
-              [[ $code == 200 ]] && break
-              sleep 10
-            done
-            [[ $code == 200 ]] || { echo "PyPI doesn't serve $distribution $version after ten minutes" >&2; exit 1; }
-          done
-
-  pypi-stage-4:
-    name: PyPI, stage 4 (${{ matrix.package.slug }})
-    needs: [plan, pypi-check, pypi-stage-3]
-    if: ${{ !cancelled() && needs.plan.outputs.publish == 'true' && needs.plan.outputs.stage4 != '[]' && needs.pypi-check.result == 'success' && needs.pypi-stage-3.result != 'failure' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # Required reviewers on this environment are the approval to publish; the trusted publisher
-    # on PyPI is registered for it (see the PR that added this job).
-    environment: pypi
-    permissions:
-      contents: read
-      id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        package: ${{ fromJSON(needs.plan.outputs.stage4) }}
-    steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: dist-${{ matrix.package.slug }}
-          path: dist
-      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
-        with:
-          packages-dir: dist
-          skip-existing: true
-      # The next stage's packages require this one's: they are published once PyPI serves it.
-      - name: Wait until PyPI serves it
-        run: |
-          for file in dist/*.whl; do
-            name=$(basename "$file")
-            distribution=$(cut -d- -f1 <<<"$name" | tr _ -)
-            version=$(cut -d- -f2 <<<"$name")
-            for _ in $(seq 60); do
-              code=$(curl --silent --output /dev/null --write-out '%{http_code}' \
-                "https://pypi.org/pypi/$distribution/$version/json" || true)
-              [[ $code == 200 ]] && break
-              sleep 10
-            done
-            [[ $code == 200 ]] || { echo "PyPI doesn't serve $distribution $version after ten minutes" >&2; exit 1; }
-          done
+      # The next package requires this one: it is published once PyPI serves these files.
+      - name: Wait until PyPI serves the files
+        run: python3 scripts/pypi.py wait dist
 
   # Each architecture's thin images, on a runner of that architecture, from the release's commit,
   # saved as OCI archives: nothing here can write to the registry.
@@ -461,7 +345,7 @@ jobs:
   publish-images:
     name: Publish (${{ matrix.image }})
     needs: [plan, image]
-    if: needs.plan.outputs.stackr == 'true'
+    if: needs.plan.outputs.stackr == 'true' && needs.plan.outputs.write == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -514,7 +398,7 @@ jobs:
   release-notes:
     name: Images in the release's notes
     needs: [plan, publish-images]
-    if: needs.plan.outputs.stackr == 'true'
+    if: needs.plan.outputs.stackr == 'true' && needs.plan.outputs.write == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

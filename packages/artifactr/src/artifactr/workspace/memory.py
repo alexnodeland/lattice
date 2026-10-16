@@ -114,6 +114,10 @@ class _Transaction:
     async def save_cursor(self, name: str, seq: int) -> None:
         self._cursors[name] = max(self._cursors.get(name, 0), seq)
 
+    async def holds_lease(self, key: str, holder: str) -> bool:
+        lease = self._data.leases.get(key)
+        return lease is not None and lease[0] == holder
+
     def commit(self) -> None:
         for result in self._results:
             _apply(self._data, result)
@@ -288,14 +292,19 @@ class InMemoryStorage:
         return list(self._data(scope).history.get(thread_id, []))
 
     async def acquire_lease(self, scope: Scope, key: str, holder: str, ttl: timedelta) -> bool:
-        """Take or renew an exclusive lease. Return False if another holder has it."""
-        leases = self._data(scope).leases
-        now = self._clock()
-        current = leases.get(key)
-        if current is not None and current[0] != holder and current[1] > now:
-            return False
-        leases[key] = (holder, now + ttl)
-        return True
+        """Take or renew an exclusive lease. Return False if another holder has it.
+
+        It waits for the workspace's transaction, as SQL storage's waits for a lease's row
+        that a transaction locked (:meth:`~artifactr.workspace.Transaction.holds_lease`).
+        """
+        data = self._data(scope)
+        async with data.lock:
+            now = self._clock()
+            current = data.leases.get(key)
+            if current is not None and current[0] != holder and current[1] > now:
+                return False
+            data.leases[key] = (holder, now + ttl)
+            return True
 
     async def release_lease(self, scope: Scope, key: str, holder: str) -> None:
         """Release a lease if ``holder`` has it."""

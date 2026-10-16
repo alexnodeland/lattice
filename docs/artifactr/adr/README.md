@@ -72,5 +72,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0066](0066-row-level-security-under-the-scoping.md) | Row-level security under the scoping | Accepted |
 | [0067](0067-a-failed-turns-series-starts-at-zero.md) | A turn's failed series starts at zero | Accepted |
 | [0068](0068-an-access-token-redacted-from-span-urls.md) | An access token redacted from the spans' URLs | Accepted, amended by [lattice ADR-0018](../../adr/0018-lattice-core-what-the-libraries-share.md) |
+| [0069](0069-a-claim-fences-the-writes-that-consume.md) | A claim fences the writes that consume | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

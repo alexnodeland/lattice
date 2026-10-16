@@ -27,7 +27,8 @@ class Delivered:
 
     The Runner names a cursor for it. The capability then saves it with the run's start, as its
     input, and with the run's end, as far as its watcher delivered: in the same transaction as
-    each record, so a message is taken exactly when the write that consumes it is made.
+    each record, so a message is taken exactly when the write that consumes it is made. The
+    Runner names its claim too, which fences the run's start (ADR-0069).
     """
 
     seq: int = 0
@@ -35,6 +36,10 @@ class Delivered:
 
     cursor: str | None = None
     """The cursor that records ``seq``, when the Runner keeps one."""
+
+    claim: tuple[ThreadId, str] | None = None
+    """The thread's claim the run holds, ``(thread_id, holder)``, when the Runner holds one: the
+    run's start is recorded only while its holder has the thread."""
 
     def at(self, seq: int) -> tuple[str, int] | None:
         """The cursor to save as taken through ``seq``, with a record, if there is one."""

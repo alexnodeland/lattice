@@ -13,8 +13,9 @@
 - I7, the upgrade point, is in ``test_upgrade.py``.
 
 Each test holds one storage call at a :class:`Gate`, patched onto the storage it runs on. The
-last section is what the TLA+ spec in docs/artifactr/spec found: each test there fails, a strict
-``xfail``, until its issue is fixed.
+last section is what the TLA+ spec in docs/artifactr/spec found, each trace run against the code:
+#249's tests and #252's run in memory alone, with a storage clock moved on; #252's fails, a strict
+``xfail``, until it is decided.
 """
 
 import asyncio
@@ -28,15 +29,27 @@ import pytest
 from pydantic_ai import Agent, DeferredToolRequests, FunctionToolset, ModelResponse, RunContext
 
 from artifactr.agent import ArtifactWorkspace, Session, function_model
+from artifactr.agent.runner import _reply
 from artifactr.core import (
+    AgentActor,
     AnswerDeferred,
     DeferredAnswered,
+    DeferredRequest,
     PostMessage,
+    RunPaused,
+    RunStarted,
     Thread,
     UserActor,
 )
 from artifactr.sql import SqlStorage, create_schema
-from artifactr.workspace import InMemoryStorage, Scope, Storage, Workspace, Workspaces
+from artifactr.workspace import (
+    InMemoryStorage,
+    Scope,
+    Storage,
+    ThreadBusy,
+    Workspace,
+    Workspaces,
+)
 from tests.agent.conftest import (
     ALICE,
     Gate,
@@ -651,7 +664,8 @@ async def _two_holders_after_a_lapse(runners: MakeRunner) -> tuple[list[str], in
 
     The first process plans a run for the message, and is held before its run records its
     start. The storage's clock passes the claim's TTL, as across a stall or a skewed clock, so
-    the second process's claim is granted, and it plans from the same `taken`.
+    the second process's claim is granted, and it plans from the same `taken`. The first run's
+    start is fenced by its claim, which it no longer has, so it fails before it starts.
     """
     clock = _Clock()
     storage = InMemoryStorage(clock=clock)
@@ -676,12 +690,12 @@ async def _two_holders_after_a_lapse(runners: MakeRunner) -> tuple[list[str], in
     assert second is not None, "the lapsed claim was granted again"
     await second.wait()
     starting.release.set()
-    await first.wait()
+    with pytest.raises(ThreadBusy):
+        await first.wait()
     await settled(thread.id, here, there)
     return recorder.prompts, len(await ws.runs(thread_id=thread.id))
 
 
-@pytest.mark.xfail(strict=True, reason="#249: a lapsed claim lets a second run take the prompt")
 async def test_i1_a_claim_that_lapses_as_its_run_starts_lets_no_second_run_take_its_prompt(
     runners: MakeRunner,
 ) -> None:
@@ -689,12 +703,33 @@ async def test_i1_a_claim_that_lapses_as_its_run_starts_lets_no_second_run_take_
     assert prompts == ["Plan the launch"]
 
 
-@pytest.mark.xfail(strict=True, reason="#249: a lapsed claim lets a second run start")
 async def test_i3_a_claim_that_lapses_as_its_run_starts_leaves_one_run(
     runners: MakeRunner,
 ) -> None:
     _, runs = await _two_holders_after_a_lapse(runners)
     assert runs == 1
+
+
+async def test_i1_a_reply_whose_claim_another_holder_took_answers_nothing(
+    ws: Workspace, thread: Thread
+) -> None:
+    agent = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_1"))
+    await agent.record(RunStarted(run_id="run_1", thread_id=thread.id))
+    question = DeferredRequest(tool_call_id="q1", tool_name="ask_user", kind="question")
+    await agent.record(RunPaused(run_id="run_1", thread_id=thread.id, requests=(question,)))
+    await ws.post_message(thread.id, "Tuesday")
+    [reply] = await ws.read(threads={thread.id}, last=1)
+    run = await ws.run("run_1")
+    async with ws.claim_thread(thread.id, holder="claim_2"):
+        with pytest.raises(ThreadBusy):  # not refused as answered, which would plan again
+            await _reply(
+                ws,
+                run,
+                reply,
+                cursor=(f"artifactr.runner/{thread.id}/taken", reply.seq),
+                claim=(thread.id, "claim_1"),
+            )
+    assert not (await ws.run("run_1")).answers, "the request is left to the new holder"
 
 
 @pytest.mark.xfail(strict=True, reason="#250: a claim granted as its call is cancelled is kept")

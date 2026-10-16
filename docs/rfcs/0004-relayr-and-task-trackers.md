@@ -7,7 +7,7 @@
 **Siblings:**
 
 - [stackr RFC-0002][s-rfc-0002] is the bridge this extends: followers with leases and cursors, runs that act once, and chains that continue across it.
-- [artifactr ADR-0034](../artifactr/adr/0034-ports-and-adapters-for-integrations.md) is the shape: a small port owned by the inner layer, adapters in extras, a fake and one contract test.
+- [artifactr ADR-0034](../artifactr/adr/0034-ports-and-adapters-for-integrations.md) is the shape: a small port owned by the inner layer, adapters in extras, each tested against a fake, and one contract test where it is cheap.
 - [reflexr ADR-0057](../reflexr/adr/0057-reserved-publishers.md) reserves the tracker's event namespace to the source that publishes it.
 
 ## Summary
@@ -73,11 +73,12 @@ class Tracker(Protocol):
 Neither tracker deduplicates a retried request, so the ledger does, for both adapters alike.
 
 - **A key per write,** derived as relayr ADR-0019 derives ids: from the run, its last checkpoint, the operation and a digest of what it writes, by `RunActions._derive`, moved where both can share it. A rule may pass its own key instead, such as `dead-letter/<run id>`, so that a later run files into the same item rather than a new one.
-- **The claim comes first.** `ensure_item(key, draft)` inserts the key into `relayr_tracker_items` with the run's correlation id and depth, then asks `find`, then `create`. A claim older than the lease (30 s) whose holder never recorded an item is retaken with another `find`, so a process that died between `create` and the record makes nothing twice.
+- **The claim comes first.** `ensure_item(key, draft)` inserts the key into `relayr_tracker_items` with the filing run's correlation id, then asks `find`, then `create`. A claim older than 30 s whose holder never recorded an item is retaken with another `find`, so a process that died between `create` and the record makes nothing twice. Every request has a 10 s timeout, well inside the claim, so a retaken claim never overlaps a request still in flight from relayr; a request the tracker itself finishes more than 30 s late could still make a second item on Vikunja, where `find` is a text search. On Plane the 409 catches it.
+- **The row keeps only the correlation id,** because nothing that comes back through a tracker is published with causation ([Echoes and loops](#echoes-and-loops)): joining a chain without causation needs only its correlation id, as the follower already does for a person's answer to a proposal. It is looked up by the item's id on the row, not through an ADR-0021 cause kind, and it lives outside `relayr_causes`, so the causes' week ([relayr ADR-0025](../relayr/adr/0025-counters-and-how-long-causes-are-kept.md)) deliberately doesn't apply: it lasts as long as the item. With a key a rule shares across runs, such as `dead-letter/<rule>`, the item stays in the chain of the run that filed it first, which is the item's story; later runs' comments don't move it.
 - **Plane's external ids are the second guard.** relayr sends `external_id` (the key) and `external_source` (`lattice:<tenant>/<workspace>`) on every item, comment and label. `find` is `GET ?external_id=&external_source=`, and a `POST` with a used pair returns 409 with the existing id, which `create` returns as found. Plane enforces the pair in code, not in the database, so it can't stop two racing creates; the claim does. A race that slipped through anyway would make Plane's lookup raise `MultipleObjectsReturned`, which it answers with a 500.
 - **Vikunja has no external ids.** Its `find` looks for a marker, `lattice-key: <key>`, at the end of the description, searched within the bound project; the ledger's record is what normally answers. The marker survives the REST API, which stores the description as sent; whether Vikunja's editor keeps it when a person edits the description is unverified.
 - **A comment is claimed the same way,** with Plane's external id on the comment and Vikunja's marker in its body.
-- **State and fields are keyed edits:** read the item, and update only the fields that differ, as relayr ADR-0019's edits do. The fields relayr sets are recorded on the item's row before the update, so the follower can tell its own change from a person's.
+- **State and fields are keyed edits:** read the item, and update only the fields that differ, as relayr ADR-0019's edits do. The values relayr sets are recorded on the item's row, field by field, before the update, so the follower can tell its own change from a person's. A write the tracker refuses clears its record.
 - **An item a person deleted stays deleted.** Plane frees an external id when an item is soft-deleted, so a lookup alone would file it again. `ensure_item` reads a recorded item before it returns it, and the item's row is marked deleted when that read or the follower finds it gone, and `ensure_item` on that key returns `Deleted` and makes nothing. A rule that wants a new item uses a new key. A closed or archived item is not deleted: `ensure_item` returns it, and the rule decides whether to reopen it.
 
 ### What a rule does
@@ -94,7 +95,7 @@ await actions.set_state(item, "todo")
 
 - **What to file is the rule's to say:** title, body, priority and labels, as arguments. Where it goes is the binding's: each reflexr workspace is bound to one tracker project, with that project's defaults. There is no separate mapping table to keep in step with the rules.
 - **Labels are found or created by name,** each with its own external id on Plane.
-- **The allowlist gains `trackers: bool`,** false by default ([relayr ADR-0020](../relayr/adr/0020-allowlists.md)). A rule that may not file gets `NotAllowed`.
+- **The allowlist gains `trackers: bool`,** false by default. That amends [relayr ADR-0020](../relayr/adr/0020-allowlists.md), whose `Allowlist` has four fields and says what a rule may do in artifactr; a frozen model with a default stays compatible. The allowlist is relayr's alone, since reflexr has none. A rule that may not write to its tracker gets `NotAllowed`. A bool doesn't tell reading from writing, which v1 doesn't need: rules read the tracker through its events.
 - **Refusals are handled as relayr ADR-0019 handles artifactr's.** `RateLimited` and `Unavailable` fail the attempt, to be retried on reflexr's backoff. `Refused` and `NotFound` go back to an agent's model, or fail a function action's attempt. `Unauthorized` is permanent. reflexr's retries are the outbox: nothing is queued in relayr, and a tracker that is down never blocks reflexr, only the runs that file.
 - **The template ships one example:** a rule on `reflexr:run_dead_lettered` that files the failed run, and comments on each later failure of the same rule. It never fires on its own dead letters.
 
@@ -102,12 +103,16 @@ await actions.set_state(item, "todo")
 
 A follower per binding polls its project, diffs what it finds against the ledger, and publishes `tracker:*` events into the bound reflexr workspace.
 
-- **Lease and cursor in the ledger,** in `relayr_tracker_followers`, as [relayr ADR-0015][r-adr-0015] keeps them for artifactr's followers: a 30 s lease renewed every third of that, and a cursor of `(updated_at, id)` saved only after a page is published. Followers start on open ([relayr ADR-0016](../relayr/adr/0016-followers-start-on-open.md)), for workspaces with a binding.
+- **Lease and cursor in the ledger,** in `relayr_tracker_followers`, as [relayr ADR-0015][r-adr-0015] keeps them for artifactr's followers: a 30 s lease renewed every third of that, and a cursor of `(updated_at, id)` saved only after a page is published.
+- **Started on open and at startup.** A tracker follower starts when its bound workspace is opened ([relayr ADR-0016](../relayr/adr/0016-followers-start-on-open.md)), and `Ledger.tracker_followed()` lists the bindings to resume when the application starts, so a project is polled even if no one opens its workspace. That is a second read across tenants, on the owner's engine, beside `followed`; it amends [relayr ADR-0027](../relayr/adr/0027-row-level-security-under-the-scoping.md), whose test pins that engine to one function.
+- **A new binding starts silently.** Its first poll records a snapshot of every item and publishes nothing, unless the binding names a `since`, from which items are published as created. Binding a project of 2000 items doesn't publish 2000 events. A row lost from the ledger is seeded the same way.
+- **Each poll looks back.** It reads from two minutes before its cursor, since a row can commit with an `updated_at` older than one already read; the snapshots and the derived ids drop what was seen. The daily sweep below also compares every item's `updated_at` with its row's, and diffs any that a poll missed.
 - **Changes are level-triggered.** For each item on the page, the follower compares the snapshot with the one on the item's row and publishes one event per field that differs. Two changes between polls show as one; a change undone between polls shows as none. Plane's activity log would give every edge, but only per item, at a request per changed item; it stays an option (Decision T1).
-- **Ids are derived, so publishing is exactly once:** `trk_<digest>` of the tracker, item id, field, new value and the item's `updated_at`. reflexr's `publish` appends an id once, so a page read again publishes nothing new. A comment's event id is `trk_` and a digest of its own id.
+- **Ids are derived, so publishing is exactly once:** `trk_` and the first 16 hex digits of a SHA-256 over the tenant, binding, tracker, item id, field, the new value as canonical JSON and the item's `updated_at`, joined by NUL bytes, as `_derive` joins its parts. A comment's is the same over the tenant, binding, tracker and the comment's id. The tenant and binding are there because Vikunja's ids are integers per instance. reflexr's `publish` appends an id once, so a page read again publishes nothing new, and the ids don't depend on the item's row: a lost row, reseeded, publishes nothing twice.
 - **Comments are read per changed item,** after the last comment the row has seen.
 - **Removals are found two ways.** A Plane delete webhook carries only the item's id, which the row maps back to its key. And a daily sweep lists every item id in the project, 1000 to a page on Plane and 50 on Vikunja, and publishes `tracker:item_removed` for rows whose item is gone. For an item lattice filed, Plane's external-id lookup then tells deleted from archived, and only a deleted one is marked so; for others, the event says only that the item left the list.
-- **Dead letters,** for a change whose projection raises, go in `relayr_tracker_dead_letters`, once per event id; anything else stops the follower until its workspace is opened again, as artifactr's followers do.
+- **Dead letters,** for a change whose projection raises, go in `relayr_tracker_dead_letters`, once per event id; anything else stops the follower until it is started again, as artifactr's followers do. `DepthExceeded` can't happen here: nothing is published with causation.
+- **What comes back is untrusted text.** Titles, descriptions and comments are written by whoever can reach the tracker, and reach rules and their agents as artifactr's messages do; agents' requests carry the gateway's `prompt-injection` guardrail as they do for chat. The item rows store titles and descriptions for the diff, so offboarding deletes them.
 
 | Event | When | Carries |
 |---|---|---|
@@ -116,28 +121,35 @@ A follower per binding polls its project, diffs what it finds against the ledger
 | `tracker:item_commented` | A new comment | The comment's text and author |
 | `tracker:item_removed` | The item left the project's list | The item's id, `key`, and `deleted` when known |
 
-Every event carries `tracker` (`plane` or `vikunja`), the project and the item's id, number and link, so rules are written once for both trackers. The namespace is reserved to `SourceActor(name="tracker")` through reflexr's `publishers=`, and relayr's wiring passes the entry.
+Every event carries `tracker` (`plane` or `vikunja`), the project and the item's id, number and link, so rules are written once for both trackers.
+
+- **The types are relayr's,** declared as the bridged types are ([relayr ADR-0006](../relayr/adr/0006-bridged-types-in-the-artifactr-namespace.md)): under `TrackerEvent(Event, abstract=True, event_namespace="tracker")` in `relayr.trackers.events`, with `TRACKED` listing them for reflexr's `Workspaces(events=...)`, as `BRIDGED` does.
+- **Projections** from a diff to these events are relayr's; an application may give its own per binding, returning its own event or None, as [relayr ADR-0018](../relayr/adr/0018-bridged-events-their-fields-ids-and-projections.md)'s `Projections` do for an artifact kind. Its event keeps the derived id.
+- **Reserved to `SourceActor(name="tracker")`** through reflexr's `publishers=`, which relayr's wiring passes. reflexr checks the key against its registry at startup, so the types must be registered with the workspaces. As reflexr ADR-0057 warns, the application must never resolve a client to `source:tracker`.
 
 ### Echoes and loops
 
-- **relayr's own writes are dropped,** not published: a change whose actor is the tenant's tracker user, or whose new value is the one the row says relayr wrote. The run's own events already say what it did.
-- **A person's change on an item a run filed joins that run's chain without causation,** as a person's answer to a rule's proposal does ([relayr ADR-0021][r-adr-0021]). The correlation is on the item's row, written with the claim, so it outlives the causes' week ([relayr ADR-0025](../relayr/adr/0025-counters-and-how-long-causes-are-kept.md)) and is never missing when the follower looks.
-- **A change whose actor is unknown continues the chain of the last run that wrote the item,** one level deeper. Vikunja's items carry no `updated_by`, and Plane's is empty on a new item. So an echo the filter missed still deepens its chain, and reflexr's depth limit ends a loop that the filter didn't.
-- **Items lattice didn't file start chains of their own.**
+- **relayr's own writes are dropped by value,** not by actor: a field whose new value is the one the row says relayr wrote last, and an item whose creation the row claimed. A snapshot shows only an item's last updater, so a person's change made just before relayr's would be lost if the actor decided. The value is recorded before each write, so every write relayr makes is recognised, whichever process polls first. The run's own events already say what it did.
+- **Anything else is a person's,** whether or not the tracker names them: Vikunja's items carry no `updated_by`, and Plane's is empty on a new item. `actor` is set when the tracker names someone other than relayr's user.
+- **A person's change on an item a run filed joins that run's chain without causation,** as a person's answer to a rule's proposal does ([relayr ADR-0021][r-adr-0021]), with the correlation id on the item's row. Items lattice didn't file start chains of their own.
+- **So depth never grows through a tracker,** and reflexr's depth limit can't end a loop through one. A person's edit is never dead-lettered for depth, which matters on Vikunja, where no edit names its author. The loop ends at the echo filter instead, which is complete for relayr's own writes by construction. Its backstop is a cap: relayr makes at most 20 writes to one item in an hour, and the next is a permanent `RunFailure` (`tracker_loop`), counted (Decision T7). The cap catches what the filter can't see: the tenant's tracker key used by something other than relayr, which the guide forbids.
+- **The filter's one false drop:** a person who sets a field to the value relayr last wrote there, when relayr's write didn't land. That loses one event, never makes a loop.
 
 ### Nudges
 
-- **`tracker_router(trackers)`** is a FastAPI router the application mounts beside the libraries': `POST /relayr/v1/trackers/{tenant}/{tracker}`. It verifies the signature with that tenant's secret, checks Plane's `workspace_slug` against the tenant's, wakes the binding's follower if this process holds its lease, and answers 204. A bad signature is 401, and counted.
+- **`tracker_router(trackers)`** is a FastAPI router the application mounts beside the libraries': `POST /relayr/v1/trackers/{tenant}/{tracker}`. It verifies the signature with that tenant's secret, checks Plane's `workspace_slug` against the tenant's, wakes the binding's follower if this process holds its lease, and answers 204.
+- **It is unauthenticated, so it gives nothing away.** Bodies over 1 MB are refused before they are read. Signatures are compared with `hmac.compare_digest` over the raw bytes. Secrets come from the resolver's cache, refreshed on its own schedule, never fetched for a request, so a flood of requests can't amplify into the secrets store. An unknown tenant and a bad signature get the same 401, counted together. A replayed nudge only wakes a poll, debounced by 2 s.
+- **A nudge reaches one replica.** If that replica doesn't hold the binding's lease, the nudge is dropped, and the change waits for the holder's next poll: latency, accepted, rather than a signal shared between replicas.
 - **The signatures:** Plane's `X-Plane-Signature` is HMAC-SHA256, hex, over `json.dumps(payload)`; Vikunja's `X-Vikunja-Signature` is the same over the exact bytes it sends. Whether Plane's signed bytes equal its body is unverified (phase 1).
-- **A nudge lost is latency, never data.** Plane retries only network errors, five times from 600 s, and then deactivates the webhook and emails its creator; it logs any status as sent. Vikunja retries any status above 399 five times, from memory. Either way the next poll finds the change. `relayr.trackers.unnudged` counts changes a poll found that no nudge announced, so an operator sees a webhook Plane switched off.
+- **A nudge lost is latency, never data.** Plane retries only `requests` exceptions (timeouts and connection errors), five times from 600 s, and then deactivates the webhook and emails its creator; it logs any status as sent. Vikunja retries any status above 399 five times, from memory. Either way the next poll finds the change. `relayr.trackers.unnudged` counts changes a poll found that no nudge announced, so an operator sees a webhook Plane switched off, or one Plane refuses to send because `WEBHOOK_ALLOWED_HOSTS` is wrong: Plane logs that refusal, and neither retries nor deactivates.
 
 ### Budget
 
 Plane's API allows 60 requests a minute per key by default (`API_KEY_RATE_LIMIT`), and one key is one tenant here.
 
-- **One budget per key in relayr's client,** 40 a minute by default, set per tracker. Writes go first; polls take what is left.
-- **A poll costs one request per project,** plus one per changed item for its comments. A follower polls every 30 s while it has budget, sooner after a nudge (debounced by 2 s), and stretches its interval when writes use the budget: a tenant with three projects and no writes spends six requests a minute.
-- **A 429 waits for `Retry-After`,** with jitter. Plane's throttle is Django REST framework's, which sends it. Its `X-RateLimit-*` values are set on the request, not the response, so relayr doesn't rely on them.
+- **One budget per key in each process,** 40 a minute by default, set per tracker. Writes go first; polls take what is left. Replicas don't coordinate: one process polls each binding, by the lease, and writes come from whichever replica runs a rule, so the tracker's 429 is the control between them.
+- **A poll costs one request per project,** plus one per changed item for its comments. A follower polls every 30 s while it has budget, sooner after a nudge, and stretches its interval when writes use the budget: a tenant with three projects and no writes spends six requests a minute.
+- **A 429 never sleeps in a run.** It fails the attempt, as `RateLimited`, and reflexr's retry backs off; an attempt that waited would hold its slot. A follower, which holds nothing else, waits out `Retry-After` with jitter. Plane's throttle is Django REST framework's, which sends it. Its `X-RateLimit-*` values are set on the request, not the response, so relayr doesn't rely on them.
 - **stackr's recipe sets the limit,** since the deployment runs Plane: 300 a minute, with relayr's budget raised to match.
 
 ### Tenancy, provisioning and credentials
@@ -145,11 +157,11 @@ Plane's API allows 60 requests a minute per key by default (`API_KEY_RATE_LIMIT`
 Each lattice tenant has one Plane workspace, and a Plane user of its own for relayr.
 
 - **A user per tenant, not one for the deployment.** Plane's API keys belong to a user and work in every workspace that user belongs to, so one bot user would let one tenant's key reach every tenant, and share one rate limit (Decision T4).
-- **Provisioning is a checklist, with a checker.** Plane CE creates workspaces, users, API keys and webhooks only through its web app's session API, so none of it can be scripted with an API key. For each tenant, an operator: creates the workspace; creates the user `relayr-<tenant>`, a member of the workspace and of every bound project; signs in as it and creates an API key; registers the webhook to the application's route, for work items and comments; and stores the key and the secret. `make tracker-check TENANT=...` then checks each step through the API and says which is missing; it changes nothing.
+- **Provisioning is a checklist, with a checker.** Plane CE creates workspaces, users, API keys and webhooks only through its web app's session API, so none of it can be scripted with an API key. For each tenant, an operator: creates the workspace; creates the user `relayr-<tenant>`, a member of the workspace and of every bound project; signs in as it and creates an API key; registers the webhook to the application's route, for work items and comments; and stores the key and the secret. `make tracker-check TENANT=...` then checks each step through the API and says which is missing; it changes nothing. It also checks isolation: `relayr-<tenant>` belongs to exactly one workspace, the tenant's, and to the bound projects only. And it reads `relayr.trackers.unnudged`, so a webhook that never arrives is found at set-up.
 - **Vikunja's provisioning is scriptable:** a top-level project per tenant, owned by the tenant's user, and its webhook registered by relayr through the API, since Vikunja's API tokens can hold the `webhooks` scope.
-- **Credentials come from a resolver,** `credentials(tenant) -> TrackerCredentials`, as artifactr's LiteLLM adapter resolves a tenant's key. The template's default reads `TRACKER_CREDENTIALS`, a JSON object by tenant, as it reads `LITELLM_TENANT_KEYS`; a deployment on AWS points it at its secrets. Keys and secrets never reach the ledger, logs or spans.
+- **Credentials come from a resolver,** `credentials(tenant) -> TrackerCredentials` (the tracker's base URL, the API key, the webhook secret, and Plane's workspace slug), as artifactr's LiteLLM adapter resolves a tenant's key. Bindings, from workspace to project, are configuration beside it, not secrets. The template's default reads `TRACKER_CREDENTIALS`, a JSON object by tenant, as it reads `LITELLM_TENANT_KEYS`; a deployment on AWS points it at its secrets. Keys and secrets never reach the ledger, logs or spans.
 - **Rotation without a gap:** create a second key for the same user, update the secret, and revoke the first once `make tracker-check` passes. The resolver's answer is cached for five minutes and asked again after a 401. Vikunja's tokens must have an expiry, so the checker warns 14 days before it. A webhook secret changed in the tracker before it is stored costs only nudges.
-- **Offboarding:** stop the tenant's followers, deactivate its tracker user, delete its webhook, and delete its rows from the `relayr_tracker_*` tables. relayr never deletes tracker data; the workspace is the tenant's, exported and deleted by the operator under the deployment's retention policy.
+- **Offboarding:** stop the tenant's followers, deactivate its tracker user, delete its webhook, and delete its rows from the `relayr_tracker_*` tables, titles and descriptions included. relayr never deletes tracker data; the workspace is the tenant's, exported and deleted by the operator under the deployment's retention policy.
 
 ### stackr
 
@@ -172,8 +184,10 @@ A run's page shows "filed as" with the item's link, and a tracker event's page l
 
 | Package | Changes | Breaking |
 |---|---|---|
-| relayr | `relayr.trackers` (port, core, fake, router), `relayr.plane`, `relayr.vikunja`, the `[plane]` and `[vikunja]` extras, three tables and their migration, `Allowlist.trackers`, `TrackerCapability`, counters | No |
-| reflexr | Nothing: `publishers=` and the depth limit exist | |
+| relayr | `relayr.trackers` (port, core, fake, router) and `relayr.trackers.events` (the `tracker:` types, `TRACKED`, projections), `relayr.plane`, `relayr.vikunja`, the `[plane]` and `[vikunja]` extras; `TrackerActions`, `TrackerCapability`, counters | No |
+| relayr's ledger | The `Ledger` protocol grows the claims, items, tracker cursors and leases, tracker dead letters and `tracker_followed()`, in `InMemoryLedger`, `SqlLedger` and `tests/ledger/test_contract.py`; three `relayr_tracker_*` tables, keyed by `WorkspaceKey` and the binding, in one migration with their row-level security policies and grants, as migration `0004` gives the others | Only for a ledger an application wrote, which must add the methods |
+| relayr's ADRs | Amended: ADR-0006 and ADR-0018 (a second namespace of relayr's types, and its projections), ADR-0020 (`Allowlist.trackers`), ADR-0027 (a second read across tenants) | |
+| reflexr | Nothing: `publishers=` and `events=` exist; relayr registers its types and passes the entry | |
 | stackr | The two recipes, the tracker guide, the `tracker` question, `make tracker-check` | No |
 | portalr | The "filed as" link (phase 3) | No |
 
@@ -182,9 +196,9 @@ A run's page shows "filed as" with the item's link, and a tracker event's page l
 | Phase | Deliverable | Exit criteria |
 |---|---|---|
 | 1. Outbound | The port, core, fake and contract test; both adapters with recorded fixtures; claims and items; `TrackerActions`, `TrackerCapability` and `Allowlist.trackers`; both recipes, the checklist and `make tracker-check`; the template's example rule | The contract test passes on the fake, on fixtures and live on both trackers; a run killed between `create` and its record, then retried, makes one item; a deleted item isn't filed again; and each item of [Unverified](#unverified) is settled, its fixture recorded, and the result written in an ADR |
-| 2. Inbound | Followers, `tracker:*` events and the publisher entry, echoes and loops, nudges and `tracker_router`, the sweep, the budget, dead letters and counters | Two rules that answer each other through the tracker make no loop, and still stop at the depth limit with the echo filter turned off; a relayr stopped for six hours (Plane's webhook deactivated) loses no change and publishes none twice; a two-tenant test never reads across tenants; a tenant's polls stay within its budget under a write burst |
+| 2. Inbound | Followers, `tracker:*` events and the publisher entry, echoes and loops, nudges and `tracker_router`, the sweep, the budget, dead letters and counters | Two rules that answer each other through the tracker make no loop, and stop at the write cap with the echo filter turned off; a relayr stopped for six hours (Plane's webhook deactivated) loses no change and publishes none twice; a two-tenant test never reads across tenants; a tenant's polls stay within its budget under a write burst; a new binding over existing items publishes nothing; a change committed with an `updated_at` older than the cursor is still published, once; a person's edit on Vikunja, of an item a run filed at the depth limit, is published and joins its chain; a rule writing to one item in a loop stops at the cap |
 | 3. portalr | "Filed as" on a run; links on tracker events | Each link's `bdd` scenario passes |
-| 4. Docs | relayr's guide and ADRs, stackr's tracker guide, the architecture | The site builds; the ADRs record T1 to T6 |
+| 4. Docs | relayr's guide and ADRs, stackr's tracker guide, the architecture | The site builds; the ADRs record T1 to T7 and the amendments |
 
 Vikunja runs live in CI on every change to `relayr.trackers` or its adapter; Plane, at 4 to 8 GB, runs live nightly, and from fixtures on pull requests.
 
@@ -209,14 +223,16 @@ Recommended, for the maintainer to decide:
 | T4 | Tracker identity | A tracker user and key per tenant | One bot user for the deployment, whose key reaches every workspace |
 | T5 | What a run files | The rule's arguments, with the binding's project and defaults | A mapping table from events to projects, priorities and labels |
 | T6 | Vikunja tenancy | A top-level project per tenant on one instance | An instance per tenant: stronger isolation, one more service per tenant |
+| T7 | Loops through a tracker | Echoes dropped by the value relayr recorded before writing; people's changes join chains without depth; a cap of 20 writes per item an hour as the backstop | Unattributed changes published with the last writer's causation, so the depth limit is the backstop, at the cost of dead-lettering people's edits on Vikunja, where none is attributed |
 
 ## Drawbacks
 
-- **Two trackers, both AGPL, both young as integration targets.** Plane's API reference and its code disagree (its pages are capped at 1000, not 100), and its webhooks are v1 on CE. `plane-sdk` is at 0.3.1. Vikunja's MCP server arrived in v2.7.0, two weeks ago.
+- **Two trackers, both AGPL, both young as integration targets.** Plane's behaviour had to be read from its code (pages go up to 1000, for one), and its webhooks are v1 on CE. `plane-sdk` is at 0.3.1. Vikunja's MCP server is new in v2.7.0, released on 2026-10-02.
 - **Plane is heavy:** 13 services and 4 to 8 GB for one tracker, and a manual checklist per tenant, since its session API alone creates workspaces, users, keys and webhooks.
 - **Level-triggered reads lose edges.** A state changed twice between polls is one event. Rules that need every transition can't have it without T1's alternative.
 - **Latency is the poll's when nudges fail,** 30 s by default, longer under a busy tenant's budget.
 - **Vikunja's isolation is weaker** under T6: its users are instance-wide. It suits a deployment with one tenant, or a few that trust each other.
+- **Loops through a tracker rest on relayr's own filter and cap,** not on reflexr's depth limit (T7).
 - **Three more tables,** and the item table grows with every item in a bound project, not only those lattice filed.
 
 ## Alternatives
@@ -234,7 +250,8 @@ Recommended, for the maintainer to decide:
 Each is a phase 1 exit criterion, settled against the pinned releases and recorded as a fixture.
 
 - **Plane's signature:** whether `json.dumps(payload)` equals the body `requests` sends. If it doesn't, relayr verifies against the re-serialized parsed body, which is still safe for a nudge.
-- **Plane's `updated_by`** is set to the key's user on an API write, and a new comment changes the item's `updated_at`. If it doesn't, comments are polled for open items lattice filed, within the budget.
+- **What moves an item's `updated_at`,** on each tracker: a change of state, priority, title, description, labels or assignees, and a new comment. A field that doesn't is diffed by the daily sweep only, and comments, if they don't, are polled for open items lattice filed, within the budget.
+- **Plane's `updated_by`** is set to the key's user on an API write; it only fills in `actor`.
 - **Plane's bot users on CE:** whether `is_bot` users can be made there; otherwise `relayr-<tenant>` is an ordinary user.
 - **Plane's activities' response shape,** if T1's alternative is chosen.
 - **Vikunja's filter `updated > <time>`** with `sort_by=updated`, its marker surviving an edit in its editor, its bot users, and an API token registering a webhook.
@@ -243,13 +260,13 @@ Not in scope: two-way sync of artifacts, Plane's Commercial edition and its v2 w
 
 ## Tracking
 
-- [ ] Sign-off on T1 to T6
-- [ ] relayr: the port, core, fake and contract test, claims and items, and their migration
+- [ ] Sign-off on T1 to T7
+- [ ] relayr: the port, core, fake and contract test; the ledger's new methods, its contract test, and the migration with row-level security
 - [ ] relayr: the Plane and Vikunja adapters, with recorded fixtures
 - [ ] relayr: `TrackerActions`, `TrackerCapability` and `Allowlist.trackers`
 - [ ] stackr: the two recipes, the checklist and `make tracker-check`; the template's `tracker` question and example rule
 - [ ] The unverified items settled, in an ADR
-- [ ] relayr: followers, `tracker:*` events, nudges, the sweep and the budget
+- [ ] relayr: followers and their resume, `tracker:*` events and projections, nudges, the sweep and the budget
 - [ ] portalr: "filed as" and tracker links
 - [ ] Docs: relayr's guide and ADRs, stackr's tracker guide
 
@@ -275,9 +292,9 @@ Gathered on 2026-10-16. Sources were read as untrusted data in a scratch directo
 | An API key works in every workspace its user belongs to | `api/middleware/api_authentication.py` | Verified in code |
 | Webhooks: `{event, action, webhook_id, workspace_id, workspace_slug, data, activity}`; a delete's `data` is `{"id"}`; `data` read at send time | `bgtasks/webhook_task.py` | Verified, v1.4.2 |
 | `X-Plane-Delivery` is a new UUID per attempt | `bgtasks/webhook_task.py` | Verified |
-| Retries only on network errors, five, backoff from 600 s; then deactivated and its creator emailed; any status logged as sent | `bgtasks/webhook_task.py` | Verified, v1.4.2 |
+| Retries only on `requests` exceptions (network errors and timeouts), five, backoff from 600 s; then deactivated and its creator emailed; any status logged as sent | `bgtasks/webhook_task.py` | Verified, v1.4.2 |
 | `X-Plane-Signature`: HMAC-SHA256 hex over `json.dumps(payload)`; the body sent with `json=` | `bgtasks/webhook_task.py`, `utils/url_security.py` | Verified; byte equality unverified |
-| Private targets refused unless `WEBHOOK_ALLOWED_HOSTS` or `WEBHOOK_ALLOWED_IPS` | `settings/common.py`, `utils/url_security.py` | Verified |
+| Private targets refused unless `WEBHOOK_ALLOWED_HOSTS` or `WEBHOOK_ALLOWED_IPS`; a refused target is logged, not retried, not deactivated | `settings/common.py`, `utils/url_security.py`, `bgtasks/webhook_task.py` | Verified |
 | Webhooks registered only through the session API | `app/urls/webhook.py`; none in `api/urls/` | Verified |
 | No workspace creation in the API-key API | `api/urls/` | Verified |
 | CE compose: 13 services, `APP_RELEASE` defaults to `stable`, proxy on 80 and 443 on every interface | `deployments/cli/community/docker-compose.yml` | Verified at `main`; memory from Plane's docs, unverified |

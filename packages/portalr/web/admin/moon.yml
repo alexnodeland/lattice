@@ -1,6 +1,8 @@
 # The UI for a tenant's owners and admins, and the deployment's operators.
 language: 'typescript'
 layer: 'application'
+# Its tests run in Chromium, which CI keeps apart from other tests' containers (lattice ADR-0002).
+tags: ['browser']
 dependsOn:
   - 'client'
   - 'notices'

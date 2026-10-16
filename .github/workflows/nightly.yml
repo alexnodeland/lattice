@@ -68,6 +68,9 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun x --bun --no-install playwright install --with-deps --only-shell chromium
         working-directory: packages/portalr/web/ui
+      # The browser projects' checks first, apart from the containers other tests start (ADR-0002);
+      # the second run finds them in moon's cache.
+      - run: moon run '#browser:check'
       - run: moon run :check
 
   images:

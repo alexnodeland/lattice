@@ -22,7 +22,7 @@ The Supabase, gateway and dashboard checks are `scripts/check-config`, which cov
 
 One of its modes is online, so `make validate` doesn't run it: `scripts/check-config gotrue` (`moon run stackr:gotrue`) holds GoTrue's image, in `compose.yaml` and in the AWS stack module, to the version the Supabase CLI pinned in `versions.env` runs. It reads the CLI's own list of images, at the CLI's tag, from GitHub.
 
-- CI runs it, as "GoTrue follows the Supabase CLI", only on a pull request that changes `versions.env`, `compose.yaml` or `deploy/aws/modules/stack/locals.tf`.
+- CI runs it, as "GoTrue follows the Supabase CLI", only on a pull request whose own diff changes `versions.env`, `compose.yaml` or `deploy/aws/modules/stack/locals.tf`: a change to anything else in stackr, or to a library, doesn't run it, and the job counts as passed. Nothing runs it on `main`, where each change is a merged pull request that ran it.
 - It tries twice. A file it can't read is a failure, not a pass, so a GitHub outage can fail a pull request that touches those files: run the job again.
 - Renovate keeps proposing GoTrue's updates, and the check fails them until the CLI is bumped to a version that runs the same one. Bump the CLI first, in `versions.env`, then Renovate's pull request passes.
 - If the CLI moves the file, the failure says so, and `CLI_DOCKERFILE` in the script is the place to follow it.

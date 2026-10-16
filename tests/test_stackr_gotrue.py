@@ -5,8 +5,10 @@ the CLI's Dockerfile (tests/fixtures), at v2.118.0, which runs supabase/gotrue:v
 they need none.
 """
 
+import http.client
 import importlib.machinery
 import importlib.util
+import re
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
@@ -89,7 +91,7 @@ def test_gotrue_behind_the_cli_says_to_set_it(tmp_path: Path) -> None:
     assert problems[0].startswith(
         "deploy/aws/modules/stack/locals.tf runs supabase/gotrue:v2.196.0"
     )
-    assert "set it to v2.197.0" in problems[0]
+    assert "set its tag to v2.197.0" in problems[0]
 
 
 def test_both_pins_off_are_both_reported(tmp_path: Path) -> None:
@@ -97,6 +99,52 @@ def test_both_pins_off_are_both_reported(tmp_path: Path) -> None:
         stack(tmp_path, compose="v2.198.0", aws="v2.198.0"), serve(CLI_DOCKERFILE)
     )
     assert len(problems) == 2
+
+
+def test_a_digest_on_the_clis_pin_does_not_make_every_comparison_fail(tmp_path: Path) -> None:
+    pinned = CLI_DOCKERFILE.replace(
+        "FROM supabase/gotrue:v2.197.0 AS gotrue",
+        f"FROM supabase/gotrue:v2.197.0@{DIGEST} AS gotrue",
+    )
+    assert pinned != CLI_DOCKERFILE
+    assert check_config.check_gotrue(stack(tmp_path), serve(pinned)) == []
+
+
+def test_gotrue_behind_the_cli_says_to_keep_the_digest(tmp_path: Path) -> None:
+    [problem] = check_config.check_gotrue(stack(tmp_path, aws="v2.196.0"), serve(CLI_DOCKERFILE))
+    assert "keeping its @sha256 digest pin" in problem
+
+
+def test_a_tag_that_is_not_a_version_gets_no_direction(tmp_path: Path) -> None:
+    [problem] = check_config.check_gotrue(
+        stack(tmp_path, compose="v2.198.0-rc1"), serve(CLI_DOCKERFILE)
+    )
+    assert "bump the CLI first" not in problem
+    assert "behind" not in problem
+    assert "make them one" in problem
+
+
+def test_a_cli_version_cannot_carry_a_path_into_the_url(tmp_path: Path) -> None:
+    root = stack(tmp_path)
+    (root / "versions.env").write_text("SUPABASE_CLI_VERSION=2.118.0/../../x\n")
+    asked: list[str] = []
+
+    def fetch(url: str) -> str:
+        asked.append(url)
+        return CLI_DOCKERFILE
+
+    problems = check_config.check_gotrue(root, fetch)
+    assert problems == ["versions.env has no SUPABASE_CLI_VERSION, or one that isn't a version"]
+    assert asked == []
+
+
+def test_the_aws_module_is_read_on_its_gotrue_line_only(tmp_path: Path) -> None:
+    root = stack(tmp_path)
+    locals_tf = root / "deploy/aws/modules/stack/locals.tf"
+    locals_tf.write_text(
+        "# supabase/gotrue:v9.9.9 is named here in a comment\n" + locals_tf.read_text()
+    )
+    assert check_config.check_gotrue(root, serve(CLI_DOCKERFILE)) == []
 
 
 def test_a_file_that_cannot_be_read_fails_after_one_retry(tmp_path: Path) -> None:
@@ -152,6 +200,30 @@ def test_fetch_text_succeeds_on_the_retry(monkeypatch: pytest.MonkeyPatch) -> No
     assert "gotrue:v2.197.0" in check_config.fetch_text("https://example.test/x", pause=0)
 
 
+@pytest.mark.parametrize(
+    "failure",
+    [
+        http.client.IncompleteRead(b"FROM supabase/go"),
+        UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte"),
+    ],
+    ids=["a body cut short", "bytes that aren't text"],
+)
+def test_fetch_text_retries_what_is_not_an_oserror(
+    monkeypatch: pytest.MonkeyPatch, failure: Exception
+) -> None:
+    calls: list[str] = []
+
+    def broken(request: object, timeout: float) -> object:
+        calls.append("try")
+        raise failure
+
+    monkeypatch.setattr(check_config.urllib.request, "urlopen", broken)
+    with pytest.raises(OSError, match=re.escape("https://example.test/x")) as raised:
+        check_config.fetch_text("https://example.test/x", pause=0)
+    assert len(calls) == 2
+    assert raised.value.__cause__ is failure
+
+
 def test_a_dockerfile_without_a_gotrue_line_fails(tmp_path: Path) -> None:
     problems = check_config.check_gotrue(
         stack(tmp_path), serve("FROM library/kong:2.8.1 AS kong\n")
@@ -173,7 +245,7 @@ def test_the_real_files_have_pins_the_check_can_read() -> None:
     It holds only that the check can read the real files, so it doesn't change when the CLI's
     version, and with it GoTrue's, does.
     """
-    tag = check_config.STACK_GOTRUE.search((STACKR / "compose.yaml").read_text())
+    tag = re.search(r"supabase/gotrue:([^@\s]+)", (STACKR / "compose.yaml").read_text())
     assert tag is not None
     agreeing = f"FROM supabase/postgres:17 AS pg\nFROM supabase/gotrue:{tag[1]} AS gotrue\n"
     assert check_config.check_gotrue(STACKR, serve(agreeing)) == []

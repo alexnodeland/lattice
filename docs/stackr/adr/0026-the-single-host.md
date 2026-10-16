@@ -28,7 +28,7 @@ RFC-0004 runs stackr's Compose stack on one VM behind Caddy, on the `postgres` a
 - **A database of GoTrue's own, not an `auth` schema beside the application's tables.** It keeps identity out of [ADR-0022](0022-row-level-security-in-the-template.md)'s row-level security and the application's roles.
 - **`scripts/_auth_keys.py`, a module, not a `scripts/auth-keys` command.** `make env` is its only caller on a host. The AWS recipe's one-off task (phase 3) gets a command around the same module, in its thin image.
 - **A check that GoTrue's version follows the Supabase CLI's came after,** in [#132](https://github.com/alexnodeland/lattice/issues/132): `scripts/check-config gotrue` reads the CLI's own image pins at its tag, so it is online and runs in CI, not in `make validate`.
-  - It runs only on a pull request that changes `versions.env`, `compose.yaml` or the AWS stack's `locals.tf`.
+  - It runs only on a pull request whose own diff changes `versions.env`, `compose.yaml` or the AWS stack's `locals.tf`, compared by the job itself, since moon's affected check would add every change to stackr and to the libraries it depends on. The job counts as passed when none changed, and nothing runs it on `main`.
   - It tries twice, and a file it can't read fails it.
   - Renovate keeps proposing GoTrue's updates, which fail it until the CLI is bumped: the CLI goes first.
 - **The application reads GoTrue's key set at its private address,** `http://gotrue:9999/.well-known/jwks.json`, not through the edge: no certificate to trust inside the stack, and the same keys.

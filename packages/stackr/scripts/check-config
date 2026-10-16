@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static checks that no service's own validator covers. Run by scripts/validate.
+"""Static checks that no service's own validator covers. Run by scripts/validate, but `gotrue`.
 
 Usage: scripts/check-config {dashboards,supabase,litellm,aws,gotrue}
 
@@ -24,8 +24,9 @@ and no key is written into the file.
 gotrue: GoTrue's image in compose.yaml and in the AWS stack module
 (deploy/aws/modules/stack/locals.tf) is the version the Supabase CLI pinned in
 versions.env runs. The CLI's image pins are in its own repository, so this one
-reads them over the network: CI runs it when versions.env, compose.yaml or
-locals.tf change, and `make validate` stays offline. It tries twice, and a CLI
+reads them over the network, so `make validate` stays offline, and CI runs it
+(moon run stackr:gotrue) on a pull request whose own diff changes versions.env,
+compose.yaml or locals.tf, and on none other. It tries twice, and a CLI
 Dockerfile it can't read is a failure, never a pass.
 
 aws: the AWS recipe's state host runs ClickHouse, Prometheus and
@@ -42,13 +43,13 @@ Dockerfile builds is on its service's image, as compose.yaml pins it.
 
 from __future__ import annotations
 
+import http.client
 import json
 import re
 import subprocess
 import sys
 import time
 import tomllib
-import urllib.error
 import urllib.request
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -325,23 +326,31 @@ CLI_DOCKERFILE = (
     "/apps/cli-go/pkg/config/templates/Dockerfile"
 )
 """Where the Supabase CLI, at a version's tag, lists the images it runs."""
-CLI_GOTRUE = re.compile(r"^FROM supabase/gotrue:(\S+) AS gotrue\s*$", re.MULTILINE)
-STACK_GOTRUE = re.compile(r"supabase/gotrue:([^@\"\s]+)")
+CLI_GOTRUE = re.compile(r"^FROM supabase/gotrue:([^@\s]+)(?:@\S+)? AS gotrue\s*$", re.MULTILINE)
+"""The CLI's GoTrue pin: its tag, whether or not the CLI adds a digest."""
+CLI_VERSION = re.compile(r"^SUPABASE_CLI_VERSION=([0-9][0-9A-Za-z.-]*)\s*$", re.MULTILINE)
+"""The CLI's version, which goes into a URL's path: no `/`, `?` or `#`."""
+STACK_GOTRUE = re.compile(r"^\s*gotrue\s*=\s*\"supabase/gotrue:([^@\"\s]+)", re.MULTILINE)
+"""The AWS module's GoTrue pin, on its `gotrue =` line; compose.yaml's is read as YAML instead."""
 
 
 def fetch_text(url: str, attempts: int = 2, pause: float = 2.0) -> str:
-    """A page's text, read up to `attempts` times; raises OSError when none could be."""
-    last: OSError | None = None
+    """A page's text, read up to `attempts` times; raises OSError when none could be.
+
+    A refused connection, an HTTP error, a body cut short and bytes that aren't text all count as
+    a failed attempt, and get the retry.
+    """
+    request = urllib.request.Request(url, headers={"User-Agent": "stackr-check-config"})
+    last: Exception | None = None
     for attempt in range(attempts):
         if attempt:
             time.sleep(pause)
         try:
-            request = urllib.request.Request(url, headers={"User-Agent": "stackr-check-config"})
             with urllib.request.urlopen(request, timeout=20) as response:
                 return response.read().decode()
-        except OSError as error:  # URLError and HTTPError are OSErrors
+        except (OSError, http.client.HTTPException, UnicodeDecodeError) as error:
             last = error
-    raise OSError(f"{url}: {last}")
+    raise OSError(f"{url}: {last}") from last
 
 
 def version_tuple(tag: str) -> tuple[int, ...] | None:
@@ -352,9 +361,9 @@ def version_tuple(tag: str) -> tuple[int, ...] | None:
 
 def check_gotrue(root: Path = ROOT, fetch: Callable[[str], str] = fetch_text) -> list[str]:
     """Check that GoTrue's image is the one the pinned Supabase CLI runs."""
-    versions = re.search(r"^SUPABASE_CLI_VERSION=(\S+)$", (root / "versions.env").read_text(), re.M)
+    versions = CLI_VERSION.search((root / "versions.env").read_text())
     if versions is None:
-        return ["versions.env has no SUPABASE_CLI_VERSION"]
+        return ["versions.env has no SUPABASE_CLI_VERSION, or one that isn't a version"]
     cli = versions[1]
     compose = yaml.safe_load((root / "compose.yaml").read_text())
     pins = {
@@ -385,12 +394,19 @@ def check_gotrue(root: Path = ROOT, fetch: Callable[[str], str] = fetch_text) ->
     wanted = found[1]
     for where, tags in pins.items():
         for tag in sorted(tags - {wanted}):
-            ahead = (version_tuple(tag) or ()) > (version_tuple(wanted) or ())
-            advice = (
-                f"bump the CLI first (SUPABASE_CLI_VERSION in versions.env), to one that runs {tag}"
-                if ahead
-                else f"set it to {wanted}, or bump the CLI back"
-            )
+            ours, theirs = version_tuple(tag), version_tuple(wanted)
+            if ours is None or theirs is None:  # a tag such as v2.198.0-rc1: no direction to say
+                advice = (
+                    f"make them one: bump the CLI to one that runs {tag}, or set it to {wanted}"
+                )
+            elif ours > theirs:
+                first = "bump the CLI first (SUPABASE_CLI_VERSION in versions.env)"
+                advice = f"{first} to one that runs {tag}"
+            else:
+                advice = (
+                    f"set its tag to {wanted}, keeping its @sha256 digest pin (Renovate can set"
+                    " both), or bump the CLI back"
+                )
             problems.append(
                 f"{where} runs supabase/gotrue:{tag}, but the Supabase CLI {cli} runs {wanted}: "
                 + advice

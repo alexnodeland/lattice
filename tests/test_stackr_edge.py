@@ -32,11 +32,16 @@ def docker(*args: str) -> str:
     return done.stdout.strip()
 
 
-def request(port: int, host: str, target: str, method: str = "GET") -> tuple[int, str]:
-    """One raw HTTPS request, its target exactly as given, to the edge on `port`."""
-    context = ssl.create_default_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
+def request(
+    port: int, host: str, target: str, method: str = "GET", *, root: str
+) -> tuple[int, str]:
+    """One raw HTTPS request, its target exactly as given, to the edge on `port`.
+
+    The certificate is checked against the root of Caddy's own CA (`root`, PEM), for `host`.
+    """
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.load_verify_locations(cadata=root)
     with (
         socket.create_connection(("127.0.0.1", port), timeout=10) as raw,
         context.wrap_socket(raw, server_hostname=host) as tls,
@@ -52,19 +57,32 @@ def request(port: int, host: str, target: str, method: str = "GET") -> tuple[int
     return int(head.split(b" ", 2)[1]), body.decode(errors="replace")
 
 
-def wait_for(port: int) -> None:
+class Edge:
+    """The edge under test: where it listens, and the root its certificates are signed by."""
+
+    def __init__(self, port: int, root: str) -> None:
+        self.port = port
+        self.root = root
+
+    def __call__(self, host: str, target: str, method: str = "GET") -> tuple[int, str]:
+        return request(self.port, host, target, method, root=self.root)
+
+
+def wait_for(container: str, port: int) -> Edge:
     for _ in range(60):
         try:
-            if request(port, APP, "/ready")[0] == 200:
-                return
-        except (OSError, ValueError, IndexError):
+            root = docker("exec", container, "cat", "/data/caddy/pki/authorities/local/root.crt")
+            edge = Edge(port, root)
+            if edge(APP, "/ready")[0] == 200:
+                return edge
+        except (OSError, ValueError, IndexError, subprocess.CalledProcessError):
             time.sleep(0.5)
     pytest.fail("the edge did not come up")
 
 
 @pytest.fixture(scope="module")
-def edge(tmp_path_factory: pytest.TempPathFactory) -> Iterator[int]:
-    """The edge's published port, with its backends up; all removed afterwards, by label."""
+def edge(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Edge]:
+    """The edge, with its backends up; all removed afterwards, by label."""
     found = re.search(r"image: (caddy:\S+)", (HOST / "compose.prod.yaml").read_text())
     assert found
     image = found[1]
@@ -86,8 +104,7 @@ def edge(tmp_path_factory: pytest.TempPathFactory) -> Iterator[int]:
             *("-v", f"{HOST / 'Caddyfile'}:/etc/caddy/Caddyfile:ro", image),
         )
         port = int(docker("port", container, "443/tcp").splitlines()[0].rsplit(":", 1)[1])
-        wait_for(port)
-        yield port
+        yield wait_for(container, port)
     finally:
         for found_id in docker("ps", "-aq", "--filter", f"label={label}").split():
             docker("rm", "-f", "-v", found_id)
@@ -108,9 +125,9 @@ def edge(tmp_path_factory: pytest.TempPathFactory) -> Iterator[int]:
     ],
 )
 def test_the_calls_the_sign_in_makes_reach_gotrue(
-    edge: int, method: str, target: str, reaches: str
+    edge: Edge, method: str, target: str, reaches: str
 ) -> None:
-    assert request(edge, APP, target, method) == (200, reaches)
+    assert edge(APP, target, method) == (200, reaches)
 
 
 REFUSED = [
@@ -161,19 +178,19 @@ REFUSED = [
 @pytest.mark.parametrize("target", REFUSED)
 @pytest.mark.parametrize("method", ["GET", "POST"])
 def test_every_other_call_under_the_prefix_and_every_admin_path_is_refused(
-    edge: int, target: str, method: str
+    edge: Edge, target: str, method: str
 ) -> None:
-    status, body = request(edge, APP, target, method)
+    status, body = edge(APP, target, method)
     assert "gotrue" not in body
     assert status in {400, 404}, (status, body)
 
 
-def test_the_application_and_its_admin_ui_are_still_served(edge: int) -> None:
-    assert request(edge, APP, "/portalr/admin/") == (200, "app /portalr/admin/")
-    assert request(edge, APP, "/portalr/app/") == (200, "app /portalr/app/")
-    assert request(edge, APP, "/other") == (200, "app /other")
+def test_the_application_and_its_admin_ui_are_still_served(edge: Edge) -> None:
+    assert edge(APP, "/portalr/admin/") == (200, "app /portalr/admin/")
+    assert edge(APP, "/portalr/app/") == (200, "app /portalr/app/")
+    assert edge(APP, "/other") == (200, "app /other")
 
 
-def test_the_auth_host_is_as_it_was(edge: int) -> None:
-    assert request(edge, AUTH, "/token") == (200, "gotrue /token")
-    assert request(edge, AUTH, "/admin/users")[0] == 404
+def test_the_auth_host_is_as_it_was(edge: Edge) -> None:
+    assert edge(AUTH, "/token") == (200, "gotrue /token")
+    assert edge(AUTH, "/admin/users")[0] == 404

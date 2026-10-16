@@ -973,7 +973,9 @@ ENV
     status=1
   fi
   # Usage by workspace also reads the workspaces' tags, a route of the key's own.
-  if app_call "/portalr/v1/usage?workspaces=$run_id" | jq -e '.status == "ok"' >/dev/null; then
+  local window
+  window=$(jq -nr '"start=\(now - 86400 | todate)&end=\(now | todate)"')
+  if app_call "/portalr/v1/usage?$window&workspaces=$run_id" | jq -e '.status == "ok"' >/dev/null; then
     log "ok: the usage, by team and by workspace, comes from the gateway with the portal's key"
   else
     log "FAIL: the portal could not read the tenant's usage by workspace with its own key"

@@ -14,7 +14,7 @@
 
 **relayr** is the bridge between [artifactr](https://lattice.alexnodeland.com/artifactr/) and [reflexr](https://lattice.alexnodeland.com/reflexr/): events from chats and artifacts become events for rules, and runs act back in the chat as proposals and notices. It uses only the two libraries' public APIs, and neither library imports it or the other.
 
-> **Status:** built: the [v0.1 plan](https://lattice.alexnodeland.com/relayr/rfcs/0001-v0.1-implementation-plan/). Both adapters, telemetry across the bridge, rules from chat and evaluation, and stackr's template wires it all into an application, except LiteLLM's metadata, which waits on [lattice #86](https://github.com/alexnodeland/lattice/issues/86). Its distribution is `relayr-ai`, since the name `relayr` on PyPI is an unrelated project, and it is imported as `relayr`.
+> **Status:** built: the [v0.1 plan](https://lattice.alexnodeland.com/relayr/rfcs/0001-v0.1-implementation-plan/). Both adapters, telemetry across the bridge, rules from chat and evaluation, and stackr's template wires it all into an application. Its distribution is `relayr-ai`, since the name `relayr` on PyPI is an unrelated project, and it is imported as `relayr`.
 
 ## Why
 

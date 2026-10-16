@@ -37,8 +37,10 @@ otel = [
     "opentelemetry-sdk>=1.45",
     "pydantic-ai-slim>=2.51",
 ]
+# The litellm extra reads Langfuse 4's propagated tags from OpenTelemetry's context by their
+# internal key (lattice ADR-0022); the lockfile's langfuse is the version verified.
 langfuse = ["langfuse>=4.15,<5", "opentelemetry-sdk>=1.45"]
-litellm = ["pydantic-ai-slim[openai]>=2.51", "httpx2>=2.7"]
+litellm = ["pydantic-ai-slim[openai]>=2.51", "httpx2>=2.7", "opentelemetry-api>=1.45"]
 
 [project.urls]
 Homepage = "https://lattice.alexnodeland.com/lattice-core/"

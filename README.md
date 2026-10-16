@@ -106,7 +106,7 @@ sequenceDiagram
 | **[stackr](packages/stackr)** | The stack the libraries run on (Supabase or PostgreSQL, LiteLLM, OpenTelemetry, Grafana, Langfuse), an application template, and hosting recipes | ✅ template · 🚧 [hosting recipes](docs/stackr/rfcs/0004-hosting-recipes.md) |
 
 > [!NOTE]
-> **Alpha.** artifactr's [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) is lattice's first release. The others will release once lattice reaches v0.1. APIs may still change before 1.0.
+> **Alpha.** artifactr's [0.1.0](https://github.com/alexnodeland/artifactr/releases/tag/v0.1.0) was released from its original repository; lattice keeps its tag, `artifactr-v0.1.0`. The others release once lattice reaches v0.1. None is on PyPI yet. APIs may still change before 1.0.
 
 ## 🚀 Start an application
 
@@ -146,7 +146,10 @@ uv add "reflexr @ git+https://github.com/alexnodeland/lattice#subdirectory=packa
 uv add "evalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/evalr"
 uv add "relayr-ai @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/relayr"
 uv add "grantr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/grantr"
+uv add "portalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packages/portalr"
 ```
+
+portalr's wheel carries its two UIs, which Vite builds first, so installed from the repository it has none to serve: build them in a checkout (`bun install && moon run app:build admin:build`), or wait for its release wheel. portalr isn't in the application template yet either.
 
 uv takes each package's own dependencies from lattice, from the same commit: relayr's, artifactr and reflexr, and lattice-core, which artifactr and reflexr share. Each package's getting-started page lists its extras, such as artifactr's `fastapi`, `mcp` and `postgres`: [artifactr](https://lattice.alexnodeland.com/artifactr/getting-started/), [reflexr](https://lattice.alexnodeland.com/reflexr/getting-started/), [evalr](https://lattice.alexnodeland.com/evalr/getting-started/), [grantr](https://lattice.alexnodeland.com/grantr/getting-started/).
 

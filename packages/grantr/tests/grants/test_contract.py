@@ -431,22 +431,45 @@ async def test_the_last_owner_stays(grants: Grants) -> None:
     assert await grants.check("acme", BOB, "grantr:delete_tenant", TENANT)
 
 
-@pytest.mark.xfail(strict=True, reason="https://github.com/alexnodeland/lattice/issues/253")
-async def test_the_last_owner_is_someone_in_the_group_that_holds_it(grants: Grants) -> None:
+# #253: a group's owner grant counts as an owner whoever is in the group. Each test below fails
+# today because the change is carried out, so pytest.raises fails; an error in its setup would
+# not be the expected failure, and fails the test.
+LAST_OWNER_IN_A_GROUP = pytest.mark.xfail(
+    strict=True,
+    raises=pytest.fail.Exception,
+    reason="https://github.com/alexnodeland/lattice/issues/253",
+)
+
+
+async def _owned_by_the_team(grants: Grants) -> None:
+    """Make Bob, alone in TEAM, the tenant's one owner, through TEAM's grant."""
     await _members(grants, BOB)
     await grants.define_group("acme", TEAM, frozenset((BOB,)), by=ALICE)
     await grants.grant("acme", "owner", on=TENANT, to=TEAM, by=ALICE)
     await grants.revoke("acme", "owner", on=TENANT, to=ALICE, by=ALICE)
+
+
+@LAST_OWNER_IN_A_GROUP
+async def test_the_group_that_holds_the_last_owner_grant_keeps_a_member(grants: Grants) -> None:
+    await _owned_by_the_team(grants)
     with pytest.raises(Invalid):
         await grants.define_group("acme", TEAM, frozenset(), by=BOB)
+
+
+@LAST_OWNER_IN_A_GROUP
+async def test_the_last_member_of_the_group_that_owns_the_tenant_stays(grants: Grants) -> None:
+    await _owned_by_the_team(grants)
     with pytest.raises(Invalid):
         await grants.remove_member("acme", BOB, by=BOB)
+
+
+@LAST_OWNER_IN_A_GROUP
+async def test_an_empty_groups_owner_grant_is_no_owner(grants: Grants) -> None:
     empty = Group(id="empty")
-    await grants.define_group("acme", empty, frozenset(), by=BOB)
-    await grants.grant("acme", "owner", on=TENANT, to=empty, by=BOB)
+    await grants.define_group("acme", empty, frozenset(), by=ALICE)
+    await grants.grant("acme", "owner", on=TENANT, to=empty, by=ALICE)
     with pytest.raises(Invalid):
-        await grants.revoke("acme", "owner", on=TENANT, to=TEAM, by=BOB)
-    assert await grants.check("acme", BOB, "grantr:delete_tenant", TENANT)
+        await grants.revoke("acme", "owner", on=TENANT, to=ALICE, by=ALICE)
 
 
 async def test_operators_are_granted_by_operators(grants: Grants) -> None:

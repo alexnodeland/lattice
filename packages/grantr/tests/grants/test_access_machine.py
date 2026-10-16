@@ -111,7 +111,11 @@ class Access:
         return any(not actions(g) <= self.held(by, g.on) for g in grants)
 
     def last_owner(self, losing: Iterable[Grant]) -> bool:
-        """Whether a change would take every grant of ``owner`` on the tenant."""
+        """Whether a change would take every grant of ``owner`` on the tenant.
+
+        As ADR-0014 words it and grantr has it: a group's grant counts whoever is in the group,
+        which is #253.
+        """
         owners = frozenset(g for g in self.grants if (g.role, g.on) == ("owner", TENANT))
         return bool(owners) and owners <= frozenset(losing)
 
@@ -174,19 +178,27 @@ class AccessMachine(RuleBasedStateMachine):
 
     def __init__(self) -> None:
         super().__init__()
-        self.loop = asyncio.new_event_loop()
         self.storage = InMemoryStorage()
         self.grants = Grants(self.storage, catalogs=[ARTIFACTR, REFLEXR, PORTALR])
-        self.run(self.grants.first_operator(ROOT.id))
-        self.run(self.grants.create_tenant(ACME, owner=ALICE.id, by=ROOT))
         self.model = Access(frozenset((membership(ALICE), granted("owner", TENANT, ALICE))))
+        self.loop = asyncio.new_event_loop()
+        try:
+            self.run(self.open())
+        except BaseException:
+            self.loop.close()  # teardown runs only for a machine that started
+            raise
+
+    async def open(self) -> None:
+        """Make the tenant and its members, group and grants, in grantr and in the model."""
+        await self.grants.first_operator(ROOT.id)
+        await self.grants.create_tenant(ACME, owner=ALICE.id, by=ROOT)
         for member in (BOB, CAROL):
-            self.run(self.grants.add_member(ACME, member, by=ALICE))
+            await self.grants.add_member(ACME, member, by=ALICE)
             self.model.give(membership(member))
-        self.run(self.grants.define_group(ACME, TEAM, frozenset((BOB,)), by=ALICE))
+        await self.grants.define_group(ACME, TEAM, frozenset((BOB,)), by=ALICE)
         self.model.groups[TEAM.id] = frozenset((BOB,))
         for role, to in (("owner", TEAM), ("admin", CAROL)):
-            self.run(self.grants.grant(ACME, role, on=TENANT, to=to, by=ALICE))
+            await self.grants.grant(ACME, role, on=TENANT, to=to, by=ALICE)
             self.model.give(granted(role, TENANT, to))
 
     def teardown(self) -> None:
@@ -304,7 +316,7 @@ class AccessMachine(RuleBasedStateMachine):
 
     @invariant()
     def the_tenant_has_an_owner_grant(self) -> None:
-        # The weak form: that a member holds owner, through a group or not, fails until #253.
+        # TODO(#253): strengthen to "a member holds owner", through a group or not.
         assert any((g.role, g.on) == ("owner", TENANT) for g in self.model.grants)
 
     @invariant()

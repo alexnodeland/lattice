@@ -9,7 +9,6 @@ cancellation is raised after it. SQLAlchemy takes a statement cancelled part-way
 connection, which on SQLite can keep the database's write lock, or the pool's one connection.
 """
 
-import contextlib
 from collections.abc import AsyncGenerator, Awaitable, Callable, Collection
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -17,7 +16,6 @@ from typing import Final
 
 from pydantic import TypeAdapter
 from sqlalchemy import ColumnElement, Select, and_, delete, false, or_, select, update
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
 
@@ -55,7 +53,7 @@ from grantr.sql.tables import (
     RoleRow,
     TenantRow,
 )
-from lattice_core.sql.sessions import awaited_to_the_end, to_the_end
+from lattice_core.sql.sessions import awaited_to_the_end, lock_row, to_the_end
 from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 
 Clock = Callable[[], datetime]
@@ -470,13 +468,8 @@ class _Transaction(_Reads):
 
 
 async def _lock(session: AsyncSession, scope: str) -> None:
-    """Lock a tenant's row (``SELECT ... FOR UPDATE``), inserting it first if it isn't there."""
-    while await session.get(TenantRow, scope, with_for_update=True) is None:
-        # A concurrent transaction may insert the row first. Then this insert fails, and the
-        # next lookup waits for that transaction to end and locks its row instead.
-        with contextlib.suppress(IntegrityError):
-            async with session.begin_nested():
-                session.add(TenantRow(id=scope, live=False))
+    """Lock a tenant's row, which is not live until the tenant is created."""
+    await lock_row(session, TenantRow, scope, TenantRow(id=scope, live=False))
 
 
 ACROSS_TENANTS: Final = frozenset({"tenant_grants", "key", "tenants"})

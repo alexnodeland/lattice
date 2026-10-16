@@ -58,6 +58,12 @@
   --row-height: 2.75rem;
   /* Behind a drawer or a dialog. */
   --scrim: light-dark(rgb(28 29 38 / 45%), rgb(0 0 0 / 60%));
+  /*
+   * What a raised thing casts: a card a little, a menu or a tooltip more, a dialog or a drawer the
+   * most (`shadow-raised`, `shadow-md`, `shadow-lg`, in styles.css). A shadow on the paper is faint
+   * in light and, to be seen at all on the dark paper, black and heavier in dark.
+   */
+  --shadow-color: light-dark(rgb(40 20 70 / 16%), rgb(0 0 0 / 65%));
 }
 
 /*

@@ -517,6 +517,30 @@ test("a logs read names its window, its limit and its filter; a line is its own 
   expect(keys.portalr.logLine("acme", id)).not.toEqual(keys.portalr.logLine("globex", id));
 });
 
+test("an operator's links for ids are asked for once each, and never kept", async () => {
+  const client = new QueryClient();
+  const ids = { trace: "t1", tenant: "acme" };
+  await client.fetchQuery(queries.portalr.toolLinks("ops", ids));
+  const request = seen.at(-1);
+  expect(request?.url.pathname).toBe("/portalr/v1/deployment/links");
+  expect(Object.fromEntries(request?.url.searchParams ?? [])).toEqual({
+    trace_id: "t1",
+    tenant_id: "acme",
+  });
+  const options = queries.portalr.toolLinks("ops", ids);
+  expect([
+    options.staleTime,
+    options.gcTime,
+    options.retry,
+    options.refetchOnWindowFocus,
+    options.refetchOnReconnect,
+  ]).toEqual([0, 0, false, false, false]);
+  expect(keys.portalr.toolLinks("ops", ids)).not.toEqual(keys.portalr.toolLinks("ops2", ids));
+  expect(keys.portalr.toolLinks("ops", ids)).not.toEqual(
+    keys.portalr.toolLinks("ops", { ...ids, run: "r1" }),
+  );
+});
+
 test("the deployment's audit log is read a page back at a time, naming no tenant", async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   await client.fetchInfiniteQuery(queries.grantr.deploymentAudit("ops"));

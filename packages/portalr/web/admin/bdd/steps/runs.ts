@@ -18,6 +18,21 @@ async function token(request: APIRequestContext, person: string): Promise<string
 /** Publish a ticket as a person, and wait for the run of triage it sets off: its id. */
 Given("bob has published a ticket that fails in acme", async ({ request, made }) => {
   const headers = { Authorization: `Bearer ${await token(request, "bob")}`, "X-Tenant": "acme" };
+  // artifactr lists a workspace once something is made in it, and Runs picks among the listed:
+  // so a thread is made first, which no other scenario need have done.
+  const thread = await request.post(`${origin()}/artifactr/v1/workspaces/notes/commands`, {
+    headers,
+    data: {
+      type: "command",
+      command_id: crypto.randomUUID(),
+      command: {
+        type: "create_thread",
+        thread_id: `thr_${crypto.randomUUID().replaceAll("-", "")}`,
+        title: "Runs",
+      },
+    },
+  });
+  expect(thread.ok()).toBe(true);
   const published = await request.post(`${origin()}${NOTES}/events`, {
     headers,
     data: { event: { type: "portalr:ticket.opened", subject: `fail ${crypto.randomUUID()}` } },

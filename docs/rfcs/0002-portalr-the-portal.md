@@ -179,7 +179,7 @@ The UI for a tenant's owners and admins, and the deployment's operators.
 | Usage and spend | Tokens and spend from LiteLLM, by workspace where the tags allow, against the tenant's budget | tenant admins |
 | Runs | A workspace's rule runs, live, those that need attention or every one, in the workspace the admin picks, until a library offers a tenant-wide read, with retry, skip and cancel after a confirmation, and what people did to each ([ADR-0032](../portalr/adr/0032-runs-in-admin.md)) | tenant admins |
 | Tenants | Every tenant from grantr, with its spend from one LiteLLM team list; creating a tenant and its owner | operators |
-| Tools | Deep links into Langfuse and Grafana for any run, session or tenant | operators |
+| Tools | Deep links into Langfuse and Grafana for any run, session or tenant, with a notice that they are outside the traces and logs gates, each making of links recorded ([ADR-0035](../portalr/adr/0035-tools-and-the-record-of-opening-them.md)) | operators |
 
 The admin UI shows a tenant its own traces and logs, but doesn't rebuild Grafana's dashboards or Langfuse's analysis tools; operators open those through deep links.
 

@@ -802,7 +802,7 @@ class Workspace:
         )
 
     async def checkpoint_run(
-        self, run_id: RunId, *, attempt: int, step: str, state: JsonValue
+        self, run_id: RunId, *, epoch: int, step: str, state: JsonValue
     ) -> Run:
         """Save a running run's progress after a step, and append ``reflexr:run_progressed``.
 
@@ -811,26 +811,28 @@ class Workspace:
 
         Args:
             run_id: The run.
-            attempt: The attempt saving it, which must still be the run's current one.
+            epoch: The :attr:`~reflexr.core.Run.epoch` of the attempt saving it, which must
+                still be the run's current one.
             step: The step that completed.
             state: What resuming needs, as JSON.
 
         Raises:
             NotFound: If the run does not exist.
-            InvalidState: If the run is no longer running this attempt: it was cancelled, or
-                another executor took it over.
+            InvalidState: If the run is no longer running this attempt: it was cancelled or
+                retried, or another executor took it over.
         """
         _check_text(run_id, step, state)
         await self.check(Access(action="reflexr:checkpoint_run"))
         with self._span("reflexr.checkpoint_run") as span:
-            span.set_attributes({a.RUN_ID: run_id, a.ATTEMPT: attempt})
+            span.set_attribute(a.RUN_ID, run_id)
             traceparent = current_traceparent()
             async with self._context.storage.transaction(self._ref) as transaction:
                 run = await transaction.run(run_id)
                 if run is None:
                     raise NotFound("run", run_id)
-                if (run.status, run.attempts) != ("running", attempt):
-                    raise InvalidState(f"attempt {attempt} of run {run_id} is no longer current")
+                if not run.is_running(epoch):
+                    raise InvalidState(f"the attempt of run {run_id} is no longer current")
+                span.set_attribute(a.ATTEMPT, run.attempts)
                 saved, event = checkpoint(run, now=self._context.clock(), step=step, state=state)
                 await transaction.save_runs([saved])
                 await self._append(

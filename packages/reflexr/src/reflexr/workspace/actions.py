@@ -89,7 +89,7 @@ class Reaction[D]:
                 should stop.
         """
         self.run = await self.workspace.checkpoint_run(
-            self.run.id, attempt=self.run.attempts, step=step, state=state
+            self.run.id, epoch=self.run.epoch, step=step, state=state
         )
         self._emitted = 0  # events after a checkpoint are numbered afresh, in its segment
 

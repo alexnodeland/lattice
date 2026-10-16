@@ -97,6 +97,21 @@ class Run(BaseModel):
     trace_ids: tuple[TraceId, ...] = ()
     """The trace id of each attempt, so feedback on the run can be attached to its traces."""
 
+    epoch: int = 0
+    """How many attempts the run has started, retries included: the fence of its current one.
+
+    Unlike ``attempts``, which a retry sets back to 0 for a fresh budget, it never goes back, so
+    no two attempts of a run share it.
+    """
+
+    def is_running(self, epoch: int) -> bool:
+        """Whether the run is still running the attempt that started at ``epoch``.
+
+        An attempt records its checkpoints and its outcome only while this holds, so one that
+        was cancelled, retried, or taken over by another executor cannot overwrite a newer one.
+        """
+        return self.status == "running" and self.epoch == epoch
+
     @property
     def causation(self) -> Causation:
         """The causation of the events the run emits, and of reflexr's facts about it.
@@ -128,7 +143,9 @@ def start(run: Run, *, now: AwareDatetime, trace_id: str | None = None) -> tuple
     _require(run, "start", "pending", "retrying")
     attempt = run.attempts + 1
     traces = (*run.trace_ids, trace_id) if trace_id else run.trace_ids
-    started = _update(run, now, status="running", attempts=attempt, trace_ids=traces)
+    started = _update(
+        run, now, status="running", attempts=attempt, epoch=run.epoch + 1, trace_ids=traces
+    )
     return started, RunStarted(
         run_id=run.id, rule=run.rule, scope=run.scope, scope_key=run.scope_key, attempt=attempt
     )

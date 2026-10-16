@@ -169,7 +169,7 @@ Acting is at least once ([ADR-0041](../adr/0041-executing-runs.md)). A firing cr
 
 1. **Claim.** Under the run's lease, one transaction checks that the run is still due and first in its scope, and appends `reflexr:run_started`.
 2. **Act.** The action runs outside any transaction, with a [`Reaction`](actions.md#the-reaction), inside an `invoke_workflow {rule}` span. The reactor renews the run's lease every third of `lease_ttl` while the action works.
-3. **Record.** One transaction appends `reflexr:run_succeeded`, `reflexr:run_retrying` or `reflexr:run_dead_lettered`, but only if the run is still running this attempt. An executor that lost its lease, or whose run an operator cancelled, cannot overwrite a newer state.
+3. **Record.** One transaction appends `reflexr:run_succeeded`, `reflexr:run_retrying` or `reflexr:run_dead_lettered`, but only if the run is still running this attempt, as its `epoch` says: every start adds one to it and nothing sets it back, unlike `attempts`, which a retry does ([ADR-0066](../adr/0066-an-epoch-fences-each-attempt.md)). An executor that lost its lease, or whose run an operator cancelled and retried, cannot overwrite a newer state.
 
 An action returns the run's output, or raises to fail the attempt. The output must be JSON-compatible data or a Pydantic model, which is dumped as JSON; anything else fails the attempt with "the action returned a value that is not JSON". A rule's `timeout` bounds each attempt: an action that runs longer is cancelled, and the attempt fails with "the action timed out after ..." and the reason `timeout`. Cancelling a running run (`workspace.cancel_run`) stops its action within a third of `lease_ttl`.
 

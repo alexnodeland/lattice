@@ -385,7 +385,7 @@ class Executor[D]:
                         ref, run_lease(run.id), self._holder, self._lease_ttl
                     )
                     current = await storage.run(ref, run.id)
-                    if not kept or current is None or current.status != "running":
+                    if not kept or current is None or not current.is_running(run.epoch):
                         task.cancel()
                         return
         except Exception:
@@ -398,8 +398,8 @@ class Executor[D]:
         async with self._workspaces.storage.transaction(ref) as transaction:
             current = await transaction.run(run.id)
             assert current is not None, "runs are never deleted"
-            if (current.status, current.attempts) != ("running", run.attempts):
-                return None  # cancelled, or abandoned and attempted again elsewhere
+            if not current.is_running(run.epoch):
+                return None  # cancelled, retried, or abandoned and attempted again elsewhere
             now = self._workspaces.clock()
             if outcome.kind == "succeeded":
                 done, fact = succeed(current, now=now, output=outcome.output)

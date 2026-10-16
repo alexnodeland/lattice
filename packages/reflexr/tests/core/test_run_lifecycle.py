@@ -6,6 +6,10 @@ transition from a status outside its table is refused, attempts only grow except
 gives a finished run a fresh budget, and ``runnable`` starts a run only if no earlier run of
 its scope holds it. The table and the scope rule are written out again here rather than
 imported, so that a change to either shows up.
+
+It also keeps every attempt ever started, by the epoch it started at (ADR-0066), and completes
+any of them at random, as a stale executor would after a cancel, a retry, a skip or a lapsed
+lease: only the attempt the machine itself knows to be the run's current one may record.
 """
 
 from collections.abc import Callable
@@ -91,6 +95,10 @@ class RunLifecycle(RuleBasedStateMachine):
     def __init__(self) -> None:
         super().__init__()
         self.runs: list[Run] = []
+        self.started: list[list[int]] = []
+        """The epoch of every attempt each run has started, in order."""
+        self.current: list[int | None] = []
+        """The epoch of the attempt each run is running, if it is running one."""
         self.now = NOW
         self.ordering: Literal["scope", "none"] = "scope"
         self.on_dead_letter: Literal["continue", "block"] = "continue"
@@ -126,6 +134,8 @@ class RunLifecycle(RuleBasedStateMachine):
     @rule()
     def fire(self) -> None:
         self.runs.append(fired(len(self.runs) + 1))
+        self.started.append([])
+        self.current.append(None)
 
     @rule(seconds=st.sampled_from([0, 1, 60]))
     def tick(self, seconds: int) -> None:
@@ -152,6 +162,23 @@ class RunLifecycle(RuleBasedStateMachine):
             assert isinstance(fact, RunDeadLettered if exhausted else RunRetrying)
             if not exhausted:
                 assert after.next_attempt_at > self.now
+
+    @rule(index=st.integers(0), which=st.integers(0), succeeds=st.booleans())
+    def complete_an_attempt(self, index: int, which: int, succeeds: bool) -> None:
+        """Complete any attempt ever started, as its executor would, fenced by its epoch."""
+        position = index % len(self.runs)
+        started = self.started[position]
+        if not started:
+            return
+        epoch = started[which % len(started)]
+        current = self.current[position] == epoch
+        assert self.runs[position].is_running(epoch) == current
+        if not current:
+            return  # a stale attempt: its executor discards its outcome
+        if succeeds:
+            self.succeed_a_run(position)
+        else:
+            self.fail_a_run(position, permanent=False)
 
     @rule(index=st.integers(0))
     def checkpoint_a_run(self, index: int) -> None:
@@ -193,6 +220,14 @@ class RunLifecycle(RuleBasedStateMachine):
             assert after.attempts == 0
         else:
             assert after.attempts == before.attempts + (name == "start")
+        # The epoch only grows, by a start, whatever else happens.
+        assert after.epoch == before.epoch + (name == "start")
+        if name == "start":
+            assert after.epoch not in self.started[position]
+            self.started[position].append(after.epoch)
+            self.current[position] = after.epoch
+        elif after.status != "running":
+            self.current[position] = None
         self.runs[position] = after
         return before, after, fact
 
@@ -201,6 +236,12 @@ class RunLifecycle(RuleBasedStateMachine):
         for run in self.runs:
             assert 0 <= run.attempts <= self.max_attempts
             assert run.attempts >= 1 or run.status not in ("running", "retrying", "dead")
+
+    @invariant()
+    def the_epoch_is_the_latest_attempts(self) -> None:
+        for run, started in zip(self.runs, self.started, strict=True):
+            assert run.epoch == (started[-1] if started else 0)
+            assert run.epoch >= run.attempts
 
     @invariant()
     def only_runs_with_no_earlier_holder_start(self) -> None:

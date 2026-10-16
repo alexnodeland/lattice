@@ -1,6 +1,6 @@
 # ADR-0041: Executing runs
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0066](0066-an-epoch-fences-each-attempt.md)
 **Date:** 2026-09-29
 **Deciders:** Alex Nodeland
 

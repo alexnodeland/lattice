@@ -431,6 +431,24 @@ async def test_the_last_owner_stays(grants: Grants) -> None:
     assert await grants.check("acme", BOB, "grantr:delete_tenant", TENANT)
 
 
+@pytest.mark.xfail(strict=True, reason="https://github.com/alexnodeland/lattice/issues/253")
+async def test_the_last_owner_is_someone_in_the_group_that_holds_it(grants: Grants) -> None:
+    await _members(grants, BOB)
+    await grants.define_group("acme", TEAM, frozenset((BOB,)), by=ALICE)
+    await grants.grant("acme", "owner", on=TENANT, to=TEAM, by=ALICE)
+    await grants.revoke("acme", "owner", on=TENANT, to=ALICE, by=ALICE)
+    with pytest.raises(Invalid):
+        await grants.define_group("acme", TEAM, frozenset(), by=BOB)
+    with pytest.raises(Invalid):
+        await grants.remove_member("acme", BOB, by=BOB)
+    empty = Group(id="empty")
+    await grants.define_group("acme", empty, frozenset(), by=BOB)
+    await grants.grant("acme", "owner", on=TENANT, to=empty, by=BOB)
+    with pytest.raises(Invalid):
+        await grants.revoke("acme", "owner", on=TENANT, to=TEAM, by=BOB)
+    assert await grants.check("acme", BOB, "grantr:delete_tenant", TENANT)
+
+
 async def test_operators_are_granted_by_operators(grants: Grants) -> None:
     with pytest.raises(Invalid, match="has an operator already"):
         await grants.first_operator(BOB.id)

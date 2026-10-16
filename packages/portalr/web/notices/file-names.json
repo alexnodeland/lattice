@@ -1,0 +1,21 @@
+{
+  "licence": [
+    "LICENSE",
+    "license",
+    "LICENCE.md",
+    "LICENSES",
+    "COPYING",
+    "UNLICENSE",
+    "LICENSE-MIT",
+    "LICENSE.txt"
+  ],
+  "notice": ["NOTICE", "NOTICE.txt", "COPYRIGHT"],
+  "neither": [
+    "license.js",
+    "notice.ts",
+    "license.d.ts",
+    "license.js.map",
+    "license-checker.js",
+    "README.md"
+  ]
+}

@@ -164,4 +164,4 @@ Every area of a workspace renders in `AppShell`. The screens outside one are ui'
 
 ## The wheel
 
-Vite builds `app` and `admin` into `src/portalr/static/`, which git ignores and the wheel carries. portalr's `build` depends on theirs, and `ui-in-wheel`, in `check` and the release workflow, fails unless this version's wheel holds both, each with its typefaces, and the typefaces' licences.
+Vite builds `app` and `admin` into `src/portalr/static/`, which git ignores and the wheel carries. portalr's `build` depends on theirs, and `ui-in-wheel`, in `check` and the release workflow, fails unless this version's wheel holds both, each with its typefaces, and the typefaces' licences, and each UI's third-party notices ([ADR-0033](adr/0033-third-party-notices-for-the-bundled-javascript.md)): the licences of the packages its bundle holds, written by its build, which fails on one the policy in `web/notices/policy.json` doesn't allow.

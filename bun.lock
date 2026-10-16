@@ -25,6 +25,7 @@
       },
       "devDependencies": {
         "@playwright/test": "1.64.0",
+        "@portalr/notices": "workspace:*",
         "@tailwindcss/vite": "4.3.3",
         "@tanstack/router-generator": "1.167.40",
         "@tanstack/router-plugin": "1.168.42",
@@ -51,6 +52,7 @@
       },
       "devDependencies": {
         "@playwright/test": "1.64.0",
+        "@portalr/notices": "workspace:*",
         "@tailwindcss/vite": "4.3.3",
         "@tanstack/router-generator": "1.167.40",
         "@tanstack/router-plugin": "1.168.42",
@@ -81,6 +83,13 @@
       },
       "peerDependencies": {
         "@tanstack/react-query": "^5.104.1",
+      },
+    },
+    "packages/portalr/web/notices": {
+      "name": "@portalr/notices",
+      "devDependencies": {
+        "@types/bun": "1.4.2",
+        "vite": "8.3.4",
       },
     },
     "packages/portalr/web/ui": {
@@ -480,6 +489,8 @@
     "@portalr/app": ["@portalr/app@workspace:packages/portalr/web/app"],
 
     "@portalr/client": ["@portalr/client@workspace:packages/portalr/web/client"],
+
+    "@portalr/notices": ["@portalr/notices@workspace:packages/portalr/web/notices"],
 
     "@portalr/ui": ["@portalr/ui@workspace:packages/portalr/web/ui"],
 

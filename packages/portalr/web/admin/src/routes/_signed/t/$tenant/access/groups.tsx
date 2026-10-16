@@ -129,14 +129,18 @@ function Groups() {
         actions={(group) => (
           <>
             <Button
-              variant="secondary"
+              variant="ghost"
+              size="sm"
               aria-label={define.words.change(group.name)}
               onClick={() => void change(group.name)}
             >
               Change members
             </Button>
             <ConfirmDialog
-              label={`Delete ${group.name}`}
+              label="Delete"
+              about={group.name}
+              look="danger-soft"
+              size="sm"
               title={`Delete the group ${group.name}?`}
               confirm="Delete"
               onConfirm={async () =>

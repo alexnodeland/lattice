@@ -9,6 +9,7 @@ import {
   RunList,
   type RunParts,
   SectionTitle,
+  SegmentedFilter,
   SelectField,
 } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
@@ -95,27 +96,26 @@ function RunsPage() {
         <EmptyState title="No workspaces">A tenant's rules run in its workspaces.</EmptyState>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 sm:max-w-xl">
+          <div className="grid items-start gap-3 sm:grid-cols-2">
             <SelectField
               label="Workspace"
               value={known ? workspace : ""}
-              onChange={(event) =>
-                void navigate({ search: shownOf({ ...search, workspace: event.target.value }) })
+              onValueChange={(chosen) =>
+                void navigate({ search: shownOf({ ...search, workspace: chosen }) })
               }
               options={[
                 ...(known ? [] : [{ value: "", label: "Choose a workspace" }]),
                 ...names.map((name) => ({ value: name, label: name })),
               ]}
             />
-            <SelectField
+            <SegmentedFilter
               label="Show"
+              showLabel
+              segments={SHOWN.map((one) => ({ value: one.show, label: one.label }))}
               value={search.show}
-              onChange={(event) =>
-                void navigate({
-                  search: shownOf({ ...search, workspace, show: event.target.value }),
-                })
+              onValueChange={(show) =>
+                void navigate({ search: shownOf({ ...search, workspace, show }) })
               }
-              options={SHOWN.map((one) => ({ value: one.show, label: one.label }))}
             />
           </div>
           <DeadLetters />
@@ -277,7 +277,7 @@ const WORDS: Record<Action, { label: string; title: string; confirm: string; bod
   cancel: {
     label: "Cancel",
     title: "Cancel this run?",
-    confirm: "Cancel the run",
+    confirm: "Cancel run",
     body: "The run is stopped. If an attempt is running, what it gives is discarded, though what it already did outside isn't undone.",
   },
 };
@@ -304,7 +304,10 @@ function Actions({
       <ConfirmDialog
         key={action}
         label={WORDS[action].label}
-        name={`${WORDS[action].label} run ${run.id}`}
+        about={`run ${run.id}`}
+        look={action === "cancel" ? "danger-soft" : "ghost"}
+        size="sm"
+        {...(action === "cancel" && { dismiss: "Keep running" })}
         title={WORDS[action].title}
         confirm={WORDS[action].confirm}
         calm={action === "retry"}

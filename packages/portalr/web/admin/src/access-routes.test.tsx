@@ -3,6 +3,7 @@
  * part not allowed said in the tenant's frame, and a key's secret gone once its screen is left.
  */
 
+import { choose, optionsOf } from "@portalr/ui/testing";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { page } from "vitest/browser";
 import { TENANT_ACTIONS } from "./access";
@@ -352,9 +353,9 @@ test("on a phone, each place's grants are a list named by its heading", async ()
 
 test("a group made the tenant's admin is named so in the question", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
-  await screen.getByRole("combobox", { name: "Role" }).selectOptions("owner");
-  await screen.getByRole("combobox", { name: "On" }).selectOptions("tenant");
-  await screen.getByRole("combobox", { name: "To" }).selectOptions("ops (group)");
+  await choose(screen, "Role", "owner");
+  await choose(screen, "On", "tenant");
+  await choose(screen, "To", "ops (group)");
   await screen.getByRole("button", { name: "Grant", exact: true }).click();
   await expect
     .element(screen.getByRole("alertdialog", { name: "Make the group ops owner of acme?" }))
@@ -363,14 +364,20 @@ test("a group made the tenant's admin is named so in the question", async () => 
 
 test("the form starts on no role and no one, and a role chooses where again", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
-  await expect.element(screen.getByRole("combobox", { name: "Role" })).toHaveValue("");
-  await expect.element(screen.getByRole("combobox", { name: "To" })).toHaveValue("");
-  await screen.getByRole("combobox", { name: "Role" }).selectOptions("viewer");
-  await screen.getByRole("combobox", { name: "On" }).selectOptions("thread");
+  await expect
+    .element(screen.getByRole("combobox", { name: "Role" }))
+    .toHaveTextContent("Choose a role…");
+  await expect
+    .element(screen.getByRole("combobox", { name: "To" }))
+    .toHaveTextContent("Choose whom…");
+  await choose(screen, "Role", "viewer");
+  await choose(screen, "On", "thread");
   await expect.element(screen.getByRole("combobox", { name: "Workspace" })).toBeVisible();
   await expect.element(screen.getByRole("textbox", { name: "The thread's id" })).toBeVisible();
-  await screen.getByRole("combobox", { name: "Role" }).selectOptions("owner");
-  await expect.element(screen.getByRole("combobox", { name: "On" })).toHaveValue("");
+  await choose(screen, "Role", "owner");
+  await expect
+    .element(screen.getByRole("combobox", { name: "On" }))
+    .toHaveTextContent("Choose where…");
   await expect.element(screen.getByRole("combobox", { name: "Workspace" })).not.toBeInTheDocument();
   await expect
     .element(screen.getByRole("textbox", { name: "The thread's id" }))
@@ -379,18 +386,17 @@ test("the form starts on no role and no one, and a role chooses where again", as
 
 test("a custom role is granted where custom roles may be, and the ids are trimmed", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
-  await screen.getByRole("combobox", { name: "Role" }).selectOptions("triager");
-  const on = screen.getByRole("combobox", { name: "On" });
-  expect([...on.element().querySelectorAll("option")].map((option) => option.value)).toEqual([
-    "",
+  await choose(screen, "Role", "triager");
+  expect(await optionsOf(screen, "On")).toEqual([
+    "Choose where…",
     "workspace",
     "thread",
     "artifact",
     "rule",
   ]);
-  await on.selectOptions("workspace");
+  await choose(screen, "On", "workspace");
   await screen.getByRole("combobox", { name: "Workspace" }).fill(" ws_1 ");
-  await screen.getByRole("combobox", { name: "To" }).selectOptions("ops (group)");
+  await choose(screen, "To", "ops (group)");
   await screen.getByRole("button", { name: "Grant", exact: true }).click();
   await expect
     .element(screen.getByRole("status"))
@@ -409,9 +415,9 @@ test("a custom role is granted where custom roles may be, and the ids are trimme
 
 test("granting a role that runs the tenant is confirmed first", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
-  await screen.getByRole("combobox", { name: "Role" }).selectOptions("owner");
-  await screen.getByRole("combobox", { name: "On" }).selectOptions("tenant");
-  await screen.getByRole("combobox", { name: "To" }).selectOptions("bob (person)");
+  await choose(screen, "Role", "owner");
+  await choose(screen, "On", "tenant");
+  await choose(screen, "To", "bob (person)");
   // The trigger sits at the form's start, as Grant does; the question names whom it makes owner.
   const trigger = screen.getByRole("button", { name: "Grant", exact: true });
   await expect.element(trigger).toBeVisible();
@@ -433,22 +439,24 @@ test("granting a role that runs the tenant is confirmed first", async () => {
 
 test("a refused grant says why, and keeps what was entered", async () => {
   const { screen } = await open("/t/acme/access/grants", TENANT_ACTIONS);
-  await screen.getByRole("combobox", { name: "Role" }).selectOptions("editor");
-  await screen.getByRole("combobox", { name: "On" }).selectOptions("workspace");
+  await choose(screen, "Role", "editor");
+  await choose(screen, "On", "workspace");
   await screen.getByRole("combobox", { name: "Workspace" }).fill("ws_1");
-  await screen.getByRole("combobox", { name: "To" }).selectOptions("bob (person)");
+  await choose(screen, "To", "bob (person)");
   await screen.getByRole("button", { name: "Grant", exact: true }).click();
   await expect
     .element(screen.getByRole("alert"))
     .toHaveTextContent("Not granted: bob holds editor there already");
   await expect.element(screen.getByRole("combobox", { name: "Workspace" })).toHaveValue("ws_1");
-  await expect.element(screen.getByRole("combobox", { name: "To" })).toHaveValue("user:bob");
+  await expect
+    .element(screen.getByRole("combobox", { name: "To" }))
+    .toHaveTextContent("bob (person)");
 });
 
 test("without groups to read, whom is typed as kind:id", async () => {
   const { screen } = await open("/t/acme/access/grants", ["grantr:grant", "grantr:add_member"]);
-  await screen.getByRole("combobox", { name: "Role" }).selectOptions("viewer");
-  await screen.getByRole("combobox", { name: "On" }).selectOptions("workspace");
+  await choose(screen, "Role", "viewer");
+  await choose(screen, "On", "workspace");
   await screen.getByRole("combobox", { name: "Workspace" }).fill("ws_1");
   const to = screen.getByRole("combobox", { name: /^To, as user:id/ });
   await to.fill("ops");
@@ -473,13 +481,8 @@ test("without deleting the tenant, owner isn't offered, nor its grants' Revoke",
     "grantr:add_member",
     "grantr:manage_groups",
   ]);
-  const role = screen.getByRole("combobox", { name: "Role" });
-  await expect.element(role).toBeVisible();
-  expect([...role.element().querySelectorAll("option")].map((option) => option.value)).toEqual([
-    "",
-    "editor",
-    "viewer",
-  ]);
+  await expect.element(screen.getByRole("combobox", { name: "Role" })).toBeVisible();
+  expect(await optionsOf(screen, "Role")).toEqual(["Choose a role…", "editor", "viewer"]);
   await expect
     .element(screen.getByRole("button", { name: /^Revoke alice \(person\) as owner/ }))
     .not.toBeInTheDocument();
@@ -499,7 +502,10 @@ test("revoking a grant is confirmed, and sends the grant", async () => {
   const revoke = screen.getByRole("button", {
     name: "Revoke ops (group) as viewer on thread t_1 in ws_1",
   });
-  await expect.element(revoke).toHaveTextContent("Revoke");
+  // A row's action shows "Revoke", and says what it revokes only aloud.
+  await expect.element(revoke).toBeVisible();
+  expect(revoke.element().firstChild?.textContent).toBe("Revoke");
+  expect(revoke.element().querySelector(".sr-only")).not.toBeNull();
   await revoke.click();
   await screen.getByRole("alertdialog").getByRole("button", { name: "Revoke" }).click();
   await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();

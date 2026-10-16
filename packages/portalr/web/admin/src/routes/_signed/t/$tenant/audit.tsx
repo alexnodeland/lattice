@@ -124,7 +124,7 @@ function Filter({ filter }: { filter: AuditFilter }) {
           label="Made by"
           name="actor_kind"
           value={kind}
-          onChange={(event) => setKind(event.target.value)}
+          onValueChange={setKind}
           options={MAKERS}
         />
         {(kind === "user" || kind === "service_principal" || kind === "rule") && (

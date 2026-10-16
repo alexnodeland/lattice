@@ -8,6 +8,7 @@ import {
   MAX_SERIES,
   Moment,
   PageHeader,
+  SegmentedFilter,
   SelectField,
   StatusBadge,
   TextLink,
@@ -306,19 +307,18 @@ function Filter({ tenant, shown }: { tenant: string; shown: Required<Shown> }) {
   ];
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <SelectField
+      <SegmentedFilter
         label="Window"
+        showLabel
+        hint="The last days, whole and in UTC."
+        segments={WINDOWS.map((days) => ({ value: String(days), label: `${days} days` }))}
         value={String(shown.days)}
-        onChange={(event) => go({ days: event.target.value })}
-        options={WINDOWS.map((days) => ({
-          value: String(days),
-          label: `The last ${days} days, in UTC`,
-        }))}
+        onValueChange={(days) => go({ days })}
       />
       <SelectField
         label="Workspace"
         value={shown.workspace ?? ""}
-        onChange={(event) => go({ workspace: event.target.value })}
+        onValueChange={(workspace) => go({ workspace })}
         options={[
           { value: "", label: "Every workspace" },
           ...offered.sort().map((one) => ({ value: one, label: one })),

@@ -5,7 +5,7 @@ import {
   EmptyState,
   ItemTable,
   PageHeader,
-  SelectField,
+  SegmentedFilter,
   StatusBadge,
   Tracker,
 } from "@portalr/ui";
@@ -201,16 +201,13 @@ function Workspaces({ usage, listed, more }: { usage: Usage; listed: boolean; mo
 function Filter({ shown }: { shown: Required<Shown> }) {
   const navigate = Route.useNavigate();
   return (
-    <div className="sm:max-w-xs">
-      <SelectField
-        label="Window"
-        value={String(shown.days)}
-        onChange={(event) => void navigate({ search: shownOf({ days: event.target.value }) })}
-        options={WINDOWS.map((days) => ({
-          value: String(days),
-          label: `The last ${days} days, in UTC`,
-        }))}
-      />
-    </div>
+    <SegmentedFilter
+      label="Window"
+      showLabel
+      hint="The last days, whole and in UTC."
+      segments={WINDOWS.map((days) => ({ value: String(days), label: `${days} days` }))}
+      value={String(shown.days)}
+      onValueChange={(days) => void navigate({ search: shownOf({ days }) })}
+    />
   );
 }

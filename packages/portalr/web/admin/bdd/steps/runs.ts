@@ -1,5 +1,6 @@
 import { type APIRequestContext, expect, type Page } from "@playwright/test";
 import { email, password } from "../../../app/bdd/steps/people";
+import { choose } from "./choose";
 import { Given, Then, When } from "./fixtures";
 
 const origin = () => new URL(process.env.PORTALR_APP_URL ?? "http://localhost:8000").origin;
@@ -51,7 +52,7 @@ When("they open Runs", async ({ page }) => {
     .getByRole("link", { name: "Runs" })
     .click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Runs");
-  await page.getByRole("combobox", { name: "Workspace" }).selectOption("notes");
+  await choose(page, page.getByRole("combobox", { name: "Workspace" }), "notes");
 });
 
 Then("the run is {string}", async ({ page, made }, status: string) => {
@@ -120,7 +121,7 @@ Then("the run is no longer among those that need someone", async ({ page, made }
 });
 
 When("they show every state", async ({ page }) => {
-  await page.getByRole("combobox", { name: "Show" }).selectOption("all");
+  await page.getByRole("radio", { name: "Every state" }).click();
 });
 
 Then("the run's history says {string}", async ({ page, made }, reason: string) => {

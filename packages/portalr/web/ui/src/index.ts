@@ -22,7 +22,7 @@ export {
   type Renderers,
   rendererFor,
 } from "./artifacts";
-export { Button } from "./button";
+export { Button, type ButtonSize, type ButtonVariant } from "./button";
 export { Card } from "./card";
 export {
   BarChart,
@@ -66,7 +66,7 @@ export { Row, RowLink, Rows } from "./rows";
 export { RuleRunStatus, RunList, type RunParts } from "./run-list";
 export { SectionTitle } from "./section-title";
 export { type Segment, SegmentedFilter } from "./segmented-filter";
-export { SelectField } from "./select-field";
+export { type Option, SelectField } from "./select-field";
 export { NavLink, SideNav } from "./side-nav";
 export { SignIn } from "./sign-in";
 export { StatCard } from "./stat-card";

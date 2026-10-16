@@ -60,7 +60,10 @@ function Keys() {
           allowed.has("grantr:revoke_key")
             ? (key) => (
                 <ConfirmDialog
-                  label={`Revoke ${key.id}`}
+                  label="Revoke"
+                  about={key.id}
+                  look="danger-soft"
+                  size="sm"
                   title={`Revoke the key ${key.id}?`}
                   confirm="Revoke"
                   onConfirm={async () => {

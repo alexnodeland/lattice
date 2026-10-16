@@ -69,12 +69,61 @@ test("a ghost button is bare until hovered", async () => {
   expect(style.color).toBe(token("fg"));
 });
 
-test("a disabled button keeps its words readable, rather than fading", async () => {
-  const screen = await render(<Button disabled>Send</Button>);
-  const style = getComputedStyle(screen.getByRole("button", { name: "Send" }).element());
-  expect(style.opacity).toBe("1");
-  expect(style.color).toBe(token("muted"));
-  expect(contrast(style.color, token("paper"))).toBeGreaterThanOrEqual(4.5);
+test("a disabled button is visibly so: a muted fill, the cursor that says so, its words still readable", async () => {
+  const screen = await render(
+    <>
+      <Button disabled>Send</Button>
+      <Button variant="secondary" disabled>
+        Skip
+      </Button>
+    </>,
+  );
+  for (const name of ["Send", "Skip"]) {
+    const style = getComputedStyle(screen.getByRole("button", { name }).element());
+    expect(style.opacity, name).toBe("1");
+    expect(style.cursor, name).toBe("not-allowed");
+    expect(style.backgroundColor, name).toBe(token("line"));
+    expect(style.color, name).toBe(token("muted"));
+    expect(contrast(style.color, style.backgroundColor), name).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
+test("a small button is smaller than the default in its words and its padding, for a row", async () => {
+  const screen = await render(
+    <>
+      <Button variant="ghost">Change</Button>
+      <Button variant="ghost" size="sm">
+        Remove
+      </Button>
+    </>,
+  );
+  const medium = getComputedStyle(screen.getByRole("button", { name: "Change" }).element());
+  const small = getComputedStyle(screen.getByRole("button", { name: "Remove" }).element());
+  expect(Number.parseFloat(small.fontSize)).toBeLessThan(Number.parseFloat(medium.fontSize));
+  expect(Number.parseFloat(small.paddingLeft)).toBeLessThan(Number.parseFloat(medium.paddingLeft));
+});
+
+test("a ghost button is bare until it is hovered", async () => {
+  const screen = await render(<Button variant="ghost">Retry</Button>);
+  const button = screen.getByRole("button", { name: "Retry" });
+  expect(getComputedStyle(button.element()).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  await button.hover();
+  await expect.poll(() => getComputedStyle(button.element()).backgroundColor).toBe(token("wash"));
+});
+
+test("a soft danger button offers a destructive action in the danger colour, readably, and washes it when hovered", async () => {
+  const screen = await render(<Button variant="danger-soft">Remove</Button>);
+  const button = screen.getByRole("button", { name: "Remove" });
+  const style = getComputedStyle(button.element());
+  expect(style.color).toBe(token("danger"));
+  for (const ground of ["paper", "surface"]) {
+    expect(contrast(style.color, token(ground))).toBeGreaterThanOrEqual(4.5);
+  }
+  expect(style.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  await button.hover();
+  await expect
+    .poll(() => getComputedStyle(button.element()).backgroundColor)
+    .not.toBe("rgba(0, 0, 0, 0)");
 });
 
 test("a pressed toggle takes the wash, in the working colour", async () => {

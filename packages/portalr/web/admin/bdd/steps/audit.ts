@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { choose } from "./choose";
 import { madeAs, Then, When } from "./fixtures";
 
 When("they open the audit log, filtered to members added", async ({ page }) => {
@@ -6,7 +7,7 @@ When("they open the audit log, filtered to members added", async ({ page }) => {
     .getByRole("navigation", { name: "Tenant" })
     .getByRole("link", { name: "Audit" })
     .click();
-  await page.getByRole("combobox", { name: "Change" }).selectOption("Members added");
+  await choose(page, page.getByRole("combobox", { name: "Change" }), "Members added");
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page).toHaveURL(/type=member_added/);
 });

@@ -208,7 +208,9 @@ function Granted({
                 !revocable(grant) ? null : (
                   <ConfirmDialog
                     label="Revoke"
-                    name={`Revoke ${said(grant)}`}
+                    about={said(grant)}
+                    look="danger-soft"
+                    size="sm"
                     title={`Revoke ${grant.role} from ${whomIn(grant.to)}?`}
                     confirm="Revoke"
                     onConfirm={async () =>
@@ -335,7 +337,7 @@ function Granting({
           name="role"
           required
           value={fields.role}
-          onChange={(event) => set("role")(event.target.value)}
+          onValueChange={set("role")}
           options={[
             { value: "", label: "Choose a role…" },
             ...roles.map((role) => ({ value: role.name, label: role.name })),
@@ -347,7 +349,7 @@ function Granting({
             name="kind"
             required
             value={kind ?? ""}
-            onChange={(event) => set("kind")(event.target.value)}
+            onValueChange={set("kind")}
             options={[
               { value: "", label: "Choose where…" },
               ...kinds.map((one) => ({ value: one, label: one })),
@@ -406,7 +408,7 @@ function Granting({
             name="to"
             required
             value={fields.to}
-            onChange={(event) => set("to")(event.target.value)}
+            onValueChange={set("to")}
             options={[
               { value: "", label: "Choose whom…" },
               ...listed.map((grantee) => ({ value: keyOf(grantee), label: whomOf(grantee) })),

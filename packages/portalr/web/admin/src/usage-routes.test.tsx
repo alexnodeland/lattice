@@ -148,7 +148,7 @@ test("without a budget, there is no tracker", async () => {
 
 test("a window goes to portalr and into the address", async () => {
   const { screen, router } = await open("/t/acme/usage");
-  await screen.getByRole("combobox", { name: "Window" }).selectOptions("The last 30 days, in UTC");
+  await screen.getByRole("radio", { name: "30 days" }).click();
   await expect.poll(() => router.state.location.search).toMatchObject({ days: 30 });
   const start = new Date(reads.at(-1)?.get("start") ?? "");
   const end = new Date(reads.at(-1)?.get("end") ?? "");

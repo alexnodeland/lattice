@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Button } from "./button";
+import { Button, type ButtonSize, type ButtonVariant } from "./button";
 import { actions, backdrop, description, title as heading, popup } from "./dialog";
 import { TextField } from "./text-field";
 
@@ -17,7 +17,7 @@ const MOST_REASON = 500;
 
 /**
  * An action that can't be taken back, or does something outside, confirmed: its trigger opens a Base UI alert dialog that says what will
- * be lost, with the action in the danger colour. The focus starts on Cancel; with `typed`, it starts
+ * be lost, with the action in the danger colour. The focus starts on its way out, Cancel; with `typed`, it starts
  * in the field, and the action waits until that name is typed, as deleting a tenant does, which
  * Enter then sends. With `asking`, it also asks for a reason, which is optional and goes to
  * `onConfirm`; with `calm`, the action is in the primary colour, for one that loses nothing but is
@@ -27,7 +27,10 @@ const MOST_REASON = 500;
  */
 export function ConfirmDialog({
   label,
-  name,
+  about,
+  look = "secondary",
+  size = "md",
+  dismiss = "Cancel",
   className,
   title,
   children,
@@ -43,8 +46,17 @@ export function ConfirmDialog({
 }: {
   /** The trigger's words, such as "Archive". */
   label: string;
-  /** The trigger's accessible name, where its words alone don't say what it acts on. */
-  name?: string;
+  /**
+   * What the trigger acts on, such as "alice": read aloud after its words, "Remove alice", and not
+   * shown, so a row of them says "Remove" and no more.
+   */
+  about?: string;
+  /** The trigger's look: a row's action is `ghost`, and a destructive one offered `danger-soft`. */
+  look?: ButtonVariant;
+  /** The trigger's size: `sm` for an action in a row. */
+  size?: ButtonSize;
+  /** The words of the way out, `Cancel` unless it would stand beside another, such as "Keep running". */
+  dismiss?: string;
   /** The trigger's classes, beside its own, such as where it sits in a form. */
   className?: string | undefined;
   /** The question, such as "Archive portalr:triage?". */
@@ -136,9 +148,10 @@ export function ConfirmDialog({
     >
       <AlertDialog.Trigger
         disabled={disabled}
-        render={<Button variant="secondary" aria-label={name} className={className ?? ""} />}
+        render={<Button variant={look} size={size} className={className ?? ""} />}
       >
         {label}
+        {about !== undefined && <span className="sr-only"> {about}</span>}
       </AlertDialog.Trigger>
       <AlertDialog.Portal>
         <AlertDialog.Backdrop className={backdrop} />
@@ -178,7 +191,7 @@ export function ConfirmDialog({
             {failed && <p role="alert">{failed}</p>}
             <div className={actions}>
               <AlertDialog.Close ref={cancel} render={<Button variant="secondary" />}>
-                Cancel
+                {dismiss}
               </AlertDialog.Close>
               <Button
                 type="submit"

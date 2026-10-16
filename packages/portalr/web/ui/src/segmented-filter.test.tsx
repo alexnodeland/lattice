@@ -53,3 +53,42 @@ test("arrow keys move the choice", async () => {
   await expect.element(screen.getByRole("radio", { name: "Needs you, 2" })).toHaveFocus();
   expect(chosen).toHaveBeenCalledWith("you");
 });
+
+test("with a label shown, the group is named by it and the hint is written beneath", async () => {
+  const screen = await render(
+    <SegmentedFilter<Shown>
+      label="Window"
+      showLabel
+      hint="Back from now."
+      segments={SEGMENTS}
+      value="all"
+      onValueChange={vi.fn()}
+    />,
+  );
+  await expect.element(screen.getByText("Window", { exact: true })).toBeVisible();
+  await expect.element(screen.getByRole("radiogroup", { name: "Window" })).toBeVisible();
+  await expect.element(screen.getByText("Back from now.")).toBeVisible();
+});
+
+test("with a name it submits the choice with its form", async () => {
+  let submitted: string | null = null;
+  const screen = await render(
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        submitted = String(new FormData(event.currentTarget).get("window"));
+      }}
+    >
+      <SegmentedFilter<Shown>
+        label="Window"
+        name="window"
+        segments={SEGMENTS}
+        value="you"
+        onValueChange={vi.fn()}
+      />
+      <button type="submit">Apply</button>
+    </form>,
+  );
+  await screen.getByRole("button", { name: "Apply" }).click();
+  expect(submitted).toBe("you");
+});

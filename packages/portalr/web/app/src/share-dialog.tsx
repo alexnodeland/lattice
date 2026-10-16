@@ -54,7 +54,7 @@ export function ShareDialog({
   /** Where focus goes when it closes: the menu it was opened from. */
   finalFocus?: RefObject<HTMLElement | null>;
 }) {
-  const person = useRef<HTMLSelectElement>(null);
+  const person = useRef<HTMLButtonElement>(null);
   const [refused, grant, granting] = useActionState(
     async (_last: string | null, form: FormData) => {
       const role = form.get("role");
@@ -92,6 +92,8 @@ export function ShareDialog({
               {canRevoke && (
                 <ConfirmDialog
                   label="Revoke"
+                  look="danger-soft"
+                  size="sm"
                   title={`Revoke ${named(each.to)}'s ${each.role} role?`}
                   confirm="Revoke the role"
                   onConfirm={async () => {
@@ -117,7 +119,7 @@ export function ShareDialog({
       ) : (
         <form aria-label="Share with someone" className="flex flex-col gap-2" action={grant}>
           <SelectField
-            ref={person}
+            triggerRef={person}
             label="Person"
             name="person"
             options={people.map((each) => ({ value: each, label: each }))}

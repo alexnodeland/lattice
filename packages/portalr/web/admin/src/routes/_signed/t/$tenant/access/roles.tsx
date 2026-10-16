@@ -79,14 +79,18 @@ function Roles() {
         actions={(role) => (
           <>
             <Button
-              variant="secondary"
+              variant="ghost"
+              size="sm"
               aria-label={WORDS.change(role.name)}
               onClick={() => void change(role.name)}
             >
               Change actions
             </Button>
             <ConfirmDialog
-              label={`Delete ${role.name}`}
+              label="Delete"
+              about={role.name}
+              look="danger-soft"
+              size="sm"
               title={`Delete the role ${role.name}?`}
               confirm="Delete"
               onConfirm={async () =>

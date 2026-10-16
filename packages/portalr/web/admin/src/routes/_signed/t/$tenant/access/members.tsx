@@ -110,7 +110,10 @@ function Remove({ tenant, member }: { tenant: string; member: Member }) {
   const { changed } = useAccess(tenant);
   return (
     <ConfirmDialog
-      label={`Remove ${member.id}`}
+      label="Remove"
+      about={member.id}
+      look="danger-soft"
+      size="sm"
       title={`Remove ${member.id} from ${tenant}?`}
       confirm="Remove"
       onConfirm={async () =>

@@ -1,3 +1,4 @@
+import { choose } from "@portalr/ui/testing";
 import { useRef, useState } from "react";
 import { expect, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
@@ -56,8 +57,8 @@ test("sharing sends the person and the role, and a refusal is said for the form"
   const screen = await render(<Opened onGrant={onGrant} />);
   await screen.getByRole("button", { name: "Thread actions" }).click();
   const dialog = screen.getByRole("dialog", { name: "Share the thread" });
-  await dialog.getByRole("combobox", { name: "Person" }).selectOptions("vera");
-  await dialog.getByRole("combobox", { name: "Role" }).selectOptions("editor");
+  await choose(dialog, "Person", "vera");
+  await choose(dialog, "Role", "editor");
   await dialog.getByRole("button", { name: "Share", exact: true }).click();
   expect(onGrant).toHaveBeenCalledExactlyOnceWith("vera", "editor");
   await expect.element(dialog.getByRole("alert")).toHaveTextContent("Not shared: no");

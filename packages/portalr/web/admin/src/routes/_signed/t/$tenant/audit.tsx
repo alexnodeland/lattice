@@ -1,5 +1,6 @@
 import type { AuditFilter } from "@portalr/client";
 import {
+  Alert,
   Button,
   Card,
   EmptyState,
@@ -13,8 +14,17 @@ import {
 import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 import { type FormEvent, useId, useState } from "react";
-import { opening } from "../../../../access";
-import { actor, filterOf, ID_FIELD, MAKERS, said, searchOf, TYPES } from "../../../../audit";
+import { opening, useNames } from "../../../../access";
+import {
+  actor,
+  filterOf,
+  ID_FIELD,
+  MAKERS,
+  peopleOf,
+  said,
+  searchOf,
+  TYPES,
+} from "../../../../audit";
 import { ReadFailed } from "../../../../read-failed";
 
 const HEADER = <PageHeader title="Audit" meta="Every change to who may see and do what" />;
@@ -52,6 +62,7 @@ function Audit() {
   // Each page is oldest first, and each is older than the last: the newest are on top.
   const entries = data.pages.flatMap((page) => [...page].reverse());
   const filtered = Object.values(filter).some((value) => value !== undefined);
+  const names = useNames(tenant, entries.flatMap(peopleOf));
   return (
     <div className="flex flex-col gap-6">
       {HEADER}
@@ -59,13 +70,13 @@ function Audit() {
       <ItemTable
         caption="Audit log"
         columns={[
-          { key: "change", label: "Change", cell: (entry) => said(entry.event) },
-          { key: "by", label: "By", cell: (entry) => actor(entry.by) },
+          { key: "change", label: "Change", cell: (entry) => said(entry.event, names) },
+          { key: "by", label: "By", cell: (entry) => actor(entry.by, names) },
           { key: "at", label: "When", cell: (entry) => <Moment at={entry.at} /> },
         ]}
         items={entries}
         keyOf={(entry) => String(entry.seq)}
-        named={(entry) => `${said(entry.event)}, ${new Date(entry.at).toLocaleString()}`}
+        named={(entry) => `${said(entry.event, names)}, ${new Date(entry.at).toLocaleString()}`}
         empty={
           filtered
             ? { title: "No changes match", body: "Change the filter, or clear it." }
@@ -77,10 +88,10 @@ function Audit() {
         {entries.length === 1 ? "1 change shown" : `${entries.length} changes shown`}
       </p>
       {isFetchNextPageError && (
-        <p role="alert">
+        <Alert tone="error">
           The changes before these couldn't be read:{" "}
           {error instanceof Error ? error.message : String(error)}
-        </p>
+        </Alert>
       )}
       {hasNextPage && (
         <Button
@@ -124,7 +135,7 @@ function Filter({ filter }: { filter: AuditFilter }) {
           label="Made by"
           name="actor_kind"
           value={kind}
-          onChange={(event) => setKind(event.target.value)}
+          onValueChange={setKind}
           options={MAKERS}
         />
         {(kind === "user" || kind === "service_principal" || kind === "rule") && (

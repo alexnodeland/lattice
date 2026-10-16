@@ -2,9 +2,12 @@ import type { ReactNode } from "react";
 import { cn } from "./cn";
 
 /**
- * How a thing is going, as a shape and a word, never colour alone. Only waiting for you takes the
- * working colour; the rest are neutral. A budget nearly spent is a half-filled ring, and one
- * overspent a triangle on the foreground, louder by weight, with no warning colour.
+ * How a thing is going, as a shape and a word, never colour alone. The word is always in the
+ * ink, which reads on the pill; the colour is the border and the shape, as a mark. Only waiting
+ * for you takes the working colour. What failed, and a budget overspent, are edged in the rose
+ * red; what is retrying, and a budget nearly spent, in the gold; the rest are neutral
+ * (portalr ADR-0039). Under forced colours the shapes keep their own colours, as the border would not be
+ * enough to tell them by. A budget nearly spent is a half-filled ring, and one overspent a triangle.
  */
 const TONE = {
   working: {
@@ -17,20 +20,24 @@ const TONE = {
     glyph: "rotate-45 scale-75 bg-current",
   },
   done: { badge: "border-line bg-surface text-muted", glyph: "rounded-full bg-current" },
-  failed: { badge: "border-fg bg-surface text-fg", glyph: "bg-current" },
+  failed: { badge: "border-status-failed bg-surface text-fg", glyph: "bg-status-failed" },
+  retrying: {
+    badge: "border-status-warn bg-surface text-fg",
+    glyph: "rotate-45 scale-75 border-2 border-status-warn",
+  },
   queued: {
     badge: "border-line bg-surface text-muted",
     glyph: "rounded-full border-2 border-dotted border-current",
   },
   stopped: { badge: "border-line bg-surface text-muted", glyph: "border-2 border-current" },
   near: {
-    badge: "border-fg bg-surface text-fg",
+    badge: "border-status-warn bg-surface text-fg",
     glyph:
-      "rounded-full border-2 border-current bg-[linear-gradient(to_top,currentColor_50%,transparent_50%)]",
+      "rounded-full border-2 border-status-warn bg-[linear-gradient(to_top,var(--status-warn)_50%,transparent_50%)]",
   },
   over: {
-    badge: "border-fg bg-fg text-paper",
-    glyph: "bg-current [clip-path:polygon(50%_0,100%_100%,0_100%)]",
+    badge: "border-status-failed bg-surface text-fg",
+    glyph: "bg-status-failed [clip-path:polygon(50%_0,100%_100%,0_100%)]",
   },
 } as const;
 
@@ -56,7 +63,10 @@ export function StatusBadge({ tone, children, live = false, className }: Props) 
         className,
       )}
     >
-      <span aria-hidden="true" className={cn("size-2 shrink-0", TONE[tone].glyph)} />
+      <span
+        aria-hidden="true"
+        className={cn("size-2 shrink-0 forced-color-adjust-none", TONE[tone].glyph)}
+      />
       {children}
     </span>
   );

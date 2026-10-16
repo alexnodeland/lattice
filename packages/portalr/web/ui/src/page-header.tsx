@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "./cn";
+import { TYPE } from "./type";
 
 /**
  * The top of a page: where it is, its one heading, a line about it, and its actions, which wrap
@@ -24,16 +25,13 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 pb-1">
       <div className="flex min-w-0 flex-col gap-1">
-        {crumb && <div className="text-muted text-xs">{crumb}</div>}
-        <h1
-          id={id}
-          className={cn("font-bold text-2xl text-fg tracking-tight", mono && "font-mono")}
-        >
+        {crumb && <div className={TYPE.note}>{crumb}</div>}
+        <h1 id={id} className={cn(TYPE.page, mono && "font-mono")}>
           {title}
         </h1>
-        {meta && <p className="text-muted text-xs">{meta}</p>}
+        {meta && <p className={TYPE.meta}>{meta}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>

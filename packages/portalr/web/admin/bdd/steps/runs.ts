@@ -1,4 +1,5 @@
 import { type APIRequestContext, expect, type Page } from "@playwright/test";
+import { choose } from "@portalr/ui/testing/bdd";
 import { email, password } from "../../../app/bdd/steps/people";
 import { Given, Then, When } from "./fixtures";
 
@@ -18,6 +19,21 @@ async function token(request: APIRequestContext, person: string): Promise<string
 /** Publish a ticket as a person, and wait for the run of triage it sets off: its id. */
 Given("bob has published a ticket that fails in acme", async ({ request, made }) => {
   const headers = { Authorization: `Bearer ${await token(request, "bob")}`, "X-Tenant": "acme" };
+  // artifactr lists a workspace once something is made in it, and Runs picks among the listed:
+  // so a thread is made first, which no other scenario need have done.
+  const thread = await request.post(`${origin()}/artifactr/v1/workspaces/notes/commands`, {
+    headers,
+    data: {
+      type: "command",
+      command_id: crypto.randomUUID(),
+      command: {
+        type: "create_thread",
+        thread_id: `thr_${crypto.randomUUID().replaceAll("-", "")}`,
+        title: "Runs",
+      },
+    },
+  });
+  expect(thread.ok()).toBe(true);
   const published = await request.post(`${origin()}${NOTES}/events`, {
     headers,
     data: { event: { type: "portalr:ticket.opened", subject: `fail ${crypto.randomUUID()}` } },
@@ -51,7 +67,7 @@ When("they open Runs", async ({ page }) => {
     .getByRole("link", { name: "Runs" })
     .click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Runs");
-  await page.getByRole("combobox", { name: "Workspace" }).selectOption("notes");
+  await choose(page, page.getByRole("combobox", { name: "Workspace" }), "notes");
 });
 
 Then("the run is {string}", async ({ page, made }, status: string) => {
@@ -101,7 +117,10 @@ async function intervene(
     .click();
   const dialog = page.getByRole("alertdialog", { name: `${verb} this run?` });
   await dialog.getByRole("textbox", { name: "Reason (optional)" }).fill(reason);
-  await dialog.getByRole("button", { name: `${verb} the run` }).click();
+  // Cancel is confirmed as "Cancel run", so no two buttons are called Cancel.
+  await dialog
+    .getByRole("button", { name: verb === "Cancel" ? "Cancel run" : `${verb} the run` })
+    .click();
   await expect(dialog).toHaveCount(0);
 }
 
@@ -120,7 +139,7 @@ Then("the run is no longer among those that need someone", async ({ page, made }
 });
 
 When("they show every state", async ({ page }) => {
-  await page.getByRole("combobox", { name: "Show" }).selectOption("all");
+  await page.getByRole("radio", { name: "Every state" }).click();
 });
 
 Then("the run's history says {string}", async ({ page, made }, reason: string) => {

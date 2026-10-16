@@ -1,5 +1,13 @@
 import type { PortalrApi, TimeSpan } from "@portalr/client";
-import { BarChart, EmptyState, LineChart, SectionTitle, SelectField } from "@portalr/ui";
+import {
+  Alert,
+  BarChart,
+  EmptyState,
+  formatMoment,
+  LineChart,
+  SectionTitle,
+  SegmentedFilter,
+} from "@portalr/ui";
 import type { ReactNode } from "react";
 import { figure } from "./format";
 import { HEALTH_RANGES, type HealthHours, onGrid, pointAt, stepSaid } from "./logs";
@@ -34,7 +42,7 @@ function Drawn({
     case "unavailable":
       return (
         <EmptyState title="Prometheus isn't answering">
-          <p role="alert">{reading.reason}</p>
+          <Alert tone="error">{reading.reason}</Alert>
         </EmptyState>
       );
     case "ok":
@@ -65,20 +73,22 @@ export function Health({
   onWindow: (hours: string) => void;
 }) {
   const step = window.step ?? 0;
+  /** A point's time as the axis writes it: the time of day for an hour, and the day too from a day up. */
+  const tick = (moment: string) => formatMoment(moment, hours >= 24);
   return (
     <section aria-labelledby="health" className="flex flex-col gap-4">
       <SectionTitle id="health">Health</SectionTitle>
-      <div className="sm:max-w-xs">
-        <SelectField
-          label="Health window"
-          value={String(hours)}
-          onChange={(event) => onWindow(event.target.value)}
-          options={HEALTH_RANGES.map((range) => ({
-            value: String(range.hours),
-            label: range.label,
-          }))}
-        />
-      </div>
+      <SegmentedFilter
+        label="Health window"
+        showLabel
+        hint="Back from now."
+        segments={HEALTH_RANGES.map((range) => ({
+          value: String(range.hours),
+          label: range.label,
+        }))}
+        value={String(hours)}
+        onValueChange={onWindow}
+      />
       <p className="text-muted text-sm">
         Each point is {stepSaid(step)}. Times are in UTC. A step with no turns is a gap.
       </p>
@@ -94,10 +104,11 @@ export function Health({
             index={TIME}
             series={[{ key: "p95", name: "95th percentile" }]}
             data={onGrid(window, points).map((point) => ({
-              time: pointAt(point.time, hours),
+              time: pointAt(point.time),
               p95: point.value,
             }))}
             format={(value) => `${value.toFixed(2)} s`}
+            tick={tick}
           />
         )}
       />
@@ -113,10 +124,12 @@ export function Health({
             index={TIME}
             series={[{ key: "failed", name: "Failed turns" }]}
             data={onGrid(window, points).map((point) => ({
-              time: pointAt(point.time, hours),
+              time: pointAt(point.time),
               failed: point.value === null ? null : Math.round(point.value),
             }))}
             format={(value) => figure(Math.round(value))}
+            tick={tick}
+            whole
           />
         )}
       />

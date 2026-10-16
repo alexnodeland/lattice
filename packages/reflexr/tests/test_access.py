@@ -122,7 +122,7 @@ METHODS: dict[str, tuple[Call, Access]] = {
     "skip_run": (lambda ws: ws.skip_run(RUN), Access(action="reflexr:skip_run")),
     "cancel_run": (lambda ws: ws.cancel_run(RUN), Access(action="reflexr:cancel_run")),
     "checkpoint_run": (
-        lambda ws: ws.checkpoint_run(RUN, attempt=1, step="s", state=None),
+        lambda ws: ws.checkpoint_run(RUN, attempt=1, epoch=1, step="s", state=None),
         Access(action="reflexr:checkpoint_run"),
     ),
     "replay_rule": (

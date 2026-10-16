@@ -49,6 +49,7 @@ test = [
     "aiosqlite>=0.22",
     "asyncpg>=0.31",
     "opentelemetry-sdk>=1.28",
+    "hypothesis>=6.168",
 ]
 lint = ["ruff>=0.16", "pyright>=1.1.414"]
 dev = [

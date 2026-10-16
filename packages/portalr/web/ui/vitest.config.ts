@@ -29,6 +29,11 @@ const pointerAway: BrowserCommand<[]> = async ({ page }) => {
 // The screenshots' baselines are Linux's, made in CI (portalr ADR-0019): they run where CI is.
 const screenshots = "src/**/*.screenshot.test.tsx";
 
+/** Ask for forced colours, as a high-contrast mode does, or stop asking. */
+const forcedColors: BrowserCommand<[active: boolean]> = async ({ page }, active) => {
+  await page.emulateMedia({ forcedColors: active ? "active" : "none" });
+};
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   // Every test's imports are found before the first runs, so a dependency met mid-run doesn't
@@ -45,7 +50,7 @@ export default defineConfig({
       headless: true,
       provider: playwright(),
       instances: [scheme("light"), scheme("dark")],
-      commands: { pointerAway, reduceMotion },
+      commands: { forcedColors, pointerAway, reduceMotion },
     },
   },
 });

@@ -1,4 +1,4 @@
-import { Account, AppShell, Card, PageHeader, Switcher, TextLink } from "@portalr/ui";
+import { Account, AppShell, PageHeader, Row, RowLink, Rows, Switcher, TextLink } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 
@@ -51,33 +51,32 @@ function Workspaces() {
       {workspaces.length === 0 ? (
         <p>There is no workspace here you can open.</p>
       ) : (
-        <ul aria-label="Workspaces" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <Rows label="Workspaces">
           {workspaces.map((workspace) => (
-            <li key={workspace}>
-              <Card className="flex h-full flex-col gap-3">
-                <h2 className="font-semibold text-lg">
-                  <TextLink
-                    render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}
-                  >
-                    {workspace}
-                  </TextLink>
-                </h2>
-                <ul aria-label={`${workspace}'s areas`} className="flex flex-wrap gap-x-4 gap-y-1">
-                  {AREAS.map(({ to, label }) => (
-                    <li key={label}>
-                      <TextLink
-                        className="text-sm"
-                        render={<Link to={to} params={{ tenant, workspace }} />}
-                      >
-                        {label}
-                      </TextLink>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            </li>
+            <Row key={workspace}>
+              <RowLink
+                render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}
+              >
+                {workspace}
+              </RowLink>
+              <ul
+                aria-label={`${workspace}'s areas`}
+                className="relative z-10 ml-auto flex flex-wrap gap-x-4 gap-y-1"
+              >
+                {AREAS.map(({ to, label }) => (
+                  <li key={label}>
+                    <TextLink
+                      className="text-sm"
+                      render={<Link to={to} params={{ tenant, workspace }} />}
+                    >
+                      {label}
+                    </TextLink>
+                  </li>
+                ))}
+              </ul>
+            </Row>
           ))}
-        </ul>
+        </Rows>
       )}
     </AppShell>
   );

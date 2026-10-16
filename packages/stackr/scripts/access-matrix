@@ -5,8 +5,9 @@ Usage: scripts/access-matrix [--check]
 
 An application generated with grantr commits `access.md`, every role against every action, and a
 test of its own compares the two (grantr's `grantr.testing.matrix`). The template renders the
-table for the libraries the application chose, from template/access.md's block for each. This
-script writes those blocks from this checkout's libraries; with `--check` it writes nothing, and
+table for the libraries the application chose, from template/access.md's block for each, and with
+portalr's rows when it has the portal. This script writes those blocks from this checkout's
+libraries and portalr; with `--check` it writes nothing, and
 fails when they are out of date, so a library's new action, or a change to a role, is reviewed
 here as it will be in every application.
 """
@@ -14,10 +15,12 @@ here as it will be in every application.
 from __future__ import annotations
 
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 from artifactr.workspace import ACTIONS as ARTIFACTR
 from grantr.testing import matrix
+from portalr.actions import ACTIONS as PORTALR
 from reflexr.workspace import ACTIONS as REFLEXR
 
 TEMPLATE = (
@@ -28,10 +31,27 @@ TEMPLATE = (
 CATALOGS = {"both": [ARTIFACTR, REFLEXR], "artifactr": [ARTIFACTR], "reflexr": [REFLEXR]}
 
 
+def with_portal(catalogs: list[Mapping[str, object]]) -> str:
+    """The libraries' matrix with portalr's rows, which the portal alone brings, in a condition."""
+    lines = matrix([*catalogs, PORTALR]).splitlines(keepends=True)
+    kept: list[str] = []
+    for line in lines:
+        row = line.startswith("| `portalr:")
+        in_run = bool(kept) and kept[-1].startswith("| `portalr:")
+        if row and not in_run:
+            kept.append("{%- if use_portal %}\n")
+        if in_run and not row:
+            kept.append("{%- endif %}\n")
+        kept.append(line)
+    if kept[-1].startswith("| `portalr:"):
+        kept.append("{%- endif %}\n")
+    return "".join(kept)
+
+
 def rendered() -> str:
     """The template's file: one block per choice of libraries."""
     blocks = [
-        f"{{% {'if' if i == 0 else 'elif'} libraries == '{choice}' -%}}\n" + matrix(catalogs)
+        f"{{% {'if' if i == 0 else 'elif'} libraries == '{choice}' -%}}\n" + with_portal(catalogs)
         for i, (choice, catalogs) in enumerate(CATALOGS.items())
     ]
     return "".join(blocks) + "{% endif %}"

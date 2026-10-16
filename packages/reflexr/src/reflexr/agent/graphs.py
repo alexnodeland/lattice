@@ -132,7 +132,7 @@ class GraphAction[D, S, I, O]:
         saved = self._restorable(reaction.run.checkpoint)
         if saved is not None and "output" in saved:
             return saved["output"]  # the graph finished; only recording the run did not
-        resumed = None if saved is None else self._resume(saved, reaction.run.attempts)
+        resumed = None if saved is None else self._resume(saved, reaction.run.epoch)
         if resumed is None:
             state = self.state(reaction) if self.state else graph.state_type()
             # Without an inputs builder the graph gets None, which its input type must accept.
@@ -180,7 +180,7 @@ class GraphAction[D, S, I, O]:
         return saved
 
     def _resume(
-        self, saved: dict[str, Any], attempt: int
+        self, saved: dict[str, Any], epoch: int
     ) -> tuple[S, I, list[GraphTaskRequest]] | None:
         """Read a checkpoint back, or return None to start over if it no longer validates.
 
@@ -191,19 +191,20 @@ class GraphAction[D, S, I, O]:
         try:
             state = TypeAdapter(graph.state_type).validate_python(saved["state"])
             inputs = TypeAdapter(graph.input_type).validate_python(saved["inputs"])
-            requests = self._requests(saved, attempt)
+            requests = self._requests(saved, epoch)
         except ValidationError as error:
             return _discarded("invalid", error)
         return state, inputs, requests
 
-    def _requests(self, saved: dict[str, Any], attempt: int) -> list[GraphTaskRequest]:
+    def _requests(self, saved: dict[str, Any], epoch: int) -> list[GraphTaskRequest]:
         requests: list[GraphTaskRequest] = []
         for task in saved["frontier"]:
             node_id: str = task["node_id"]
             stack = tuple(
-                # Restored runs number their node runs afresh, so prefix the saved ids.
+                # Restored runs number their node runs afresh, so prefix the saved ids with the
+                # attempt's epoch, which a retry never sets back, unlike its attempt number.
                 ForkStackItem(
-                    item.fork_id, NodeRunID(f"a{attempt}:{item.node_run_id}"), item.thread_index
+                    item.fork_id, NodeRunID(f"e{epoch}:{item.node_run_id}"), item.thread_index
                 )
                 for item in _STACK.validate_python(task["fork_stack"])
             )

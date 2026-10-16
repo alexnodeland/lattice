@@ -78,9 +78,6 @@ export const trackerLabel = (share: number, budget: Usage["budget"]) =>
       : ""
   }`;
 
-/** A day as an axis reads it, in UTC: `10-13`. The tables and titles keep the whole date. */
-export const short = (day: string) => day.slice(5);
-
 /**
  * Each day the read reached as a block of the tracker, against its share of the budget. A day a
  * partial read never reached isn't in `usage.days`, so it is no block: unknown isn't nothing spent.

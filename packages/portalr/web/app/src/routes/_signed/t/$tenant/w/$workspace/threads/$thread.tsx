@@ -1,14 +1,15 @@
 import {
   type Artifactr,
-  type ArtifactrV1,
   allowedIn,
   changedAccess,
   type GrantrApi,
   thumbs,
   useMe,
+  usePeople,
   workspaceOf,
 } from "@portalr/client";
 import {
+  Alert,
   Composer,
   Message,
   Messages,
@@ -27,6 +28,7 @@ import {
 } from "@tanstack/react-query";
 import { CatchBoundary, createFileRoute, Link } from "@tanstack/react-router";
 import { type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { author, unnamedPeople } from "../../../../../../../author";
 import { ShareDialog } from "../../../../../../../share-dialog";
 import { ThreadMenu } from "../../../../../../../thread-menu";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
@@ -106,27 +108,6 @@ function readsFor(
   ] as const;
 }
 
-/**
- * How to name who posted a message: the reader as "You", a person by their name, an agent as the
- * assistant, and an external agent, the system or an evaluator each as themselves.
- */
-function author(actor: ArtifactrV1.Actor, me: string): string {
-  switch (actor.kind) {
-    case "user":
-      return actor.id === me ? "You" : (actor.name ?? actor.id);
-    case "agent":
-      return "Assistant";
-    case "external_agent":
-      return actor.name ?? actor.client_id;
-    case "system":
-      return actor.name ?? "System";
-    case "evaluator":
-      return actor.name;
-    default:
-      return actor satisfies never;
-  }
-}
-
 function Chat() {
   const { tenant, workspace, thread: id } = Route.useParams();
   const crumb = (
@@ -134,7 +115,7 @@ function Chat() {
       Threads
     </TextLink>
   );
-  const { queries, queryClient, user } = Route.useRouteContext();
+  const { queries, queryClient, user, config } = Route.useRouteContext();
   const me = useMe(queries, user, tenant);
   const checks = useMemo(
     () => allowedIn(queries, tenant, threadOf(workspace, id), ACTIONS),
@@ -155,6 +136,14 @@ function Chat() {
   }, [snapshot.status, queryClient, checks.queryKey]);
   const { threads, runs, proposals } = snapshot.state;
   const thread = threads[id];
+  // The people who posted without a name of their own, named when drawn: the stream's state
+  // holds the actors as the server sent them, never an email.
+  const names = usePeople(
+    queries,
+    config.people,
+    tenant,
+    unnamedPeople(thread?.messages ?? [], me),
+  );
   if (thread === undefined) {
     return snapshot.status === "live" ? (
       <>
@@ -169,7 +158,7 @@ function Chat() {
     return (
       <>
         <PageHeader title={thread.title || "Untitled"} crumb={crumb} />
-        <p role="alert">This isn't available to you any more.</p>
+        <Alert tone="error">This isn't available to you any more.</Alert>
       </>
     );
   }
@@ -196,7 +185,9 @@ function Chat() {
           (allowed.has("grantr:grant") || allowed.has("grantr:restrict")) && (
             <CatchBoundary
               getResetKey={() => id}
-              errorComponent={() => <p role="alert">Who has access to it couldn't be read.</p>}
+              errorComponent={() => (
+                <Alert tone="error">Who has access to it couldn't be read.</Alert>
+              )}
             >
               <Suspense fallback={null}>
                 <Access tenant={tenant} workspace={workspace} thread={id} allowed={allowed} />
@@ -211,7 +202,7 @@ function Chat() {
           <Message
             key={message.id}
             message={message}
-            author={author(message.actor, me)}
+            author={author(message.actor, me, names)}
             thumbs={thumbs(message.feedback, me)}
             {...(message.runId !== null && { onThumbs: give(message) })}
           />
@@ -374,7 +365,7 @@ function Sharing({
   restricted: readonly Resource[] | null;
   members: readonly Member[] | null;
 }) {
-  const { commands, queryClient } = Route.useRouteContext();
+  const { commands, queryClient, queries, config } = Route.useRouteContext();
   const [sharing, setSharing] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const on = threadOf(workspace, thread);
@@ -399,6 +390,10 @@ function Sharing({
   ]
     .filter((person) => !holding.has(person))
     .sort();
+  const names = usePeople(queries, config.people, tenant, [
+    ...people,
+    ...(held ?? []).flatMap((grant) => (grant.to.kind === "user" ? [grant.to.id] : [])),
+  ]);
   /** A change to access, done or not, after which grantr's answers in the tenant are read again. */
   const changed = <A,>(answer: Promise<A>) => changedAccess(queryClient, tenant, answer);
   const canShare = allowed.has("grantr:grant");
@@ -421,6 +416,7 @@ function Sharing({
           onOpenChange={setSharing}
           grants={held}
           people={people}
+          names={names}
           canRevoke={allowed.has("grantr:revoke")}
           finalFocus={trigger}
           onGrant={(person, role) =>

@@ -73,6 +73,16 @@ access:
     none (any user of a tenant, named in their token, may do anything in it): none
   default: grantr
 
+portal:
+  type: bool
+  help: >-
+    Include portalr (an app UI to chat with the agents and see their work, and an admin UI for
+    access, feedback, traces and spend)? It signs people in through a Supabase project, which the
+    application is told of in PORTAL_SUPABASE_URL and PORTAL_SUPABASE_KEY: without one it is off.
+    It adds a Bun build and a network fetch to the image.
+  default: true
+  when: "{{ access == 'grantr' }}"
+
 hosting:
   type: str
   help: Where it is hosted, beside stackr's recipe for it (stackr RFC-0004)
@@ -122,4 +132,9 @@ use_reflexr:
 use_relayr:
   type: bool
   default: "{{ libraries == 'both' and bridge }}"
+  when: false
+
+use_portal:
+  type: bool
+  default: "{{ access == 'grantr' and portal }}"
   when: false

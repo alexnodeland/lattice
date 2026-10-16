@@ -15,7 +15,12 @@ export function Card({ render, className, ...props }: Props) {
     defaultTagName: "div",
     render,
     props: mergeProps<"div">(
-      { className: cn("rounded-lg border border-line bg-surface p-4 text-fg", className) },
+      {
+        className: cn(
+          "rounded-lg border border-line bg-surface p-4 text-fg shadow-raised",
+          className,
+        ),
+      },
       props,
     ),
   });

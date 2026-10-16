@@ -8,7 +8,10 @@ import {
   changedAccess,
   type createQueries,
   type GrantrApi,
+  type Names,
   type Refusal,
+  shortId,
+  usePeople,
 } from "@portalr/client";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, notFound } from "@tanstack/react-router";
@@ -17,6 +20,7 @@ import type { Context } from "./context";
 
 type Member = GrantrApi.components["schemas"]["Member"];
 type Grantee = GrantrApi.components["schemas"]["Grantee"];
+type Subject = GrantrApi.components["schemas"]["Subject"];
 type Resource = GrantrApi.components["schemas"]["Resource"];
 
 /**
@@ -83,22 +87,47 @@ export const KIND: Record<Member["kind"], string> = {
   service_principal: "service principal",
 };
 
-/** A member as people read it: its id, and its kind beside it, such as "ci (service principal)". */
-export const who = (member: Member) => `${member.id} (${KIND[member.kind]})`;
+/**
+ * A member as people read it: a person by their email, or a short id where there is none, a
+ * service principal by its id, and the kind beside it, such as "ci (service principal)".
+ */
+export const who = (member: Member, names: Names = shortId) =>
+  `${member.kind === "user" ? names(member.id) : member.id} (${KIND[member.kind]})`;
+
+/** Anyone grantr names: a member, a grantee, or the maker of a change. */
+export type Named = Member | Grantee | Subject;
+
+/** The ids of the people among some of them: the ones whose emails a screen asks for. */
+export const peopleIn = (named: Iterable<Named>) =>
+  [...named].flatMap((one) => (one.kind === "user" ? [one.id] : []));
+
+/**
+ * Members in the order Access lists them, as they are named: people first by what is shown of them,
+ * their email where known, then service principals, each by id. A person is ordered by their short
+ * id until their email arrives, so the order changes once.
+ */
+export const byKindThenName = (names: Names) => (a: Member, b: Member) => {
+  const shown = (member: Member) => (member.kind === "user" ? names(member.id) : member.id);
+  return (
+    Number(a.kind !== "user") - Number(b.kind !== "user") ||
+    shown(a).localeCompare(shown(b)) ||
+    a.id.localeCompare(b.id)
+  );
+};
 
 /** Members in the order Access lists them: people first, then service principals, each by id. */
 export const byKind = (a: Member, b: Member) =>
   Number(a.kind !== "user") - Number(b.kind !== "user") || a.id.localeCompare(b.id);
 
 /** Whom a grant is to, as people read it: a member as `who` names them, a group, or a rule. */
-export function whom(grantee: Grantee): string {
+export function whom(grantee: Grantee, names: Names = shortId): string {
   switch (grantee.kind) {
     case "group":
       return `${grantee.id} (group)`;
     case "rule":
       return `${grantee.rule} (rule in ${grantee.workspace})`;
     default:
-      return who(grantee);
+      return who(grantee, names);
   }
 }
 
@@ -107,7 +136,7 @@ export function whom(grantee: Grantee): string {
  * they are, as in "Make bob admin of acme?" or "Make the group ops admin of acme?". A person and
  * a service principal may share an id, so the second is never taken for the first.
  */
-export function whomIn(grantee: Grantee): string {
+export function whomIn(grantee: Grantee, names: Names = shortId): string {
   switch (grantee.kind) {
     case "group":
       return `the group ${grantee.id}`;
@@ -116,7 +145,7 @@ export function whomIn(grantee: Grantee): string {
     case "rule":
       return `the rule ${grantee.rule} in ${grantee.workspace}`;
     case "user":
-      return grantee.id;
+      return names(grantee.id);
   }
 }
 
@@ -181,4 +210,10 @@ export function useAccess(tenant: string) {
     [queryClient, tenant],
   );
   return { allowed, changed };
+}
+
+/** The names of some people in a tenant, as the server lets the reader see them. */
+export function useNames(tenant: string, ids: Iterable<string>): Names {
+  const { queries, config } = tenantRoute.useRouteContext();
+  return usePeople(queries, config.people, tenant, ids);
 }

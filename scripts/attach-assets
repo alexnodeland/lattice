@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Attaches each file to a GitHub release, and never replaces one that is there.
+#
+# Usage: scripts/attach-assets TAG FILE...   (GH_TOKEN and GH_REPO in the environment)
+#
+# A release is built again when its workflow is run on its tag (#206's recovery, or a publish
+# that failed part way). A file already attached with the same bytes is left; one with other
+# bytes fails the run, since a rebuild that isn't byte for byte the same would otherwise replace
+# what the release (and PyPI, if it has the file) holds with something else. To replace one on
+# purpose, delete the asset from the release first.
+
+set -euo pipefail
+
+tag=${1:?usage: attach-assets TAG FILE...}
+shift
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+for file in "$@"; do
+  name=$(basename "$file")
+  sum=$(sha256sum "$file" | cut -d' ' -f1)
+  # An asset's digest is GitHub's own, for assets uploaded since mid-2025; an older one has none
+  # (null, or absent), and then its bytes are fetched and summed here.
+  attached=$(gh release view "$tag" --json assets |
+    jq -r --arg name "$name" '.assets[] | select(.name == $name) | .digest // "none"')
+  if [[ -z $attached ]]; then
+    gh release upload "$tag" "$file"
+    continue
+  fi
+  if [[ $attached == none ]]; then
+    gh release download "$tag" --pattern "$name" --dir "$work" --clobber
+    attached=sha256:$(sha256sum "$work/$name" | cut -d' ' -f1)
+  fi
+  if [[ $attached == "sha256:$sum" ]]; then
+    echo "attach-assets: $name is attached already, with these bytes"
+  else
+    echo "attach-assets: $name is attached to $tag with other bytes than this build's ($attached, not sha256:$sum); delete the asset to replace it" >&2
+    exit 1
+  fi
+done

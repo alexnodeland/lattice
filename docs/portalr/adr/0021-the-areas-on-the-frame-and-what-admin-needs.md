@@ -1,6 +1,6 @@
 # ADR-0021: The areas on the frame, a danger colour, budget badges, and what admin's frame decides
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0036](0036-the-chart-theme-and-colour-blind-mode.md) (the chart rule) and [ADR-0039](0039-elevation-status-colour-states-and-density.md) (budget badges' colour)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

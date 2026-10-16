@@ -403,9 +403,12 @@ answers "a trace, to the Collector" 200 --header 'Content-Type: application/json
 answers "the trace, in Tempo" 200 "http://tempo.stackr.internal:3200/api/v2/traces/$trace"
 
 # LiteLLM answers a mock only for a key whose team allows it, as stackr's smoke's does: a team
-# made for this, with the master key, and the mock's own words back.
+# made for this, with the master key, and the mock's own words back. ECS counts its task running
+# before LiteLLM listens, while it readies its database: first its readiness, as compose.yaml's
+# healthcheck waits for it.
 master=$(aws secretsmanager get-secret-value --secret-id stackr/litellm-master-key --query SecretString --output text)
 litellm=http://litellm.stackr.internal:4000
+answers "LiteLLM, ready" 200 "$litellm/health/readiness"
 team=$(bearer "$master" | ask --config - --header 'Content-Type: application/json' \
   --data '{"team_alias": "tier2", "metadata": {"allow_client_mock_response": true}}' "$litellm/team/new" |
   jq --raw-output '.team_id // empty' || true)

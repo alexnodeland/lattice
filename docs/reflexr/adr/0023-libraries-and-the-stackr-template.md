@@ -6,7 +6,7 @@
 
 ## Context
 
-This records, for reflexr, the decision made in [artifactr ADR-0032](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0032-libraries-and-the-stackr-template.md). artifactr, reflexr and evalr are growing an ecosystem around them. It needs LLM gateway configuration (LiteLLM routing, budgets and guardrails), observability (an OpenTelemetry Collector, Grafana with Prometheus, Tempo, Loki and Pyroscope, Langfuse) and application scaffolding. It also needs a database platform with authentication; Supabase provides one that runs locally with its CLI. None of that is library code, and all of it is shared by the libraries, by applications built on them, and by the system that will combine them.
+This records, for reflexr, the decision made in [artifactr ADR-0032](../../artifactr/adr/0032-libraries-and-the-stackr-template.md). artifactr, reflexr and evalr are growing an ecosystem around them. It needs LLM gateway configuration (LiteLLM routing, budgets and guardrails), observability (an OpenTelemetry Collector, Grafana with Prometheus, Tempo, Loki and Pyroscope, Langfuse) and application scaffolding. It also needs a database platform with authentication; Supabase provides one that runs locally with its CLI. None of that is library code, and all of it is shared by the libraries, by applications built on them, and by the system that will combine them.
 
 ## Decision
 

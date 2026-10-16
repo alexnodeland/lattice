@@ -1,4 +1,5 @@
-# What `docker build` leaves out: the image needs pyproject.toml, uv.lock, README.md and src/.
+# What `docker build` leaves out: the image needs pyproject.toml, uv.lock, README.md and src/ (and
+# scripts/, for portalr's UIs, in an application that has the portal).
 .git
 .env
 .venv

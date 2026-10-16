@@ -28,7 +28,7 @@ Writing this twice would drift. Putting it in core would saddle every user with 
   - experiment tasks that replay a firing's run
   - **evaluators as rules**: an evaluator is an action, so a rule on finished runs judges them online
   - the end-to-end measures for workflows (resolution, dead-letter and retry rates, operator intervention, time to resolution)
-- The core library keeps only what evaluation needs from it: typed feedback, the evaluator actor, and trace links. artifactr made the same decision ([artifactr ADR-0029](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0029-evalr-shared-eval-kit.md)).
+- The core library keeps only what evaluation needs from it: typed feedback, the evaluator actor, and trace links. artifactr made the same decision ([artifactr ADR-0029](../../artifactr/adr/0029-evalr-shared-eval-kit.md)).
 
 ### Amendment (2026-09-28): the first part of the extra
 

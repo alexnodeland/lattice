@@ -1,10 +1,12 @@
 /**
  * Sharing a thread: who holds a role on it, each with Revoke, asked first (portalr ADR-0021), and a
- * role granted to a person, as viewer or editor (portalr ADR-0022). grantr names people by id, so the dialog does too.
+ * role granted to a person, as viewer or editor (portalr ADR-0022). grantr names people by id; the
+ * dialog shows their email where the server names them, and a short id where it does not
+ * (portalr ADR-0038).
  */
 
-import { type Answer, type GrantrApi, refusal } from "@portalr/client";
-import { Button, ConfirmDialog, Dialog, SelectField } from "@portalr/ui";
+import { type Answer, type GrantrApi, type Names, refusal, shortId } from "@portalr/client";
+import { Alert, Button, ConfirmDialog, Dialog, Row, Rows, SelectField } from "@portalr/ui";
 import { type RefObject, useActionState, useRef } from "react";
 
 type Grant = GrantrApi.components["schemas"]["Grant"];
@@ -17,10 +19,11 @@ export type Role = (typeof ROLES)[number];
 
 const isRole = (role: unknown): role is Role => ROLES.some((each) => each === role);
 
-/** A grantee as the dialog names it: a person or a client by id, a group or a rule as such. */
-function named(to: Grantee): string {
+/** A grantee as the dialog names it: a person by `names`, a client by id, a group or a rule as such. */
+function named(to: Grantee, names: Names): string {
   switch (to.kind) {
     case "user":
+      return names(to.id);
     case "service_principal":
       return to.id;
     case "group":
@@ -32,11 +35,16 @@ function named(to: Grantee): string {
   }
 }
 
+/** Who a grantee is, by id alone: a row's key must not change when a name arrives. */
+const identity = (to: Grantee): string =>
+  to.kind === "rule" ? `rule:${to.workspace}:${to.rule}` : `${to.kind}:${to.id}`;
+
 export function ShareDialog({
   open,
   onOpenChange,
   grants,
   people,
+  names = shortId,
   canRevoke,
   onGrant,
   onRevoke,
@@ -48,13 +56,15 @@ export function ShareDialog({
   grants: readonly Grant[] | null;
   /** Who it may be shared with: people in the tenant, by id, not holding a role on it yet. */
   people: readonly string[];
+  /** Names the people it shows: their email where known. A person is their short id until then. */
+  names?: Names;
   canRevoke: boolean;
   onGrant: (person: string, role: Role) => Promise<Answer<AuditEntry>>;
   onRevoke: (grant: Grant) => Promise<Answer<AuditEntry>>;
   /** Where focus goes when it closes: the menu it was opened from. */
   finalFocus?: RefObject<HTMLElement | null>;
 }) {
-  const person = useRef<HTMLSelectElement>(null);
+  const person = useRef<HTMLButtonElement>(null);
   const [refused, grant, granting] = useActionState(
     async (_last: string | null, form: FormData) => {
       const role = form.get("role");
@@ -80,19 +90,25 @@ export function ShareDialog({
       ) : grants.length === 0 ? (
         <p>No one holds a role on it yet.</p>
       ) : (
-        <ul aria-label="People with access" className="flex flex-col gap-2">
+        <Rows label="People with access">
           {grants.map((each) => (
-            <li
-              key={`${each.to.kind}:${named(each.to)}:${each.role}`}
-              className="flex flex-wrap items-center justify-between gap-2"
-            >
+            <Row key={`${identity(each.to)}:${each.role}`}>
               <span>
-                {named(each.to)} <span className="text-muted">{each.role}</span>
+                {each.to.kind === "user" ? (
+                  <span title={each.to.id}>{named(each.to, names)}</span>
+                ) : (
+                  named(each.to, names)
+                )}{" "}
+                <span className="text-muted">{each.role}</span>
               </span>
               {canRevoke && (
                 <ConfirmDialog
+                  className="ml-auto"
                   label="Revoke"
-                  title={`Revoke ${named(each.to)}'s ${each.role} role?`}
+                  about={`${named(each.to, names)} as ${each.role}`}
+                  look="danger-soft"
+                  size="sm"
+                  title={`Revoke ${named(each.to, names)}'s ${each.role} role?`}
                   confirm="Revoke the role"
                   onConfirm={async () => {
                     const answer = await onRevoke(each);
@@ -101,13 +117,13 @@ export function ShareDialog({
                     }
                   }}
                 >
-                  {named(each.to)} loses the {each.role} role on this thread. While it's restricted,
-                  they no longer see it.
+                  {named(each.to, names)} loses the {each.role} role on this thread. While it's
+                  restricted, they no longer see it.
                 </ConfirmDialog>
               )}
-            </li>
+            </Row>
           ))}
-        </ul>
+        </Rows>
       )}
       {people.length === 0 ? (
         <p>
@@ -117,17 +133,19 @@ export function ShareDialog({
       ) : (
         <form aria-label="Share with someone" className="flex flex-col gap-2" action={grant}>
           <SelectField
-            ref={person}
+            triggerRef={person}
             label="Person"
             name="person"
-            options={people.map((each) => ({ value: each, label: each }))}
+            options={[...people]
+              .sort((a, b) => names(a).localeCompare(names(b)) || a.localeCompare(b))
+              .map((each) => ({ value: each, label: names(each) }))}
           />
           <SelectField
             label="Role"
             name="role"
             options={ROLES.map((role) => ({ value: role, label: role }))}
           />
-          {refused && <p role="alert">{refused}</p>}
+          {refused && <Alert tone="error">{refused}</Alert>}
           <Button type="submit" disabled={granting} className="self-start">
             Share
           </Button>

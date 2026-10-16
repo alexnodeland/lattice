@@ -3,7 +3,7 @@
  * failed, a way to read it again, and any other way on, such as clearing a filter.
  */
 
-import { Button, EmptyState, failureSaid } from "@portalr/ui";
+import { Alert, Button, EmptyState, failureSaid } from "@portalr/ui";
 import { type ErrorComponentProps, useRouter } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
@@ -42,7 +42,7 @@ export function ReadFailed({
           </div>
         }
       >
-        <p role="alert">{failureSaid(error)}</p>
+        <Alert tone="error">{failureSaid(error)}</Alert>
       </EmptyState>
     </>
   );

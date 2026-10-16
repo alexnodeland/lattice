@@ -1,6 +1,6 @@
 # ADR-0024: Access: members, groups and keys, each where grantr allows its read
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0038](0038-people-by-email.md)
 **Date:** 2026-10-13
 **Deciders:** Alex Nodeland
 

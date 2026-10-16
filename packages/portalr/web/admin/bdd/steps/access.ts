@@ -1,4 +1,6 @@
 import { expect, type Page } from "@playwright/test";
+import { choose } from "@portalr/ui/testing/bdd";
+import { email } from "../../../app/bdd/steps/people";
 import { madeAs, Then, When } from "./fixtures";
 
 /** A name made afresh for this run, so a scenario runs again against the same application. */
@@ -59,9 +61,11 @@ When("they add a service principal", async ({ page, made }) => {
 });
 
 When("they issue it a key", async ({ page, made }) => {
-  await page
-    .getByRole("combobox", { name: "Service principal" })
-    .selectOption(madeAs(made, "principal"));
+  await choose(
+    page,
+    page.getByRole("combobox", { name: "Service principal" }),
+    madeAs(made, "principal"),
+  );
   await page.getByRole("button", { name: "Issue" }).click();
   await expect(page.getByRole("status")).toContainText("Copy it now");
   await expect(page.getByLabel("The key")).not.toHaveValue("");
@@ -86,8 +90,8 @@ Then("it has no key", async ({ page, made }) => {
 
 When("they make a group of {string}", async ({ page, made }, member: string) => {
   await page.getByRole("textbox", { name: "Group" }).fill(fresh(made, "group"));
-  // Each member is named with their kind beside them, such as "bob (person)".
-  await page.getByRole("checkbox", { name: new RegExp(`^${member} \\(`) }).check();
+  // Each person is named by their email, with their kind beside them: "bob@portalr.test (person)".
+  await page.getByRole("checkbox", { name: `${email(member)} (person)` }).check();
   await page.getByRole("button", { name: "Create the group" }).click();
   await expect(page.getByRole("status")).toContainText("has 1 member.");
 });
@@ -127,12 +131,14 @@ When(
   "they grant it {string} on the workspace {string}",
   async ({ page, made }, role: string, workspace: string) => {
     const principal = madeAs(made, "principal");
-    await page.getByRole("combobox", { name: "Role" }).selectOption(role);
-    await page.getByRole("combobox", { name: "On" }).selectOption("workspace");
+    await choose(page, page.getByRole("combobox", { name: "Role" }), role);
+    await choose(page, page.getByRole("combobox", { name: "On" }), "workspace");
     await page.getByRole("combobox", { name: "Workspace" }).fill(workspace);
-    await page
-      .getByRole("combobox", { name: "To" })
-      .selectOption(`${principal} (service principal)`);
+    await choose(
+      page,
+      page.getByRole("combobox", { name: "To" }),
+      `${principal} (service principal)`,
+    );
     await page.getByRole("button", { name: "Grant", exact: true }).click();
     await expect(page.getByRole("status")).toContainText(`holds ${role} on workspace ${workspace}`);
   },

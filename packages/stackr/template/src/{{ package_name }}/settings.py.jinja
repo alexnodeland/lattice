@@ -72,6 +72,70 @@ class GatewaySettings:
     mock_response: str | None = None
 
 
+{% if use_portal -%}
+@dataclass(frozen=True)
+class PortalSettings:
+    """Where portalr's UIs sign in, and the tools its admin reads: the portal port.
+
+    Without a Supabase URL and publishable key, the UIs can't sign anyone in, and the portal is
+    not mounted. A tool without a URL is not configured; its card says so.
+
+    Attributes:
+        supabase_url: The Supabase project, as people's browsers reach it: its URL, or a path
+            on this application's own origin that leads to it.
+        supabase_key: The project's publishable key, which browsers send with every Supabase
+            Auth call. Never the secret one: ``config.json`` is public.
+        auth_url: Supabase's gateway, as this application reaches it, for inviting people by
+            email: ``/auth/v1`` is under it. With ``AUTH_SERVICE_ROLE_KEY``, it enables
+            invitations.
+        ui_dir: A directory holding the built ``app`` and ``admin`` UIs, when portalr's
+            package has none of its own, as an install from a repository hasn't.
+        tempo_url: Tempo's HTTP API, for traces.
+        loki_url: Loki's HTTP API, for logs.
+        prometheus_url: prom-label-proxy, in front of Prometheus, for metrics.
+        langfuse_project: The Langfuse project's id, for scores and links; with
+            ``LANGFUSE_BASE_URL`` and the project's keys.
+        litellm_key: A key that reads each tenant's spend from LiteLLM, and does nothing else:
+            stackr's ``make portal-key`` makes it, a view-only admin's, limited to the four routes
+            the admin reads.
+            Never the master key, which opens everything; with ``LITELLM_BASE_URL``.
+        grafana_url: Grafana, as operators' browsers reach it, for deep links.
+        required: Whether the application must not start without a Supabase project for the UIs
+            to sign in to, rather than leave the portal off: set on a single host, where a
+            portal that is silently off would be an application that looks deployed and isn't.
+    """
+
+    supabase_url: str | None = None
+    supabase_key: str | None = None
+    auth_url: str | None = None
+    ui_dir: str | None = None
+    tempo_url: str | None = None
+    loki_url: str | None = None
+    prometheus_url: str | None = None
+    langfuse_project: str | None = None
+    litellm_key: str | None = None
+    grafana_url: str | None = None
+    required: bool = False
+
+    @classmethod
+    def from_environ(cls, env: Mapping[str, str]) -> Self:
+        """Read the portal's settings from ``PORTAL_*``."""
+        return cls(
+            supabase_url=env.get("PORTAL_SUPABASE_URL"),
+            supabase_key=env.get("PORTAL_SUPABASE_KEY"),
+            auth_url=env.get("PORTAL_AUTH_URL"),
+            ui_dir=env.get("PORTAL_UI_DIR"),
+            tempo_url=env.get("PORTAL_TEMPO_URL"),
+            loki_url=env.get("PORTAL_LOKI_URL"),
+            prometheus_url=env.get("PORTAL_PROMETHEUS_URL"),
+            langfuse_project=env.get("PORTAL_LANGFUSE_PROJECT"),
+            litellm_key=env.get("PORTAL_LITELLM_KEY"),
+            grafana_url=env.get("PORTAL_GRAFANA_URL"),
+            required=env.get("PORTAL_REQUIRED") == "true",
+        )
+
+
+{% endif -%}
 @dataclass(frozen=True)
 class Settings:
     """Everything the application reads from its environment.
@@ -93,6 +157,11 @@ class Settings:
         telemetry: Whether to export OpenTelemetry, to ``OTEL_EXPORTER_OTLP_ENDPOINT``.
         langfuse: Whether to use Langfuse, with the ``LANGFUSE_*`` keys, for trace attributes
             and scores.
+{%- if use_portal %}
+        portal: Where portalr's UIs sign in, and the tools its admin reads.
+        langfuse_url: Langfuse, as this application reaches it.
+        langfuse_keys: The project's public and secret keys, which portalr reads scores with.
+{%- endif %}
     """
 
     service_name: str = "{{ project_slug }}"
@@ -106,6 +175,11 @@ class Settings:
     gateway: GatewaySettings = field(default_factory=GatewaySettings)
     telemetry: bool = False
     langfuse: bool = False
+{%- if use_portal %}
+    portal: PortalSettings = field(default_factory=PortalSettings)
+    langfuse_url: str | None = None
+    langfuse_keys: tuple[str, str] | None = None
+{%- endif %}
 
     def __post_init__(self) -> None:
         if self.database_admin_url and not self.database_url:
@@ -152,6 +226,15 @@ class Settings:
             gateway=gateway,
             telemetry="OTEL_EXPORTER_OTLP_ENDPOINT" in env,
             langfuse="LANGFUSE_PUBLIC_KEY" in env,
+{%- if use_portal %}
+            portal=PortalSettings.from_environ(env),
+            langfuse_url=env.get("LANGFUSE_BASE_URL"),
+            langfuse_keys=(
+                (env["LANGFUSE_PUBLIC_KEY"], env["LANGFUSE_SECRET_KEY"])
+                if "LANGFUSE_PUBLIC_KEY" in env and "LANGFUSE_SECRET_KEY" in env
+                else None
+            ),
+{%- endif %}
         )
 
 

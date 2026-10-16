@@ -22,6 +22,7 @@ const CONFIG: Config = {
   supabase: { url: "http://127.0.0.1:9", key: "sb_publishable_x" },
   surfaces: { artifactr: "/artifactr/v1", reflexr: "/reflexr/v1", grantr: "", portalr: "" },
   readers: { tempo: false },
+  people: true,
 };
 
 /** alice, signed in, as Supabase Auth would say, without asking it. */
@@ -58,23 +59,26 @@ function server(allowed: readonly string[], serve: Serve, tenants: readonly stri
 
 /**
  * admin, opened at `path`, with grantr allowing `allowed` in each of `tenants`, acme alone unless
- * a test names more: its screen and its router.
+ * a test names more: its screen and its router. `settings` replace parts of the config the page
+ * is given, such as the readers an admin has or whether people are named.
  */
 export async function open(
   path: string,
   allowed: readonly string[],
   serve: Serve,
   tenants: readonly string[] = ["acme"],
+  settings: Partial<Config> = {},
 ) {
   vi.stubGlobal("fetch", vi.fn(server(allowed, serve, tenants)));
   const queryClient = createQueryClient(() => undefined);
   const api = createApi(CONFIG.surfaces, () => ({ token: "t0k3n" }));
-  const signed = new Alice(CONFIG, () => undefined);
+  const config = { ...CONFIG, ...settings };
+  const signed = new Alice(config, () => undefined);
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: [path] }),
     context: {
-      config: CONFIG,
+      config,
       signed,
       queries: createQueries(api),
       commands: createCommands(api, () => undefined),

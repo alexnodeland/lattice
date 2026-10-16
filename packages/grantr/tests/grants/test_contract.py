@@ -5,6 +5,9 @@ exit criteria of grantr RFC-0001's phase 2.
 """
 
 import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Any
 
 import pytest
 
@@ -14,6 +17,7 @@ from grantr.core import (
     Agent,
     AuditFilter,
     AuditType,
+    DeploymentTenantCreated,
     Forbidden,
     Grant,
     Granted,
@@ -427,6 +431,47 @@ async def test_the_last_owner_stays(grants: Grants) -> None:
     assert await grants.check("acme", BOB, "grantr:delete_tenant", TENANT)
 
 
+# #253: a group's owner grant counts as an owner whoever is in the group. Each test below fails
+# today because the change is carried out, so pytest.raises fails; an error in its setup would
+# not be the expected failure, and fails the test.
+LAST_OWNER_IN_A_GROUP = pytest.mark.xfail(
+    strict=True,
+    raises=pytest.fail.Exception,
+    reason="https://github.com/alexnodeland/lattice/issues/253",
+)
+
+
+async def _owned_by_the_team(grants: Grants) -> None:
+    """Make Bob, alone in TEAM, the tenant's one owner, through TEAM's grant."""
+    await _members(grants, BOB)
+    await grants.define_group("acme", TEAM, frozenset((BOB,)), by=ALICE)
+    await grants.grant("acme", "owner", on=TENANT, to=TEAM, by=ALICE)
+    await grants.revoke("acme", "owner", on=TENANT, to=ALICE, by=ALICE)
+
+
+@LAST_OWNER_IN_A_GROUP
+async def test_the_group_that_holds_the_last_owner_grant_keeps_a_member(grants: Grants) -> None:
+    await _owned_by_the_team(grants)
+    with pytest.raises(Invalid):
+        await grants.define_group("acme", TEAM, frozenset(), by=BOB)
+
+
+@LAST_OWNER_IN_A_GROUP
+async def test_the_last_member_of_the_group_that_owns_the_tenant_stays(grants: Grants) -> None:
+    await _owned_by_the_team(grants)
+    with pytest.raises(Invalid):
+        await grants.remove_member("acme", BOB, by=BOB)
+
+
+@LAST_OWNER_IN_A_GROUP
+async def test_an_empty_groups_owner_grant_is_no_owner(grants: Grants) -> None:
+    empty = Group(id="empty")
+    await grants.define_group("acme", empty, frozenset(), by=ALICE)
+    await grants.grant("acme", "owner", on=TENANT, to=empty, by=ALICE)
+    with pytest.raises(Invalid):
+        await grants.revoke("acme", "owner", on=TENANT, to=ALICE, by=ALICE)
+
+
 async def test_operators_are_granted_by_operators(grants: Grants) -> None:
     with pytest.raises(Invalid, match="has an operator already"):
         await grants.first_operator(BOB.id)
@@ -580,7 +625,9 @@ async def test_every_change_is_in_the_audit_log_in_order(grants: Grants) -> None
     ]
     assert all(entry.tenant == "acme" and entry.at == NOW for entry in entries)
     assert [entry.by for entry in entries] == [ROOT] + [ALICE] * 8
-    assert [entry.seq for entry in entries] == list(range(2, 11)), "one log; 1 is the operator's"
+    assert [entry.seq for entry in entries] == [2, *range(4, 12)], (
+        "one log; 1 is the operator's, and 3 the deployment log's record of acme"
+    )
 
     page = await grants.audit("acme", by=ALICE, after_seq=entries[2].seq, limit=2)
     assert page == entries[3:5]
@@ -635,12 +682,84 @@ async def test_the_deployments_log_holds_its_operators(grants: Grants) -> None:
     entries = await grants.audit(None, by=ROOT)
     assert [(entry.by, entry.event) for entry in entries] == [
         (None, Granted(grant=Grant(tenant=None, role="operator", on=DEPLOYMENT, to=ROOT))),
+        (ROOT, DeploymentTenantCreated(tenant="acme", owner="alice")),
         (ROOT, Granted(grant=Grant(tenant=None, role="operator", on=DEPLOYMENT, to=BOB))),
     ]
     with pytest.raises(Forbidden, match="grantr:grant_operator"):
         await grants.audit(None, by=ALICE)
     with pytest.raises(Forbidden, match="grantr:read_audit"):
         await grants.audit("acme", by=ROOT)
+
+
+async def test_a_tenants_creation_is_in_the_deployments_log_by_its_creator(
+    grants: Grants,
+) -> None:
+    """An operator who isn't a member of the tenant it creates is seen to have created it."""
+    created = await grants.create_tenant("globex", owner="bob", by=ROOT)
+    assert (created.tenant, created.by, created.event) == (
+        "globex",
+        ROOT,
+        TenantCreated(owner="bob"),
+    ), "the tenant's own entry is as it was"
+    deployments = await grants.audit(
+        None, by=ROOT, keep=AuditFilter(types=frozenset({"deployment_tenant_created"}))
+    )
+    assert [(e.tenant, e.by, e.event) for e in deployments] == [
+        (None, ROOT, DeploymentTenantCreated(tenant="acme", owner="alice")),
+        (None, ROOT, DeploymentTenantCreated(tenant="globex", owner="bob")),
+    ]
+    assert deployments[1].seq == created.seq + 1
+    assert deployments[1].at == NOW
+    assert not await grants.check("globex", ROOT, "grantr:read_audit", TENANT), "no member"
+    with pytest.raises(Forbidden):
+        await grants.audit(None, by=ALICE)
+    assert "deployment_tenant_created" not in {
+        entry.event.type for entry in await grants.audit("globex", by=BOB)
+    }, "a tenant's own log does not hold it"
+
+
+async def test_a_refused_or_repeated_creation_records_nothing_in_the_deployments_log(
+    grants: Grants,
+) -> None:
+    before = await grants.audit(None, by=ROOT)
+    with pytest.raises(Invalid, match="exists"):
+        await grants.create_tenant("acme", owner="bob", by=ROOT)
+    with pytest.raises(Forbidden, match="grantr:create_tenant"):
+        await grants.create_tenant("globex", owner="bob", by=ALICE)
+    with pytest.raises(Invalid, match="has no ~"):
+        await grants.create_tenant("a~b", owner="bob", by=ROOT)
+    assert await grants.provision_tenant("acme", owner="carol") == []
+    assert await grants.audit(None, by=ROOT) == before
+    assert await grants.tenants(by=ROOT) == ["acme"]
+
+
+@pytest.mark.parametrize("fails_on", [TenantCreated, DeploymentTenantCreated])
+async def test_a_failed_creation_leaves_no_entry_in_either_log(
+    storage: Storage, grants: Grants, monkeypatch: pytest.MonkeyPatch, fails_on: type
+) -> None:
+    transaction = storage.transaction
+
+    @asynccontextmanager
+    async def failing(tenant: str | None) -> AsyncIterator[Any]:
+        async with transaction(tenant) as tx:
+            append = tx.append
+
+            async def refuse(tenant: str | None, by: Any, event: Any) -> Any:
+                if isinstance(event, fails_on):
+                    raise RuntimeError("the log is down")
+                return await append(tenant, by, event)
+
+            monkeypatch.setattr(tx, "append", refuse)
+            yield tx
+
+    monkeypatch.setattr(storage, "transaction", failing)
+    before = await grants.audit(None, by=ROOT)
+    with pytest.raises(RuntimeError, match="the log is down"):
+        await grants.create_tenant("globex", owner="bob", by=ROOT)
+    monkeypatch.undo()
+    assert await grants.audit(None, by=ROOT) == before, "no deployment entry"
+    assert await storage.audit("globex") == [], "and none of the tenant's own"
+    assert "globex" not in await storage.tenants()
 
 
 async def test_a_read_of_the_log_keeps_some_types_or_one_subjects_changes(
@@ -694,7 +813,7 @@ async def test_the_deployments_log_keeps_the_first_operators_grant_by_no_one(
 ) -> None:
     await grants.grant_operator(BOB.id, by=ROOT)
     by_root = await grants.audit(None, by=ROOT, keep=AuditFilter(by=ROOT))
-    assert [entry.by for entry in by_root] == [ROOT]
+    assert [entry.event.type for entry in by_root] == ["deployment_tenant_created", "granted"]
     granted = await grants.audit(None, by=ROOT, keep=AuditFilter(types=frozenset({"granted"})))
     assert [entry.by for entry in granted] == [None, ROOT]
 
@@ -877,7 +996,14 @@ async def test_the_deployments_tools_provision_a_tenant_and_the_admins_it_lacks(
         (None, TenantCreated),
         (None, MemberAdded),
         (None, Granted),
+        (None, DeploymentTenantCreated),
     ]
+    [recorded] = [entry for entry in entries if isinstance(entry.event, DeploymentTenantCreated)]
+    assert (recorded.tenant, recorded.event) == (
+        None,
+        DeploymentTenantCreated(tenant="globex", owner="bob"),
+    )
+    assert recorded in await grants.audit(None, by=ROOT), "in the deployment's log"
     assert await grants.member("globex", BOB.id) == Membership(
         tenant="globex", user="bob", roles=("member", "owner")
     )

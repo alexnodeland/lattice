@@ -29,6 +29,7 @@ export {
 } from "./landing";
 export type { LogRecord, Logs } from "./logs";
 export { useMe } from "./me";
+export { keepWithin, type Names, namesOf, shortId, usePeople } from "./people";
 export {
   type AuditFilter,
   createQueries,
@@ -38,6 +39,7 @@ export {
   Refused,
   stale,
   type TimeSpan,
+  type ToolIds,
   TRACES_LIMIT,
   type TraceFilter,
 } from "./queries";

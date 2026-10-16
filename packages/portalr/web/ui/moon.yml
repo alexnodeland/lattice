@@ -1,6 +1,8 @@
 # @portalr/ui: the brand tokens, the primitives, and the chat and artifact components.
 language: 'typescript'
 layer: 'library'
+# Its tests run in Chromium, which CI keeps apart from other tests' containers (lattice ADR-0002).
+tags: ['browser']
 # Its chat renders client's store, whose types alone it imports (portalr ADR-0015).
 dependsOn:
   - 'client'

@@ -9,7 +9,8 @@ their tasks' inputs, which cover the root's files (uv.lock, pyproject.toml, .moo
 every project that depends on one, all the way down, from moon's project graph, and runs the
 task in each that has it.
 
-A task in ONE_AT_A_TIME runs in one project after another, rather than all at once.
+A task in ONE_AT_A_TIME runs in one project after another, rather than all at once. Otherwise
+the projects tagged BROWSER run theirs first, in a `moon run` of their own, and then the rest.
 """
 
 import json
@@ -21,6 +22,11 @@ from typing import Any
 # scenarios each start and stop a compose stack: in CI, one stack's network coming down while
 # the other's Chromium navigates fails it with ERR_NETWORK_CHANGED (ADR-0002).
 ONE_AT_A_TIME = frozenset({"bdd"})
+
+# The projects whose tests run in Chromium. Chromium fails every request it has in flight when a
+# network interface comes or goes, as a container's does when another project's tests start or
+# stop one, and a test file's import failed with ERR_NETWORK_CHANGED (#254). So they run apart.
+BROWSER = "browser"
 
 
 def query(*arguments: str) -> dict[str, Any]:
@@ -58,7 +64,13 @@ def main() -> int:
         return 0
     sys.stdout.write(f"affected: {' '.join(targets)}\n")
     sys.stdout.flush()
-    batches = [[target] for target in targets] if task in ONE_AT_A_TIME else [targets]
+    if task in ONE_AT_A_TIME:
+        batches = [[target] for target in targets]
+    else:
+        tags: dict[str, list[str]] = {n: projects[n]["config"].get("tags") or [] for n in affected}
+        browser = [target for target in targets if BROWSER in tags[target.split(":")[0]]]
+        rest = [target for target in targets if target not in browser]
+        batches = [batch for batch in (browser, rest) if batch]
     codes = [subprocess.run(["moon", "run", *batch], check=False).returncode for batch in batches]
     return max(codes)
 

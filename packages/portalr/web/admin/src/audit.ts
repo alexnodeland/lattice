@@ -3,37 +3,65 @@
  * for each type of event grantr records (portalr ADR-0026).
  */
 
-import type { AuditFilter, GrantrApi } from "@portalr/client";
-import { possessive, where, who, whom } from "./access";
+import { type AuditFilter, type GrantrApi, type Names, shortId } from "@portalr/client";
+import { peopleIn, possessive, where, who, whom } from "./access";
 
 type Subject = GrantrApi.components["schemas"]["Subject"];
 type AuditEvent = GrantrApi.components["schemas"]["AuditEvent"];
+type AuditEntry = GrantrApi.components["schemas"]["AuditEntry"];
 type AuditType = GrantrApi.components["schemas"]["AuditType"];
 
 /** Who made a change: a member, a rule, the agent, or no one, for the first operator's grant. */
-export function actor(by: Subject | null): string {
+export function actor(by: Subject | null, names: Names = shortId): string {
   if (by === null) {
     return "no one";
   }
-  return by.kind === "agent" ? "the agent" : whom(by);
+  return by.kind === "agent" ? "the agent" : whom(by, names);
+}
+
+/** The ids of the people an entry names: who made it, and whom it is about. */
+export function peopleOf(entry: AuditEntry): string[] {
+  const { by, event } = entry;
+  const named: { readonly kind: string; readonly id?: string }[] = [];
+  if (by !== null) {
+    named.push(by);
+  }
+  switch (event.type) {
+    case "tenant_created":
+      named.push({ kind: "user", id: event.owner });
+      break;
+    case "member_added":
+    case "member_removed":
+      named.push(event.member);
+      break;
+    case "group_defined":
+      named.push(...event.members);
+      break;
+    case "granted":
+    case "revoked":
+      named.push(event.grant.to);
+      break;
+    default:
+  }
+  return peopleIn(named);
 }
 
 /** A list of names, or "no one" for none. */
 const listed = (names: readonly string[]) => (names.length > 0 ? names.join(", ") : "no one");
 
 /** What a change was, as a sentence's predicate: "added ci (service principal)". */
-export function said(event: AuditEvent): string {
+export function said(event: AuditEvent, names: Names = shortId): string {
   switch (event.type) {
     case "tenant_created":
-      return `created the tenant, owned by ${who({ kind: "user", id: event.owner })}`;
+      return `created the tenant, owned by ${who({ kind: "user", id: event.owner }, names)}`;
     case "tenant_deleted":
       return "deleted the tenant";
     case "member_added":
-      return `added ${who(event.member)}`;
+      return `added ${who(event.member, names)}`;
     case "member_removed":
-      return `removed ${who(event.member)}`;
+      return `removed ${who(event.member, names)}`;
     case "group_defined":
-      return `set ${possessive(event.group)} members to ${listed(event.members.map(who))}`;
+      return `set ${possessive(event.group)} members to ${listed(event.members.map((member) => who(member, names)))}`;
     case "group_deleted":
       return `deleted the group ${event.group}`;
     case "role_defined":
@@ -41,13 +69,13 @@ export function said(event: AuditEvent): string {
     case "role_deleted":
       return `deleted the role ${event.role}`;
     case "granted":
-      return `granted ${event.grant.role} on ${where(event.grant.on)} to ${whom(event.grant.to)}`;
+      return `granted ${event.grant.role} on ${where(event.grant.on)} to ${whom(event.grant.to, names)}`;
     case "revoked":
-      return `revoked ${event.grant.role} on ${where(event.grant.on)} from ${whom(event.grant.to)}`;
+      return `revoked ${event.grant.role} on ${where(event.grant.on)} from ${whom(event.grant.to, names)}`;
     case "key_issued":
-      return `issued the key ${event.key} to ${who(event.principal)}`;
+      return `issued the key ${event.key} to ${who(event.principal, names)}`;
     case "key_revoked":
-      return `revoked the key ${event.key} of ${who(event.principal)}`;
+      return `revoked the key ${event.key} of ${who(event.principal, names)}`;
     case "restricted":
       return `restricted ${where(event.on)}`;
     case "unrestricted":

@@ -1,6 +1,6 @@
 # ADR-0022: Restricting and sharing a thread, from its menu
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0035](0035-people-by-email.md)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

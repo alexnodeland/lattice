@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { account } from "./app";
 import { started, Then, When } from "./fixtures";
-import { password, signIn } from "./people";
+import { email, password, signIn } from "./people";
 
 /** The workspace's threads, once its log has been read: Start is enabled only then. */
 async function threads(page: Page) {
@@ -11,12 +11,12 @@ async function threads(page: Page) {
 
 const dialog = (page: Page) => page.getByRole("dialog", { name: "Share the thread" });
 
-/** Who holds a role on the thread, in its sharing dialog, by what the item says. */
+/** Who holds a role on the thread, in its sharing dialog, by what the item says: their email. */
 const holder = (page: Page, person: string, role: string) =>
   dialog(page)
     .getByRole("list", { name: "People with access" })
     .getByRole("listitem")
-    .filter({ hasText: `${person} ${role}` });
+    .filter({ hasText: `${email(person)} ${role}` });
 
 async function act(page: Page, item: string) {
   await page.getByRole("button", { name: "Thread actions" }).click();
@@ -90,8 +90,9 @@ Then(
   "they're offered {string}, and not {string}",
   async ({ page }, offered: string, not: string) => {
     const people = dialog(page).getByRole("combobox", { name: "Person" });
-    await expect(people.getByRole("option", { name: offered, exact: true })).toHaveCount(1);
-    await expect(people.getByRole("option", { name: not, exact: true })).toHaveCount(0);
+    // The dialog shows a person by their email, which the test application gives everyone.
+    await expect(people.getByRole("option", { name: email(offered), exact: true })).toHaveCount(1);
+    await expect(people.getByRole("option", { name: email(not), exact: true })).toHaveCount(0);
   },
 );
 

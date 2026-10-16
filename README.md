@@ -151,7 +151,7 @@ uv add "portalr @ git+https://github.com/alexnodeland/lattice#subdirectory=packa
 
 portalr's wheel carries its two UIs, which Vite builds first, so installed from the repository it has none to serve: build them in a checkout (`bun install && moon run app:build admin:build`), or wait for its release wheel. portalr isn't in the application template yet either.
 
-uv takes each package's own dependencies from lattice, from the same commit: relayr's, artifactr and reflexr, and lattice-core, which artifactr and reflexr share. Each package's getting-started page lists its extras, such as artifactr's `fastapi`, `mcp` and `postgres`: [artifactr](https://lattice.alexnodeland.com/artifactr/getting-started/), [reflexr](https://lattice.alexnodeland.com/reflexr/getting-started/), [evalr](https://lattice.alexnodeland.com/evalr/getting-started/), [grantr](https://lattice.alexnodeland.com/grantr/getting-started/).
+uv takes each package's own dependencies from lattice, from the same commit: relayr's, artifactr and reflexr, portalr's, grantr, and lattice-core, which artifactr, reflexr, grantr and portalr share. Each package's getting-started page lists its extras, such as artifactr's `fastapi`, `mcp` and `postgres`: [artifactr](https://lattice.alexnodeland.com/artifactr/getting-started/), [reflexr](https://lattice.alexnodeland.com/reflexr/getting-started/), [evalr](https://lattice.alexnodeland.com/evalr/getting-started/), [grantr](https://lattice.alexnodeland.com/grantr/getting-started/).
 
 </details>
 

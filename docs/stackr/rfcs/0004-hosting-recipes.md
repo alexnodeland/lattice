@@ -371,6 +371,6 @@ Tracked in [#103](https://github.com/alexnodeland/lattice/issues/103).
 - [x] Sign-off on H1 to H18 (2026-10-12)
 - [x] Phase 1: spike ([ADR-0025](../adr/0025-what-the-floci-spike-found.md))
 - [x] Phase 2: single host ([ADR-0026](../adr/0026-the-single-host.md))
-- [x] Phase 3: AWS modules and tier 1 ([ADR-0029](../adr/0029-the-aws-modules-and-tier-1.md), [ADR-0034](../adr/0034-the-stack-on-aws.md))
+- [x] Phase 3: AWS modules and tier 1 ([ADR-0029](../adr/0029-the-aws-modules-and-tier-1.md), [ADR-0032](../adr/0032-the-edge-the-services-and-the-state-host.md), [ADR-0034](../adr/0034-the-stack-on-aws.md), [ADR-0035](../adr/0035-the-thin-images.md))
 - [ ] Phase 4: tier 2. Partly met: tier 2 passes in CI and leaves nothing behind ([ADR-0036](../adr/0036-tier-2-against-floci.md)); the template's `hosting: aws` is still to come
 - [ ] Phase 5: docs, ADRs and the gate

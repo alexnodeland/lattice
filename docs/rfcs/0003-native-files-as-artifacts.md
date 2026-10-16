@@ -147,7 +147,7 @@ Binary files don't merge. Two edits from the same version can't both apply; the 
 | Replay fails (a command no longer applies) | Nothing is committed | The conflict reaches the agent as a tool result, with the summaries of what changed since ([ADR-0008][a-adr-0008]); a person sees both versions' pages |
 | Accept with changes (`RespondToProposal.changes`) | Applies a JSON Patch to the manifest | portalr offers accept or reject only, for native kinds; edits after accepting are a new revision |
 
-Replay is only sound if a command names what it changes by content or by a stable id ("the paragraph whose text starts …", a bookmark), not by position ("paragraph 12"). Whether WordCraft's commands are anchored is the pilot's first question, and an exit criterion. Until it is answered, the package does not replay: a conflict is returned, and the agent plans again against the new head, which is what ADR-0004 expects of it anyway.
+Replay is only sound if a batch names what it changes by content, not by position. WordCraft's commands act on the current selection, so a batch is positional unless it first selects by content: its MCP server has `select_text(text, occurrence)`, which is the same anchor as artifactr's text edits. So the package replays a batch only if every command that changes the document follows a `select_text` in the same batch; any other batch is refused on conflict, and the agent plans again against the new head, which is what ADR-0004 expects of it anyway. Whether this rule is enough in practice (tables, styles, images) is the pilot's first question, and an exit criterion.
 
 ### Blob storage
 
@@ -172,7 +172,7 @@ class Blobs(Protocol):
 | Retention | Follows artifactr's revisions | Revisions are append-only, so every blob a revision names is kept. `collect` deletes what no revision and no pending proposal names, and was put more than a grace period ago (one day by default), so an upload in flight survives. Deleting a tenant deletes its rows |
 | Referential integrity | Checked on read, not on write | Every surface can commit `edit_artifact` ([ADR-0002][a-adr-0002]), and core can't look in the blob store, so a hand-made patch can name a digest that isn't there. Reads then show "content unavailable", and the tools refuse to edit it until the content is replaced. No one gains access by it, because of the key |
 
-Renders (page images) are a cache, not blobs: keyed by the content digest, the page, the resolution and the worker image's digest, and evicted by age. They are deterministic for a given image, so a cache miss only costs time.
+Renders (page images) are a cache, not blobs: keyed by the content digest, the page, the scale and the worker image's digest, and evicted by age. The spike found WordCraft's renders byte-identical across processes, and fonts are the only input from the host: it uses system fonts when they are installed. The worker image installs none, so its renders depend on the image alone, and a cache miss only costs time.
 
 ### The app port
 
@@ -189,8 +189,8 @@ Each call is stateless: bytes in, bytes out. A document is never held open betwe
 
 | Transport | Assessment |
 |---|---|
-| **MCP over stdio (chosen)** | WordCraft's documented headless surface (`wordcraft-cli mcp`: `execute`, `batch`, `inspect_document`, `render_page`, `save_document`). stdio needs no listening port at all, which is what makes a no-network sandbox possible. The MCP Python SDK is already a dependency of `artifactr[mcp]` |
-| The JSON control channel (`--control <port>`) | A TCP listener with a JSON protocol of its own, aimed at driving the desktop app. It would need a port inside the sandbox, and a protocol to keep up with |
+| **MCP over stdio (chosen)** | WordCraft's headless surface, `wordcraft-cli mcp`, which speaks only stdio: 16 tools, of which the pilot uses `open_document`, `new_document`, `batch`, `select_text`, `get_text`, `inspect_document`, `render_page`, `save_document` and `list_commands`. Its `--automation-read-root` and `--automation-write-root` confine what it may read and write to two directories. stdio needs no listening port at all, which is what makes a no-network sandbox possible. The MCP Python SDK is already a dependency of `artifactr[mcp]` |
+| The JSON control channel (`--control <port>`) | Bound to 127.0.0.1, with a key from a file, newline-delimited JSON. It belongs to the desktop app, not the CLI, and would need a listener and a key inside the sandbox for nothing stdio lacks |
 | One CLI call per operation | No batches and no inspection, and output parsed from a terminal |
 | Linking the Rust crates | A Python extension built from young crates, inside the application's process: no isolation from a hostile file, and a Rust toolchain in every build |
 
@@ -204,7 +204,7 @@ Two adapters implement the port for each app:
 Opening a user's `.docx` runs a young parser on hostile input: a zip bomb, XML nested a million deep, a 40,000-pixel image, a link to a remote template. Rust's memory safety removes one class of bug, not panics, runaway allocation or slow paths. The worker treats every file as hostile.
 
 - **A worker per app, in stackr's compose,** on an internal network (`internal: true`) that only the application joins: no route out, no published port. The application reaches it by service name. Nothing listens on the host; a developer who wants to call it from outside the stack goes through the application.
-- **One process per call.** The worker's runner, a small program in `artifactr_craft.worker`, accepts one job on the internal network, spawns the app's CLI over stdio in a fresh temporary directory, and returns its result. It never runs two jobs in one process.
+- **One process per call, in a long-lived container.** The worker's runner, a small program in `artifactr_craft.worker`, accepts one job on the internal network, spawns the app's CLI over stdio in a fresh temporary directory given as its read and write roots, and returns its result. It never runs two jobs in one process. Starting the CLI took about 4 ms in the spike, against 0.4 to 8 s to start a container, which is why the container lives on and the process doesn't.
 - **Limits on every call:** a wall-clock deadline (30 s for an edit, 10 s for a render by default), CPU time, address space and file size by `setrlimit`, a cap on the size of what comes back. A breach kills the process and is a typed failure: `timeout`, `crashed`, `too_large`, `refused`.
 - **The container:** non-root, read-only root file system, a size-limited `tmpfs`, all capabilities dropped, `no-new-privileges`, the runtime's default seccomp profile, and memory, CPU and PID limits. These are compose settings, so the template, the single host and the AWS stack carry them the same way.
 - **stackr owns the policy,** because it owns the network, the limits and the image. The package documents what it needs and ships the runner; it doesn't choose the limits for a deployment.
@@ -217,9 +217,11 @@ Opening a user's `.docx` runs a young parser on hostile input: a zip bomb, XML n
 | What the file is | `render_for_agent`: name, pages and the outline the app wrote at the revision | The outline's 4,000 characters, which is the capability's `max_render_chars` |
 | Its words | `read_native(artifact_id, pages)`: the text blob, cut to the pages asked for | 8,000 characters a call, with how much remains |
 | Its look | `view_page(artifact_id, page)`: one rendered page, as an image, for models that take images | One page a call, at a fixed resolution; off unless the application turns it on |
-| What it can do | `find_commands(query)`: the app's commands that match, with their argument schemas | Ten a call; the full catalog (WordCraft claims 422 commands) is never in the prompt |
+| What it can do | `find_commands(query)`: the app's commands that match, through its `list_commands` | Ten a call; the full catalog (617 commands in WordCraft 0.7.0) is never in the prompt |
 | To change it | `edit_native(artifact_id, base_version, commands, summary)` | One batch a call; returns `Applied`, `Proposed`, or the conflict |
 | To start one | `create_native(kind, name)` | |
+
+WordCraft describes each command's parameters as a free-text signature, such as `{"rows": n, "cols": n, "style"?: string}`, not as JSON Schema, so neither the model nor the package can validate a batch before the app runs it. A refused command comes back as the tool's error, and the batch commits nothing.
 
 The toolset is `NativeFileTools`, registered on the agent beside the application's own, as [ADR-0017][a-adr-0017] has it. External agents over MCP get the same tools on artifactr's MCP server. Everything they read is artifact-scoped, so authorization is artifactr's: the tools open workspaces through `Workspaces`, whose `authorize` hook grantr answers.
 
@@ -246,7 +248,7 @@ The toolset is `NativeFileTools`, registered on the agent beside the application
 ### stackr
 
 - **A recipe, not a default.** The template gains a `native_files` question, off by default. On, it adds the worker service, its internal network and its limits, and wires `Worker` into the application.
-- **The image is stackr's thin image.** WordCraft publishes no image the evidence found, so stackr builds one from the release's Linux binary, checked against the release's checksum, in the way and with the provenance of [ADR-0035][s-adr-0035], pinned by version and digest. The worker runs only that binary and the runner.
+- **The image is stackr's thin image.** WordCraft publishes no image the spike could find, and its Linux CLI comes only inside the full app's tarball. stackr builds an image from that tarball's `wordcraft-cli`, checked against the release's `SHA256SUMS.txt`, in the way and with the provenance of [ADR-0035][s-adr-0035], pinned by version and digest. The CLI needs only the C library, so the image is a slim base, the CLI, the runner and no fonts. Upstream signs nothing and publishes no SBOM, so the checksum is the whole chain of custody from upstream, and stackr's attestation starts at its own build.
 - **Notices.** The image carries the app's licence files and a `NOTICE` naming its source and version, and the template's licence notes list it. A recipe is added only for an app whose licence is verified.
 
 ### Fidelity and what "supported" means
@@ -257,7 +259,7 @@ A format is supported when its corpus round-trips through the app without loss i
 - **Loss is measured on the format, not the bytes.** For `.docx`, open and save with no edits, then compare the normalized OOXML of the input and the output, feature by feature: text, paragraph styles, run properties, tables, lists, images, headers and footers, footnotes, comments, tracked changes, section properties. Each feature is preserved, changed or dropped.
 - **Saving twice is a fixpoint:** saving what was saved changes nothing, after normalization.
 - **A feature matrix per format,** published in the package's docs from the nightly run: supported, changed on save, or dropped. "Supported" is per feature, never per format.
-- **Determinism decides what is compared.** If the same input and commands give the same bytes, tests compare digests and renders can be cached forever. If not, which the [evidence](#evidence) measures, tests compare normalized parts, and the digest still names the revision correctly but saves of unchanged content make new blobs.
+- **Determinism decides what is compared.** The spike found WordCraft's `.docx` output identical across runs except `docProps/core.xml`, where every save stamps the clock as `dcterms:modified`, adds one to `cp:revision` and writes `--author` as `lastModifiedBy`, with no way to fix the clock. Tests therefore compare with `core.xml` normalized. The package passes the acting participant's name as `--author`, so the file records who made a revision as artifactr does, and accepts that saves of unchanged content make new blobs.
 - **Where it runs:** the fake app on every pull request; the real worker image in the Acceptance job and nightly, since it needs a container runtime and the release binary.
 
 ### What changes in each package
@@ -311,12 +313,12 @@ Recommended, for the maintainer to decide.
 
 ## Drawbacks
 
-- **A young dependency on the critical path.** WordCraft is described as alpha. Its commands, its MCP tools and its output can change in any release, and the adapter has to follow.
+- **A young dependency on the critical path.** WordCraft's repository is nine days old, with six releases in seven days, and calls itself alpha. Its own documents disagree on how many commands it has (422, "over 270", and 617 in the binary). Its commands, tools and output can change in any release, and the adapter has to follow.
 - **Two stores to keep consistent.** The manifest is transactional and the bytes are not; put-first and collection make the gap safe, not absent, and a hand-made patch can still name missing content.
 - **No merging.** Two people editing the same document concurrently means one of them replays or re-plans. Collaboration stays turn-based, as ADR-0004 chose, but the turns are coarser than in a Markdown document.
 - **Seconds per edit.** Every edit spawns a process and round-trips the file. The evidence measures what that costs.
 - **A worker service to run,** with its own image to build, pin and patch, in every deployment that turns it on.
-- **The name.** `artifactr-craft` is named after a third-party product. If its owners object, or the apps' direction changes, the package is renamed; the neutral parts (manifest, blobs, sandbox) don't depend on it.
+- **The name.** `artifactr-craft` borrows the apps' brand, and WordCraft's `NOTICE` says the ArtCraft name, wordmark and logos are trademarks, outside the open-source licence. The neutral parts (manifest, blobs, sandbox) don't depend on the apps, so a neutral name costs nothing; see the unresolved questions.
 
 ## Alternatives
 
@@ -328,16 +330,16 @@ Recommended, for the maintainer to decide.
 
 ## Unresolved questions
 
-- **Are WordCraft's commands anchored?** Decides whether replay is sound (D4).
-- **Is the output deterministic?** Decides whether renders can be cached forever, and how fidelity is compared.
-- **The name** of the package, given that "craft" is the apps' brand.
+- **Is "select by content first" enough to make replay sound** for tables, styles and images, or only for text (D4)?
+- **The name** of the package. `artifactr-files`, with `wordcraft` as an adapter module, avoids the apps' trademark; `artifactr-craft` was the working name.
+- **Upstream's supply chain.** Checksums only, no signatures, SBOM or attestations, and a very young organization whose repositories gathered tens of thousands of stars in days. Whether to wait for signed releases before phase 4, or build the CLI from a pinned source commit in CI instead of taking the binary.
 - **Quotas.** A per-workspace or per-tenant limit on blob bytes, beyond the per-blob limit, and where it is enforced.
 - **Text extraction** for search across native files, which the text blob makes possible and nothing here builds.
 - **When the blob port moves into artifactr,** if another package needs attachments, such as images in Markdown documents.
 
 ## Evidence
 
-The spike that grounds this RFC. Everything downloaded was treated as untrusted data, in a scratch directory outside the repository.
+The spike that grounds this RFC, on 2026-10-16. Everything downloaded was treated as untrusted data, in a scratch directory outside the repository, and nothing was built from source.
 
 ### artifactr
 
@@ -346,7 +348,73 @@ The spike that grounds this RFC. Everything downloaded was treated as untrusted 
 - **`render_for_agent(self) -> str`** is synchronous on the model (`core/artifacts.py`), and `read_artifact` and the capability's instructions call it directly.
 - **Every revision stores its resulting data,** and `artifact_created` and `artifact_changed` carry data or a patch into relayr's bridged events.
 
-<!-- spike: WordCraft and the other apps -->
+### WordCraft
+
+Read from a shallow clone of `main` at `eae24217` (2026-10-15) and the v0.7.0 release (2026-10-14, tag at `fc419188`), on 2026-10-16. "Verified" means read in the repository or seen running; "unverified" means not checked.
+
+| Claim | Finding | |
+|---|---|---|
+| Licence | `LICENSE-MIT` and `LICENSE-APACHE`; `Cargo.toml` says `MIT OR Apache-2.0`. `NOTICE`: the ArtCraft name, wordmark and logos are trademarks, under `LICENSE-brand.txt`. Bundled fonts are OFL-1.1 | Verified |
+| Releases | v0.1.0 to v0.7.0 between 2026-10-07 and 2026-10-14. Linux x86_64, aarch64 and riscv64 tarballs, packages and AppImages; macOS, Windows, FreeBSD; a web build; `SHA256SUMS.txt` | Verified |
+| A Linux CLI | Only inside the full app's tarball (`bin/wordcraft-cli`, 69.6 MB, beside the 98.6 MB app); a standalone CLI archive exists for macOS only. Dynamically linked against the C library, `libm` and `libgcc_s` | Verified (aarch64) |
+| Signatures, SBOM, attestations | None: nothing in `release.yml`, and GitHub's attestation API has none for the x86_64 tarball | Verified absent |
+| Container image | None found: no Dockerfile in the repository, no registry references | Unverified (the registry's API wasn't readable with the token used) |
+| Published crates | None on crates.io; the name `wordcraft` there is an unrelated crate. Using the crates as a library means a git dependency | Verified |
+| MCP server | `wordcraft-cli mcp`, stdio only, line-delimited JSON-RPC, protocol `2025-06-18`. 16 tools; `--automation-read-root` and `--automation-write-root` confine file access | Verified, live |
+| Control channel | In the desktop app: binds 127.0.0.1, a 256-bit key from a 0600 file, newline-delimited JSON, 1 MiB lines, 30 s to authorize | Verified in code, not run |
+| Commands | 617 in `wordcraft-cli commands --json` for v0.7.0 (389 change the document), 629 `CommandSpec`s at `eae24217`; the README says 422 and `docs/mcp.md` "over 270". Parameters are free-text signatures, not JSON Schema. Commands serialize as `{command, params}`; macros exist in memory | Verified |
+| Undo | Whole-document snapshots | Verified in code |
+| Formats | Opens docx, doc (import only), odt, rtf, html, md, tex, txt, json, xml. Saves docx, pdf, odt, rtf, html, md, tex, txt, png, json, xml; all ten conversions of one test file succeeded | Verified, live |
+| Network | No HTTP client in `Cargo.lock`, no telemetry or update checks. Sockets only in the control server, MCP's `--connect`, and a local Zotero client | Verified in code |
+| Fonts | Bundled first, then user fonts, then system fonts from `/usr/share/fonts` | Verified in code |
+
+### Running it
+
+In a container on Docker 29.4.0, on an aarch64 host, from `debian:bookworm-slim` at `sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587`, with the release's aarch64 tarball (its checksum matched):
+
+```sh
+docker run --rm -i --platform linux/arm64 --network none --read-only \
+  --memory 1g --cpus 1 --pids-limit 256 --tmpfs /tmp \
+  -e HOME=/tmp -e WORDCRAFT_NO_PREFS=1 -e TZ=UTC \
+  -v "$BIN":/app:ro -v "$CORPUS":/in:ro -v "$OUT":/out \
+  debian@sha256:7c7b2c96... \
+  /app/wordcraft-cli mcp --author "Spike Agent" \
+    --automation-read-root /in --automation-write-root /out
+```
+
+A script of our own drove it over stdio. The corpus was six `.docx` files generated with Python's `zipfile`: headings, run formatting, lists and a bordered table; a footnote; an image; a comment; tracked insertions and deletions; and all of them together. No real-world documents were tested.
+
+| Measure | Result |
+|---|---|
+| Start-up | About 4 ms for `--version` and 6 ms for MCP's `initialize`, inside the container. Starting a container took 0.4 to 8 s |
+| Calls on the small files | `open_document` 1 to 12 ms, `inspect_document` 1 to 41 ms, `render_page` 3 to 18 ms, `save_document` 2 to 18 ms. Every call succeeded, `batch` and `edit.undo` included |
+| `render_page` | A PNG as MCP image content, with the page's size and count; US Letter at scale 1 is 612 × 792 |
+| Open and save, no edits | Kept exactly: paragraph count, styles, numbering, text, run properties (bold, italic, underline, colour, size, font), table borders and widths, the footnote, the comment and its author and date, the tracked changes' authors and dates, the image's bytes |
+| Changed on save | Adds `docProps/app.xml`, `word/settings.xml`, `word/theme/theme1.xml`, and `word/commentsExtended.xml` where there are comments; renumbers tracked changes' ids; in `core.xml`, sets `dcterms:modified` to the clock, adds one to `cp:revision` and writes `--author` as `lastModifiedBy` |
+| Determinism, two processes | PNG renders identical. `.docx` identical except `docProps/core.xml`'s dates; zip entries carry a fixed 1980 time. PDF differs in its dates and `/ID` |
+| Failure | The first run used an amd64 image, because the host's Docker defaults to `linux/amd64`, and failed with `exec /app/wordcraft-cli: no such file or directory`. `--platform linux/arm64` fixed it. x86_64 was not run |
+
+### The other apps
+
+From [getartcraft.com/apps](https://getartcraft.com/apps) on 2026-10-16 and each repository under `github.com/storytold`. Each repository exists, has `LICENSE-MIT` and `LICENSE-APACHE` and a `MIT OR Apache-2.0` badge, and documents MCP in `docs/`. Formats are the READMEs' claims, not tested. Nothing but WordCraft was run.
+
+| App | Site's maturity | Latest release | Formats claimed | Surface documented | Licence files | Run |
+|---|---|---|---|---|---|---|
+| WordCraft | In development (README: alpha) | v0.7.0 | docx, odt, rtf, md, tex, pdf | stdio MCP, control channel | Verified | Verified |
+| DeckCraft | In development | v0.7.0 | pptx; pdf, png, jpeg, gif export | MCP, control channel | Verified | Unverified |
+| GridCraft | In development | v0.7.0 | xlsx; csv, tsv; xls, xlsb, ods import | MCP, control channel | Verified | Unverified |
+| PdfCraft | Early alpha | v0.8.0 | pdf: combine, redact, sign, forms, OCR | MCP, CLI | Verified | Unverified |
+| PhotoCraft | Early alpha | v0.9.0 | psd | MCP, control channel | Verified | Unverified |
+| VectorCraft | In development | v0.12.0 | svg, pdf, ai; raster export | MCP, control channel | Verified | Unverified |
+| FigCraft | Early alpha | v0.6.0 | its own; svg, png, pdf; fig (best effort) | MCP, control channel | Verified | Unverified |
+| DesignCraft | In development | v0.8.0 | its own; idml; indd import; pptx, pdf, epub export | MCP, control channel | Verified | Unverified |
+| CADCraft | In development | v0.7.0 | dxf; dwg; svg, png, pdf export | MCP, control channel | Verified | Unverified |
+| SoundCraft | In development | v0.7.0 | wav, aiff, flac; mp3, ogg, aac import; MIDI | MCP, control channel | Verified | Unverified |
+| LightCraft | In development | v0.8.0 | camera raw, jpeg, png, tiff, webp, psd, jxl | MCP, control channel | Verified | Unverified |
+| EffectCraft | In development | v0.10.0 | Lottie; video codecs; exr, psd | MCP, control channel | Verified | Unverified |
+| FilmCraft | In development | v0.8.0 | video codecs; FCP7 XML, AAF, OTIO; subtitles | MCP, control channel | Verified | Unverified |
+
+Every repository was created between 2026-09-30 and 2026-10-09, all thirteen were pushed to on 2026-10-16, and their stars run from about 1,900 to 64,700. A fourteenth repository, AniCraft, isn't on the page and has no licence GitHub detects.
 
 [a-adr-0001]: ../artifactr/adr/0001-python-library-with-sans-io-core.md
 [a-adr-0002]: ../artifactr/adr/0002-single-write-path.md

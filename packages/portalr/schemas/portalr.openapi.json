@@ -631,7 +631,7 @@
         "type": "object"
       },
       "Refused": {
-        "description": "The body of a refused request, in the shape artifactr's and reflexr's routers document.\n\n``detail`` is the refusal, the message of one FastAPI gives, or the problems it found with the\nrequest's parameters or body.",
+        "description": "The body of a refused request.\n\n``detail`` is the rejection, the message of a resolver's refusal, or the problems FastAPI\nfound with the request.",
         "properties": {
           "detail": {
             "anyOf": [
@@ -659,7 +659,7 @@
       },
       "RejectionDetail": {
         "additionalProperties": true,
-        "description": "A refusal portalr or grantr gives: its ``type`` and its ``message``.",
+        "description": "A rejection, as REST sends it: its ``type``, its ``message`` and its typed details.",
         "properties": {
           "message": {
             "title": "Message",

@@ -524,10 +524,10 @@ export interface components {
         };
         /**
          * Refused
-         * @description The body of a refused request, in the shape artifactr's and reflexr's routers document.
+         * @description The body of a refused request.
          *
-         *     ``detail`` is the refusal, the message of one FastAPI gives, or the problems it found with the
-         *     request's parameters or body.
+         *     ``detail`` is the rejection, the message of a resolver's refusal, or the problems FastAPI
+         *     found with the request.
          */
         Refused: {
             /** Detail */
@@ -535,7 +535,7 @@ export interface components {
         };
         /**
          * RejectionDetail
-         * @description A refusal portalr or grantr gives: its ``type`` and its ``message``.
+         * @description A rejection, as REST sends it: its ``type``, its ``message`` and its typed details.
          */
         RejectionDetail: {
             /** Message */

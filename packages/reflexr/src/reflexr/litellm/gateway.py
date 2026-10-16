@@ -15,7 +15,7 @@ from pydantic_ai.messages import ModelResponse
 from pydantic_ai.models import ModelRequestContext
 from pydantic_ai.settings import ModelSettings
 
-from lattice_core.litellm import litellm_model
+from lattice_core.litellm import add_propagated_tags, litellm_model
 from lattice_core.tags import request_tags
 from reflexr.core import RuleName, TenantId, UserActor, WorkspaceId
 from reflexr.telemetry import current_trace_id
@@ -90,7 +90,8 @@ class LiteLLMGateway(AbstractCapability[Reaction[Any]]):
 
     - LiteLLM metadata: the tenant, workspace, rule, scope and run, the causal chain as the
       session, the person whose event fired the rule as the user, the trace id (so LiteLLM's
-      own traces join the run's), and tags
+      own traces join the run's), and tags, including the ``rule:`` and ``kind:`` trace tags
+      Langfuse is propagating
     - the W3C trace context, as ``traceparent``
     - the guardrails the rule's policy names
     - the tenant's virtual key, as the request's ``Authorization``, from ``tenant_key``
@@ -138,12 +139,14 @@ class LiteLLMGateway(AbstractCapability[Reaction[Any]]):
             "scope": run.scope_key,
             "run_id": run.id,
             "session_id": run.correlation_id,
-            "tags": [
-                "reflexr",
-                *request_tags(tenant_id, workspace_id),
-                f"rule:{run.rule}",
-                *self.tags,
-            ],
+            "tags": add_propagated_tags(
+                [
+                    "reflexr",
+                    *request_tags(tenant_id, workspace_id),
+                    f"rule:{run.rule}",
+                    *self.tags,
+                ]
+            ),
         }
         cause = reaction.events[-1].actor if reaction.events else None
         if isinstance(cause, UserActor):

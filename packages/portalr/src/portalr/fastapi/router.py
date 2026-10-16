@@ -25,6 +25,7 @@ from grantr.core import (
 )
 from grantr.fastapi import STATUS_CODES, Caller, ResolveActor, Unauthorized
 from grantr.grants import Grants
+from lattice_core.refusals import Refused, refusals
 from portalr.actions import READ_DEPLOYMENT, READ_SPEND, READ_TELEMETRY
 from portalr.fastapi.site import Site, Surfaces
 from portalr.fastapi.ui import ui_router
@@ -120,40 +121,9 @@ class Links(BaseModel):
     grafana_logs: str | None = None
 
 
-class RejectionDetail(BaseModel):
-    """A refusal portalr or grantr gives: its ``type`` and its ``message``."""
-
-    model_config = ConfigDict(extra="allow")
-
-    type: str
-    message: str
-
-
-class FieldError(BaseModel):
-    """One problem FastAPI found with a request's parameters or body."""
-
-    model_config = ConfigDict(extra="allow")
-
-    loc: list[str | int]
-    msg: str
-    type: str
-
-
-class Refused(BaseModel):
-    """The body of a refused request, in the shape artifactr's and reflexr's routers document.
-
-    ``detail`` is the refusal, the message of one FastAPI gives, or the problems it found with the
-    request's parameters or body.
-    """
-
-    detail: RejectionDetail | str | list[FieldError]
-
-
-REFUSALS: Final[dict[int | str, dict[str, Any]]] = {
-    status: {"model": Refused, "description": "Refused"} for status in (400, 401, 403, 422)
-}
-"""The refused responses every route under ``/v1`` documents, described in words of portalr's
-own, since FastAPI's default is Python's phrase for the status, which changes between versions."""
+REFUSALS: Final = refusals(400, 401, 403, 422)
+"""The refused responses every route under ``/v1`` documents: no route of portalr's answers 404 or
+409, which artifactr's and reflexr's document."""
 
 
 TenantHeader = Annotated[TenantId | None, Header(alias="X-Tenant")]

@@ -18,7 +18,7 @@ from pydantic_ai.settings import ModelSettings
 from artifactr.agent import RunFailure, Session
 from artifactr.core import TenantId, UserActor, WorkspaceId
 from artifactr.telemetry import current_trace_id
-from lattice_core.litellm import litellm_model
+from lattice_core.litellm import add_propagated_tags, litellm_model
 from lattice_core.tags import request_tags
 
 __all__ = [
@@ -86,7 +86,9 @@ class LiteLLMGateway(AbstractCapability[Session[Any]]):
     model request it adds, through the request's ``extra_body`` and ``extra_headers``:
 
     - LiteLLM metadata: the tenant, workspace, thread and run, the thread as the session, the
-      person as the user, the trace id (so LiteLLM's own traces join the turn's), and tags
+      person as the user, the trace id (so LiteLLM's own traces join the turn's), and tags,
+      including the ``rule:`` and ``kind:`` trace tags Langfuse is propagating, such as
+      relayr's for a rule's turn
     - the W3C trace context, as ``traceparent``
     - the guardrails the workspace's policy names
     - the tenant's virtual key, as the request's ``Authorization``, from ``tenant_key``
@@ -130,7 +132,9 @@ class LiteLLMGateway(AbstractCapability[Session[Any]]):
             "thread_id": session.thread_id,
             "run_id": session.run_id,
             "session_id": session.thread_id,
-            "tags": ["artifactr", *request_tags(tenant_id, workspace_id), *self.tags],
+            "tags": add_propagated_tags(
+                ["artifactr", *request_tags(tenant_id, workspace_id), *self.tags]
+            ),
         }
         if isinstance(person := session.on_behalf_of, UserActor):
             metadata["trace_user_id"] = person.id

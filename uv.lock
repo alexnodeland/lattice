@@ -2244,6 +2244,7 @@ langfuse = [
 ]
 litellm = [
     { name = "httpx2" },
+    { name = "opentelemetry-api" },
     { name = "pydantic-ai-slim", extra = ["openai"] },
 ]
 otel = [
@@ -2295,6 +2296,7 @@ test = [
 requires-dist = [
     { name = "httpx2", marker = "extra == 'litellm'", specifier = ">=2.7" },
     { name = "langfuse", marker = "extra == 'langfuse'", specifier = ">=4.15,<5" },
+    { name = "opentelemetry-api", marker = "extra == 'litellm'", specifier = ">=1.45" },
     { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'otel'", specifier = ">=1.45" },
     { name = "opentelemetry-instrumentation-asyncpg", marker = "extra == 'otel'", specifier = ">=0.66b0" },
     { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'otel'", specifier = ">=0.66b0" },

@@ -12,7 +12,7 @@ import httpx
 import pytest
 
 from artifactr.fastapi.openapi import openapi_app, openapi_document
-from artifactr.fastapi.router import Refused
+from lattice_core.refusals import Refused
 
 SCHEMAS = Path(__file__).parent.parent / "schemas"
 DOCUMENT = SCHEMAS / "artifactr.openapi.json"

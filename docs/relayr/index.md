@@ -18,7 +18,7 @@ The bridge between artifactr and reflexr: events from chats and artifacts become
 
 !!! note "Built: the v0.1 plan"
 
-    Everything below is built: both adapters, telemetry across the bridge, rules from chat, and evaluation, with stackr's template wiring it all into an application ([v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)), except LiteLLM's metadata, which waits on [lattice #86](https://github.com/alexnodeland/lattice/issues/86). It is distributed as `relayr-ai`, since the name `relayr` on PyPI is an unrelated project, and imported as `relayr`.
+    Everything below is built: both adapters, telemetry across the bridge, rules from chat, and evaluation, with stackr's template wiring it all into an application ([v0.1 plan](rfcs/0001-v0.1-implementation-plan.md)). It is distributed as `relayr-ai`, since the name `relayr` on PyPI is an unrelated project, and imported as `relayr`.
 
 ## Why: one bridge, built once
 

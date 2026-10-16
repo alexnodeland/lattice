@@ -48,4 +48,4 @@ artifactr and reflexr keep their extension because their docstrings already use 
 [a-adr-0050]: ../../artifactr/adr/0050-one-docs-build.md
 [e-adr-0013]: ../../evalr/adr/0013-docstrings-in-markdown-and-one-docs-build.md
 [r-adr-0046]: ../../reflexr/adr/0046-one-docs-build.md
-[r-brand]: https://github.com/alexnodeland/reflexr/blob/main/docs/assets/brand/README.md#the-family
+[r-brand]: ../../reflexr/assets/brand/README.md#the-family

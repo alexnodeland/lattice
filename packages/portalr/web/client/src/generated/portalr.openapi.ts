@@ -218,6 +218,10 @@ export interface paths {
         /**
          * Trace
          * @description A trace, if it is the tenant's: its spans, for its waterfall.
+         *
+         *     Only the attributes known to be safe are shown. ``content=true`` and ``span`` ask for one
+         *     span's others, its prompt and completion among them, and nothing of any other span's; the
+         *     answer is not to be kept.
          */
         get: operations["trace_portalr_v1_traces__trace_id__get"];
         put?: never;
@@ -608,6 +612,11 @@ export interface components {
             span_id: string;
             /** Start Ns */
             start_ns: number;
+            /**
+             * Withheld
+             * @default []
+             */
+            withheld: string[];
         };
         /**
          * Spend
@@ -692,11 +701,16 @@ export interface components {
          * @description A trace and its spans.
          */
         Trace: {
+            /**
+             * Complete
+             * @default true
+             */
+            complete: boolean;
             /** Spans */
             spans: components["schemas"]["Span"][];
-            /** Trace Id */
-            trace_id: string;
+            trace_id: components["schemas"]["TraceId"];
         };
+        TraceId: string;
         /**
          * TraceSummary
          * @description A trace Tempo found: its id, start and duration.
@@ -712,8 +726,7 @@ export interface components {
             root_service?: string | null;
             /** Start Ns */
             start_ns: number;
-            /** Trace Id */
-            trace_id: string;
+            trace_id: components["schemas"]["TraceId"];
         };
         /**
          * Unavailable
@@ -1373,7 +1386,10 @@ export interface operations {
     };
     trace_portalr_v1_traces__trace_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                content?: boolean;
+                span?: components["schemas"]["Id"] | null;
+            };
             header?: {
                 "X-Tenant"?: components["schemas"]["TenantId"] | null;
             };

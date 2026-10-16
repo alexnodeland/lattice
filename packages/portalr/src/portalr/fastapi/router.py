@@ -10,7 +10,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Annotated, Any, Final
 
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from grantr.core import (
@@ -210,10 +210,25 @@ def portalr_router(
 
     @api.get("/v1/traces/{trace_id}", response_model=reading(Trace | None))
     async def trace(
-        trace_id: Id, tenant: Tenant = telemetry
+        trace_id: Id,
+        response: Response,
+        content: bool = False,
+        span: Id | None = None,
+        tenant: Tenant = telemetry,
     ) -> Ok[Trace | None] | Unavailable | Unconfigured:
-        """A trace, if it is the tenant's: its spans, for its waterfall."""
-        return await readers.tempo.trace(tenant, trace_id) if readers.tempo else Unconfigured()
+        """A trace, if it is the tenant's: its spans, for its waterfall.
+
+        Only the attributes known to be safe are shown. ``content=true`` and ``span`` ask for one
+        span's others, its prompt and completion among them, and nothing of any other span's; the
+        answer is not to be kept.
+        """
+        if content and span is None:
+            raise HTTPException(422, "content is asked for a span: name it with span")
+        if not readers.tempo:
+            return Unconfigured()
+        if content:
+            response.headers["Cache-Control"] = "no-store"
+        return await readers.tempo.trace(tenant, trace_id, reveal=span if content else None)
 
     @api.get("/v1/logs", response_model=reading(list[LogLine]))
     async def logs(

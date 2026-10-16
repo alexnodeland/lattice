@@ -109,7 +109,7 @@ The admin UI renders what the readers return with open-source components it vend
 
 | What | With |
 |---|---|
-| Traces and sessions: the span tree and waterfall, inputs, outputs, tokens and timings | AgentPrism (Evil Martians, MIT), whose adapters read OpenTelemetry's shape. It is alpha and built on Tailwind 3 and Radix, so `ui` vendors its components and ports them to Tailwind 4 and Base UI, with TanStack Virtual for long traces |
+| Traces and sessions: the span tree and waterfall, inputs, outputs, tokens and timings | AgentPrism (Evil Martians, MIT), whose adapters read OpenTelemetry's shape. It is alpha and built on Tailwind 3 and Radix, so `ui` vendors its components and ports them to Tailwind 4 and Base UI, with TanStack Virtual for long traces. [portalr ADR-0030](../portalr/adr/0030-traces-and-the-trace-view.md) writes `ui`'s own view instead, with TanStack Virtual, and keeps what was said in a span behind a reveal |
 | Charts: usage, spend, scores, latency and errors over time | Tremor's copied components on Recharts, and uPlot for dense time series |
 | Logs | A virtualized list over LogQL results, with ANSI colours, in `ui` |
 

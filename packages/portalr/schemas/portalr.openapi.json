@@ -870,6 +870,14 @@
           "start_ns": {
             "title": "Start Ns",
             "type": "integer"
+          },
+          "withheld": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Withheld",
+            "type": "array"
           }
         },
         "required": [
@@ -1039,6 +1047,11 @@
       "Trace": {
         "description": "A trace and its spans.",
         "properties": {
+          "complete": {
+            "default": true,
+            "title": "Complete",
+            "type": "boolean"
+          },
           "spans": {
             "items": {
               "$ref": "#/components/schemas/Span"
@@ -1047,8 +1060,7 @@
             "type": "array"
           },
           "trace_id": {
-            "title": "Trace Id",
-            "type": "string"
+            "$ref": "#/components/schemas/TraceId"
           }
         },
         "required": [
@@ -1057,6 +1069,9 @@
         ],
         "title": "Trace",
         "type": "object"
+      },
+      "TraceId": {
+        "type": "string"
       },
       "TraceSummary": {
         "description": "A trace Tempo found: its id, start and duration.\n\nIts root's service and name are left out, since the root may be another tenant's span.",
@@ -1099,8 +1114,7 @@
             "type": "integer"
           },
           "trace_id": {
-            "title": "Trace Id",
-            "type": "string"
+            "$ref": "#/components/schemas/TraceId"
           }
         },
         "required": [
@@ -2378,7 +2392,7 @@
     },
     "/portalr/v1/traces/{trace_id}": {
       "get": {
-        "description": "A trace, if it is the tenant's: its spans, for its waterfall.",
+        "description": "A trace, if it is the tenant's: its spans, for its waterfall.\n\nOnly the attributes known to be safe are shown. ``content=true`` and ``span`` ask for one\nspan's others, its prompt and completion among them, and nothing of any other span's; the\nanswer is not to be kept.",
         "operationId": "trace_portalr_v1_traces__trace_id__get",
         "parameters": [
           {
@@ -2389,6 +2403,32 @@
               "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$",
               "title": "Trace Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "content",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Content",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "span",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Span"
             }
           },
           {

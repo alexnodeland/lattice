@@ -135,6 +135,14 @@ test("every read has its own path", async () => {
       }),
       "/portalr/v1/feedback",
     ],
+    [
+      queries.portalr.traces("acme", {
+        start: "2026-10-07T00:00:00Z",
+        end: "2026-10-14T00:00:00Z",
+      }),
+      "/portalr/v1/traces",
+    ],
+    [queries.portalr.trace("acme", "c029eec9"), `/portalr/v1/traces/${"0".repeat(24)}c029eec9`],
     [queries.portalr.links("ops", "t1"), "/portalr/v1/deployment/links"],
     [queries.grantr.grants("acme", "ws_1"), "/grantr/v1/tenants/acme/grants"],
     [queries.grantr.restrictions("acme", "ws_1"), "/grantr/v1/tenants/acme/restrictions"],
@@ -423,4 +431,46 @@ test("a refusal says why, and never shows its body as it came", () => {
   );
   expect(said(500, null)).toBe("the server refused the read (500): The server answered 500.");
   expect(said(500, undefined)).toBe("the server refused the read (500): The server answered 500.");
+});
+
+test("a traces read names its window, its limit and its filter; a trace read, whether it wants content", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const window = { start: "2026-10-07T00:00:00Z", end: "2026-10-14T00:00:00Z" };
+  await client.fetchQuery(
+    queries.portalr.traces("acme", window, { session: "thr_1", run: "run_2" }),
+  );
+  const list = seen.at(-1);
+  expect(Object.fromEntries(list?.url.searchParams ?? [])).toEqual({
+    start: window.start,
+    end: window.end,
+    limit: "100",
+    session: "thr_1",
+    run: "run_2",
+  });
+  expect(list?.headers.get("x-tenant")).toBe("acme");
+  await client.fetchQuery(queries.portalr.traces("acme", window));
+  expect(seen.at(-1)?.url.searchParams.has("session")).toBe(false);
+  await client.fetchQuery(queries.portalr.trace("acme", "C029EEC9"));
+  const plain = seen.at(-1);
+  expect(plain?.url.pathname).toBe(`/portalr/v1/traces/${"0".repeat(24)}c029eec9`);
+  expect(plain?.url.searchParams.has("content")).toBe(false);
+  await client.fetchQuery(queries.portalr.trace("acme", "c029eec9", "83db6fcbe8c81dba"));
+  const revealed = seen.at(-1);
+  expect(revealed?.url.searchParams.get("content")).toBe("true");
+  expect(revealed?.url.searchParams.get("span")).toBe("83db6fcbe8c81dba");
+  // One trace is one read, however its id is written; a span's withheld attributes are another,
+  // let go as soon as nothing shows them.
+  const whole = "0".repeat(24) + "c029eec9";
+  expect(queries.portalr.trace("acme", "c029eec9").queryKey).toEqual(
+    keys.portalr.trace("acme", whole, null),
+  );
+  expect(keys.portalr.trace("acme", whole, "s1")).not.toEqual(
+    keys.portalr.trace("acme", whole, null),
+  );
+  expect(queries.portalr.trace("acme", whole, "s1").gcTime).toBe(0);
+  // A span's withheld attributes are read once: no retry, and no read again on focus.
+  const asked = queries.portalr.trace("acme", whole, "s1");
+  expect([asked.retry, asked.refetchOnWindowFocus]).toEqual([false, false]);
+  expect(queries.portalr.trace("acme", whole).retry).toBeUndefined();
+  expect(queries.portalr.trace("acme", whole).gcTime).toBeGreaterThan(0);
 });

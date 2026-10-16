@@ -211,3 +211,38 @@ test("an axis may write an index shorter than the table does", async () => {
   await figure.getByText("Show the figures").click();
   await expect.element(figure.getByRole("row", { name: "2025-12-31" })).toBeVisible();
 });
+
+test("on a phone, a chart's direct labels are whole, inside its drawing", async () => {
+  await page.viewport(390, 844);
+  const screen = await render(
+    <div style={{ width: 346 }}>
+      <BarChart
+        label="People's thumbs per day"
+        index={days}
+        series={[
+          { key: "up", name: "Thumbs up" },
+          { key: "down", name: "Thumbs down" },
+        ]}
+        data={[
+          { day: "2026-10-12", up: 3, down: 1 },
+          { day: "2026-10-13", up: 2, down: 4 },
+        ]}
+        diverging
+      />
+    </div>,
+  );
+  await expect
+    .element(screen.getByRole("figure", { name: "People's thumbs per day" }))
+    .toBeVisible();
+  await expect
+    .poll(() =>
+      [...document.querySelectorAll("svg text")].some((t) => t.textContent === "Thumbs down"),
+    )
+    .toBe(true);
+  const svg = document.querySelector(".recharts-surface")?.getBoundingClientRect();
+  const label = [...document.querySelectorAll("svg text")].find(
+    (t) => t.textContent === "Thumbs down",
+  );
+  expect(label?.getBoundingClientRect().right).toBeLessThanOrEqual((svg?.right ?? 0) + 0.5);
+  expect(label?.textContent).toBe("Thumbs down");
+});

@@ -20,6 +20,7 @@ import type * as reflexrV1 from "./generated/reflexr.v1";
 import { reasons } from "./reasons";
 import * as reflexr from "./reflexr";
 import { type Api, named } from "./rest";
+import { wholeTrace } from "./traces";
 
 type Check = Grantr["schemas"]["Check"];
 type AuditQuery = NonNullable<
@@ -111,6 +112,11 @@ export const keys = {
       [...keys.portalr.tenant(tenant), "feedback", window, workspace] as const,
     usage: (tenant: string, window: TimeSpan, workspaces: readonly string[]) =>
       [...keys.portalr.tenant(tenant), "usage", window, workspaces] as const,
+    traces: (tenant: string, window: TimeSpan, filter: TraceFilter) =>
+      [...keys.portalr.tenant(tenant), "traces", "list", window, filter] as const,
+    /** A trace, and, apart, the same with one span's withheld attributes, which are asked for. */
+    trace: (tenant: string, trace: string, span: string | null) =>
+      [...keys.portalr.tenant(tenant), "traces", "detail", trace, span] as const,
     /** The deployment's tenants, as the signed-in person, `user`, reads them: an operator's. */
     tenants: (user: string) => ["portalr", "deployment", "tenants", user] as const,
     /** Deep links into the tools for a trace, which only an operator, `user`, reads. */
@@ -172,6 +178,15 @@ export const refusedOutright = (error: unknown) =>
 
 /** A long read is tried again once, unless the server refused it outright. */
 const once = (count: number, error: unknown) => !refusedOutright(error) && count < 1;
+
+/** What narrows a tenant's traces: a thread's, or a run's. */
+export interface TraceFilter {
+  readonly session?: string | undefined;
+  readonly run?: string | undefined;
+}
+
+/** The most traces one read asks for. */
+export const TRACES_LIMIT = 100;
 
 /** The query options of every read, over the given clients. */
 export function createQueries(api: Api) {
@@ -519,6 +534,58 @@ export function createQueries(api: Api) {
           staleTime: 10 * 60_000,
           retry: once,
         }),
+      /**
+       * The tenant's newest traces in a window, up to `TRACES_LIMIT`, those of a thread or a run
+       * if the filter names one, from Tempo (portalr ADR-0030).
+       */
+      traces: (tenant: string, window: TimeSpan, filter: TraceFilter = {}) =>
+        queryOptions({
+          queryKey: keys.portalr.traces(tenant, window, filter),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/traces", {
+                ...named(tenant),
+                params: {
+                  query: {
+                    start: window.start,
+                    end: window.end,
+                    limit: TRACES_LIMIT,
+                    ...(filter.session && { session: filter.session }),
+                    ...(filter.run && { run: filter.run }),
+                  },
+                },
+              }),
+            ),
+          staleTime: 30_000,
+        }),
+      /**
+       * A trace by its id, whole however it is written: null if it isn't the tenant's, or isn't
+       * there. Only its attributes known to be safe are in it. With `span`, one span's others are
+       * too, which is a read of its own, for that span alone, and is not kept.
+       */
+      trace: (tenant: string, trace: string, span: string | null = null) => {
+        const whole = wholeTrace(trace);
+        return queryOptions({
+          queryKey: keys.portalr.trace(tenant, whole, span),
+          queryFn: () =>
+            body(
+              api.portalr.GET("/portalr/v1/traces/{trace_id}", {
+                ...named(tenant),
+                params: {
+                  path: { trace_id: whole },
+                  query: span === null ? {} : { content: true, span },
+                },
+              }),
+            ),
+          // A trace is written once it ends: what is read of it stays good for a while. What a
+          // span withheld is read when asked, shown, and let go: it isn't kept in the page's cache.
+          staleTime: span === null ? 5 * 60_000 : 0,
+          gcTime: span === null ? 5 * 60_000 : 0,
+          // A span's withheld attributes are read once, when it asks: not again as the window
+          // regains focus, and, if refused, not tried three times before it says so.
+          ...(span !== null && { retry: false, refetchOnWindowFocus: false }),
+        });
+      },
       /** An operator's deep links into Langfuse and Grafana for a trace. */
       links: (user: string, trace: string) =>
         queryOptions({

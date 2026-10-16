@@ -35,6 +35,8 @@ export {
   Refused,
   stale,
   type TimeSpan,
+  TRACES_LIMIT,
+  type TraceFilter,
 } from "./queries";
 export { createQueryClient } from "./query-client";
 export type * as Reflexr from "./reflexr";
@@ -53,3 +55,13 @@ export {
   Stream,
   type StreamOptions,
 } from "./stream";
+export {
+  type Kind,
+  type Outline,
+  outline,
+  type Row,
+  type Said,
+  said,
+  type Trace,
+  wholeTrace,
+} from "./traces";

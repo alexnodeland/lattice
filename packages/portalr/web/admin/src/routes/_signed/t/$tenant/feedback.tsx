@@ -16,6 +16,7 @@ import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import {
   createFileRoute,
   type ErrorComponentProps,
+  Link,
   type SearchSchemaInput,
 } from "@tanstack/react-router";
 import { opening } from "../../../../access";
@@ -234,8 +235,12 @@ function Charts({ summary, everywhere }: { summary: Summary; everywhere: boolean
   );
 }
 
-/** What people wrote, newest first, each with its trace, and, for operators, Langfuse's page. */
+/**
+ * What people wrote, newest first, each with its trace, which opens here, and, for operators,
+ * Langfuse's page beside it.
+ */
 function Comments({ comments }: { comments: readonly Comment[] }) {
+  const { tenant } = Route.useParams();
   const { queries, user } = Route.useRouteContext();
   // An operator reads every tenant; the switch reads this too, so it is cached.
   const { data: every } = useQuery(queries.portalr.tenants(user));
@@ -256,20 +261,29 @@ function Comments({ comments }: { comments: readonly Comment[] }) {
         {
           key: "trace",
           label: "Trace",
-          cell: (comment) => {
-            const id = <code className="font-mono text-xs">{comment.trace_id}</code>;
-            return template ? (
+          cell: (comment) => (
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <TextLink
-                href={template.replace(TEMPLATE, encodeURIComponent(comment.trace_id))}
-                target="_blank"
-                rel="noreferrer"
+                render={
+                  <Link
+                    to="/t/$tenant/traces/$trace"
+                    params={{ tenant, trace: comment.trace_id }}
+                  />
+                }
               >
-                {id}
+                <code className="font-mono text-xs">{comment.trace_id}</code>
               </TextLink>
-            ) : (
-              id
-            );
-          },
+              {template && (
+                <TextLink
+                  href={template.replace(TEMPLATE, encodeURIComponent(comment.trace_id))}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Langfuse
+                </TextLink>
+              )}
+            </span>
+          ),
         },
       ]}
       items={comments}

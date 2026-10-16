@@ -15,36 +15,42 @@ let tempo: "ok" | "unconfigured" | "unavailable" = "ok";
 /** How many traces the next search finds. */
 let found = 2;
 let missing = false;
+let partial = false;
 
-const ID = "0".repeat(24) + "c029eec9";
-const spans = (content: boolean) => [
-  {
-    span_id: "s1",
-    parent_id: null,
-    name: "turn",
-    start_ns: 1_000_000_000,
-    end_ns: 1_100_000_000,
-    attributes: { "gen_ai.operation.name": "invoke_workflow" },
-    error: false,
-    withheld: [],
-  },
-  {
-    span_id: "s2",
-    parent_id: "s1",
-    name: "chat claude",
-    start_ns: 1_010_000_000,
-    end_ns: 1_060_000_000,
+const A = `${"0".repeat(24)}c029eec9`;
+const B = `${"0".repeat(24)}c029eeca`;
+
+/** A trace's spans: a turn, and two model calls, each with a prompt it keeps back. */
+const spans = (span: string | null) => {
+  const model = (id: string, start: number, said: string) => ({
+    span_id: id,
+    parent_id: "a000000000000001",
+    name: `chat ${id}`,
+    start_ns: start * 1_000_000,
+    end_ns: (start + 40) * 1_000_000,
     attributes: {
       "gen_ai.operation.name": "chat",
       "gen_ai.request.model": "claude",
-      ...(content
-        ? { "gen_ai.output.messages": '[{"role":"assistant","content":"Launch on Tuesday."}]' }
-        : {}),
+      ...(span === id ? { "gen_ai.input.messages": said } : {}),
     },
     error: false,
-    withheld: content ? [] : ["gen_ai.output.messages"],
-  },
-];
+    withheld: span === id ? [] : ["gen_ai.input.messages"],
+  });
+  return [
+    {
+      span_id: "a000000000000001",
+      parent_id: null,
+      name: "turn",
+      start_ns: 1_000_000_000,
+      end_ns: 1_100_000_000,
+      attributes: { "gen_ai.operation.name": "invoke_workflow" },
+      error: false,
+      withheld: [],
+    },
+    model("b000000000000001", 1010, '[{"role":"user","content":"Launch on Tuesday."}]'),
+    model("b000000000000002", 1060, '[{"role":"user","content":"Second prompt."}]'),
+  ];
+};
 
 async function portalr(request: Request, path: string): Promise<Response | undefined> {
   if (!path.startsWith("/portalr/v1/traces")) {
@@ -71,10 +77,13 @@ async function portalr(request: Request, path: string): Promise<Response | undef
       })),
     });
   }
-  const content = new URL(request.url).searchParams.get("content") === "true";
+  const query = new URL(request.url).searchParams;
+  const revealed = query.get("content") === "true" ? query.get("span") : null;
   return Response.json({
     status: "ok",
-    data: missing ? null : { trace_id: ID, spans: spans(content) },
+    data: missing
+      ? null
+      : { trace_id: path.split("/").at(-1), spans: spans(revealed), complete: !partial },
   });
 }
 
@@ -90,6 +99,7 @@ afterEach(() => {
   tempo = "ok";
   found = 2;
   missing = false;
+  partial = false;
   vi.unstubAllGlobals();
 });
 
@@ -161,30 +171,99 @@ test("Tempo not configured, or not answering, says so", async () => {
   const first = await open("/t/acme/traces");
   await expect.element(first.screen.getByText("Tempo isn't configured")).toBeVisible();
   tempo = "unavailable";
-  const second = await open(`/t/acme/traces/${ID}`);
+  const second = await open(`/t/acme/traces/${A}`);
   await expect.element(second.screen.getByRole("alert")).toHaveTextContent("tempo answered 502");
 });
 
-test("a trace is a tree of its spans, and what was said in a span is read when asked", async () => {
-  const { screen } = await open(`/t/acme/traces/${ID}`);
+/** The reads that asked for what a span withheld. */
+const content = () => reads.filter((read) => read.query.get("content") === "true");
+
+test("a trace is a tree of its spans, and nothing is withheld-read until a span asks", async () => {
+  const { screen } = await open(`/t/acme/traces/${A}`);
   const tree = screen.getByRole("tree", { name: "Spans" });
   await expect.element(tree.getByRole("treeitem", { name: /^turn,/ })).toBeVisible();
-  await tree.getByRole("treeitem", { name: /^chat claude,/ }).click();
-  expect(reads).toHaveLength(1);
-  expect(reads[0]?.query.get("content")).toBe("false");
-  const said = screen.getByRole("region", { name: "What was said" });
-  await said.getByRole("button", { name: "Show what was said" }).click();
-  await expect.element(said.getByText("Completion")).toBeVisible();
-  await expect.element(said.getByText(/Launch on Tuesday/)).toBeVisible();
-  // One read for the structure, and one for the content, which was asked for.
-  expect(reads.map((read) => read.query.get("content"))).toEqual(["false", "true"]);
-  // Another span asking doesn't read again.
-  await tree.getByRole("treeitem", { name: /^turn,/ }).click();
+  await tree.getByRole("treeitem", { name: /^chat b000000000000001,/ }).click();
+  // One read, for the structure: no content, and none asked for.
+  expect(reads.map((read) => read.query.has("content"))).toEqual([false]);
+  await expect
+    .element(screen.getByRole("region", { name: "Withheld" }).getByText("gen_ai.input.messages"))
+    .toBeVisible();
+});
+
+test("what a span withheld is read for that span alone, when it asks, and another's stays withheld", async () => {
+  const { screen } = await open(`/t/acme/traces/${A}`);
+  const tree = screen.getByRole("tree", { name: "Spans" });
+  await tree.getByRole("treeitem", { name: /^chat b000000000000001,/ }).click();
+  const withheld = screen.getByRole("region", { name: "Withheld" });
+  await withheld.getByRole("button", { name: "Show what this span withheld" }).click();
+  await expect.element(withheld.getByText("Prompt")).toBeVisible();
+  await expect.element(withheld.getByText(/Launch on Tuesday/)).toBeVisible();
+  // One read for the structure, and one for the span that asked, naming it.
+  expect(content().map((read) => read.query.get("span"))).toEqual(["b000000000000001"]);
+  expect(reads).toHaveLength(2);
+  // The other model call still offers to be asked, and shows nothing of what it withheld.
+  await tree.getByRole("treeitem", { name: /^chat b000000000000002,/ }).click();
+  const other = screen.getByRole("region", { name: "Withheld" });
+  await expect
+    .element(other.getByRole("button", { name: "Show what this span withheld" }))
+    .toBeVisible();
+  await expect.element(screen.getByText(/Second prompt/)).not.toBeInTheDocument();
+  await expect.element(screen.getByText(/Launch on Tuesday/)).not.toBeInTheDocument();
   expect(reads).toHaveLength(2);
 });
 
-test("a trace that isn't there, or isn't the tenant's, says so", async () => {
+test("another trace starts afresh: nothing asked, nothing read for it, the first span chosen", async () => {
+  const { screen, router } = await open(`/t/acme/traces/${A}`);
+  const tree = screen.getByRole("tree", { name: "Spans" });
+  await tree.getByRole("treeitem", { name: /^chat b000000000000002,/ }).click();
+  await screen
+    .getByRole("region", { name: "Withheld" })
+    .getByRole("button", { name: "Show what this span withheld" })
+    .click();
+  await expect.element(screen.getByText(/Second prompt/)).toBeVisible();
+  expect(content()).toHaveLength(1);
+  // Opening another trace: the page is another, and asks for nothing.
+  await router.navigate({ to: "/t/$tenant/traces/$trace", params: { tenant: "acme", trace: B } });
+  await expect
+    .element(
+      screen
+        .getByRole("region", { name: "Trace" })
+        .or(screen.getByRole("heading", { name: "Trace" })),
+    )
+    .toBeVisible();
+  await expect.element(screen.getByRole("region", { name: "turn" })).toBeVisible();
+  await expect.element(screen.getByText(/Second prompt/)).not.toBeInTheDocument();
+  await expect
+    .element(screen.getByRole("treeitem", { name: /^turn,/ }))
+    .toHaveAttribute("aria-selected", "true");
+  expect(content()).toHaveLength(1);
+  // Coming back to the first doesn't keep what was read of it either.
+  await router.navigate({ to: "/t/$tenant/traces/$trace", params: { tenant: "acme", trace: A } });
+  await screen.getByRole("treeitem", { name: /^chat b000000000000002,/ }).click();
+  await expect.element(screen.getByText(/Second prompt/)).not.toBeInTheDocument();
+  expect(content()).toHaveLength(1);
+});
+
+test("a trace is one read, however its id is written", async () => {
+  const { screen } = await open("/t/acme/traces/C029EEC9");
+  await expect.element(screen.getByRole("tree", { name: "Spans" })).toBeVisible();
+  expect(reads.map((read) => read.path)).toEqual([`/portalr/v1/traces/${A}`]);
+});
+
+test("a trace past the spans portalr gives says so", async () => {
+  partial = true;
+  const { screen } = await open(`/t/acme/traces/${A}`);
+  await expect
+    .element(screen.getByRole("status"))
+    .toHaveTextContent("This trace has more spans than are shown: these are its first.");
+});
+
+test("a trace that isn't there, or isn't the tenant's, or whose id isn't one, says so, and the last isn't read", async () => {
   missing = true;
-  const { screen } = await open(`/t/acme/traces/${ID}`);
+  const { screen } = await open(`/t/acme/traces/${A}`);
   await expect.element(screen.getByText("No such trace")).toBeVisible();
+  reads.length = 0;
+  const bad = await open("/t/acme/traces/not%20an%20id");
+  await expect.element(bad.screen.getByText("No such trace")).toBeVisible();
+  expect(reads).toEqual([]);
 });

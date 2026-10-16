@@ -56,7 +56,6 @@ export {
   type StreamOptions,
 } from "./stream";
 export {
-  CONTENT,
   type Kind,
   type Outline,
   outline,
@@ -64,4 +63,5 @@ export {
   type Said,
   said,
   type Trace,
+  wholeTrace,
 } from "./traces";

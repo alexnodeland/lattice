@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { CONTENT, kindOf, outline, said, type Trace } from "./traces";
+import { kindOf, outline, said, type Trace, wholeTrace } from "./traces";
 
 const span = (
   id: string,
@@ -20,7 +20,11 @@ const span = (
   ...rest,
 });
 
-const trace = (...spans: Trace["spans"]): Trace => ({ trace_id: "t".repeat(32), spans });
+const trace = (...spans: Trace["spans"]): Trace => ({
+  trace_id: "a".repeat(32),
+  spans,
+  complete: true,
+});
 
 test("spans are in tree order, each parent before its children, children by start", () => {
   const { rows, duration } = outline(
@@ -52,7 +56,9 @@ test("a span whose parent isn't there, or a cycle of spans, is shown, not lost",
   ]);
   const cycle = outline(trace(span("x", "y", 0, 1), span("y", "x", 1, 2)));
   expect(cycle.rows.map((row) => row.id).sort()).toEqual(["x", "y"]);
-  expect(outline(trace())).toEqual({ rows: [], duration: 0 });
+  expect(outline(trace())).toEqual({ rows: [], complete: true, duration: 0 });
+  // Only the span that opens is expandable: the second of a cycle has no child to show.
+  expect(cycle.rows.map((row) => row.parent)).toEqual([true, false]);
 });
 
 test("a span is what its GenAI operation says, or what else it carries", () => {
@@ -92,21 +98,50 @@ test("a span's model, tool, tokens, error and what it withheld are read from it"
     tokens: { input: 120, output: 30 },
     withheld: ["gen_ai.input.messages"],
   });
-  expect(rows[1]).toMatchObject({ tool: "publish", model: "r", tokens: null, said: [] });
+  expect(rows[1]).toMatchObject({ tool: "publish", model: "r", tokens: null });
   expect(rows[2]?.tokens).toEqual({ input: null, output: 4 });
 });
 
-test("what was said is each part, labelled, its JSON indented, and nothing if it wasn't read", () => {
-  expect(said({})).toEqual([]);
+test("withheld attributes are read labelled, the known ones first, their JSON indented", () => {
+  const attributes = {
+    "zz.unknown": "plain",
+    "gen_ai.output.messages": "not json",
+    "gen_ai.input.messages": '[{"role":"user"}]',
+    "gen_ai.tool.call.result": 3,
+    "kept.out": "x",
+  };
+  expect(said({}, [])).toEqual([]);
   expect(
-    said({
-      "gen_ai.input.messages": '[{"role":"user"}]',
-      "gen_ai.output.messages": "not json",
-      "gen_ai.tool.call.result": 3,
-    }),
+    said(attributes, [
+      "zz.unknown",
+      "gen_ai.output.messages",
+      "gen_ai.input.messages",
+      "gen_ai.tool.call.result",
+      "not.there",
+    ]),
   ).toEqual([
     { label: "Prompt", text: '[\n  {\n    "role": "user"\n  }\n]' },
     { label: "Completion", text: "not json" },
+    { label: "Tool result", text: "3" },
+    { label: "zz.unknown", text: "plain" },
   ]);
-  expect(CONTENT).toContain("gen_ai.system_instructions");
+});
+
+test("a trace's id is 32 lowercase hex digits, wherever it is written, and anything else as it came", () => {
+  expect(wholeTrace("C029EEC9")).toBe("0".repeat(24) + "c029eec9");
+  expect(wholeTrace("f".repeat(32))).toBe("f".repeat(32));
+  expect(wholeTrace("zz")).toBe("zz");
+  expect(wholeTrace("")).toBe("");
+});
+
+test("a trace of a hundred thousand spans, wide or deep, is laid out at once", () => {
+  const wide = trace(
+    span("root", null, 0, 10),
+    ...Array.from({ length: 100_000 }, (_, at) => span(`s${at}`, "root", at, at + 1)),
+  );
+  const started = performance.now();
+  const laid = outline(wide);
+  expect(laid.rows).toHaveLength(100_001);
+  expect(laid.rows[1]?.depth).toBe(1);
+  expect(performance.now() - started).toBeLessThan(2000);
 });

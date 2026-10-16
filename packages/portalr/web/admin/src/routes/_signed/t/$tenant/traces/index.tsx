@@ -104,6 +104,7 @@ function Traces() {
   return (
     <div className="flex flex-col gap-6">
       {HEADER}
+      {/* Keyed by what the address holds, so the form's own fields start from it again when it changes. */}
       <Filter key={JSON.stringify(shown)} shown={shown} />
       {traces.length >= TRACES_LIMIT && (
         <p role="status" className="text-muted text-sm">

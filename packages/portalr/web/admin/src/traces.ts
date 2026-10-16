@@ -25,6 +25,9 @@ export type Shown = {
   readonly run?: string | undefined;
 };
 
+/** Whether text is an id portalr takes, such as a trace's: what its reads check ids by. */
+export const isId = (text: string) => ID.test(text);
+
 /** An id from the address, trimmed: text, as the router reads `?run=42` as a number; or none. */
 function idOf(value: unknown): string | undefined {
   const read = typeof value === "string" || typeof value === "number" ? String(value).trim() : "";

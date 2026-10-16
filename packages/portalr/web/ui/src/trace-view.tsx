@@ -2,13 +2,13 @@
  * A trace: its spans as a tree beside a waterfall, and, for the one chosen, its details (portalr
  * ADR-0030). It is written for `ui`, from the shape of AgentPrism's views but not its code.
  *
- * The tree is an ARIA tree, which the arrow keys walk and fold, and its rows are virtualized,
- * so a trace of thousands of spans draws only those in view. What was said in a span, its prompt
- * and completion, is not here until a person asks for that span's: the caller reads it then, and
- * gives the view the trace with it.
+ * The tree is an ARIA tree, which the arrow keys walk and fold, and its rows are virtualized, so a
+ * trace of thousands of spans draws only those in view. A span's attributes that aren't known to
+ * be safe, a prompt and a completion among them, aren't in the trace it is given: they are read
+ * for one span when a person asks for that span's, and the caller gives them back through `reveal`.
  */
 
-import type { Kind, Outline, Row } from "@portalr/client";
+import type { Kind, Outline, Row, Said } from "@portalr/client";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Bot,
@@ -22,7 +22,7 @@ import {
   Workflow,
   Wrench,
 } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useId, useMemo, useRef, useState } from "react";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { Icon } from "./icon";
@@ -50,13 +50,22 @@ export function duration(ms: number): string {
   return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`;
 }
 
-/** Where what was said in a span stands: not asked for, being read, read, or not readable. */
+/** Where what a span withheld stands: not asked for, being read, read, or not readable. */
 export type Standing = "hidden" | "reading" | "read" | "failed";
+
+/** What the caller does about what spans withhold: it reads it, for a span, when one asks. */
+export interface Reveal {
+  /** Where one span's withheld attributes stand. */
+  standing(id: string): Standing;
+  /** What the span withheld, read, each labelled; none if the read had none of its names. */
+  parts(row: Row): readonly Said[];
+  /** A span asked to see what it withheld. */
+  ask(id: string): void;
+}
 
 /** A row with its place among its siblings, as the tree's ARIA wants it. */
 interface Placed {
   readonly row: Row;
-  readonly index: number;
   readonly among: number;
   readonly of: number;
 }
@@ -76,7 +85,7 @@ function placed(rows: readonly Row[]): Placed[] {
     const parent = parents.get(row.id) ?? null;
     const among = (seen.get(parent) ?? 0) + 1;
     seen.set(parent, among);
-    return { row, index: 0, among, of: counts.get(parent) ?? 1 };
+    return { row, among, of: counts.get(parent) ?? 1 };
   });
 }
 
@@ -89,65 +98,63 @@ function visible(all: readonly Placed[], folded: ReadonlySet<string>): Placed[] 
       continue;
     }
     hiding = folded.has(each.row.id) ? each.row.depth : null;
-    shown.push({ ...each, index: shown.length });
+    shown.push(each);
   }
   return shown;
 }
 
 /** A trace's spans as a tree and a waterfall, with the chosen span's details beside or below. */
-export function TraceView({
-  outline,
-  said: standing,
-  onAskToSee,
-}: {
-  outline: Outline;
-  /** Where the trace's content stands: the caller reads it when a span asks. */
-  said: Standing;
-  /** A span asked to see what was said in it: the caller reads it, and gives the trace with it. */
-  onAskToSee: () => void;
-}) {
+export function TraceView({ outline, reveal }: { outline: Outline; reveal: Reveal }) {
+  const base = useId();
   const all = useMemo(() => placed(outline.rows), [outline.rows]);
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
-  const [chosen, setChosen] = useState<string | null>(outline.rows[0]?.id ?? null);
-  const [asked, setAsked] = useState<ReadonlySet<string>>(new Set());
+  const [chosen, setChosen] = useState<string | null>(null);
   const shown = useMemo(() => visible(all, folded), [all, folded]);
   const scroller = useRef<HTMLDivElement>(null);
-  const focusing = useRef(false);
+  /** The row the keyboard chose, to be focused as its row is drawn, however far it scrolled. */
+  const pending = useRef<string | null>(null);
   const virtual = useVirtualizer({
     count: shown.length,
     getScrollElement: () => scroller.current,
     estimateSize: () => ROW,
     overscan: 8,
   });
+  // What is chosen is a row that is shown: the first, if what was chosen is no longer, as it
+  // isn't after its ancestor folds, or in a trace that has changed.
   const at = Math.max(
     0,
     shown.findIndex((each) => each.row.id === chosen),
   );
   const current = shown[at]?.row ?? null;
-
-  // Focus follows the choice made with the keyboard, once its row is drawn.
-  useEffect(() => {
-    if (focusing.current && chosen) {
-      scroller.current?.querySelector<HTMLElement>(`[data-span="${CSS.escape(chosen)}"]`)?.focus();
-    }
-  });
+  const items = virtual.getVirtualItems();
+  const windowed = items.some((item) => item.index === at);
 
   function choose(index: number) {
     const next = shown[Math.min(Math.max(index, 0), shown.length - 1)];
     if (next) {
-      focusing.current = true;
+      pending.current = next.row.id;
       setChosen(next.row.id);
-      virtual.scrollToIndex(next.index);
+      virtual.scrollToIndex(index, { align: "auto" });
     }
   }
 
-  function fold(id: string, on: boolean) {
+  function fold(row: Row, on: boolean) {
+    if (on) {
+      // What is chosen under what folds goes to what folds, so the choice isn't lost with its row.
+      const from = all.findIndex((each) => each.row.id === row.id);
+      const under = all.slice(from + 1).findIndex((each) => each.row.depth <= row.depth);
+      const inside = all.slice(from + 1, under === -1 ? undefined : from + 1 + under);
+      if (inside.some((each) => each.row.id === current?.id)) {
+        pending.current = row.id;
+        setChosen(row.id);
+      }
+    }
     setFolded((before) => {
       const after = new Set(before);
       if (on) {
-        after.add(id);
+        after.add(row.id);
       } else {
-        after.delete(id);
+        after.delete(row.id);
       }
       return after;
     });
@@ -164,19 +171,19 @@ export function TraceView({
       End: () => choose(shown.length - 1),
       ArrowRight: () => {
         if (current.parent && folded.has(current.id)) {
-          fold(current.id, false);
+          fold(current, false);
         } else if (current.parent) {
           choose(at + 1);
         }
       },
       ArrowLeft: () => {
         if (current.parent && !folded.has(current.id)) {
-          fold(current.id, true);
+          fold(current, true);
         } else if (current.depth > 0) {
           // To its parent: the nearest row above that is shallower.
-          const above = shown.slice(0, at).findLast((each) => each.row.depth < current.depth);
-          if (above) {
-            choose(above.index);
+          const above = shown.slice(0, at).findLastIndex((each) => each.row.depth < current.depth);
+          if (above !== -1) {
+            choose(above);
           }
         }
       },
@@ -193,9 +200,9 @@ export function TraceView({
   }
   return (
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-      <section aria-labelledby="spans" className="flex min-w-0 flex-col gap-2">
+      <section aria-labelledby={`${base}-spans`} className="flex min-w-0 flex-col gap-2">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 id="spans" className="font-semibold text-fg text-sm">
+          <h2 id={`${base}-spans`} className="font-semibold text-fg text-sm">
             Spans
           </h2>
           <span className="text-muted text-xs">
@@ -203,31 +210,45 @@ export function TraceView({
             {duration(outline.duration)}
           </span>
         </div>
+        {!outline.complete && (
+          <p role="status" className="text-muted text-sm">
+            This trace has more spans than are shown: these are its first.
+          </p>
+        )}
         <div
           ref={scroller}
           role="tree"
-          aria-labelledby="spans"
-          tabIndex={-1}
-          onKeyDown={walk}
-          onBlur={() => {
-            focusing.current = false;
+          aria-labelledby={`${base}-spans`}
+          // The tree is a tab stop of its own while the row chosen isn't drawn, so the keyboard
+          // can always get in: it then draws the row, and moves focus to it.
+          tabIndex={windowed ? -1 : 0}
+          onFocus={(event) => {
+            if (event.target === event.currentTarget) {
+              choose(at);
+            }
           }}
-          className="max-h-[28rem] min-h-24 overflow-auto rounded-lg border border-line bg-surface"
+          onKeyDown={walk}
+          className="@container max-h-[28rem] min-h-24 overflow-auto rounded-lg border border-line bg-surface"
         >
-          <div style={{ height: virtual.getTotalSize() }} className="relative w-full min-w-[26rem]">
-            {virtual.getVirtualItems().map((item) => {
+          <div style={{ height: virtual.getTotalSize() }} className="relative w-full">
+            {items.map((item) => {
               const each = shown[item.index];
               if (!each) {
                 return null;
               }
               const { row } = each;
               const open = row.parent ? !folded.has(row.id) : undefined;
-              const on = row.id === chosen;
+              const on = item.index === at;
               return (
                 <div
                   key={row.id}
+                  ref={(node) => {
+                    if (node && pending.current === row.id) {
+                      pending.current = null;
+                      node.focus({ preventScroll: true });
+                    }
+                  }}
                   role="treeitem"
-                  data-span={row.id}
                   aria-level={row.depth + 1}
                   aria-setsize={each.of}
                   aria-posinset={each.among}
@@ -235,13 +256,10 @@ export function TraceView({
                   {...(open !== undefined && { "aria-expanded": open })}
                   aria-label={`${row.name}, ${KINDS[row.kind].word}, ${duration(row.duration)}${row.error ? ", failed" : ""}`}
                   tabIndex={on ? 0 : -1}
-                  onFocus={() => {
-                    focusing.current = true;
-                    setChosen(row.id);
-                  }}
+                  onFocus={() => setChosen(row.id)}
                   style={{ height: ROW, transform: `translateY(${item.start}px)` }}
                   className={cn(
-                    "absolute inset-x-0 top-0 grid cursor-default grid-cols-[minmax(11rem,2fr)_minmax(8rem,3fr)_4.5rem] items-center gap-3 border-line border-b px-2 text-sm outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-focus",
+                    "absolute inset-x-0 top-0 grid cursor-default grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-3 border-line border-b px-2 text-sm outline-offset-[-2px] focus-visible:outline-2 focus-visible:outline-focus @xl:grid-cols-[minmax(11rem,2fr)_minmax(8rem,3fr)_4.5rem]",
                     on ? "bg-wash" : "hover:bg-wash/60",
                   )}
                 >
@@ -256,7 +274,7 @@ export function TraceView({
                         aria-hidden="true"
                         onClick={(event) => {
                           event.stopPropagation();
-                          fold(row.id, open === true);
+                          fold(row, open === true);
                         }}
                         className="grid size-5 shrink-0 place-items-center rounded-sm text-muted hover:text-fg"
                       >
@@ -285,27 +303,17 @@ export function TraceView({
           </div>
         </div>
       </section>
-      {current && (
-        <Details
-          row={current}
-          standing={standing}
-          seen={asked.has(current.id)}
-          onAskToSee={() => {
-            setAsked((before) => new Set(before).add(current.id));
-            onAskToSee();
-          }}
-        />
-      )}
+      {current && <Details key={current.id} row={current} reveal={reveal} />}
     </div>
   );
 }
 
-/** A span's bar on the trace's timeline: from when it began, as long as it took. */
+/** A span's bar on the trace's timeline: from when it began, as long as it took. Not on a phone. */
 function Bar({ row, total }: { row: Row; total: number }) {
   const left = total > 0 ? (row.offset / total) * 100 : 0;
   const width = total > 0 ? Math.max((row.duration / total) * 100, 0.6) : 100;
   return (
-    <div aria-hidden="true" className="relative h-4 min-w-0">
+    <div aria-hidden="true" className="relative hidden h-4 min-w-0 @xl:block">
       <div
         style={{ left: `${Math.min(left, 99.4)}%`, width: `${Math.min(width, 100 - left)}%` }}
         className={cn(
@@ -320,27 +328,17 @@ function Bar({ row, total }: { row: Row; total: number }) {
   );
 }
 
-/** The chosen span: what it is, when, how long, its model, tool and tokens, its attributes, and what was said. */
-function Details({
-  row,
-  standing,
-  seen,
-  onAskToSee,
-}: {
-  row: Row;
-  standing: Standing;
-  seen: boolean;
-  onAskToSee: () => void;
-}) {
+/** The chosen span: what it is, when, how long, its model, tool and tokens, its attributes, and what it withheld. */
+function Details({ row, reveal }: { row: Row; reveal: Reveal }) {
+  const base = useId();
   const attributes = Object.entries(row.attributes).sort(([a], [b]) => a.localeCompare(b));
-  const spoken = row.said;
   return (
     <section
-      aria-labelledby="span"
+      aria-labelledby={`${base}-span`}
       className="flex min-w-0 flex-col gap-3 rounded-lg border border-line bg-surface p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="span" className="min-w-0 break-words font-semibold text-fg">
+        <h2 id={`${base}-span`} className="min-w-0 break-words font-semibold text-fg">
           {row.name}
         </h2>
         {row.error && <StatusBadge tone="failed">Failed</StatusBadge>}
@@ -357,44 +355,9 @@ function Details({
           </Fact>
         )}
       </dl>
-      {(row.withheld.length > 0 || spoken.length > 0) && (
-        <section aria-labelledby="said" className="flex flex-col gap-2">
-          <h3 id="said" className="font-semibold text-fg text-sm">
-            What was said
-          </h3>
-          {seen && spoken.length > 0 ? (
-            spoken.map((part) => (
-              <div key={part.label} className="flex flex-col gap-1">
-                <span className="text-muted text-xs">{part.label}</span>
-                <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-paper p-3 font-mono text-fg text-xs">
-                  {part.text}
-                </pre>
-              </div>
-            ))
-          ) : seen && standing === "reading" ? (
-            <p role="status" className="text-muted text-sm">
-              Reading…
-            </p>
-          ) : seen && standing === "failed" ? (
-            <p role="alert" className="text-sm">
-              What was said couldn't be read.
-            </p>
-          ) : seen ? (
-            <p className="text-muted text-sm">Nothing was recorded for this span.</p>
-          ) : (
-            <>
-              <p className="text-muted text-sm">
-                Prompts and completions are kept out of the trace until you ask for them.
-              </p>
-              <Button variant="secondary" className="self-start" onClick={onAskToSee}>
-                Show what was said
-              </Button>
-            </>
-          )}
-        </section>
-      )}
-      <section aria-labelledby="attributes" className="flex flex-col gap-1">
-        <h3 id="attributes" className="font-semibold text-fg text-sm">
+      {row.withheld.length > 0 && <Withheld row={row} reveal={reveal} />}
+      <section aria-labelledby={`${base}-attributes`} className="flex flex-col gap-1">
+        <h3 id={`${base}-attributes`} className="font-semibold text-fg text-sm">
           Attributes
         </h3>
         {attributes.length === 0 ? (
@@ -412,6 +375,69 @@ function Details({
       </section>
     </section>
   );
+}
+
+/** What a span withheld: its names, and, once asked for, the attributes, which only this span's. */
+function Withheld({ row, reveal }: { row: Row; reveal: Reveal }) {
+  const heading = useId();
+  return (
+    <section aria-labelledby={heading} className="flex flex-col gap-2">
+      <h3 id={heading} className="font-semibold text-fg text-sm">
+        Withheld
+      </h3>
+      <WithheldNow row={row} reveal={reveal} />
+    </section>
+  );
+}
+
+/** Where a span's withheld attributes stand, and what to do about it. */
+function WithheldNow({ row, reveal }: { row: Row; reveal: Reveal }) {
+  switch (reveal.standing(row.id)) {
+    case "hidden":
+      return (
+        <>
+          <p className="text-muted text-sm">
+            {row.withheld.length === 1
+              ? "One attribute is"
+              : `${row.withheld.length} attributes are`}{" "}
+            kept out of the trace, as {row.withheld.length === 1 ? "it isn't" : "they aren't"} known
+            to be safe to show: prompts and completions may be among them. They are read for this
+            span alone, when you ask.
+          </p>
+          <p className="break-words font-mono text-muted text-xs">{row.withheld.join(", ")}</p>
+          <Button variant="secondary" className="self-start" onClick={() => reveal.ask(row.id)}>
+            Show what this span withheld
+          </Button>
+        </>
+      );
+    case "reading":
+      return (
+        <p role="status" className="text-muted text-sm">
+          Reading…
+        </p>
+      );
+    case "failed":
+      return (
+        <p role="alert" className="text-sm">
+          What this span withheld couldn't be read.
+        </p>
+      );
+    case "read": {
+      const parts = reveal.parts(row);
+      return parts.length === 0 ? (
+        <p className="text-muted text-sm">Nothing of it was recorded.</p>
+      ) : (
+        parts.map((part) => (
+          <div key={part.label} className="flex flex-col gap-1">
+            <span className="break-words text-muted text-xs">{part.label}</span>
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-paper p-3 font-mono text-fg text-xs">
+              {part.text}
+            </pre>
+          </div>
+        ))
+      );
+    }
+  }
 }
 
 /** One fact of a span: its term, and what it is. */

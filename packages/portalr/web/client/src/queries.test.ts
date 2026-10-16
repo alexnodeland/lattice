@@ -142,7 +142,7 @@ test("every read has its own path", async () => {
       }),
       "/portalr/v1/traces",
     ],
-    [queries.portalr.trace("acme", "c029eec9"), "/portalr/v1/traces/c029eec9"],
+    [queries.portalr.trace("acme", "c029eec9"), `/portalr/v1/traces/${"0".repeat(24)}c029eec9`],
     [queries.portalr.links("ops", "t1"), "/portalr/v1/deployment/links"],
     [queries.grantr.grants("acme", "ws_1"), "/grantr/v1/tenants/acme/grants"],
     [queries.grantr.restrictions("acme", "ws_1"), "/grantr/v1/tenants/acme/restrictions"],
@@ -450,12 +450,23 @@ test("a traces read names its window, its limit and its filter; a trace read, wh
   expect(list?.headers.get("x-tenant")).toBe("acme");
   await client.fetchQuery(queries.portalr.traces("acme", window));
   expect(seen.at(-1)?.url.searchParams.has("session")).toBe(false);
-  await client.fetchQuery(queries.portalr.trace("acme", "c029eec9"));
-  expect(seen.at(-1)?.url.searchParams.get("content")).toBe("false");
-  await client.fetchQuery(queries.portalr.trace("acme", "c029eec9", true));
-  expect(seen.at(-1)?.url.searchParams.get("content")).toBe("true");
-  // With content, and without, are two reads: one's key isn't the other's.
-  expect(keys.portalr.trace("acme", "c029eec9", true)).not.toEqual(
-    keys.portalr.trace("acme", "c029eec9", false),
+  await client.fetchQuery(queries.portalr.trace("acme", "C029EEC9"));
+  const plain = seen.at(-1);
+  expect(plain?.url.pathname).toBe(`/portalr/v1/traces/${"0".repeat(24)}c029eec9`);
+  expect(plain?.url.searchParams.has("content")).toBe(false);
+  await client.fetchQuery(queries.portalr.trace("acme", "c029eec9", "83db6fcbe8c81dba"));
+  const revealed = seen.at(-1);
+  expect(revealed?.url.searchParams.get("content")).toBe("true");
+  expect(revealed?.url.searchParams.get("span")).toBe("83db6fcbe8c81dba");
+  // One trace is one read, however its id is written; a span's withheld attributes are another,
+  // let go as soon as nothing shows them.
+  const whole = "0".repeat(24) + "c029eec9";
+  expect(queries.portalr.trace("acme", "c029eec9").queryKey).toEqual(
+    keys.portalr.trace("acme", whole, null),
   );
+  expect(keys.portalr.trace("acme", whole, "s1")).not.toEqual(
+    keys.portalr.trace("acme", whole, null),
+  );
+  expect(queries.portalr.trace("acme", whole, "s1").gcTime).toBe(0);
+  expect(queries.portalr.trace("acme", whole).gcTime).toBeGreaterThan(0);
 });

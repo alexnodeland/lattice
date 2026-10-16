@@ -20,7 +20,8 @@ What the spans hold, looked at in the test stack:
 
 - An artifactr turn is a trace of an HTTP span, an `artifactr.commit` span for each command, and an `invoke_workflow` span named `turn`, with `gen_ai.workflow.name`, `gen_ai.conversation.id` and `session.id`, which a thread's traces are found by. The libraries' own attributes name the tenant, workspace, run and actor.
 - Prompts, completions and tool arguments are recorded only when the application sets `include_content`, which lattice-core defaults to false, though pydantic-ai's own default is true. In the test application they aren't recorded.
-- Tempo answers a trace's search with ids that have lost their leading zeros, and, in the test stack, a trace's read with each span twice.
+- pydantic-ai writes them as span attributes, and not as span events: `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.system_instructions`, `gen_ai.tool.call.arguments` and `.result`. Other things that span may carry hold what was said too, and under names no list of ours can keep up with: `pydantic_ai.all_messages`, `final_result`, `tool_arguments`, `tool_response`, an older `gen_ai.prompt` and `gen_ai.completion`, a request's or a response's body, a SQL statement, an exception's message, and what a library or a later version adds.
+- Tempo answers a trace's search with ids that have lost their leading zeros; in the test stack, a trace's read with each span twice; and its OTLP JSON with spans' ids in base64.
 
 The user decided four things:
 
@@ -37,11 +38,14 @@ The user decided four things:
   - A failed span is marked by a word and a hatched bar, not by a tone alone. A span's kind is a mark and a word.
   - On a phone the details sit under the tree.
   - A span whose parent isn't in the trace, or that is part of a cycle, is shown as a root, not lost.
-- **What was said is read apart, and when asked for.**
-  - `GET /portalr/v1/traces/{id}` leaves the content attributes out, and names the ones it left out in each span's `withheld`. `?content=true` gives them.
-  - The trace page reads the structure. A span that has something withheld offers "Show what was said", which reads the trace again with content, once, and shows that span's parts, labelled. A span that wasn't asked about shows nothing of it. Each part's JSON is indented.
-  - So content leaves the server only for a person who asked for it, and is never in a page that was only opened. It is the tenant's own data, which its owners and admins may read in Tempo's and Langfuse's own UIs; the reveal is a rule of this view, not of the data.
-- **`GET /portalr/v1/traces` and `/traces/{id}` repair what Tempo gives.** A search's ids are padded to 32 hex digits, so they match the ids elsewhere, and a trace's spans are each once, the first. Both are tested.
+- **A trace read shows only what is known to be safe, and the rest is read for one span, when asked.**
+  - `GET /portalr/v1/traces/{id}` gives a span the attributes on a list of those known not to hold what a person or a model said: ids, kinds, outcomes, counts, models, tools, HTTP methods and statuses, a database's system and operation. Every other attribute is withheld, and named in the span's `withheld`. A prompt or an attribute that doesn't exist yet is withheld by not being on the list, so the gate fails closed. A test holds it against a span that carries each of the names above.
+  - `?content=true&span=<id>` gives that span's other attributes, and no other span's. Content without a span is a 422. It is answered with `Cache-Control: no-store`, and `client` reads it with `gcTime: 0`, so it isn't kept.
+  - The trace page reads the structure. A span with something withheld lists the names, and offers "Show what this span withheld", which reads the trace for that span alone and shows its attributes, each labelled, JSON indented. Another span still offers its own, and shows nothing of what it withheld, in the page or in what was sent to it. A scenario holds that, by the bodies of the answers.
+  - A trace's page is keyed by its trace's id: opening another is a page of its own, with nothing asked and nothing chosen.
+  - So what a span withheld leaves the server only for the span, and the person, that asked. It is the tenant's own data, which its owners and admins may read in Tempo's and Langfuse's own UIs; the reveal is a rule of this view, not of the data. Reading it is a read of the trace again, and Tempo's answer is the same size.
+- **`GET /portalr/v1/traces` and `/traces/{id}` repair what Tempo gives.** A trace's id is 32 lowercase hex digits wherever it is written, in one type for a search's ids and a trace's, and `client` reads a trace by that form, so one trace is one read, however a link writes its id. Its spans are each once, the first, and their ids are hex, not base64. Each is tested.
+- **A trace read is bounded.** At most 5,000 spans are given, the first, and the trace says it isn't complete, as the page does; whose it is, is decided over every span first. Tempo has 10 seconds to answer, past which it is unavailable. A trace of a tenant's turn is far smaller, and a trace of a runaway isn't a page to wait for.
 - **Traces is `/t/$tenant/traces` and `/t/$tenant/traces/$trace`,** on the rail where `portalr:read_telemetry` is allowed, gated in `beforeLoad` and read in `loader`.
   - The list is the newest 100 in the last hour, day or week, or a thread's or a run's, newest first, each with when it began and how long it took, as a table or, on a phone, cards. The window is read to the next whole minute, so a read of it is one query for a minute.
   - The window and the filters are in the address, as Feedback's are. An id that isn't one portalr takes is none.
@@ -58,7 +62,8 @@ The user decided four things:
 | **Write `TraceView` for `ui` (chosen)** | Ours to change; Tailwind 4 and Base UI from the start; no port, no licence | The tree, the keys and the waterfall are ours to test and keep |
 | Port AgentPrism's source, as the RFC says | Its look, and its details tabs | A Tailwind 3 and Radix alpha to rewrite and then follow, for a view we then shape to our spans anyway |
 | Use AgentPrism's `data` adapter | Its categories | It takes OTLP whole, which portalr doesn't give, and reads none of our content |
-| **Content read apart, on a span's ask (chosen)** | Prompts never leave the server unasked | A second read, once, when a span asks |
+| **Only what is known safe, the rest for one span on its ask (chosen)** | A prompt, or a name that doesn't exist yet, never leaves the server unasked; fails closed | A read for each span that asks; the list is ours to keep |
+| A list of the names that hold content | Nothing harmless is withheld | Fails open: every name missed leaks, and pydantic-ai, its older versions, and the libraries add names |
 | Content in every trace read, hidden by the UI | One read | A prompt in the page, and in the network log, of everyone who only opened a trace |
 | No content at all | Nothing to leak | A trace of what the agent said can't be read |
 
@@ -67,4 +72,5 @@ The user decided four things:
 - Easier: a tenant's admin follows a turn span by span, from a thread's id, a run's, or a feedback comment, and a long trace stays fast.
 - Easier: a prompt is seen only by someone who asked to see it.
 - Harder: the applications that record content do so for every tenant's traces, which is theirs to decide, as `include_content` is.
-- Harder: our adapter follows the GenAI conventions as pydantic-ai writes them. A later version that records content in span events, not attributes, would show none, and say that it was recorded.
+- Harder: our adapter follows the GenAI conventions as pydantic-ai writes them. A later version that records content in span events, not attributes, would show none, and nothing says that it was recorded: the trace read gives span attributes alone.
+- Harder: a span with an attribute that isn't on the list, harmless or not, offers to show it, until it is added to the list.

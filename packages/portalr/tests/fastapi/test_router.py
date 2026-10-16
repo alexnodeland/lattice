@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -42,6 +43,93 @@ async def test_a_tenant_admin_reads_their_tenants_traces(
         ],
     }
     assert stack.tempo.last.url.params["q"].startswith('{ span.tenant.id = "acme"')
+
+
+def _trace(*spans: tuple[str, str, dict[str, str]]) -> dict[str, Any]:
+    """A trace as Tempo gives it: each span with its tenant and some content."""
+    return {
+        "trace": {
+            "resourceSpans": [
+                {
+                    "scopeSpans": [
+                        {
+                            "spans": [
+                                {
+                                    "spanId": span_id,
+                                    "name": span_id,
+                                    "startTimeUnixNano": "1",
+                                    "endTimeUnixNano": "2",
+                                    "attributes": [
+                                        {"key": "tenant.id", "value": {"stringValue": tenant}},
+                                        *(
+                                            {"key": key, "value": {"stringValue": value}}
+                                            for key, value in content.items()
+                                        ),
+                                    ],
+                                }
+                                for span_id, tenant, content in spans
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+
+
+async def test_what_a_span_withheld_is_given_for_that_span_alone_and_never_kept(
+    client: httpx.AsyncClient, stack: Stack
+) -> None:
+    said = {"gen_ai.input.messages": "[secret prompt]"}
+    stack.tempo.paths["/api/v2/traces/f1"] = json(
+        _trace(("1", "acme", said), ("2", "acme", {"gen_ai.output.messages": "[other]"}))
+    )
+    alice = headers("alice")
+    plain = await client.get("/v1/traces/f1", headers=alice)
+    assert "[secret prompt]" not in plain.text
+    assert "cache-control" not in plain.headers
+    first, second = plain.json()["data"]["spans"]
+    assert first["withheld"] == ["gen_ai.input.messages"]
+    assert second["withheld"] == ["gen_ai.output.messages"]
+    # A span named without `content` reveals nothing.
+    named = await client.get("/v1/traces/f1", params={"span": "1"}, headers=alice)
+    assert "[secret prompt]" not in named.text
+    revealed = await client.get(
+        "/v1/traces/f1", params={"content": "true", "span": "1"}, headers=alice
+    )
+    assert revealed.headers["cache-control"] == "no-store"
+    one, two = revealed.json()["data"]["spans"]
+    assert one["attributes"]["gen_ai.input.messages"] == "[secret prompt]"
+    assert (two["attributes"].get("gen_ai.output.messages"), two["withheld"]) == (
+        None,
+        ["gen_ai.output.messages"],
+    )
+    assert "[other]" not in revealed.text
+    # Content is asked for a span.
+    unnamed = await client.get("/v1/traces/f1", params={"content": "true"}, headers=alice)
+    assert unnamed.status_code == 422
+
+
+async def test_what_a_span_withheld_needs_the_grant_and_the_tenants_own_trace(
+    client: httpx.AsyncClient, stack: Stack
+) -> None:
+    said = {"gen_ai.input.messages": "[secret prompt]"}
+    stack.tempo.paths["/api/v2/traces/f1"] = json(_trace(("1", "acme", said)))
+    stack.tempo.paths["/api/v2/traces/f2"] = json(
+        _trace(("1", "acme", said), ("2", "globex", said))
+    )
+    asked = {"content": "true", "span": "1"}
+    for who, tenant in (("bob", "acme"), ("carol", "acme"), ("alice", "globex")):
+        refused = await client.get("/v1/traces/f1", params=asked, headers=headers(who, tenant))
+        assert refused.status_code == 403, (who, tenant)
+    assert not stack.tempo.requests
+    # A trace with a span of another tenant's, or none of this one's, is none, content or not.
+    mixed = await client.get("/v1/traces/f2", params=asked, headers=headers("alice"))
+    assert mixed.json() == {"status": "ok", "data": None}
+    stack.tempo.paths["/api/v2/traces/f3"] = json(_trace(("1", "globex", said)))
+    other = await client.get("/v1/traces/f3", params=asked, headers=headers("alice"))
+    assert other.json() == {"status": "ok", "data": None}
+    assert "[secret prompt]" not in mixed.text + other.text
 
 
 async def test_every_read_is_refused_without_the_tenants_grant(

@@ -63,9 +63,10 @@ const cut = (name: string) =>
   name.length > LONGEST_LABEL ? `${name.slice(0, LONGEST_LABEL - 1)}…` : name;
 
 /**
- * The room a chart keeps to its right for its direct labels: enough for the longest, cut, at the
- * width a chart's small type takes, 7px a character, which a name of wide letters, such as
- * "Thumbs down", needs more of than 6.
+ * The room a chart keeps to its right for its direct labels: enough for the longest, cut. A
+ * character of a chart's small type is taken to be 7px wide. That is an inference from "Thumbs
+ * down" being cut at 6px a character, not a measurement of the face, so it is the least that was
+ * seen to fit; a test holds that the label stays inside the drawing.
  */
 const labelRoom = (series: readonly Series[]) =>
   14 + 7 * Math.max(0, ...series.map((one) => cut(one.name).length));

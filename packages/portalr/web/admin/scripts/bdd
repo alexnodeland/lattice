@@ -34,4 +34,5 @@ for person in alice bob dana olga ops; do
 done
 
 bun x --bun --no-install bddgen
-PORTALR_APP_URL=$app bun x --bun --no-install playwright test
+# Tempo's OTLP receiver, where a scenario sends a trace of its own: one that carries a prompt.
+PORTALR_APP_URL=$app PORTALR_TEMPO_OTLP_URL=$(at tempo 4318) bun x --bun --no-install playwright test

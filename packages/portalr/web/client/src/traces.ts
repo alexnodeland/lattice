@@ -59,13 +59,11 @@ export interface Row {
   readonly tool: string | null;
   readonly tokens: { readonly input: number | null; readonly output: number | null } | null;
   readonly attributes: Span["attributes"];
-  /** The names of what was said in it that this read left out. */
+  /** The names of the attributes it has that this read left out, as they aren't known to be safe. */
   readonly withheld: readonly string[];
-  /** What was said in it, if this read has it: each part, labelled, its JSON indented. */
-  readonly said: readonly Said[];
 }
 
-/** One part of what was said in a span. */
+/** One of a span's attributes that was withheld, read when its span was asked for. */
 export interface Said {
   readonly label: string;
   readonly text: string;
@@ -74,6 +72,8 @@ export interface Said {
 /** A trace laid out: every span in order, its parents before its children, and how long it ran. */
 export interface Outline {
   readonly rows: readonly Row[];
+  /** False where the trace has more spans than portalr gives: these are its first. */
+  readonly complete: boolean;
   /** Milliseconds from its first span's start to its last span's end. */
   readonly duration: number;
 }
@@ -89,15 +89,22 @@ const text = (value: unknown): string | null => (typeof value === "string" ? val
  * as a root rather than lost, so a trace that is wrong is still read.
  */
 export function outline(trace: Trace): Outline {
-  const spans = [...trace.spans];
+  const spans = trace.spans;
   const ids = new Set(spans.map((span) => span.span_id));
   const children = new Map<string | null, Span[]>();
+  let start = Number.POSITIVE_INFINITY;
+  let end = Number.NEGATIVE_INFINITY;
   for (const span of spans) {
     const parent = span.parent_id !== null && ids.has(span.parent_id) ? span.parent_id : null;
-    children.set(parent, [...(children.get(parent) ?? []), span]);
+    const siblings = children.get(parent);
+    if (siblings) {
+      siblings.push(span);
+    } else {
+      children.set(parent, [span]);
+    }
+    start = Math.min(start, span.start_ns);
+    end = Math.max(end, span.end_ns);
   }
-  const start = Math.min(...spans.map((span) => span.start_ns));
-  const end = Math.max(...spans.map((span) => span.end_ns));
   const rows: Row[] = [];
   const placed = new Set<string>();
   const place = (span: Span, depth: number) => {
@@ -106,6 +113,8 @@ export function outline(trace: Trace): Outline {
     }
     placed.add(span.span_id);
     const below = children.get(span.span_id) ?? [];
+    // A span in a cycle may have a child already placed above it: that isn't one to open.
+    const opens = below.some((child) => !placed.has(child.span_id));
     const { attributes } = span;
     const input = number(attributes["gen_ai.usage.input_tokens"]);
     const output = number(attributes["gen_ai.usage.output_tokens"]);
@@ -114,7 +123,7 @@ export function outline(trace: Trace): Outline {
       name: span.name,
       kind: kindOf(attributes),
       depth,
-      parent: below.length > 0,
+      parent: opens,
       parentId: span.parent_id,
       offset: (span.start_ns - start) / NS_PER_MS,
       duration: Math.max(0, span.end_ns - span.start_ns) / NS_PER_MS,
@@ -124,7 +133,6 @@ export function outline(trace: Trace): Outline {
       tokens: input === null && output === null ? null : { input, output },
       attributes,
       withheld: span.withheld ?? [],
-      said: said(attributes),
     });
     for (const child of [...below].sort((a, b) => a.start_ns - b.start_ns)) {
       place(child, depth + 1);
@@ -137,32 +145,43 @@ export function outline(trace: Trace): Outline {
   for (const span of spans) {
     place(span, 0);
   }
-  return { rows, duration: spans.length === 0 ? 0 : (end - start) / NS_PER_MS };
+  return {
+    rows,
+    complete: trace.complete ?? true,
+    duration: spans.length === 0 ? 0 : (end - start) / NS_PER_MS,
+  };
 }
 
-/** What was said in a span, by attribute: a name for a person, and the attribute's text. */
-const SAID: readonly [attribute: string, label: string][] = [
-  ["gen_ai.system_instructions", "Instructions"],
-  ["gen_ai.input.messages", "Prompt"],
-  ["gen_ai.output.messages", "Completion"],
-  ["gen_ai.tool.call.arguments", "Tool arguments"],
-  ["gen_ai.tool.call.result", "Tool result"],
-];
+/** What people call the attributes that most often hold what was said. */
+const LABELS: Readonly<Record<string, string>> = {
+  "gen_ai.system_instructions": "Instructions",
+  "gen_ai.input.messages": "Prompt",
+  "gen_ai.output.messages": "Completion",
+  "gen_ai.tool.call.arguments": "Tool arguments",
+  "gen_ai.tool.call.result": "Tool result",
+};
 
-/** The attributes that hold what was said, which a read leaves out until it is asked for them. */
-export const CONTENT: readonly string[] = SAID.map(([attribute]) => attribute);
+/**
+ * A span's attributes as a person reads them once they are asked for: each labelled, a name people
+ * know by it, else by its own, its JSON, if it is JSON, indented; the labelled first.
+ */
+export function said(attributes: Span["attributes"], names: readonly string[]): Said[] {
+  const labelled = (name: string) => Object.hasOwn(LABELS, name);
+  return [...names]
+    .filter((name) => name in attributes)
+    .sort((a, b) => Number(!labelled(a)) - Number(!labelled(b)) || a.localeCompare(b))
+    .map((name) => {
+      const value = String(attributes[name]);
+      const label = LABELS[name] ?? name;
+      try {
+        return { label, text: JSON.stringify(JSON.parse(value), null, 2) };
+      } catch {
+        return { label, text: value };
+      }
+    });
+}
 
-/** What was said in a span, if its read has it: each part, labelled, its JSON indented. */
-export function said(attributes: Span["attributes"]): Said[] {
-  return SAID.flatMap(([attribute, label]) => {
-    const value = attributes[attribute];
-    if (typeof value !== "string") {
-      return [];
-    }
-    try {
-      return [{ label, text: JSON.stringify(JSON.parse(value), null, 2) }];
-    } catch {
-      return [{ label, text: value }];
-    }
-  });
+/** A trace's id as portalr and Tempo write it: 32 lowercase hex digits where it is hex. */
+export function wholeTrace(id: string): string {
+  return /^[0-9a-f]{1,31}$/i.test(id) ? id.toLowerCase().padStart(32, "0") : id;
 }

@@ -20,6 +20,7 @@ import type * as reflexrV1 from "./generated/reflexr.v1";
 import { reasons } from "./reasons";
 import * as reflexr from "./reflexr";
 import { type Api, named } from "./rest";
+import { wholeTrace } from "./traces";
 
 type Check = Grantr["schemas"]["Check"];
 type AuditQuery = NonNullable<
@@ -113,9 +114,9 @@ export const keys = {
       [...keys.portalr.tenant(tenant), "usage", window, workspaces] as const,
     traces: (tenant: string, window: TimeSpan, filter: TraceFilter) =>
       [...keys.portalr.tenant(tenant), "traces", "list", window, filter] as const,
-    /** A trace, and, apart, the same with what was said in it: the second is asked for. */
-    trace: (tenant: string, trace: string, content: boolean) =>
-      [...keys.portalr.tenant(tenant), "traces", "detail", trace, content] as const,
+    /** A trace, and, apart, the same with one span's withheld attributes, which are asked for. */
+    trace: (tenant: string, trace: string, span: string | null) =>
+      [...keys.portalr.tenant(tenant), "traces", "detail", trace, span] as const,
     /** The deployment's tenants, as the signed-in person, `user`, reads them: an operator's. */
     tenants: (user: string) => ["portalr", "deployment", "tenants", user] as const,
     /** Deep links into the tools for a trace, which only an operator, `user`, reads. */
@@ -558,23 +559,30 @@ export function createQueries(api: Api) {
           staleTime: 30_000,
         }),
       /**
-       * A trace by its id: null if it isn't the tenant's, or isn't there. What was said in its
-       * spans, prompts and completions, is left out, unless `content` asks for it, and then it is
-       * a read of its own, kept apart.
+       * A trace by its id, whole however it is written: null if it isn't the tenant's, or isn't
+       * there. Only its attributes known to be safe are in it. With `span`, one span's others are
+       * too, which is a read of its own, for that span alone, and is not kept.
        */
-      trace: (tenant: string, trace: string, content = false) =>
-        queryOptions({
-          queryKey: keys.portalr.trace(tenant, trace, content),
+      trace: (tenant: string, trace: string, span: string | null = null) => {
+        const whole = wholeTrace(trace);
+        return queryOptions({
+          queryKey: keys.portalr.trace(tenant, whole, span),
           queryFn: () =>
             body(
               api.portalr.GET("/portalr/v1/traces/{trace_id}", {
                 ...named(tenant),
-                params: { path: { trace_id: trace }, query: { content } },
+                params: {
+                  path: { trace_id: whole },
+                  query: span === null ? {} : { content: true, span },
+                },
               }),
             ),
-          // A trace is written once it ends: what is read of it stays good for a while.
-          staleTime: 5 * 60_000,
-        }),
+          // A trace is written once it ends: what is read of it stays good for a while. What a
+          // span withheld is read when asked, shown, and let go: it isn't kept in the page's cache.
+          staleTime: span === null ? 5 * 60_000 : 0,
+          gcTime: span === null ? 5 * 60_000 : 0,
+        });
+      },
       /** An operator's deep links into Langfuse and Grafana for a trace. */
       links: (user: string, trace: string) =>
         queryOptions({

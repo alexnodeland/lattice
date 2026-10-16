@@ -12,7 +12,7 @@ Flat names have cost us once, and would cost us again ([#45](https://github.com/
 
 - **An application and the test suite.** oncall couldn't use `heartbeat` or `deploy.finished`, because reflexr's test fixtures register them in the same pytest process ([ADR-0031](0031-the-reference-implementations-events-and-rules.md)).
 - **An application and a plugin**, or two applications, can't use the same names in one process.
-- **A bridge and reflexr.** [stackr RFC-0002](https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md) adds relayr, which publishes artifactr's events into reflexr. artifactr's `feedback_given` and `run_started` are also names of reflexr's own facts. The RFC's decision D6 settles this issue before relayr's phase 1, so the bridged names are right the first time.
+- **A bridge and reflexr.** [stackr RFC-0002](../../stackr/rfcs/0002-the-combined-system.md) adds relayr, which publishes artifactr's events into reflexr. artifactr's `feedback_given` and `run_started` are also names of reflexr's own facts. The RFC's decision D6 settles this issue before relayr's phase 1, so the bridged names are right the first time.
 
 [#72](https://github.com/alexnodeland/reflexr/issues/72), which reserves a type to one publisher, may build on the same namespaces.
 
@@ -34,7 +34,7 @@ Where a name is used today:
 
 reflexr's own facts have thirteen bare names: `rule_fired`, `rule_errored`, `rule_reset`, the eight `run_*` facts, `feedback_given` and `tick`. Feedback types have a registry of the same shape (`core/feedback.py`).
 
-artifactr names events differently. Its own events are a closed union that only artifactr defines ([artifactr ADR-0005](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0005-one-event-log-per-workspace.md)). Applications' facts share one open type, `app_event`, told apart by a free-form `name` that nothing registers. pydantic-ai, whose `CustomEvent` naming reflexr follows, does namespace its capability events: `class CheckpointStartEvent(CapabilityEvent, namespace="checkpoint")`. Subclasses of an `abstract=True` base inherit its namespace, and a kind is the namespace and the name joined with a dot.
+artifactr names events differently. Its own events are a closed union that only artifactr defines ([artifactr ADR-0005](../../artifactr/adr/0005-one-event-log-per-workspace.md)). Applications' facts share one open type, `app_event`, told apart by a free-form `name` that nothing registers. pydantic-ai, whose `CustomEvent` naming reflexr follows, does namespace its capability events: `class CheckpointStartEvent(CapabilityEvent, namespace="checkpoint")`. Subclasses of an `abstract=True` base inherit its namespace, and a kind is the namespace and the name joined with a dot.
 
 ## Decision
 

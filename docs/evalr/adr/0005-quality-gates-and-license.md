@@ -6,7 +6,7 @@
 
 ## Context
 
-evalr decides which agents, prompts and models are better. Its metrics and evaluators must be as trustworthy as the libraries they judge, whose gates are 100% branch coverage, pyright strict with no suppressions, and warnings as errors ([artifactr ADR-0015](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0015-quality-gates.md), [reflexr ADR-0013](https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0013-quality-gates.md)).
+evalr decides which agents, prompts and models are better. Its metrics and evaluators must be as trustworthy as the libraries they judge, whose gates are 100% branch coverage, pyright strict with no suppressions, and warnings as errors ([artifactr ADR-0015](../../artifactr/adr/0015-quality-gates.md), [reflexr ADR-0013](../../reflexr/adr/0013-quality-gates.md)).
 
 ## Decision
 

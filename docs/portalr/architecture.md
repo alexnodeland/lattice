@@ -148,7 +148,8 @@ TanStack Router's route tree, `src/routeTree.gen.ts`, is committed, and a test h
 | `TabNav`, `TabLink` | An area's parts as tabs of links, the current one marked with `aria-current`, on one row that scrolls on a phone |
 | `CheckboxGroup` | Several choices, any of them checked, named by a legend |
 | `SignIn`, `Account` | Signing in, and the account menu over a session, for both UIs |
-| `BarChart`, `LineChart`, `DonutChart` | Tremor's charts, adapted, on Recharts: the inks as marks, a pattern and a label per series, and the figures as a table ([ADR-0027](adr/0027-feedback-and-evaluations.md)) |
+| `BarChart`, `LineChart`, `DonutChart`, `Tracker` | Tremor's charts, adapted, on Recharts, over one chart theme (`chart-theme.tsx`): violet-led series as marks, patterns only where marks touch, a legend and a tooltip on the menus' surface, and the figures as a table; `data-cvd` on the root switches to a colour-blind palette with every pattern on ([ADR-0027](adr/0027-feedback-and-evaluations.md), [ADR-0036](adr/0036-the-chart-theme-and-colour-blind-mode.md)) |
+| `Num` | A figure with tabular digits only, so its decimal point keeps its width ([ADR-0036](adr/0036-the-chart-theme-and-colour-blind-mode.md)) |
 | `TraceView` | A trace's spans as an ARIA tree with a waterfall, virtualized, and the chosen span's details; what a span withheld is shown when asked for ([ADR-0030](adr/0030-traces-and-the-trace-view.md)) |
 | `LogList`, `AnsiText` | Log records as a virtualized ARIA listbox with the chosen record's details; a line in the eight palette colours and bold, with every other escape stripped ([ADR-0031](adr/0031-logs-and-health.md)) |
 | `RunList`, `RuleRunStatus` | Rule runs as a table, or cards on a phone, with each row's actions, and a run's status as a word and a shape ([ADR-0032](adr/0032-runs-in-admin.md)) |

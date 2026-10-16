@@ -155,7 +155,7 @@ test("the week's thumbs, evaluations and workspaces, from portalr's summary", as
     .toBeVisible();
   await expect.element(screen.getByText("accuracy · accuracy").first()).toBeVisible();
   const donut = screen.getByRole("figure", { name: "People's thumbs by workspace" });
-  await expect.element(donut.getByRole("listitem").first()).toHaveTextContent("notes4 · 80%");
+  await expect.element(donut.getByRole("listitem").first()).toHaveTextContent("notes, 4, 80%");
   const places = screen.getByRole("table", { name: "By workspace" });
   await expect.element(places.getByRole("rowheader", { name: "In no workspace" })).toBeVisible();
   const said = screen.getByRole("table", { name: "What people said" });
@@ -235,8 +235,8 @@ test("a partial summary says so, with a badge", async () => {
     .poll(() => [...thumbs.element().querySelectorAll("svg text")].map((t) => t.textContent))
     .toContain("Not read");
   await thumbs.getByText("Show the figures").click();
-  // The first day's figures are unknown: none, not 0.
-  const first = days(7)[0]?.slice(5) ?? "";
+  // The first day's figures are unknown: none, not 0. The table keeps the whole day.
+  const first = days(7)[0] ?? "";
   await expect.element(thumbs.getByRole("row", { name: first })).toHaveTextContent(`${first}––`);
 });
 

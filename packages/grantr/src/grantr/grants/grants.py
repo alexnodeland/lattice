@@ -603,7 +603,7 @@ class Grants:
                 raise Invalid(f"{member} isn't a member")
             own = [grant for grant in await tx.grants(tenant, member) if grant.to == member]
             await self._bounded(tx, tenant, by, own)
-            await self._keeps_an_owner(tx, tenant, own)
+            await self._keeps_an_owner(tx, tenant, leaving=member)
             await tx.remove_member(tenant, member)
             return await record(tenant, by, MemberRemoved(member=member))
 
@@ -615,7 +615,8 @@ class Grants:
         Raises:
             Forbidden: If ``by`` may not (``grantr:manage_groups`` on the tenant), or holds less
                 than a role the group is granted, which its members gain or lose.
-            Invalid: If one of the members isn't a member of it.
+            Invalid: If one of the members isn't a member of it, or the change would leave the
+                tenant with no member holding ``owner``.
         """
         async with self._change(tenant) as (tx, record):
             await self._require(tx, tenant, by, "grantr:manage_groups", TENANT)
@@ -623,6 +624,7 @@ class Grants:
                 if not await self._is_member(tx, tenant, member):
                     raise Invalid(f"{member} isn't a member")
             await self._bounded(tx, tenant, by, await tx.grants(tenant, group))
+            await self._keeps_an_owner(tx, tenant, regrouped=(group, members))
             await tx.put_group(tenant, group, members)
             return await record(tenant, by, GroupDefined(group=group.id, members=members))
 
@@ -640,7 +642,7 @@ class Grants:
                 raise Invalid(f"there is no group {group.id}")
             carried = await tx.grants(tenant, group)
             await self._bounded(tx, tenant, by, carried)
-            await self._keeps_an_owner(tx, tenant, carried)
+            await self._keeps_an_owner(tx, tenant, losing=carried)
             await tx.remove_group(tenant, group)
             return await record(tenant, by, GroupDeleted(group=group.id))
 
@@ -724,7 +726,7 @@ class Grants:
                 raise Invalid(f"{to} doesn't hold {role} there")
             if to != by:
                 await self._bounded(tx, tenant, by, [grant])
-            await self._keeps_an_owner(tx, tenant, [grant])
+            await self._keeps_an_owner(tx, tenant, losing=[grant])
             await tx.remove_grant(grant)
             return await record(tenant, by, Revoked(grant=grant))
 
@@ -932,12 +934,36 @@ class Grants:
             await record(tenant, operator, MemberAdded(member=operator))
 
     async def _keeps_an_owner(
-        self, tx: Transaction, tenant: TenantId, losing: Iterable[Grant]
+        self,
+        tx: Transaction,
+        tenant: TenantId,
+        *,
+        losing: Iterable[Grant] = (),
+        leaving: Member | None = None,
+        regrouped: tuple[Group, frozenset[Member]] | None = None,
     ) -> None:
-        """Refuse a change that would leave the tenant with no owner."""
-        owners = await tx.granted(tenant, TENANT, role="owner")
-        if owners and set(owners) <= set(losing):
-            raise Invalid(f"{owners[0].to} is the last owner")
+        """Refuse a change that would leave no member holding ``owner`` on the tenant, if one does.
+
+        An owner grant to a group makes its members owners, so one to an empty group makes no
+        one an owner (ADR-0014's amendment). The change takes the grants ``losing``, removes the
+        member ``leaving``, or gives a group new members, ``regrouped``.
+        """
+        lost = set(losing)
+        before: set[Grantee] = set()
+        after: set[Grantee] = set()
+        for grant in await tx.granted(tenant, TENANT, role="owner"):
+            held: frozenset[Grantee] = frozenset((grant.to,))
+            kept = held
+            if isinstance(grant.to, Group):
+                held = await tx.group(tenant, grant.to) or frozenset()
+                kept = regrouped[1] if regrouped and regrouped[0] == grant.to else held
+            before |= held
+            if grant not in lost:
+                after |= kept - frozenset((leaving,))
+        if before and not after:
+            owners = ", ".join(sorted(map(str, before)))
+            last = "is the last owner" if len(before) == 1 else "are the last owners"
+            raise Invalid(f"{owners} {last}")
 
 
 def _application(principal: ServicePrincipal) -> Grant:

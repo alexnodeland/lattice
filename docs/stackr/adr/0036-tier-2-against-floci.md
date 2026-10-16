@@ -39,7 +39,7 @@ Tier 1 ([ADR-0029](0029-the-aws-modules-and-tier-1.md)) plans the recipe against
   - that the edge routes nothing to GoTrue's admin API: a 404, which is also what the listener answers for anything it doesn't route, so it shows no rule sends it on;
   - Langfuse's and Grafana's health;
   - a trace sent to the Collector, and found in Tempo;
-  - LiteLLM, answering with its mock's own words, for a key whose team allows mocks, as stackr's smoke's does;
+  - LiteLLM, once its readiness endpoint answers (ECS counts its task running before it listens), answering with its mock's own words, for a key whose team allows mocks, as stackr's smoke's does;
   - through RDS's relay, as the application's role and as its owner, with the passwords from Secrets Manager: each one's `search_path`, the application's schema.
 - **It removes only what it made, and never by a name pattern.** Each run has an id, which names its network, its two containers and its image tags. When it ends, however it ends, it destroys the stack, then removes:
   - its own two containers and its network, by the ids Docker gave them, with their volumes;

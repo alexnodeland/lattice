@@ -2033,6 +2033,11 @@
             "title": "Depth",
             "type": "integer"
           },
+          "epoch": {
+            "default": 0,
+            "title": "Epoch",
+            "type": "integer"
+          },
           "error": {
             "anyOf": [
               {

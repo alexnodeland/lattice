@@ -87,7 +87,7 @@ async def notify_owners(reaction: Reaction[AppDeps]) -> None:
             await reaction.checkpoint(owner, sorted(done))
 ```
 
-Each checkpoint appends `reflexr:run_progressed` with the step's name. If the attempt is no longer the run's current one (it was cancelled, or another executor took it over), `checkpoint` raises `InvalidState`, and the action should stop.
+Each checkpoint appends `reflexr:run_progressed` with the step's name. If the attempt is no longer the run's current one (it was cancelled or retried, or another executor took it over), `checkpoint` raises `InvalidState`, and the action should stop.
 
 ## Agents
 

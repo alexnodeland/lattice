@@ -25,7 +25,9 @@ from reflexr.core import (
     RunRetrying,
     RunStarted,
     RunSucceeded,
+    cancel,
     fail,
+    retry,
     start,
 )
 from reflexr.telemetry import attributes as a
@@ -294,6 +296,51 @@ async def test_a_stale_attempt_cannot_overwrite_a_newer_one(build: Build, storag
     assert await attempt == 0
     [current] = await workspace.runs()
     assert (current.status, current.attempts) == ("running", 2)
+
+
+async def test_a_cancelled_and_retried_attempt_cannot_overwrite_the_newer_one(
+    build: Build, storage: Storage
+) -> None:
+    workspaces = build([rule(then=run("blocked"))])
+    deps = Deps()
+    workspace = await open_(workspaces)
+    await workspace.publish(Deploy(service="auth"))
+    executor = reactor(workspaces, deps)
+    await executor.evaluate()
+    attempt = asyncio.create_task(executor.execute())
+    await deps.started.wait()
+    [first] = await workspace.runs()
+    await workspace.cancel_run(first.id)
+    await workspace.retry_run(first.id)  # a fresh budget: its attempts are 0 again
+    [retried] = await workspace.runs()
+    newer, _ = start(retried, now=START)
+    async with storage.transaction(ACME) as transaction:  # another executor took it
+        await transaction.save_runs([newer])
+    deps.release.set()
+    assert await attempt == 0
+    assert await workspace.runs() == [newer]
+    assert (newer.attempts, newer.epoch) == (1, 2)
+
+
+async def test_a_cancelled_and_retried_attempt_stops_once_another_runs(
+    build: Build, storage: Storage
+) -> None:
+    workspaces = build([rule(then=run("blocked"))])
+    deps = Deps()
+    workspace = await open_(workspaces)
+    await workspace.publish(Deploy(service="auth"))
+    executor = reactor(workspaces, deps, lease_ttl=timedelta(milliseconds=30))
+    await executor.evaluate()
+    attempt = asyncio.create_task(executor.execute())
+    await deps.started.wait()
+    [first] = await workspace.runs()
+    # Cancelled, retried and started again at once, while this executor still holds the lease.
+    cancelled, _ = cancel(first, now=START)
+    newer, _ = start(retry(cancelled, now=START)[0], now=START)
+    async with storage.transaction(ACME) as transaction:
+        await transaction.save_runs([newer])
+    assert await asyncio.wait_for(attempt, timeout=1) == 0
+    assert await workspace.runs() == [newer]
 
 
 async def test_cancelling_a_run_stops_its_action(build: Build) -> None:
@@ -578,6 +625,7 @@ async def test_attempts_are_traced_and_linked_to_their_causes(
         2,
         deploy.id,
     )
+    assert attributes[a.EPOCH] == done.epoch == 2
     cause = parse_traceparent(deploy.traceparent)
     assert cause is not None
     assert [link.context for link in succeeded.links] == [cause]
@@ -656,9 +704,33 @@ async def test_a_stale_attempt_cannot_checkpoint(build: Build, storage: Storage)
     await reactor(workspaces, Deps()).evaluate()
     [pending] = await workspace.runs()
     with pytest.raises(InvalidState, match=f"attempt 1 of run {pending.id} is no longer current"):
-        await workspace.checkpoint_run(pending.id, attempt=1, step="s", state=None)
+        await workspace.checkpoint_run(pending.id, attempt=1, epoch=1, step="s", state=None)
     with pytest.raises(NotFound, match="run nope"):
-        await workspace.checkpoint_run("nope", attempt=1, step="s", state=None)
+        await workspace.checkpoint_run("nope", attempt=1, epoch=1, step="s", state=None)
+
+
+async def test_a_cancelled_and_retried_attempt_cannot_checkpoint(
+    build: Build, storage: Storage
+) -> None:
+    workspaces = build([rule()])
+    workspace = await open_(workspaces)
+    await workspace.publish(Deploy(service="auth"))
+    await reactor(workspaces, Deps()).evaluate()
+    [pending] = await workspace.runs()
+    first, _ = start(pending, now=START)
+    cancelled, _ = cancel(first, now=START)
+    newer, _ = start(retry(cancelled, now=START)[0], now=START)
+    async with storage.transaction(ACME) as transaction:
+        await transaction.save_runs([newer])
+    assert (first.attempts, newer.attempts) == (1, 1)
+    with pytest.raises(InvalidState, match="no longer current"):
+        await workspace.checkpoint_run(
+            pending.id, attempt=1, epoch=first.epoch, step="s", state=None
+        )
+    saved = await workspace.checkpoint_run(
+        pending.id, attempt=1, epoch=newer.epoch, step="s", state=None
+    )
+    assert saved.step == "s"
 
 
 async def test_each_attempt_runs_inside_the_run_context_with_its_chain_in_baggage(

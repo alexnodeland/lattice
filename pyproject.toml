@@ -91,6 +91,8 @@ convention = "google"
 [tool.pyright]
 include = ["scripts", "tests"]
 strict = ["scripts"]
+# The scripts a test imports (tests/test_release_plan.py).
+extraPaths = ["scripts"]
 typeCheckingMode = "standard"
 pythonVersion = "3.12"
 venvPath = "."
@@ -100,6 +102,8 @@ venv = ".venv"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The scripts a test imports.
+pythonpath = ["scripts"]
 addopts = ["--strict-markers", "--strict-config", "-ra"]
 # A test that runs for a minute is stuck: fail it, with every thread's stack.
 timeout = 60

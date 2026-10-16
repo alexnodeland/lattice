@@ -35,7 +35,7 @@ export function StatCard({
       className="flex h-full flex-col gap-1"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id={heading} className={`${TYPE.label} text-muted`}>
+        <h2 id={heading} className={TYPE.labelQuiet}>
           {title}
         </h2>
         {badge}

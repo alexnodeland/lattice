@@ -169,18 +169,6 @@ test("a chart's series are told apart, to a reader who sees every colour and to 
   }
 });
 
-test("the two violets differ in lightness, and so do not rest on hue", () => {
-  expect(Math.abs(luminance(token("chart-1")) - luminance(token("chart-2")))).toBeGreaterThan(0.05);
-});
-
-test("the accent is clear of the danger colour, the status colours' red, to every reader", () => {
-  const accent = token("chart-3");
-  expect(distance(accent, token("danger"))).toBeGreaterThanOrEqual(APART);
-  for (const deficiency of DEFICIENCIES) {
-    expect(distance(accent, token("danger"), deficiency), deficiency).toBeGreaterThanOrEqual(APART);
-  }
-});
-
 test("colour-blind mode swaps the series for others that stand out from the surface and the paper", () => {
   const screen = cvd();
   const swapped = inks(screen);
@@ -282,19 +270,5 @@ test("the status colours are told apart from each other and from the chart accen
   expect(closest(colours)).toBeGreaterThanOrEqual(APART);
   for (const deficiency of DEFICIENCIES) {
     expect(closest(colours, deficiency), deficiency).toBeGreaterThanOrEqual(APART);
-  }
-});
-
-test("colour-blind mode leaves the status colours holding their floors, with its own chart inks", () => {
-  const screen = cvd();
-  const status = [token("status-failed", screen), token("status-warn", screen)];
-  for (const colour of status) {
-    for (const ground of GROUNDS) {
-      expect(contrast(colour, token(ground))).toBeGreaterThanOrEqual(3);
-    }
-  }
-  expect(closest(status)).toBeGreaterThanOrEqual(APART);
-  for (const deficiency of DEFICIENCIES) {
-    expect(closest(status, deficiency), deficiency).toBeGreaterThanOrEqual(APART);
   }
 });

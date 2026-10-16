@@ -6,7 +6,8 @@ import { cn } from "./cn";
  * ink, which reads on the pill; the colour is the border and the shape, as a mark. Only waiting
  * for you takes the working colour. What failed, and a budget overspent, are edged in the rose
  * red; what is retrying, and a budget nearly spent, in the gold; the rest are neutral
- * (portalr ADR-0039). A budget nearly spent is a half-filled ring, and one overspent a triangle.
+ * (portalr ADR-0039). Under forced colours the shapes keep their own colours, as the border would not be
+ * enough to tell them by. A budget nearly spent is a half-filled ring, and one overspent a triangle.
  */
 const TONE = {
   working: {
@@ -62,7 +63,10 @@ export function StatusBadge({ tone, children, live = false, className }: Props) 
         className,
       )}
     >
-      <span aria-hidden="true" className={cn("size-2 shrink-0", TONE[tone].glyph)} />
+      <span
+        aria-hidden="true"
+        className={cn("size-2 shrink-0 forced-color-adjust-none", TONE[tone].glyph)}
+      />
       {children}
     </span>
   );

@@ -119,8 +119,9 @@ function UsagePage() {
           <StatusBadge tone="stopped" className="mr-2">
             Partial
           </StatusBadge>
-          The read stopped short, so the days it didn't reach are left out, not shown as nothing
-          spent, and the sums are of what it read. A shorter window may read it all.
+          The read stopped short, so the days it didn't reach, and the last it read, which may be
+          part-read, are left out, not shown as nothing spent, and the sums are of what it read. A
+          shorter window may read it all.
         </Alert>
       )}
       <Spent usage={usage} />

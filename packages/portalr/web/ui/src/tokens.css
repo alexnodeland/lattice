@@ -153,7 +153,4 @@
   --chart-marker-corner-2: 0;
   --chart-marker-corner-3: 0;
   --chart-marker-turn-3: 45deg;
-  /* Status keeps its hues, which hold their floors to every reader; they are here, in the mode's one block, for a change to make. */
-  --status-failed: light-dark(#8a0f2c, #f391b1);
-  --status-warn: light-dark(#9c821c, #f9e890);
 }

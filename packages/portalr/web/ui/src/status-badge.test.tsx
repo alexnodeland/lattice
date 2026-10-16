@@ -73,7 +73,7 @@ test("still, working keeps a shape of its own, apart from queued's", async () =>
   expect(shape("Working")).not.toBe(shape("Queued"));
 });
 
-test("a budget nearly spent and one overspent have shapes of their own, , the budget's own", async () => {
+test("a budget nearly spent and one overspent have shapes of their own", async () => {
   const screen = await render(
     <div>
       <StatusBadge tone="near">Near budget</StatusBadge>
@@ -143,4 +143,22 @@ test("retrying's shape is apart from queued's and from waiting's, so colour is n
   };
   const shapes = new Set([shape("Retrying"), shape("Queued"), shape("Waiting for you")]);
   expect(shapes.size).toBe(3);
+});
+
+test("under forced colours a shape keeps its own colour, which the border alone would not tell", async () => {
+  onTestFinished(() => commands.forcedColors(false));
+  const screen = await render(
+    <div>
+      <StatusBadge tone="failed">Dead-lettered</StatusBadge>
+      <StatusBadge tone="over">Over budget</StatusBadge>
+    </div>,
+  );
+  // Read before the colours are forced: a probe's own colour is forced then too.
+  const red = token("status-failed");
+  await commands.forcedColors(true);
+  for (const word of ["Dead-lettered", "Over budget"]) {
+    const glyph = screen.getByText(word).element().firstElementChild as Element;
+    expect(getComputedStyle(glyph).forcedColorAdjust, word).toBe("none");
+    expect(getComputedStyle(glyph).backgroundColor, word).toBe(red);
+  }
 });

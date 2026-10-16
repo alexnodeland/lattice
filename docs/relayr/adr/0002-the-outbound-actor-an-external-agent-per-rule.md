@@ -33,4 +33,4 @@ When a reflexr run acts in artifactr (proposes a change, creates an artifact, po
 - Easier: people see which rule wrote what, and review it as they review any outside agent.
 - Harder: the adapter carries one prohibition of its own, `respond_to_proposal`, that artifactr can't enforce for it.
 
-[rfc-0002]: https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md#d2-the-outbound-actor
+[rfc-0002]: ../../stackr/rfcs/0002-the-combined-system.md#d2-the-outbound-actor

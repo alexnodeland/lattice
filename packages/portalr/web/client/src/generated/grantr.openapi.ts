@@ -482,9 +482,9 @@ export interface components {
             seq: number;
             tenant: components["schemas"]["TenantId"] | null;
         };
-        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"];
+        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["DeploymentTenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"];
         /** @enum {string} */
-        AuditType: "tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted";
+        AuditType: "tenant_created" | "deployment_tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted";
         /**
          * BuiltInRole
          * @description A built-in role a tenant's admins grant, and the kinds of resource it may be granted on.
@@ -519,6 +519,23 @@ export interface components {
             /** Action */
             action: string;
             resource: components["schemas"]["Resource"];
+        };
+        /**
+         * DeploymentTenantCreated
+         * @description A tenant was created: the deployment's record of it, beside the tenant's own.
+         *
+         *     Its entry is in no tenant's log, the deployment's, and names who created the tenant, so an
+         *     operator who isn't a member of the tenant it created is seen to have created it. The owner is
+         *     a user's id, never an email.
+         */
+        DeploymentTenantCreated: {
+            owner: components["schemas"]["UserId"];
+            tenant: components["schemas"]["TenantId"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "deployment_tenant_created";
         };
         /**
          * Grant

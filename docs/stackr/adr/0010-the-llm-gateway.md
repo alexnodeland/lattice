@@ -6,7 +6,7 @@
 
 ## Context
 
-RFC-0001 puts the LiteLLM proxy in front of every model: model aliases in the style already in use (with an OpenRouter wildcard and local servers), model groups with fallbacks, a team per tenant with budgets and rate limits, guardrails selected per request, and telemetry that continues the application's trace. The libraries reach it through pydantic-ai's `LiteLLMProvider` ([artifactr ADR-0031](https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0031-litellm-proxy-first.md)); to them it is the LLM gateway port ([ADR-0005](0005-ports-and-adapters-for-the-stack.md)).
+RFC-0001 puts the LiteLLM proxy in front of every model: model aliases in the style already in use (with an OpenRouter wildcard and local servers), model groups with fallbacks, a team per tenant with budgets and rate limits, guardrails selected per request, and telemetry that continues the application's trace. The libraries reach it through pydantic-ai's `LiteLLMProvider` ([artifactr ADR-0031](../../artifactr/adr/0031-litellm-proxy-first.md)); to them it is the LLM gateway port ([ADR-0005](0005-ports-and-adapters-for-the-stack.md)).
 
 Checking LiteLLM 1.103.0, the current release, against its source settled what the RFC left open:
 

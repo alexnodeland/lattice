@@ -519,3 +519,66 @@ def test_an_id_holds_nothing_of_a_withheld_value_of_a_safe_label() -> None:
     )
     assert [each.id.rsplit("-", 1)[1] for each, _ in placed] == ["0", "1"]
     assert [line for _, line in placed] == ["a", "b"]
+
+
+def test_a_tenants_links_name_the_tenant_as_each_tool_reads_it() -> None:
+    langfuse = Langfuse("http://langfuse", project="p1")
+    assert langfuse.tenant_traces_link("acme") == (
+        "http://langfuse/project/p1/traces?filter="
+        "traceTags%3BarrayOptions%3B%3Bany%20of%3Btenant%253Aacme"
+    )
+    # Langfuse escapes a pipe and a backslash in a value before it percent-encodes it.
+    odd = langfuse.tenant_traces_link("a|b\\c d")
+    assert odd.endswith("tenant%253Aa%255C%257Cb%255C%255Cc%2520d")
+    grafana = Grafana("http://grafana")
+    logs = parse_qs(urlparse(grafana.tenant_logs_link('a"b')).query)["left"][0]
+    assert jsonlib.loads(logs)["queries"][0]["expr"] == '{service_name=~".+"} | tenant_id = "a\\"b"'
+    traces = parse_qs(urlparse(grafana.tenant_traces_link("acme")).query)["left"][0]
+    assert jsonlib.loads(traces)["queries"][0]["query"] == '{ span.tenant.id = "acme" }'
+
+
+def _langfuse_decoded(link: str) -> list[dict[str, str | list[str]]]:
+    """A Langfuse traces link's ``filter``, decoded as Langfuse 4.46.0's ``filterQueryEncoding.ts``
+    does: split on commas, then semicolons, percent-decode each part, then split an array's value
+    on the pipes that aren't escaped and unescape each."""
+    from urllib.parse import unquote
+
+    (query,) = parse_qs(urlparse(link).query)["filter"]
+    filters: list[dict[str, str | list[str]]] = []
+    for each in query.split(","):
+        column, kind, key, operator, value = each.split(";")
+        parts: list[str] = []
+        current = ""
+        chars = iter(unquote(value))
+        for char in chars:
+            if char == "\\":
+                current += next(chars, "")
+            elif char == "|":
+                parts.append(current)
+                current = ""
+            else:
+                current += char
+        parts.append(current)
+        filters.append(
+            {
+                "column": column,
+                "type": kind,
+                "key": unquote(key),
+                "operator": unquote(operator),
+                "value": parts,
+            }
+        )
+    return filters
+
+
+def test_a_tenant_whatever_its_id_is_one_tag_to_langfuse() -> None:
+    langfuse = Langfuse("http://langfuse", project="p1")
+    for tenant in ("acme", "a,b", "a;b", "a|b", "a\\b", "a b", "é", "a=b&c"):
+        (found,) = _langfuse_decoded(langfuse.tenant_traces_link(tenant))
+        assert found == {
+            "column": "traceTags",
+            "type": "arrayOptions",
+            "key": "",
+            "operator": "any of",
+            "value": [f"tenant:{tenant}"],
+        }, tenant

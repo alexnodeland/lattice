@@ -34,6 +34,6 @@ Each library has its own idea of a session. In artifactr it is the thread, and a
 - Easier: each library's traces, sessions and scores keep meaning what they mean today.
 - Harder: following one story means opening two sessions, joined by tags and span links.
 
-[a-adr-0035]: https://github.com/alexnodeland/artifactr/blob/main/docs/adr/0035-a-turn-is-its-own-trace.md
-[r-adr-0018]: https://github.com/alexnodeland/reflexr/blob/main/docs/adr/0018-opentelemetry-observability-with-langfuse.md
-[rfc-0002]: https://github.com/alexnodeland/stackr/blob/main/docs/rfcs/0002-the-combined-system.md#d4-sessions-linked-or-continued
+[a-adr-0035]: ../../artifactr/adr/0035-a-turn-is-its-own-trace.md
+[r-adr-0018]: ../../reflexr/adr/0018-opentelemetry-observability-with-langfuse.md
+[rfc-0002]: ../../stackr/rfcs/0002-the-combined-system.md#d4-sessions-linked-or-continued

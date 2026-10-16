@@ -1,23 +1,27 @@
 #!/usr/bin/env python3
 """Create the key portalr's admin reads the gateway's spend with: a read-only one, not the master.
 
-Usage: scripts/create-portal-key [--quiet]
+Usage: scripts/create-portal-key [--quiet] [--rotate]
 
 portalr's admin shows each tenant's spend and budget from the LLM gateway (the LiteLLM proxy):
-its team's info, the list of teams, and the daily activity. Those are management routes, which
-the master key opens and so does everything else, so the application is given a key of its own
-that opens these three and nothing else (ADR-0038). The master key never reaches an application.
+its team's info, the list of teams, and the daily activity of the teams and of the workspaces'
+tags. Those are management routes, which the master key opens and so does everything else, so the
+application is given a key of its own that opens these four and nothing else (ADR-0038). The
+master key never reaches an application.
 
 The key belongs to a user, `portalr`, whose role is the proxy's view-only admin, since a team's
 info is read by a team's member or an admin; and it is limited with `allowed_routes` to
-/team/info, /team/list and /team/daily/activity. Neither alone is enough: a key with no user
-can't read a team it is not in, and the role alone would let the key read keys and spend logs.
-On LiteLLM v1.103.0, checked against the proxy: with the key, those three routes answer, and
-every other (chat, key and team creation or update, key and spend reads) is refused.
+/team/info, /team/list, /team/daily/activity and /tag/daily/activity. Neither alone is enough: a
+key with no user can't read a team it is not in, and the role alone would let the key read keys
+and spend logs. On LiteLLM v1.103.0, checked against the proxy: with the key, those four routes
+answer, and every other (chat, key and team creation or update, key and spend reads) is refused.
 
 Running this again is safe: the user is kept, and a new key is created only when `portal-spend-read`
 is not there, since a key's secret can't be read back. The key is printed once, as the setting
-the application reads.
+the application reads (put it in `.env`, which holds secrets: keep it mode 0600). When the key
+exists and its value is lost, `--rotate` deletes it by its alias and makes another; the one lost
+stops working. With `--quiet`, the key alone is printed, and the exit status is 3 when there was
+none to print, so a script can't take an empty value for a key.
 """
 
 from __future__ import annotations
@@ -32,12 +36,18 @@ from _gateway import Gateway, error_message
 
 USER = "portalr"
 KEY_ALIAS = "portal-spend-read"
-ROUTES = ["/team/info", "/team/list", "/team/daily/activity"]
+ROUTES = ["/team/info", "/team/list", "/team/daily/activity", "/tag/daily/activity"]
 """The routes portalr's readers call (portalr.readers.litellm and usage)."""
 
 
-def provision(gateway: Gateway, say: Callable[[str], None]) -> str | None:
-    """Make the user and the key, where they aren't; return the new key, or None if one was there."""
+NO_KEY = 3
+"""The exit status of `--quiet` when no key was made: the key exists and `--rotate` wasn't asked."""
+
+
+def provision(gateway: Gateway, say: Callable[[str], None], *, rotate: bool = False) -> str | None:
+    """Make the user and the key, where they aren't; return the new key, or None if one was there.
+
+    With `rotate`, a key that is there is deleted by its alias first, and another is made."""
     try:
         gateway.call("GET", f"/user/info?user_id={USER}")
         say(f"create-portal-key: user {USER} exists; kept as it is")
@@ -55,6 +65,17 @@ def provision(gateway: Gateway, say: Callable[[str], None]) -> str | None:
             message = error_message(creating)
             raise SystemExit(f"create-portal-key: creating user {USER}: {message}") from creating
         say(f"create-portal-key: created user {USER}, the proxy's view-only admin")
+    if rotate:
+        try:
+            gateway.call("POST", "/key/delete", {"key_aliases": [KEY_ALIAS]})
+        except urllib.error.HTTPError as error:
+            message = error_message(error)
+            if error.code != 404:
+                raise SystemExit(
+                    f"create-portal-key: deleting key {KEY_ALIAS}: {message}"
+                ) from error
+        else:
+            say(f"create-portal-key: deleted key {KEY_ALIAS}; the one it was stops working")
     try:
         created = gateway.call(
             "POST",
@@ -63,9 +84,9 @@ def provision(gateway: Gateway, say: Callable[[str], None]) -> str | None:
         )
     except urllib.error.HTTPError as error:
         message = error_message(error)
-        if "already exists" in message:
+        if error.code == 400 and "already exists" in message:
             say(
-                f"create-portal-key: key {KEY_ALIAS} exists; delete it on the proxy to make another"
+                f"create-portal-key: key {KEY_ALIAS} exists; its value can't be read back: --rotate"
             )
             return None
         raise SystemExit(f"create-portal-key: creating key {KEY_ALIAS}: {message}") from error
@@ -74,9 +95,10 @@ def provision(gateway: Gateway, say: Callable[[str], None]) -> str | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description=__doc__.splitlines()[0], usage="scripts/create-portal-key [--quiet]"
+        description=__doc__.splitlines()[0], usage="scripts/create-portal-key [--quiet] [--rotate]"
     )
     parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--rotate", action="store_true", help="replace a key whose value is lost")
     args = parser.parse_args()
     if not (ROOT / ".env").exists():
         raise SystemExit("create-portal-key: .env is missing; run `make env` and `make up` first")
@@ -88,9 +110,9 @@ def main() -> int:
         if not args.quiet:
             print(message, file=sys.stderr)
 
-    key = provision(gateway, say)
+    key = provision(gateway, say, rotate=args.rotate)
     if key is None:
-        return 0
+        return NO_KEY if args.quiet else 0
     if args.quiet:
         print(key)
     else:

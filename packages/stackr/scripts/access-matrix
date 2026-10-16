@@ -36,11 +36,11 @@ def with_portal(catalogs: list[Mapping[str, object]]) -> str:
     lines = matrix([*catalogs, PORTALR]).splitlines(keepends=True)
     kept: list[str] = []
     for line in lines:
-        first = line.startswith("| `portalr:")
-        was = bool(kept) and kept[-1].startswith("| `portalr:")
-        if first and not was:
+        row = line.startswith("| `portalr:")
+        in_run = bool(kept) and kept[-1].startswith("| `portalr:")
+        if row and not in_run:
             kept.append("{%- if use_portal %}\n")
-        if was and not first:
+        if in_run and not row:
             kept.append("{%- endif %}\n")
         kept.append(line)
     if kept[-1].startswith("| `portalr:"):

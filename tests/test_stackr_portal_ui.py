@@ -1,5 +1,5 @@
-"""The template's scripts/build-portal-ui.sh: the commit it builds portalr's UIs from is the one
-uv.lock pins portalr at, the one place that says which portalr is installed."""
+"""The template's scripts/build-portal-ui.sh: the repository and commit it builds portalr's UIs from
+are the ones uv.lock pins portalr at, the one place that says which portalr is installed."""
 
 import subprocess
 from pathlib import Path
@@ -43,7 +43,7 @@ def run(lock: str, tmp_path: Path) -> subprocess.CompletedProcess[str]:
     path = tmp_path / "uv.lock"
     path.write_text(lock)
     return subprocess.run(
-        ["bash", str(SCRIPT), "--print-rev", str(path)], capture_output=True, text=True, check=False
+        ["bash", str(SCRIPT), "--print", str(path)], capture_output=True, text=True, check=False
     )
 
 
@@ -52,7 +52,26 @@ def test_the_commit_is_the_one_the_lock_pins_portalr_at_and_no_other_packages(
 ) -> None:
     done = run(LOCK, tmp_path)
     assert done.returncode == 0, done.stderr
-    assert done.stdout.strip() == PINNED
+    assert done.stdout.strip() == f"{REPOSITORY} {PINNED}"
+
+
+def test_a_fork_is_built_from_its_own_repository(tmp_path: Path) -> None:
+    url = "https://github.com/someone/lattice"
+    fork = f'{{ git = "{url}?subdirectory=packages%2Fportalr&rev={OTHER}#{OTHER}" }}'
+    done = run("version = 1\n\n" + package("portalr", fork), tmp_path)
+    assert done.stdout.strip() == f"https://github.com/someone/lattice {OTHER}"
+
+
+def test_a_portalr_with_no_commit_does_not_take_the_next_packages(tmp_path: Path) -> None:
+    lock = "version = 1\n\n" + "\n".join(
+        [
+            '[[package]]\nname = "portalr"\nversion = "1"\n',
+            package("grantr", git("grantr", OTHER)),
+        ]
+    )
+    done = run(lock, tmp_path)
+    assert done.returncode == 1
+    assert "pins portalr at no git commit" in done.stderr
 
 
 @pytest.mark.parametrize(

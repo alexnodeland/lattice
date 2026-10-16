@@ -18,6 +18,7 @@ from {{ package_name }}.settings import AuthSettings, PortalSettings, Settings
 from conftest import TENANT, Script, app, bearer, settings, token
 
 SUPABASE = "http://127.0.0.1:54321"
+SECURE = "https://app.example.com"
 KEY = "sb_publishable_for_the_tests"
 
 
@@ -65,8 +66,16 @@ def test_a_portal_that_is_required_and_has_no_project_stops_the_application(scri
         app(script, required)
 
 
-def test_a_portal_that_is_required_and_has_its_project_starts(script: Script, ui: Path) -> None:
+def test_a_portal_that_is_required_and_has_a_plain_http_project_stops_it(
+    script: Script, ui: Path
+) -> None:
     portal = replace(with_portal(ui_dir=str(ui)).portal, required=True)
+    with pytest.raises(ValueError, match="https"):
+        app(script, replace(settings(), portal=portal))
+
+
+def test_a_portal_that_is_required_and_has_its_project_starts(script: Script, ui: Path) -> None:
+    portal = replace(with_portal(ui_dir=str(ui)).portal, supabase_url=SECURE, required=True)
     named = replace(settings(), portal=portal)
     with TestClient(app(script, named)) as client:
         assert client.get("/portalr/config.json").status_code == 200

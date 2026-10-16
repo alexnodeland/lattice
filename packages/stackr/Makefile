@@ -137,8 +137,8 @@ tenant: ## Create a tenant's team and key on the gateway: make tenant NAME=acme 
 	@if [ -z "$(NAME)" ]; then echo "usage: make tenant NAME=<tenant> [TENANT_FLAGS=...]"; exit 2; fi
 	$(UV) run scripts/create-tenant $(NAME) $(TENANT_FLAGS)
 
-portal-key: ## Create the read-only key portalr's admin reads spend with (PORTAL_LITELLM_KEY), not the master key
-	$(UV) run scripts/create-portal-key
+portal-key: ## Create the read-only key portalr's admin reads spend with (PORTAL_LITELLM_KEY), not the master key; ARGS=--rotate replaces a lost one
+	$(UV) run scripts/create-portal-key $(ARGS)
 
 backup: ## On a single host: back up PostgreSQL and ClickHouse to the BACKUP_S3_* bucket now
 	$(if $(COMPOSE_FILES),deploy/host/backup,$(error backups are the single host's: set STACKR_RECIPE=host))

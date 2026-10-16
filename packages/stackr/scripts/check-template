@@ -183,7 +183,9 @@ def check(app: Path, sources: dict[str, dict[str, str]]) -> list[str]:
     host = app / "deploy" / "host" / "compose.prod.yaml"
     if host.exists():
         overlay = ["docker", "compose", "-f", "compose.yaml", "-f", str(host), *compose[2:]]
-        problems += run("compose, on a single host", overlay, app, {"APP_IMAGE": "app:checked"})
+        # The overlay asks for the image to run, and the domain the edge serves.
+        needs = {"APP_IMAGE": "app:checked", "STACKR_DOMAIN": "example.com"}
+        problems += run("compose, on a single host", overlay, app, needs)
     return problems
 
 

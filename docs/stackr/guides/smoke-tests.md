@@ -58,6 +58,7 @@ With `STACKR_RECIPE=host`, `make smoke` adds the edge's checks:
 - Caddy redirects HTTP to HTTPS
 - it serves GoTrue at `auth.<domain>`, with a certificate the probe trusts: with `CADDY_TLS="tls internal"`, Caddy's own root, copied from Caddy's container, and nothing else
 - it refuses GoTrue's admin API there, with 404
+- on the application's host, `/auth/v1/token` signs a user in, and the admin API and the rest of `/auth/v1` are refused in every spelling (the application's checks, below)
 
 ### `drill`: a single host's restore drill
 
@@ -94,10 +95,10 @@ It runs an application from the template beside the whole stack:
 9. PostgreSQL itself must keep each tenant's rows to that tenant, past the libraries' scoping: the application's role sees no rows outside a tenant, and can't write another tenant's.
 10. Through relayr's bridge, an `<app>:alert.fired` event must open an incident thread with its timeline, and the user's message in that thread must join the timeline. `<app>` is the application's package name.
 11. An `<app>:incident.resolved` event for the same service must post a closing notice in the incident's thread, and propose its postmortem there, drawn from the timeline.
-12. The portal: both of portalr's UIs (`/portalr/app/` and `/portalr/admin/`) must answer 200, its `config.json` must name the Supabase project the application was given, the tenant's owner must read the tenant's spend (200) and, from the gateway, with the portal's own read-only key (`make portal-key`), and that key must be refused the gateway's other routes, and a tenant the user isn't in must be refused (403).
+12. The portal: both of portalr's UIs (`/portalr/app/` and `/portalr/admin/`) must answer 200, its `config.json` must name the Supabase project the application was given, the tenant's owner must read the tenant's spend (200), and its usage by workspace, from the gateway, with the portal's own read-only key (`make portal-key`, made for the run and failing it if none is made), that key must be refused chat, the key list and team creation (403), and a tenant the user isn't in must be refused (403). On a single host, the smoke user must also sign in at `https://app.<domain>/auth/v1/token`, and the edge must refuse GoTrue's admin API and the other calls there under a dozen spellings, traversal and escapes among them.
 13. Rules from chat: a rule drafted in a thread, by a service principal's key, must go live in reflexr once the user accepts it, and tell the thread of the alert it watches. Before that, a forged `artifactr:proposal_resolved`, published into reflexr, must be refused, and install nothing.
 
-At the end it removes the application, its image and volumes, the key, the user and the application's schema. On the `postgres` adapter it needs the `auth` profile, whose GoTrue signs the user in. Building the application's image fetches the libraries from GitHub at `HEAD`, the commit the application was rendered from, so it needs the network, and `HEAD` must be pushed and the working tree clean: Copier renders uncommitted changes from a commit of its own, which GitHub doesn't have. In CI, `HEAD` is the pull request's merge commit, so the application runs the pull request's libraries.
+At the end it removes the application, its image and volumes, the key, the user, the portal's key and its `portalr` user, and the application's schema. On the `postgres` adapter it needs the `auth` profile, whose GoTrue signs the user in. Building the application's image fetches the libraries from GitHub at `HEAD`, the commit the application was rendered from, so it needs the network, and `HEAD` must be pushed and the working tree clean: Copier renders uncommitted changes from a commit of its own, which GitHub doesn't have. In CI, `HEAD` is the pull request's merge commit, so the application runs the pull request's libraries.
 
 ## In CI
 

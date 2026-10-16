@@ -20,8 +20,36 @@
 app.{$STACKR_DOMAIN} {
 	{$CADDY_TLS}
 	import headers
-	# The template's app service, in its app profile on the stackr network.
-	reverse_proxy app:8000
+	# portalr's UIs sign in with supabase-js, which reaches Supabase Auth at <url>/auth/v1. The
+	# portal's URL is this host, so the browser stays on one origin (the CSP's connect-src 'self',
+	# and no CORS: GoTrue answers a preflight with no Access-Control headers). Only the three calls
+	# its sign-in makes reach GoTrue, by exact path: supabase-js's signInWithPassword and a session's
+	# refresh are POST /token, getUser is GET /user, signOut is POST /logout. Nothing else under
+	# /auth/v1 is GoTrue's to the internet: not the admin API, not signup, invite or recover.
+	# Whatever is not one of these is answered 404 here, whatever its spelling.
+	@gotrue_browser path /auth/v1/token /auth/v1/user /auth/v1/logout
+	handle @gotrue_browser {
+		uri strip_prefix /auth/v1
+		reverse_proxy gotrue:9999
+	}
+	@gotrue_other path /auth/v1 /auth/v1/*
+	handle @gotrue_other {
+		respond 404
+	}
+	# In depth: a path with an admin segment is never the application's (portalr's admin UI, at
+	# /portalr/admin/, is). GoTrue's admin API is for the application's commands, on the private
+	# network.
+	@admin {
+		path_regexp (?i)(^|/)admin(/|$)
+		not path /portalr/*
+	}
+	handle @admin {
+		respond 404
+	}
+	handle {
+		# The template's app service, in its app profile on the stackr network.
+		reverse_proxy app:8000
+	}
 }
 
 auth.{$STACKR_DOMAIN} {
@@ -30,14 +58,6 @@ auth.{$STACKR_DOMAIN} {
 	# GoTrue's admin API is for the application's admin commands, on the private network.
 	handle /admin/* {
 		respond 404
-	}
-	# supabase-js, in portalr's UIs, reaches Supabase Auth at <url>/auth/v1; GoTrue alone serves at
-	# its root. The same refusal of the admin API holds under the prefix.
-	handle_path /auth/v1/* {
-		handle /admin/* {
-			respond 404
-		}
-		reverse_proxy gotrue:9999
 	}
 	# Caddy replaces X-Forwarded-For from clients with their address, which GoTrue's per-address
 	# rate limits read (GOTRUE_RATE_LIMIT_HEADER).

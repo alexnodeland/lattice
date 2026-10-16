@@ -27,13 +27,18 @@ services:
 {%- endif %}
 {%- if use_portal %}
       # The edge reaches the application as app:8000, so the client's address and scheme are in
-      # X-Forwarded-*, which uvicorn trusts only from the addresses listed. Nothing but the edge
-      # reaches this service: it publishes no port, on a network of stackr's own.
+      # X-Forwarded-*, which uvicorn trusts only from the addresses listed. The application is on
+      # the stackr network with every service of the stack, so this trusts any of them: they are
+      # stackr's own, and none is reachable from outside but through the edge.
       FORWARDED_ALLOW_IPS: "*"
       # The portal is part of what is deployed: the application doesn't start without the
-      # Supabase project its UIs sign in to (PORTAL_SUPABASE_URL and PORTAL_SUPABASE_KEY in
-      # .env, the publishable key only), rather than start with the portal off.
+      # Supabase project its UIs sign in to (PORTAL_SUPABASE_KEY in .env, the publishable key
+      # only), rather than start with the portal off, nor with a project at a plain-http address.
       PORTAL_REQUIRED: "true"
+      # The project is this host: the edge serves GoTrue's sign-in calls under /auth/v1 on the
+      # application's own address, so a browser stays on one origin (the CSP's connect-src 'self',
+      # no CORS). Not the .env's PORTAL_SUPABASE_URL, which is local Supabase's.
+      PORTAL_SUPABASE_URL: https://app.${STACKR_DOMAIN:?set STACKR_DOMAIN in .env, the domain stackr's edge serves}
       # Invitations need Supabase's gateway (`/auth/v1/invite`), which a single host's GoTrue,
       # alone, doesn't have behind its private address, and its admin API is the edge's to refuse.
       # So they are off here, and say why; local Supabase's address in stackr.env is not this host's.

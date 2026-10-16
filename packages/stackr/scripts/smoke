@@ -18,7 +18,8 @@
 # loopback but Caddy, which publishes only at STACKR_EDGE_BIND (127.0.0.1
 # unless chosen); it redirects HTTP to HTTPS, serves GoTrue at auth.<domain>
 # with a certificate the probe trusts, and refuses GoTrue's admin API there. The auth
-# and app checks then go through it.
+# and app checks then go through it; the app's include the portal's sign-in at app.<domain>/auth/v1
+# and the refusal of the admin API there in a dozen spellings.
 # drill (on a single host, after `make backup restore-drill`): the restore
 # drill's success reached Prometheus, where Grafana's alert reads it.
 # langfuse (with observability): a trace with a known id, sent to the
@@ -648,6 +649,12 @@ cleanup_app() {
     gateway_call "$(master_key)" /key/delete -o /dev/null -H 'Content-Type: application/json' \
       --data "{\"keys\": [\"$app_key\"]}" || true
   fi
+  if [[ -n ${portal_key_made:-} ]]; then
+    gateway_call "$(master_key)" /key/delete -o /dev/null -H 'Content-Type: application/json' \
+      --data '{"key_aliases": ["portal-spend-read"]}' || true
+    gateway_call "$(master_key)" /user/delete -o /dev/null -H 'Content-Type: application/json' \
+      --data '{"user_ids": ["portalr"]}' || true
+  fi
   if [[ -n ${app_user:-} ]]; then
     auth_delete_user "$app_user" || true
   fi
@@ -775,6 +782,32 @@ timeline_has() {
 # The trace has the application's spans and the gateway's.
 app_trace_in_tempo() { tempo_trace_has_service "$app_name" && tempo_trace_has_service litellm; }
 
+# The portal's sign-in on a single host, at the application's own address (the one origin the
+# browser has): the call supabase-js makes reaches GoTrue and signs the smoke user in, and
+# GoTrue's admin API, signup and the rest are refused there, however a path is spelled.
+smoke_portal_sign_in() {
+  local user=$1 path code failed=0
+  if probe -fsS -H 'Content-Type: application/json' -H 'apikey: sb_publishable_smoke' --data "$user}" \
+    "$app_url/auth/v1/token?grant_type=password" | jq -e '.access_token | length > 0' >/dev/null; then
+    log "ok: the portal's sign-in reaches GoTrue through the edge, at the application's address"
+  else
+    log "FAIL: the smoke user could not sign in at $app_url/auth/v1/token"
+    failed=1
+  fi
+  for path in /auth/v1/admin/users /auth/v1/ADMIN/users /auth/v1/admin /auth/v1/../admin/users \
+    /auth/v1/%2e%2e/admin/users /auth/v1/admin%00/users /auth/v1/admin./users /auth/v1/admin%2fusers \
+    /auth/v1/signup /auth/v1/invite /auth/v1/settings /auth/v1/ /admin /admin/users; do
+    code=$(probe -s --path-as-is -o /dev/null -w '%{http_code}' "$app_url$path" || true)
+    if [[ $code == 404 || $code == 400 ]]; then
+      log "ok: the edge refuses $app_url$path ($code)"
+    else
+      log "FAIL: the edge answered $code, not a refusal, to $app_url$path"
+      failed=1
+    fi
+  done
+  return $failed
+}
+
 smoke_app() {
   local adapter=${STACKR_DATABASE:-$(setting STACKR_DATABASE)} issuer jwks admin=""
   if [[ $adapter == supabase ]]; then
@@ -812,10 +845,15 @@ AUTH_ADMIN_URL=http://gotrue:9999"
 
   app_key=$(uv run scripts/create-tenant stackr-smoke --max-budget 1 --allow-mock-responses \
     --key-alias "$run_id-app" --quiet) || { log "FAIL: app: creating its gateway key"; return 1; }
-  # portalr's admin reads the tenant's spend with a key of its own, which reads nothing else: a
-  # second run finds the key made already and prints none, so the spend isn't checked then.
-  portal_key=$(uv run scripts/create-portal-key --quiet) ||
-    { log "FAIL: app: creating the portal's spend-read key"; return 1; }
+  # portalr's admin reads the tenant's spend with a key of its own, which reads nothing else. It
+  # is the stack's own `portal-spend-read`, so one that is there already (an operator's, or a run
+  # that died) stops the run rather than being replaced, or skipped: a key's value can't be read
+  # back. The key and its user are removed at the end, as they were made here.
+  if ! portal_key=$(uv run scripts/create-portal-key --quiet) || [[ -z $portal_key ]]; then
+    log "FAIL: app: no portal spend-read key was made; if one exists, \`scripts/create-portal-key --rotate\` replaces it"
+    return 1
+  fi
+  portal_key_made=1
   app_password=$(random_hex 16)
   (
     umask 077
@@ -835,6 +873,7 @@ APP_IMAGE=$app_name:local
 PORTAL_SUPABASE_URL=$app_url
 PORTAL_SUPABASE_KEY=sb_publishable_smoke
 PORTAL_LITELLM_KEY=$portal_key
+${domain:+STACKR_DOMAIN=$domain}
 ENV
   )
   if ! docker compose --project-directory "$app_dir" --profile app build >/dev/null; then
@@ -927,28 +966,41 @@ ENV
     log "FAIL: the owner's read of the tenant's spend answered $code, not 200"
     status=1
   fi
-  if [[ -n $portal_key ]]; then
-    if app_call "/portalr/v1/spend" | jq -e '.status == "ok"' >/dev/null; then
-      log "ok: the spend comes from the gateway, read with the portal's own key"
-    else
-      log "FAIL: the portal could not read the tenant's spend from the gateway with its own key"
-      status=1
-    fi
-    # The key opens the team routes and nothing else: not chat, and not the keys.
-    if [[ $(probe -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $portal_key" \
-      "$gateway/key/list") == 403 ]]; then
-      log "ok: the portal's key is refused the gateway's other routes"
-    else
-      log "FAIL: the portal's key was not refused the gateway's key list"
-      status=1
-    fi
+  if app_call "/portalr/v1/spend" | jq -e '.status == "ok"' >/dev/null; then
+    log "ok: the spend comes from the gateway, read with the portal's own key"
+  else
+    log "FAIL: the portal could not read the tenant's spend from the gateway with its own key"
+    status=1
   fi
+  # Usage by workspace also reads the workspaces' tags, a route of the key's own.
+  if app_call "/portalr/v1/usage?workspaces=$run_id" | jq -e '.status == "ok"' >/dev/null; then
+    log "ok: the usage, by team and by workspace, comes from the gateway with the portal's key"
+  else
+    log "FAIL: the portal could not read the tenant's usage by workspace with its own key"
+    status=1
+  fi
+  # The key opens the four routes and nothing else: not chat, nor the keys, nor a new team.
+  local route method refused_path
+  for route in "GET /key/list" "POST /chat/completions" "POST /team/new"; do
+    read -r method refused_path <<<"$route"
+    code=$(gateway_call "$portal_key" "$refused_path" -X "$method" -H 'Content-Type: application/json' \
+      --data '{}' -o /dev/null -w '%{http_code}' || true)
+    if [[ $code == 403 ]]; then
+      log "ok: the portal's key is refused $method $refused_path"
+    else
+      log "FAIL: the portal's key was not refused $method $refused_path: it answered $code, not 403"
+      status=1
+    fi
+  done
   code=$(APP_TENANT=stackr-smoke-other app_call "/portalr/v1/spend" -o /dev/null -w '%{http_code}' || true)
   if [[ $code == 403 ]]; then
     log "ok: the portal refuses a read in the tenant the user isn't in"
   else
     log "FAIL: the portal's read in the tenant the user isn't in answered $code, not 403"
     status=1
+  fi
+  if [[ ${STACKR_RECIPE:-local} == host ]]; then
+    smoke_portal_sign_in "$user" || status=1
   fi
 
   log "app: a message to the notes agent, and a ticket for the triage agent"

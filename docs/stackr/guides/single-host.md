@@ -26,12 +26,15 @@ sudo deploy/host/bootstrap example.com
 | `STACKR_EDGE_BIND` | `0.0.0.0`: Caddy's 80 and 443 on every interface. Everywhere else it is `127.0.0.1`, unless you choose a LAN address on purpose |
 | `STACKR_DATABASE` | `postgres` |
 | `STACKR_DOMAIN` | The domain Caddy serves, as `app.<domain>` and `auth.<domain>` |
-| `AUTH_PUBLIC_URL`, `AUTH_SITE_URL` | `https://auth.<domain>`, GoTrue's address and its tokens' issuer, and `https://app.<domain>` |
+| `AUTH_PUBLIC_URL`, `AUTH_SITE_URL` | `https://auth.<domain>`, GoTrue's address and its tokens' issuer, and `https://app.<domain>`. `AUTH_SITE_URL` must be exactly `https://app.<domain>`: it is where GoTrue sends people after an emailed link, and the portal's sign-in is there |
+| `AUTH_DISABLE_SIGNUP` | `true`, the default. **Leave it.** Users are made by the application's admin commands and invitations, not by themselves. If you set it to `false`, anyone on the internet can create a user at `https://auth.<domain>/signup`, and a user is a person who can sign in to the portal's UIs and reach whatever a tenant's owner has granted them |
 
 Keep a copy of `.env` off the host: it holds every secret, including the ones that encrypt Langfuse's and LiteLLM's data.
 
 - **Email:** GoTrue sends invitations and password resets only through an SMTP server. Set `AUTH_SMTP_HOST`, `AUTH_SMTP_PORT`, `AUTH_SMTP_USER`, `AUTH_SMTP_PASSWORD` and `AUTH_SMTP_SENDER`.
 - **Left to you:** hardening SSH (keys only, no password or root login), fail2ban, and unattended upgrades.
+
+GoTrue's `/health` at `https://auth.<domain>/health` answers anyone with its name and version. It's the edge's health check and the smoke test's; if you'd rather not tell the internet, add a `/health` rule to the `auth.` block of `deploy/host/Caddyfile` that answers only your monitor's address.
 
 ## Start it
 
@@ -62,6 +65,12 @@ Before it first starts, create the role it works as, then start it:
 docker compose -f compose.yaml -f deploy/host/compose.prod.yaml --profile app run --rm app <slug>-admin db-roles
 docker compose -f compose.yaml -f deploy/host/compose.prod.yaml --profile app up --detach --wait
 ```
+
+### Signing in to the portal
+
+The portal's UIs reach Supabase Auth at `<url>/auth/v1`. The overlay sets that URL to `https://app.<domain>`, the application's own address, so a browser makes its sign-in calls to the origin it was served from: no cross-origin request, no CORS (the stack's GoTrue answers a preflight with no `Access-Control` headers), and the content security policy's `connect-src 'self'` holds. Caddy sends exactly three calls under `/auth/v1` of that host to GoTrue, the ones supabase-js's sign-in makes: `POST /token` (a password sign-in, and a session's refresh), `GET /user` and `POST /logout`. Everything else under `/auth/v1`, and any path with an `admin` segment, is answered 404 at the edge, whatever its spelling (traversal, escapes, case); the admin API stays on the stack's network. `auth.<domain>` is as it was, for other clients, and for the links GoTrue emails. Put `STACKR_DOMAIN` in the application's `.env` as well, since the overlay derives the URL from it.
+
+The edge's routing is tested with the shipped `Caddyfile` in Caddy, in front of two stand-in backends (`tests/test_stackr_edge.py`), and `make smoke` signs the smoke user in through it.
 
 ## Reach the admin UIs
 

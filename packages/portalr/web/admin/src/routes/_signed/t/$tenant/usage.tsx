@@ -204,7 +204,7 @@ function Filter({ shown }: { shown: Required<Shown> }) {
     <SegmentedFilter
       label="Window"
       showLabel
-      hint="The last days, whole and in UTC."
+      hint="Whole days, in UTC."
       segments={WINDOWS.map((days) => ({ value: String(days), label: `${days} days` }))}
       value={String(shown.days)}
       onValueChange={(days) => void navigate({ search: shownOf({ days }) })}

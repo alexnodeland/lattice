@@ -1,6 +1,6 @@
 # ADR-0019: The kit's look: a side rail, labelled icons, raised surfaces and quiet statuses
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0037](0037-form-controls-and-row-actions.md) (controls and buttons)
 **Date:** 2026-10-12
 **Deciders:** Alex Nodeland
 

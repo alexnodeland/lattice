@@ -3,6 +3,7 @@ language: 'typescript'
 layer: 'application'
 dependsOn:
   - 'client'
+  - 'notices'
   - 'ui'
 
 tasks:

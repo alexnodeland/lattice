@@ -5,20 +5,21 @@ each again in its transaction with :func:`~reflexr.core.runnable`. ADR-0041 has 
 remain the authority, so storage may return too much but must never leave out a run the claim
 would start, and it returns nothing the claim would refuse for the policy's reasons. This
 property generates scopes of runs in every status, with leases and rules of every ordering, and
-holds storage's answer to the claim's.
+holds storage's answer to the claim's. The examples share one database, each in a workspace of
+its own, since a new database for each would cost PostgreSQL its migrations every time.
 """
 
 import asyncio
-import tempfile
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+import itertools
+from collections.abc import AsyncGenerator, Iterator
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import Literal
 
 import pytest
-from hypothesis import example, given, settings
+from hypothesis import HealthCheck, example, given, settings
 from hypothesis import strategies as st
 
 from reflexr import Rule
@@ -31,7 +32,6 @@ from tests.core.test_runs import rule as make_rule
 from tests.databases import SQL_BACKENDS, empty_database
 from tests.workspace.helpers import fired
 
-ACME = WorkspaceRef("acme", "prod")
 MINUTE = timedelta(minutes=1)
 NOW = START + timedelta(minutes=5)
 """When the due runs are asked for, after the leases were taken at ``START``."""
@@ -96,11 +96,11 @@ def build(rules: list[Rule], draws: list[Draw]) -> list[Run]:
 
 
 async def claimable(
-    storage: Storage, rules: list[Rule], runs: list[Run], draws: list[Draw]
+    storage: Storage, ref: WorkspaceRef, rules: list[Rule], runs: list[Run], draws: list[Draw]
 ) -> set[str]:
     """The runs a claim would accept at ``NOW``, as the executor's claim decides."""
     found: set[str] = set()
-    async with storage.transaction(ACME) as transaction:
+    async with storage.transaction(ref) as transaction:
         for run, draw in zip(runs, draws, strict=True):
             rule = rules[draw.rule]
             if not rule.enabled or run.status in FINISHED:
@@ -128,7 +128,29 @@ async def storage_on(backend: str, directory: Path) -> AsyncGenerator[Storage]:
         yield SqlStorage(engine, clock=clock)
 
 
-async def agree(backend: str, directory: Path, specs: list[Spec], draws: list[Draw]) -> None:
+@dataclass
+class Shared:
+    """One storage for every example, on one event loop, and a new workspace for each example."""
+
+    runner: asyncio.Runner
+    storage: Storage
+    workspaces: Iterator[WorkspaceRef]
+
+
+@pytest.fixture(params=["memory", *SQL_BACKENDS])
+def shared(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Shared]:
+    with asyncio.Runner() as runner:
+        stack = AsyncExitStack()
+        storage = runner.run(stack.enter_async_context(storage_on(request.param, tmp_path)))
+        try:
+            yield Shared(
+                runner, storage, (WorkspaceRef(f"t{n}", "prod") for n in itertools.count())
+            )
+        finally:
+            runner.run(stack.aclose())
+
+
+async def agree(storage: Storage, ref: WorkspaceRef, specs: list[Spec], draws: list[Draw]) -> None:
     rules = [
         make_rule(
             name=f"app:r{i}",
@@ -139,18 +161,23 @@ async def agree(backend: str, directory: Path, specs: list[Spec], draws: list[Dr
         for i, spec in enumerate(specs)
     ]
     runs = build(rules, draws)
-    async with storage_on(backend, directory) as storage:
-        async with storage.transaction(ACME) as transaction:
-            await transaction.save_runs(runs)
-        for run, draw in zip(runs, draws, strict=True):
-            if draw.lease is not None:
-                assert await storage.acquire_lease(ACME, run_lease(run.id), "executor", draw.lease)
-        due = await storage.due_runs(now=NOW, limit=len(runs), policy=RunPolicy.of(rules))
-        assert {run.id for _, run in due} == await claimable(storage, rules, runs, draws)
+    async with storage.transaction(ref) as transaction:
+        await transaction.save_runs(runs)
+    for run, draw in zip(runs, draws, strict=True):
+        if draw.lease is not None:
+            assert await storage.acquire_lease(ref, run_lease(run.id), "executor", draw.lease)
+    # Every workspace's due runs, of which this example's are compared.
+    due = await storage.due_runs(now=NOW, limit=10_000, policy=RunPolicy.of(rules))
+    found = {run.id for at, run in due if at == ref}
+    assert found == await claimable(storage, ref, rules, runs, draws)
 
 
-@pytest.mark.parametrize("backend", ["memory", *SQL_BACKENDS])
-@settings(max_examples=200, deadline=None)
+@settings(
+    max_examples=200,
+    deadline=None,
+    # The storage is shared on purpose: each example works in a workspace of its own.
+    suppress_health_check=[HealthCheck.function_scoped_fixture],
+)
 @example(  # a dead letter that blocks its scope, ahead of a run that is due
     specs=[Spec("scope", "block", True), Spec("none", "continue", True)],
     draws=[Draw(0, 0, "dead", -MINUTE, None), Draw(0, 0, "pending", -MINUTE, None)],
@@ -161,7 +188,6 @@ async def agree(backend: str, directory: Path, specs: list[Spec], draws: list[Dr
 )
 @given(specs=st.lists(SPECS, min_size=2, max_size=2), draws=st.lists(DRAWS, max_size=7))
 def test_storage_finds_the_runs_a_claim_would_start(
-    backend: str, specs: list[Spec], draws: list[Draw]
+    shared: Shared, specs: list[Spec], draws: list[Draw]
 ) -> None:
-    with tempfile.TemporaryDirectory() as directory:
-        asyncio.run(agree(backend, Path(directory), specs, draws))
+    shared.runner.run(agree(shared.storage, next(shared.workspaces), specs, draws))

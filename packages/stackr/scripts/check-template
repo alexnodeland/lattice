@@ -185,7 +185,9 @@ def main() -> int:
             )
             app = base / name
             commit = render(libraries, evals, access, bridge, hosting, portal, app)
-            problems = check(app, expected_sources(libraries, evals, access, bridge, portal, commit))
+            problems = check(
+                app, expected_sources(libraries, evals, access, bridge, portal, commit)
+            )
             for problem in problems:
                 print(f"FAIL: {name}: {problem}", file=sys.stderr)
             if problems:

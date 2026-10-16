@@ -35,6 +35,8 @@ export interface Sent {
 
 /** What a test decides: the log so far, and what a command comes to. */
 export interface Script {
+  /** Whether the server says nothing to a hello: a workspace that can't be reached. */
+  mute?: boolean;
   /** The events a new connection replays. */
   log: ReflexrV1.EventFrame[];
   /** What the server says of a command: a result, and the events that follow it, if any. */
@@ -47,6 +49,8 @@ export interface Script {
 export class FakeSocket {
   static sockets: FakeSocket[] = [];
   static sent: Sent[] = [];
+  /** The hellos the page sent: what it asked for. */
+  static hellos: { types?: string[] | null; resume_after_seq?: number }[] = [];
   static script: Script = { log: [], answer: () => null };
 
   onopen: (() => void) | null = null;
@@ -80,6 +84,11 @@ export class FakeSocket {
     this.#emit(event);
   }
 
+  /** The server sends any frame at all, such as an error. */
+  raw(frame: unknown) {
+    this.#emit(frame);
+  }
+
   /** The connection ends, as a server or a network ends it. */
   end(code: number) {
     this.closed = true;
@@ -93,6 +102,10 @@ export class FakeSocket {
       command?: Sent["command"];
     };
     if (frame.type === "hello") {
+      FakeSocket.hellos.push(frame as never);
+      if (FakeSocket.script.mute) {
+        return;
+      }
       const log = FakeSocket.script.log;
       this.#emit({ type: "welcome", head_seq: log.at(-1)?.seq ?? 0 });
       for (const each of log) {
@@ -128,6 +141,7 @@ export class FakeSocket {
 export function stubSockets(script: Script) {
   FakeSocket.sockets = [];
   FakeSocket.sent = [];
+  FakeSocket.hellos = [];
   FakeSocket.script = script;
   vi.stubGlobal("WebSocket", FakeSocket);
 }

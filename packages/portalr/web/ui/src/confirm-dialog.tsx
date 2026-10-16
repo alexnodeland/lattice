@@ -8,12 +8,14 @@ import { TextField } from "./text-field";
 const MOST_REASON = 500;
 
 /**
- * A destructive action, confirmed: its trigger opens a Base UI alert dialog that says what will
+ * An action that can't be taken back, or that does something outside, confirmed: its trigger opens a Base UI alert dialog that says what will
  * be lost, with the action in the danger colour. The focus starts on Cancel; with `typed`, it starts
  * in the field, and the action waits until that name is typed, as deleting a tenant does, which
  * Enter then sends. With `asking`, it also asks for a reason, which is optional and goes to
- * `onConfirm`; with `calm`, the action is in the primary colour, for one that loses nothing. The
- * dialog closes once `onConfirm` is done; if it throws, it stays open and says why.
+ * `onConfirm`; with `calm`, the action is in the primary colour, for one that loses nothing but is
+ * confirmed all the same, such as running something again. The dialog closes once `onConfirm` is
+ * done, and the action is sent once however often it is submitted meanwhile; if it throws, it
+ * stays open and says why. `onOpenChange` hears each time it opens and closes.
  */
 export function ConfirmDialog({
   label,
@@ -25,6 +27,7 @@ export function ConfirmDialog({
   typed,
   asking,
   calm = false,
+  onOpenChange,
   onConfirm,
 }: {
   /** The trigger's words, such as "Archive". */
@@ -45,6 +48,8 @@ export function ConfirmDialog({
   asking?: string;
   /** Whether the action is one that loses nothing, so it isn't in the danger colour. */
   calm?: boolean;
+  /** Called when the dialog opens or closes, however it closes. */
+  onOpenChange?: (open: boolean) => void;
   /** What to do, with the reason given, if it was asked for; it ends the dialog if it doesn't throw. */
   onConfirm: (reason: string) => Promise<unknown>;
 }) {
@@ -52,14 +57,17 @@ export function ConfirmDialog({
   const [entered, setEntered] = useState("");
   const [reason, setReason] = useState("");
   const [pending, setPending] = useState(false);
+  // Whether the action is under way: read at once, where a state would be a render behind.
+  const busy = useRef(false);
   const [failed, setFailed] = useState<string | null>(null);
   const cancel = useRef<HTMLButtonElement>(null);
   const ready = !pending && (typed === undefined || entered === typed);
   async function act(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!ready) {
+    if (!ready || busy.current) {
       return;
     }
+    busy.current = true;
     setPending(true);
     setFailed(null);
     try {
@@ -68,6 +76,7 @@ export function ConfirmDialog({
     } catch (error) {
       setFailed(error instanceof Error ? error.message : String(error));
     } finally {
+      busy.current = false;
       setPending(false);
     }
   }
@@ -76,6 +85,7 @@ export function ConfirmDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
+        onOpenChange?.(next);
         setEntered("");
         setReason("");
         setFailed(null);
@@ -110,6 +120,11 @@ export function ConfirmDialog({
                 maxLength={MOST_REASON}
                 autoComplete="off"
               />
+            )}
+            {asking !== undefined && (
+              <p className="text-muted text-xs">
+                {reason.length} of {MOST_REASON} characters
+              </p>
             )}
             {failed && <p role="alert">{failed}</p>}
             <div className={actions}>

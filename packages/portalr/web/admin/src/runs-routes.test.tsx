@@ -5,6 +5,7 @@
  */
 
 import type { ReflexrV1 } from "@portalr/client";
+import { RUN_EVENTS } from "@portalr/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { page } from "vitest/browser";
 import { open as opened } from "./test/admin";
@@ -69,6 +70,12 @@ async function portalr(_request: Request, path: string): Promise<Response | unde
 }
 
 const open = (path: string, allowed: readonly string[] = EVERY) => opened(path, allowed, portalr);
+
+const confirm = (
+  screen: Awaited<ReturnType<typeof open>>["screen"],
+  title: string,
+  button: string,
+) => screen.getByRole("alertdialog", { name: title }).getByRole("button", { name: button });
 
 const row = (screen: Awaited<ReturnType<typeof open>>["screen"], run: string) =>
   screen.getByRole("table", { name: "Rules' runs" }).getByRole("row", { name: `Run ${run}` });
@@ -144,7 +151,7 @@ test("a retry is confirmed, sent once, and shows who did it", async () => {
   await expect.element(dialog).toBeVisible();
   // Nothing was sent by asking.
   expect(commands()).toEqual([]);
-  await dialog.getByRole("button", { name: "Retry the run" }).click();
+  await confirm(screen, "Retry this run?", "Retry the run").click();
   await expect.element(row(screen, "run_dead").getByRole("status")).toHaveTextContent("Queued");
   expect(commands().map((sent) => sent.command)).toEqual([
     { type: "retry_run", run_id: "run_dead" },
@@ -157,18 +164,49 @@ test("a retry is confirmed, sent once, and shows who did it", async () => {
     .toBeVisible();
 });
 
-test("a skip and a cancel take a reason, which goes with the command and shows in the history", async () => {
+test("a skip takes a reason, which goes with the command and stays in the history", async () => {
   const { screen } = await open("/t/acme/runs?show=all");
   await row(screen, "run_dead").getByRole("button", { name: "Skip run run_dead" }).click();
   const dialog = screen.getByRole("alertdialog", { name: "Skip this run?" });
   await dialog.getByRole("textbox", { name: "Reason (optional)" }).fill("a known outage");
-  await dialog.getByRole("button", { name: "Skip the run" }).click();
-  await expect.element(row(screen, "run_dead")).toBeInTheDocument();
+  await confirm(screen, "Skip this run?", "Skip the run").click();
+  await expect.element(row(screen, "run_dead").getByRole("status")).toHaveTextContent("Skipped");
   expect(commands().at(-1)?.command).toEqual({
     type: "skip_run",
     run_id: "run_dead",
     reason: "a known outage",
   });
+  await row(screen, "run_dead")
+    .getByText(/History \(1\)/)
+    .click();
+  await expect.element(row(screen, "run_dead").getByText(/alice skipped it/)).toBeVisible();
+  await expect.element(row(screen, "run_dead").getByText(/a known outage/)).toBeVisible();
+});
+
+test("a cancel takes a reason too, and a retry takes none", async () => {
+  const { screen } = await open("/t/acme/runs?show=all");
+  await row(screen, "run_busy").getByRole("button", { name: "Cancel run run_busy" }).click();
+  const dialog = screen.getByRole("alertdialog", { name: "Cancel this run?" });
+  await dialog.getByRole("textbox", { name: "Reason (optional)" }).fill("not needed");
+  await confirm(screen, "Cancel this run?", "Cancel the run").click();
+  await expect.element(row(screen, "run_busy").getByRole("status")).toHaveTextContent("Cancelled");
+  expect(commands().at(-1)?.command).toEqual({
+    type: "cancel_run",
+    run_id: "run_busy",
+    reason: "not needed",
+  });
+  await row(screen, "run_dead").getByRole("button", { name: "Retry run run_dead" }).click();
+  expect(
+    screen.getByRole("alertdialog", { name: "Retry this run?" }).getByRole("textbox").elements(),
+  ).toEqual([]);
+});
+
+test("a run that leaves the list needing attention returns focus to the list's heading", async () => {
+  const { screen } = await open("/t/acme/runs");
+  await row(screen, "run_dead").getByRole("button", { name: "Retry run run_dead" }).click();
+  await confirm(screen, "Retry this run?", "Retry the run").click();
+  await expect.element(row(screen, "run_dead")).not.toBeInTheDocument();
+  await expect.element(screen.getByRole("heading", { name: "Rules' runs in notes" })).toHaveFocus();
 });
 
 test("a refusal is said, the dialog stays, and a new try is a new command", async () => {
@@ -187,19 +225,54 @@ test("a refusal is said, the dialog stays, and a new try is a new command", asyn
   expect(new Set(commands().map((sent) => sent.id)).size).toBe(2);
 });
 
-test("a command the connection lost the answer to is sent again under the same id", async () => {
+test("a command the connection lost the answer to is sent again under the same id, while the dialog is open", async () => {
   script.answer = () => null;
-  const { screen } = await open("/t/acme/runs");
+  const { screen, signed } = await open("/t/acme/runs");
   await row(screen, "run_dead").getByRole("button", { name: "Retry run run_dead" }).click();
-  await screen
-    .getByRole("alertdialog", { name: "Retry this run?" })
-    .getByRole("button", { name: "Retry the run" })
-    .click();
+  const dialog = screen.getByRole("alertdialog", { name: "Retry this run?" });
+  await dialog.getByRole("button", { name: "Retry the run" }).click();
   await expect.poll(() => commands().length).toBe(1);
-  // The connection drops; the store reconnects and sends what was unanswered, with its id.
-  FakeSocket.sockets[0]?.end(1006);
-  await expect.poll(() => commands().length, { timeout: 5000 }).toBe(2);
+  // The server refuses the connection for good: the answer will never come, and the page says so.
+  FakeSocket.sockets[0]?.end(4401);
+  await expect
+    .element(dialog.getByRole("alert"))
+    .toHaveTextContent(
+      "The connection ended before the server answered. Try again: it is carried out once.",
+    );
+  // A refreshed session connects again; trying again, in the same dialog, is the same command.
+  signed.changed("refreshed");
+  await expect.poll(() => FakeSocket.sockets.filter((each) => each.open).length).toBe(1);
+  await expect.element(dialog.getByRole("button", { name: "Retry the run" })).toBeEnabled();
+  await dialog.getByRole("button", { name: "Retry the run" }).click();
+  await expect.poll(() => commands().length).toBe(2);
   expect(commands()[1]?.id).toBe(commands()[0]?.id);
+  // Dismissed, it is that intention's alone: a later try is a new command.
+  FakeSocket.sockets.find((each) => each.open)?.end(4401);
+  await expect.element(dialog.getByRole("alert")).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  signed.changed("refreshed");
+  await expect.poll(() => FakeSocket.sockets.filter((each) => each.open).length).toBe(1);
+  await row(screen, "run_dead").getByRole("button", { name: "Retry run run_dead" }).click();
+  await confirm(screen, "Retry this run?", "Retry the run").click();
+  await expect.poll(() => commands().length).toBe(3);
+  expect(commands()[2]?.id).not.toBe(commands()[0]?.id);
+});
+
+test("an answered command ends its id: the same run retried again is a new command", async () => {
+  script.answer = () => ({ result: { ok: true } });
+  const { screen } = await open("/t/acme/runs");
+  for (const again of [1, 2]) {
+    await row(screen, "run_dead").getByRole("button", { name: "Retry run run_dead" }).click();
+    await confirm(screen, "Retry this run?", "Retry the run").click();
+    await expect.poll(() => commands().length).toBe(again);
+  }
+  expect(new Set(commands().map((sent) => sent.id)).size).toBe(2);
+});
+
+test("only the run events are asked for, so no other event's body reaches the page", async () => {
+  const { screen } = await open("/t/acme/runs");
+  await expect.element(row(screen, "run_dead")).toBeVisible();
+  expect(FakeSocket.hellos.map((hello) => hello.types)).toEqual([[...RUN_EVENTS]]);
 });
 
 test("one stream is open, for the workspace shown, and it is closed with the page and on a switch", async () => {
@@ -216,7 +289,27 @@ test("one stream is open, for the workspace shown, and it is closed with the pag
   expect(FakeSocket.sockets.filter((each) => each.open)).toEqual([]);
 });
 
-test("the connection ending for good is said", async () => {
+test("a workspace the tenant doesn't have is not found, and opens no stream", async () => {
+  const { screen } = await open("/t/acme/runs?workspace=ghost");
+  await expect.element(screen.getByText("No such workspace")).toBeVisible();
+  expect(FakeSocket.sockets).toEqual([]);
+  await expect.element(screen.getByRole("combobox", { name: "Workspace" })).toHaveValue("");
+});
+
+test("the session ending closes the stream, and a refreshed one connects again", async () => {
+  const { screen, signed } = await open("/t/acme/runs");
+  await expect.element(row(screen, "run_dead")).toBeVisible();
+  signed.changed("ended");
+  await expect
+    .element(screen.getByRole("alert"))
+    .toHaveTextContent("The connection to this workspace ended. Reload the page to connect again.");
+  expect(FakeSocket.sockets.filter((each) => each.open)).toEqual([]);
+  signed.changed("refreshed");
+  await expect.poll(() => FakeSocket.sockets.filter((each) => each.open).length).toBe(1);
+  await expect.element(screen.getByRole("alert")).not.toBeInTheDocument();
+});
+
+test("the connection ending for good is said, in words of the page's own", async () => {
   const { screen } = await open("/t/acme/runs");
   await expect.element(row(screen, "run_dead")).toBeVisible();
   FakeSocket.sockets[0]?.end(4401);
@@ -225,8 +318,23 @@ test("the connection ending for good is said", async () => {
     .toHaveTextContent("The connection to this workspace ended. Reload the page to connect again.");
 });
 
-test("no run needing attention is said, and the list can be widened", async () => {
-  script.log = [];
+test("what the server says in an error frame is not put on the page", async () => {
   const { screen } = await open("/t/acme/runs");
+  await expect.element(row(screen, "run_dead")).toBeVisible();
+  FakeSocket.sockets[0]?.raw({
+    type: "error",
+    message: "not a command frame: a customer's secret",
+  });
+  await expect.element(screen.getByText(/secret/)).not.toBeInTheDocument();
+  await expect.element(screen.getByRole("alert")).not.toBeInTheDocument();
+});
+
+test("no run needing attention is said, and every state can be shown", async () => {
+  script.log = LOG.filter((each) => each.seq >= 6);
+  const { screen, router } = await open("/t/acme/runs");
   await expect.element(screen.getByText("No run needs attention")).toBeVisible();
+  await screen.getByRole("combobox", { name: "Show" }).selectOptions("Every state");
+  await expect.poll(() => router.state.location.search).toMatchObject({ show: "all" });
+  await expect.element(row(screen, "run_done")).toBeVisible();
+  await expect.element(screen.getByText("No run needs attention")).not.toBeInTheDocument();
 });

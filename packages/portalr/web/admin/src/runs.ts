@@ -24,7 +24,7 @@ export type Shown = {
 };
 
 /** A workspace's name as grantr and artifactr take one: any text but NUL, up to 256 characters. */
-const workspaceOf = (value: unknown): string | undefined => {
+const nameOf = (value: unknown): string | undefined => {
   const read = typeof value === "string" ? value : "";
   return read !== "" && read.length <= 256 && !read.includes("\0") ? read : undefined;
 };
@@ -32,7 +32,7 @@ const workspaceOf = (value: unknown): string | undefined => {
 /** The address's workspace and list: a list Runs doesn't offer is its default. */
 export function shownOf(search: Record<string, unknown>): Required<Shown> {
   return {
-    workspace: workspaceOf(search.workspace),
+    workspace: nameOf(search.workspace),
     show: SHOWN.find((one) => one.show === search.show)?.show ?? SHOWN[0].show,
   };
 }
@@ -55,7 +55,14 @@ const ACTIONS = ["retry", "skip", "cancel"] as const;
 export type Action = (typeof ACTIONS)[number];
 
 /** The action grantr checks for each, in the workspace. */
-export const GRANTS = ["reflexr:retry_run", "reflexr:skip_run", "reflexr:cancel_run"] as const;
+export const GRANTS = ACTIONS.map((action) => `reflexr:${action}_run` as const);
+
+/** The workspace shown when the address names none: the first of the tenant's, by name. */
+export const firstOf = (workspaces: readonly string[]): string | undefined =>
+  [...workspaces].sort()[0];
+
+/** How long the stream may be connecting before the page says it can't get through, in ms. */
+export const PATIENCE = 10_000;
 
 /**
  * The states each action may be taken in, as reflexr allows them (its run lifecycle): a retry

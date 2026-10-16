@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-10-15
 **Deciders:** Alex Nodeland
-**Amends:** [RFC-0002](../../rfcs/0002-portalr-the-portal.md), whose admin Runs row is read-only: "Failed and dead-lettered runs in the workspace the admin picks, until a library offers a tenant-wide read"
+**Amends:** [RFC-0002](../../rfcs/0002-portalr-the-portal.md), whose admin Runs row is read-only: "Failed and dead-lettered runs in the workspace the admin picks, until a library offers a tenant-wide read" (the table is edited to match)
 
 ## Context
 
@@ -32,21 +32,26 @@ The user decided five things:
 - **Admin's Runs goes beyond the RFC's read-only row.** It offers Retry, Skip and Cancel, as the app does, after a confirmation. This amends RFC-0002's admin table. The reads stay behind a grant: a person who may read runs and not act sees no button.
 - **Runs is `/t/$tenant/runs`,** on the rail where `reflexr:read_runs` is allowed on the tenant, gated in `beforeLoad`.
   - The address keeps the workspace and the list (`?workspace=notes&show=all`). Without a workspace, the first of the tenant's, as artifactr lists them, is shown. A tenant has no tenant-wide runs read, so one workspace is shown at a time.
-  - The list is **Needs attention** by default: the runs that are dead-lettered or retrying, newest first; **Every state** shows all.
+  - The list is **Needs attention** by default: the runs that are dead-lettered or retrying, newest first by when each started (its first attempt's place in the log); **Every state** shows all.
   - The actions each run offers are those its state takes in reflexr, where grantr allows them in that workspace (`allowedIn`, as the app does), and the server checks every command again.
   - A run row is its status as a word and a shape, its rule's name, why its last attempt failed as a code, how often it was retried, its attempts, and, folded, its history.
 - **The stream is one, for the workspace shown, and goes with it.**
   - It is reflexr's stream alone, opened for the workspace chosen, not artifactr's.
   - The page is keyed by the tenant and the workspace, so choosing another closes the stream and opens another, and leaving Runs closes it; there is never more than one open.
   - It reconnects from where it was after a drop, reconnects with each refreshed token, and closes when the session ends, as the app's streams do. A closed stream is said, and the page asks for a reload.
-  - It replays the workspace's log on opening, as the app's does, so a workspace with a long log takes longer to show its runs; a snapshot read could follow if that proves slow.
+  - Its hello asks for the run events alone (`run_started`, `run_retrying`, `run_requeued`, `run_succeeded`, `run_dead_lettered`, `run_cancelled`, `run_skipped`), which is all that Runs' store builds a run from. So the replay is of a workspace's runs, not its whole log, and the bodies of the application's events, which may hold what people said, never reach the admin's browser: the stream fails closed. A test holds the hello.
+  - A stream that is refused for good (4400, 4401 or 4403), or closed, settles any command still unanswered as closed, and a command sent after says so at once, so a confirmed action never waits for ever.
+  - While it is connecting the page says it is reading; after ten seconds without a welcome, as when reflexr is down, it says the runs can't be reached and that it keeps trying. When it has ended, the page says so in words of its own, never in the server's, which can echo what was sent.
+  - `RunStreams` is keyed by the tenant and the workspace itself, so a stream and what was asked of it never carry over, whoever renders it.
 - **Each action is confirmed and carried out once.**
   - Retry, Skip and Cancel each open an alert dialog that names the rule, the run and its attempts, says what the action does and what it can't undo, and has the action as its confirm. Skip and Cancel ask for an optional reason of at most 500 characters. Retry is in the primary colour; the others in the danger colour.
-  - A command is sent only on confirming, on the stream, with a `command_id` of its own. If the connection ends before the server answers, the store sends it again under the same id when it reconnects, and if the person tries again after the stream said so, the same id is sent, so the server carries it out once. A refusal ends that id, and a new try is a new command.
+  - A command is sent only on confirming, on the stream, with a `command_id` of its own, which lasts as long as the dialog that asked for it is open. If the connection ends before the server answers, the store sends it again under the same id when it reconnects, and if the person tries again in that dialog after the stream said so, the same id is sent, so the server carries it out once. Any answer ends the id, a refusal included, and so does the dialog closing or being dismissed: a later intention is a new command under a new id, never one the server may answer from an earlier time, which would say "done" for a run that has dead-lettered again since.
+  - Submitting the dialog again while the action is under way sends nothing more. When the button that opened a dialog is gone as it closes, since a retry takes the run from the list of those needing attention, focus goes to the list's heading, not to the page.
   - A refusal is said in the dialog, which stays: forbidden, no such run, a run that has changed (what it is now is in the row), or the server's own message. The run's row updates from the log, not from the answer.
 - **What people did to a run stays with it.** The store keeps, for each run, the requeues, skips and cancels with their actor, time and reason, and the row lists them under "History". It is the log's own record, which reflexr keeps; admin adds no audit of its own, and grantr's Audit doesn't show these.
+- **A run's last failure is a code, and is let go when the run is retried or succeeds.** A tenant admin sees `last failure: guardrail_blocked` only while it holds.
 - **A run's error is not shown.** An action's error message can hold what a person or a model said, so the store keeps only the stable `reason` code the run failed with, and never the error. The run read in reflexr's own surfaces has the error for a person who needs it, which is the tenant's own data.
-- **`RunList` and the rule-run status badge are `ui`'s,** moved from the app's Runs, which uses them as before. `ConfirmDialog` can ask for a reason and have a calm confirm.
+- **`RunList` and the rule-run status badge are `ui`'s,** moved from the app's Runs, which uses them as before. `ConfirmDialog` can ask for a reason, with a count of its characters, and have a calm confirm, for an action that loses nothing but is confirmed all the same, such as running something again.
 - **The scenarios:** a ticket that fails is published as bob, and its run is waited for until it is dead-lettered. One asks to retry and thinks better of it: the run is as it was, with no history. Retrying, skipping with a reason and cancelling with a reason each show the run's history, with the reason; a skipped run leaves the runs that need attention and is in the list of every state; and the page says which dead letters these are. The viewer's refusal is the app's scenario, which holds the server's check.
 
 ## Options considered

@@ -23,6 +23,8 @@ export type Known = v1.LoggedEvent extends infer E
 /** What a person did to a run: made it runnable again, skipped it, or cancelled it. */
 export interface Intervention {
   readonly kind: "retried" | "skipped" | "cancelled";
+  /** Where the log recorded it: no two steps share one. */
+  readonly seq: number;
   /** Who did it, as the log recorded. */
   readonly actor: v1.EventFrame["actor"];
   /** When, as the log recorded: an ISO time. */
@@ -96,11 +98,6 @@ function withRule(state: Workspace, name: string, change: Partial<Rule>): Worksp
   return { ...state, rules: { ...state.rules, [name]: { ...rule, ...change } } };
 }
 
-function ended(status: Run["status"]) {
-  return (state: Workspace, event: { readonly run_id: string }): Workspace =>
-    withRun(state, event.run_id, { status });
-}
-
 /** A run a person changed: its new status, if any, and what they did, with who and when. */
 function intervened(
   kind: Intervention["kind"],
@@ -115,6 +112,7 @@ function intervened(
     const history = state.runs[event.run_id]?.history ?? [];
     const step: Intervention = {
       kind,
+      seq: envelope.seq,
       actor: envelope.actor,
       at: envelope.ts,
       reason: event.reason ?? null,
@@ -154,8 +152,11 @@ const handlers: Handlers = {
     }),
   "reflexr:run_requeued": intervened("retried", "pending", (state, id) => ({
     retries: (state.runs[id]?.retries ?? 0) + 1,
+    // A new set of attempts: why the last failed is no longer the news.
+    reason: null,
   })),
-  "reflexr:run_succeeded": ended("succeeded"),
+  "reflexr:run_succeeded": (state, event) =>
+    withRun(state, event.run_id, { status: "succeeded", reason: null }),
   "reflexr:run_dead_lettered": (state, event) =>
     withRun(state, event.run_id, { status: "dead_lettered", reason: event.reason ?? null }),
   "reflexr:run_cancelled": intervened("cancelled", "cancelled"),
@@ -175,6 +176,21 @@ const handlers: Handlers = {
     return withRun(state, run.id, { feedback: [...run.feedback, feedback] });
   },
 };
+
+/**
+ * The events a run is built from, which a stream asks for in its hello and no others: a screen
+ * that shows runs alone then gets none of the bodies of the application's events, which may hold
+ * what people said (portalr ADR-0032).
+ */
+export const RUN_EVENTS: readonly Known["type"][] = [
+  "reflexr:run_started",
+  "reflexr:run_retrying",
+  "reflexr:run_requeued",
+  "reflexr:run_succeeded",
+  "reflexr:run_dead_lettered",
+  "reflexr:run_cancelled",
+  "reflexr:run_skipped",
+];
 
 /** Whether the event is one of reflexr's own that this version knows. */
 export function isKnown(event: v1.LoggedEvent): event is Known {

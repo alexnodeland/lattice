@@ -60,6 +60,8 @@ Then("the run is {string}", async ({ page, made }, status: string) => {
 });
 
 Then("the run has no history", async ({ page, made }) => {
+  // The row is there, so that none is a finding and not an empty page.
+  await expect(runOf(page, made)).toBeVisible();
   await expect(runOf(page, made).getByText(/^History \(/)).toHaveCount(0);
 });
 

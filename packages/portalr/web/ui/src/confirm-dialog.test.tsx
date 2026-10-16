@@ -173,3 +173,47 @@ test("a reason is asked for only when it is asked for, and a calm action is not 
   ).backgroundColor;
   expect(calm).not.toBe(hot);
 });
+
+test("however often it is submitted while it is under way, the action is sent once", async () => {
+  let finish: () => void = () => undefined;
+  const onConfirm = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const screen = await render(<Archive onConfirm={onConfirm} />);
+  await screen.getByRole("button", { name: "Archive" }).click();
+  const form = screen.getByRole("alertdialog").element().querySelector("form") as HTMLFormElement;
+  form.requestSubmit();
+  form.requestSubmit();
+  form.requestSubmit();
+  expect(onConfirm).toHaveBeenCalledTimes(1);
+  finish();
+  await expect.element(screen.getByRole("alertdialog")).not.toBeInTheDocument();
+  expect(onConfirm).toHaveBeenCalledTimes(1);
+});
+
+test("a reason says how much of its room is used, and the dialog says when it opens and closes", async () => {
+  const onOpenChange = vi.fn();
+  const screen = await render(
+    <ConfirmDialog
+      label="Skip"
+      title="Skip this run?"
+      confirm="Skip the run"
+      asking="Reason (optional)"
+      onOpenChange={onOpenChange}
+      onConfirm={async () => undefined}
+    >
+      The run is given up on.
+    </ConfirmDialog>,
+  );
+  await screen.getByRole("button", { name: "Skip", exact: true }).click();
+  expect(onOpenChange).toHaveBeenLastCalledWith(true);
+  const dialog = screen.getByRole("alertdialog");
+  await expect.element(dialog.getByText("0 of 500 characters")).toBeVisible();
+  await dialog.getByRole("textbox", { name: "Reason (optional)" }).fill("abc");
+  await expect.element(dialog.getByText("3 of 500 characters")).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  expect(onOpenChange).toHaveBeenLastCalledWith(false);
+});

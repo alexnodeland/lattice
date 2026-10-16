@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type * as v1 from "./generated/reflexr.v1";
-import { apply, reflexr, type Workspace } from "./reflexr";
+import { apply, RUN_EVENTS, reflexr, type Workspace } from "./reflexr";
 
 function replay(...events: v1.EventFrame["event"][]): Workspace {
   return events
@@ -59,6 +59,7 @@ test("a run moves through its statuses", () => {
     history: [
       {
         kind: "retried",
+        seq: 4,
         actor: { kind: "system", name: "reflexr" },
         at: "2026-10-12T00:00:00Z",
         reason: null,
@@ -152,18 +153,21 @@ test("what people did to a run is kept with who, when and why", () => {
   expect(state.runs.r?.history).toEqual([
     {
       kind: "skipped",
+      seq: 1,
       actor: { kind: "user", id: "alice" },
       at: "2026-10-12T00:00:01Z",
       reason: "known",
     },
     {
       kind: "retried",
+      seq: 2,
       actor: { kind: "user", id: "bob" },
       at: "2026-10-12T00:00:02Z",
       reason: null,
     },
     {
       kind: "cancelled",
+      seq: 3,
       actor: { kind: "user", id: "carol" },
       at: "2026-10-12T00:00:03Z",
       reason: null,
@@ -171,4 +175,42 @@ test("what people did to a run is kept with who, when and why", () => {
   ]);
   expect(state.runs.r?.status).toBe("cancelled");
   expect(state.runs.r?.retries).toBe(1);
+});
+
+test("a retry or a success ends why the last attempt failed", () => {
+  const failed = [
+    { type: "reflexr:run_started", run_id: "r", rule: "x", attempt: 1 },
+    {
+      type: "reflexr:run_dead_lettered",
+      run_id: "r",
+      rule: "x",
+      attempts: 1,
+      error: "e",
+      reason: "timeout",
+    },
+  ] as v1.EventFrame["event"][];
+  expect(replay(...failed).runs.r?.reason).toBe("timeout");
+  expect(
+    replay(...failed, { type: "reflexr:run_requeued", run_id: "r", rule: "x" }).runs.r?.reason,
+  ).toBeNull();
+  expect(
+    replay(...failed, { type: "reflexr:run_succeeded", run_id: "r", rule: "x" }).runs.r?.reason,
+  ).toBeNull();
+});
+
+test("the events a stream of runs asks for are the ones that make a run, and are all known", () => {
+  expect(RUN_EVENTS.every((type) => type.startsWith("reflexr:run_"))).toBe(true);
+  // Each of them changes a run in the store, which only an event with a handler does.
+  for (const type of RUN_EVENTS) {
+    const state = replay({
+      type,
+      run_id: "r",
+      rule: "x",
+      attempt: 1,
+      attempts: 1,
+      error: "e",
+      next_attempt_at: "2026-10-12T00:00:00Z",
+    } as v1.EventFrame["event"]);
+    expect(state.runs.r, type).toBeDefined();
+  }
 });

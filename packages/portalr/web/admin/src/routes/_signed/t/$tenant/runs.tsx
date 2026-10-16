@@ -1,3 +1,4 @@
+import type { Snapshot } from "@portalr/client";
 import { allowedIn, type Reflexr, workspaceOf } from "@portalr/client";
 import {
   ConfirmDialog,
@@ -16,6 +17,7 @@ import {
   type ErrorComponentProps,
   type SearchSchemaInput,
 } from "@tanstack/react-router";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { opening } from "../../../../access";
 import { ReadFailed } from "../../../../read-failed";
 import { RunStreams, useAct, useRuns } from "../../../../run-streams";
@@ -24,11 +26,14 @@ import {
   actorName,
   commandFor,
   DONE,
+  firstOf,
   GRANTS,
   listed,
   offered,
+  PATIENCE,
   refusedAs,
   SHOWN,
+  type Show,
   type Shown,
   shownOf,
 } from "../../../../runs";
@@ -52,7 +57,7 @@ export const Route = createFileRoute("/_signed/t/$tenant/runs")({
     const workspaces = await queryClient.ensureQueryData(
       queries.artifactr.workspaces(params.tenant),
     );
-    const shown = deps.workspace ?? [...workspaces].sort()[0];
+    const shown = deps.workspace ?? firstOf(workspaces);
     if (shown !== undefined) {
       await queryClient.ensureQueryData(
         allowedIn(queries, params.tenant, workspaceOf(shown), GRANTS),
@@ -81,7 +86,8 @@ function RunsPage() {
   const navigate = Route.useNavigate();
   const { data: workspaces } = useSuspenseQuery(queries.artifactr.workspaces(tenant));
   const names = [...workspaces].sort();
-  const workspace = search.workspace ?? names[0];
+  const workspace = search.workspace ?? firstOf(workspaces);
+  const known = workspace !== undefined && names.includes(workspace);
   return (
     <div className="flex flex-col gap-6">
       {HEADER}
@@ -92,14 +98,14 @@ function RunsPage() {
           <div className="grid gap-3 sm:grid-cols-2 sm:max-w-xl">
             <SelectField
               label="Workspace"
-              value={workspace}
+              value={known ? workspace : ""}
               onChange={(event) =>
                 void navigate({ search: shownOf({ ...search, workspace: event.target.value }) })
               }
-              options={(names.includes(workspace) ? names : [workspace, ...names]).map((name) => ({
-                value: name,
-                label: name,
-              }))}
+              options={[
+                ...(known ? [] : [{ value: "", label: "Choose a workspace" }]),
+                ...names.map((name) => ({ value: name, label: name })),
+              ]}
             />
             <SelectField
               label="Show"
@@ -113,13 +119,13 @@ function RunsPage() {
             />
           </div>
           <DeadLetters />
-          {/* Another tenant's or another workspace's is another page: its own stream, and nothing asked. */}
-          <Workspace
-            key={`${tenant}:${workspace}`}
-            tenant={tenant}
-            workspace={workspace}
-            show={search.show}
-          />
+          {known ? (
+            <Workspace tenant={tenant} workspace={workspace} show={search.show} />
+          ) : (
+            <EmptyState title="No such workspace">
+              This tenant has no workspace by that name. Choose one of its own.
+            </EmptyState>
+          )}
         </>
       )}
     </div>
@@ -136,15 +142,7 @@ function DeadLetters() {
   );
 }
 
-function Workspace({
-  tenant,
-  workspace,
-  show,
-}: {
-  tenant: string;
-  workspace: string;
-  show: "attention" | "all";
-}) {
+function Workspace({ tenant, workspace, show }: { tenant: string; workspace: string; show: Show }) {
   const { config, signed } = Route.useRouteContext();
   return (
     <RunStreams surfaces={config.surfaces} signed={signed} tenant={tenant} workspace={workspace}>
@@ -153,17 +151,10 @@ function Workspace({
   );
 }
 
-function Runs({
-  tenant,
-  workspace,
-  show,
-}: {
-  tenant: string;
-  workspace: string;
-  show: "attention" | "all";
-}) {
+function Runs({ tenant, workspace, show }: { tenant: string; workspace: string; show: Show }) {
   const { queries } = Route.useRouteContext();
   const snapshot = useRuns();
+  const heading = useRef<HTMLHeadingElement>(null);
   const { data: allowed } = useSuspenseQuery(
     allowedIn(queries, tenant, workspaceOf(workspace), GRANTS),
   );
@@ -175,12 +166,14 @@ function Runs({
     title: <Title run={run} />,
     attempts: run.attempt,
     feedback: null,
-    actions: <Actions run={run} actions={offered(run.status, allowed)} />,
+    actions: <Actions run={run} actions={offered(run.status, allowed)} heading={heading} />,
   }));
   return (
     <section aria-labelledby="runs" className="flex flex-col gap-3">
-      <SectionTitle id="runs">Rules' runs in {workspace}</SectionTitle>
-      <Connection status={snapshot.status} error={snapshot.error} />
+      <SectionTitle id="runs" tabIndex={-1} ref={heading}>
+        Rules' runs in {workspace}
+      </SectionTitle>
+      <Connection status={snapshot.status} />
       {snapshot.status === "live" && runs.length === 0 ? (
         <EmptyState title={show === "attention" ? "No run needs attention" : "No runs"}>
           {show === "attention"
@@ -194,23 +187,43 @@ function Runs({
   );
 }
 
-/** Where the stream is, until it is live; or that it ended. */
-function Connection({ status, error }: { status: string; error: string | null }) {
+/**
+ * Where the stream is, until it is live; that it can't get through, if it has been connecting for
+ * a while, as it does while reflexr is down; or that it ended. Never what the server said: that
+ * can echo what was sent.
+ */
+function Connection({ status }: { status: Snapshot<unknown>["status"] }) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    setSlow(false);
+    if (status === "live" || status === "closed") {
+      return;
+    }
+    const timer = setTimeout(() => setSlow(true), PATIENCE);
+    return () => clearTimeout(timer);
+  }, [status]);
   if (status === "closed") {
     return (
-      <p role="alert">
-        The connection to this workspace ended{error ? `: ${error}` : ""}. Reload the page to
-        connect again.
-      </p>
+      <p role="alert">The connection to this workspace ended. Reload the page to connect again.</p>
     );
   }
-  return status === "live" ? null : <p role="status">Reading the workspace's runs…</p>;
+  if (status === "live") {
+    return null;
+  }
+  return slow ? (
+    <p role="alert">
+      The workspace's runs can't be reached: reflexr may be down. It keeps trying, and they appear
+      once it answers.
+    </p>
+  ) : (
+    <p role="status">Reading the workspace's runs…</p>
+  );
 }
 
 /** A run's rule, why it last failed, how often it was retried, and what people did to it. */
 function Title({ run }: { run: Reflexr.Run }) {
   return (
-    <span className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1">
       <code className="font-mono">{run.rule}</code>
       {run.reason && <span className="text-muted text-xs">last failure: {run.reason}</span>}
       {run.retries > 0 && (
@@ -223,7 +236,7 @@ function Title({ run }: { run: Reflexr.Run }) {
           <summary className="cursor-pointer text-muted">History ({run.history.length})</summary>
           <ul className="mt-1 flex flex-col gap-1">
             {run.history.map((step) => (
-              <li key={`${step.at}-${step.kind}`}>
+              <li key={step.seq}>
                 {actorName(step.actor)} {DONE[step.kind]} <Moment at={step.at} />
                 {step.reason ? <span className="text-muted">: {step.reason}</span> : null}
               </li>
@@ -231,7 +244,7 @@ function Title({ run }: { run: Reflexr.Run }) {
           </ul>
         </details>
       )}
-    </span>
+    </div>
   );
 }
 
@@ -256,25 +269,56 @@ const WORDS: Record<Action, { label: string; title: string; confirm: string; bod
   },
 };
 
-/** A run's actions, each confirmed, and sent once. */
-function Actions({ run, actions }: { run: Reflexr.Run; actions: Action[] }) {
+/**
+ * A run's actions, each confirmed, and sent once. A retry makes the run something no list of
+ * those needing attention holds, and a skip takes it from that list, so the button that opened the
+ * dialog may be gone when it closes: focus then goes to the list's heading, and not to the page.
+ */
+function Actions({
+  run,
+  actions,
+  heading,
+}: {
+  run: Reflexr.Run;
+  actions: Action[];
+  heading: RefObject<HTMLElement | null>;
+}) {
   const act = useAct(refusedAs);
-  return actions.map((action) => (
-    <ConfirmDialog
-      key={action}
-      label={WORDS[action].label}
-      name={`${WORDS[action].label} run ${run.id}`}
-      title={WORDS[action].title}
-      confirm={WORDS[action].confirm}
-      calm={action === "retry"}
-      {...(action === "retry" ? {} : { asking: "Reason (optional)" })}
-      onConfirm={(reason) => act(commandFor(action, run.id, reason))}
-    >
-      <p>
-        <code className="font-mono">{run.rule}</code>, {run.id}: attempt {run.attempt}
-        {run.reason ? `, last failure ${run.reason}` : ""}.
-      </p>
-      <p>{WORDS[action].body}</p>
-    </ConfirmDialog>
-  ));
+  return actions.map((action) => {
+    const command = (reason: string) => commandFor(action, run.id, reason);
+    return (
+      <ConfirmDialog
+        key={action}
+        label={WORDS[action].label}
+        name={`${WORDS[action].label} run ${run.id}`}
+        title={WORDS[action].title}
+        confirm={WORDS[action].confirm}
+        calm={action === "retry"}
+        {...(action === "retry" ? {} : { asking: "Reason (optional)" })}
+        onOpenChange={(open) => {
+          if (!open) {
+            act.release(command(""));
+          }
+        }}
+        onConfirm={async (reason) => {
+          await act.send(command(reason));
+          // After the dialog has closed, and focus has gone back where it can: if it can't, here.
+          setTimeout(() => {
+            if (!document.activeElement || document.activeElement === document.body) {
+              heading.current?.focus();
+            }
+          }, FOCUS_AFTER);
+        }}
+      >
+        <p>
+          <code className="font-mono">{run.rule}</code>, {run.id}: attempt {run.attempt}
+          {run.reason ? `, last failure ${run.reason}` : ""}.
+        </p>
+        <p>{WORDS[action].body}</p>
+      </ConfirmDialog>
+    );
+  });
 }
+
+/** How long after an action to look for where focus is: past the dialog's closing, in ms. */
+const FOCUS_AFTER = 400;

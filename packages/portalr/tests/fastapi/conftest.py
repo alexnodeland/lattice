@@ -4,7 +4,7 @@ acme's owner is alice, and bob is its member with no role; globex's owner is car
 deployment's operator. Every tool is a stand-in whose answers a test scripts.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Collection
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,12 +13,13 @@ import pytest
 from fastapi import FastAPI
 from starlette.requests import HTTPConnection
 
-from grantr.core import User
+from grantr.core import ServicePrincipal, User
 from grantr.fastapi import Caller, Unauthorized
 from grantr.grants import Grants, InMemoryStorage
 from portalr.actions import ACTIONS
 from portalr.fastapi import Site, portalr_router
 from portalr.invites import Invite
+from portalr.people import People
 from portalr.readers import Grafana, Langfuse, LiteLLM, Loki, Prometheus, Readers, Tempo
 from tests.tools import Tool
 
@@ -90,14 +91,53 @@ def invite(invited: list[str]) -> Invite:
     return invite
 
 
+EMAILS = {
+    "alice": "alice@acme.test",
+    "bob": "bob@acme.test",
+    "carol": "carol@globex.test",
+    "ops": "ops@deployment.test",
+    "noemail": "",
+}
+"""Auth's emails by user id: one user has none."""
+
+
+class Directory:
+    """The people hook's stand-in: it answers from ``EMAILS`` and keeps the ids it was asked."""
+
+    def __init__(self) -> None:
+        self.asked: list[list[str]] = []
+
+    async def __call__(self, ids: Collection[str]) -> dict[str, str]:
+        self.asked.append(list(ids))
+        return {each: EMAILS[each] for each in ids if EMAILS.get(each)}
+
+
+@pytest.fixture
+def directory() -> Directory:
+    return Directory()
+
+
+@pytest.fixture
+def people(directory: Directory) -> People:
+    return directory
+
+
 async def resolve_actor(connection: HTTPConnection) -> Caller:
     """A caller named by ``X-User``, bound to one tenant if ``X-Key-Tenant`` says, as a key is."""
+    if principal := connection.headers.get("x-principal"):
+        return Caller(ServicePrincipal(id=principal), connection.headers.get("x-key-tenant"))
     if user := connection.headers.get("x-user"):
         return Caller(User(id=user), connection.headers.get("x-key-tenant"))
     raise Unauthorized
 
 
-def app_for(grants: Grants, readers: Readers, invite: Invite | None, ui: Path) -> FastAPI:
+def app_for(
+    grants: Grants,
+    readers: Readers,
+    invite: Invite | None,
+    ui: Path,
+    people: People | None = None,
+) -> FastAPI:
     app = FastAPI()
     router = portalr_router(
         resolve_actor=resolve_actor,
@@ -106,6 +146,7 @@ def app_for(grants: Grants, readers: Readers, invite: Invite | None, ui: Path) -
         invite=invite,
         site=SITE,
         ui=ui,
+        people=people,
     )
     app.include_router(router, prefix="/portalr")
     return app
@@ -117,4 +158,16 @@ async def client(
 ) -> AsyncIterator[httpx.AsyncClient]:
     transport = httpx.ASGITransport(app=app_for(grants, stack.readers(), invite, ui))
     async with httpx.AsyncClient(transport=transport, base_url="http://app/portalr") as client:
+        yield client
+
+
+@pytest.fixture
+async def naming_client(
+    grants: Grants, stack: Stack, invite: Invite, ui: Path, people: People
+) -> AsyncIterator[httpx.AsyncClient]:
+    """The same application, with a people hook."""
+    app = app_for(grants, stack.readers(), invite, ui, people)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://app/portalr"
+    ) as client:
         yield client

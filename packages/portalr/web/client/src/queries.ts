@@ -499,7 +499,7 @@ export function createQueries(api: Api) {
     portalr: {
       /**
        * The emails of people by their ids, as far as the server lets the reader see them (portalr
-       * ADR-0036): at most `PEOPLE_MAX` ids to a request, and those the server names, by id. It
+       * ADR-0038): at most `PEOPLE_MAX` ids to a request, and those the server names, by id. It
        * is asked in a tenant, or by an operator with none. It is kept five minutes, in memory,
        * is not tried again, and is not read again as the window regains focus.
        */

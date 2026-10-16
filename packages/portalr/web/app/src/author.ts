@@ -1,5 +1,5 @@
 /**
- * Who posted a message, as the thread names them (portalr ADR-0036): the reader as "You", a person
+ * Who posted a message, as the thread names them (portalr ADR-0038): the reader as "You", a person
  * by the name they posted under, else by their email where the server names them, else by a short
  * id. The emails are looked up when a message is drawn and kept nowhere else: the stream's state
  * holds the actors as the server sent them.

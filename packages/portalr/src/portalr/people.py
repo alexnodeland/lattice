@@ -2,7 +2,7 @@
 
 grantr knows a person by their Supabase Auth user id, a UUID, and holds nothing else about them.
 portalr's router asks this hook for the emails of ids it has already checked the caller may see
-(portalr ADR-0036). An email is personal data, so nothing here logs one, puts one in an error, or
+(portalr ADR-0038). An email is personal data, so nothing here logs one, puts one in an error, or
 keeps one beyond a short, bounded, in-memory cache. An id that can't be resolved is left out of
 the answer, and the UIs show a short id for it.
 """

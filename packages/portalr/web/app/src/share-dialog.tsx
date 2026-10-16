@@ -2,7 +2,7 @@
  * Sharing a thread: who holds a role on it, each with Revoke, asked first (portalr ADR-0021), and a
  * role granted to a person, as viewer or editor (portalr ADR-0022). grantr names people by id; the
  * dialog shows their email where the server names them, and a short id where it does not
- * (portalr ADR-0036).
+ * (portalr ADR-0038).
  */
 
 import { type Answer, type GrantrApi, type Names, refusal, shortId } from "@portalr/client";

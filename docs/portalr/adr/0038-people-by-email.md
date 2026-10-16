@@ -1,4 +1,4 @@
-# ADR-0036: People by email, not by id
+# ADR-0038: People by email, not by id
 
 **Status:** Accepted
 **Date:** 2026-10-16

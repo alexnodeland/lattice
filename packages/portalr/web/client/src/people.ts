@@ -1,5 +1,5 @@
 /**
- * People by email, not by the id grantr knows them by (portalr ADR-0036).
+ * People by email, not by the id grantr knows them by (portalr ADR-0038).
  *
  * With real Supabase a person's id is their auth user's UUID. The server names the ones the
  * reader may see, so a screen asks for the ids it shows and calls what comes back a `Names`:

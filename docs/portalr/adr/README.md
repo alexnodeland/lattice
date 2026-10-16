@@ -27,9 +27,9 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0019](0019-the-kits-look.md) | The kit's look: a side rail, labelled icons, raised surfaces and quiet statuses | Accepted |
 | [0020](0020-the-rules-area.md) | The Rules area: stored rules as reflexr's JSON, sent over its REST | Accepted |
 | [0021](0021-the-areas-on-the-frame-and-what-admin-needs.md) | The areas on the frame, a danger colour, budget badges, and what admin's frame decides | Accepted |
-| [0022](0022-restricting-and-sharing-a-thread.md) | Restricting and sharing a thread, from its menu | Accepted, amended by 0036 |
+| [0022](0022-restricting-and-sharing-a-thread.md) | Restricting and sharing a thread, from its menu | Accepted, amended by 0038 |
 | [0023](0023-admins-shell-and-home.md) | admin's shell and Home: its own tenant, every tenant for operators, and a card per read | Accepted |
-| [0024](0024-access-members-groups-and-keys.md) | Access: members, groups and keys, each where grantr allows its read | Accepted, amended by 0036 |
+| [0024](0024-access-members-groups-and-keys.md) | Access: members, groups and keys, each where grantr allows its read | Accepted, amended by 0038 |
 | [0025](0025-access-roles-and-grants.md) | Access: roles and grants, on grantr's catalog | Accepted |
 | [0026](0026-audit.md) | Audit: grantr's log, newest on top, filtered by type and maker | Accepted |
 | [0027](0027-feedback-and-evaluations.md) | Feedback and evaluations, summed by day, and the first charts | Accepted |
@@ -40,6 +40,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0032](0032-runs-in-admin.md) | Runs in admin, with Retry, Skip and Cancel | Accepted |
 | [0033](0033-third-party-notices-for-the-bundled-javascript.md) | Third-party notices for the JavaScript the UIs bundle | Accepted |
 | [0034](0034-tenants-and-the-deployments-audit.md) | Tenants in admin, created by email, and the deployment's audit log | Accepted |
-| [0036](0036-people-by-email.md) | People by email, not by id | Accepted |
+| [0038](0038-people-by-email.md) | People by email, not by id | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

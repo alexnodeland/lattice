@@ -118,13 +118,13 @@ def test_the_space_is_planned_and_refused_alike(outcomes: list[tuple[rp.Run, Out
     assert 0 < refused < len(outcomes)
 
 
-def test_nothing_is_written_but_a_release_on_its_push_or_a_tag_dispatched_to_publish(
+def test_a_release_on_its_push_or_a_tag_dispatched_to_publish_writes_and_nothing_else(
     outcomes: list[tuple[rp.Run, Outcome]],
 ) -> None:
     for run, made in planned(outcomes):
-        if made.write and (made.packages or made.stackr):
-            release = run.event == "push" and bool(run.released)
-            assert release or (on_its_tag(run) and run.mode == "publish"), run
+        writes = made.write and bool(made.packages or made.stackr)
+        release = run.event == "push" and bool(run.released)
+        assert writes == (release or (on_its_tag(run) and run.mode == "publish")), run
         if run.event == "workflow_dispatch":
             assert made.write == (run.mode == "publish"), run
 
@@ -160,11 +160,13 @@ def test_stackr_and_a_release_of_no_wheel_publish_nothing(
 def test_packages_are_published_after_what_they_require(
     outcomes: list[tuple[rp.Run, Outcome]],
 ) -> None:
+    # The requirements are read with the script's own readers, but not through STAGES.
     names = {rp.distribution(path): path for path in rp.WHEELS}
     requires = {
         path: {names[name] for name in rp.requirement_names(path) if name in names} - {path}
         for path in rp.WHEELS
     }
+    assert any(requires.values()), "some package requires another, or this tests nothing"
     for run, made in planned(outcomes):
         assert sorted(made.ordered) == sorted(made.packages), run
         for position, path in enumerate(made.ordered):

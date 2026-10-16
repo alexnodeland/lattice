@@ -134,7 +134,12 @@ test("retrying's shape is apart from queued's and from waiting's, so colour is n
   );
   const shape = (word: string) => {
     const style = getComputedStyle(screen.getByText(word).element().firstElementChild as Element);
-    return [style.borderTopStyle, style.borderRadius, style.transform, style.backgroundColor === "rgba(0, 0, 0, 0)"].join("|");
+    return [
+      style.borderTopStyle,
+      style.borderRadius,
+      style.transform,
+      style.backgroundColor === "rgba(0, 0, 0, 0)",
+    ].join("|");
   };
   const shapes = new Set([shape("Retrying"), shape("Queued"), shape("Waiting for you")]);
   expect(shapes.size).toBe(3);

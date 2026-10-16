@@ -256,6 +256,8 @@ test("by default a series is solid and a line unbroken; colour-blind mode hatche
   const hatched = getComputedStyle(document.body).getPropertyValue("--chart-hatched").trim();
   expect(Number(hatched)).toBeGreaterThan(0);
   expect(probe(cvd())).toEqual([hatched, "none", "6 4", "2 3", "0", "0", "45deg"]);
+});
+
 test("the danger colour is the status red: one red for a failed run and a destructive action", () => {
   expect(token("danger")).toBe(token("status-failed"));
 });
@@ -263,7 +265,10 @@ test("the danger colour is the status red: one red for a failed run and a destru
 test("the status colours stand out from the surface and the paper, as marks", () => {
   for (const status of ["status-failed", "status-warn"]) {
     for (const ground of GROUNDS) {
-      expect(contrast(token(status), token(ground)), `${status} on ${ground}`).toBeGreaterThanOrEqual(3);
+      expect(
+        contrast(token(status), token(ground)),
+        `${status} on ${ground}`,
+      ).toBeGreaterThanOrEqual(3);
     }
   }
 });

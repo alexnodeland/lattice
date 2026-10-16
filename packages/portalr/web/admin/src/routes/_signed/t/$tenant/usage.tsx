@@ -3,7 +3,9 @@ import {
   BarChart,
   DonutChart,
   EmptyState,
+  formatDay,
   ItemTable,
+  Num,
   PageHeader,
   SegmentedFilter,
   StatusBadge,
@@ -25,7 +27,6 @@ import {
   MOST_WORKSPACES,
   partsOf,
   type Shown,
-  short,
   shownOf,
   trackerLabel,
 } from "../../../../usage";
@@ -138,8 +139,10 @@ function Spent({ usage }: { usage: Usage }) {
   return (
     <>
       <p className="text-muted text-sm">
-        <span className="font-semibold text-fg text-xl tabular-nums">{dollars(spent)}</span> in{" "}
-        {numbers.format(requests)} requests over the window.
+        <span className="font-semibold text-fg text-xl">
+          <Num>{dollars(spent)}</Num>
+        </span>{" "}
+        in {numbers.format(requests)} requests over the window.
       </p>
       {share != null && budget && (
         <Tracker
@@ -156,7 +159,7 @@ function Spent({ usage }: { usage: Usage }) {
         series={[{ key: "spend", name: "Spend" }]}
         data={usage.days.map((day) => ({ day: day.day, spend: day.spend }))}
         format={dollars}
-        tick={short}
+        tick={formatDay}
       />
     </>
   );

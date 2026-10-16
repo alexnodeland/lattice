@@ -113,7 +113,8 @@ test("the week's spend, each day against its share, and each workspace's part", 
     .getByRole("navigation", { name: "Tenant" })
     .getByRole("link", { name: "Usage" })
     .click();
-  await expect.element(screen.getByText("$7.00")).toBeVisible();
+  // The window's spend is the headline, and the donut's total, at the centre of its ring.
+  await expect.element(screen.getByText("$7.00").first()).toBeVisible();
   const tracker = screen.getByRole("figure", {
     name: "Each day's spend against its share of the budget: $3.00 a day, of $90.00 over 30 days",
   });
@@ -130,7 +131,7 @@ test("the week's spend, each day against its share, and each workspace's part", 
       .getByRole("listitem")
       .elements()
       .map((item) => item.textContent),
-  ).toEqual(["notes$4.00 · 57%", "No workspace$2.00 · 29%", "plans$1.00 · 14%"]);
+  ).toEqual(["notes, $4.00, 57%", "No workspace, $2.00, 29%", "plans, $1.00, 14%"]);
   await expect.element(screen.getByText(/has no workspace split/)).toBeVisible();
   // The tenant's workspaces, as artifactr lists them, in order.
   expect(reads.at(-1)?.getAll("workspaces")).toEqual(["notes", "plans"]);
@@ -196,7 +197,7 @@ test("a partial read says so, with a badge", async () => {
       .getByRole("listitem")
       .elements()
       .map((item) => item.textContent),
-  ).toEqual(["notes$4.00 · 80%", "plans$1.00 · 20%"]);
+  ).toEqual(["notes, $4.00, 80%", "plans, $1.00, 20%"]);
 });
 
 test("LiteLLM not configured says so", async () => {

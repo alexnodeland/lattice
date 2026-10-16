@@ -3,6 +3,7 @@ import {
   BarChart,
   DonutChart,
   EmptyState,
+  formatDay,
   ItemTable,
   LineChart,
   MAX_SERIES,
@@ -34,9 +35,6 @@ const HEADER = <PageHeader title="Feedback" meta="What people and evaluators sai
 
 /** A mean as people read it: two places. */
 const mean = (value: number) => value.toFixed(2);
-
-/** A day as an axis reads it, in UTC: `10-13`. */
-const short = (day: string) => day.slice(5);
 
 /** What the axes and tables call a day: one in UTC, as portalr sums them. */
 const DAY = { key: "day", name: "Day (UTC)" } as const;
@@ -155,12 +153,14 @@ function Charts({ summary, everywhere }: { summary: Summary; everywhere: boolean
             { key: "down", name: "Thumbs down" },
           ]}
           data={summary.days.map((day, at) => ({
-            day: short(day.day),
+            day: day.day,
             up: known(at, day.up),
             down: known(at, day.down),
           }))}
           format={figure}
+          tick={formatDay}
           unknown={unknown}
+          whole
           diverging
         />
       ) : (
@@ -176,7 +176,7 @@ function Charts({ summary, everywhere }: { summary: Summary; everywhere: boolean
           series={drawn.map((evaluation) => ({ key: named(evaluation), name: named(evaluation) }))}
           data={summary.days.map((day, at) =>
             Object.fromEntries([
-              ["day", short(day.day)],
+              ["day", day.day],
               ...drawn.map((evaluation) => [
                 named(evaluation),
                 known(at, evaluation.days[at]?.mean ?? null),
@@ -184,6 +184,7 @@ function Charts({ summary, everywhere }: { summary: Summary; everywhere: boolean
             ]),
           )}
           format={mean}
+          tick={formatDay}
           unknown={unknown}
         />
       ) : (

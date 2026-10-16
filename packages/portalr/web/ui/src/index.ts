@@ -33,6 +33,7 @@ export {
   type Part,
   type Series,
 } from "./chart";
+export { formatDay, formatMoment, formatNumber } from "./chart-theme";
 export {
   CommandButton,
   Composer,
